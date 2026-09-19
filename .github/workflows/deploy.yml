@@ -41,6 +41,7 @@ jobs:
               echo "Required repository variable ${name} is not configured." >&2
               exit 1
             fi
+            echo "Repository variable ${name} is present."
           done
 
       - name: Check out repository
