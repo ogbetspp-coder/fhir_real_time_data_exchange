@@ -16,7 +16,12 @@ ENVIRONMENT="${EMA_FLOW_ENVIRONMENT:-dev}"
 TAG="$(git rev-parse --short=12 HEAD)"
 REPOSITORY="${REGION}-docker.pkg.dev/${PROJECT_ID}/ema-flow"
 
-npm ci --no-audit --no-fund
+if [[ -f package-lock.json ]]; then
+  npm ci --no-audit --no-fund
+else
+  echo "package-lock.json is missing; falling back to npm install." >&2
+  npm install --no-audit --no-fund
+fi
 
 terraform -chdir=infra init -input=false
 terraform -chdir=infra apply \
