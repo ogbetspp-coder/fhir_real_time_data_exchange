@@ -1,8 +1,8 @@
 FROM node:22.14.0-bookworm-slim AS build
 
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package*.json ./
+RUN if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi
 COPY tsconfig.json tsconfig.build.json ./
 COPY src ./src
 RUN npm run build

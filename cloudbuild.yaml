@@ -11,8 +11,15 @@ substitutions:
 steps:
   - id: install
     name: node:22.14.0-bookworm-slim
-    entrypoint: npm
-    args: ["ci"]
+    entrypoint: sh
+    args:
+      - -c
+      - >-
+        if [ -f package-lock.json ]; then
+        npm ci --no-audit --no-fund;
+        else
+        npm install --no-audit --no-fund;
+        fi
 
   - id: standards-integrity
     name: node:22.14.0-bookworm-slim
