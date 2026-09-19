@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(npm ci)",
+      "Bash(terraform fmt *)",
+      "Bash(terraform validate *)"
+    ],
+    "ask": [
+      "Bash(git push *)",
+      "Bash(terraform apply *)",
+      "Bash(terraform destroy *)",
+      "Bash(gcloud *)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./fhir/vendor/**)",
+      "Bash(git reset --hard *)",
+      "Bash(git push --force *)",
+      "Bash(git clean -f*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/shell_guard.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

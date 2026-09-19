@@ -1,0 +1,13 @@
+.git
+.gitignore
+node_modules
+dist
+coverage
+.terraform
+*.tfstate*
+agent-tools
+artifacts
+fhir/vendor
+infra
+docs
+test
