@@ -31,14 +31,18 @@ resource "google_cloud_run_v2_service" "worker" {
           cpu    = "2"
           memory = "2Gi"
         }
-        cpu_idle = false
+        cpu_idle          = false
+        startup_cpu_boost = true
       }
 
+      # The HL7 validator_cli.jar loads four IG packages (including the full HL7
+      # terminology package) on every cold start before it binds its port; this
+      # routinely takes several minutes, well past a 5-minute probe budget.
       startup_probe {
         initial_delay_seconds = 5
         timeout_seconds       = 2
         period_seconds        = 5
-        failure_threshold     = 60
+        failure_threshold     = 180
 
         tcp_socket {
           port = 8090
