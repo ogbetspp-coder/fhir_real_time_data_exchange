@@ -99,7 +99,7 @@ The deployment:
 2. runs Cloud Build quality, standards-integrity, provenance, Terraform, and image builds;
 3. deploys immutable image digests with Binary Authorization enabled;
 4. reconciles the R5 stores and native BigQuery stream through the Healthcare REST API;
-5. imports checksum-pinned profile dependencies and profiles; and
+5. imports checksum-pinned profile cards and profiles; and
 6. seeds `Bundle/synthetic-type2-smpc` in the source store.
 
 The REST reconciliation is intentional: Google’s Healthcare API supports R5, but the current
@@ -110,14 +110,24 @@ resources.
 
 ### GitHub Actions deployment
 
-The deployment workflow runs for pushes to `main` and can also be started manually. It uses
-GitHub's OIDC token with Google Cloud Workload Identity Federation, so no service-account key
-is stored in GitHub. Configure these repository variables:
+The deploy remote is
+[ogbetspp-coder/fhir_real_time_data_exchange](https://github.com/ogbetspp-coder/fhir_real_time_data_exchange).
+The workflow runs for pushes to `main` and can also be started from
+**Actions → Deploy to Google Cloud → Run workflow**.
 
-- `GCP_PROJECT_ID`
-- `GCP_REGION`
-- `GCP_DEPLOY_SERVICE_ACCOUNT`
-- `GCP_WORKLOAD_IDENTITY_PROVIDER`
+It uses GitHub's OIDC token with Google Cloud Workload Identity Federation, so no
+service-account key is stored in GitHub. In that repository, set these Actions variables:
+
+| Variable | Example |
+| --- | --- |
+| `GCP_PROJECT_ID` | your Google Cloud project id |
+| `GCP_REGION` | `europe-west4` |
+| `GCP_DEPLOY_SERVICE_ACCOUNT` | `ema-flow-deployer@PROJECT_ID.iam.gserviceaccount.com` |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | `projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL/providers/PROVIDER` |
+
+The WIF attribute condition must allow
+`repo:ogbetspp-coder/fhir_real_time_data_exchange:ref:refs/heads/main` (or the whole
+repository). After the four variables are set, start the workflow from the Actions tab.
 
 The bootstrapped deployer service account needs
 `roles/healthcare.datasetAdmin` for the Healthcare dataset and
