@@ -1,0 +1,373 @@
+{
+  "resourceType": "ConceptMap",
+  "id": "canonical-to-ema-cap-smpc-en",
+  "url": "https://khs.dev/fhir/ConceptMap/canonical-to-ema-cap-smpc-en",
+  "version": "1.0.0",
+  "name": "CanonicalToEmaCapSmpcEnglish",
+  "title": "Canonical SmPC sections to EMA CAP SmPC English QRD sections",
+  "status": "active",
+  "experimental": true,
+  "description": "Deterministic terminology map. It maps section identifiers only and does not generate or alter regulated narrative.",
+  "sourceScopeCanonical": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+  "targetScopeCanonical": "http://ema.europa.eu/fhir/CodeSystem/200000029659",
+  "group": [
+    {
+      "source": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+      "target": "http://ema.europa.eu/fhir/CodeSystem/200000029659",
+      "element": [
+        {
+          "code": "smpc",
+          "display": "SUMMARY OF PRODUCT CHARACTERISTICS",
+          "target": [
+            {
+              "code": "200000029791",
+              "display": "SUMMARY OF PRODUCT CHARACTERISTICS",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.1",
+          "display": "1. NAME OF THE MEDICINAL PRODUCT",
+          "target": [
+            {
+              "code": "200000029792",
+              "display": "1. NAME OF THE MEDICINAL PRODUCT",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.2",
+          "display": "2. QUALITATIVE AND QUANTITATIVE COMPOSITION",
+          "target": [
+            {
+              "code": "200000029793",
+              "display": "2. QUALITATIVE AND QUANTITATIVE COMPOSITION",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.3",
+          "display": "3. PHARMACEUTICAL FORM",
+          "target": [
+            {
+              "code": "200000029797",
+              "display": "3. PHARMACEUTICAL FORM",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.4",
+          "display": "4. CLINICAL PARTICULARS",
+          "target": [
+            {
+              "code": "200000029798",
+              "display": "4. CLINICAL PARTICULARS",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.4.1",
+          "display": "4.1 Therapeutic indications",
+          "target": [
+            {
+              "code": "200000029799",
+              "display": "4.1 Therapeutic indications",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.4.2",
+          "display": "4.2 Posology and method of administration",
+          "target": [
+            {
+              "code": "200000029800",
+              "display": "4.2 Posology and method of administration",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.4.2.posology",
+          "display": "Posology",
+          "target": [
+            {
+              "code": "200000029801",
+              "display": "Posology",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.4.2.administration",
+          "display": "Method of administration",
+          "target": [
+            {
+              "code": "200000029803",
+              "display": "Method of administration",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.4.3",
+          "display": "4.3 Contraindications",
+          "target": [
+            {
+              "code": "200000029805",
+              "display": "4.3 Contraindications",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.4.4",
+          "display": "4.4 Special warnings and precautions for use",
+          "target": [
+            {
+              "code": "200000029806",
+              "display": "4.4 Special warnings and precautions for use",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.4.5",
+          "display": "4.5 Interaction with other medicinal products and other forms of interaction",
+          "target": [
+            {
+              "code": "200000029809",
+              "display": "4.5 Interaction with other medicinal products and other forms of interaction",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.4.6",
+          "display": "4.6 Fertility, pregnancy and lactation",
+          "target": [
+            {
+              "code": "200000029811",
+              "display": "4.6 Fertility, pregnancy and lactation",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.4.7",
+          "display": "4.7 Effects on ability to drive and use machines",
+          "target": [
+            {
+              "code": "200000029815",
+              "display": "4.7 Effects on ability to drive and use machines",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.4.8",
+          "display": "4.8 Undesirable effects",
+          "target": [
+            {
+              "code": "200000029816",
+              "display": "4.8 Undesirable effects",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.4.8.reporting",
+          "display": "Reporting of suspected adverse reactions",
+          "target": [
+            {
+              "code": "200000029818",
+              "display": "Reporting of suspected adverse reactions",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.4.9",
+          "display": "4.9 Overdose",
+          "target": [
+            {
+              "code": "200000029819",
+              "display": "4.9 Overdose",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.5",
+          "display": "5. PHARMACOLOGICAL PROPERTIES",
+          "target": [
+            {
+              "code": "200000029821",
+              "display": "5. PHARMACOLOGICAL PROPERTIES",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.5.1",
+          "display": "5.1 Pharmacodynamic properties",
+          "target": [
+            {
+              "code": "200000029822",
+              "display": "5.1 Pharmacodynamic properties",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.5.2",
+          "display": "5.2 Pharmacokinetic properties",
+          "target": [
+            {
+              "code": "200000029827",
+              "display": "5.2 Pharmacokinetic properties",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.5.3",
+          "display": "5.3 Preclinical safety data",
+          "target": [
+            {
+              "code": "200000029834",
+              "display": "5.3 Preclinical safety data",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.6",
+          "display": "6. PHARMACEUTICAL PARTICULARS",
+          "target": [
+            {
+              "code": "200000029836",
+              "display": "6. PHARMACEUTICAL PARTICULARS",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.6.1",
+          "display": "6.1 List of excipients",
+          "target": [
+            {
+              "code": "200000029837",
+              "display": "6.1 List of excipients",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.6.2",
+          "display": "6.2 Incompatibilities",
+          "target": [
+            {
+              "code": "200000029838",
+              "display": "6.2 Incompatibilities",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.6.3",
+          "display": "6.3 Shelf life",
+          "target": [
+            {
+              "code": "200000029839",
+              "display": "6.3 Shelf life",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.6.4",
+          "display": "6.4 Special precautions for storage",
+          "target": [
+            {
+              "code": "200000029840",
+              "display": "6.4 Special precautions for storage",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.6.5",
+          "display": "6.5 Nature and contents of container and special equipment for use, administration or implantation",
+          "target": [
+            {
+              "code": "200000029841",
+              "display": "6.5 Nature and contents of container and special equipment for use, administration or implantation",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.6.6",
+          "display": "6.6 Special precautions for disposal and other handling",
+          "target": [
+            {
+              "code": "200000029842",
+              "display": "6.6 Special precautions for disposal and other handling",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.7",
+          "display": "7. MARKETING AUTHORISATION HOLDER",
+          "target": [
+            {
+              "code": "200000029844",
+              "display": "7. MARKETING AUTHORISATION HOLDER",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.8",
+          "display": "8. MARKETING AUTHORISATION NUMBER(S)",
+          "target": [
+            {
+              "code": "200000029845",
+              "display": "8. MARKETING AUTHORISATION NUMBER(S)",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.9",
+          "display": "9. DATE OF FIRST AUTHORISATION/RENEWAL OF THE AUTHORISATION",
+          "target": [
+            {
+              "code": "200000029846",
+              "display": "9. DATE OF FIRST AUTHORISATION/RENEWAL OF THE AUTHORISATION",
+              "relationship": "equivalent"
+            }
+          ]
+        },
+        {
+          "code": "smpc.10",
+          "display": "10. DATE OF REVISION OF THE TEXT",
+          "target": [
+            {
+              "code": "200000029847",
+              "display": "10. DATE OF REVISION OF THE TEXT",
+              "relationship": "equivalent"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
