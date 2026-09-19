@@ -60,6 +60,14 @@ for prefix in terminology extensions global ema; do
       gcloud --quiet healthcare operations describe "$operation_id" \
         --project="$PROJECT_ID" --location="$REGION" --dataset="$DATASET" \
         --format=json >&2 || true
+      # The operation's own metadata only has success/failure counts, not the
+      # per-resource errors -- those are in Cloud Logging under this operation id.
+      echo "=== per-resource import errors for ${prefix} (operation ${operation_id}) ===" >&2
+      gcloud --quiet logging read \
+        "operation.id=\"projects/${PROJECT_ID}/locations/${REGION}/datasets/${DATASET}/operations/${operation_id}\"" \
+        --project="$PROJECT_ID" \
+        --format="value(timestamp,severity,jsonPayload,textPayload)" \
+        --limit=100 >&2 || true
     fi
     exit 1
   fi
