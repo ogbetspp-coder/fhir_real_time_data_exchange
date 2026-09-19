@@ -104,12 +104,19 @@ phase_apis() {
     fi
   fi
 
+  # google_logging_project_sink.regulated_audit's auto-provisioned writer_identity
+  # (like the healthcare service identity's email) isn't reliably populated on the
+  # same apply that creates the sink, and unlike that email it has no predictable
+  # static format to fall back to. Create it here, in its own apply, so its state
+  # is fully populated well before the main apply (phase_apply) needs it.
   terraform -chdir=infra apply \
     -input=false \
     -auto-approve \
     -target=google_project_service.required \
     -target=google_artifact_registry_repository.images \
     -target=google_project_iam_member.cloudbuild_default_compute_builder \
+    -target=google_logging_project_bucket_config.regulated_audit \
+    -target=google_logging_project_sink.regulated_audit \
     "${tf_common_vars[@]}" \
     -var="worker_image=us-docker.pkg.dev/cloudrun/container/hello" \
     -var="validator_image=us-docker.pkg.dev/cloudrun/container/hello"
