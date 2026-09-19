@@ -186,12 +186,22 @@ phase_apply() {
   echo "=== terraform apply ==="
   WORKER_DIGEST="$(resolve_image_digest worker "$TAG")"
   VALIDATOR_DIGEST="$(resolve_image_digest validator "$TAG")"
-  terraform -chdir=infra apply \
+  if ! terraform -chdir=infra apply \
     -input=false \
     -auto-approve \
     "${tf_common_vars[@]}" \
     -var="worker_image=${REPOSITORY}/worker@${WORKER_DIGEST}" \
-    -var="validator_image=${REPOSITORY}/validator@${VALIDATOR_DIGEST}"
+    -var="validator_image=${REPOSITORY}/validator@${VALIDATOR_DIGEST}"; then
+    echo "=== terraform apply failed; dumping recent container logs for diagnosis ===" >&2
+    gcloud --quiet logging read \
+      "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"ema-flow-${ENVIRONMENT}-worker\"" \
+      --project="$PROJECT_ID" \
+      --order=asc \
+      --freshness=1h \
+      --limit=500 \
+      --format="value(timestamp,resource.labels.container_name,severity,textPayload,jsonPayload.message)" || true
+    return 1
+  fi
 }
 
 phase_bootstrap() {
