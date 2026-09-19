@@ -138,16 +138,36 @@ phase_images() {
   return 1
 }
 
+# `gcloud artifacts docker images describe` unconditionally calls Container
+# Analysis to build its image_summary, needing a containeranalysis IAM role the
+# deploy service account isn't granted (that account's roles are bootstrapped
+# outside this repo's Terraform, see README.md) -- neither --show-package-
+# vulnerability nor its --no- negation skips that call. Resolve the digest
+# instead via the plain Docker Registry v2 HTTP API that Artifact Registry
+# implements, which only needs the artifactregistry read access we already have.
+resolve_image_digest() {
+  local image_name="$1"
+  local tag="$2"
+  local digest
+  # Artifact Registry's docker v2 endpoint authenticates like `docker login`
+  # does: HTTP Basic with the fixed username `oauth2accesstoken` and a GCP
+  # access token as the password (not a raw Authorization: Bearer header).
+  digest="$(curl --fail --silent --show-error --head \
+    --user "oauth2accesstoken:$(ema_flow_access_token)" \
+    --header "Accept: application/vnd.docker.distribution.manifest.v2+json,application/vnd.oci.image.manifest.v1+json" \
+    "https://${REGION}-docker.pkg.dev/v2/${PROJECT_ID}/ema-flow/${image_name}/manifests/${tag}" \
+    | tr -d '\r' | grep -i '^docker-content-digest:' | awk '{print $2}')"
+  if [[ -z "$digest" ]]; then
+    echo "Could not resolve a digest for ${image_name}:${tag} from the registry manifest response." >&2
+    exit 1
+  fi
+  printf '%s' "$digest"
+}
+
 phase_apply() {
   echo "=== terraform apply ==="
-  WORKER_TAG="${REPOSITORY}/worker:${TAG}"
-  VALIDATOR_TAG="${REPOSITORY}/validator:${TAG}"
-  # --show-package-vulnerability=false skips a Container Analysis lookup we don't
-  # need (only the digest); it also requires a containeranalysis IAM role the
-  # deploy service account isn't granted (that account's roles are bootstrapped
-  # outside this repo's Terraform, see README.md).
-  WORKER_DIGEST="$(gcloud --quiet artifacts docker images describe "$WORKER_TAG" --no-show-package-vulnerability --format='value(image_summary.digest)')"
-  VALIDATOR_DIGEST="$(gcloud --quiet artifacts docker images describe "$VALIDATOR_TAG" --no-show-package-vulnerability --format='value(image_summary.digest)')"
+  WORKER_DIGEST="$(resolve_image_digest worker "$TAG")"
+  VALIDATOR_DIGEST="$(resolve_image_digest validator "$TAG")"
   terraform -chdir=infra apply \
     -input=false \
     -auto-approve \
