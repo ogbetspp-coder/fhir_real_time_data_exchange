@@ -17,7 +17,7 @@ concurrency:
 jobs:
   deploy:
     name: Deploy
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
       GOOGLE_CLOUD_PROJECT: ${{ vars.GCP_PROJECT_ID }}
@@ -66,10 +66,28 @@ jobs:
           package-manager-cache: false
 
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: 1.16.3
           terraform_wrapper: false
 
-      - name: Deploy
-        run: bash scripts/gcp/deploy.sh
+      - name: Preflight
+        run: bash scripts/gcp/deploy.sh preflight
+
+      - name: Install Node dependencies
+        run: bash scripts/gcp/deploy.sh deps
+
+      - name: Terraform init
+        run: bash scripts/gcp/deploy.sh init
+
+      - name: Enable APIs and Artifact Registry
+        run: bash scripts/gcp/deploy.sh apis
+
+      - name: Build container images
+        run: bash scripts/gcp/deploy.sh images
+
+      - name: Apply infrastructure
+        run: bash scripts/gcp/deploy.sh apply
+
+      - name: Reconcile FHIR stores
+        run: bash scripts/gcp/deploy.sh bootstrap
