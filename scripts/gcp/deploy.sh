@@ -104,11 +104,6 @@ phase_apis() {
     fi
   fi
 
-  # google_logging_project_sink.regulated_audit's auto-provisioned writer_identity
-  # (like the healthcare service identity's email) isn't reliably populated on the
-  # same apply that creates the sink, and unlike that email it has no predictable
-  # static format to fall back to. Create it here, in its own apply, so its state
-  # is fully populated well before the main apply (phase_apply) needs it.
   terraform -chdir=infra apply \
     -input=false \
     -auto-approve \
@@ -120,6 +115,22 @@ phase_apis() {
     "${tf_common_vars[@]}" \
     -var="worker_image=us-docker.pkg.dev/cloudrun/container/hello" \
     -var="validator_image=us-docker.pkg.dev/cloudrun/container/hello"
+
+  # google_logging_project_sink.regulated_audit's auto-provisioned writer_identity
+  # isn't reliably readable back through Terraform (two separate apply passes both
+  # left it empty), so grant its role imperatively instead -- the same "manage
+  # outside Terraform" pattern reconcile-fhir-stores.sh already uses for the R5
+  # FHIR stores. Idempotent: re-adding an existing binding is a no-op.
+  local sink_writer_identity
+  sink_writer_identity="$(gcloud --quiet logging sinks describe "ema-flow-${ENVIRONMENT}-regulated-audit" --project="$PROJECT_ID" --format='value(writerIdentity)')"
+  if [[ -n "$sink_writer_identity" ]]; then
+    gcloud --quiet projects add-iam-policy-binding "$PROJECT_ID" \
+      --member="$sink_writer_identity" \
+      --role="roles/logging.bucketWriter" \
+      --condition=None >/dev/null
+  else
+    echo "::warning::Could not resolve the regulated audit log sink's writer identity; grant roles/logging.bucketWriter to it manually."
+  fi
 }
 
 phase_images() {

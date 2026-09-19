@@ -147,11 +147,12 @@ resource "google_logging_project_sink" "regulated_audit" {
   EOT
 }
 
-resource "google_project_iam_member" "regulated_audit_sink_writer" {
-  project = var.project_id
-  role    = "roles/logging.bucketWriter"
-  member  = google_logging_project_sink.regulated_audit.writer_identity
-}
+# The sink's auto-provisioned writer_identity is not reliably readable back through
+# this resource (two separate apply passes both left it empty, so this isn't just
+# an apply-ordering race). scripts/gcp/deploy.sh grants roles/logging.bucketWriter
+# to it directly via `gcloud logging sinks describe`, the same "manage outside
+# Terraform" pattern already used for the R5 FHIR stores (see
+# scripts/gcp/reconcile-fhir-stores.sh).
 
 resource "google_storage_bucket_iam_member" "worker_evidence_writer" {
   bucket = google_storage_bucket.evidence.name
