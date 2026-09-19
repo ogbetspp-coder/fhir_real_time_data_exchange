@@ -129,7 +129,11 @@ reconcile() {
     --header "Authorization: Bearer ${TOKEN}" "$resource")"
 
   if [[ "$status" == "404" ]]; then
-    request POST "${COLLECTION}?fhirStoreId=${store_id}" "$body" >"$current"
+    if ! request POST "${COLLECTION}?fhirStoreId=${store_id}" "$body" >"$current"; then
+      cat "$current" >&2
+      echo "Failed to create ${store_id}." >&2
+      exit 1
+    fi
     echo "Created R5 FHIR store ${store_id}."
     return
   fi
@@ -151,7 +155,11 @@ reconcile() {
   if [[ "$store_id" == "$TARGET_STORE" ]]; then
     update_mask="${update_mask},notificationConfigs,streamConfigs"
   fi
-  request PATCH "${resource}?updateMask=${update_mask}" "$body" >"$current"
+  if ! request PATCH "${resource}?updateMask=${update_mask}" "$body" >"$current"; then
+    cat "$current" >&2
+    echo "Failed to update ${store_id}." >&2
+    exit 1
+  fi
   echo "Reconciled R5 FHIR store ${store_id}."
 }
 

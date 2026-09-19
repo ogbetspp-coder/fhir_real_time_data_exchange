@@ -55,14 +55,18 @@ TYPE2_EXAMPLE=(fhir/vendor/HL7_Global_ePI_Type_2_DrugX_example-*.json)
 node_modules/.bin/tsx scripts/export-fixture.ts "$TMP/synthetic-type2.json" "${TYPE2_EXAMPLE[0]}"
 TOKEN="$(ema_flow_access_token)"
 FHIR_BASE="https://healthcare.googleapis.com/v1/projects/${PROJECT_ID}/locations/${REGION}/datasets/${DATASET}/fhirStores/${SOURCE_STORE}/fhir"
-curl --fail-with-body --silent --show-error \
+if ! curl --fail-with-body --silent --show-error \
   --request PUT \
   --header "Authorization: Bearer ${TOKEN}" \
   --header "Content-Type: application/fhir+json; charset=utf-8" \
   --header "X-Request-Id: bootstrap-synthetic-type2" \
   --header "X-Goog-Healthcare-Audit-AppName: ema-flow-bootstrap" \
   --data-binary "@$TMP/synthetic-type2.json" \
-  "${FHIR_BASE}/Bundle/synthetic-type2-smpc" >/dev/null
+  "${FHIR_BASE}/Bundle/synthetic-type2-smpc" >"$TMP/bootstrap-response.json"; then
+  cat "$TMP/bootstrap-response.json" >&2
+  echo "Failed to seed the synthetic Type 2 bundle." >&2
+  exit 1
+fi
 unset TOKEN
 
 echo "Profiles imported into ${TARGET_STORE}."
