@@ -1,0 +1,64 @@
+{
+  "name": "ema-flow",
+  "version": "1.0.0",
+  "description": "Deterministic HL7 Global ePI Type 2 to EMA EU ePI interoperability pipeline on Google Cloud",
+  "type": "module",
+  "main": "dist/server.js",
+  "engines": {
+    "node": ">=22.14"
+  },
+  "packageManager": "npm@10.9.7",
+  "overrides": {
+    "uuid": "^11.1.1"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run artifacts:check && npm run test",
+    "artifacts:check": "npm run artifacts:generate && git diff --exit-code -- fhir/generated",
+    "artifacts:generate": "tsx scripts/fhir/generate-artifacts.ts",
+    "fixtures:export": "tsx scripts/fhir/export-validation-set.ts",
+    "dev": "tsx watch src/server.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "start": "node dist/server.js",
+    "standards:fetch": "node scripts/fhir/fetch-standards.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "demo": "tsx scripts/run-demo.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://origin.cursor.com/git/khs-dev/tmp-41fcacc600797f17.git"
+  },
+  "keywords": [
+    "fhir",
+    "epi",
+    "ema",
+    "google-cloud-healthcare"
+  ],
+  "author": "khs-dev",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@google-cloud/bigquery": "^9.1.0",
+    "@google-cloud/kms": "^6.2.0",
+    "@google-cloud/lineage": "^3.1.0",
+    "@google-cloud/storage": "^8.2.0",
+    "@hono/node-server": "^2.1.1",
+    "@opentelemetry/api": "^1.9.1",
+    "google-auth-library": "^11.1.0",
+    "hono": "^4.13.8",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.6.2",
+    "eslint": "^10.11.0",
+    "prettier": "^3.9.8",
+    "tsx": "^4.23.13",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.70.0",
+    "vitest": "^5.0.1"
+  }
+}
