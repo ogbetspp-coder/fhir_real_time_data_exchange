@@ -55,8 +55,8 @@ terraform -chdir=infra apply \
   -var="worker_image=${REPOSITORY}/worker@${WORKER_DIGEST}" \
   -var="validator_image=${REPOSITORY}/validator@${VALIDATOR_DIGEST}"
 
-GOOGLE_CLOUD_PROJECT="$PROJECT_ID" scripts/gcp/reconcile-fhir-stores.sh
-GOOGLE_CLOUD_PROJECT="$PROJECT_ID" scripts/gcp/bootstrap.sh
+GOOGLE_CLOUD_PROJECT="$PROJECT_ID" bash scripts/gcp/reconcile-fhir-stores.sh
+GOOGLE_CLOUD_PROJECT="$PROJECT_ID" bash scripts/gcp/bootstrap.sh
 
 echo "Deployment complete."
 terraform -chdir=infra output workflow_console_url

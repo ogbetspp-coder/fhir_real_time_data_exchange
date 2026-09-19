@@ -72,4 +72,4 @@ jobs:
           terraform_wrapper: false
 
       - name: Deploy
-        run: scripts/gcp/deploy.sh
+        run: bash scripts/gcp/deploy.sh
