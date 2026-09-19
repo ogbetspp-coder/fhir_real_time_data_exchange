@@ -91,3 +91,8 @@ jobs:
 
       - name: Reconcile FHIR stores
         run: bash scripts/gcp/deploy.sh bootstrap
+
+      - name: Report failed phase
+        if: failure()
+        run: |
+          echo "::error::A named step above failed. Open the first red step (Preflight, Terraform init, Enable APIs, Build images, or Apply infrastructure) and copy the last error lines, not only exit code 1."

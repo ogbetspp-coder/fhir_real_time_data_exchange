@@ -7,6 +7,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 cd "$ROOT"
 
 PHASE="${1:-all}"
+trap 'echo "::error title=Phase ${PHASE} failed::${BASH_COMMAND} exited $?"' ERR
 PROJECT_ID="$(ema_flow_resolve_project)"
 export GOOGLE_CLOUD_PROJECT="$PROJECT_ID"
 export GCP_PROJECT_ID="${GCP_PROJECT_ID:-$PROJECT_ID}"
@@ -32,9 +33,16 @@ phase_preflight() {
   echo "=== preflight ==="
   echo "project=${PROJECT_ID} region=${REGION} environment=${ENVIRONMENT} tag=${TAG}"
   terraform version
-  gcloud --quiet version
+  # `gcloud version` can exit 1 when component updates exist; do not fail deploy on that.
+  gcloud info --format='value(basic.version)' || true
+  if ! gcloud --quiet auth print-access-token >/dev/null; then
+    echo "::error::Workload Identity Federation did not yield an access token. Check GCP_WORKLOAD_IDENTITY_PROVIDER, GCP_DEPLOY_SERVICE_ACCOUNT, and the WIF attribute condition for repo:ogbetspp-coder/fhir_real_time_data_exchange." >&2
+    exit 1
+  fi
   gcloud --quiet auth list
-  gcloud --quiet projects describe "$PROJECT_ID" --format='value(projectId)'
+  if ! gcloud --quiet projects describe "$PROJECT_ID" --format='value(projectId)'; then
+    echo "::warning::Could not describe project ${PROJECT_ID}. Grant the deployer SA roles/browser (resourcemanager.projects.get) if later steps fail with 403."
+  fi
 }
 
 phase_deps() {
