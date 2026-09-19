@@ -37,10 +37,14 @@ node scripts/fhir/select-import-resources.mjs "$TMP/ema/package" "$TMP/import/em
 node scripts/fhir/select-import-resources.mjs "$TMP/terminology/package" "$TMP/import/terminology"
 node scripts/fhir/select-import-resources.mjs "$TMP/extensions/package" "$TMP/import/extensions"
 
-gcloud --quiet storage rsync "$TMP/import/global" "gs://${PROFILE_BUCKET}/global" --recursive
-gcloud --quiet storage rsync "$TMP/import/ema" "gs://${PROFILE_BUCKET}/ema" --recursive
-gcloud --quiet storage rsync "$TMP/import/terminology" "gs://${PROFILE_BUCKET}/terminology" --recursive
-gcloud --quiet storage rsync "$TMP/import/extensions" "gs://${PROFILE_BUCKET}/extensions" --recursive
+# --delete-unmatched-destination-objects: without it, rsync only adds/updates
+# objects, so a file excluded here after already having been uploaded by an
+# earlier run (e.g. select-import-resources.mjs's exclusion list) would keep
+# being imported from the stale copy left in the bucket.
+gcloud --quiet storage rsync "$TMP/import/global" "gs://${PROFILE_BUCKET}/global" --recursive --delete-unmatched-destination-objects
+gcloud --quiet storage rsync "$TMP/import/ema" "gs://${PROFILE_BUCKET}/ema" --recursive --delete-unmatched-destination-objects
+gcloud --quiet storage rsync "$TMP/import/terminology" "gs://${PROFILE_BUCKET}/terminology" --recursive --delete-unmatched-destination-objects
+gcloud --quiet storage rsync "$TMP/import/extensions" "gs://${PROFILE_BUCKET}/extensions" --recursive --delete-unmatched-destination-objects
 
 for prefix in terminology extensions global ema; do
   echo "=== importing ${prefix} ==="
