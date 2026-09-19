@@ -142,8 +142,12 @@ phase_apply() {
   echo "=== terraform apply ==="
   WORKER_TAG="${REPOSITORY}/worker:${TAG}"
   VALIDATOR_TAG="${REPOSITORY}/validator:${TAG}"
-  WORKER_DIGEST="$(gcloud --quiet artifacts docker images describe "$WORKER_TAG" --format='value(image_summary.digest)')"
-  VALIDATOR_DIGEST="$(gcloud --quiet artifacts docker images describe "$VALIDATOR_TAG" --format='value(image_summary.digest)')"
+  # --show-package-vulnerability=false skips a Container Analysis lookup we don't
+  # need (only the digest); it also requires a containeranalysis IAM role the
+  # deploy service account isn't granted (that account's roles are bootstrapped
+  # outside this repo's Terraform, see README.md).
+  WORKER_DIGEST="$(gcloud --quiet artifacts docker images describe "$WORKER_TAG" --show-package-vulnerability=false --format='value(image_summary.digest)')"
+  VALIDATOR_DIGEST="$(gcloud --quiet artifacts docker images describe "$VALIDATOR_TAG" --show-package-vulnerability=false --format='value(image_summary.digest)')"
   terraform -chdir=infra apply \
     -input=false \
     -auto-approve \
