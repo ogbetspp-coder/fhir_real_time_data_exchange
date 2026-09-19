@@ -37,8 +37,7 @@ cat >"$TMP/source.json" <<JSON
     "disableProfileValidation": true,
     "disableRequiredFieldValidation": false,
     "disableReferenceTypeValidation": false,
-    "disableFhirpathValidation": false,
-    "enableFhirpathProfileValidation": true
+    "disableFhirpathValidation": false
   },
   "labels": {
     "application": "ema-flow",
@@ -60,8 +59,7 @@ cat >"$TMP/target.json" <<JSON
     "disableProfileValidation": true,
     "disableRequiredFieldValidation": false,
     "disableReferenceTypeValidation": false,
-    "disableFhirpathValidation": false,
-    "enableFhirpathProfileValidation": true
+    "disableFhirpathValidation": false
   },
   "notificationConfigs": [{
     "pubsubTopic": "${CHANGES_TOPIC}",
