@@ -43,12 +43,26 @@ gcloud --quiet storage rsync "$TMP/import/terminology" "gs://${PROFILE_BUCKET}/t
 gcloud --quiet storage rsync "$TMP/import/extensions" "gs://${PROFILE_BUCKET}/extensions" --recursive
 
 for prefix in terminology extensions global ema; do
-  gcloud --quiet healthcare fhir-stores import gcs "$TARGET_STORE" \
+  echo "=== importing ${prefix} ==="
+  import_log="$TMP/import-${prefix}.log"
+  if ! gcloud --quiet healthcare fhir-stores import gcs "$TARGET_STORE" \
     --project="$PROJECT_ID" \
     --location="$REGION" \
     --dataset="$DATASET" \
     --gcs-uri="gs://${PROFILE_BUCKET}/${prefix}/*.json" \
-    --content-structure=resource-pretty
+    --content-structure=resource-pretty 2>&1 | tee "$import_log"; then
+    # The CLI only reports a summary error pointing at metadata.logsUrl for the
+    # per-resource details; describing the operation surfaces that (and often a
+    # sample of the actual failures) instead of just the bare invalid_argument.
+    operation_id="$(grep -oE 'operations/[0-9]+' "$import_log" | head -1 | cut -d/ -f2)"
+    if [[ -n "$operation_id" ]]; then
+      echo "=== operation details for ${prefix} import (operation ${operation_id}) ===" >&2
+      gcloud --quiet healthcare operations describe "$operation_id" \
+        --project="$PROJECT_ID" --location="$REGION" --dataset="$DATASET" \
+        --format=json >&2 || true
+    fi
+    exit 1
+  fi
 done
 
 TYPE2_EXAMPLE=(fhir/vendor/HL7_Global_ePI_Type_2_DrugX_example-*.json)
