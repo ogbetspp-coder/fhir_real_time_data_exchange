@@ -1,0 +1,219 @@
+{
+  "mappingVersion": "1.0.0",
+  "sourceCodeSystem": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+  "targetCodeSystem": "http://ema.europa.eu/fhir/CodeSystem/200000029659",
+  "profiles": {
+    "list": "http://ema.europa.eu/fhir/StructureDefinition/EUEpiList",
+    "bundle": "http://ema.europa.eu/fhir/StructureDefinition/EUEpiBundle",
+    "composition": [
+      "http://ema.europa.eu/fhir/StructureDefinition/EUEpiComposition",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUEpiCompositionSmPC",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUEpiCompositionCAP",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUQRD-CAP-template-new-SmPC-en"
+    ]
+  },
+  "root": {
+    "sourceKey": "smpc",
+    "targetCode": "200000029791",
+    "title": "SUMMARY OF PRODUCT CHARACTERISTICS",
+    "required": true,
+    "children": [
+      {
+        "sourceKey": "smpc.1",
+        "targetCode": "200000029792",
+        "title": "1. NAME OF THE MEDICINAL PRODUCT",
+        "required": true
+      },
+      {
+        "sourceKey": "smpc.2",
+        "targetCode": "200000029793",
+        "title": "2. QUALITATIVE AND QUANTITATIVE COMPOSITION",
+        "required": true
+      },
+      {
+        "sourceKey": "smpc.3",
+        "targetCode": "200000029797",
+        "title": "3. PHARMACEUTICAL FORM",
+        "required": true
+      },
+      {
+        "sourceKey": "smpc.4",
+        "targetCode": "200000029798",
+        "title": "4. CLINICAL PARTICULARS",
+        "required": true,
+        "children": [
+          {
+            "sourceKey": "smpc.4.1",
+            "targetCode": "200000029799",
+            "title": "4.1 Therapeutic indications",
+            "required": true
+          },
+          {
+            "sourceKey": "smpc.4.2",
+            "targetCode": "200000029800",
+            "title": "4.2 Posology and method of administration",
+            "required": true,
+            "children": [
+              {
+                "sourceKey": "smpc.4.2.posology",
+                "targetCode": "200000029801",
+                "title": "Posology",
+                "required": true
+              },
+              {
+                "sourceKey": "smpc.4.2.administration",
+                "targetCode": "200000029803",
+                "title": "Method of administration",
+                "required": true
+              }
+            ]
+          },
+          {
+            "sourceKey": "smpc.4.3",
+            "targetCode": "200000029805",
+            "title": "4.3 Contraindications",
+            "required": true
+          },
+          {
+            "sourceKey": "smpc.4.4",
+            "targetCode": "200000029806",
+            "title": "4.4 Special warnings and precautions for use",
+            "required": true
+          },
+          {
+            "sourceKey": "smpc.4.5",
+            "targetCode": "200000029809",
+            "title": "4.5 Interaction with other medicinal products and other forms of interaction",
+            "required": true
+          },
+          {
+            "sourceKey": "smpc.4.6",
+            "targetCode": "200000029811",
+            "title": "4.6 Fertility, pregnancy and lactation",
+            "required": true
+          },
+          {
+            "sourceKey": "smpc.4.7",
+            "targetCode": "200000029815",
+            "title": "4.7 Effects on ability to drive and use machines",
+            "required": true
+          },
+          {
+            "sourceKey": "smpc.4.8",
+            "targetCode": "200000029816",
+            "title": "4.8 Undesirable effects",
+            "required": true,
+            "children": [
+              {
+                "sourceKey": "smpc.4.8.reporting",
+                "targetCode": "200000029818",
+                "title": "Reporting of suspected adverse reactions",
+                "required": true
+              }
+            ]
+          },
+          {
+            "sourceKey": "smpc.4.9",
+            "targetCode": "200000029819",
+            "title": "4.9 Overdose",
+            "required": true
+          }
+        ]
+      },
+      {
+        "sourceKey": "smpc.5",
+        "targetCode": "200000029821",
+        "title": "5. PHARMACOLOGICAL PROPERTIES",
+        "required": true,
+        "children": [
+          {
+            "sourceKey": "smpc.5.1",
+            "targetCode": "200000029822",
+            "title": "5.1 Pharmacodynamic properties",
+            "required": true
+          },
+          {
+            "sourceKey": "smpc.5.2",
+            "targetCode": "200000029827",
+            "title": "5.2 Pharmacokinetic properties",
+            "required": true
+          },
+          {
+            "sourceKey": "smpc.5.3",
+            "targetCode": "200000029834",
+            "title": "5.3 Preclinical safety data",
+            "required": true
+          }
+        ]
+      },
+      {
+        "sourceKey": "smpc.6",
+        "targetCode": "200000029836",
+        "title": "6. PHARMACEUTICAL PARTICULARS",
+        "required": true,
+        "children": [
+          {
+            "sourceKey": "smpc.6.1",
+            "targetCode": "200000029837",
+            "title": "6.1 List of excipients",
+            "required": true
+          },
+          {
+            "sourceKey": "smpc.6.2",
+            "targetCode": "200000029838",
+            "title": "6.2 Incompatibilities",
+            "required": true
+          },
+          {
+            "sourceKey": "smpc.6.3",
+            "targetCode": "200000029839",
+            "title": "6.3 Shelf life",
+            "required": true
+          },
+          {
+            "sourceKey": "smpc.6.4",
+            "targetCode": "200000029840",
+            "title": "6.4 Special precautions for storage",
+            "required": true
+          },
+          {
+            "sourceKey": "smpc.6.5",
+            "targetCode": "200000029841",
+            "title": "6.5 Nature and contents of container and special equipment for use, administration or implantation",
+            "required": true
+          },
+          {
+            "sourceKey": "smpc.6.6",
+            "targetCode": "200000029842",
+            "title": "6.6 Special precautions for disposal and other handling",
+            "required": true
+          }
+        ]
+      },
+      {
+        "sourceKey": "smpc.7",
+        "targetCode": "200000029844",
+        "title": "7. MARKETING AUTHORISATION HOLDER",
+        "required": true
+      },
+      {
+        "sourceKey": "smpc.8",
+        "targetCode": "200000029845",
+        "title": "8. MARKETING AUTHORISATION NUMBER(S)",
+        "required": true
+      },
+      {
+        "sourceKey": "smpc.9",
+        "targetCode": "200000029846",
+        "title": "9. DATE OF FIRST AUTHORISATION/RENEWAL OF THE AUTHORISATION",
+        "required": true
+      },
+      {
+        "sourceKey": "smpc.10",
+        "targetCode": "200000029847",
+        "title": "10. DATE OF REVISION OF THE TEXT",
+        "required": true
+      }
+    ]
+  }
+}

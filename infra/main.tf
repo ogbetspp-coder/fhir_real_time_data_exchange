@@ -1,0 +1,149 @@
+locals {
+  name_prefix = "ema-flow-${var.environment}"
+  # The Google Terraform provider rejects R5 even though the Healthcare v1 API supports it.
+  # scripts/gcp/reconcile-fhir-stores.sh manages these immutable-version stores through REST.
+  source_fhir_store_id = "${local.name_prefix}-source-r5"
+  target_fhir_store_id = "${local.name_prefix}-validated-r5"
+  labels = {
+    application = "ema-flow"
+    environment = var.environment
+    managed_by  = "terraform"
+    data_class  = "regulated-product-information"
+  }
+}
+
+data "google_project" "current" {
+  project_id = var.project_id
+}
+
+resource "google_project_service" "required" {
+  for_each = toset([
+    "artifactregistry.googleapis.com",
+    "binaryauthorization.googleapis.com",
+    "bigquery.googleapis.com",
+    "bigquerydatatransfer.googleapis.com",
+    "cloudbuild.googleapis.com",
+    "clouddeploy.googleapis.com",
+    "cloudkms.googleapis.com",
+    "eventarc.googleapis.com",
+    "healthcare.googleapis.com",
+    "logging.googleapis.com",
+    "monitoring.googleapis.com",
+    "pubsub.googleapis.com",
+    "run.googleapis.com",
+    "secretmanager.googleapis.com",
+    "storage.googleapis.com",
+    "workflows.googleapis.com",
+    "workflowexecutions.googleapis.com",
+    "datalineage.googleapis.com",
+    "dataplex.googleapis.com",
+  ])
+
+  project            = var.project_id
+  service            = each.value
+  disable_on_destroy = false
+}
+
+resource "google_project_service_identity" "healthcare" {
+  provider = google-beta
+  project  = var.project_id
+  service  = "healthcare.googleapis.com"
+
+  depends_on = [google_project_service.required]
+}
+
+resource "google_artifact_registry_repository" "images" {
+  location      = var.region
+  repository_id = "ema-flow"
+  description   = "Signed and provenance-attached ema-flow containers"
+  format        = "DOCKER"
+  labels        = local.labels
+
+  depends_on = [google_project_service.required]
+}
+
+resource "google_bigquery_dataset" "fhir_analytics" {
+  dataset_id                 = "ema_flow_fhir_${var.environment}"
+  friendly_name              = "EMA Flow FHIR Analytics (${var.environment})"
+  description                = "Native Cloud Healthcare API R5 ANALYTICS_V2 stream"
+  location                   = var.region
+  delete_contents_on_destroy = false
+  labels                     = local.labels
+
+  depends_on = [google_project_service.required]
+}
+
+resource "google_bigquery_dataset" "ledger" {
+  dataset_id                 = "ema_flow_ledger_${var.environment}"
+  friendly_name              = "EMA Flow transformation ledger (${var.environment})"
+  description                = "Transformation, validation, and provenance index"
+  location                   = var.region
+  delete_contents_on_destroy = false
+  labels                     = local.labels
+
+  depends_on = [google_project_service.required]
+}
+
+resource "google_bigquery_table" "transformation_runs" {
+  dataset_id          = google_bigquery_dataset.ledger.dataset_id
+  table_id            = "transformation_runs"
+  deletion_protection = var.deletion_protection
+  description         = "One immutable summary row per deterministic interoperability run"
+
+  time_partitioning {
+    type  = "DAY"
+    field = "completed_at"
+  }
+
+  schema = jsonencode([
+    { name = "run_id", type = "STRING", mode = "REQUIRED" },
+    { name = "completed_at", type = "TIMESTAMP", mode = "REQUIRED" },
+    { name = "status", type = "STRING", mode = "REQUIRED" },
+    { name = "source_hash", type = "STRING", mode = "REQUIRED" },
+    { name = "output_hash", type = "STRING", mode = "REQUIRED" },
+    { name = "manifest_hash", type = "STRING", mode = "REQUIRED" },
+    { name = "signature_key_version", type = "STRING", mode = "NULLABLE" },
+    { name = "manifest_json", type = "JSON", mode = "REQUIRED" },
+  ])
+}
+
+resource "google_pubsub_topic" "fhir_changes" {
+  name   = "${local.name_prefix}-fhir-changes"
+  labels = local.labels
+
+  message_retention_duration = "604800s"
+  depends_on                 = [google_project_service.required]
+}
+
+resource "google_pubsub_topic" "dead_letter" {
+  name   = "${local.name_prefix}-dead-letter"
+  labels = local.labels
+
+  message_retention_duration = "1209600s"
+  depends_on                 = [google_project_service.required]
+}
+
+resource "google_healthcare_dataset" "epi" {
+  name     = "${local.name_prefix}-dataset"
+  location = var.region
+
+  depends_on = [google_project_service.required]
+}
+
+resource "google_bigquery_dataset_iam_member" "healthcare_stream_writer" {
+  dataset_id = google_bigquery_dataset.fhir_analytics.dataset_id
+  role       = "roles/bigquery.dataEditor"
+  member     = "serviceAccount:${google_project_service_identity.healthcare.email}"
+}
+
+resource "google_project_iam_member" "healthcare_bigquery_job_user" {
+  project = var.project_id
+  role    = "roles/bigquery.jobUser"
+  member  = "serviceAccount:${google_project_service_identity.healthcare.email}"
+}
+
+resource "google_pubsub_topic_iam_member" "healthcare_publisher" {
+  topic  = google_pubsub_topic.fhir_changes.name
+  role   = "roles/pubsub.publisher"
+  member = "serviceAccount:${google_project_service_identity.healthcare.email}"
+}
