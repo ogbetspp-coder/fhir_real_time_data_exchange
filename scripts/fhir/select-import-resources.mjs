@@ -19,6 +19,18 @@ const allowedTypes = new Set([
   "ValueSet",
 ]);
 
+// Resources that are structurally invalid per base FHIR R5 rules and that Google
+// Cloud Healthcare API's FHIR store import rejects outright, unrelated to this
+// project's EU ePI/Type 2 interoperability content. Each entry is the upstream
+// HL7 package's own resource id, not something authored here.
+const excludedResourceIds = new Set([
+  // hl7.fhir.uv.extensions.r5: its root element sets label/code/requirements,
+  // violating the base StructureDefinition FHIRPath constraint that those may
+  // only be set on non-root elements. Healthcare API import error:
+  // "failed FHIRPath constraint: fhirpath-constraint-violation-StructureDefinition".
+  "operationoutcome-instance-id",
+]);
+
 const source = path.resolve(sourceArg);
 const destination = path.resolve(destinationArg);
 await mkdir(destination, { recursive: true });
@@ -30,6 +42,7 @@ for (const name of await readdir(source)) {
   try {
     const resource = JSON.parse(await readFile(input, "utf8"));
     if (!allowedTypes.has(resource.resourceType)) continue;
+    if (excludedResourceIds.has(resource.id)) continue;
     await cp(input, path.join(destination, name));
     copied += 1;
   } catch (error) {
