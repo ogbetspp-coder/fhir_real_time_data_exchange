@@ -1,0 +1,61 @@
+variable "project_id" {
+  description = "Google Cloud project ID for this environment."
+  type        = string
+}
+
+variable "region" {
+  description = "EU region used for all regional resources."
+  type        = string
+  default     = "europe-west4"
+}
+
+variable "environment" {
+  description = "Environment name used in labels and resource names."
+  type        = string
+  default     = "dev"
+
+  validation {
+    condition     = contains(["dev", "validation", "prod"], var.environment)
+    error_message = "environment must be dev, validation, or prod."
+  }
+}
+
+variable "worker_image" {
+  description = "Immutable Artifact Registry worker image reference, preferably by digest."
+  type        = string
+}
+
+variable "validator_image" {
+  description = "Immutable Artifact Registry validator image reference, preferably by digest."
+  type        = string
+}
+
+variable "evidence_retention_days" {
+  description = "Minimum retention for qualification-supporting evidence."
+  type        = number
+  default     = 2555
+
+  validation {
+    condition     = var.evidence_retention_days >= 30
+    error_message = "Evidence retention must be at least 30 days."
+  }
+}
+
+variable "bigquery_partition_expiration_days" {
+  description = "FHIR history partition retention. Set null to retain indefinitely."
+  type        = number
+  default     = 2555
+  nullable    = true
+}
+
+variable "alert_notification_channels" {
+  description = "Existing Cloud Monitoring notification channel resource names."
+  type        = list(string)
+  default     = []
+}
+
+variable "deletion_protection" {
+  description = "Protect Cloud Run and Healthcare resources from accidental deletion."
+  type        = bool
+  default     = false
+}

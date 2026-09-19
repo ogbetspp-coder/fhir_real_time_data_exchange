@@ -1,0 +1,87 @@
+{
+  "resourceType": "StructureMap",
+  "id": "type2-to-ema-cap-smpc-en",
+  "url": "https://khs.dev/fhir/StructureMap/type2-to-ema-cap-smpc-en",
+  "version": "1.0.0",
+  "name": "Type2ToEmaCapSmpcEnglish",
+  "title": "HL7 Global ePI Type 2 to EMA CAP SmPC English",
+  "status": "active",
+  "experimental": true,
+  "description": "High-level structural contract. The reviewed TypeScript implementation executes the complete fail-closed mapping and records field-level evidence.",
+  "structure": [
+    {
+      "url": "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/Bundle-uv-epi",
+      "mode": "source",
+      "alias": "Type2Bundle"
+    },
+    {
+      "url": "http://ema.europa.eu/fhir/StructureDefinition/EUEpiBundle",
+      "mode": "target",
+      "alias": "EmaBundle"
+    }
+  ],
+  "group": [
+    {
+      "name": "Type2BundleToEmaBundle",
+      "typeMode": "none",
+      "input": [
+        {
+          "name": "src",
+          "mode": "source",
+          "type": "Type2Bundle"
+        },
+        {
+          "name": "tgt",
+          "mode": "target",
+          "type": "EmaBundle"
+        }
+      ],
+      "rule": [
+        {
+          "name": "copyDocumentIdentifier",
+          "source": [
+            {
+              "context": "src",
+              "element": "identifier",
+              "variable": "identifier"
+            }
+          ],
+          "target": [
+            {
+              "context": "tgt",
+              "element": "identifier",
+              "transform": "copy",
+              "parameter": [
+                {
+                  "valueId": "identifier"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "copyDocumentTimestamp",
+          "source": [
+            {
+              "context": "src",
+              "element": "timestamp",
+              "variable": "timestamp"
+            }
+          ],
+          "target": [
+            {
+              "context": "tgt",
+              "element": "timestamp",
+              "transform": "copy",
+              "parameter": [
+                {
+                  "valueId": "timestamp"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

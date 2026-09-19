@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "1.0.0",
+  "artifacts": [
+    {
+      "name": "HL7 Global ePI package",
+      "package": "hl7.fhir.uv.emedicinal-product-info#1.0.0",
+      "url": "https://hl7.org/fhir/uv/emedicinal-product-info/package.tgz",
+      "sha256": "6cdbc95ff054ef52c16e1beaec1c81c9e04fab1c0123b31de6ff1748e30ba0b1",
+      "status": "trial-use-published"
+    },
+    {
+      "name": "HL7 Global ePI Type 2 DrugX example",
+      "url": "https://hl7.org/fhir/uv/emedicinal-product-info/STU1/Bundle-bundlepackageleaflet75type2.json",
+      "sha256": "c07e53f4edb77b931ab474bfe650faa2443717cce5808ceaf77b30d1b0a2b457",
+      "status": "non-normative-example"
+    },
+    {
+      "name": "EMA EUePI package",
+      "package": "EUePI#1.0.0",
+      "url": "https://epi.ema.europa.eu/fhirig/1.0.0/package.tgz",
+      "sha256": "19fb9fbf55c6bb3819c78d427acac1e3e5b96b50c1045d80e70c94f09566bd80",
+      "status": "preview"
+    },
+    {
+      "name": "HL7 R5 terminology dependency",
+      "package": "hl7.terminology.r5#7.3.0",
+      "url": "https://packages2.fhir.org/packages/hl7.terminology.r5/7.3.0",
+      "sha256": "c2ee6bccc9d0130d0a90db5967e7adbf9dd175df7a3351c531642c3dce102d10",
+      "status": "dependency"
+    },
+    {
+      "name": "HL7 R5 extensions dependency",
+      "package": "hl7.fhir.uv.extensions.r5#5.3.0",
+      "url": "https://packages2.fhir.org/packages/hl7.fhir.uv.extensions.r5/5.3.0",
+      "sha256": "f1039cac888d79ebd29878d7debe5e647ffe7ed962a9033da095258a03a06105",
+      "status": "dependency"
+    },
+    {
+      "name": "EMA EPI-23-1022 English commented sample",
+      "url": "https://epi.ema.europa.eu/fhirig/1.0.0/EPI-23-1022-sample-english.zip",
+      "sha256": "69631b7887b136490cdee07b74075d849e4024064f3354e7b1c8bfcbee29e51d",
+      "status": "non-normative-example"
+    },
+    {
+      "name": "HL7 FHIR Validator CLI",
+      "version": "6.10.4",
+      "url": "https://github.com/hapifhir/org.hl7.fhir.core/releases/download/6.10.4/validator_cli.jar",
+      "sha256": "1106b9d58f9e363e47bea7c4fc065841e5fc91fe9d062775c3bfdd212bd653cc",
+      "status": "tool"
+    }
+  ]
+}
