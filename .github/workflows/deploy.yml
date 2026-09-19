@@ -20,6 +20,9 @@ jobs:
     name: Deploy
     runs-on: ubuntu-24.04
     timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash --noprofile --norc -eo pipefail {0}
     env:
       GOOGLE_CLOUD_PROJECT: ${{ vars.GCP_PROJECT_ID }}
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}

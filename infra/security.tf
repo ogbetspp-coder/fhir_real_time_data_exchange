@@ -8,6 +8,12 @@ resource "google_service_account" "workflow" {
   display_name = "EMA Flow workflow orchestrator (${var.environment})"
 }
 
+resource "google_project_iam_member" "cloudbuild_default_compute_builder" {
+  project = var.project_id
+  role    = "roles/cloudbuild.builds.builder"
+  member  = "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
+}
+
 resource "google_project_iam_audit_config" "regulated_data_access" {
   for_each = toset([
     "healthcare.googleapis.com",

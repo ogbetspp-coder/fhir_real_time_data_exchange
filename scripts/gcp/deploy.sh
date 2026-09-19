@@ -57,7 +57,18 @@ phase_deps() {
 
 phase_init() {
   echo "=== terraform init ==="
-  terraform -chdir=infra init -input=false
+  local state_bucket="${PROJECT_ID}-ema-flow-tfstate"
+  if ! gcloud --quiet storage buckets describe "gs://${state_bucket}" >/dev/null 2>&1; then
+    echo "Creating Terraform state bucket gs://${state_bucket}"
+    gcloud --quiet storage buckets create "gs://${state_bucket}" \
+      --project="$PROJECT_ID" \
+      --location="$REGION" \
+      --uniform-bucket-level-access
+    gcloud --quiet storage buckets update "gs://${state_bucket}" --versioning
+  fi
+  terraform -chdir=infra init -input=false \
+    -backend-config="bucket=${state_bucket}" \
+    -backend-config="prefix=terraform/state"
 }
 
 phase_apis() {
@@ -76,11 +87,29 @@ phase_apis() {
     storage.googleapis.com \
     workflows.googleapis.com \
     --project="$PROJECT_ID"
+
+  # The Artifact Registry repo can already exist in GCP (e.g. created by an earlier
+  # run) without being in the current Terraform state (e.g. after the state backend
+  # was lost or reset). Reconcile that drift with an import instead of failing on a
+  # 409 from `apply`.
+  if ! terraform -chdir=infra state show google_artifact_registry_repository.images >/dev/null 2>&1; then
+    if gcloud --quiet artifacts repositories describe ema-flow --location="$REGION" --project="$PROJECT_ID" >/dev/null 2>&1; then
+      echo "Importing pre-existing Artifact Registry repository into Terraform state."
+      terraform -chdir=infra import \
+        "${tf_common_vars[@]}" \
+        -var="worker_image=us-docker.pkg.dev/cloudrun/container/hello" \
+        -var="validator_image=us-docker.pkg.dev/cloudrun/container/hello" \
+        google_artifact_registry_repository.images \
+        "projects/${PROJECT_ID}/locations/${REGION}/repositories/ema-flow"
+    fi
+  fi
+
   terraform -chdir=infra apply \
     -input=false \
     -auto-approve \
     -target=google_project_service.required \
     -target=google_artifact_registry_repository.images \
+    -target=google_project_iam_member.cloudbuild_default_compute_builder \
     "${tf_common_vars[@]}" \
     -var="worker_image=us-docker.pkg.dev/cloudrun/container/hello" \
     -var="validator_image=us-docker.pkg.dev/cloudrun/container/hello"
@@ -88,11 +117,24 @@ phase_apis() {
 
 phase_images() {
   echo "=== cloud build images ==="
-  gcloud --quiet builds submit \
-    --project="$PROJECT_ID" \
-    --config=cloudbuild.images.yaml \
-    --substitutions="_REGION=${REGION},_IMAGE_TAG=${TAG}" \
-    .
+  # The IAM grant for Cloud Build's default runtime service account (phase_apis)
+  # can take up to ~60s to propagate, so retry a transient permission-denied here
+  # rather than failing the whole deploy on it.
+  local attempt
+  for attempt in 1 2 3; do
+    if gcloud --quiet builds submit \
+      --project="$PROJECT_ID" \
+      --config=cloudbuild.images.yaml \
+      --substitutions="_REGION=${REGION},_IMAGE_TAG=${TAG}" \
+      .; then
+      return 0
+    fi
+    if [[ "$attempt" -lt 3 ]]; then
+      echo "Cloud Build submit failed (attempt ${attempt}/3); retrying in 20s in case the IAM grant is still propagating." >&2
+      sleep 20
+    fi
+  done
+  return 1
 }
 
 phase_apply() {
