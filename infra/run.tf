@@ -5,6 +5,13 @@ resource "google_cloud_run_v2_service" "worker" {
   ingress             = "INGRESS_TRAFFIC_ALL"
   labels              = local.labels
 
+  # The provider's default 20m create/update timeout left almost no margin over
+  # the validator container's own ~15-minute startup probe budget below.
+  timeouts {
+    create = "30m"
+    update = "30m"
+  }
+
   dynamic "binary_authorization" {
     for_each = var.enforce_binary_authorization ? [true] : []
     content {
