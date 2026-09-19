@@ -118,10 +118,11 @@ phase_apis() {
 phase_images() {
   echo "=== cloud build images ==="
   # The IAM grant for Cloud Build's default runtime service account (phase_apis)
-  # can take up to ~60s to propagate, so retry a transient permission-denied here
-  # rather than failing the whole deploy on it.
+  # can take several minutes to propagate on a cold-started project, so retry a
+  # transient permission-denied here rather than failing the whole deploy on it.
+  local max_attempts=8
   local attempt
-  for attempt in 1 2 3; do
+  for attempt in $(seq 1 "$max_attempts"); do
     if gcloud --quiet builds submit \
       --project="$PROJECT_ID" \
       --config=cloudbuild.images.yaml \
@@ -129,9 +130,9 @@ phase_images() {
       .; then
       return 0
     fi
-    if [[ "$attempt" -lt 3 ]]; then
-      echo "Cloud Build submit failed (attempt ${attempt}/3); retrying in 20s in case the IAM grant is still propagating." >&2
-      sleep 20
+    if [[ "$attempt" -lt "$max_attempts" ]]; then
+      echo "Cloud Build submit failed (attempt ${attempt}/${max_attempts}); retrying in 30s in case the IAM grant is still propagating." >&2
+      sleep 30
     fi
   done
   return 1
