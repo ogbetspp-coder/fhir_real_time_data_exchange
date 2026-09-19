@@ -35,4 +35,9 @@ RUN curl -fL \
 
 EXPOSE 8090
 ENTRYPOINT ["java", "-Xms768m", "-Xmx1536m", "-jar", "/opt/fhir/validator_cli.jar"]
-CMD ["server", "8090", "-version", "5.0.0", "-ig", "/opt/fhir/terminology-package.tgz", "-ig", "/opt/fhir/extensions-package.tgz", "-ig", "/opt/fhir/global-epi-package.tgz", "-ig", "/opt/fhir/ema-epi-package.tgz", "-tx", "n/a"]
+# -allowNetworkAccess: without it, FhirValidatorHttpService binds to the loopback
+# address only (127.0.0.1) regardless of the port given here, which Cloud Run's
+# sidecar networking/probes cannot reach -- the container never fails to start,
+# its startup probe just never succeeds. This service isn't itself internet
+# exposed: only the "worker" container publishes a port in infra/run.tf.
+CMD ["server", "8090", "-allowNetworkAccess", "-version", "5.0.0", "-ig", "/opt/fhir/terminology-package.tgz", "-ig", "/opt/fhir/extensions-package.tgz", "-ig", "/opt/fhir/global-epi-package.tgz", "-ig", "/opt/fhir/ema-epi-package.tgz", "-tx", "n/a"]

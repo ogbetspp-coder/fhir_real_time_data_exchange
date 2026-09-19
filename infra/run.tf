@@ -5,13 +5,6 @@ resource "google_cloud_run_v2_service" "worker" {
   ingress             = "INGRESS_TRAFFIC_ALL"
   labels              = local.labels
 
-  # The provider's default 20m create/update timeout left almost no margin over
-  # the validator container's own ~15-minute startup probe budget below.
-  timeouts {
-    create = "30m"
-    update = "30m"
-  }
-
   dynamic "binary_authorization" {
     for_each = var.enforce_binary_authorization ? [true] : []
     content {
@@ -42,14 +35,13 @@ resource "google_cloud_run_v2_service" "worker" {
         startup_cpu_boost = true
       }
 
-      # The HL7 validator_cli.jar loads four IG packages (including the full HL7
-      # terminology package) on every cold start before it binds its port; this
-      # routinely takes several minutes, well past a 5-minute probe budget.
+      # The HL7 validator_cli.jar re-fetches its IG packages from the network on
+      # every cold start (observed ~35-40s typically); keep some margin over that.
       startup_probe {
         initial_delay_seconds = 5
         timeout_seconds       = 2
         period_seconds        = 5
-        failure_threshold     = 180
+        failure_threshold     = 60
 
         tcp_socket {
           port = 8090
