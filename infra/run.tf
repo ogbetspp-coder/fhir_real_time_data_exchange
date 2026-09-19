@@ -5,8 +5,11 @@ resource "google_cloud_run_v2_service" "worker" {
   ingress             = "INGRESS_TRAFFIC_ALL"
   labels              = local.labels
 
-  binary_authorization {
-    use_default = true
+  dynamic "binary_authorization" {
+    for_each = var.enforce_binary_authorization ? [true] : []
+    content {
+      use_default = true
+    }
   }
 
   template {

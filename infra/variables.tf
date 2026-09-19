@@ -59,3 +59,9 @@ variable "deletion_protection" {
   type        = bool
   default     = false
 }
+
+variable "enforce_binary_authorization" {
+  description = "Require Binary Authorization on Cloud Run. Leave false for the first prototype deploy."
+  type        = bool
+  default     = false
+}

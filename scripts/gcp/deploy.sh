@@ -62,6 +62,20 @@ phase_init() {
 
 phase_apis() {
   echo "=== enable APIs and artifact registry ==="
+  gcloud --quiet services enable \
+    artifactregistry.googleapis.com \
+    bigquery.googleapis.com \
+    cloudbuild.googleapis.com \
+    cloudkms.googleapis.com \
+    healthcare.googleapis.com \
+    iam.googleapis.com \
+    logging.googleapis.com \
+    monitoring.googleapis.com \
+    pubsub.googleapis.com \
+    run.googleapis.com \
+    storage.googleapis.com \
+    workflows.googleapis.com \
+    --project="$PROJECT_ID"
   terraform -chdir=infra apply \
     -input=false \
     -auto-approve \
@@ -76,7 +90,7 @@ phase_images() {
   echo "=== cloud build images ==="
   gcloud --quiet builds submit \
     --project="$PROJECT_ID" \
-    --config=cloudbuild.yaml \
+    --config=cloudbuild.images.yaml \
     --substitutions="_REGION=${REGION},_IMAGE_TAG=${TAG}" \
     .
 }

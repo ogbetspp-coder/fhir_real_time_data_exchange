@@ -9,6 +9,7 @@ on:
 permissions:
   contents: read
   id-token: write
+  issues: write
 
 concurrency:
   group: deploy-google-cloud
@@ -72,27 +73,39 @@ jobs:
           terraform_wrapper: false
 
       - name: Preflight
-        run: bash scripts/gcp/deploy.sh preflight
+        run: bash scripts/gcp/deploy.sh preflight 2>&1 | tee -a deploy-run.log
 
       - name: Install Node dependencies
-        run: bash scripts/gcp/deploy.sh deps
+        run: bash scripts/gcp/deploy.sh deps 2>&1 | tee -a deploy-run.log
 
       - name: Terraform init
-        run: bash scripts/gcp/deploy.sh init
+        run: bash scripts/gcp/deploy.sh init 2>&1 | tee -a deploy-run.log
 
       - name: Enable APIs and Artifact Registry
-        run: bash scripts/gcp/deploy.sh apis
+        run: bash scripts/gcp/deploy.sh apis 2>&1 | tee -a deploy-run.log
 
       - name: Build container images
-        run: bash scripts/gcp/deploy.sh images
+        run: bash scripts/gcp/deploy.sh images 2>&1 | tee -a deploy-run.log
 
       - name: Apply infrastructure
-        run: bash scripts/gcp/deploy.sh apply
+        run: bash scripts/gcp/deploy.sh apply 2>&1 | tee -a deploy-run.log
 
       - name: Reconcile FHIR stores
-        run: bash scripts/gcp/deploy.sh bootstrap
+        run: bash scripts/gcp/deploy.sh bootstrap 2>&1 | tee -a deploy-run.log
 
-      - name: Report failed phase
+      - name: Publish failure log
         if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          echo "::error::A named step above failed. Open the first red step (Preflight, Terraform init, Enable APIs, Build images, or Apply infrastructure) and copy the last error lines, not only exit code 1."
+          python3 - <<'PY'
+          from pathlib import Path
+          log = Path("deploy-run.log")
+          text = log.read_text(errors="replace") if log.exists() else "deploy-run.log was not created"
+          run_url = """${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"""
+          body = f"Actions run: {run_url}\n\n```text\n{text[-50000:]}\n```\n"
+          Path("issue.md").write_text(body, encoding="utf-8")
+          PY
+          gh issue create \
+            --title "deploy-failure ${{ github.run_id }}" \
+            --body-file issue.md

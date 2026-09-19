@@ -1,6 +1,5 @@
 options:
   logging: CLOUD_LOGGING_ONLY
-  requestedVerifyOption: VERIFIED
   substitutionOption: MUST_MATCH
 
 substitutions:
