@@ -4,6 +4,11 @@ locals {
   # scripts/gcp/reconcile-fhir-stores.sh manages these immutable-version stores through REST.
   source_fhir_store_id = "${local.name_prefix}-source-r5"
   target_fhir_store_id = "${local.name_prefix}-validated-r5"
+  # google_project_service_identity.healthcare.email is unreliable (the provider can
+  # return it empty on the same apply that creates the identity). Google's managed
+  # service agent emails follow a fixed, documented format, so build it directly
+  # instead of depending on that computed attribute.
+  healthcare_service_identity_email = "service-${data.google_project.current.number}@gcp-sa-healthcare.iam.gserviceaccount.com"
   labels = {
     application = "ema-flow"
     environment = var.environment
@@ -133,17 +138,20 @@ resource "google_healthcare_dataset" "epi" {
 resource "google_bigquery_dataset_iam_member" "healthcare_stream_writer" {
   dataset_id = google_bigquery_dataset.fhir_analytics.dataset_id
   role       = "roles/bigquery.dataEditor"
-  member     = "serviceAccount:${google_project_service_identity.healthcare.email}"
+  member     = "serviceAccount:${local.healthcare_service_identity_email}"
+  depends_on = [google_project_service_identity.healthcare]
 }
 
 resource "google_project_iam_member" "healthcare_bigquery_job_user" {
-  project = var.project_id
-  role    = "roles/bigquery.jobUser"
-  member  = "serviceAccount:${google_project_service_identity.healthcare.email}"
+  project    = var.project_id
+  role       = "roles/bigquery.jobUser"
+  member     = "serviceAccount:${local.healthcare_service_identity_email}"
+  depends_on = [google_project_service_identity.healthcare]
 }
 
 resource "google_pubsub_topic_iam_member" "healthcare_publisher" {
-  topic  = google_pubsub_topic.fhir_changes.name
-  role   = "roles/pubsub.publisher"
-  member = "serviceAccount:${google_project_service_identity.healthcare.email}"
+  topic      = google_pubsub_topic.fhir_changes.name
+  role       = "roles/pubsub.publisher"
+  member     = "serviceAccount:${local.healthcare_service_identity_email}"
+  depends_on = [google_project_service_identity.healthcare]
 }

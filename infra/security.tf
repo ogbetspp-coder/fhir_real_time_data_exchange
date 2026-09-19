@@ -121,9 +121,10 @@ resource "google_storage_bucket" "profiles" {
 }
 
 resource "google_storage_bucket_iam_member" "healthcare_profile_reader" {
-  bucket = google_storage_bucket.profiles.name
-  role   = "roles/storage.objectViewer"
-  member = "serviceAccount:${google_project_service_identity.healthcare.email}"
+  bucket     = google_storage_bucket.profiles.name
+  role       = "roles/storage.objectViewer"
+  member     = "serviceAccount:${local.healthcare_service_identity_email}"
+  depends_on = [google_project_service_identity.healthcare]
 }
 
 resource "google_logging_project_bucket_config" "regulated_audit" {
