@@ -9,9 +9,9 @@ import {
   Uuid,
   verifyDocumentSubmission,
   type DocumentGateResult,
+  type DocumentSubmissionInput,
   type IngestionEvidence,
 } from "./contracts/index.js";
-import type { SourceDocumentText } from "./fidelity/index.js";
 import { OfficialFhirValidatorClient } from "./fhir/official-validator.js";
 import {
   hasValidationErrors,
@@ -41,12 +41,9 @@ export type PipelineInput =
       sourceKind: "fixture" | "healthcare-api";
       source: FhirBundle;
     })
-  | (BaseInput & {
-      sourceKind: "document";
-      submission: unknown;
-      fidelityReport: unknown;
-      sourceText: SourceDocumentText;
-    });
+  // The three document parts stay `unknown` all the way to the gate: nothing upstream of
+  // `verifyDocumentSubmission` may assume a shape it has not proved.
+  | (BaseInput & { sourceKind: "document" } & DocumentSubmissionInput);
 
 export type PipelineResult = {
   runId: string;

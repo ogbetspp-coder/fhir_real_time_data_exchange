@@ -19,12 +19,15 @@ trust zones enforced mechanically rather than by instruction.
 Zone A (a separate, probabilistic service) proposes section boundaries, metadata, and codes
 from an approved source document; it may never author, alter, reorder, or omit narrative
 words, and every code it assigns must cite a terminology lookup. Its output is a
-`CanonicalSubmission` proposal, passed by reference, until a human approves it. Status: the
-contract and the ingress gate exist; the reference resolver, the `/v1/runs` `document` route,
-and the Workflows branch are the next phase, so today the document path is reachable only from
-tests and `src/fixtures/synthetic-submission.ts`. The `fixture` and `healthcare-api` sources are
-pre-existing trusted inputs guarded by IAM, not by this gate; deployments where Zone A is the
-only producer should disable them. Zone B (this
+`CanonicalSubmission` proposal, passed by reference, until a human approves it. An approved
+submission is written to the submission bucket and named to `POST /v1/runs` as
+`{uri, sha256}`; `src/gcp/submission-reader.ts` resolves that pointer and the two it contains
+(fidelity report, extracted text), reading only from the configured bucket, capping object
+size, and hash-checking every part. Status: the contract, the ingress gate, the reader, the
+`document` route, and the Workflows `document` branch exist; no Zone A service produces
+submissions yet, so in practice the only producer is `src/fixtures/synthetic-submission.ts`.
+The `fixture` and `healthcare-api` sources are pre-existing trusted inputs guarded by IAM, not
+by this gate; deployments where Zone A is the only producer should disable them. Zone B (this
 repository, deterministic) accepts only an approved `CanonicalSubmission`, re-verifies hash,
 approval, bijection, and terminology invariants at ingress, and only then runs the unchanged
 transform, validation, persistence, and evidence pipeline. `src/fhir/transform.ts`, the

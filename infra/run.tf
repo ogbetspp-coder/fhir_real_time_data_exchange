@@ -111,6 +111,10 @@ resource "google_cloud_run_v2_service" "worker" {
         value = google_storage_bucket.evidence.name
       }
       env {
+        name  = "SUBMISSION_BUCKET"
+        value = google_storage_bucket.submissions.name
+      }
+      env {
         name  = "FHIR_ANALYTICS_DATASET"
         value = google_bigquery_dataset.fhir_analytics.dataset_id
       }
@@ -137,12 +141,16 @@ resource "google_cloud_run_v2_service" "worker" {
     }
   }
 
+  # The ledger table is listed so its schema is updated before a revision that writes the new
+  # columns starts serving; an insert naming a column the table does not have is rejected.
   depends_on = [
     google_project_service.required,
     google_project_iam_member.worker_healthcare,
     google_storage_bucket_iam_member.worker_evidence_writer,
+    google_storage_bucket_iam_member.worker_submission_reader,
     google_kms_crypto_key_iam_member.worker_manifest_signer,
     google_bigquery_dataset_iam_member.worker_ledger_writer,
+    google_bigquery_table.transformation_runs,
   ]
 }
 

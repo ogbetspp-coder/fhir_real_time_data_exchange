@@ -30,6 +30,11 @@ output "profile_staging_bucket" {
   value = google_storage_bucket.profiles.name
 }
 
+output "submission_bucket" {
+  description = "Bucket Zone A writes approved canonical submissions to"
+  value       = google_storage_bucket.submissions.name
+}
+
 output "fhir_changes_topic" {
   value = google_pubsub_topic.fhir_changes.id
 }

@@ -86,17 +86,46 @@ export class GcpEvidenceStore {
     await this.#bigQuery
       .dataset(dataset)
       .table(table)
-      .insert([
-        {
-          run_id: record.manifest.runId,
-          completed_at: record.manifest.completedAt,
-          status: record.manifest.status,
-          source_hash: record.manifest.source.hash,
-          output_hash: record.manifest.transformation.outputHash,
-          manifest_hash: record.manifestHash,
-          signature_key_version: record.signature?.keyVersion ?? null,
-          manifest_json: canonicalJson(record.manifest),
-        },
-      ]);
+      .insert([ledgerRow(record)]);
   }
+}
+
+export type LedgerRow = {
+  run_id: string;
+  completed_at: string;
+  status: string;
+  source_kind: string;
+  source_hash: string;
+  output_hash: string;
+  manifest_hash: string;
+  signature_key_version: string | null;
+  contract_version: string | null;
+  ingestion_source_hash: string | null;
+  fidelity_status: string | null;
+  approval_hash: string | null;
+  manifest_json: string;
+};
+
+// The queryable projection of a signed manifest. Every column is a hash, an enumeration, a
+// timestamp, or an identifier — the full manifest travels as JSON, and neither carries narrative
+// (ADR 0002). Columns that only a document run populates are null everywhere else, which is why
+// they could be added to the existing table in place.
+export function ledgerRow(record: SignedManifest): LedgerRow {
+  const { manifest } = record;
+  const { ingestion } = manifest;
+  return {
+    run_id: manifest.runId,
+    completed_at: manifest.completedAt,
+    status: manifest.status,
+    source_kind: manifest.source.kind,
+    source_hash: manifest.source.hash,
+    output_hash: manifest.transformation.outputHash,
+    manifest_hash: record.manifestHash,
+    signature_key_version: record.signature?.keyVersion ?? null,
+    contract_version: ingestion?.contractVersion ?? null,
+    ingestion_source_hash: ingestion?.sourceDocumentSha256 ?? null,
+    fidelity_status: ingestion?.fidelity.status ?? null,
+    approval_hash: ingestion?.approval.approvedContentSha256 ?? null,
+    manifest_json: canonicalJson(manifest),
+  };
 }

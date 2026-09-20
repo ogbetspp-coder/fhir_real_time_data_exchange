@@ -36,6 +36,14 @@ const CREATED_AT = "2026-09-19T00:00:00Z";
 const APPROVED_AT = "2026-09-19T00:00:00Z";
 const EXTRACTOR_VERSION = "synthetic-extractor/1.0.0";
 const SOURCE_FILENAME = "synthetic-smpc.pdf";
+
+// Where a Zone A service would have written the three by-reference parts. The fixture carries
+// them so it is a complete example of what the submission reader must resolve, not only of what
+// the ingress gate must accept.
+export const SYNTHETIC_SUBMISSION_BUCKET = "synthetic-bucket";
+export const SYNTHETIC_SUBMISSION_URI = `gs://${SYNTHETIC_SUBMISSION_BUCKET}/synthetic-smpc.submission.json`;
+export const SYNTHETIC_REPORT_URI = `gs://${SYNTHETIC_SUBMISSION_BUCKET}/synthetic-smpc.fidelity-report.json`;
+export const SYNTHETIC_SOURCE_TEXT_URI = `gs://${SYNTHETIC_SUBMISSION_BUCKET}/synthetic-smpc.pages.json`;
 const PAGE_COUNT = 3;
 const HEADER = "Synthetic Paracetamol 500 mg tablets - synthetic demonstration extract\n";
 
@@ -179,7 +187,7 @@ export function createSyntheticSubmission(mapping: EmaMapping): SyntheticSubmiss
       filename: SOURCE_FILENAME,
       pageCount: source.pages.length,
       extractedText: {
-        uri: "gs://synthetic-bucket/synthetic-smpc.pages.json",
+        uri: SYNTHETIC_SOURCE_TEXT_URI,
         sha256: sha256(source),
         extractorVersion: EXTRACTOR_VERSION,
       },
@@ -194,6 +202,7 @@ export function createSyntheticSubmission(mapping: EmaMapping): SyntheticSubmiss
       sectionsMatched: report.summary.verified,
       narrativeBindingSha256: report.narrativeBindingSha256,
       reportSha256: report.reportHash,
+      reportUri: SYNTHETIC_REPORT_URI,
     },
   };
 

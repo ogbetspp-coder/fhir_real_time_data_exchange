@@ -63,19 +63,31 @@ into `contracts/generated/` and enforced by `npm run contracts:check`):
    `editorId` and `reason` for edits and rejections), and a terminology service is declared
    whenever any decision is `code-mapped`.
 6. No free text exists anywhere in the Bundle outside the verified narratives: any other
-   `text.div`, and any string longer than 300 characters or containing `<`, rejects. Product
-   graph fields are names, codes, identifiers, and URLs; regulated prose must travel as a
-   verified section. Field-level spans for structured strings are a known extension, not yet
-   implemented.
+   `text.div` rejects, as does any string longer than 300 characters, containing `<`, or longer
+   than 20 words by ICU word segmentation, any property name that is not an identifier, and any
+   Bundle whose unverified strings exceed the aggregate budget (3,000 strings, 40,000
+   characters, 500 entries) or whose JSON nests deeper than 48. Product graph fields are names,
+   codes, identifiers, and URLs; regulated prose must travel as a verified section. Field-level
+   spans for structured strings are a known extension, not yet implemented.
 
 **Transport.** Submissions are passed by reference (`{ uri, sha256 }`), never inline: real
 bundles are multi-megabyte, orchestration payload limits are small, and request bodies transit
-logs. Extracted source text travels separately by reference and is never logged. Status: the
-contract and the ingress gate exist; the reference resolver, the `/v1/runs` `document` route,
-and the Workflows branch are the next phase, so today the document path is reachable only from
-tests and `src/fixtures/synthetic-submission.ts`. The `fixture` and `healthcare-api` sources are
-pre-existing trusted inputs guarded by IAM, not by this gate; deployments where Zone A is the
-only producer should disable them.
+logs. Extracted source text travels separately by reference and is never logged.
+
+A request names one object (`RunRequest`, `contracts/generated/run-request.schema.json`); that
+submission names its own fidelity report and extracted text, each with the hash the resolver
+must reproduce, so a single caller-supplied hash pins the whole hand-off.
+`src/gcp/submission-reader.ts` resolves the chain and proves only that the objects it fetched
+are the objects that were named: reads are confined to one configured bucket
+(`SUBMISSION_BUCKET`), object size is capped, JSON depth is bounded before anything is hashed,
+and every failure is a closed reason code carrying no document content. Whether a submission
+_should_ be published stays entirely with `verifyDocumentSubmission`, which re-executes the
+fidelity check whichever way the parts arrived. Status: the reader, the `/v1/runs` `document`
+route, and the Workflows `document` branch exist; no Zone A service produces submissions yet,
+so in practice the only producer is `src/fixtures/synthetic-submission.ts`.
+
+The `fixture` and `healthcare-api` sources are pre-existing trusted inputs guarded by IAM, not
+by this gate; deployments where Zone A is the only producer should disable them.
 
 **Versioning.** Every contract root carries a `schemaVersion` literal and a `$id` that embeds
 it. Objects are strict (unknown keys reject) so content cannot be smuggled in unnamed fields.
@@ -89,7 +101,7 @@ the raw slice. See ADR 0003.
 ## Consequences
 
 - AI output can never reach the FHIR store or the evidence bucket without a hash-bound human
-  approval and a passing mechanical fidelity check. UR-09 to UR-16 in
+  approval and a passing mechanical fidelity check. UR-09 to UR-17 in
   `docs/validation/README.md` trace these controls to tests.
 - `RunManifest` moves to `schemaVersion` 1.1.0 with an optional `ingestion` block containing
   hashes, counts, enumerations, and identifiers only. Version 1.0.0 remains readable.

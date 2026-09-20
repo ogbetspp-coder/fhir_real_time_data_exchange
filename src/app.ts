@@ -1,37 +1,38 @@
 import { Hono } from "hono";
-import { z } from "zod";
 
-import { loadConfig } from "./config.js";
-import { SubmissionRejectedError } from "./contracts/index.js";
+import { loadConfig, type AppConfig } from "./config.js";
+import { RunRequestSchema, SubmissionRejectedError } from "./contracts/index.js";
 import { loadEmaMapping } from "./fhir/mapping.js";
 import type { FhirBundle } from "./fhir/types.js";
 import { createSyntheticType2Bundle } from "./fixtures/synthetic.js";
 import { HealthcareApiClient } from "./gcp/healthcare.js";
+import {
+  GcsSubmissionReader,
+  SubmissionReadError,
+  type SubmissionReader,
+} from "./gcp/submission-reader.js";
 import { log } from "./lib/logger.js";
-import { runPipeline } from "./pipeline.js";
+import { runPipeline, type PipelineInput } from "./pipeline.js";
 
-const RunRequestSchema = z.discriminatedUnion("source", [
-  z.object({
-    source: z.literal("fixture"),
-    runId: z.uuid().optional(),
-  }),
-  z.object({
-    source: z.literal("healthcare-api"),
-    bundleId: z.string().min(1),
-    runId: z.uuid().optional(),
-  }),
-]);
+export type AppOverrides = {
+  config?: AppConfig;
+  submissionReader?: SubmissionReader;
+};
 
-export function createApp(): Hono {
+export function createApp(overrides: AppOverrides = {}): Hono {
   const app = new Hono();
-  const config = loadConfig();
+  const config = overrides.config ?? loadConfig();
   const mappingPromise = loadEmaMapping();
+  const submissionReader =
+    overrides.submissionReader ??
+    (config.SUBMISSION_BUCKET === undefined ? undefined : new GcsSubmissionReader(config));
 
   app.get("/healthz", (context) =>
     context.json({
       status: "ok",
       service: "ema-flow",
       dryRun: config.DRY_RUN,
+      documentSource: submissionReader !== undefined,
       timestamp: new Date().toISOString(),
     }),
   );
@@ -57,33 +58,45 @@ export function createApp(): Hono {
       );
     }
 
-    const mapping = await mappingPromise;
-    let source: FhirBundle;
-    let sourceResource: string;
-
-    if (parsed.data.source === "fixture") {
-      source = createSyntheticType2Bundle(mapping);
-      sourceResource = "fixture:synthetic-type2-smpc";
-    } else {
-      const healthcare = new HealthcareApiClient(config);
-      source = await healthcare.readSourceResource<FhirBundle>(
-        "Bundle",
-        parsed.data.bundleId,
-        parsed.data.runId ?? crypto.randomUUID(),
-      );
-      sourceResource = `Bundle/${parsed.data.bundleId}`;
+    const request = parsed.data;
+    if (request.source === "document" && submissionReader === undefined) {
+      return context.json({ error: "document-source-not-configured" }, 503);
     }
 
-    const result = await runPipeline(
-      {
-        ...(parsed.data.runId === undefined ? {} : { runId: parsed.data.runId }),
-        source,
-        sourceKind: parsed.data.source === "fixture" ? "fixture" : "healthcare-api",
-        sourceResource,
-      },
-      mapping,
-      config,
-    );
+    // One correlation id for the whole request, so the reference read and the source fetch log
+    // under the same runId as the pipeline they feed.
+    const runId = request.runId ?? crypto.randomUUID();
+    const mapping = await mappingPromise;
+    let input: PipelineInput;
+
+    if (request.source === "fixture") {
+      input = {
+        runId,
+        sourceKind: "fixture",
+        source: createSyntheticType2Bundle(mapping),
+        sourceResource: "fixture:synthetic-type2-smpc",
+      };
+    } else if (request.source === "healthcare-api") {
+      const healthcare = new HealthcareApiClient(config);
+      input = {
+        runId,
+        sourceKind: "healthcare-api",
+        source: await healthcare.readSourceResource<FhirBundle>("Bundle", request.bundleId, runId),
+        sourceResource: `Bundle/${request.bundleId}`,
+      };
+    } else {
+      if (submissionReader === undefined) throw new Error("Submission reader is unavailable");
+      input = {
+        runId,
+        sourceKind: "document",
+        ...(await submissionReader.read(request.submissionRef, runId)),
+        // The pinned hash identifies the submission without putting an object path, which a
+        // caller chooses, into the manifest and from there into the ledger.
+        sourceResource: `document:${request.submissionRef.sha256}`,
+      };
+    }
+
+    const result = await runPipeline(input, mapping, config);
 
     return context.json({
       runId: result.runId,
@@ -94,12 +107,29 @@ export function createApp(): Hono {
       mappingDecisions: result.mappingDecisions.length,
       validation: result.evidence.manifest.validation,
       artifacts: result.artifactUris,
+      ...(result.evidence.manifest.ingestion === undefined
+        ? {}
+        : { submissionId: result.evidence.manifest.ingestion.submissionId }),
     });
   });
 
   // Error messages can embed upstream response bodies (which may quote narrative), so the HTTP
   // surface returns only the error class; details stay in the evidence, never in a response.
   app.onError((error, context) => {
+    if (error instanceof SubmissionReadError) {
+      log("error", "Submission reference could not be read", {
+        stage: "http",
+        errorType: error.name,
+        reason: error.reason,
+        part: error.part,
+      });
+      // Both fields are closed enumerations, so the caller learns why without learning anything
+      // about the document.
+      return context.json(
+        { error: "submission-unreadable", reason: error.reason, part: error.part },
+        422,
+      );
+    }
     const rejected = error instanceof SubmissionRejectedError;
     log("error", "Request failed", {
       stage: "http",

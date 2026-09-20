@@ -99,6 +99,28 @@ resource "google_storage_bucket" "evidence" {
   depends_on = [google_kms_crypto_key_iam_member.gcs_evidence_encryption]
 }
 
+# Landing zone for approved Zone A hand-offs. The worker reads submissions only from here, so
+# this bucket is the boundary between the probabilistic structuring service and deterministic
+# publishing: write access to it is write access to the ingress queue, never to the FHIR store.
+# Versioning is on because a submission is evidence of what was approved.
+resource "google_storage_bucket" "submissions" {
+  name                        = "${var.project_id}-${local.name_prefix}-submissions"
+  location                    = var.region
+  uniform_bucket_level_access = true
+  force_destroy               = false
+  labels                      = local.labels
+
+  versioning {
+    enabled = true
+  }
+
+  encryption {
+    default_kms_key_name = google_kms_crypto_key.evidence_encryption.id
+  }
+
+  depends_on = [google_kms_crypto_key_iam_member.gcs_evidence_encryption]
+}
+
 resource "google_storage_bucket" "profiles" {
   name                        = "${var.project_id}-${local.name_prefix}-profiles"
   location                    = var.region
@@ -157,6 +179,14 @@ resource "google_logging_project_sink" "regulated_audit" {
 resource "google_storage_bucket_iam_member" "worker_evidence_writer" {
   bucket = google_storage_bucket.evidence.name
   role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.worker.email}"
+}
+
+# Read-only, and only this bucket: the worker consumes submissions, it never produces or
+# amends them.
+resource "google_storage_bucket_iam_member" "worker_submission_reader" {
+  bucket = google_storage_bucket.submissions.name
+  role   = "roles/storage.objectViewer"
   member = "serviceAccount:${google_service_account.worker.email}"
 }
 

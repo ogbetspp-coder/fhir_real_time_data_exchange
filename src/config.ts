@@ -12,6 +12,15 @@ const ConfigSchema = z
     SOURCE_FHIR_STORE_ID: optionalNonEmpty,
     TARGET_FHIR_STORE_ID: optionalNonEmpty,
     EVIDENCE_BUCKET: optionalNonEmpty,
+    // The single bucket Zone A writes approved submissions to. Absent, the document source is
+    // simply unavailable: this repository never reads a submission from anywhere else.
+    SUBMISSION_BUCKET: optionalNonEmpty,
+    SUBMISSION_MAX_BYTES: z.coerce
+      .number()
+      .int()
+      .min(1_024)
+      .max(256 * 1_024 * 1_024)
+      .default(64 * 1_024 * 1_024),
     FHIR_ANALYTICS_DATASET: optionalNonEmpty,
     TRANSFORMATION_LEDGER_DATASET: optionalNonEmpty,
     TRANSFORMATION_LEDGER_TABLE: z.string().trim().min(1).default("transformation_runs"),

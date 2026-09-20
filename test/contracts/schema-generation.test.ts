@@ -59,6 +59,7 @@ describe("generated contract JSON Schemas", () => {
       "ingestion-provenance",
       "fidelity-report",
       "source-document-text",
+      "run-request",
       "run-manifest",
     ]);
   });

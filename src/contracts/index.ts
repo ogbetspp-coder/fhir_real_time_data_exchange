@@ -2,6 +2,7 @@ import type { z } from "zod";
 
 import { CANONICAL_SUBMISSION_VERSION, CanonicalSubmissionSchema } from "./canonical-submission.js";
 import { FidelityReportSchema, SourceDocumentTextSchema } from "./fidelity-report.js";
+import { RUN_REQUEST_VERSION, RunRequestSchema } from "./run-request.js";
 import { IngestionProvenanceSchema } from "./ingestion-provenance.js";
 import { RUN_MANIFEST_VERSION, RunManifestSchema } from "./run-manifest.js";
 
@@ -22,6 +23,7 @@ export const CONTRACTS: readonly ContractDefinition[] = [
   { name: "ingestion-provenance", version: "1.0.0", schema: IngestionProvenanceSchema },
   { name: "fidelity-report", version: "1.0.0", schema: FidelityReportSchema },
   { name: "source-document-text", version: "1.0.0", schema: SourceDocumentTextSchema },
+  { name: "run-request", version: RUN_REQUEST_VERSION, schema: RunRequestSchema },
   { name: "run-manifest", version: RUN_MANIFEST_VERSION, schema: RunManifestSchema },
 ];
 
@@ -34,4 +36,5 @@ export * from "./common.js";
 export * from "./fidelity-report.js";
 export * from "./ingestion-provenance.js";
 export * from "./run-manifest.js";
+export * from "./run-request.js";
 export * from "./type2-bundle.js";

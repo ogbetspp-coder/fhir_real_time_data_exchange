@@ -56,11 +56,13 @@ See [docs/architecture.md](docs/architecture.md) for trust boundaries, controls,
 Structuring a label document into the Type 2 graph is a separate, probabilistic Zone A
 service; this repository (Zone B) accepts only an approved `CanonicalSubmission`, passed by
 reference, and re-verifies it before running the frozen transform and validation pipeline.
-Status: the contract and the ingress gate exist; the reference resolver, the `/v1/runs`
-`document` route, and the Workflows branch are the next phase, so today the document path is
-reachable only from tests and `src/fixtures/synthetic-submission.ts`. The `fixture` and
-`healthcare-api` sources are pre-existing trusted inputs guarded by IAM, not by this gate;
-deployments where Zone A is the only producer should disable them. See
+A submission is named, never inlined: `POST /v1/runs` takes `{uri, sha256}` into the submission
+bucket, and the submission itself names its fidelity report and extracted text. Status: the
+contract, the ingress gate, the reference resolver, the `document` route, and the Workflows
+`document` branch exist; no Zone A service produces submissions yet, so in practice the only
+producer is `src/fixtures/synthetic-submission.ts`. The `fixture` and `healthcare-api` sources
+are pre-existing trusted inputs guarded by IAM, not by this gate; deployments where Zone A is
+the only producer should disable them. See
 [docs/adr/0002-two-trust-zones-and-canonical-submission.md](docs/adr/0002-two-trust-zones-and-canonical-submission.md)
 and
 [docs/adr/0003-mechanical-narrative-fidelity.md](docs/adr/0003-mechanical-narrative-fidelity.md)
@@ -93,6 +95,19 @@ curl -X POST http://127.0.0.1:8080/v1/runs \
   -d '{"source":"fixture"}'
 ```
 
+An approved Zone A hand-off is named rather than sent. `SUBMISSION_BUCKET` must be set, the
+object must live in that bucket, and the hash must be the SHA-256 of the submission's canonical
+JSON (`contracts/generated/run-request.schema.json`):
+
+```bash
+curl -X POST http://127.0.0.1:8080/v1/runs \
+  -H 'content-type: application/json' \
+  -d '{"source":"document","submissionRef":{"uri":"gs://BUCKET/smpc.submission.json","sha256":"<64 hex>"}}'
+```
+
+`GET /healthz` reports `documentSource: false` when no submission bucket is configured, and the
+route then answers `503 document-source-not-configured` rather than failing obscurely.
+
 ## Google Cloud deployment
 
 Prerequisites:
@@ -100,7 +115,7 @@ Prerequisites:
 - a billing-enabled Google Cloud project;
 - `gcloud` Application Default Credentials with permission to provision the listed services;
 - Terraform 1.16 or newer;
-- Cloud Build and Binary Authorization permissions;
+- Cloud Build permissions;
 - an EU region supported by Cloud Healthcare API and all selected services.
 
 The default is `europe-west4`.

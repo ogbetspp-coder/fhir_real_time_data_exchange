@@ -100,6 +100,9 @@ resource "google_bigquery_table" "transformation_runs" {
     field = "completed_at"
   }
 
+  # Columns added after the first release are NULLABLE so BigQuery evolves the schema in place
+  # and existing rows stay valid; removing or retyping one would force a replacement, which
+  # deletion_protection would (correctly) refuse.
   schema = jsonencode([
     { name = "run_id", type = "STRING", mode = "REQUIRED" },
     { name = "completed_at", type = "TIMESTAMP", mode = "REQUIRED" },
@@ -109,6 +112,11 @@ resource "google_bigquery_table" "transformation_runs" {
     { name = "manifest_hash", type = "STRING", mode = "REQUIRED" },
     { name = "signature_key_version", type = "STRING", mode = "NULLABLE" },
     { name = "manifest_json", type = "JSON", mode = "REQUIRED" },
+    { name = "source_kind", type = "STRING", mode = "NULLABLE", description = "fixture, healthcare-api, or document" },
+    { name = "contract_version", type = "STRING", mode = "NULLABLE", description = "CanonicalSubmission version; null outside document runs" },
+    { name = "ingestion_source_hash", type = "STRING", mode = "NULLABLE", description = "SHA-256 of the approved source document" },
+    { name = "fidelity_status", type = "STRING", mode = "NULLABLE", description = "Narrative fidelity outcome; only passed can be persisted" },
+    { name = "approval_hash", type = "STRING", mode = "NULLABLE", description = "SHA-256 of the content a human approved" },
   ])
 }
 

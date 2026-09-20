@@ -12,6 +12,7 @@ import {
 } from "../fidelity/index.js";
 import type { FhirBundle } from "../fhir/types.js";
 import { sha256, sha256Utf8 } from "../lib/hash.js";
+import { jsonShapeIssues } from "../lib/json-shape.js";
 import { IsoDateTime, Sha256Hex, Uuid } from "./common.js";
 import { FidelityReportSchema, SourceDocumentTextSchema } from "./fidelity-report.js";
 import { ApprovalSchema, IngestionProvenanceSchema } from "./ingestion-provenance.js";
@@ -33,10 +34,6 @@ const MAX_UNVERIFIED_WORDS = 20;
 const MAX_UNVERIFIED_STRINGS = 3_000;
 const MAX_UNVERIFIED_TOTAL_LENGTH = 40_000;
 const JSON_KEY = /^_?[A-Za-z][A-Za-z0-9]{0,63}$/;
-// Structural bounds checked before anything recursive (hashing, walking) touches the input, so
-// a pathological document is a contract rejection rather than a stack overflow.
-const MAX_JSON_DEPTH = 48;
-const MAX_JSON_NODES = 200_000;
 
 const WORD_SEGMENTER = new Intl.Segmenter(undefined, { granularity: "word" });
 
@@ -44,28 +41,6 @@ function countWordsAnyScript(value: string): number {
   let words = 0;
   for (const segment of WORD_SEGMENTER.segment(value)) if (segment.isWordLike === true) words += 1;
   return words;
-}
-
-// Iterative (never recursive) depth and size check of untrusted JSON.
-function structureIssues(name: string, value: unknown): string[] {
-  const stack: { value: unknown; depth: number }[] = [{ value, depth: 0 }];
-  let nodes = 0;
-  while (stack.length > 0) {
-    const item = stack.pop();
-    if (item === undefined) break;
-    nodes += 1;
-    if (nodes > MAX_JSON_NODES) return [`${name} exceeds ${MAX_JSON_NODES} JSON nodes`];
-    if (item.depth > MAX_JSON_DEPTH) return [`${name} nesting exceeds depth ${MAX_JSON_DEPTH}`];
-    const current = item.value;
-    if (Array.isArray(current)) {
-      for (const child of current) stack.push({ value: child, depth: item.depth + 1 });
-    } else if (current !== null && typeof current === "object") {
-      for (const child of Object.values(current as Record<string, unknown>)) {
-        stack.push({ value: child, depth: item.depth + 1 });
-      }
-    }
-  }
-  return [];
 }
 
 const CanonicalSubmissionBase = z.strictObject({
@@ -252,9 +227,9 @@ export function verifyDocumentSubmission(
   sourceCodeSystem: string,
 ): DocumentGateResult {
   const structural = [
-    ...structureIssues("submission", input.submission),
-    ...structureIssues("fidelityReport", input.fidelityReport),
-    ...structureIssues("sourceText", input.sourceText),
+    ...jsonShapeIssues("submission", input.submission),
+    ...jsonShapeIssues("fidelityReport", input.fidelityReport),
+    ...jsonShapeIssues("sourceText", input.sourceText),
   ];
   if (structural.length > 0) {
     throw new SubmissionRejectedError("Document submission rejected", structural);

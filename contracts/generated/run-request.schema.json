@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://khs.dev/contracts/run-request/1.0.0/schema.json",
+  "$ref": "#/$defs/RunRequest",
+  "$defs": {
+    "RunRequest": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "const": "fixture"
+            },
+            "runId": {
+              "$ref": "#/$defs/Uuid"
+            }
+          },
+          "required": ["source"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "const": "healthcare-api"
+            },
+            "bundleId": {
+              "$ref": "#/$defs/FhirId"
+            },
+            "runId": {
+              "$ref": "#/$defs/Uuid"
+            }
+          },
+          "required": ["source", "bundleId"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "const": "document"
+            },
+            "submissionRef": {
+              "$ref": "#/$defs/SubmissionRef"
+            },
+            "runId": {
+              "$ref": "#/$defs/Uuid"
+            }
+          },
+          "required": ["source", "submissionRef"],
+          "additionalProperties": false
+        }
+      ],
+      "description": "Request to run the deterministic pipeline. Strict: an unrecognised field is a rejection, never a silently ignored one."
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "FhirId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9\\-.]{1,64}$"
+    },
+    "SubmissionRef": {
+      "type": "object",
+      "properties": {
+        "uri": {
+          "$ref": "#/$defs/StorageUri"
+        },
+        "sha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        }
+      },
+      "required": ["uri", "sha256"],
+      "additionalProperties": false,
+      "description": "Cloud Storage location of a canonical submission, pinned by the SHA-256 of its canonical JSON value."
+    },
+    "StorageUri": {
+      "type": "string",
+      "maxLength": 512,
+      "pattern": "^gs:\\/\\/[a-z0-9][a-z0-9._-]{1,220}[a-z0-9]\\/[A-Za-z0-9._/-]{1,256}$",
+      "description": "Cloud Storage object URI (gs://bucket/object)."
+    },
+    "Sha256Hex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Lower-case hexadecimal SHA-256 digest."
+    }
+  }
+}

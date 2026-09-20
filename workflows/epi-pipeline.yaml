@@ -7,14 +7,20 @@ main:
           - serviceUrl: ${sys.get_env("EMA_FLOW_SERVICE_URL")}
           - sourceKind: ${default(map.get(args, "source"), "healthcare-api")}
           - bundleId: ${map.get(args, "bundleId")}
+          - submissionRef: ${map.get(args, "submissionRef")}
           - requestBody:
               source: ${sourceKind}
               runId: ${runId}
-    - addSourceBundle:
+    # A document run carries only the hash-pinned reference; the submission itself stays in the
+    # submission bucket and never transits the workflow body or its execution history.
+    - addSourceReference:
         switch:
           - condition: ${sourceKind == "healthcare-api"}
             assign:
               - requestBody.bundleId: ${bundleId}
+          - condition: ${sourceKind == "document"}
+            assign:
+              - requestBody.submissionRef: ${submissionRef}
     - logStart:
         call: sys.log
         args:
