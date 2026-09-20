@@ -21,6 +21,7 @@ import {
   type Entitlements,
 } from "../../src/query/entitlements.js";
 import type { FhirReader } from "../../src/query/fhir-reader.js";
+import { createReadBudget } from "../../src/query/tools.js";
 import { stableUuid } from "../../src/lib/hash.js";
 
 // The store these tests query is built by the real pipeline, not written by hand: the synthetic
@@ -319,6 +320,10 @@ export async function connectHarness(options: {
   // When set, the audit record also goes through the service's own logger, so a test can scan
   // the log lines the service really writes.
   logAudit?: boolean;
+  // Store reads this harness may make in total. The HTTP service creates one budget per
+  // request; a harness is one connection over which a test makes several calls, so the default
+  // here is large enough that only a test that sets it small meets the exhausted path.
+  readBudget?: number;
 }): Promise<Harness> {
   const audits: QueryAuditRecord[] = [];
   const { reader, log } = createFakeReader(options.documents ?? options.store.documents);
@@ -328,6 +333,7 @@ export async function connectHarness(options: {
     serviceVersion: SERVICE_VERSION,
     identity: options.identity ?? testIdentity(options.principal),
     entitlements: options.entitlements,
+    readBudget: createReadBudget(options.readBudget ?? 10_000),
     audit: (record) => {
       audits.push(record);
       if (options.logAudit === true) logAuditRecord(record);

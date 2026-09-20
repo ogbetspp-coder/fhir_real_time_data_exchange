@@ -43,17 +43,24 @@ output "cloud_run_service_uri" {
   value = google_cloud_run_v2_service.worker.uri
 }
 
+# The three query outputs below describe two different hostnames. Cloud Run serves the service
+# on both, but src/query/auth.ts accepts an ID token only when its `aud` is the QUERY_AUDIENCE
+# string (output query_audience), so an ID token minted for the other hostname is answered 401
+# by a service that is otherwise healthy. Send requests to query_service_url and mint ID tokens
+# for query_audience; with var.query_audience unset (the default) those two strings are equal.
+
 output "query_service_url" {
-  value = google_cloud_run_v2_service.query.uri
+  description = "Endpoint to send query service requests to: Cloud Run's deterministic https://<service>-<project number>.<region>.run.app hostname. Equal to query_audience unless var.query_audience overrides the audience."
+  value       = local.query_deterministic_url
 }
 
 output "query_service_urls" {
-  description = "Every URL Cloud Run reports for the query service"
+  description = "Every URL Cloud Run reports for the query service, including the legacy https://<service>-<hash>-<region code>.a.run.app hostname. Requests to any of them reach the service; only the query_audience value is accepted as an ID token audience, so do not mint tokens for these."
   value       = google_cloud_run_v2_service.query.urls
 }
 
 output "query_audience" {
-  description = "The audience a caller's ID token must carry: QUERY_AUDIENCE as deployed"
+  description = "The exact string the container receives as QUERY_AUDIENCE: the only value an ID token's `aud` may carry (gcloud ... print-identity-token --audiences=<this>)."
   value       = local.query_audience
 }
 

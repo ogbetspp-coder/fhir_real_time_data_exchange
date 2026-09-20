@@ -34,10 +34,13 @@ import { bearerToken, type CredentialVerifier } from "./auth.js";
 import type { EntitlementDirectory, Entitlements } from "./entitlements.js";
 import type { FhirReader } from "./fhir-reader.js";
 import {
+  REQUEST_READ_BUDGET,
+  createReadBudget,
   findProduct,
   getProvenance,
   getSection,
   verifyQuote,
+  type ReadBudget,
   type ToolContext,
   type ToolOutcome,
 } from "./tools.js";
@@ -54,6 +57,13 @@ const MAX_BODY_BYTES = 4 * 1024 * 1024;
 // A JSON-RPC batch carries at most this many messages; a larger one is refused before the
 // transport is connected, so its entries are never dispatched.
 export const MAX_BATCH_MESSAGES = 8;
+
+// How long the service waits for the transport to answer before it answers the request itself.
+// The MCP SDK resolves its JSON response only once every request id in the body has a response
+// and offers no way to settle that promise early, so without this bound a body the transport
+// never answers holds the request — and everything the SDK retains for it — until Cloud Run's
+// request timeout (`infra/query.tf`: 60s). This is shorter than that timeout.
+export const REQUEST_DEADLINE_MS = 30_000;
 
 export const TURN_ID_HEADER = "x-query-turn-id";
 
@@ -77,10 +87,25 @@ export type McpServerDeps = {
   identity: RequestIdentity;
   entitlements: Entitlements | undefined;
   audit: AuditSink;
-  // When present, the JSON-RPC id of every tools/call request that was audited is added here,
-  // so the HTTP layer can tell a request the transport never dispatched from one it did.
-  audited?: Set<RequestId> | undefined;
+  // The store reads every tool call served by this server may make between them.
+  readBudget: ReadBudget;
+  // When present, what the HTTP layer needs to write exactly one record per tools/call request.
+  journal?: RequestJournal | undefined;
 };
+
+// Which JSON-RPC ids of one request have entered a tool handler and which have had their audit
+// record written, and whether the HTTP layer has already written the records for everything
+// still outstanding. After `sealed`, a tool call that finishes writes no record of its own,
+// because one has already been written for its id.
+export type RequestJournal = {
+  dispatched: Set<RequestId>;
+  audited: Set<RequestId>;
+  sealed: boolean;
+};
+
+export function createRequestJournal(): RequestJournal {
+  return { dispatched: new Set<RequestId>(), audited: new Set<RequestId>(), sealed: false };
+}
 
 // Every tool result carries document text as *content*: a client assistant must render or quote
 // it, and must never follow it. The wording is repeated on each tool because a client may show
@@ -105,10 +130,8 @@ const READ_ONLY = {
 export function logAuditRecord(record: QueryAuditRecord): void {
   // The logger drops forbidden keys and long values; every field here is a hash, an identifier,
   // an enumeration, or a count, so nothing in the record can carry narrative in the first place.
-  // One field is lost on the way: the logger's forbidden-key pattern matches `credentialType`
-  // (it contains "credential"), so the written line carries every other field of the record
-  // but not that one. Widening the logger's allow-list is a shared-library change (ADR 0004)
-  // and is not made here.
+  // `credentialType` is on the logger's allow-list, so the written line carries every field of
+  // the record; a test parses a written line back with QueryAuditRecordSchema.
   log("info", "Query tool call", { ...record, stage: "query-tool" });
 }
 
@@ -178,10 +201,14 @@ async function runTool<Input, Output extends Record<string, unknown>>(
   run: (context: ToolContext, input: Input) => Promise<ToolOutcome<Output>>,
 ): Promise<CallToolResult> {
   const startedAt = Date.now();
+  // Recorded before the tool runs, so the HTTP layer can tell a request that reached a handler
+  // from one the transport refused even while the tool is still running.
+  if (requestId !== undefined) deps.journal?.dispatched.add(requestId);
   const context: ToolContext = {
     entitlements: deps.entitlements,
     reader: deps.reader,
     mapping: deps.mapping,
+    readBudget: deps.readBudget,
   };
 
   let outcome: ToolOutcome<Output>;
@@ -212,8 +239,15 @@ async function runTool<Input, Output extends Record<string, unknown>>(
     };
   }
 
-  auditRecord(deps, tool, args, outcome, startedAt);
-  if (requestId !== undefined) deps.audited?.add(requestId);
+  // Exactly one record per call: this one, unless the HTTP layer already gave up waiting for
+  // this request and wrote the record for it.
+  const journal = deps.journal;
+  if (journal === undefined || requestId === undefined) {
+    auditRecord(deps, tool, args, outcome, startedAt);
+  } else if (!journal.sealed) {
+    journal.audited.add(requestId);
+    auditRecord(deps, tool, args, outcome, startedAt);
+  }
   if (outcome.status === "error") return errorResult(outcome.error);
   return {
     content: [{ type: "text", text: JSON.stringify(outcome.value) }],
@@ -299,7 +333,7 @@ export function createMcpServer(deps: McpServerDeps): McpServer {
   // rather than as a validation message the contract does not allow, and the strict object
   // schemas have to be the ones that run, so an unexpected argument is refused rather than
   // quietly dropped. Exactly one audit record is written per call, on both paths, and the
-  // request's JSON-RPC id is recorded as audited.
+  // request's JSON-RPC id is recorded as dispatched before the tool runs.
   server.server.setRequestHandler(CallToolRequestSchema, (request, extra) => {
     const tool = QueryToolNameSchema.safeParse(request.params.name);
     if (!tool.success) {
@@ -322,6 +356,11 @@ export type QueryAppDeps = {
   verifier: CredentialVerifier;
   entitlements: EntitlementDirectory;
   audit?: AuditSink;
+  // Store reads one HTTP request may make across its whole batch; defaults to
+  // REQUEST_READ_BUDGET. A test sets it small to exercise the exhausted path.
+  readBudget?: number | undefined;
+  // Defaults to REQUEST_DEADLINE_MS. A test sets it small to exercise the deadline path.
+  requestDeadlineMs?: number | undefined;
 };
 
 const TOOL_NAMES = new Set<string>([
@@ -353,6 +392,39 @@ function pendingToolRequests(body: unknown): PendingRequest[] {
   });
 }
 
+// A body this service refuses before the transport is connected, because the transport would
+// not answer it as one response per request id:
+//
+// - two entries carrying the same JSON-RPC id. The SDK dispatches both — two store reads, two
+//   audit records — and answers only the first, so the audit trail would be a superset of what
+//   the caller saw. Ids are compared by value and type, as the SDK's own map keys them, so the
+//   number 1 and the string "1" are different ids and are not a duplicate.
+// - a `notifications/cancelled` naming a request id in the same body. The SDK aborts that
+//   request's handler and suppresses its response, so one id never gets a response and the
+//   JSON response promise never resolves — the request would run to the deadline below with
+//   the tool already run and audited.
+function refusedBodyShape(body: unknown): boolean {
+  const messages = Array.isArray(body) ? body : [body];
+  const ids = new Set<RequestId>();
+  const cancelled: RequestId[] = [];
+  let duplicated = false;
+
+  for (const message of messages) {
+    if (message === null || typeof message !== "object") continue;
+    const record = message as { id?: unknown; method?: unknown; params?: unknown };
+    if (isRequestId(record.id)) {
+      if (ids.has(record.id)) duplicated = true;
+      ids.add(record.id);
+    }
+    if (record.method === "notifications/cancelled") {
+      const requestId = (record.params as { requestId?: unknown } | undefined)?.requestId;
+      if (isRequestId(requestId)) cancelled.push(requestId);
+    }
+  }
+
+  return duplicated || cancelled.some((id) => ids.has(id));
+}
+
 // The SDK declares a transport's optional callbacks without `| undefined`, which this
 // repository's `exactOptionalPropertyTypes` rejects at the interface boundary even though the
 // object is the SDK's own. The assertion is confined to this one call.
@@ -361,6 +433,57 @@ async function connectTransport(
   transport: StreamableHTTPServerTransport,
 ): Promise<void> {
   await server.connect(transport as unknown as Parameters<McpServer["connect"]>[0]);
+}
+
+// How one request's wait for the transport ended.
+type RequestEnd = "answered" | "client-closed" | "deadline";
+
+// Waits for the transport to answer, but no longer than the client stays connected and no
+// longer than `deadlineMs`. On the two bounded ends the transport's promise is still pending
+// and this function abandons it: the SDK offers no way to settle it, and abandoning it is what
+// lets the caller close the transport and the server and return. A pending promise nothing
+// references any more is not this code's to collect, and nothing here claims it is collected.
+function awaitTransport(
+  transport: StreamableHTTPServerTransport,
+  request: IncomingMessage,
+  response: ServerResponse,
+  body: unknown,
+  deadlineMs: number,
+): Promise<RequestEnd> {
+  return new Promise<RequestEnd>((resolve, reject) => {
+    let settled = false;
+    // `close` fires both when the response finished writing and when the socket went away
+    // first; `writableFinished` is what tells the two apart.
+    const onClose = (): void => {
+      finish(response.writableFinished ? "answered" : "client-closed");
+    };
+    const timer = setTimeout(() => {
+      finish("deadline");
+    }, deadlineMs);
+    const release = (): void => {
+      clearTimeout(timer);
+      response.off("close", onClose);
+    };
+    function finish(end: RequestEnd): void {
+      if (settled) return;
+      settled = true;
+      release();
+      resolve(end);
+    }
+
+    response.on("close", onClose);
+    transport.handleRequest(request, response, body).then(
+      () => {
+        finish("answered");
+      },
+      (error: unknown) => {
+        if (settled) return;
+        settled = true;
+        release();
+        reject(error instanceof Error ? error : new Error("transport request failed"));
+      },
+    );
+  });
 }
 
 function sendJson(response: ServerResponse, status: number, body: unknown): void {
@@ -402,6 +525,8 @@ export function createQueryApp(
   deps: QueryAppDeps,
 ): (request: IncomingMessage, response: ServerResponse) => Promise<void> {
   const audit = deps.audit ?? logAuditRecord;
+  const readBudget = deps.readBudget ?? REQUEST_READ_BUDGET;
+  const deadlineMs = deps.requestDeadlineMs ?? REQUEST_DEADLINE_MS;
 
   return async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
     const path = new URL(request.url ?? "/", "http://ema-flow-query.invalid").pathname;
@@ -480,6 +605,11 @@ export function createQueryApp(
       return;
     }
 
+    if (refusedBodyShape(body)) {
+      sendJson(response, 400, { error: "invalid-request" });
+      return;
+    }
+
     const identity: RequestIdentity = {
       principal,
       credentialType,
@@ -487,7 +617,7 @@ export function createQueryApp(
       turnId: turn.turnId,
     };
     const pending = pendingToolRequests(body);
-    const audited = new Set<RequestId>();
+    const journal = createRequestJournal();
     const server = createMcpServer({
       reader: deps.reader,
       mapping: deps.mapping,
@@ -495,16 +625,19 @@ export function createQueryApp(
       identity,
       entitlements,
       audit,
-      audited,
+      // One budget for the whole request: every tool call of the batch draws on it.
+      readBudget: createReadBudget(readBudget),
+      journal,
     });
     // Stateless mode is `sessionIdGenerator` absent (the SDK reads it as undefined), which is
     // what lets Cloud Run scale the service to zero and across instances: no session lives
     // between requests. The transport and the server are built per request for the same reason.
     const transport = new StreamableHTTPServerTransport({ enableJsonResponse: true });
 
+    let end: RequestEnd = "answered";
     try {
       await connectTransport(server, transport);
-      await transport.handleRequest(request, response, body);
+      end = await awaitTransport(transport, request, response, body, deadlineMs);
     } catch (error) {
       log("error", "Query request failed", {
         service: QUERY_SERVICE_NAME,
@@ -513,11 +646,15 @@ export function createQueryApp(
       });
       if (!response.headersSent) sendJson(response, 500, { error: "unavailable" });
     } finally {
-      // A tools/call request (an entry with an id) the protocol layer rejected before the tool
-      // ran is still a call, and the audit trail says so rather than silently losing it. Only
-      // requests whose id was never audited are recorded here; notifications never are.
+      // One record per tools/call request in the body, and no more. Sealing first means a tool
+      // still running on an abandoned request writes no second record when it finishes.
+      // A request the protocol layer rejected before the handler ran is `invalid-request`; one
+      // that reached a handler and has not finished is `unavailable`, which is what its caller
+      // was told. Notifications are never recorded.
+      journal.sealed = true;
       for (const unanswered of pending) {
-        if (audited.has(unanswered.id)) continue;
+        if (journal.audited.has(unanswered.id)) continue;
+        const code = journal.dispatched.has(unanswered.id) ? "unavailable" : "invalid-request";
         auditRecord(
           {
             reader: deps.reader,
@@ -526,13 +663,15 @@ export function createQueryApp(
             identity,
             entitlements: undefined,
             audit,
+            // Nothing is read on this path; the budget is here because the type requires one.
+            readBudget: createReadBudget(0),
           },
           unanswered.tool,
           unanswered.args,
           {
             status: "error",
-            error: { tool: unanswered.tool, error: "invalid-request" },
-            auditOutcome: "invalid-request",
+            error: { tool: unanswered.tool, error: code },
+            auditOutcome: code,
           },
           Date.now(),
         );
@@ -540,6 +679,25 @@ export function createQueryApp(
       await transport.close();
       await server.close();
     }
+
+    if (end === "answered") return;
+
+    // The transport did not answer, and `transport.close()` above cleared the stream it would
+    // have answered on, so the service ends the response itself rather than leaving the socket
+    // open to Cloud Run's request timeout. A client that has already gone gets nothing.
+    log("warning", "Query request ended without a protocol answer", {
+      service: QUERY_SERVICE_NAME,
+      stage: "query-http",
+      event: end,
+      principal,
+      // The deadline this request was given, whether or not it is what ended the wait.
+      requestDeadlineMs: deadlineMs,
+      // How many tools/call requests in the body never reached a tool handler.
+      undispatchedCount: pending.filter(({ id }) => !journal.dispatched.has(id)).length,
+    });
+    if (response.destroyed || response.writableEnded) return;
+    if (response.headersSent) response.end();
+    else sendJson(response, 503, { error: "unavailable" });
   };
 }
 

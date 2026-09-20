@@ -40,6 +40,36 @@ tf_common_vars=(
   -var="environment=${ENVIRONMENT}"
 )
 
+# Converts a comma-separated environment value into the JSON array Terraform's -var flag parses
+# as list(string): "a, b" becomes ["a","b"], empty becomes []. A value that already starts with
+# "[" is passed through unchanged, so JSON can be supplied directly. Surrounding whitespace is
+# stripped from each element, empty elements are dropped, and " and \ inside an element are
+# escaped.
+ema_flow_json_array() {
+  local raw="${1:-}"
+  if [[ "$raw" == \[* ]]; then
+    printf '%s' "$raw"
+    return 0
+  fi
+  local -a parts=()
+  IFS=',' read -r -a parts <<<"$raw" || true
+  local out="[" first=1 item
+  # ${parts[@]+...}: reading an empty value leaves parts unset in bash 3.2 (macOS), where
+  # expanding an unset array under `set -u` is an error.
+  for item in ${parts[@]+"${parts[@]}"}; do
+    item="${item#"${item%%[![:space:]]*}"}"
+    item="${item%"${item##*[![:space:]]}"}"
+    if [[ -z "$item" ]]; then
+      continue
+    fi
+    item="${item//\\/\\\\}"
+    item="${item//\"/\\\"}"
+    if [[ "$first" == 1 ]]; then first=0; else out+=","; fi
+    out+="\"${item}\""
+  done
+  printf '%s]' "$out"
+}
+
 phase_preflight() {
   echo "=== preflight ==="
   echo "project=${PROJECT_ID} region=${REGION} environment=${ENVIRONMENT} tag=${TAG}"
@@ -197,12 +227,103 @@ resolve_image_digest() {
   printf '%s' "$digest"
 }
 
+# Effective IAM of the worker and query service accounts as the project and the Healthcare
+# dataset report it after an apply (UR-18 in docs/validation/README.md, ADR 0004 decision 5).
+# Terraform state says which bindings this configuration declares; these exports say which
+# bindings the platform actually holds, including any added outside Terraform. Every step is
+# guarded: a missing permission, a missing output, or a failed upload prints a warning line and
+# the function still returns 0, so evidence collection never fails a deploy.
+export_effective_iam() {
+  echo "=== effective IAM policy export ==="
+  local out_dir dataset bucket stamp date_path sa short_name policy_file exported=0
+  if ! out_dir="$(mktemp -d)"; then
+    echo "::warning::Could not create a temporary directory for the effective IAM export; skipping it."
+    return 0
+  fi
+  stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+  date_path="$(date -u +%Y/%m/%d)"
+  dataset="$(terraform -chdir=infra output -raw healthcare_dataset_id 2>/dev/null || true)"
+  bucket="$(terraform -chdir=infra output -raw evidence_bucket 2>/dev/null || true)"
+
+  for sa in "ema-flow-worker-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com" \
+    "ema-flow-query-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com"; do
+    short_name="${sa%%@*}"
+
+    echo "--- project ${PROJECT_ID}: roles held by ${sa} ---"
+    policy_file="${out_dir}/project-iam-${short_name}.json"
+    if gcloud --quiet projects get-iam-policy "$PROJECT_ID" \
+      --flatten='bindings[].members' \
+      --filter="bindings.members:serviceAccount:${sa}" \
+      --format='json(bindings.role,bindings.members,bindings.condition)' >"$policy_file"; then
+      cat "$policy_file"
+      exported=$((exported + 1))
+    else
+      rm -f "$policy_file"
+      echo "::warning::Could not read the project IAM policy for ${sa}. Grant the deployer resourcemanager.projects.getIamPolicy (roles/iam.securityReviewer) to record this evidence."
+    fi
+
+    if [[ -z "$dataset" ]]; then
+      continue
+    fi
+    echo "--- healthcare dataset ${dataset}: roles held by ${sa} ---"
+    policy_file="${out_dir}/dataset-iam-${short_name}.json"
+    if gcloud --quiet healthcare datasets get-iam-policy "$dataset" \
+      --location="$REGION" \
+      --project="$PROJECT_ID" \
+      --flatten='bindings[].members' \
+      --filter="bindings.members:serviceAccount:${sa}" \
+      --format='json(bindings.role,bindings.members,bindings.condition)' >"$policy_file"; then
+      cat "$policy_file"
+      exported=$((exported + 1))
+    else
+      rm -f "$policy_file"
+      echo "::warning::Could not read the Healthcare dataset IAM policy for ${sa}. Grant the deployer healthcare.datasets.getIamPolicy to record this evidence."
+    fi
+  done
+
+  if [[ -z "$dataset" ]]; then
+    echo "::warning::terraform output healthcare_dataset_id was empty; the dataset-level export was skipped."
+  fi
+
+  if [[ "$exported" -gt 0 && -n "$bucket" ]]; then
+    # Dated path, then the timestamp, environment and the first 12 characters of the deployed
+    # commit, so one export belongs to exactly one apply.
+    local destination="gs://${bucket}/deploy-evidence/${date_path}/${stamp}-${ENVIRONMENT}-${SERVICE_VERSION:0:12}/"
+    if gcloud --quiet storage cp "${out_dir}"/*.json "$destination" >/dev/null; then
+      echo "Effective IAM export written to ${destination}"
+    else
+      echo "::warning::Could not upload the effective IAM export to ${destination}; it remains in this deploy log only."
+    fi
+  elif [[ -z "$bucket" ]]; then
+    echo "::warning::terraform output evidence_bucket was empty; the effective IAM export is in this deploy log only."
+  fi
+
+  rm -rf "$out_dir"
+  return 0
+}
+
 phase_apply() {
   echo "=== terraform apply ==="
   echo "service_version=${SERVICE_VERSION}"
   WORKER_DIGEST="$(resolve_image_digest worker "$TAG")"
   VALIDATOR_DIGEST="$(resolve_image_digest validator "$TAG")"
   QUERY_DIGEST="$(resolve_image_digest query "$TAG")"
+
+  # Query service access configuration, supplied by the environment (GitHub Actions repository
+  # variables, see .github/workflows/deploy.yml). Unset means the Terraform defaults: no
+  # invoker, no entitlement, no accepted OAuth client id -- a service that deploys and passes
+  # its startup probe while authorising no caller, rather than a deploy that fails.
+  local query_invokers_json query_oauth_client_ids_json query_entitlements_json
+  query_invokers_json="$(ema_flow_json_array "${QUERY_INVOKERS:-}")"
+  query_oauth_client_ids_json="$(ema_flow_json_array "${QUERY_OAUTH_CLIENT_IDS:-}")"
+  query_entitlements_json="${QUERY_ENTITLEMENTS_JSON:-}"
+  if [[ -z "$query_entitlements_json" ]]; then
+    query_entitlements_json='{}'
+  fi
+  # Sizes, not values: invoker members and entitlement keys are account identifiers, and this
+  # log is attached to a failure issue by .github/workflows/deploy.yml.
+  echo "query access configuration: query_invokers=${#query_invokers_json} bytes, query_oauth_client_ids=${#query_oauth_client_ids_json} bytes, query_entitlements_json=${#query_entitlements_json} bytes (2 bytes is the empty default)"
+
   if ! terraform -chdir=infra apply \
     -input=false \
     -auto-approve \
@@ -210,7 +331,10 @@ phase_apply() {
     -var="service_version=${SERVICE_VERSION}" \
     -var="worker_image=${REPOSITORY}/worker@${WORKER_DIGEST}" \
     -var="validator_image=${REPOSITORY}/validator@${VALIDATOR_DIGEST}" \
-    -var="query_image=${REPOSITORY}/query@${QUERY_DIGEST}"; then
+    -var="query_image=${REPOSITORY}/query@${QUERY_DIGEST}" \
+    -var="query_invokers=${query_invokers_json}" \
+    -var="query_oauth_client_ids=${query_oauth_client_ids_json}" \
+    -var="query_entitlements_json=${query_entitlements_json}"; then
     echo "=== terraform apply failed; dumping recent container logs for diagnosis ===" >&2
     # Only the worker's and the query service's structured logs, whose fields are sanitised by
     # src/lib/logger.ts, and only the five fields named in --format; the validator sidecar's
@@ -228,6 +352,13 @@ phase_apply() {
     done
     return 1
   fi
+
+  # The endpoint and the audience are different hostnames; printing both here keeps a caller
+  # from minting a token for the wrong one (infra/outputs.tf).
+  terraform -chdir=infra output query_service_url || true
+  terraform -chdir=infra output query_audience || true
+
+  export_effective_iam
 }
 
 phase_bootstrap() {

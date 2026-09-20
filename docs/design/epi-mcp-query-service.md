@@ -1,8 +1,11 @@
 # Design note: ePI query service (Model Context Protocol)
 
-- Status: Proposed; phase 1 in implementation on branch `mcp-query-phase1`. "Phase 1 as
-  built" below is the build specification and its acceptance tests are criteria until the
-  named test files under `test/query/` are merged — this line is updated when they are.
+- Status: Phase 1 built and twice adversarially reviewed on branch `mcp-query-phase1`; not
+  deployed. "Phase 1 as built" below describes the code in this tree and each of its
+  acceptance tests exists as a named test under `test/query/` (criterion 18 under `test/ci/`).
+  Everything above that section — the tool surface, the component table, the phasing — is the
+  original plan and is not a description of the code. No `terraform apply` has created the
+  service, so every infrastructure statement is `terraform validate`-checked only.
 - Date: 2026-09-20
 - Related: `docs/architecture.md`, `docs/adr/0002-two-trust-zones-and-canonical-submission.md`,
   `docs/adr/0003-mechanical-narrative-fidelity.md`
@@ -50,9 +53,15 @@ These are design constraints, not preferences. They follow from `AGENTS.md`.
    summarises, or infers regulated text.
 3. **Every returned fact is citable.** No tool returns bare prose. Each result carries the
    document reference, version, `sourceKey`, and `narrativeDivSha256`.
-4. **Entitlement filtering happens before the query, not after.** A caller's organisation and
-   market entitlements are resolved first and pushed into the FHIR search; results are never
-   fetched and then filtered.
+4. **Entitlement is decided before any store read, never after.** The caller's entitlement is
+   resolved once per request, immediately after the principal and before the protocol is
+   reached; every tool then checks the document id it was given against that entitlement
+   before it reads anything. In phase 1 that is an in-process allow-list of document Bundle
+   ids per principal checked ahead of a by-id read — there is no store-wide search to push a
+   filter into, and `find_product` scans the caller's own entitled ids rather than searching
+   the store. Pushing an entitlement into a FHIR search is the phase 2 shape, once a search
+   exists; what must hold in every phase is that nothing outside the entitlement is fetched
+   and then filtered out. See "Phase 1 as built".
 5. **Every call is audited** — principal, tool, argument digest, result count — and no returned
    narrative is logged. `src/lib/logger.ts` drops fields whose names match a forbidden pattern
    and any value over 512 characters or containing `<`; that is a defence-in-depth guard, not a
@@ -98,17 +107,38 @@ Fit-for-purpose managed services throughout; nothing custom that Google already 
 
 ## Authorization model
 
-A caller presents an OIDC token from Identity Platform or Workforce Identity Federation. The
-token subject maps to an organisation and an entitlement set. That set is resolved once per
-request and pushed into every FHIR search and BigQuery query as a filter. The service's own
-service account holds read-only access to the FHIR store and the ledger, and nothing else — it
-is a reader. Its Terraform-declared role set contains no write role and a test asserts that set
-exactly; the _effective_ IAM policy can still be widened outside Terraform, so each
-deployment's evidence includes an effective-policy export for this service account.
+What phase 1 does, and it is narrower than this note first proposed. The authoritative detail
+is in "Phase 1 as built"; this is the shape of the decision.
 
-Cross-tenant isolation is the highest-risk area of this design and needs its own test suite:
-every tool needs a negative test proving that an entitled caller cannot reach an unentitled
-product through any argument.
+A caller presents a Google-issued credential on `Authorization: Bearer` — either an OIDC ID
+token verified against `QUERY_AUDIENCE`, or a Google OAuth 2.0 access token verified through
+Google's tokeninfo endpoint against a configured list of OAuth client ids. There is no other
+issuer: Identity Platform for external users and Workforce Identity Federation for staff SSO
+are phase 2, not built, and nothing in the code reads a token from them. The principal is the
+credential's `sub` and nothing else.
+
+That principal is looked up in a Terraform-managed map of document Bundle ids per principal,
+resolved once per request before the transport is connected. There is no organisation field:
+one was parsed and stored in an earlier draft, no authorization decision read it, and a field
+that looks like a control but decides nothing is worse than no field. There is no Firestore
+directory, no BigQuery query, and no ledger read — the service reads the validated FHIR store
+and nothing else. Organisation scoping arrives with the Firestore directory in phase 2,
+together with a document-to-organisation binding.
+
+The service's own service account is a reader: `roles/healthcare.fhirResourceReader` on the
+Healthcare dataset and `roles/logging.logWriter` on the project, and nothing else. A test
+asserts that Terraform-declared role set across every file under `infra/`. The _effective_ IAM
+policy can still be widened outside Terraform, so `scripts/gcp/deploy.sh` exports the effective
+policy for this service account after each successful apply, into the deploy log and the
+evidence bucket (`docs/architecture.md`, "Evidence and observability"); that export has not yet
+run against a project.
+
+Cross-tenant isolation is the highest-risk area of this design. Phase 1's answer is the tenant-
+wall acceptance test: two principals with disjoint bundle lists, and every tool, for every
+argument shape that can name a document, answering `document-not-found` outside the
+entitlement while the audit record shows `not-entitled`. Its known weakness is timing — an
+unentitled request returns without I/O — which is stated under "Security properties stated
+honestly" and traced as UR-20.
 
 ## Residual risks, stated plainly
 
@@ -125,6 +155,27 @@ product through any argument.
 - **This is an information-retrieval aid.** It is not a regulatory decision system, it is not
   validated, and it does not replace the approved ePI or the authorised product information. No
   compliance claim is made or implied.
+- **Amplification is bounded per request, not per principal.** One HTTP request may make 400
+  store reads (`REQUEST_READ_BUDGET`), with at most 8 in flight, and may occupy a request slot
+  for 30 seconds. That is the per-request worst case. Nothing limits how many such requests one
+  principal sends: an entitled caller can still drive the instance's reads and request slots as
+  hard as Cloud Run's own concurrency and instance limits allow. A per-principal quota — Cloud
+  Armor, or an API product — is phase 2 and is not in place.
+- **An abandoned request leaves a promise the SDK never settles.** The MCP SDK assembles its
+  JSON response only once every request id in the body has a response and offers no way to
+  settle that promise early. When the service gives up waiting it closes the transport and the
+  per-request server and drops its own reference, which is all it can do; whether the runtime
+  then collects what the SDK retained is not something this code asserts or tests.
+- **The image-pinning gate is textual.** `check-dockerfiles.mjs` reads the Dockerfiles as text.
+  It does not resolve build arguments, so `FROM ${BASE}` or `--from=$STAGE` passes unexamined,
+  and it does not contact a registry, so it proves only that a digest was written — not that
+  the registry still serves the content that digest named.
+- **The gcloud access-token path widens who can present a credential.** The OAuth client id an
+  operator adds to `QUERY_OAUTH_CLIENT_IDS` to make the human demo work is the client id of the
+  gcloud CLI, which is shared by every gcloud installation; it identifies the tool, not the
+  caller. Opening it means any Google identity with a gcloud login can present a token the
+  service will verify. What still stands between such a caller and a document is Cloud Run's
+  `run.invoker` on the service and the per-subject entitlement — nothing else.
 
 ## Phasing
 
@@ -161,8 +212,14 @@ identity, and shares only pure libraries with the worker.
   is the service name the audit record carries, not an image name. Both build stages are
   pinned to the worker's Node image digest, because `verify_quote` depends on the runtime's
   Unicode database (ADR 0003); `npm run images:check` (`scripts/ci/check-dockerfiles.mjs`, part
-  of `npm run check`) fails if any root `Dockerfile*` has a `FROM` without a `@sha256` digest or
-  if two Node-based Dockerfiles pin different digests.
+  of `npm run check`) fails if any root `Dockerfile*` pulls image bytes from a reference that is
+  not pinned by `@sha256` digest, or if two Node-based Dockerfiles pin different digests. It
+  scans all three places a Dockerfile pulls bytes — `FROM`, `--from=` on `COPY` and `ADD`, and
+  `from=` inside a `RUN --mount=` flag — and skips a reference that names a stage declared in
+  the same file or a stage index. The scan is textual: it joins line continuations and ignores
+  comments, but it does not resolve build arguments (`FROM ${BASE}`, `--from=$STAGE`) and it
+  does not contact a registry, so it cannot see indirection through a build arg and a digest it
+  accepts is only as good as the registry content addressed by it.
 - **Authentication.** Cloud Run requires authentication at the edge, and the service verifies
   the credential again itself: the edge is not trusted alone. Two credential kinds are accepted
   on `Authorization: Bearer`, distinguished by shape (`src/query/auth.ts`):
@@ -187,6 +244,17 @@ identity, and shares only pure libraries with the worker.
   A credential that fails is answered `401 {"error":"unauthenticated"}` before the transport
   is connected. Identity Platform as the issuer for external users is phase 2.
 
+  The access-token path is also the only way a human can call the service with their own Google
+  account today: `gcloud auth print-identity-token --audiences=...` is refused for user
+  accounts, and a user's plain identity token carries gcloud's own OAuth client id as its
+  audience rather than `QUERY_AUDIENCE`. To open that path an operator must add the OAuth 2.0
+  client id that gcloud presents — the `aud`/`azp` of `gcloud auth print-access-token`, read
+  from Google's tokeninfo — to `QUERY_OAUTH_CLIENT_IDS`, and entitle that person's Google
+  subject in `QUERY_ENTITLEMENTS_JSON`; that client id is shared by every gcloud installation,
+  so it identifies the tool and not the caller, and the walls that remain are Cloud Run's
+  `run.invoker` on the service and the per-subject entitlement. No client id is written in the
+  code; it is configuration.
+
 - **Entitlements** are an interface — `entitlementsFor(principal) → { bundles } | undefined` —
   resolved once per request, immediately after the principal, and applied before any store
   read. A phase 1 entitlement is a list of document Bundle ids per principal and nothing else.
@@ -201,23 +269,51 @@ identity, and shares only pure libraries with the worker.
 [...] } }`); an unknown key in that map fails startup.
 - **Request shape.** The service answers `400 {"error":"invalid-request"}`, before the
   transport is connected and without dispatching anything, when the body is not JSON or is
-  larger than 4 MiB, when a JSON-RPC batch carries more than 8 messages, or when the
-  `X-Query-Turn-Id` header is present but is not a UUID. When that header is a UUID it is the
-  assistant turn the caller declares (`contracts/agent-turn`) and is copied into every audit
-  record of the request as `turnId`.
+  larger than 4 MiB, when a JSON-RPC batch carries more than 8 messages, when two entries carry
+  the same JSON-RPC id, when the body carries a `notifications/cancelled` naming a request id
+  in the same body, or when the `X-Query-Turn-Id` header is present but is not a UUID. When
+  that header is a UUID it is the assistant turn the caller declares (`contracts/agent-turn`)
+  and is copied into every audit record of the request as `turnId`.
+  - The two id-shaped refusals exist because the transport would not answer those bodies as one
+    response per request id. A repeated id is dispatched twice by the SDK and answered once, so
+    the audit trail would be a superset of what the caller saw. A `notifications/cancelled`
+    naming an id in the same body aborts that request's handler and suppresses its response, so
+    the SDK's JSON response — which it assembles only once every request id has a response —
+    is never assembled. Ids are compared by value and type, as the SDK's own map keys them, so
+    the number `1` and the string `"1"` are different ids.
+- **Request deadline.** The service waits at most 30 seconds for the transport to answer, and
+  stops waiting sooner if the client disconnects. On either bounded end it answers
+  `503 {"error":"unavailable"}` (or closes the socket, when the client is already gone), closes
+  the transport and the per-request server, and abandons the SDK's pending response promise —
+  the SDK offers no way to settle that promise, and abandoning it is what lets the request
+  finish. The deadline is shorter than the Cloud Run request timeout (`infra/query.tf`: 60s),
+  so a body the transport cannot answer occupies a request slot for 30 seconds rather than 60.
+- **Store reads are budgeted per request.** One HTTP request may make 400 store reads across
+  its whole JSON-RPC batch (`REQUEST_READ_BUDGET`), shared by every tool call in it. Without it
+  the batch cap (8) times the `find_product` horizon (200) would allow 1,600 Bundle reads in one
+  request. `find_product` stops scanning when the budget is spent and reports `truncated: true`;
+  every other tool answers `unavailable` rather than reading. The budget is checked after the
+  entitlement decision, so an exhausted budget never turns a `not-entitled` record into an
+  `unavailable` one. It is not a per-principal limit: a caller may send many requests.
 - **Reads** go to the validated FHIR store only, by REST, as the worker's own client does.
   Section lookup is by canonical `sourceKey`; the pinned mapping manifest translates to the
   store's coding where needed. No narrative and no result is cached across requests.
 - **`find_product`** has no search against the store in phase 1: it reads the caller's entitled
   documents one by one and inspects each. The reads run through a pool of at most 8 in flight,
   cover at most the first 200 entitled ids in entitlement order (`FIND_PRODUCT_SCAN_HORIZON`),
-  and stop being launched once `limit` matches are in hand. `truncated` is true exactly when
-  the entitlement holds more than 200 ids — so an empty `products` never silently means "no
-  such product" — and the same value is carried into the audit record. Matches are reported in
-  entitlement order regardless of the order the reads completed in.
-- **`verify_quote`** counts `sectionsSearched` as the number of candidate sections that carry a
-  narrative, normalises each candidate's text in turn, stops at the first match, and hashes
-  only the matched section's text.
+  stop being launched once `limit` matches are in hand, and stop when the request's read budget
+  is spent. `truncated` is the published contract's meaning and nothing narrower: true whenever
+  the caller's entitlement holds more documents than the call searched — because the horizon cut
+  the list, because `limit` stopped the scan, or because the budget ran out. So an empty or a
+  full `products` never silently means "that is all there is", and the same value is carried
+  into the audit record. Matches are reported in entitlement order regardless of the order the
+  reads completed in.
+- **`verify_quote`** decides entitlement before it looks at the quote, so every argument shape
+  naming a document outside the caller's entitlement — including one whose quote carries a
+  character the normalisation forbids — is `document-not-found` to the caller and
+  `not-entitled` in the record. It then counts `sectionsSearched` as the number of candidate
+  sections that carry a narrative, normalises each candidate's text in turn, stops at the first
+  match, and hashes only the matched section's text.
 - **Provenance is document-level.** The persisted `Provenance` resource carries the source
   document hash, the fidelity report hash, the approved-content hash, extractor and model
   identities, the approver's identity, and — on the attester agent's `role`, under
@@ -252,24 +348,30 @@ identity, and shares only pure libraries with the worker.
   refused before the handler ran still produces one `invalid-request` record; a notification
   (no id) produces none, because the protocol never answers it. The `outcome` enumeration is a
   superset of the returnable error codes: `not-entitled` is recorded and never returned. Records
-  go through the same logger the worker uses, so its no-narrative guard applies; one
-  consequence is that the logger's forbidden-key pattern drops `credentialType` from the
-  written line (the key contains "credential"), so the line carries every other field of the
-  record but not that one — widening the logger is a shared-library change and has not been
-  made. Cloud Audit Logs record the store reads themselves.
+  go through the same logger the worker uses, so its no-narrative guard applies;
+  `credentialType` is on the logger's allow-list — its value is one of two enum members and
+  cannot carry text — so the written line carries every field of the record, and a test parses
+  a written line back with `QueryAuditRecordSchema`. Cloud Audit Logs record the store reads
+  themselves. "Exactly one" holds on the abandoned paths too: when the service gives up waiting
+  (deadline or client disconnect) it writes the outstanding records itself — `unavailable` for
+  a request that reached a tool handler and had not finished, `invalid-request` for one the
+  transport refused — and a tool that finishes afterwards writes no second record.
 - **Structured log lines** the service writes all carry `service: "ema-flow-query"`. A refused
   authentication is `severity: WARNING, stage: "query-http", event: "unauthenticated"` with no
   principal, no reason, and nothing derived from the credential; a refused entitlement is
   `severity: WARNING, stage: "query-http", event: "not-entitled", principal: <sub>` — the
   opaque subject an operator would entitle; tool audit records are `stage: "query-tool"` with
-  `outcome` as above. These are the fields the infrastructure's log-based metrics filter on.
+  `outcome` as above; a request the transport never answered is `severity: WARNING,
+stage: "query-http", event: "deadline" | "client-closed", principal: <sub>` with the deadline
+  and a count of the `tools/call` entries that never reached a handler. These are the fields
+  the infrastructure's log-based metrics filter on.
 
 ### Acceptance tests (phase 1)
 
 Each of these is an acceptance criterion for phase 1 — it exists as a named test under
-`test/query/` — and each is also a demonstration. The first seven are the original criteria;
-the rest were added with the adversarial review of 2026-09-20 and pin the behaviour described
-above.
+`test/query/`, except 18, which tests the image gate itself and lives in `test/ci/` — and each
+is also a demonstration. The first seven are the original criteria; the rest were added with
+the two adversarial reviews of 2026-09-20 and pin the behaviour described above.
 
 1. **Verbatim with citations.** `get_section` returns the stored narrative byte for byte, with
    `narrativeDivSha256` and `normalizedTextSha256` that the test recomputes independently
@@ -292,8 +394,9 @@ above.
    in the response changes. (`acceptance.test.ts`, "the injection test")
 5. **The tenant wall.** Two principals with disjoint bundle lists. A caller entitled to one
    receives `document-not-found` for the other's document from every tool, for every argument
-   shape that could name it, and the audit record shows the attempt with outcome
-   `not-entitled` and no `versionId`, internally mapped to what was returned.
+   shape that could name it — including a `verify_quote` whose quote carries a character the
+   normalisation forbids — and the audit record shows the attempt with outcome `not-entitled`
+   and no `versionId`, internally mapped to what was returned.
    (`acceptance.test.ts`, "the tenant wall")
 6. **No narrative anywhere but the answer.** The audit record for every call, and every error
    response, passes the same narrative-leak scan the pipeline's evidence is held to.
@@ -348,6 +451,48 @@ above.
     and role on the attester agent, and nothing else about the approver.
     (`test/provenance.test.ts`, "names the approver and the approver's role on the attester
     agent")
+18. **The image gate catches what it claims to.** The real `check-dockerfiles.mjs` is run over
+    fixture Dockerfiles: it passes digests and declared stage names, and fails an unpinned
+    `FROM`, an unpinned `COPY --from`, an unpinned `ADD --from`, an unpinned `RUN --mount`
+    source, an unpinned reference written after a line continuation, two node images pinned to
+    different digests, and a directory with no Dockerfile at all. (`test/ci/
+check-dockerfiles.test.ts`)
+19. **A body the transport cannot answer is refused.** A batch pairing a `tools/call` with a
+    `notifications/cancelled` naming its id, and a batch repeating a JSON-RPC id, are each
+    answered `400` with no tool run, no store read and no record; a cancellation naming an id
+    the body does not carry is not refused; the number `1` and the string `"1"` are answered
+    separately. Without the refusal the first request hangs. (`http.test.ts`, "refuses a batch
+    that cancels one of its own requests, before the transport sees it", "refuses a batch that
+    repeats a JSON-RPC id, before the transport sees it")
+20. **The deadline, and the disconnect.** Against a store read that never returns, a request is
+    answered `503 {"error":"unavailable"}` at the deadline rather than held open, and exactly
+    one audit record is written for the dispatched call with outcome `unavailable`; a client
+    that disconnects first ends the wait immediately and leaves one `client-closed` warning
+    line. (`http.test.ts`, "answers at the deadline instead of holding the request open, and
+    audits the call once", "stops waiting when the client disconnects, and says so on one
+    warning line")
+21. **The read budget.** `find_product` over an entitlement larger than the budget reads exactly
+    the budget and answers `truncated: true`; a call with no budget left answers `unavailable`
+    without reading; one read is not enough for a `get_section`, because its provenance lookup
+    is a read too; and one budget is shared across a whole JSON-RPC batch. (`acceptance.test.ts`,
+    "bounds the store reads one request may make, and says so"; `http.test.ts`, "shares one
+    store-read budget across every call in a batch")
+22. **Truncated means what the contract says.** With 60 entitled documents that all match and
+    `limit: 50`, `find_product` answers 50 products and `truncated: true`, in the result and in
+    the record; with a limit it cannot reach, every document is searched and `truncated` is
+    false. (`acceptance.test.ts`, "find_product reports truncated whenever the limit stopped the
+    scan short")
+23. **The written line is the record.** Audit lines written through the service's own logger are
+    parsed back, stripped of the logger's four fields, and validated against
+    `QueryAuditRecordSchema` — `credentialType` included — and compared field for field with the
+    records the service built. (`acceptance.test.ts`, "the written audit line is the published
+    record"; `test/logger.test.ts`, "keeps credentialType while still dropping credential and
+    credentials")
+24. **The demo path works.** A user access token of the shape `gcloud auth print-access-token`
+    yields — opaque, `aud` and `azp` the gcloud client id, a Google subject — is refused while
+    no client id is configured and accepted as `credentialType: access-token` once that client
+    id is in `QUERY_OAUTH_CLIENT_IDS`, without reaching ID-token verification. (`auth.test.ts`,
+    "accepts a user access token whose tokeninfo names a configured client id")
 
 ## Security properties stated honestly
 
@@ -380,14 +525,31 @@ on the page next to what it does.
 
 ## Audit trail
 
-One `QueryAuditRecord` per tool call, through the regulated-audit sink to the retained log
-bucket (`min(evidence_retention_days, 3650)` days). Needed before a pilot, and listed in
-`docs/validation/README.md` UR-24: the record gains `versionId` (which version of a label was
-served), `credentialType`, and a `turnId` correlating it with the agent's per-turn record;
-the retained log bucket is locked; readers are a named role on that bucket only; a log-based
-alert fires on `not-entitled` outcomes. The trail is not cryptographically tamper-evident —
-Cloud Logging immutability plus IAM is the control, unlike the worker's KMS-signed manifest —
-and this note says so rather than implying otherwise.
+One `QueryAuditRecord` per dispatched tool call, through the regulated-audit sink to the
+retained log bucket (`min(evidence_retention_days, 3650)` days). What this note listed as
+"needed before a pilot" has moved; here is where each item actually stands.
+
+**Delivered.** The record carries `versionId` (the document version the call actually read),
+`credentialType` (which kind of credential the verifier accepted), and `turnId` (the agent's
+declared turn, when one is declared), and `credentialType` is on the shared logger's allow-list
+so the written line carries every field of the record — a test parses a written line back and
+validates it against `QueryAuditRecordSchema`. The log-based metric that counts entitlement
+denials (`ema_flow/query_entitlement_denials`) is created on every apply.
+
+**Available, not applied.** The e-mail notification channel and the alert policy on that metric
+(more than five denials in a rolling hour) are created only when `alert_notification_email` is
+set; it is unset. The retained log bucket's lock is a variable
+(`lock_regulated_audit_log_bucket`, default `false`) and setting it is irreversible: retention
+can then never be changed and Terraform will not unlock it. Neither has run against a project;
+both are `terraform validate`-checked only.
+
+**Not implemented.** No reader role scoped to the retained log bucket exists — who can read the
+retained audit log today is whoever the project's logging roles let read it. That is a gap, not
+a control, and closing it is a person's decision about which role and which principals.
+
+The trail is not cryptographically tamper-evident — Cloud Logging immutability plus IAM is the
+control, unlike the worker's KMS-signed manifest — and this note says so rather than implying
+otherwise.
 
 ## Entitlement changes are change-controlled
 
@@ -425,6 +587,30 @@ precisely so entitlements can be granted by a role separate from the developer.
   Dockerfiles as part of `npm run check`. Decided 2026-09-20.
 - The Cloud Run service is `ema-flow-<env>-query`; the image is the `query` path of the shared
   `ema-flow` Artifact Registry repository. Decided 2026-09-20.
+- A body the transport cannot answer as one response per request id is refused with `400`
+  before the transport is connected: a repeated JSON-RPC id, and a `notifications/cancelled`
+  naming a request id in the same body. Refusing the shape was chosen over trying to answer it,
+  because the SDK gives no way to make the suppressed response appear. Decided 2026-09-20.
+- The service bounds its own wait at 30 seconds and on the client's disconnect, rather than
+  relying on the Cloud Run request timeout, and answers `503 {"error":"unavailable"}` when it
+  gives up. It writes the outstanding audit records itself at that point and seals the request,
+  so a tool finishing later adds no second record. Decided 2026-09-20.
+- One HTTP request may make 400 store reads across its whole batch (`REQUEST_READ_BUDGET`),
+  twice the `find_product` horizon: enough for one full scan plus the documents that scan
+  named, and a quarter of what the batch cap times the horizon would otherwise allow. It is a
+  per-request bound, not a per-principal quota. Decided 2026-09-20.
+- `truncated` is the contract's meaning — any entitled document the call did not search —
+  rather than the scan horizon alone, because the agent instruction tells the model that
+  `truncated` means the search was cut short. Decided 2026-09-20.
+- `credentialType` is added to the shared logger's allow-list (`src/lib/logger.ts`), so the
+  retained log line conforms to the published `QueryAuditRecord`. Its value is one of two enum
+  members and cannot carry text, and every other forbidden key is unchanged. This is a change
+  to a library the worker also uses (ADR 0004) and belongs in change control as such; the
+  worker never logs that key. Decided 2026-09-20.
+- `verify_quote` decides entitlement before it normalises the caller's quote, so the tenant-wall
+  audit promise holds for every argument shape. Decided 2026-09-20.
+- The image-pinning gate covers `COPY --from`, `ADD --from` and `RUN --mount ... from=` as well
+  as `FROM`, and has its own negative fixture test. Decided 2026-09-20.
 
 ## Open questions
 

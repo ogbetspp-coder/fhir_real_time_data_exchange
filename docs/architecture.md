@@ -31,8 +31,8 @@ by this gate; the worker's run-source allowlist (`ENABLED_RUN_SOURCES`, Terrafor
 `enabled_run_sources`, default all three sources; a request for a source outside it answers
 `422 source-disabled` before any reader, fixture, or client is touched) is how a deployment
 where Zone A is the only producer disables them, by setting `["document"]`. That allowlist is
-built and tested (`test/run-sources.test.ts`) in commit `d241065` on a separate branch and is
-not yet merged into this tree. Zone B (this
+built, tested (`test/run-sources.test.ts`) and merged into this tree; the Terraform default is
+still all three sources, so nothing narrows until an operator sets the variable. Zone B (this
 repository, deterministic) accepts only an approved `CanonicalSubmission`, re-verifies hash,
 approval, bijection, and terminology invariants at ingress, and only then runs the unchanged
 transform, validation, persistence, and evidence pipeline. `src/fhir/transform.ts`, the
@@ -155,9 +155,23 @@ Cloud Monitoring presents throughput, failures, validation rejections, service l
 workflow executions, and architectural guidance. Data Access audit logging is enabled for
 Healthcare API, Storage, BigQuery, and KMS and routed to a retained regional log bucket.
 
+After a successful `terraform apply`, `scripts/gcp/deploy.sh` reads the effective IAM policy
+held by the worker and query service accounts — at project level and on the Healthcare dataset
+— prints it into the deploy log and copies it to
+`gs://<evidence bucket>/deploy-evidence/<YYYY>/<MM>/<DD>/<UTC stamp>-<environment>-<commit>/`.
+This is what closes the gap between the Terraform-declared role set a test asserts and the
+policy actually in force (ADR 0004, decision 5). Every step of it is warning-only: a denied
+`get-iam-policy`, a missing output, or a failed upload prints a `::warning::` naming the
+permission needed and never fails the deploy, so an absent export is visible rather than
+silent. It has not yet run against a project.
+
 ## Security boundaries
 
-- Cloud Run requires IAM authentication; only the Workflow service account receives invoker.
+- Cloud Run requires IAM authentication on both services; no `allUsers` invoker is granted
+  anywhere. On the worker, the Workflow service account is the only invoker. On the query
+  service, `run.invoker` is granted to exactly the members listed in the `query_invokers`
+  variable (`infra/query.tf`), which is empty by default — a deploy that sets nothing
+  authorises no caller.
 - The worker uses a dedicated service account with the narrow
   `roles/healthcare.fhirResourceEditor` role plus evidence-object, ledger-writer,
   lineage-editor, logger, and signing permissions. That editor role is bound at project level
@@ -209,22 +223,36 @@ only.
   list empty, which is the default, every access token is rejected). Successful access-token
   verifications are cached in process memory — keyed by the token's SHA-256, holding principal
   and expiry only, at most 300 s and never past the token's expiry, at most 1,000 entries,
-  failures never cached. `QUERY_AUDIENCE` defaults to the deterministic Cloud Run URL; a
-  Terraform postcondition asserts after apply that the URL is one the service serves.
+  failures never cached. `QUERY_AUDIENCE` defaults to the deterministic Cloud Run URL
+  (`https://ema-flow-<env>-query-<project number>.<region>.run.app`); a Terraform postcondition
+  asserts after apply that the URL is one the service serves. Cloud Run also serves the service
+  on a legacy `https://<service>-<hash>-<region code>.a.run.app` hostname. Both hostnames reach
+  the service and only the audience string is accepted as an ID token's `aud`, so the outputs
+  keep them apart by name: `query_service_url` (where to send requests) and `query_audience`
+  (what to mint tokens for) are the same string unless `var.query_audience` overrides it, while
+  `query_service_urls` lists every hostname and is not an audience.
 - **Answers before the protocol** (`src/query/app.ts`, in this order): `401 unauthenticated`
   for a missing or unverifiable bearer; `403 not-entitled` for a verified principal with no
   entry in the entitlement map, so an authenticated stranger never reaches `tools/list`;
   `405` for a non-`POST`; `400 invalid-request` for an `X-Query-Turn-Id` that is present but
-  not a UUID, for a body that is not JSON or exceeds 4 MiB, and for a JSON-RPC batch of more
-  than 8 messages. Nothing is dispatched on any of these paths.
+  not a UUID, for a body that is not JSON or exceeds 4 MiB, for a JSON-RPC batch of more than
+  8 messages, for two entries carrying the same JSON-RPC id, and for a body carrying a
+  `notifications/cancelled` that names a request id in the same body. Nothing is dispatched on
+  any of these paths. The last two shapes are refused because the transport would not answer
+  them as one response per request id. Past that point the service bounds its own wait at 30
+  seconds and on the client's disconnect, answering `503 unavailable` and writing the
+  outstanding audit records itself rather than holding a request slot to the Cloud Run timeout.
 - **Entitlements.** A Terraform-managed map, `{"<sub>": {"bundles": [...]}}`, parsed once at
   startup with a strict schema (an `organisation` key or an e-mail-shaped principal fails
   startup) and resolved once per request before any store read. Inside the protocol, a document
   outside the caller's entitlement is `document-not-found` from every tool; `not-entitled` is an
   audit outcome, never a returned error code. `find_product` reads at most the first 200
   entitled ids in entitlement order through a pool of 8, stops launching reads once `limit`
-  matches are in hand, and reports `truncated: true` exactly when the entitlement holds more
-  than 200 ids — in the result and in the audit record.
+  matches are in hand, and reports `truncated: true` whenever the entitlement holds more
+  documents than the call searched — the horizon, the limit, or an exhausted read budget — in
+  the result and in the audit record. One HTTP request may make 400 store reads across its
+  whole batch; past that `find_product` stops scanning and every other tool answers
+  `unavailable` without reading. It is a per-request bound, not a per-principal quota.
 - **What it must never do.** Write, amend, draft, rewrite, or summarise regulated narrative;
   return narrative without its hash; disclose a document outside a caller's entitlement.
 - **`/healthz`.** Answers `status`, `service`, and `version` from the process's configuration
@@ -237,10 +265,13 @@ only.
   (`find_product` only), `durationMs`, `bundleId`, `versionId` (the version actually read;
   absent when nothing was read), and `turnId` (when the caller declared one) — never narrative,
   never an argument value. A request the transport refused before the handler ran still gets one
-  `invalid-request` record; a notification (no JSON-RPC id) gets none. Records go through the
-  same logger as the worker, whose forbidden-key filter drops `credentialType` from the written
-  line (the key contains "credential"); the field is in the record but not in Cloud Logging
-  until that shared library is widened.
+  `invalid-request` record; a notification (no JSON-RPC id) gets none. When the service gives up
+  waiting it writes the outstanding records itself — `unavailable` for a call that reached a
+  handler and had not finished — and a tool finishing later adds no second record. Records go
+  through the same logger as the worker; `credentialType` is on that logger's allow-list
+  (`src/lib/logger.ts`, a shared library under ADR 0004 change control), so the written line
+  carries every field of the record, and a test parses a written line back against
+  `QueryAuditRecordSchema`.
 - **Structured lines and alerting.** Every line carries `service: "ema-flow-query"`. The 401
   line is `stage: "query-http", event: "unauthenticated"` with nothing derived from the
   credential; the 403 line adds `principal`. A log-based metric

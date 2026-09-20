@@ -64,8 +64,9 @@ contract, the ingress gate, the reference resolver, the `document` route, and th
 producer is `src/fixtures/synthetic-submission.ts`. The `fixture` and `healthcare-api` sources
 are pre-existing trusted inputs guarded by IAM, not by this gate; the worker's run-source
 allowlist (`ENABLED_RUN_SOURCES`, Terraform `enabled_run_sources`, default all three; set
-`["document"]` where Zone A is the only producer) disables them. That allowlist is built and
-tested in commit `d241065` on a separate branch and is not yet merged into this tree. See
+`["document"]` where Zone A is the only producer) disables them. That allowlist is built,
+tested (`test/run-sources.test.ts`) and merged into this tree; the Terraform default is still
+all three sources, so nothing narrows until an operator sets the variable. See
 [docs/adr/0002-two-trust-zones-and-canonical-submission.md](docs/adr/0002-two-trust-zones-and-canonical-submission.md)
 and
 [docs/adr/0003-mechanical-narrative-fidelity.md](docs/adr/0003-mechanical-narrative-fidelity.md)
@@ -111,7 +112,7 @@ curl -X POST http://127.0.0.1:8080/v1/runs \
 `GET /healthz` reports `documentSource: false` when no submission bucket is configured, and the
 route then answers `503 document-source-not-configured` rather than failing obscurely. A source
 outside `ENABLED_RUN_SOURCES` answers `422 { "error": "source-disabled" }` before any reader,
-fixture, or client is touched (on the separate branch named above).
+fixture, or client is touched.
 
 ## Google Cloud deployment
 
@@ -166,6 +167,21 @@ service-account key is stored in GitHub. In that repository, set these Actions v
 | `GCP_REGION`                     | `europe-west4`                                                                           |
 | `GCP_DEPLOY_SERVICE_ACCOUNT`     | `ema-flow-deployer@PROJECT_ID.iam.gserviceaccount.com`                                   |
 | `GCP_WORKLOAD_IDENTITY_PROVIDER` | `projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL/providers/PROVIDER` |
+
+Three further Actions variables configure who may call the query service. They are variables,
+not secrets: an IAM member string, an opaque subject id, a FHIR bundle id, and an OAuth client
+id are identifiers, and holding one grants nothing. Each is optional; an unset variable leaves
+the Terraform default, and a deploy with all three unset succeeds and authorises no caller.
+
+| Variable                  | Example                                                           | Default when unset |
+| ------------------------- | ----------------------------------------------------------------- | ------------------ |
+| `QUERY_INVOKERS`          | `user:you@example.com,serviceAccount:a@p.iam.gserviceaccount.com` | `[]`               |
+| `QUERY_ENTITLEMENTS_JSON` | `{"112233445566778899000":{"bundles":["synthetic-type2-smpc"]}}`  | `{}`               |
+| `QUERY_OAUTH_CLIENT_IDS`  | `32555940559.apps.googleusercontent.com`                          | `[]`               |
+
+`scripts/gcp/deploy.sh` turns the two comma-separated values into Terraform list arguments and
+passes the entitlement map through unchanged; it logs byte counts, never values, because the
+deploy log is attached to a GitHub issue on failure.
 
 The WIF attribute condition must allow
 `repo:ogbetspp-coder/fhir_real_time_data_exchange:ref:refs/heads/main` (or the whole
@@ -249,40 +265,80 @@ The service accepts two credential kinds on `Authorization: Bearer`, told apart 
   Successful access-token verifications are cached in process memory, keyed by the token's
   SHA-256, for at most 300 seconds and never past the token's own expiry, at most 1,000 entries.
 
-Both a user account and a service account can call the service; only the token-minting command
-differs. Cloud Run's own edge check and the service's own `QUERY_AUDIENCE` check both require
-the token's audience to equal the service URL, so mint it for that URL in either case:
+#### Two hostnames, one audience
+
+Cloud Run serves the service on two hostnames, and only one of them is accepted as a token
+audience. Three Terraform outputs keep them apart:
+
+| Output               | Value                                                                                                                    |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `query_service_url`  | the deterministic `https://ema-flow-<env>-query-<project number>.<region>.run.app` — the endpoint to send requests to    |
+| `query_audience`     | the exact string the container receives as `QUERY_AUDIENCE`; equal to `query_service_url` unless `query_audience` is set |
+| `query_service_urls` | every URL Cloud Run reports, including the legacy `https://<service>-<hash>-<region code>.a.run.app` hostname            |
+
+Requests to either hostname reach the service. Only `query_audience` is accepted as an ID
+token's `aud` (`src/query/auth.ts`), so an ID token minted for the legacy hostname produces a
+failure that looks like a service fault: `/healthz`, which the service answers without any
+token check of its own, still returns 200, while every `/mcp` call is answered
+`401 {"error":"unauthenticated"}`. Mint tokens for `query_audience` and send them to
+`query_service_url`.
 
 ```bash
 SERVICE_URL="$(terraform -chdir=infra output -raw query_service_url)"
-
-# As your own logged-in user credential:
-gcloud auth print-identity-token --audiences="$SERVICE_URL"
-
-# As a service account, without switching your active gcloud account (needs
-# roles/iam.serviceAccountTokenCreator on that service account):
-gcloud auth print-identity-token \
-  --impersonate-service-account="ema-flow-query-caller@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
-  --audiences="$SERVICE_URL"
+AUDIENCE="$(terraform -chdir=infra output -raw query_audience)"
 ```
 
-A caller's subject is the `sub` claim of that same token. Read it locally without printing the
-token itself anywhere it could be logged — decode the payload in memory and keep only the claim:
+That 401 was reproduced in review against the service's verification code. It has not been
+observed against a deployed service, because no `terraform apply` has created one; the two
+URL shapes above were confirmed on the already-deployed worker in the same project and region.
+
+#### Minting a token
+
+**A service account you can impersonate** — needs `roles/iam.serviceAccountTokenCreator` on it,
+and does not switch your active gcloud account:
 
 ```bash
-TOKEN="$(gcloud auth print-identity-token --audiences="$SERVICE_URL")"
+TOKEN="$(gcloud auth print-identity-token \
+  --impersonate-service-account="ema-flow-query-caller@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
+  --audiences="$AUDIENCE")"
+
+# The subject to entitle is that token's `sub`. Decode the payload without printing the token.
 printf '%s' "$TOKEN" | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null | jq -r .sub
 ```
 
-Then call the service. `GET /healthz` performs no application-level check: it answers
+**Your own Google account** cannot mint an ID token for this service at all.
+`gcloud auth print-identity-token --audiences=...` answers
+`ERROR: (gcloud.auth.print-identity-token) Invalid account type for --audiences. Requires valid service account.`
+for a user account, and a user's plain identity token carries gcloud's own OAuth client id as
+its audience rather than `QUERY_AUDIENCE`. The path that does work for a human is the
+access-token path. Read the client id and the subject gcloud presents:
+
+```bash
+curl -s -X POST -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  https://oauth2.googleapis.com/tokeninfo
+```
+
+Run from a logged-in user account on 2026-09-20, that returned `aud` and `azp` both
+`32555940559.apps.googleusercontent.com`, plus the `sub` to entitle. An operator then sets
+three things: that client id in `query_oauth_client_ids`, `user:<your e-mail>` in
+`query_invokers`, and that `sub` in `query_entitlements_json`. The token is then
+`$(gcloud auth print-access-token)` and needs no audience.
+
+That client id is built into every gcloud installation worldwide, so naming it proves only that
+a token came from gcloud and never who presented it. What still stands between such a caller
+and a document is Cloud Run's `run.invoker` on the service and the per-subject entitlement —
+nothing else. It is `[]` by default; adding it is a deliberate act.
+
+#### Calling it
+
+`GET /healthz` performs no application-level check: it answers
 `{ "status": "ok", "service": "ema-flow-query", "version": <QUERY_SERVICE_VERSION> }` from the
 process's own configuration, without a token check and without touching the FHIR store, so it
 proves the container started and nothing more. Cloud Run's own IAM check still applies to it,
-so the same bearer token is required:
+so a bearer token is still required. `$TOKEN` below is either the impersonated ID token above
+or `$(gcloud auth print-access-token)`:
 
 ```bash
-TOKEN="$(gcloud auth print-identity-token --audiences="$SERVICE_URL")"
-
 curl -s -H "Authorization: Bearer $TOKEN" "$SERVICE_URL/healthz"
 
 curl -s -X POST "$SERVICE_URL/mcp" \
@@ -306,21 +362,32 @@ curl -s -X POST "$SERVICE_URL/mcp" \
 What `/mcp` answers before any protocol message is dispatched, in this order
 (`src/query/app.ts`):
 
-| Condition                                                     | Answer                                  |
-| ------------------------------------------------------------- | --------------------------------------- |
-| No, malformed, or unverifiable bearer                         | `401 { "error": "unauthenticated" }`    |
-| Verified principal with no entry in `query_entitlements_json` | `403 { "error": "not-entitled" }`       |
-| Method other than `POST`                                      | `405 { "error": "method-not-allowed" }` |
-| `X-Query-Turn-Id` present but not a UUID                      | `400 { "error": "invalid-request" }`    |
-| Body not JSON, or larger than 4 MiB                           | `400 { "error": "invalid-request" }`    |
-| JSON-RPC batch of more than 8 messages                        | `400 { "error": "invalid-request" }`    |
+| Condition                                                        | Answer                                  |
+| ---------------------------------------------------------------- | --------------------------------------- |
+| No, malformed, or unverifiable bearer                            | `401 { "error": "unauthenticated" }`    |
+| Verified principal with no entry in `query_entitlements_json`    | `403 { "error": "not-entitled" }`       |
+| Method other than `POST`                                         | `405 { "error": "method-not-allowed" }` |
+| `X-Query-Turn-Id` present but not a UUID                         | `400 { "error": "invalid-request" }`    |
+| Body not JSON, or larger than 4 MiB                              | `400 { "error": "invalid-request" }`    |
+| JSON-RPC batch of more than 8 messages                           | `400 { "error": "invalid-request" }`    |
+| Two entries carrying the same JSON-RPC id                        | `400 { "error": "invalid-request" }`    |
+| A `notifications/cancelled` naming a request id in the same body | `400 { "error": "invalid-request" }`    |
+
+The last two are refused because the transport would not answer those bodies as one response
+per request id, and the request would never finish. Past that point the service waits at most
+30 seconds for the transport, and stops sooner if the client disconnects; on either bounded end
+it answers `503 { "error": "unavailable" }` and writes the outstanding audit records itself.
 
 The `401` line logged carries nothing derived from the credential; the `403` line carries the
 principal (the `sub` an operator would entitle). Inside the protocol, a document outside the
 caller's entitlement is `document-not-found` from every tool — `not-entitled` is an audit
 outcome only, never a returned error code. `find_product` reads at most the first 200 entitled
-Bundle ids (8 reads in flight) and answers `truncated: true` when the entitlement holds more, so
-an empty `products` with `truncated: true` is not "no such product".
+Bundle ids (8 reads in flight) and answers `truncated: true` whenever the caller's entitlement
+holds more documents than the call searched — because the horizon cut the list, because `limit`
+stopped the scan, or because the request's read budget ran out — so an empty `products` with
+`truncated: true` is not "no such product". One HTTP request may make 400 store reads across
+its whole JSON-RPC batch; past that, `find_product` stops scanning and every other tool answers
+`unavailable` rather than reading. That is a per-request bound and not a per-principal quota.
 
 `X-Query-Turn-Id`, when present and a UUID, is copied into every audit record of the request
 as `turnId`; the agent sends it on every request of a turn so its own `AgentTurnRecord` can be
@@ -332,9 +399,9 @@ service exists, so no bootstrap apply is needed; a Terraform postcondition fails
 that URL is not one Cloud Run reports for the service. This has been checked by `terraform
 validate` only, not by an apply against a project.
 
-Query-service Terraform variables beyond `query_invokers` and `query_entitlements_json`
-(supply them through `TF_VAR_<name>` or an `infra/*.auto.tfvars` file; `scripts/gcp/deploy.sh`
-passes only project, region, environment, `service_version`, and the image references):
+Query-service Terraform variables beyond `query_invokers`, `query_entitlements_json`, and
+`query_oauth_client_ids` — those three `scripts/gcp/deploy.sh` passes from the Actions
+variables above; supply the rest through `TF_VAR_<name>` or an `infra/*.auto.tfvars` file:
 
 | Variable                          | Default   | Effect                                                                                                                      |
 | --------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------- |
@@ -347,6 +414,31 @@ passes only project, region, environment, `service_version`, and the image refer
 
 The metric filter and the alert threshold have been checked by `terraform validate` only; no
 plan or apply has run against a project.
+
+### Deploy order before the first demonstration
+
+Do these three in this order. The order matters because of one change in this branch: the
+worker's Provenance projection now writes the approver's role on the attester agent
+(`src/fhir/provenance.ts`, `APPROVER_ROLE_SYSTEM`), and `get_provenance` reads only that coding
+and never infers it. Every document already in the demonstrator's validated store was written
+by a worker built before that change, so its persisted `Provenance` carries no role — and
+`get_provenance` answers `unavailable` for all of them, with nothing to indicate the cause but
+this paragraph.
+
+1. **Deploy the worker** from this branch, so the projection that writes the role is running.
+2. **Re-ingest the documents** through the ordinary document path: `npx tsx scripts/demo/seed.ts`
+   (rehearse with `--dry-run`). That writes a second `Provenance` resource for the document —
+   its id is derived from the submission id (`stableUuid("ingestion-provenance", submissionId)`),
+   so a re-ingest adds one rather than replacing the old one.
+3. **Deploy the query service**, then call `get_provenance` for the document you intend to show
+   and confirm it answers an approver role before anyone is in the room. Confirming it is not
+   optional: `get_provenance` resolves the resource with
+   `Provenance?target=Bundle/<id>&_count=1` and no `_sort` (`src/query/fhir-reader.ts`), so
+   which of two Provenance resources for the same document it returns is not fixed by this
+   code. A fresh store, or a fresh document id, avoids the ambiguity entirely.
+
+Nothing here is a data migration: a `Provenance` already written is never rewritten, and this
+repository has no tool that would rewrite one.
 
 ## Standards and validation
 

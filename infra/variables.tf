@@ -100,7 +100,7 @@ variable "query_image" {
 }
 
 variable "query_invokers" {
-  description = "IAM members granted roles/run.invoker on the query service. No allUsers."
+  description = "IAM members granted roles/run.invoker on the query service, in gcloud member syntax (user:, serviceAccount:, group:). No allUsers. A human calling the service with their own account needs an entry here and an entitlement in query_entitlements_json."
   type        = list(string)
   default     = []
 }
@@ -138,9 +138,22 @@ variable "query_entitlements_json" {
 
 variable "query_oauth_client_ids" {
   description = <<-EOT
-    OAuth 2.0 client ids the query service additionally accepts as the audience of a
-    Google-signed ID token, joined with "," into QUERY_OAUTH_CLIENT_IDS. Empty omits the
-    variable, so only the service URL audience is accepted.
+    OAuth 2.0 client ids whose opaque Google access tokens the query service accepts, joined
+    with "," into QUERY_OAUTH_CLIENT_IDS. src/query/auth.ts sends a non-JWT bearer token to
+    Google's tokeninfo endpoint and accepts it only when the returned `aud` or `azp` is one of
+    these ids; ID tokens take the other path and are checked against QUERY_AUDIENCE alone, so
+    an id here never widens what ID token audiences are accepted. Empty (the default) omits the
+    variable and every access token is rejected.
+
+    Adding "32555940559.apps.googleusercontent.com", the client id of the gcloud CLI, makes
+    `gcloud auth print-access-token` a working credential for this service: a human who holds
+    roles/run.invoker on it (var.query_invokers) and an entitlement keyed by their Google
+    account's `sub` (var.query_entitlements_json) can then call it with their own account.
+    `gcloud auth print-identity-token --audiences=...` cannot serve that case: Google refuses
+    the flag for user accounts. That client id is built into every gcloud installation
+    worldwide, so naming it proves only that a token came from gcloud and never who presented
+    it: the controls that decide access stay Cloud Run IAM on the caller's own identity and the
+    per-subject entitlement map.
   EOT
   type        = list(string)
   default     = []
@@ -159,7 +172,8 @@ variable "query_audience" {
     the service's deterministic Cloud Run URL,
     https://<service name>-<project number>.<region>.run.app, which is known before the service
     exists so no bootstrap apply is needed. Set it only to front the service with another
-    hostname; the URL assertion on the service is skipped in that case.
+    hostname; the URL assertion on the service is skipped in that case. The `query_audience`
+    output reports the value the container was given, whichever branch applied.
   EOT
   type        = string
   default     = ""

@@ -40,7 +40,14 @@ Services are discrete in **identity and state**, never in code.
    product — and carries, in `docs/validation/README.md`, a traceability row per prohibition
    naming its test. Tests assert the Terraform-declared role set; the effective IAM policy can
    be widened outside Terraform, so each deployment's evidence includes an effective-policy
-   export per service account. Role grants that cannot be Terraform-managed — today the
+   export per service account. That export is implemented. After a successful apply,
+   `scripts/gcp/deploy.sh` reads the effective policy held by the worker and query service
+   accounts, at project level and on the Healthcare dataset, prints it into the deploy log,
+   and copies it to
+   `gs://<evidence bucket>/deploy-evidence/<YYYY>/<MM>/<DD>/<UTC stamp>-<environment>-<commit>/`.
+   Every step is warning-only and never fails the deploy, so a missing permission leaves a
+   `::warning::` naming it rather than a silent gap; it has not yet run against a project.
+   Role grants that cannot be Terraform-managed — today the
    deployer's bootstrap roles, `roles/documentai.editor` on the deployer, and the audit log
    sink's writer identity — are listed in `docs/architecture.md` with the reason, and
    re-confirmed at each deployment.

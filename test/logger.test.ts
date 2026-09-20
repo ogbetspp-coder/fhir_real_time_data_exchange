@@ -90,6 +90,18 @@ describe("structured logger redaction", () => {
     expect(entry.resourceId).toBe("bundle-1");
   });
 
+  it("keeps credentialType while still dropping credential and credentials", () => {
+    const entry = fieldsOf({
+      credentialType: "access-token",
+      credential: "ya29.opaque",
+      credentials: "ya29.opaque",
+    });
+
+    expect(entry.credentialType).toBe("access-token");
+    expect(Object.keys(entry)).not.toContain("credential");
+    expect(Object.keys(entry)).not.toContain("credentials");
+  });
+
   it("drops every other forbidden key", () => {
     for (const key of forbiddenKeys) {
       const entry = fieldsOf({ runId: "run-1", [key]: "Synthetic demonstration content" });

@@ -6,6 +6,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
   FindProductOutputSchema,
   ProvenanceDetailSchema,
+  QueryAuditRecordSchema,
   QuoteVerificationSchema,
   SectionContentSchema,
   type QueryAuditRecord,
@@ -361,6 +362,12 @@ describe("ePI query service, phase 1", () => {
         { tool: "verify_quote", args: { bundleId: foreign, quote } },
         { tool: "verify_quote", args: { bundleId: foreign, sourceKey: SECTION_KEY, quote } },
         { tool: "verify_quote", args: { bundleId: foreign, versionId: VERSION_ID, quote } },
+        // A quote the normalisation refuses, against a document outside the entitlement: the
+        // entitlement decision comes first, so this is the wall and not a bad request.
+        {
+          tool: "verify_quote",
+          args: { bundleId: foreign, quote: `dose${String.fromCodePoint(0)} is` },
+        },
       ];
 
       for (const shape of shapes) {
@@ -457,6 +464,164 @@ describe("ePI query service, phase 1", () => {
       expect(harness.log.bundles).toHaveLength(2);
       expect(onlyAudit(harness.audits).truncated).toBe(false);
     });
+  });
+
+  it("find_product reports truncated whenever the limit stopped the scan short", async () => {
+    const seeded = store.documents.get(store.bundleIdA);
+    if (seeded === undefined) throw new Error("expected a seeded document");
+
+    // Every entitled document matches the query, and there are more of them than `limit`.
+    const ids = Array.from({ length: 60 }, (_, position) =>
+      stableUuid("ema-bundle", `limit-${String(position)}`),
+    );
+    const documents = new Map<string, SeededDocument>(ids.map((id) => [id, seeded]));
+    const harness = await connectHarness({
+      store,
+      principal: PRINCIPAL_A,
+      entitlements: { bundles: ids },
+      documents,
+    });
+    try {
+      const capped = FindProductOutputSchema.parse(
+        (await callTool(harness, "find_product", { query: store.productNameA, limit: 50 }))
+          .structured,
+      );
+      // 50 of 60 entitled documents are reported, so 10 were never searched — the scan stopped
+      // at the limit, well inside the horizon of 200.
+      expect(capped.products).toHaveLength(50);
+      expect(harness.log.bundles.length).toBeLessThan(ids.length);
+      expect(capped.truncated).toBe(true);
+      expect(onlyAudit(harness.audits).truncated).toBe(true);
+
+      // The same entitlement with a limit it cannot reach: every document is searched and
+      // nothing is truncated.
+      harness.audits.length = 0;
+      harness.log.bundles.length = 0;
+      const whole = FindProductOutputSchema.parse(
+        (await callTool(harness, "find_product", { query: "no-such-product-anywhere" })).structured,
+      );
+      expect(whole.truncated).toBe(false);
+      expect(harness.log.bundles.length).toBe(ids.length);
+      expect(onlyAudit(harness.audits).truncated).toBe(false);
+    } finally {
+      await harness.close();
+    }
+  });
+
+  it("bounds the store reads one request may make, and says so", async () => {
+    const seeded = store.documents.get(store.bundleIdA);
+    if (seeded === undefined) throw new Error("expected a seeded document");
+    const ids = Array.from({ length: 20 }, (_, position) =>
+      stableUuid("ema-bundle", `budget-${String(position)}`),
+    );
+    const documents = new Map<string, SeededDocument>(ids.map((id) => [id, seeded]));
+
+    const budgeted = (readBudget: number) =>
+      connectHarness({
+        store,
+        principal: PRINCIPAL_A,
+        entitlements: { bundles: ids },
+        documents,
+        readBudget,
+      });
+
+    // find_product stops scanning when the budget is spent, and reports the documents it did
+    // not search as `truncated`.
+    const scanning = await budgeted(5);
+    try {
+      const output = FindProductOutputSchema.parse(
+        (await callTool(scanning, "find_product", { query: store.productNameA })).structured,
+      );
+      expect(scanning.log.bundles).toHaveLength(5);
+      expect(output.products).toHaveLength(5);
+      expect(output.truncated).toBe(true);
+      expect(onlyAudit(scanning.audits)).toMatchObject({ outcome: "ok", truncated: true });
+    } finally {
+      await scanning.close();
+    }
+
+    // A request with no budget left answers `unavailable` rather than reading.
+    const spent = await budgeted(0);
+    try {
+      const answer = await callTool(spent, "get_section", {
+        bundleId: ids[0],
+        sourceKey: SECTION_KEY,
+      });
+      expect(answer.structured).toEqual({ tool: "get_section", error: "unavailable" });
+      expect(spent.log.bundles).toEqual([]);
+      expect(spent.log.provenance).toEqual([]);
+      expect(onlyAudit(spent.audits).outcome).toBe("unavailable");
+    } finally {
+      await spent.close();
+    }
+
+    // The provenance lookup is a read too: one read is not enough for a get_section.
+    const partial = await budgeted(1);
+    try {
+      const answer = await callTool(partial, "get_section", {
+        bundleId: ids[0],
+        sourceKey: SECTION_KEY,
+      });
+      expect(answer.structured).toEqual({ tool: "get_section", error: "unavailable" });
+      expect(partial.log.bundles).toHaveLength(1);
+      expect(partial.log.provenance).toEqual([]);
+    } finally {
+      await partial.close();
+    }
+  });
+
+  it("the written audit line is the published record", async () => {
+    // What an assessor is shown is the retained Cloud Logging line, not the in-process object.
+    // The line is parsed back here, minus the four fields the logger adds, and has to satisfy
+    // QueryAuditRecordSchema — including `credentialType`, the field that distinguishes a
+    // forwarded end-user access token from a direct ID-token caller.
+    const capture = captureLines();
+    const harness = await connectHarness({
+      store,
+      principal: PRINCIPAL_A,
+      entitlements: directory.entitlementsFor(PRINCIPAL_A),
+      identity: {
+        principal: PRINCIPAL_A,
+        credentialType: "access-token",
+        imageDigest: `sha256:${"ab".repeat(32)}`,
+        turnId: "0f6d1a2e-3b4c-4d5e-8f60-718293a4b5c6",
+      },
+      logAudit: true,
+    });
+    try {
+      await callTool(harness, "get_section", {
+        bundleId: store.bundleIdA,
+        sourceKey: SECTION_KEY,
+      });
+      await callTool(harness, "find_product", { query: store.productNameA });
+      await callTool(harness, "get_section", { bundleId: store.bundleIdB, sourceKey: SECTION_KEY });
+    } finally {
+      await harness.close();
+      capture.restore();
+    }
+
+    const written = capture.lines
+      .map((line) => JSON.parse(line) as Record<string, unknown>)
+      .filter((line) => line.stage === "query-tool");
+    expect(written).toHaveLength(harness.audits.length);
+    expect(written.length).toBeGreaterThan(2);
+
+    for (const line of written) {
+      expect([line.severity, line.message, line.stage]).toEqual([
+        "INFO",
+        "Query tool call",
+        "query-tool",
+      ]);
+      expect(typeof line.timestamp).toBe("string");
+      // Not `safeParse`: the failure has to name the field that did not survive the logger.
+      const parsed = QueryAuditRecordSchema.parse(withoutLoggerFields(line));
+      expect(parsed.credentialType).toBe("access-token");
+    }
+
+    // And the line really is the record the service built, field for field.
+    expect(written.map(withoutLoggerFields)).toEqual(
+      harness.audits.map((record) => ({ ...record })),
+    );
   });
 
   it("no narrative anywhere but the answer", async () => {
@@ -570,6 +735,14 @@ describe("ePI query service, phase 1", () => {
 });
 
 // --- helpers ---------------------------------------------------------------------------------
+
+// A written log line minus the four fields the logger itself adds, which is what has to be the
+// published audit record.
+const LOGGER_OWN_FIELDS = new Set(["severity", "message", "timestamp", "stage"]);
+
+function withoutLoggerFields(line: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(line).filter(([key]) => !LOGGER_OWN_FIELDS.has(key)));
+}
 
 const WINDOW_SIZE = 24;
 const WINDOW_STEP = 12;

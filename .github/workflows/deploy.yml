@@ -37,6 +37,9 @@ jobs:
         env:
           GCP_DEPLOY_SERVICE_ACCOUNT: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          QUERY_INVOKERS: ${{ vars.QUERY_INVOKERS }}
+          QUERY_ENTITLEMENTS_JSON: ${{ vars.QUERY_ENTITLEMENTS_JSON }}
+          QUERY_OAUTH_CLIENT_IDS: ${{ vars.QUERY_OAUTH_CLIENT_IDS }}
         shell: bash
         run: |
           set -euo pipefail
@@ -46,6 +49,16 @@ jobs:
               exit 1
             fi
             echo "Repository variable ${name} is present."
+          done
+          # Optional. Unset means the Terraform default for that variable, which for the query
+          # service is no invoker, no entitlement, and no accepted OAuth client id: the service
+          # deploys and its startup probe passes, and no caller is authorised.
+          for name in QUERY_INVOKERS QUERY_ENTITLEMENTS_JSON QUERY_OAUTH_CLIENT_IDS; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Optional repository variable ${name} is not set; the Terraform default applies."
+            else
+              echo "Optional repository variable ${name} is present."
+            fi
           done
 
       - name: Check out repository
@@ -97,7 +110,16 @@ jobs:
       - name: Build container images
         run: bash scripts/gcp/deploy.sh images 2>&1 | tee -a deploy-run.log
 
+      # Repository variables, not secrets. QUERY_INVOKERS holds IAM member strings, the
+      # entitlement map holds opaque subject ids and FHIR bundle ids, and QUERY_OAUTH_CLIENT_IDS
+      # holds OAuth client ids: none of these is a credential, and holding one proves nothing
+      # and grants nothing. Each is optional; unset leaves the Terraform default (no invoker,
+      # no entitlement, no accepted OAuth client id), so an unconfigured deploy still succeeds.
       - name: Apply infrastructure
+        env:
+          QUERY_INVOKERS: ${{ vars.QUERY_INVOKERS }}
+          QUERY_ENTITLEMENTS_JSON: ${{ vars.QUERY_ENTITLEMENTS_JSON }}
+          QUERY_OAUTH_CLIENT_IDS: ${{ vars.QUERY_OAUTH_CLIENT_IDS }}
         run: bash scripts/gcp/deploy.sh apply 2>&1 | tee -a deploy-run.log
 
       - name: Reconcile FHIR stores

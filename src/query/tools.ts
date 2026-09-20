@@ -65,10 +65,41 @@ export type ToolOutcome<T> =
       auditOutcome: Exclude<QueryAuditOutcome, "ok">;
     } & Resolved);
 
+// --- read budget ------------------------------------------------------------------------------
+
+// Every store read one HTTP request may make, shared by every tool call in its JSON-RPC batch.
+// Without it the batch cap (8 messages) times the find_product horizon (200 documents) allows
+// 1,600 Bundle reads per request. 400 is twice the horizon: it lets one request run a whole
+// find_product scan and then read the documents that scan named, and it bounds the request at
+// 400 reads instead of 1,600. It is not a per-principal limit — a caller may send many requests.
+export const REQUEST_READ_BUDGET = 400;
+
+export type ReadBudget = {
+  // Reserves one store read, or reports false when the request has none left.
+  take(): boolean;
+  remaining(): number;
+};
+
+export function createReadBudget(limit: number = REQUEST_READ_BUDGET): ReadBudget {
+  let left = limit;
+  return {
+    take(): boolean {
+      if (left <= 0) return false;
+      left -= 1;
+      return true;
+    },
+    remaining(): number {
+      return left;
+    },
+  };
+}
+
 export type ToolContext = {
   entitlements: Entitlements | undefined;
   reader: FhirReader;
   mapping: EmaMapping;
+  // Shared by every tool call of one HTTP request; every read below takes from it.
+  readBudget: ReadBudget;
 };
 
 function fail<T>(
@@ -177,9 +208,16 @@ async function loadDocument<T>(
   selector: DocumentSelector,
 ): Promise<LoadedDocument | ToolOutcome<T>> {
   // Entitlement is applied before the read, never after it: a bundle outside the caller's list
-  // is not fetched at all (design note, constraint 4).
+  // is not fetched at all (design note, constraint 4). It is also applied before the budget, so
+  // an exhausted budget cannot turn a `not-entitled` record into an `unavailable` one.
   if (!isEntitled(context.entitlements, selector.bundleId)) {
     return notEntitled<T>(tool, selector.bundleId);
+  }
+
+  // The request's read budget is spent before the read is made, so a request that has none left
+  // answers `unavailable` rather than reading.
+  if (!context.readBudget.take()) {
+    return fail<T>(tool, "unavailable", { bundleId: selector.bundleId });
   }
 
   const bundle =
@@ -253,6 +291,10 @@ export async function getSection(
   const narrative = narrativeOf(located.section);
   if (narrative === undefined) return fail("get_section", "section-not-found", at);
 
+  // The provenance lookup is a second store read, so it takes from the budget too. When the
+  // budget is out the whole call is `unavailable` rather than an answer whose optional
+  // `provenanceResourceId` is missing for a reason the caller cannot see.
+  if (!context.readBudget.take()) return fail("get_section", "unavailable", at);
   const provenance = await context.reader.findProvenanceForBundle(input.bundleId);
   const provenanceId = Uuid.safeParse(provenance?.id);
 
@@ -349,6 +391,8 @@ export async function getProvenance(
   if (isOutcome(loaded)) return loaded;
   const at = resolved(loaded);
 
+  // The provenance lookup is a second store read and takes from the request's budget.
+  if (!context.readBudget.take()) return fail("get_provenance", "unavailable", at);
   const resource = await context.reader.findProvenanceForBundle(input.bundleId);
   if (resource === undefined) return fail("get_provenance", "unavailable", at);
   const parsed = PersistedProvenanceSchema.safeParse(resource);
@@ -423,6 +467,14 @@ export async function verifyQuote(
   context: ToolContext,
   input: VerifyQuoteInput,
 ): Promise<ToolOutcome<QuoteVerification>> {
+  // The entitlement decision comes before the quote is looked at, so every argument shape that
+  // names a document outside the caller's entitlement is audited `not-entitled` — including one
+  // whose quote the normalisation would reject. No store read is made here: `loadDocument`
+  // below checks the same list again before it reads.
+  if (!isEntitled(context.entitlements, input.bundleId)) {
+    return notEntitled("verify_quote", input.bundleId);
+  }
+
   // A quote carrying a character the normalisation forbids cannot be compared at all; that is a
   // property of the request, so it is `invalid-request` and never a `no-match`.
   let normalizedQuote: string;
@@ -579,22 +631,29 @@ export async function findProduct(
   // so an unentitled product cannot appear even for an exact query (design note, constraint 4).
   // Phase 1 has no search against the store, so each entitled document is read and inspected;
   // the reads run through a bounded pool, cover at most the first FIND_PRODUCT_SCAN_HORIZON
-  // entitled ids, and stop being launched once `limit` matches are in hand.
+  // entitled ids, stop being launched once `limit` matches are in hand, and stop when the
+  // request's read budget is spent.
   const entitled = context.entitlements?.bundles ?? [];
   const scanned = entitled.slice(0, FIND_PRODUCT_SCAN_HORIZON);
-  const truncated = entitled.length > scanned.length;
 
   const found: (ProductSummary | undefined)[] = new Array<ProductSummary | undefined>(
     scanned.length,
   ).fill(undefined);
   let next = 0;
   let matched = 0;
+  // Entitled documents this call attempted to read. Everything the call did not attempt was not
+  // searched, whatever stopped it.
+  let attempted = 0;
   const worker = async (): Promise<void> => {
     while (next < scanned.length && matched < limit) {
+      // Checked before the position is claimed, so a document the budget will not pay for is
+      // left unattempted and counts as unsearched rather than as a read that failed.
+      if (context.readBudget.remaining() === 0) return;
       const position = next;
       next += 1;
       const bundleId = scanned[position];
       if (bundleId === undefined) return;
+      attempted += 1;
       const loaded = await loadDocument<FindProductOutput>(context, "find_product", { bundleId });
       if (isOutcome(loaded)) continue;
       const summary = productSummary(loaded, index);
@@ -607,6 +666,12 @@ export async function findProduct(
   await Promise.all(
     Array.from({ length: Math.min(FIND_PRODUCT_CONCURRENCY, scanned.length) }, () => worker()),
   );
+
+  // The published contract: `truncated` is true when the caller's entitlement holds more
+  // documents than the service searched in one call. That is every entitled id this call did
+  // not attempt — because the scan horizon cut the list, because `limit` stopped the scan, or
+  // because the request's read budget ran out — not the horizon alone.
+  const truncated = entitled.length > attempted;
 
   // Matches are reported in entitlement order regardless of the order the reads completed in.
   const products = found

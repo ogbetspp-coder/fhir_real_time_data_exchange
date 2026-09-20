@@ -18,9 +18,12 @@ type LogFields = {
 const forbiddenFieldPattern =
   /(?:payload|resource|narrative|text|token|secret|credential|xhtml|span|excerpt|diff|hint|div|content|prompt|issue)/i;
 
-// The only two field names allowed to contain a forbidden substring: both carry FHIR metadata,
-// never FHIR content.
-const allowedFieldNames = new Set(["resourceType", "resourceId"]);
+// The only field names allowed to contain a forbidden substring. `resourceType` and
+// `resourceId` carry FHIR metadata, never FHIR content. `credentialType` matches "credential"
+// but carries no credential: its value is one of the two members of the contract's
+// `CredentialType` enum (`id-token`, `access-token`), so it cannot carry text. The value guard
+// below still applies to all three.
+const allowedFieldNames = new Set(["resourceType", "resourceId", "credentialType"]);
 
 const maxValueLength = 512;
 

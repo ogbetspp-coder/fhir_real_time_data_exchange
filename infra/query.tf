@@ -8,13 +8,13 @@ locals {
 
   # Cloud Run's deterministic URL, https://<service>-<project number>.<region>.run.app, is a
   # function of values known before the service exists, so the audience the container checks
-  # tokens against can be set on the same apply that creates it. The postcondition on the
-  # service below asserts, after creation, that this URL is one the service actually serves.
-  query_audience = (
-    var.query_audience != ""
-    ? var.query_audience
-    : "https://${local.query_service_name}-${data.google_project.current.number}.${var.region}.run.app"
-  )
+  # tokens against can be set on the same apply that creates it. Cloud Run also serves the
+  # service on a second, legacy hostname (https://<service>-<hash>-<region code>.a.run.app),
+  # which is what google_cloud_run_v2_service.query.uri reports; both hostnames reach the
+  # service, only this one is the audience. The outputs keep the two apart by name.
+  query_deterministic_url = "https://${local.query_service_name}-${data.google_project.current.number}.${var.region}.run.app"
+
+  query_audience = var.query_audience != "" ? var.query_audience : local.query_deterministic_url
 
   # The digest part of the image reference, and nothing else: an audit record names the exact
   # bytes that produced it (ADR 0004, decision 1). null when the reference carries no digest;

@@ -144,8 +144,9 @@ its service agent `run.invoker`; set `query_oauth_client_ids` to the connector's
 Google's chat; every tool result is verbatim with hashes. This is the fastest demonstrable
 form of (a), and it already proves the tool surface and the tenant wall in a real UI. One
 thing the tool surface now says that an integrator must relay: `find_product` answers
-`truncated: true` when the caller's entitlement holds more documents than the service's scan
-horizon (200), so an empty `products` with `truncated: true` is not "no such product".
+`truncated: true` whenever the caller's entitlement holds more documents than the call actually
+searched — the scan horizon of 200, the `limit` argument, or the request's store-read budget can
+each cut it short — so an empty `products` with `truncated: true` is not "no such product".
 
 **Step 2 — the ADK agent adds layer 2 (item 1b).** A Python `google-adk` agent, its own
 deployable under ADR 0004 (`agent/`, own identity, shares only the published contracts),

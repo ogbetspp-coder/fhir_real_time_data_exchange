@@ -135,6 +135,41 @@ describe("credential verification", () => {
     expect(await verifier.verify(jwt("unknown"))).toBeUndefined();
   });
 
+  // The demo path. `gcloud auth print-identity-token --audiences=...` is refused for a user
+  // account, and a user's plain identity token carries gcloud's own OAuth client id as its
+  // audience, so a human presenting the demo with their own Google account has only
+  // `gcloud auth print-access-token`: an opaque user access token whose tokeninfo `aud`/`azp`
+  // is the client id of the gcloud installation that minted it. The client id below is a test
+  // value, not a value this repository configures anywhere.
+  it("accepts a user access token whose tokeninfo names a configured client id", async () => {
+    const GCLOUD_LIKE_CLIENT_ID = "32555940559-test.apps.googleusercontent.com";
+    const stub = stubClient();
+    const userToken = "ya29.a0AfB_gcloud-user-access-token";
+    // What Google's tokeninfo returns for a user access token minted by a gcloud login.
+    stub.accessTokens.set(userToken, {
+      aud: GCLOUD_LIKE_CLIENT_ID,
+      azp: GCLOUD_LIKE_CLIENT_ID,
+      sub: PRINCIPAL_A,
+      email: "person@example.invalid",
+      scopes: ["openid", "https://www.googleapis.com/auth/cloud-platform"],
+      expiry_date: NOW + 3_600_000,
+    });
+
+    // Not configured: the operator has not opted into the path, and the token is refused.
+    expect(await verifierWith(stub).verify(userToken)).toBeUndefined();
+
+    // Configured: the same token resolves to the user's Google subject, which is the principal
+    // an operator entitles. Nothing else about the path differs from the ID-token path.
+    const opened = verifierWith(stub, { oauthClientIds: [GCLOUD_LIKE_CLIENT_ID] });
+    expect(await opened.verify(userToken)).toEqual({
+      principal: PRINCIPAL_A,
+      credentialType: "access-token",
+    });
+    // The bearer is not JWT-shaped, so it never reaches ID-token verification.
+    expect(isJwtShaped(userToken)).toBe(false);
+    expect(stub.calls.verifyIdToken).toBe(0);
+  });
+
   it("rejects an access token presented to a client id that is not configured", async () => {
     const stub = stubClient();
     stub.accessTokens.set("ya29.wrong-aud", accessInfo(PRINCIPAL_A, { aud: OTHER_CLIENT_ID }));

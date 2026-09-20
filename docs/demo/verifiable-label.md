@@ -47,7 +47,28 @@ Fill these in before the meeting; every command and query below uses them verbat
 | `<SECTION_HASH>`  | SHA-256 of the section 4.4 narrative `div`, recomputed in front of the audience |
 | `<RUN_ID_V1/V2>`  | `runId` printed for version 1 and version 2 of the same product                 |
 
-## Before the meeting: seed the set
+## Before the meeting: deploy in this order, then seed
+
+**The order matters, and getting it wrong breaks scene 1 quietly.** The worker's Provenance
+projection now writes the approver's role on the attester agent (`src/fhir/provenance.ts`), and
+`get_provenance` reads only that coding — it never infers a role. Any document already in the
+validated store was written before that change, so `get_provenance` answers `unavailable` for
+it: no approver, no role, no error that explains why.
+
+1. Deploy the **worker** from this branch.
+2. **Re-ingest** with the seeding script below. That writes a second `Provenance` resource for
+   the document rather than replacing the first, because the resource id is derived from the
+   submission id.
+3. Deploy the **query service**, then call `get_provenance` for the document you plan to show
+   and confirm an approver role comes back. Do this before anyone is in the room:
+   `get_provenance` resolves a resource with `Provenance?target=Bundle/<id>&_count=1` and no
+   `_sort`, so which of two resources for the same document it returns is not fixed by the
+   code. Seeding into a fresh store, or under fresh product ids, removes the ambiguity.
+
+Scenes 1 and 2 as written below use the console and BigQuery and do not depend on any of this;
+it matters for the `get_provenance` parts, which are marked _(item 1 — built, not deployed)_.
+
+## Seed the set
 
 One command, once per environment. It writes three synthetic products at version 1 and then the
 first product at version 2, each through the ordinary `document` run path: Cloud Storage
@@ -272,10 +293,11 @@ found it because the section is coded, not because anything understood it.
 _(Items 1 and 1b — built, not deployed.)_ The assistant version: the same question in English,
 answered from `find_product` plus `get_section`, every quoted sentence followed by its product,
 version, `sourceKey` and hash, and each quote re-checked through `verify_quote` after the answer
-is composed. One honesty point for the room: `find_product` answers `truncated: true` when it
-stopped before covering the whole entitlement (three products are far inside its horizon of
-200, so it will be false here), and the assistant is instructed never to say "no such product"
-when it is true. The promise is narrow and worth repeating exactly as
+is composed. One honesty point for the room: `find_product` answers `truncated: true` whenever
+the caller's entitlement holds more documents than the call actually searched — the scan
+horizon of 200, the `limit` argument, or the request's read budget can each cut it short. With
+three entitled products and no small `limit` it will be false here. The assistant is instructed
+never to say "no such product" when it is true. The promise is narrow and worth repeating exactly as
 `docs/design/verifiable-answers.md` states it: every sentence presented as label content is
 verbatim, hashed, and re-checked — not that the assistant is right.
 

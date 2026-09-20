@@ -91,23 +91,62 @@ regulated narrative inside the system of record.
 
 ## Needs a person, not a model
 
+### Before the first demonstration, in this order
+
+1. **Deploy the worker from this branch first.** The Provenance projection now writes the
+   approver's role on the attester agent (`src/fhir/provenance.ts`), and `get_provenance` reads
+   only that coding and never infers one. Every document already in the demonstrator's
+   validated store was written before that change, so `get_provenance` answers `unavailable`
+   for all of them.
+2. **Re-ingest the demonstration documents** with `npx tsx scripts/demo/seed.ts` (rehearse with
+   `--dry-run`). A re-ingest adds a second `Provenance` resource rather than replacing the
+   first, because its id is derived from the submission id.
+3. **Deploy the query service, then check `get_provenance` before the meeting.** It resolves a
+   Provenance with `Provenance?target=Bundle/<id>&_count=1` and no `_sort`, so which of two
+   resources for the same document it returns is not fixed by the code. A fresh store or a
+   fresh document id avoids the ambiguity. `docs/demo/verifiable-label.md` repeats this.
+4. **Set the three GitHub Actions repository variables** (Settings → Secrets and variables →
+   Actions → Variables). They are variables and not secrets: an IAM member string, an opaque
+   subject id, a bundle id and an OAuth client id are identifiers, and holding one grants
+   nothing. Each is optional and an unset one leaves the Terraform default, so a deploy with
+   none of them set succeeds and authorises nobody.
+   - `QUERY_INVOKERS` — comma-separated IAM members that receive `run.invoker` on the query
+     service, e.g. `user:you@example.com,serviceAccount:agent@proj.iam.gserviceaccount.com`.
+     Default `[]`.
+   - `QUERY_ENTITLEMENTS_JSON` — the raw JSON map, e.g.
+     `{"112233445566778899000":{"bundles":["synthetic-type2-smpc"]}}`; the key is the token's
+     `sub`, never an e-mail address (an e-mail-shaped key fails startup). Default `{}`.
+   - `QUERY_OAUTH_CLIENT_IDS` — comma-separated OAuth 2.0 client ids whose access tokens are
+     accepted. Default `[]`, which rejects every access token.
+5. **Decide `query_oauth_client_ids` deliberately.** Two different ids could go in it. The
+   Gemini Enterprise MCP connector's own internal OAuth client (created in the console, not by
+   Terraform) is the production intent. The other is gcloud's client id,
+   `32555940559.apps.googleusercontent.com` — the only way a human can call the service with
+   their own Google account, because `gcloud auth print-identity-token --audiences=...` is
+   refused for user accounts. That id is built into every gcloud installation worldwide, so it
+   identifies the tool and never the caller: adding it means any Google identity with a gcloud
+   login can present a credential the service will verify, and the only walls left are
+   `run.invoker` and the per-subject entitlement. Decide it, do not drift into it.
+
+### Standing items
+
 - Enable GitHub branch protection on `main` requiring the CI check.
 - Confirm the `approverId` policy: an opaque identity-provider subject id, never an e-mail
   address. The contract enforces the shape; the policy is an organisational decision.
-- Set `enabled_run_sources` per environment (ADR 0002: production = `["document"]`; the
-  default is all three sources, so nothing changes until an operator narrows it). The variable
-  and the worker's `ENABLED_RUN_SOURCES` check are built in commit `d241065` on a separate
-  branch and are not yet merged into this tree.
-- Provide `query_oauth_client_ids`: the internal OAuth 2.0 client for the Gemini Enterprise
-  MCP connector, created in the console (not Terraform); until it is set every access token is
-  rejected and only ID tokens authenticate.
-- Provide `alert_notification_email`: the entitlement-denial log metric always exists, but the
-  e-mail channel and the alert policy (more than five denials in a rolling hour) are created
-  only when it is set.
+- Set `enabled_run_sources` per environment (ADR 0002: production = `["document"]`). The
+  variable and the worker's `ENABLED_RUN_SOURCES` check are merged into this tree and tested
+  (`test/run-sources.test.ts`), and the default is still all three sources, so nothing narrows
+  until an operator sets it. `scripts/gcp/deploy.sh` does not pass it: supply it through
+  `TF_VAR_enabled_run_sources` or an `infra/*.auto.tfvars` file.
+- Provide `alert_notification_email`: the entitlement-denial log metric is created on every
+  apply, but the e-mail channel and the alert policy (more than five denials in a rolling hour)
+  exist only when it is set.
 - Decide whether to set `lock_regulated_audit_log_bucket = true`. It is irreversible: the
   retained audit log bucket's retention can then never be changed and Terraform will not
   unlock it. Take the decision after the retention period, legal basis, and costs are approved;
-  it is `false` and not applied today.
+  it is `false` and not applied today. Separately, no reader role scoped to that bucket exists
+  — who can read the retained audit log is whoever the project's logging roles allow, and
+  narrowing that is the same person's decision.
 - Tighten the worker's Healthcare role to the dataset. Today
   `google_project_iam_member.worker_healthcare` (`infra/security.tf`) binds
   `roles/healthcare.fhirResourceEditor` at project level, so the worker can edit FHIR resources
@@ -117,9 +156,12 @@ regulated narrative inside the system of record.
   worker service's `depends_on`; it is a project-level role removal, so it needs a plan review
   and a check that `scripts/gcp/reconcile-fhir-stores.sh` and `bootstrap.sh` do not rely on
   project-wide Healthcare access through the worker's service account.
-- Supply the query-service variables through `TF_VAR_<name>` or an `infra/*.auto.tfvars` file:
-  `scripts/gcp/deploy.sh` passes only project, region, environment, `service_version`, and the
-  image references.
+- Confirm on the first real deploy that the effective-IAM export actually uploaded. It runs
+  after a successful apply and writes to
+  `gs://<evidence bucket>/deploy-evidence/<YYYY>/<MM>/<DD>/<stamp>-<env>-<commit>/`, but every
+  step is warning-only, so a deployer lacking `resourcemanager.projects.getIamPolicy`,
+  `healthcare.datasets.getIamPolicy`, or write access to the evidence bucket leaves a
+  `::warning::` in the log and no file in the bucket.
 - For item 1b: confirm the organisation has a Gemini Enterprise licence; confirm Agent Engine
   offers a 3.14 runtime in the intended region before the first deploy. All steps are written
   out in `agent/deploy/README.md`.
