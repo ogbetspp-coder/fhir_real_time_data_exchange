@@ -16,6 +16,7 @@ import {
   type GetSectionInput,
   type ProductSummary,
   type ProvenanceDetail,
+  type QueryAuditOutcome,
   type QueryError,
   type QuoteVerification,
   type SectionContent,
@@ -46,7 +47,7 @@ export type ToolOutcome<T> =
       // What the audit record records, which is not always what the caller is told: outside a
       // caller's entitlement the answer is `document-not-found` and the record is
       // `not-entitled`, so existence is not disclosed but the attempt is still visible.
-      auditOutcome: QueryErrorCodeValue;
+      auditOutcome: Exclude<QueryAuditOutcome, "ok">;
       bundleId?: string | undefined;
     };
 
@@ -556,7 +557,8 @@ export async function findProduct(
     if (summary !== undefined && matches(needle, summary)) products.push(summary);
   }
 
-  const output = FindProductOutputSchema.safeParse({ products });
+  // Phase 1 scans every entitled document, so nothing is ever left unsearched.
+  const output = FindProductOutputSchema.safeParse({ products, truncated: false });
   if (!output.success) return fail("find_product", "unavailable");
 
   return { status: "ok", value: output.data, resultCount: products.length };

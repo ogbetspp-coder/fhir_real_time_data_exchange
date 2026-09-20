@@ -357,7 +357,7 @@ describe("ePI query service, phase 1", () => {
       // And an exact query does not surface the other tenant's product either.
       const found = await callTool(harness, "find_product", { query: store.productNameB });
       expect(found.isError).toBe(false);
-      expect(found.structured).toEqual({ products: [] });
+      expect(found.structured).toEqual({ products: [], truncated: false });
       expect(harness.log.bundles.some((read) => read.includes(foreign))).toBe(false);
 
       // The caller's own products are found, so the empty answer above is a wall, not a bug.

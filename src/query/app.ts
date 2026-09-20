@@ -99,6 +99,8 @@ function auditRecord(
     serviceVersion: deps.serviceVersion,
     at: new Date(startedAt).toISOString(),
     principal: deps.principal,
+    // Only ID tokens are verified today; the access-token path sets this from the verifier.
+    credentialType: "id-token",
     tool,
     // The arguments are hashed, never recorded: a verify_quote argument is text a caller typed.
     argumentsSha256: sha256(args),

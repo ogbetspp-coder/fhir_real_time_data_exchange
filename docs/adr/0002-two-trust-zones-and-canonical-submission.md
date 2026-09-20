@@ -98,6 +98,15 @@ that Zone B branches on are major. `zod` is pinned exactly to keep generated sch
 **Offsets.** Span offsets are Unicode code points; span hashes are SHA-256 of the UTF-8 bytes of
 the raw slice. See ADR 0003.
 
+**String lengths.** A string bound in a contract is published as JSON Schema `maxLength`, which
+counts Unicode code points. The TypeScript reference enforces the same bound in UTF-16 code
+units, which is never fewer than the code points, so the reference is the stricter side: a value
+it accepts is always within the published limit, and a value built against the schema alone
+may carry astral-plane characters that Zone B then rejects. Zone B validates with the
+reference; a producer that must agree with it exactly counts UTF-16 code units (in Python,
+`len(value.encode("utf-16-le")) // 2`). No bound in any contract is close enough to a real
+value for the difference to matter today; it is recorded so that it is never a surprise.
+
 ## Consequences
 
 - No `document`-source content can reach the FHIR store or the evidence bucket without a
