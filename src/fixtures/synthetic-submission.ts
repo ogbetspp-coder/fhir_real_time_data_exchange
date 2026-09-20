@@ -24,28 +24,76 @@ import {
 import type { EmaMapping } from "../fhir/mapping.js";
 import { isComposition } from "../fhir/types.js";
 import { sha256, sha256Utf8 } from "../lib/hash.js";
+import {
+  DEFAULT_SYNTHETIC_PRODUCT_ID,
+  syntheticProduct,
+  syntheticSourceStem,
+  type SyntheticFixtureOptions,
+  type SyntheticProduct,
+  type SyntheticVersion,
+} from "./synthetic-products.js";
 import { createSyntheticType2Bundle } from "./synthetic.js";
 
 // Deterministic Zone A hand-off for the synthetic Type 2 fixture: the same Bundle the fixture
 // path publishes, plus the extracted page text, spans, and approval a real structuring service
 // would have produced. Everything is fixed; nothing reads the clock or a random source.
+//
+// The default product at version 1 is the frozen fixture that `test/fixtures/contracts/*.json`
+// was exported from; `src/fixtures/synthetic-products.ts` explains what may and may not move.
 
-const SUBMISSION_ID = "4b1d2c3e-5f60-4a71-8b92-0c1d2e3f4a5b";
-const EXTRACTION_RUN_ID = "7c8d9e0f-1a2b-4c3d-9e4f-5a6b7c8d9e0f";
-const CREATED_AT = "2026-09-19T00:00:00Z";
-const APPROVED_AT = "2026-09-19T00:00:00Z";
 const EXTRACTOR_VERSION = "synthetic-extractor/1.0.0";
-const SOURCE_FILENAME = "synthetic-smpc.pdf";
 
 // Where a Zone A service would have written the three by-reference parts. The fixture carries
 // them so it is a complete example of what the submission reader must resolve, not only of what
 // the ingress gate must accept.
 export const SYNTHETIC_SUBMISSION_BUCKET = "synthetic-bucket";
-export const SYNTHETIC_SUBMISSION_URI = `gs://${SYNTHETIC_SUBMISSION_BUCKET}/synthetic-smpc.submission.json`;
-export const SYNTHETIC_REPORT_URI = `gs://${SYNTHETIC_SUBMISSION_BUCKET}/synthetic-smpc.fidelity-report.json`;
-export const SYNTHETIC_SOURCE_TEXT_URI = `gs://${SYNTHETIC_SUBMISSION_BUCKET}/synthetic-smpc.pages.json`;
+
+export type SyntheticPartUris = {
+  fidelityReport: string;
+  sourceText: string;
+};
+
+export type SyntheticSubmissionOptions = SyntheticFixtureOptions & {
+  // Where the fidelity report and the extracted page text will actually be stored. Both are
+  // inside the approved content, so a seeding run has to set them before anything is hashed.
+  partUris?: SyntheticPartUris;
+};
+
+function resolve(options: SyntheticFixtureOptions): {
+  product: SyntheticProduct;
+  version: SyntheticVersion;
+} {
+  return {
+    product: syntheticProduct(options.product ?? DEFAULT_SYNTHETIC_PRODUCT_ID),
+    version: options.version ?? 1,
+  };
+}
+
+// The default locations of the three by-reference parts, one set per product and version.
+export function syntheticSubmissionUris(
+  options: SyntheticFixtureOptions = {},
+): SyntheticPartUris & {
+  submission: string;
+} {
+  const { product, version } = resolve(options);
+  const stem = syntheticSourceStem(product, version);
+  return {
+    submission: `gs://${SYNTHETIC_SUBMISSION_BUCKET}/${stem}.submission.json`,
+    fidelityReport: `gs://${SYNTHETIC_SUBMISSION_BUCKET}/${stem}.fidelity-report.json`,
+    sourceText: `gs://${SYNTHETIC_SUBMISSION_BUCKET}/${stem}.pages.json`,
+  };
+}
+
+const DEFAULT_URIS = syntheticSubmissionUris();
+export const SYNTHETIC_SUBMISSION_URI = DEFAULT_URIS.submission;
+export const SYNTHETIC_REPORT_URI = DEFAULT_URIS.fidelityReport;
+export const SYNTHETIC_SOURCE_TEXT_URI = DEFAULT_URIS.sourceText;
+
 const PAGE_COUNT = 3;
-const HEADER = "Synthetic Paracetamol 500 mg tablets - synthetic demonstration extract\n";
+
+function header(product: SyntheticProduct): string {
+  return `${product.productName} - synthetic demonstration extract\n`;
+}
 
 function footer(page: number): string {
   return `Page ${page} of ${PAGE_COUNT}`;
@@ -66,9 +114,10 @@ type PagedSource = {
 
 // One line per narrative section, in document order, spread over PAGE_COUNT pages so that the
 // fixture exercises multi-page extraction. Offsets are code points, as ADR 0002 requires.
-function buildSourceText(sections: NarrativeSection[]): PagedSource {
+function buildSourceText(sections: NarrativeSection[], product: SyntheticProduct): PagedSource {
   const perPage = Math.ceil(sections.length / PAGE_COUNT);
-  const bodyStart = codePointLength(HEADER);
+  const pageHeader = header(product);
+  const bodyStart = codePointLength(pageHeader);
   const pages: SourcePage[] = [];
   const spans = new Map<string, SourceSpan>();
 
@@ -95,7 +144,7 @@ function buildSourceText(sections: NarrativeSection[]): PagedSource {
     const body = `${lines.join("\n")}\n`;
     pages.push({
       page,
-      text: `${HEADER}${body}${footer(page)}`,
+      text: `${pageHeader}${body}${footer(page)}`,
       bodyStart,
       bodyEnd: bodyStart + codePointLength(body),
     });
@@ -147,15 +196,23 @@ export type SyntheticSubmission = {
   sourceText: SourceDocumentText;
 };
 
-export function createSyntheticSubmission(mapping: EmaMapping): SyntheticSubmission {
-  const bundle = createSyntheticType2Bundle(mapping);
+export function createSyntheticSubmission(
+  mapping: EmaMapping,
+  options: SyntheticSubmissionOptions = {},
+): SyntheticSubmission {
+  const { product, version } = resolve(options);
+  const bundle = createSyntheticType2Bundle(mapping, { product: product.id, version });
   const composition = bundle.entry[0]?.resource;
   if (composition === undefined || !isComposition(composition)) {
     throw new Error("Synthetic Type 2 fixture must have Composition as its first entry");
   }
 
+  const identity = product.submissions[version];
+  const partUris = options.partUris ?? syntheticSubmissionUris({ product: product.id, version });
+  const sourceFilename = `${syntheticSourceStem(product, version)}.pdf`;
+
   const sections = collectNarrativeSections(composition, mapping.sourceCodeSystem);
-  const { source, spans } = buildSourceText(sections);
+  const { source, spans } = buildSourceText(sections, product);
   const sectionProvenance = buildSectionProvenance(sections, spans);
 
   const report = verifyNarrativeFidelity({
@@ -169,7 +226,7 @@ export function createSyntheticSubmission(mapping: EmaMapping): SyntheticSubmiss
   }
 
   const extraction: ExtractionTooling = {
-    extractionRunId: EXTRACTION_RUN_ID,
+    extractionRunId: identity.extractionRunId,
     serviceVersion: "synthetic",
     parser: { name: "synthetic-extractor", version: "1.0.0" },
     terminologyService: {
@@ -181,13 +238,13 @@ export function createSyntheticSubmission(mapping: EmaMapping): SyntheticSubmiss
 
   const provenance: IngestionProvenance = {
     sourceDocument: {
-      sha256: sha256Utf8(SOURCE_FILENAME),
+      sha256: sha256Utf8(sourceFilename),
       byteLength: 1024,
       mediaType: "application/pdf",
-      filename: SOURCE_FILENAME,
+      filename: sourceFilename,
       pageCount: source.pages.length,
       extractedText: {
-        uri: SYNTHETIC_SOURCE_TEXT_URI,
+        uri: partUris.sourceText,
         sha256: sha256(source),
         extractorVersion: EXTRACTOR_VERSION,
       },
@@ -202,22 +259,22 @@ export function createSyntheticSubmission(mapping: EmaMapping): SyntheticSubmiss
       sectionsMatched: report.summary.verified,
       narrativeBindingSha256: report.narrativeBindingSha256,
       reportSha256: report.reportHash,
-      reportUri: SYNTHETIC_REPORT_URI,
+      reportUri: partUris.fidelityReport,
     },
   };
 
   const type2Bundle = bundle as unknown as Type2Bundle;
   const submission: CanonicalSubmission = {
     schemaVersion: CANONICAL_SUBMISSION_VERSION,
-    submissionId: SUBMISSION_ID,
-    createdAt: CREATED_AT,
+    submissionId: identity.submissionId,
+    createdAt: identity.createdAt,
     bundle: type2Bundle,
     bundleSha256: sha256(type2Bundle),
     provenance,
     approval: {
       approverId: "urn:reviewer:synthetic-01",
       approverRole: "content-reviewer",
-      approvedAt: APPROVED_AT,
+      approvedAt: identity.approvedAt,
       method: "api-attestation",
       meaning: "reviewed-fidelity-and-structure",
       approvedContentSha256: sha256(
