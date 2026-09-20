@@ -51,6 +51,22 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v5
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22.14.0
+          package-manager-cache: false
+
+      - name: Install Node dependencies
+        run: bash scripts/gcp/deploy.sh deps 2>&1 | tee -a deploy-run.log
+
+      # Runs before any cloud credential exists on the runner: npm scripts and tests never
+      # execute with a Google Cloud credential file in the workspace. Not tee'd into
+      # deploy-run.log either, because a failing test prints fixture diffs and that log is
+      # published into an issue on failure.
+      - name: Quality gate
+        run: npm run check
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:
@@ -63,12 +79,6 @@ jobs:
       - name: Set up Google Cloud CLI
         uses: google-github-actions/setup-gcloud@v3
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: 22.14.0
-          package-manager-cache: false
-
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v4
         with:
@@ -77,14 +87,6 @@ jobs:
 
       - name: Preflight
         run: bash scripts/gcp/deploy.sh preflight 2>&1 | tee -a deploy-run.log
-
-      - name: Install Node dependencies
-        run: bash scripts/gcp/deploy.sh deps 2>&1 | tee -a deploy-run.log
-
-      # Not tee'd into deploy-run.log: a failing test prints fixture diffs, and that log is
-      # published into an issue on failure.
-      - name: Quality gate
-        run: npm run check
 
       - name: Terraform init
         run: bash scripts/gcp/deploy.sh init 2>&1 | tee -a deploy-run.log

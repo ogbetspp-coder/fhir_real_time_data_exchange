@@ -1,0 +1,12 @@
+# Credential files that google-github-actions/auth writes into the workspace; never formatted,
+# never read by tooling.
+gha-creds-*.json
+
+# Generated, vendored, and build output
+node_modules/
+dist/
+coverage/
+fhir/vendor/
+artifacts/
+.terraform/
+package-lock.json
