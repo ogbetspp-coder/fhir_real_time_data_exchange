@@ -2,7 +2,7 @@
   "resourceType": "ConceptMap",
   "id": "canonical-to-ema-cap-smpc-en",
   "url": "https://khs.dev/fhir/ConceptMap/canonical-to-ema-cap-smpc-en",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "CanonicalToEmaCapSmpcEnglish",
   "title": "Canonical SmPC sections to EMA CAP SmPC English QRD sections",
   "status": "active",
@@ -307,7 +307,7 @@
           "target": [
             {
               "code": "200000029841",
-              "display": "6.5 Nature and contents of container and special equipment for use, administration or implantation",
+              "display": "6.5 Nature and contents of container [and special equipment for use, administration or implantation]",
               "relationship": "equivalent"
             }
           ]
@@ -318,7 +318,7 @@
           "target": [
             {
               "code": "200000029842",
-              "display": "6.6 Special precautions for disposal and other handling",
+              "display": "6.6 Special precautions for disposal [and other handling]",
               "relationship": "equivalent"
             }
           ]

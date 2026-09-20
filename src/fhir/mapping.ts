@@ -8,6 +8,7 @@ const SectionRuleSchema: z.ZodType<SectionRule> = z.lazy(() =>
     sourceKey: z.string().min(1),
     targetCode: z.string().min(1),
     title: z.string().min(1),
+    display: z.string().min(1).optional(),
     required: z.boolean(),
     children: z.array(SectionRuleSchema).optional(),
   }),
@@ -28,7 +29,11 @@ const MappingSchema = z.object({
 export type SectionRule = {
   sourceKey: string;
   targetCode: string;
+  // The section heading the label carries (Composition.section.title).
   title: string;
+  // The target code system's own display string for `targetCode`, when it differs from the
+  // heading. The validator rejects any other display on the coding; the heading is not bound.
+  display?: string | undefined;
   required: boolean;
   children?: SectionRule[] | undefined;
 };

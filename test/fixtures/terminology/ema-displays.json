@@ -1,0 +1,58 @@
+{
+  "$comment": "Extract of the two EMA code systems the mapping and the transform code against, copied verbatim from the pinned EUePI package (fhir/standards.lock.json). Test oracle only; regenerate by hand from the package when the pin moves.",
+  "package": "EUePI#1.0.0",
+  "packageSha256": "19fb9fbf55c6bb3819c78d427acac1e3e5b96b50c1045d80e70c94f09566bd80",
+  "qrdSections": {
+    "system": "http://ema.europa.eu/fhir/CodeSystem/200000029659",
+    "version": "1.0.0",
+    "display": {
+      "200000029791": "SUMMARY OF PRODUCT CHARACTERISTICS",
+      "200000029792": "1. NAME OF THE MEDICINAL PRODUCT",
+      "200000029793": "2. QUALITATIVE AND QUANTITATIVE COMPOSITION",
+      "200000029797": "3. PHARMACEUTICAL FORM",
+      "200000029798": "4. CLINICAL PARTICULARS",
+      "200000029799": "4.1 Therapeutic indications",
+      "200000029800": "4.2 Posology and method of administration",
+      "200000029801": "Posology",
+      "200000029803": "Method of administration",
+      "200000029805": "4.3 Contraindications",
+      "200000029806": "4.4 Special warnings and precautions for use",
+      "200000029809": "4.5 Interaction with other medicinal products and other forms of interaction",
+      "200000029811": "4.6 Fertility, pregnancy and lactation",
+      "200000029815": "4.7 Effects on ability to drive and use machines",
+      "200000029816": "4.8 Undesirable effects",
+      "200000029818": "Reporting of suspected adverse reactions",
+      "200000029819": "4.9 Overdose",
+      "200000029821": "5. PHARMACOLOGICAL PROPERTIES",
+      "200000029822": "5.1 Pharmacodynamic properties",
+      "200000029827": "5.2 Pharmacokinetic properties",
+      "200000029834": "5.3 Preclinical safety data",
+      "200000029836": "6. PHARMACEUTICAL PARTICULARS",
+      "200000029837": "6.1 List of excipients",
+      "200000029838": "6.2 Incompatibilities",
+      "200000029839": "6.3 Shelf life",
+      "200000029840": "6.4 Special precautions for storage",
+      "200000029841": "6.5 Nature and contents of container [and special equipment for use, administration or implantation]",
+      "200000029842": "6.6 Special precautions for disposal [and other handling]",
+      "200000029844": "7. MARKETING AUTHORISATION HOLDER",
+      "200000029845": "8. MARKETING AUTHORISATION NUMBER(S)",
+      "200000029846": "9. DATE OF FIRST AUTHORISATION/RENEWAL OF THE AUTHORISATION",
+      "200000029847": "10. DATE OF REVISION OF THE TEXT"
+    }
+  },
+  "documentTypes": {
+    "system": "http://ema.europa.eu/fhir/CodeSystem/100000155531",
+    "version": "1.0.0",
+    "display": {
+      "100000155532": "Summary of Product Characteristics",
+      "100000155533": "Annex II",
+      "100000155534": "Outer Packaging",
+      "100000155535": "Labelling",
+      "100000155537": "Other Product Information",
+      "100000155538": "Package Leaflet",
+      "100000155539": "Combined File of all Documents",
+      "100000155540": "Mock ups",
+      "100000155541": "Appendix V"
+    }
+  }
+}

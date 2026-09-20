@@ -41,6 +41,9 @@ export type SyntheticProduct = {
   strengthMg: number;
   organizationId: string;
   organizationName: string;
+  // Organization-uv-epi requires an identifier. The three labels share one invented holder,
+  // so they share one invented identifier too.
+  organizationIdentifier: string;
   compositionId: string;
   compositionIdentifier: string;
   bundleId: string;
@@ -96,6 +99,7 @@ const PARACETAMOL: SyntheticProduct = {
   strengthMg: 500,
   organizationId: "synthetic-pharma",
   organizationName: "Synthetic Pharma Ltd",
+  organizationIdentifier: "SYN-ORG-0001",
   compositionId: "synthetic-smpc",
   compositionIdentifier: "synthetic-smpc-v1",
   bundleId: "synthetic-type2-smpc",
@@ -136,6 +140,7 @@ const DEMOXETINE: SyntheticProduct = {
   strengthMg: 10,
   organizationId: "synthetic-pharma",
   organizationName: "Synthetic Pharma Ltd",
+  organizationIdentifier: "SYN-ORG-0001",
   compositionId: "synthetic-demoxetine-smpc",
   compositionIdentifier: "synthetic-demoxetine-smpc-v1",
   bundleId: "synthetic-demoxetine-type2-smpc",
@@ -179,6 +184,7 @@ const PLACEBOLOL: SyntheticProduct = {
   strengthMg: 25,
   organizationId: "synthetic-pharma",
   organizationName: "Synthetic Pharma Ltd",
+  organizationIdentifier: "SYN-ORG-0001",
   compositionId: "synthetic-placebolol-smpc",
   compositionIdentifier: "synthetic-placebolol-smpc-v1",
   bundleId: "synthetic-placebolol-type2-smpc",

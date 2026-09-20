@@ -34,7 +34,7 @@ const conceptMap = {
         target: [
           {
             code: rule.targetCode,
-            display: rule.title,
+            display: rule.display ?? rule.title,
             relationship: "equivalent",
           },
         ],

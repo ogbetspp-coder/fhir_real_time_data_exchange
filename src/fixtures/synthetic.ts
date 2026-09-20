@@ -49,6 +49,21 @@ function entry(resource: FhirResource): { fullUrl: string; resource: FhirResourc
   };
 }
 
+const GLOBAL_EPI_PROFILE_BASE =
+  "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/";
+
+// Every product-graph resource declares the Global ePI profile the Bundle-uv-epi entry slice
+// expects of it. The validator resolves a Reference to an entry and matches the target against
+// the referring element's allowed profiles; an entry that does not declare one is "Unable to
+// find a profile match".
+function globalEpiProfile(resourceType: string): { profile: string[] } {
+  return { profile: [`${GLOBAL_EPI_PROFILE_BASE}${resourceType}-uv-epi`] };
+}
+
+function syntheticIdentifier(kind: string, value: string): { system: string; value: string }[] {
+  return [{ system: `https://khs.dev/fhir/identifier/${kind}`, value }];
+}
+
 export function createSyntheticType2Bundle(
   mapping: EmaMapping,
   options: SyntheticFixtureOptions = {},
@@ -57,15 +72,12 @@ export function createSyntheticType2Bundle(
   const version = options.version ?? 1;
   const productUrl = `https://khs.dev/fhir/MedicinalProductDefinition/${product.id}`;
   const organizationUrl = `https://khs.dev/fhir/Organization/${product.organizationId}`;
+  const itemUrl = `https://khs.dev/fhir/ManufacturedItemDefinition/${product.itemId}`;
 
   const composition: FhirComposition = {
     resourceType: "Composition",
     id: product.compositionId,
-    meta: {
-      profile: [
-        "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/Composition-uv-epi",
-      ],
-    },
+    meta: globalEpiProfile("Composition"),
     language: "en",
     identifier: [
       {
@@ -98,36 +110,35 @@ export function createSyntheticType2Bundle(
     section: [sourceSection(mapping.root, mapping, product, version)],
   };
 
+  // The graph must be connected the way the Global ePI Bundle profile expects: the validator
+  // walks references forward and backward from the Composition and rejects any entry it cannot
+  // reach. Composition.subject reaches the product; authorization, package and administrable
+  // product point back at it; the package contains the manufactured item and the administrable
+  // product is produced from it; the ingredient is for the item and names the substance.
   const resources: FhirResource[] = [
     composition,
     {
       resourceType: "Organization",
       id: product.organizationId,
+      meta: globalEpiProfile("Organization"),
+      identifier: syntheticIdentifier("organization", product.organizationIdentifier),
       name: product.organizationName,
     },
     {
       resourceType: "MedicinalProductDefinition",
       id: product.id,
-      identifier: [
-        {
-          system: "https://khs.dev/fhir/identifier/product",
-          value: product.productIdentifier,
-        },
-      ],
+      meta: globalEpiProfile("MedicinalProductDefinition"),
+      identifier: syntheticIdentifier("product", product.productIdentifier),
       type: { coding: [{ code: "MedicinalProduct" }] },
       domain: { coding: [{ code: "Human" }] },
       status: { coding: [{ code: "active" }] },
-      name: [{ productName: product.productName, type: { coding: [] } }],
+      name: [{ productName: product.productName }],
     },
     {
       resourceType: "RegulatedAuthorization",
       id: product.authorizationId,
-      identifier: [
-        {
-          system: "https://khs.dev/fhir/identifier/authorization",
-          value: product.marketingAuthorizationNumber,
-        },
-      ],
+      meta: globalEpiProfile("RegulatedAuthorization"),
+      identifier: syntheticIdentifier("authorization", product.marketingAuthorizationNumber),
       subject: [
         {
           reference: productUrl,
@@ -141,19 +152,34 @@ export function createSyntheticType2Bundle(
     {
       resourceType: "PackagedProductDefinition",
       id: product.packageId,
+      meta: globalEpiProfile("PackagedProductDefinition"),
+      identifier: syntheticIdentifier("package", `${product.productIdentifier}-PKG`),
+      name: `${product.productName} carton`,
       packageFor: [
         {
           reference: productUrl,
         },
       ],
       packaging: {
+        identifier: syntheticIdentifier("packaging", `${product.productIdentifier}-PKG-1`),
         type: { coding: [{ display: "Carton" }] },
         quantity: 1,
+        containedItem: [
+          {
+            item: {
+              reference: {
+                reference: itemUrl,
+              },
+            },
+          },
+        ],
       },
     },
     {
       resourceType: "ManufacturedItemDefinition",
       id: product.itemId,
+      meta: globalEpiProfile("ManufacturedItemDefinition"),
+      identifier: syntheticIdentifier("manufactured-item", `${product.productIdentifier}-ITEM`),
       status: "active",
       manufacturedDoseForm: { coding: [{ display: "Tablet" }] },
       unitOfPresentation: { coding: [{ display: "Tablet" }] },
@@ -161,6 +187,8 @@ export function createSyntheticType2Bundle(
     {
       resourceType: "AdministrableProductDefinition",
       id: product.administrableId,
+      meta: globalEpiProfile("AdministrableProductDefinition"),
+      identifier: syntheticIdentifier("administrable-product", `${product.productIdentifier}-ADM`),
       status: "active",
       formOf: [
         {
@@ -168,6 +196,11 @@ export function createSyntheticType2Bundle(
         },
       ],
       administrableDoseForm: { coding: [{ display: "Tablet" }] },
+      producedFrom: [
+        {
+          reference: itemUrl,
+        },
+      ],
       routeOfAdministration: [
         {
           code: { coding: [{ display: "Oral use" }] },
@@ -177,10 +210,11 @@ export function createSyntheticType2Bundle(
     {
       resourceType: "Ingredient",
       id: product.ingredientId,
+      meta: globalEpiProfile("Ingredient"),
       status: "active",
       for: [
         {
-          reference: `https://khs.dev/fhir/ManufacturedItemDefinition/${product.itemId}`,
+          reference: itemUrl,
         },
       ],
       role: { coding: [{ display: "Active" }] },
@@ -208,12 +242,8 @@ export function createSyntheticType2Bundle(
     {
       resourceType: "SubstanceDefinition",
       id: product.substanceId,
-      identifier: [
-        {
-          system: "https://khs.dev/fhir/identifier/substance",
-          value: product.substanceIdentifier,
-        },
-      ],
+      meta: globalEpiProfile("SubstanceDefinition"),
+      identifier: syntheticIdentifier("substance", product.substanceIdentifier),
       version: "1",
       status: { coding: [{ code: "active" }] },
       name: [{ name: product.substanceName, status: { coding: [{ code: "current" }] } }],
@@ -223,9 +253,9 @@ export function createSyntheticType2Bundle(
   return {
     resourceType: "Bundle",
     id: product.bundleId,
-    meta: {
-      profile: ["http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/Bundle-uv-epi"],
-    },
+    meta: globalEpiProfile("Bundle"),
+    // Bundle-uv-epi makes language mandatory (1..1); the Composition already says "en".
+    language: "en",
     // Version-independent on purpose: transform.ts derives the EMA document Bundle id from this
     // value, so version 2 must carry the identifier version 1 carried or the store would hold
     // two documents instead of two versions of one.

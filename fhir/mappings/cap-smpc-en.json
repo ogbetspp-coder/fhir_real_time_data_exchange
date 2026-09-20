@@ -1,5 +1,5 @@
 {
-  "mappingVersion": "1.0.0",
+  "mappingVersion": "1.1.0",
   "sourceCodeSystem": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
   "targetCodeSystem": "http://ema.europa.eu/fhir/CodeSystem/200000029659",
   "profiles": {
@@ -180,12 +180,14 @@
             "sourceKey": "smpc.6.5",
             "targetCode": "200000029841",
             "title": "6.5 Nature and contents of container and special equipment for use, administration or implantation",
+            "display": "6.5 Nature and contents of container [and special equipment for use, administration or implantation]",
             "required": true
           },
           {
             "sourceKey": "smpc.6.6",
             "targetCode": "200000029842",
             "title": "6.6 Special precautions for disposal and other handling",
+            "display": "6.6 Special precautions for disposal [and other handling]",
             "required": true
           }
         ]
