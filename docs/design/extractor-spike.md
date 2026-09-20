@@ -1,6 +1,7 @@
 # Design note: extractor spike
 
-- Status: In progress
+- Status: Complete — verdict below (no-go for Document AI as the character source; go as the
+  structure classifier; the parser is a hybrid)
 - Date: 2026-09-20
 - Related: `docs/fidelity-normalization.md` (section 7, the extractor contract),
   `docs/adr/0003-mechanical-narrative-fidelity.md`, `docs/roadmap.md` item 0
@@ -145,4 +146,115 @@ character changed" claim and the "no narrative in any output" claim.
 
 ## Verdict
 
-_Pending._
+Run 2026-09-20 against processor `projects/sage-ship-509104-b8/locations/eu/processors/a171773c69e36baf`,
+default version `pretrained-layout-parser-v1.0-2024-06-03`, adapter 1.0.0,
+`fidelity-norm/1.1.1`. Every number below is from the reports the run wrote; no text from any
+document was read to write this section.
+
+### Part A — the plumbing works
+
+The synthetic SmPC PDF (3 pages, 24 top-level blocks, 83 flattened) went through Document AI,
+the adapter, span location, and the real verifier: **32 of 32 sections located and verified,
+status `passed`, zero issues**, `reportHash`
+`12449bee74d936f9950b27378c2aaa9d3cd04789cae73bd9473878dd8c3a6a46`. Headers and footers were
+classified on all three pages; the drawn table came back as one table block with 4 rows and 8
+cells and serialised row-major; the forced line-end hyphen was kept as a glyph and counted.
+The extractor contract (section 7) and the verifier are satisfiable by a real extractor's
+output. That question is closed.
+
+### The decisive measurement — Document AI is not character-faithful
+
+Pages 2 and 3 of the synthetic document diffed against the PDF's own text layer with **zero**
+differing code points and ordered agreement 1.0. Page 1, which carries the probes, diffed with
+exactly 11, and their Unicode categories decode without ambiguity: `Pi: 2` and `Pf: 2` only in
+the text layer with `Po: 4` only in the extractor is **all four typographic quotes straightened
+to ASCII**; `Ll: 3` with the extractor one code point longer than the text layer is **U+FB01
+expanded to `fi`**.
+
+The two real-world documents confirm that this is systematic, not a probe artefact:
+
+| Document (public, non-product)               | Pages | Differing code points | Multiset agreement | Ordered agreement | Dominant categories                                   |
+| -------------------------------------------- | ----- | --------------------- | ------------------ | ----------------- | ----------------------------------------------------- |
+| EudraLex Vol. 2C SmPC guideline              | 29    | 438 of 95,735         | 0.9977             | 0.9903            | Po 169, Pf 89, Pi 48, Ll 44, Zs 32, Pd 16, Sm 7, So 6 |
+| EMA QRD annotated template, pages 1–28 of 39 | 28    | 287 of 58,632         | 0.9976             | 0.9955            | Po 113, Pf 58, Pi 35, Zs 24, Pd 20, Lu 18, Ll 10      |
+
+Read by category: `Pi`/`Pf` removed against `Po` added is quote straightening on every page
+that has quotes; `Pd` in matched pairs is dash substitution (a typographic dash becoming
+hyphen-minus); `Zs` is space-variant normalisation (a non-breaking or thin space becoming
+U+0020); `No: 2` against `Nd: 2` in the guideline is a **superscript digit flattened to a plain
+digit**; `Ll` is ligature expansion and, on two pages, something more that a category diff
+cannot resolve; `Lu: 18` on the template is letter-level and unexplained. Only 2 of the 29
+guideline pages diffed clean.
+
+Ligature expansion is harmless: section 3 step 2 applies it to both sides. Everything else in
+that list is content under section 4 — and a superscript flattened in `m²` or a typographic
+quote straightened in a product name is a change to the approved text. The failure mode is
+worse than a fidelity mismatch: in Zone A the narrative is _derived from_ the extracted text,
+so both sides of the check carry the same corruption, the check passes, and the published
+label silently differs from the approved PDF. The character-fidelity diff is the only
+measurement that can see this, which is why it is the one the design was built around.
+
+**Document AI Layout Parser is disqualified as the source of characters.**
+
+### What Document AI is good for
+
+- **Header and footer classification works.** 29 of 29 guideline pages had their footer
+  classified; the synthetic document had all three headers and footers classified. (The template
+  slice classified one header and no footers — either the document has none or they are styled
+  past the classifier; the page/body difference of 22 code points over 28 pages says almost
+  nothing was excluded, so this needs a probe with known footers before it counts either way.)
+- **Heading hierarchy is exposed** (`heading-1` through `heading-4`) and body blocks nest under
+  headings — 553 of 593 guideline blocks were nested, which is the structure a deterministic
+  QRD segmenter (roadmap item 3) wants.
+- **Table structure is exposed** as rows and cells (template slice: 2 tables, 7 rows, 17 cells,
+  no spans, no internal line breaks).
+- **Reading order is right on body pages** (ordered agreement tracks multiset agreement to within
+  a percent) and wrong on a cover page (guideline page 1: multiset 0.99, ordered 0.70), so it is
+  not a substitute for the text layer's draw order on non-linear layouts.
+
+### The hard problem, measured
+
+Line-end hyphens across 57 real pages: **0** in the guideline, **1** in the template slice. EU
+regulatory documents produced from Word are not hyphenated in practice. The ambiguity the
+specification deliberately left to the extractor is, on this corpus, nearly absent; a
+conservative rule — treat a line-end hyphen as a real hyphen, emit no U+00AD, surface each
+occurrence for the reviewer — costs nothing here. Two documents is not a corpus; the count is
+now cheap to take on any further document and should be, before item 3 relies on it.
+
+### Two constraints for the real parser
+
+- **Online processing has a page limit.** 28 and 29 pages were accepted; the 39-page template
+  was rejected with `INVALID_ARGUMENT`. Full product information (SmPC, Annex II, labelling,
+  leaflet) runs to 60–120 pages, so the parser must use Document AI's batch (asynchronous,
+  Cloud Storage in and out) path, or process per-section slices.
+- **The processor version is not in the response.** Every run reported
+  `unknown-processor-version`; the value that pins the extractor identity
+  (`pretrained-layout-parser-v1.0-2024-06-03`) came from `processors.get`. The parser must read
+  it there and record it, or the `extractorVersion` field is a fiction.
+
+### Verdict
+
+**No-go for Document AI Layout Parser as the extractor of characters. Go for Document AI as
+the structure classifier. The parser is a hybrid**, which the rubric's third branch anticipated
+and the spike could distinguish, as it was required to:
+
+1. Characters come from the PDF's embedded text layer through a pinned, deterministic library
+   (pdf.js in Node, as the spike's `text-layer.ts` already does; PyMuPDF or pdfminer in Zone A,
+   proven against the same differential harness), character-exact by construction for
+   born-digital PDFs.
+2. Structure — which spans are headers and footers, which are headings and at what level,
+   which are table cells — comes from Document AI's blocks, aligned onto the text layer by
+   position and used to set `bodyStart`/`bodyEnd`, to drive the segmenter, and to serialise
+   tables. Document AI's own text is never emitted.
+3. The extractor contract (section 7) is amended to say so; see the change made alongside this
+   verdict.
+
+Scanned (non-born-digital) labels are outside this verdict entirely: the text-layer method
+presumes there is a text layer. They need OCR, and OCR needs a different fidelity story.
+
+### What survives the spike
+
+The recorded Document AI response for the synthetic PDF is committed as a regression fixture,
+and a test asserts the verdict's evidence — 32/32 verified, and the exact page-1 category
+diff that shows the straightening — so the finding is executable, not just written down. The
+rest of the spike code is disposable once item 3 exists.

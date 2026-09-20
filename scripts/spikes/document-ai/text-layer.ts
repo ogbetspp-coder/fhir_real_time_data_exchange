@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -29,6 +30,27 @@ type Positioned = {
   x: number;
   y: number;
 };
+
+// A PDF that names one of the 14 standard fonts without embedding it makes pdf.js load the
+// matching Liberation/Nimbus metrics from `standardFontDataUrl`; unset, it prints
+// "Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is
+// provided." once per such font. The data ships inside the pinned `pdfjs-dist` dependency — the
+// same directory `generate-pdf.ts` takes its embedded font from — so it is resolved from the
+// package rather than fetched, and `useSystemFonts: false` still holds: this is the library's own
+// pinned metrics, not a system font. Two constraints on the string: pdf.js rejects it unless it
+// ends in "/" (it concatenates the file name onto it), and under Node it hands the result to
+// `fs.readFile`, which reads a filesystem path and not a `file:` URL string — so this is a plain
+// directory path with a trailing slash, not `pathToFileURL`. If the package cannot be resolved the
+// option is omitted and the warning comes back, which is the previous behaviour, not a failure.
+function standardFontDataUrl(): string | undefined {
+  try {
+    const require = createRequire(import.meta.url);
+    const packageJson = require.resolve("pdfjs-dist/package.json");
+    return `${path.join(path.dirname(packageJson), "standard_fonts")}/`;
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * The join rule, stated exactly, because everything downstream is a diff against its output.
@@ -92,12 +114,14 @@ export async function extractTextLayer(pdfPath: string): Promise<PageText[]> {
   const data = new Uint8Array(bytes.byteLength);
   data.set(bytes);
 
+  const fontData = standardFontDataUrl();
   const loadingTask = pdfjs.getDocument({
     data,
     // No system-font fallback and no network fetches: the document must be read exactly as the
     // bytes on disk describe it, with the font it embeds.
     useSystemFonts: false,
     useWorkerFetch: false,
+    ...(fontData === undefined ? {} : { standardFontDataUrl: fontData }),
   });
   const document = await loadingTask.promise;
   try {

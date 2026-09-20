@@ -270,6 +270,17 @@ The page text an extractor produces is the reference the narrative is checked ag
 extractor is a controlled component: its name and version are recorded in
 `IngestionProvenance.extraction.parser`, pinned, and checksummed like the FHIR packages. It must:
 
+- take every character from the document's embedded text layer through a pinned,
+  deterministic library, so that for a born-digital document the extracted text is
+  character-exact by construction. A component that classifies structure (headers, footers,
+  headings, tables) may be used to decide body ranges and serialise tables, but its own text
+  is never emitted: the extractor spike (`docs/design/extractor-spike.md`) showed that a layout
+  parser straightens quotes, substitutes dashes and spaces, and flattens superscripts, and
+  because the narrative is derived from the extracted text, the fidelity check cannot see
+  such a change — both sides carry it;
+- record in `extractorVersion` the pinned versions of every component whose output reaches the
+  text or the body ranges, read from each component's own version endpoint rather than from
+  its response when the response does not carry one;
 - emit table cells row-major separated by U+0009 and rows by U+000A;
 - emit discretionary (line-break) hyphens as U+00AD and hard hyphens verbatim;
 - declare `bodyStart`/`bodyEnd` per page so repeated headers and footers are excluded, with the
