@@ -1,10 +1,16 @@
 """The published tool contract, and the rule that an unvalidated result is not a result.
 
-The agent shares nothing with the worker or with Zone A except this file's input:
-``contracts/generated/query-tools.schema.json``, the published surface of the query service
+The agent shares nothing with the worker or with Zone A except two published schemas:
+``contracts/generated/query-tools.schema.json``, the surface of the query service, and
+``contracts/generated/agent-turn.schema.json``, the shape of the agent's own turn record
 (ADR 0004, "pure libraries are shared, and versioned" — here it is not even code, it is a
-schema). A copy is vendored into the package by ``scripts/sync_contract.py`` so the deployable
-is self-contained on Agent Engine, and CI fails if the copy has drifted.
+schema). Both are vendored into the package by ``scripts/sync_contract.py`` so the deployable
+is self-contained on Agent Engine, and CI fails if either copy has drifted.
+
+query-tools 2.0.0: ``FindProductOutput`` carries ``truncated``, and ``not-entitled`` is no
+longer an error code a caller can see — outside the caller's entitlement the service answers
+``document-not-found``. Nothing here ever matched on an error code (an ``isError`` result is
+unavailable whatever its code), so the second change alters no behaviour at this end.
 
 Every tool result is validated against the schema before anything reads it. A result that does
 not validate is *unavailable*: it is never composed, never rendered, and never quoted. That is
@@ -23,6 +29,8 @@ from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 
 __all__ = [
+    "AGENT_TURN_RESOURCE",
+    "CONTRACT_RESOURCE",
     "VERIFY_QUOTE_MAX_UTF16",
     "DocumentRef",
     "FindProductOutput",
@@ -33,12 +41,14 @@ __all__ = [
     "SectionContent",
     "ToolResult",
     "UnavailableReason",
+    "load_agent_turn_schema",
     "load_schema",
     "split_for_verification",
     "validate_tool_output",
 ]
 
 CONTRACT_RESOURCE: Final = "query-tools.schema.json"
+AGENT_TURN_RESOURCE: Final = "agent-turn.schema.json"
 
 QueryToolName = Literal["find_product", "get_section", "get_provenance", "verify_quote"]
 
@@ -93,6 +103,10 @@ class QuoteVerification(TypedDict):
 
 class FindProductOutput(TypedDict):
     products: list[dict[str, Any]]
+    # True when the caller's entitlement holds more documents than the service searched in one
+    # call. An empty ``products`` with ``truncated`` true is not "no such product"; the
+    # instruction tells the model to say the search was cut short and ask for a narrower name.
+    truncated: bool
 
 
 class ProvenanceDetail(TypedDict):
@@ -122,16 +136,30 @@ class ToolResult:
         return self.value is not None
 
 
-@cache
-def load_schema() -> dict[str, Any]:
-    """The vendored copy of ``contracts/generated/query-tools.schema.json``."""
+def _vendored(name: str) -> dict[str, Any]:
     text = (
         resources.files("verifiable_answer_agent.contracts")
-        .joinpath(CONTRACT_RESOURCE)
+        .joinpath(name)
         .read_text(encoding="utf-8")
     )
     schema: dict[str, Any] = json.loads(text)
     return schema
+
+
+@cache
+def load_schema() -> dict[str, Any]:
+    """The vendored copy of ``contracts/generated/query-tools.schema.json``."""
+    return _vendored(CONTRACT_RESOURCE)
+
+
+@cache
+def load_agent_turn_schema() -> dict[str, Any]:
+    """The vendored copy of ``contracts/generated/agent-turn.schema.json``.
+
+    Nothing at runtime validates against it: ``audit.TurnAuditRecord`` is built to its shape,
+    and ``tests/test_audit.py`` is where an emitted record is checked against it.
+    """
+    return _vendored(AGENT_TURN_RESOURCE)
 
 
 @cache

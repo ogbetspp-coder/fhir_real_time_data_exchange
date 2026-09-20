@@ -47,6 +47,16 @@ output "query_service_url" {
   value = google_cloud_run_v2_service.query.uri
 }
 
+output "query_service_urls" {
+  description = "Every URL Cloud Run reports for the query service"
+  value       = google_cloud_run_v2_service.query.urls
+}
+
+output "query_audience" {
+  description = "The audience a caller's ID token must carry: QUERY_AUDIENCE as deployed"
+  value       = local.query_audience
+}
+
 output "workflow_name" {
   value = google_workflows_workflow.epi.name
 }

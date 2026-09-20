@@ -149,10 +149,11 @@ jobs:
       - name: Type-check
         run: uv run --frozen mypy --strict
 
-      # The vendored contract must equal contracts/generated/query-tools.schema.json byte for
-      # byte: the agent ships it because Agent Engine has no repository root, and a second
-      # hand-maintained copy would be a second source of truth.
-      - name: Check the vendored contract
+      # The vendored contracts must equal contracts/generated/query-tools.schema.json and
+      # contracts/generated/agent-turn.schema.json byte for byte: the agent ships them because
+      # Agent Engine has no repository root, and a second hand-maintained copy would be a
+      # second source of truth.
+      - name: Check the vendored contracts
         run: uv run --frozen python scripts/sync_contract.py --check
 
       # Hermetic: the tests stand up the four tools on a real MCP streamable-HTTP server on an

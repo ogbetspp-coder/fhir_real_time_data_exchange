@@ -1,8 +1,9 @@
 # Design note: verifiable answers on Google-native surfaces
 
-- Status: Proposed, 2026-09-20. Google product capabilities below were read from Google's
-  public documentation (dated per source, inline); none has been exercised in this project's
-  tenant, and each must be re-confirmed in the console before it is relied on
+- Status: Proposed 2026-09-20; the query service (item 1) and the agent (item 1b) are built
+  and tested as of the same date, neither is deployed. Google product capabilities below were
+  read from Google's public documentation (dated per source, inline); none has been exercised
+  in this project's tenant, and each must be re-confirmed in the console before it is relied on
 - Related: `docs/design/epi-mcp-query-service.md`, `docs/adr/0004-service-boundaries-and-shared-code.md`,
   `docs/roadmap.md` items 1, 1b, 1c
 
@@ -100,30 +101,51 @@ designed for:
 - **In-service:** the query service verifies the end user's token itself and resolves
   entitlements for that principal, as designed.
 
-**One change to item 1 follows.** The service as built verifies a Google-signed OIDC _ID_
-token for its own audience. Gemini Enterprise forwards an OAuth 2.0 _access_ token. The
-service must accept both: an ID token (verified by signature and audience, as now — the path
-a Workspace user, a service account, or an ADK agent with a per-user `header_provider` uses)
-and a Google OAuth 2.0 access token (verified through Google's token-info endpoint; the
-token's audience must equal the OAuth client registered for the connector, and its `sub` is
-the principal). Same principal namespace, same entitlements, same audit record; the record
-gains a `credentialType` of `id-token` or `access-token`. This is a follow-up to the phase 1
-build, with the same negative tests as the ID-token path (wrong audience, expired, revoked,
-wrong issuer).
+**The access-token path is implemented** (`src/query/auth.ts`, tested in
+`test/query/auth.test.ts`). The service accepts both credential kinds on `Authorization:
+Bearer`, told apart by shape:
 
-For the ADK agent path (item 1b), propagation is not automatic: ADK's MCP toolset takes a
-per-request `header_provider` callback that reads the user's token from session state, and
-Agent Engine's Agent Identity offers a brokered three-legged OAuth in which the agent never
-holds the raw credential. Either satisfies the design; the delegated-trust fallback (the agent
-asserting a user under its own identity) is **not needed** and is not built.
+- a bearer that is three base64url segments is verified as a Google-signed OIDC _ID_ token for
+  `QUERY_AUDIENCE` through `google-auth-library`'s `verifyIdToken`; the service additionally
+  requires a Google issuer and a `sub` that satisfies the contract's `PrincipalId`;
+  `credentialType` is `id-token`. This is the path a Workspace user, a service account, or the
+  ADK agent uses.
+- any other bearer is treated as a Google OAuth 2.0 _access_ token — what Gemini Enterprise
+  forwards. It is sent to Google's tokeninfo endpoint (`OAuth2Client.getTokenInfo`, token in a
+  request header, never in a URL the service builds) and accepted only when the response
+  carries an `expiry_date` in the future, an `aud` or `azp` present in `QUERY_OAUTH_CLIENT_IDS`
+  (Terraform `query_oauth_client_ids`), and a `sub` satisfying `PrincipalId`; `credentialType`
+  is `access-token`. With the list empty — the default — every access token is rejected
+  without a call to Google.
+- successful access-token verifications are cached in process memory, keyed by the SHA-256 of
+  the token (never the token), holding only the principal and an expiry equal to the smaller
+  of the token's own `expiry_date` and 300 seconds from verification; at most 1,000 entries,
+  oldest evicted first; failures are never cached. Revocation inside that window is therefore
+  not seen until the entry expires — a bounded, stated residual.
+
+Same principal namespace, same entitlements, same audit record. Not tested: signature and
+ID-token expiry rejection, which are the library's behaviour behind a stub in every test, and
+the live tokeninfo endpoint, which has not been called from this project.
+
+For the ADK agent path (item 1b), the `header_provider` route was built: `tools.begin_turn`
+(the agent's `before_agent_callback`) generates a UUID and puts it in session state; the
+per-request `bearer_header_provider` reads the user's token and that id from session state and
+sends `Authorization` and `X-Query-Turn-Id` on every request of the turn. Agent Engine's
+brokered Agent Identity was not used. The delegated-trust fallback (the agent asserting a user
+under its own identity) is **not needed** and is not built. The wiring is proven with
+in-process ADK contexts, not against a deployed runtime.
 
 ## Rollout, in two steps
 
 **Step 1 — Gemini Enterprise straight onto the MCP service (layers 1 and 3).** No agent code.
 Register the query service as a custom MCP server with OAuth 2.0 in Gemini Enterprise; grant
-its service agent `run.invoker`; ship the access-token path above. Staff ask questions in
+its service agent `run.invoker`; set `query_oauth_client_ids` to the connector's client id
+(the access-token path is built; the id is the one thing it waits on). Staff ask questions in
 Google's chat; every tool result is verbatim with hashes. This is the fastest demonstrable
-form of (a), and it already proves the tool surface and the tenant wall in a real UI.
+form of (a), and it already proves the tool surface and the tenant wall in a real UI. One
+thing the tool surface now says that an integrator must relay: `find_product` answers
+`truncated: true` when the caller's entitlement holds more documents than the service's scan
+horizon (200), so an empty `products` with `truncated: true` is not "no such product".
 
 **Step 2 — the ADK agent adds layer 2 (item 1b).** A Python `google-adk` agent, its own
 deployable under ADR 0004 (`agent/`, own identity, shares only the published contracts),
@@ -139,15 +161,29 @@ else:
    `no-match` on the card.
 4. Emits one structured record per turn through the same no-narrative logging discipline as
    everything else. Its shape is a published contract like every other evidence artefact —
-   `AgentTurnRecord`: turn id, principal, model id and version, each tool call with its
-   `argumentsSha256`, one entry per presented span with `sourceKey`, `quoteSha256`, and
-   `match` or `no-match`; counts only, never prose. Without it, the demonstration's first two
-   scenes would produce no assessable evidence, so it is part of item 1b, not an afterthought.
+   `AgentTurnRecord` (`src/contracts/agent-turn.ts`, version 1.0.0): `service`
+   (`ema-flow-agent`), `serviceVersion`, `at`, `principal`, `turnId`, `tools` (per call: tool
+   name, outcome, duration, result count — at most 200), `spansVerified`, `spansFlagged`,
+   `sectionsDropped`, `flags` (the distinct closed flag names raised), `durationMs`. It is
+   narrower than first sketched here: no model id, no per-span entries, and no argument digest
+   — a `verify_quote` argument _is_ narrative, and a digest of a quote is a way of asking
+   whether a document contains a sentence. Which spans failed is on the card; how many, and
+   why, is in the record. Without it, the demonstration's first two scenes would produce no
+   assessable evidence, so it is part of item 1b, not an afterthought.
 
-The user's token reaches the query service through Agent Engine's brokered Agent Identity
-(three-legged OAuth in which the agent never holds the raw credential) where it is available;
-the `header_provider` path that holds the token in session state for the turn is the
-fallback, and the design note says which was built.
+The two audit trails join on one value. The agent generates `turnId` before the model runs and
+sends it as `X-Query-Turn-Id` on every request of the turn; the query service copies it into
+every `QueryAuditRecord` of that request as `turnId` (and refuses a header that is not a UUID
+with `400`). A reader holding both records can reconstruct which tool calls a turn made and
+what the post-check concluded, without either record carrying a word of what was asked or
+answered. `find_product`'s `truncated` flag is handled at layer 3 only: the agent composes
+blocks from `get_section` results alone, so the instruction tells the model to say a search was
+cut short and never to say there is no such product when `truncated` is true; a test checks the
+instruction text, nothing checks a model's obedience.
+
+The user's token reaches the query service through the `header_provider` path that holds the
+token and the turn id in session state for the turn (see "The identity question, settled");
+Agent Engine's brokered Agent Identity was not used.
 
 The same agent is exposed as a Google Chat app through Google's quickstart when a Workspace
 surface is wanted.
@@ -157,8 +193,8 @@ surface is wanted.
 - Gemini Enterprise is a licensed product. Confirm the organisation (or the demonstration
   tenant) has it before step 1 is scheduled; the MCP service and item 1c do not depend on it.
 - An OAuth 2.0 client (internal consent screen) for the MCP connector — created in the Cloud
-  console, not by Terraform; its client id becomes the access-token audience the service
-  accepts.
+  console, not by Terraform; its client id goes into `query_oauth_client_ids`, the list the
+  service checks a token's `aud` or `azp` against. Until it is set, access tokens are rejected.
 - EU residency: Gemini Enterprise offers the `eu` multi-region and `europe-west2` (London,
   not EU); some features fall back to global. Confirm against the client's residency bar
   before promising EU-only.

@@ -27,7 +27,12 @@ size, and hash-checking every part. Status: the contract, the ingress gate, the 
 `document` route, and the Workflows `document` branch exist; no Zone A service produces
 submissions yet, so in practice the only producer is `src/fixtures/synthetic-submission.ts`.
 The `fixture` and `healthcare-api` sources are pre-existing trusted inputs guarded by IAM, not
-by this gate; deployments where Zone A is the only producer should disable them. Zone B (this
+by this gate; the worker's run-source allowlist (`ENABLED_RUN_SOURCES`, Terraform
+`enabled_run_sources`, default all three sources; a request for a source outside it answers
+`422 source-disabled` before any reader, fixture, or client is touched) is how a deployment
+where Zone A is the only producer disables them, by setting `["document"]`. That allowlist is
+built and tested (`test/run-sources.test.ts`) in commit `d241065` on a separate branch and is
+not yet merged into this tree. Zone B (this
 repository, deterministic) accepts only an approved `CanonicalSubmission`, re-verifies hash,
 approval, bijection, and terminology invariants at ingress, and only then runs the unchanged
 transform, validation, persistence, and evidence pipeline. `src/fhir/transform.ts`, the
@@ -39,8 +44,10 @@ Narrative fidelity is checked mechanically, not by prompt: a pure verifier
 `docs/fidelity-normalization.md`, and requires an exact match before Zone B will transform a
 document source. The `CanonicalSubmission` contract (`src/contracts/`) is Zod-first, with
 generated JSON Schema checked into `contracts/generated/` and drift caught by
-`npm run contracts:check`. AI output can never reach the FHIR store or the evidence bucket
-without a hash-bound human approval and a passing fidelity check; UR-09 through UR-16 in
+`npm run contracts:check`. On the `document` route — the only route that accepts Zone A output
+— nothing reaches the FHIR store or the evidence bucket without a hash-bound human approval and
+a passing fidelity check; the `fixture` and `healthcare-api` routes are not covered by that
+gate and rest on IAM and the run-source allowlist instead. UR-09 through UR-16 in
 `docs/validation/README.md` trace these controls to tests. See ADR 0002 and ADR 0003 for the
 full invariant list and versioning rules.
 
@@ -153,7 +160,11 @@ Healthcare API, Storage, BigQuery, and KMS and routed to a retained regional log
 - Cloud Run requires IAM authentication; only the Workflow service account receives invoker.
 - The worker uses a dedicated service account with the narrow
   `roles/healthcare.fhirResourceEditor` role plus evidence-object, ledger-writer,
-  lineage-editor, logger, and signing permissions.
+  lineage-editor, logger, and signing permissions. That editor role is bound at project level
+  (`google_project_iam_member.worker_healthcare`, `infra/security.tf`), so it reaches every
+  Healthcare dataset in the project; the query service's reader role is bound on the dataset.
+  Moving the worker's binding to the dataset is a project-level role removal listed under
+  "Needs a person" in `docs/roadmap.md`.
 - The external deployment identity uses `roles/healthcare.datasetAdmin` and
   `roles/healthcare.fhirStoreAdmin` for Healthcare provisioning; it is not used at runtime.
 - Workflows can invoke the worker and query only the FHIR analytics dataset.
@@ -168,27 +179,79 @@ Healthcare API, Storage, BigQuery, and KMS and routed to a retained regional log
 
 ## Query service
 
-`ema-flow-<env>-query` (ADR 0004, `docs/design/epi-mcp-query-service.md`) is a second, discrete
-Cloud Run deployable, not a mode of the worker.
+`ema-flow-<env>-query` (ADR 0004, `docs/design/epi-mcp-query-service.md`, whose "Phase 1 as
+built" section is the authoritative description) is a second, discrete Cloud Run deployable,
+not a mode of the worker. It is built and tested under `test/query/`; it has not been deployed
+to a project, so every infrastructure statement below has been checked by `terraform validate`
+only.
 
-- **Intended use.** A read-only Model Context Protocol endpoint that lets an AI assistant answer
-  questions about product information with verifiable answers: every result names the FHIR
-  resource and version it came from and carries the hashes needed to check it against the store
-  without trusting the service.
-- **Identity.** Its own service account, `ema-flow-query-<env>`, holds exactly two roles:
-  `roles/healthcare.fhirResourceReader` scoped to the Healthcare dataset (not the project) and
-  `roles/logging.logWriter`. No write role, no bucket, no BigQuery, no KMS access — nothing the
-  worker's service account holds.
-- **Authentication.** Cloud Run requires a Google-signed OIDC ID token at the edge for every
-  request (no `allUsers` invoker); the service verifies that token again itself against
-  `QUERY_AUDIENCE` before serving `/mcp`, so the edge is not trusted alone. Invocation is
-  granted per caller through the `query_invokers` Terraform variable.
+- **Intended use.** A read-only Model Context Protocol endpoint (four tools: `find_product`,
+  `get_section`, `get_provenance`, `verify_quote`; contract `query-tools` 2.0.0) that lets an
+  AI assistant answer questions about product information with verifiable answers: every
+  result names the FHIR resource and version it came from and carries the hashes needed to
+  check it against the store without trusting the service.
+- **Identity and image.** Its own service account, `ema-flow-query-<env>`, holds exactly two
+  roles: `roles/healthcare.fhirResourceReader` on the Healthcare dataset (not the project) and
+  `roles/logging.logWriter` on the project. No write role, no bucket, no BigQuery, no KMS
+  access. `test/query/acceptance.test.ts` ("least privilege, proven") reads every `infra/*.tf`
+  and asserts that role set. Its image (`Dockerfile.query`, the `query` path of the shared
+  Artifact Registry repository) pins both stages to the same Node digest as the worker;
+  `npm run images:check` fails any root `Dockerfile*` without a digest or with a digest that
+  differs. `query_image` must be a by-digest reference when the service is planned; the digest
+  part becomes `IMAGE_DIGEST`.
+- **Authentication.** Cloud Run requires authentication at the edge (no `allUsers` invoker;
+  invocation is per caller through `query_invokers`), and the service verifies the credential
+  again itself, so the edge is not trusted alone. Two kinds arrive on `Authorization: Bearer`,
+  distinguished by shape: a JWT-shaped bearer is verified as a Google-signed OIDC ID token for
+  `QUERY_AUDIENCE` (`credentialType` `id-token`); any other bearer is treated as a Google
+  OAuth 2.0 access token, verified through Google's tokeninfo endpoint and accepted only when
+  its `aud` or `azp` is in `QUERY_OAUTH_CLIENT_IDS` (`credentialType` `access-token`; with the
+  list empty, which is the default, every access token is rejected). Successful access-token
+  verifications are cached in process memory — keyed by the token's SHA-256, holding principal
+  and expiry only, at most 300 s and never past the token's expiry, at most 1,000 entries,
+  failures never cached. `QUERY_AUDIENCE` defaults to the deterministic Cloud Run URL; a
+  Terraform postcondition asserts after apply that the URL is one the service serves.
+- **Answers before the protocol** (`src/query/app.ts`, in this order): `401 unauthenticated`
+  for a missing or unverifiable bearer; `403 not-entitled` for a verified principal with no
+  entry in the entitlement map, so an authenticated stranger never reaches `tools/list`;
+  `405` for a non-`POST`; `400 invalid-request` for an `X-Query-Turn-Id` that is present but
+  not a UUID, for a body that is not JSON or exceeds 4 MiB, and for a JSON-RPC batch of more
+  than 8 messages. Nothing is dispatched on any of these paths.
+- **Entitlements.** A Terraform-managed map, `{"<sub>": {"bundles": [...]}}`, parsed once at
+  startup with a strict schema (an `organisation` key or an e-mail-shaped principal fails
+  startup) and resolved once per request before any store read. Inside the protocol, a document
+  outside the caller's entitlement is `document-not-found` from every tool; `not-entitled` is an
+  audit outcome, never a returned error code. `find_product` reads at most the first 200
+  entitled ids in entitlement order through a pool of 8, stops launching reads once `limit`
+  matches are in hand, and reports `truncated: true` exactly when the entitlement holds more
+  than 200 ids — in the result and in the audit record.
 - **What it must never do.** Write, amend, draft, rewrite, or summarise regulated narrative;
-  return narrative without its hash; disclose a document outside a caller's entitlement (every
-  such document is `document-not-found`, not `not-entitled`).
-- **Audit.** Every tool call produces one `QueryAuditRecord` (`src/contracts/query-tools.ts`):
-  principal, tool, a digest of the arguments, outcome, and counts — never narrative, never an
-  argument value — through the same logger the worker uses.
+  return narrative without its hash; disclose a document outside a caller's entitlement.
+- **`/healthz`.** Answers `status`, `service`, and `version` from the process's configuration
+  only; it performs no token check of its own (Cloud Run IAM still applies), calls no store,
+  and reads nothing at request time. It proves the container is up, not that the store is
+  reachable.
+- **Audit.** One `QueryAuditRecord` (`src/contracts/query-tools.ts`) per dispatched `tools/call`
+  request: `service` (`ema-flow-query`), `serviceVersion`, `imageDigest`, `at`, `principal`,
+  `credentialType`, `tool`, `argumentsSha256`, `outcome`, `resultCount`, `truncated`
+  (`find_product` only), `durationMs`, `bundleId`, `versionId` (the version actually read;
+  absent when nothing was read), and `turnId` (when the caller declared one) — never narrative,
+  never an argument value. A request the transport refused before the handler ran still gets one
+  `invalid-request` record; a notification (no JSON-RPC id) gets none. Records go through the
+  same logger as the worker, whose forbidden-key filter drops `credentialType` from the written
+  line (the key contains "credential"); the field is in the record but not in Cloud Logging
+  until that shared library is widened.
+- **Structured lines and alerting.** Every line carries `service: "ema-flow-query"`. The 401
+  line is `stage: "query-http", event: "unauthenticated"` with nothing derived from the
+  credential; the 403 line adds `principal`. A log-based metric
+  (`ema_flow/query_entitlement_denials`) counts lines with `outcome` or `event` equal to
+  `not-entitled`; an e-mail channel and an alert policy (more than 5 denials in a rolling hour)
+  exist only when `alert_notification_email` is set. The retained audit log bucket can be
+  locked with `lock_regulated_audit_log_bucket` (irreversible; default `false`, not set).
+- **Turn correlation.** The ADK agent (`agent/`) generates a UUID when a turn starts, sends it
+  as `X-Query-Turn-Id` on every request of the turn, and writes it as `turnId` in its own
+  `AgentTurnRecord` (contract `agent-turn` 1.0.0), so the two records join on that value
+  without either carrying a word of what was asked or answered.
 
 ## Scale and failure behavior
 

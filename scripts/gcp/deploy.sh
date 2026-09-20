@@ -23,6 +23,17 @@ else
 fi
 REPOSITORY="${REGION}-docker.pkg.dev/${PROJECT_ID}/ema-flow"
 
+# Recorded by the query service in every audit record as QUERY_SERVICE_VERSION, so a record
+# can be tied to the commit that produced it. GITHUB_SHA is the full commit in Actions; a
+# local run uses HEAD; "local" (the Terraform default) marks a checkout without git.
+if [[ -n "${GITHUB_SHA:-}" ]]; then
+  SERVICE_VERSION="$GITHUB_SHA"
+elif SERVICE_VERSION="$(git rev-parse HEAD 2>/dev/null)" && [[ -n "$SERVICE_VERSION" ]]; then
+  :
+else
+  SERVICE_VERSION="local"
+fi
+
 tf_common_vars=(
   -var="project_id=${PROJECT_ID}"
   -var="region=${REGION}"
@@ -188,6 +199,7 @@ resolve_image_digest() {
 
 phase_apply() {
   echo "=== terraform apply ==="
+  echo "service_version=${SERVICE_VERSION}"
   WORKER_DIGEST="$(resolve_image_digest worker "$TAG")"
   VALIDATOR_DIGEST="$(resolve_image_digest validator "$TAG")"
   QUERY_DIGEST="$(resolve_image_digest query "$TAG")"
@@ -195,19 +207,25 @@ phase_apply() {
     -input=false \
     -auto-approve \
     "${tf_common_vars[@]}" \
+    -var="service_version=${SERVICE_VERSION}" \
     -var="worker_image=${REPOSITORY}/worker@${WORKER_DIGEST}" \
     -var="validator_image=${REPOSITORY}/validator@${VALIDATOR_DIGEST}" \
     -var="query_image=${REPOSITORY}/query@${QUERY_DIGEST}"; then
     echo "=== terraform apply failed; dumping recent container logs for diagnosis ===" >&2
-    # Only the worker's structured logs, whose fields are sanitised by src/lib/logger.ts; the
-    # validator sidecar's free-text console output is never copied into deploy logs.
-    gcloud --quiet logging read \
-      "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"ema-flow-${ENVIRONMENT}-worker\" AND resource.labels.container_name=\"worker\"" \
-      --project="$PROJECT_ID" \
-      --order=asc \
-      --freshness=1h \
-      --limit=500 \
-      --format="value(timestamp,severity,jsonPayload.stage,jsonPayload.message,jsonPayload.errorCount)" || true
+    # Only the worker's and the query service's structured logs, whose fields are sanitised by
+    # src/lib/logger.ts, and only the five fields named in --format; the validator sidecar's
+    # free-text console output is never copied into deploy logs.
+    local service
+    for service in worker query; do
+      echo "--- ema-flow-${ENVIRONMENT}-${service} ---" >&2
+      gcloud --quiet logging read \
+        "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"ema-flow-${ENVIRONMENT}-${service}\" AND resource.labels.container_name=\"${service}\"" \
+        --project="$PROJECT_ID" \
+        --order=asc \
+        --freshness=1h \
+        --limit=500 \
+        --format="value(timestamp,severity,jsonPayload.stage,jsonPayload.message,jsonPayload.errorCount)" || true
+    done
     return 1
   fi
 }

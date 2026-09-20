@@ -9,7 +9,10 @@ import pytest
 
 from verifiable_answer_agent.contract import _OUTPUT_DEF as OUTPUT_DEF
 from verifiable_answer_agent.contract import (
+    AGENT_TURN_RESOURCE,
+    CONTRACT_RESOURCE,
     VERIFY_QUOTE_MAX_UTF16,
+    load_agent_turn_schema,
     load_schema,
     split_for_verification,
     validate_tool_output,
@@ -17,22 +20,25 @@ from verifiable_answer_agent.contract import (
 
 from .fake_query_service import REPOSITORY_ROOT, load_sections
 
+VENDORED = Path(str(REPOSITORY_ROOT / "agent" / "src" / "verifiable_answer_agent" / "contracts"))
 
-def test_the_vendored_contract_is_the_published_one() -> None:
-    published = (REPOSITORY_ROOT / "contracts" / "generated" / "query-tools.schema.json").read_text(
-        encoding="utf-8"
-    )
-    vendored = Path(
-        str(
-            REPOSITORY_ROOT
-            / "agent"
-            / "src"
-            / "verifiable_answer_agent"
-            / "contracts"
-            / "query-tools.schema.json"
-        )
-    ).read_text(encoding="utf-8")
+
+@pytest.mark.parametrize("name", [CONTRACT_RESOURCE, AGENT_TURN_RESOURCE])
+def test_each_vendored_contract_is_the_published_one(name: str) -> None:
+    published = (REPOSITORY_ROOT / "contracts" / "generated" / name).read_text(encoding="utf-8")
+    vendored = (VENDORED / name).read_text(encoding="utf-8")
     assert vendored == published
+
+
+def test_the_two_schemas_are_the_versions_the_agent_was_adapted_to() -> None:
+    assert load_schema()["$id"].endswith("/query-tools/2.0.0/schema.json")
+    assert load_agent_turn_schema()["$id"].endswith("/agent-turn/1.0.0/schema.json")
+
+
+def test_not_entitled_is_no_longer_an_error_code_a_caller_can_see() -> None:
+    # query-tools 2.0.0: outside the entitlement the service answers document-not-found. The
+    # agent never branched on the code, so this pins the contract, not agent behaviour.
+    assert "not-entitled" not in load_schema()["$defs"]["QueryErrorCode"]["enum"]
 
 
 def test_each_tools_output_type_is_the_one_the_contract_names() -> None:
@@ -61,6 +67,18 @@ def test_a_valid_section_validates_and_an_altered_one_does_not() -> None:
 
     extra = dict(section) | {"summary": "a field the contract forbids"}
     assert not validate_tool_output("get_section", extra).available
+
+
+def test_find_product_requires_truncated_and_accepts_either_value() -> None:
+    output = load_schema()["$defs"]["FindProductOutput"]
+    assert "truncated" in output["required"]
+    for truncated in (False, True):
+        assert validate_tool_output(
+            "find_product", {"products": [], "truncated": truncated}
+        ).available
+    refused = validate_tool_output("find_product", {"products": []})
+    assert not refused.available
+    assert refused.reason == "schema-invalid"
 
 
 @pytest.mark.parametrize("payload", [None, "a string", 7, [1, 2, 3]])

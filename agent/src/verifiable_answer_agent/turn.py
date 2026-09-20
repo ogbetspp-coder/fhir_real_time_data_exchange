@@ -9,7 +9,6 @@ no model call, so it is fully testable without one.
 from __future__ import annotations
 
 import time
-import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, final
@@ -39,10 +38,15 @@ async def answer_turn(
     surface: Surface,
     principal: str,
     service_version: str,
+    turn_id: str,
     tool_calls: Sequence[ToolCallRecord] = (),
-    turn_id: str | None = None,
 ) -> TurnResult:
     """Compose deterministically, check mechanically, render, and record.
+
+    ``turn_id`` is the UUID ``tools.begin_turn`` put in session state when the turn started —
+    the one every tool call of the turn sent as ``X-Query-Turn-Id`` — read back with
+    ``tools.current_turn_id``. It is not generated here: a record whose id the tool calls never
+    carried could not be joined to the service's audit lines.
 
     ``tool_calls`` is read when the turn ends, not when it starts, so a live list that the
     caller's ``verify_quote`` appends to during the post-check is recorded in full.
@@ -54,7 +58,7 @@ async def answer_turn(
     record = turn_record(
         service_version=service_version,
         principal=principal,
-        turn_id=turn_id if turn_id is not None else str(uuid.uuid4()),
+        turn_id=turn_id,
         answer=checked,
         tools=tuple(tool_calls),
         sections_dropped=composition.sections_dropped,

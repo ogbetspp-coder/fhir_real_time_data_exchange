@@ -1,4 +1,4 @@
-"""The ADK agent object: a name, a pinned model, the instruction, and the four tools.
+"""The ADK agent object: a name, a pinned model, the instruction, the four tools, one callback.
 
 Deliberately thin. Everything that decides whether an answer is trustworthy lives in
 ``compose``, ``postcheck`` and ``audit``, none of which this module can skip: ``render`` takes
@@ -15,7 +15,7 @@ from google.adk.agents import LlmAgent
 
 from .config import AgentConfig
 from .instruction import SYSTEM_INSTRUCTION
-from .tools import build_query_toolset
+from .tools import begin_turn, build_query_toolset
 
 __all__ = ["AGENT_DESCRIPTION", "AGENT_NAME", "build_agent"]
 
@@ -37,4 +37,7 @@ def build_agent(config: AgentConfig | None = None) -> LlmAgent:
         description=AGENT_DESCRIPTION,
         instruction=SYSTEM_INSTRUCTION,
         tools=[build_query_toolset(settings)],
+        # Generates the turn id before the model runs, so the first tool call already carries
+        # X-Query-Turn-Id and the audit record's turnId is the same value.
+        before_agent_callback=begin_turn,
     )

@@ -22,13 +22,20 @@ def query_service() -> Iterator[FakeQueryService]:
         yield service
 
 
-def invocation_context(*, token: str | None = TEST_TOKEN) -> InvocationContext:
-    """A minimal ADK invocation context, with or without the end user's token in state."""
-    from verifiable_answer_agent.tools import USER_TOKEN_STATE_KEY
+def invocation_context(
+    *, token: str | None = TEST_TOKEN, turn_id: object = None
+) -> InvocationContext:
+    """A minimal ADK invocation context, with or without the token and a turn id in state.
+
+    ``turn_id`` is put in state as given — a test can plant a value that is not a UUID.
+    """
+    from verifiable_answer_agent.tools import TURN_ID_STATE_KEY, USER_TOKEN_STATE_KEY
 
     session = Session(id="synthetic-session", app_name="agent-tests", user_id=TEST_PRINCIPAL)
     if token is not None:
         session.state[USER_TOKEN_STATE_KEY] = token
+    if turn_id is not None:
+        session.state[TURN_ID_STATE_KEY] = turn_id
     return InvocationContext(
         session_service=InMemorySessionService(),
         invocation_id="synthetic-invocation",

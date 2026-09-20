@@ -15,19 +15,20 @@ The line the whole demonstration exists to land:
 
 Say this out loud at the start. It is the difference between a demonstration and a pitch.
 
-| Shown                                                             | Built?                                                                      |
-| ----------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Canonical submission, ingress gate, fidelity check, EMA transform | Yes — `src/`, run by the deployed worker                                    |
-| Validated resources in the Cloud Healthcare FHIR store            | Yes                                                                         |
-| Near-real-time BigQuery projection of those resources             | Yes — the store's native ANALYTICS_V2 stream                                |
-| Transformation ledger rows with approval and fidelity columns     | Yes — `ema_flow_ledger_<ENV>.transformation_runs`                           |
-| Signed evidence and a Provenance resource per approval            | Yes                                                                         |
-| MCP query tools (`get_section`, `verify_quote`, `get_provenance`) | **No — roadmap item 1, designed in `docs/design/epi-mcp-query-service.md`** |
-| An assistant that answers from those tools                        | **No — roadmap item 1b, designed in `docs/design/verifiable-answers.md`**   |
+| Shown                                                                             | Built?                                                                                                                               |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Canonical submission, ingress gate, fidelity check, EMA transform                 | Yes — `src/`, run by the deployed worker                                                                                             |
+| Validated resources in the Cloud Healthcare FHIR store                            | Yes                                                                                                                                  |
+| Near-real-time BigQuery projection of those resources                             | Yes — the store's native ANALYTICS_V2 stream                                                                                         |
+| Transformation ledger rows with approval and fidelity columns                     | Yes — `ema_flow_ledger_<ENV>.transformation_runs`                                                                                    |
+| Signed evidence and a Provenance resource per approval                            | Yes                                                                                                                                  |
+| MCP query tools (`find_product`, `get_section`, `verify_quote`, `get_provenance`) | **Built and tested, not deployed** — roadmap item 1, `src/query/`, `test/query/`; no `terraform apply` has created the service yet   |
+| An assistant that answers from those tools                                        | **Built and tested, not deployed** — roadmap item 1b, `agent/`; the Agent Engine deploy is scripted in `agent/deploy/`, not executed |
 
-Where a scene below has an assistant window, it is marked _(item 1/1b — not built)_ and a
-console-only equivalent that works today is given beside it. Nothing in this script requires the
-unbuilt parts.
+Where a scene below has an assistant window, it is marked _(item 1/1b — built, not deployed)_
+and a console-only equivalent that works today is given beside it. Nothing in this script
+requires the undeployed parts; do not show a local run of them as if it were the deployed
+service.
 
 ## Placeholders
 
@@ -150,10 +151,11 @@ bytes the store streamed, with no code of ours in between.
 
 ### Window 3 — the answer with its receipt
 
-_(Items 1 and 1b — not built. Show the design note, not a mock.)_ The tool call this becomes is
-`get_section` with the document reference, the language, and `sourceKey` `smpc.4.4`, returning
-the narrative verbatim with `narrativeDivSha256`, plus `get_provenance` for the approver and the
-source document hash.
+_(Items 1 and 1b — built, not deployed. Show the design note and the test names, not a mock.)_
+The tool call this becomes is `get_section` with the document reference, the language, and
+`sourceKey` `smpc.4.4`, returning the narrative verbatim with `narrativeDivSha256`, plus
+`get_provenance` for the approver, the approver's role, and the source document hash — as
+`test/query/acceptance.test.ts` "verbatim with citations" and "prove where it came from" assert.
 
 What is real today, and worth showing instead: the approval behind that same section, from the
 ledger and from the signed evidence.
@@ -231,11 +233,11 @@ ORDER BY version, ema_code;
 sentence to say here: "a diff over a PDF tells you a byte moved; this tells you which regulated
 section of which version of which product changed, and nothing else did."
 
-_(Item 1 — not built.)_ The tool version of this scene: `get_section` for `smpc.4.4` at each
-version returns two different `narrativeDivSha256` values, and `verify_quote` with the version 1
-sentence answers match against version 1 and no-match against version 2. That is the demonstration
-the design note asks for once the query service exists; until then the two queries above make the
-same point with the systems that are deployed.
+_(Item 1 — built, not deployed.)_ The tool version of this scene: `get_section` for `smpc.4.4`
+at each version returns two different `narrativeDivSha256` values, and `verify_quote` with the
+version 1 sentence answers match against version 1 and no-match against version 2. That is the
+demonstration the design note asks for once the query service is deployed; until then the two
+queries above make the same point with the systems that are deployed.
 
 ## Scene 3 — a question a regulator cannot ask a PDF
 
@@ -267,12 +269,15 @@ answer is a filter over structured content and not a search over text.
 Say plainly what this is not: the narrative is still human-written regulated text; the query
 found it because the section is coded, not because anything understood it.
 
-_(Items 1 and 1b — not built.)_ The assistant version: the same question in English, answered
-from `find_product` plus `get_section`, every quoted sentence followed by its product, version,
-`sourceKey` and hash, and each quote re-checked through `verify_quote` after the answer is
-composed. The promise is narrow and worth repeating exactly as `docs/design/verifiable-answers.md`
-states it: every sentence presented as label content is verbatim, hashed, and re-checked — not
-that the assistant is right.
+_(Items 1 and 1b — built, not deployed.)_ The assistant version: the same question in English,
+answered from `find_product` plus `get_section`, every quoted sentence followed by its product,
+version, `sourceKey` and hash, and each quote re-checked through `verify_quote` after the answer
+is composed. One honesty point for the room: `find_product` answers `truncated: true` when it
+stopped before covering the whole entitlement (three products are far inside its horizon of
+200, so it will be false here), and the assistant is instructed never to say "no such product"
+when it is true. The promise is narrow and worth repeating exactly as
+`docs/design/verifiable-answers.md` states it: every sentence presented as label content is
+verbatim, hashed, and re-checked — not that the assistant is right.
 
 ## Closing
 
@@ -285,8 +290,9 @@ than by reading. That is what an ePI hub is for.
 - No GxP, Annex 11, or 21 CFR Part 11 compliance. This produces qualification-supporting
   evidence; validation is a separate exercise (`docs/validation/README.md`).
 - Every product, every sentence, and every identifier in this demonstration is invented.
-- The assistant layer is designed, not built, and when it exists it will be an
-  information-retrieval aid for trained staff — not a regulatory decision system.
+- The query service and the assistant are built and tested but not deployed; no live tenant
+  has exercised them. When deployed, the assistant is an information-retrieval aid for trained
+  staff — not a regulatory decision system.
 - The fidelity check proves that published narrative matches the approved source document. It
   does not prove the source document is correct; a human approved that, and the Provenance
   resource says who.

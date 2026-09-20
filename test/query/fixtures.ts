@@ -12,9 +12,9 @@ import {
   type FhirBundle,
   type FhirResource,
 } from "../../src/fhir/types.js";
+import { APPROVER_ROLE_SYSTEM } from "../../src/fhir/provenance.js";
 import { createSyntheticSubmission } from "../../src/fixtures/synthetic-submission.js";
-import { createMcpServer, logAuditRecord } from "../../src/query/app.js";
-import { APPROVER_ROLE_SYSTEM } from "../../src/query/tools.js";
+import { createMcpServer, logAuditRecord, type RequestIdentity } from "../../src/query/app.js";
 import {
   parseEntitlements,
   type EntitlementDirectory,
@@ -69,8 +69,8 @@ export type QueryStore = {
   productNameA: string;
   productNameTypography: string;
   productNameB: string;
-  // The Provenance exactly as src/fhir/provenance.ts writes it, before the approver role is
-  // added: one test asserts what the service does with it as it stands today.
+  // The persisted Provenance with the approver role coding stripped from the attester agent:
+  // one test asserts that the service answers `unavailable` rather than guessing the role.
   provenanceWithoutRole: FhirResource;
   approverId: string;
   approverRole: string;
@@ -129,19 +129,22 @@ function cloneDocument(bundle: FhirBundle, bundleId: string): FhirBundle {
   return clone;
 }
 
-// src/fhir/provenance.ts records the approver's identity but not the approver's role, and the
-// published contract requires the role. Until the projection carries it, the query service
-// answers `unavailable` (see the acceptance test that pins that behaviour); this helper adds the
-// coding the service reads, which is the one line the projection is missing.
-export function withApproverRole(provenance: FhirResource, role: string): FhirResource {
-  const agents = Array.isArray(provenance.agent) ? [...(provenance.agent as unknown[])] : [];
+// The persisted projection minus the approver-role coding: what an older store, written before
+// src/fhir/provenance.ts carried the role, would hold. The service must answer `unavailable`
+// for it rather than infer the role from the participant type.
+export function withoutApproverRole(provenance: FhirResource): FhirResource {
+  const agents = Array.isArray(provenance.agent) ? (provenance.agent as unknown[]) : [];
   return {
     ...provenance,
     agent: agents.map((agent) => {
-      const typed = agent as { type?: { coding?: { code?: string }[] } };
-      const isAttester = typed.type?.coding?.some((coding) => coding.code === "attester") === true;
-      if (!isAttester) return agent;
-      return { ...typed, role: [{ coding: [{ system: APPROVER_ROLE_SYSTEM, code: role }] }] };
+      const typed = agent as { role?: { coding?: { system?: string }[] }[] };
+      if (typed.role === undefined) return agent;
+      const { role, ...rest } = typed;
+      const kept = role.filter(
+        (concept) =>
+          !(concept.coding ?? []).some((coding) => coding.system === APPROVER_ROLE_SYSTEM),
+      );
+      return kept.length === 0 ? rest : { ...rest, role: kept };
     }),
   };
 }
@@ -156,12 +159,11 @@ export function buildQueryStore(mapping: EmaMapping): QueryStore {
   const bundleIdA = ema.documentBundle.id;
   if (bundleIdA === undefined) throw new Error("EMA document Bundle requires an id");
 
-  const provenanceWithoutRole = withEmaTarget(
-    toProvenanceResource(gate.submission, gate.report),
-    bundleIdA,
-  );
+  // The Provenance exactly as the worker persists it (src/pipeline.ts): the projection, with
+  // the EMA Bundle appended as a target.
+  const provenanceA = withEmaTarget(toProvenanceResource(gate.submission, gate.report), bundleIdA);
   const approverRole = gate.submission.approval.approverRole;
-  const provenanceA = withApproverRole(provenanceWithoutRole, approverRole);
+  const provenanceWithoutRole = withoutApproverRole(provenanceA);
 
   const bundleA = stored(ema.documentBundle);
   const productNameA = "Synthetic Paracetamol 500 mg tablets";
@@ -188,12 +190,9 @@ export function buildQueryStore(mapping: EmaMapping): QueryStore {
       bundleIdB,
       {
         bundle: bundleB,
-        provenance: withApproverRole(
-          withEmaTarget(
-            { ...provenanceWithoutRole, id: stableUuid("ingestion-provenance", "organisation-b") },
-            bundleIdB,
-          ),
-          approverRole,
+        provenance: withEmaTarget(
+          { ...provenanceA, id: stableUuid("ingestion-provenance", "organisation-b") },
+          bundleIdB,
         ),
       },
     ],
@@ -221,17 +220,23 @@ export function buildQueryStore(mapping: EmaMapping): QueryStore {
 }
 
 // The entitlement map the service is configured with, parsed by the real parser out of the real
-// environment variable format: organisation A holds two documents, organisation B holds one.
+// environment variable format: principal A holds two documents, principal B holds one. Two
+// tenants, expressed as two disjoint bundle lists — the only shape a phase 1 entitlement has.
 export function entitlementDirectory(store: QueryStore): EntitlementDirectory {
   return parseEntitlements(
     JSON.stringify({
-      [PRINCIPAL_A]: {
-        organisation: "organisation-a",
-        bundles: [store.bundleIdA, store.bundleIdTypography],
-      },
-      [PRINCIPAL_B]: { organisation: "organisation-b", bundles: [store.bundleIdB] },
+      [PRINCIPAL_A]: { bundles: [store.bundleIdA, store.bundleIdTypography] },
+      [PRINCIPAL_B]: { bundles: [store.bundleIdB] },
     }),
   );
+}
+
+// The identity every audit record of a harness call carries; tests may override any field.
+export function testIdentity(
+  principal: string,
+  overrides: Partial<RequestIdentity> = {},
+): RequestIdentity {
+  return { principal, credentialType: "id-token", ...overrides };
 }
 
 // The stored narrative of one section, read straight out of the seeded store, so a test can
@@ -310,6 +315,7 @@ export async function connectHarness(options: {
   principal: string;
   entitlements: Entitlements | undefined;
   documents?: Map<string, SeededDocument>;
+  identity?: RequestIdentity;
   // When set, the audit record also goes through the service's own logger, so a test can scan
   // the log lines the service really writes.
   logAudit?: boolean;
@@ -320,7 +326,7 @@ export async function connectHarness(options: {
     reader,
     mapping: options.store.mapping,
     serviceVersion: SERVICE_VERSION,
-    principal: options.principal,
+    identity: options.identity ?? testIdentity(options.principal),
     entitlements: options.entitlements,
     audit: (record) => {
       audits.push(record);

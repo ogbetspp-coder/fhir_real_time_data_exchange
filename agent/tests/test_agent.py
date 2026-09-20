@@ -9,7 +9,7 @@ from google.adk.tools.mcp_tool import McpToolset
 from verifiable_answer_agent.agent import AGENT_NAME, build_agent
 from verifiable_answer_agent.config import AgentConfig, MissingConfigurationError
 from verifiable_answer_agent.instruction import SYSTEM_INSTRUCTION
-from verifiable_answer_agent.tools import QUERY_TOOL_NAMES, bearer_header_provider
+from verifiable_answer_agent.tools import QUERY_TOOL_NAMES, bearer_header_provider, begin_turn
 
 CONFIG = AgentConfig(
     query_service_url="https://example.invalid/mcp",
@@ -37,6 +37,11 @@ def test_the_toolset_is_filtered_to_the_four_tools_and_signs_as_the_user() -> No
     assert toolset._header_provider is bearer_header_provider
 
 
+def test_the_turn_id_is_generated_before_the_agent_runs() -> None:
+    agent = build_agent(CONFIG)
+    assert agent.before_agent_callback is begin_turn
+
+
 def test_the_configuration_has_no_defaults_to_fall_back_on() -> None:
     for missing in ("QUERY_SERVICE_MCP_URL", "AGENT_MODEL", "AGENT_SERVICE_VERSION"):
         env = {
@@ -57,3 +62,11 @@ def test_the_instruction_says_the_four_things_it_is_meant_to_say() -> None:
     assert "tool" in lowered
     assert "sourcekey" in lowered
     assert "never" in lowered
+
+
+def test_the_instruction_covers_a_truncated_product_search() -> None:
+    # query-tools 2.0.0: an empty find_product result with truncated true is not "no such
+    # product". Again not a wording test, only that the instruction addresses the field.
+    assert "truncated" in SYSTEM_INSTRUCTION
+    assert "cut short" in SYSTEM_INSTRUCTION
+    assert "narrower" in SYSTEM_INSTRUCTION

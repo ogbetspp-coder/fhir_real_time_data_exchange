@@ -1,9 +1,10 @@
-import { readFileSync, existsSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
+  FindProductOutputSchema,
   ProvenanceDetailSchema,
   QuoteVerificationSchema,
   SectionContentSchema,
@@ -11,8 +12,10 @@ import {
 } from "../../src/contracts/query-tools.js";
 import { NORMALIZATION_VERSION, normalizeText, xhtmlToText } from "../../src/fidelity/index.js";
 import { loadEmaMapping } from "../../src/fhir/mapping.js";
-import { sha256, sha256Utf8 } from "../../src/lib/hash.js";
+import { APPROVER_ROLE_SYSTEM } from "../../src/fhir/provenance.js";
+import { sha256, sha256Utf8, stableUuid } from "../../src/lib/hash.js";
 import type { EntitlementDirectory } from "../../src/query/entitlements.js";
+import { FIND_PRODUCT_CONCURRENCY, FIND_PRODUCT_SCAN_HORIZON } from "../../src/query/tools.js";
 import {
   INJECTED_SECTION_KEY,
   INJECTED_SENTENCE,
@@ -29,13 +32,12 @@ import {
   connectHarness,
   entitlementDirectory,
   narrativeDivOf,
-  withApproverRole,
   type Harness,
   type QueryStore,
   type SeededDocument,
 } from "./fixtures.js";
 
-// The seven acceptance tests of docs/design/epi-mcp-query-service.md, in its order and under its
+// The acceptance tests of docs/design/epi-mcp-query-service.md, in its order and under its
 // names. Each one is also the demonstration it describes: the store is built by the real
 // pipeline and the tools are driven through the MCP client, so a passing run is evidence about
 // the service, not about the test's own arithmetic.
@@ -111,12 +113,18 @@ describe("ePI query service, phase 1", () => {
         service: "ema-flow-query",
         serviceVersion: SERVICE_VERSION,
         principal: PRINCIPAL_A,
+        credentialType: "id-token",
         tool: "get_section",
         outcome: "ok",
         resultCount: 1,
         bundleId: store.bundleIdA,
+        // The version the call actually read, so the record ties to the exact stored content.
+        versionId: VERSION_ID,
         argumentsSha256: sha256(args),
       });
+      // Nothing outside a container, nothing declared by the caller.
+      expect(record.imageDigest).toBeUndefined();
+      expect(record.turnId).toBeUndefined();
     });
   });
 
@@ -184,6 +192,27 @@ describe("ePI query service, phase 1", () => {
       expect(searched.result).toBe("match");
       expect(searched.sectionsSearched).toBeGreaterThan(1);
 
+      // `sectionsSearched` is the number of sections that carry a narrative, whether the match
+      // sits in the first section or the last: the search stops at the first match, the count
+      // does not.
+      const narratives = allNarratives(store)
+        .filter(({ sourceKey }) => sourceKey.startsWith(`${store.bundleIdA}:`))
+        .map(({ div }) => normalizeText(xhtmlToText(div)));
+      const first = narratives[0];
+      const last = narratives.at(-1);
+      if (first === undefined || last === undefined || first === last) {
+        throw new Error("expected at least two narrative sections in document A");
+      }
+      for (const text of [first, last]) {
+        const answer = await callTool(harness, "verify_quote", {
+          bundleId: store.bundleIdA,
+          quote: text.slice(0, 30),
+        });
+        const parsed = QuoteVerificationSchema.parse(answer.structured);
+        expect(parsed.result).toBe("match");
+        expect(parsed.sectionsSearched).toBe(narratives.length);
+      }
+
       // A quote carrying a character the normalisation forbids is a bad request, not a no-match.
       const forbidden = await callTool(harness, "verify_quote", {
         bundleId: typography,
@@ -237,12 +266,16 @@ describe("ePI query service, phase 1", () => {
     });
   });
 
-  // The role is the one ProvenanceDetail field the persisted resource does not carry today:
-  // src/fhir/provenance.ts records the approver's identity but not the approver's role, and this
-  // service will not guess it. Adding the coding to that projection is what closes this.
+  // The approver's role is read from the persisted resource and never inferred from the
+  // participant type: a Provenance written without the role coding (an older store) is answered
+  // `unavailable`, and the audit record says so.
   it("answers unavailable when the persisted Provenance omits the approver role", async () => {
     const seeded = store.documents.get(store.bundleIdA);
     if (seeded === undefined) throw new Error("expected a seeded document");
+    // The fixture really lacks the coding, and the projection as persisted really carries it.
+    expect(JSON.stringify(store.provenanceWithoutRole).includes(APPROVER_ROLE_SYSTEM)).toBe(false);
+    expect(JSON.stringify(seeded.provenance).includes(APPROVER_ROLE_SYSTEM)).toBe(true);
+
     const documents = new Map([
       [store.bundleIdA, { bundle: seeded.bundle, provenance: store.provenanceWithoutRole }],
     ]);
@@ -251,11 +284,9 @@ describe("ePI query service, phase 1", () => {
       const answer = await callTool(harness, "get_provenance", { bundleId: store.bundleIdA });
       expect(answer.isError).toBe(true);
       expect(answer.structured).toEqual({ tool: "get_provenance", error: "unavailable" });
-      expect(onlyAudit(harness.audits).outcome).toBe("unavailable");
-
-      // The role the projection would have to carry is the one the approval record holds.
-      const withRole = withApproverRole(store.provenanceWithoutRole, store.approverRole);
-      expect(JSON.stringify(withRole).includes(store.approverRole)).toBe(true);
+      const record = onlyAudit(harness.audits);
+      expect(record.outcome).toBe("unavailable");
+      expect(record.versionId).toBe(VERSION_ID);
     } finally {
       await harness.close();
     }
@@ -343,11 +374,13 @@ describe("ePI query service, phase 1", () => {
         expect(answer.text).toBe("document-not-found");
       }
 
-      // ... while the audit trail records what was really attempted.
+      // ... while the audit trail records what was really attempted. No version is recorded:
+      // none was read.
       expect(harness.audits.map((record) => record.outcome)).toEqual(
         shapes.map(() => "not-entitled"),
       );
       expect(harness.audits.every((record) => record.bundleId === foreign)).toBe(true);
+      expect(harness.audits.every((record) => record.versionId === undefined)).toBe(true);
 
       // The other tenant's document was never fetched: the entitlement is applied before the
       // read, not after it.
@@ -364,6 +397,65 @@ describe("ePI query service, phase 1", () => {
       const own = await callTool(harness, "find_product", { query: store.productNameA });
       const products = (own.structured as { products: { productName: string }[] }).products;
       expect(products.map(({ productName }) => productName)).toEqual([store.productNameA]);
+    });
+  });
+
+  it("find_product reads at most the scan horizon, and stops at the limit", async () => {
+    const seeded = store.documents.get(store.bundleIdA);
+    if (seeded === undefined) throw new Error("expected a seeded document");
+
+    // An entitlement longer than one call searches: the same published document under many
+    // ids. The reader is the only store, so its call log is the read count.
+    const beyondHorizon = FIND_PRODUCT_SCAN_HORIZON + 50;
+    const ids = Array.from({ length: beyondHorizon }, (_, position) =>
+      stableUuid("ema-bundle", `horizon-${String(position)}`),
+    );
+    const documents = new Map<string, SeededDocument>(ids.map((id) => [id, seeded]));
+    const wide = await connectHarness({
+      store,
+      principal: PRINCIPAL_A,
+      entitlements: { bundles: ids },
+      documents,
+    });
+    try {
+      // No product matches: every scanned document is read, and only those.
+      const none = await callTool(wide, "find_product", { query: "no-such-product-anywhere" });
+      expect(none.isError).toBe(false);
+      expect(FindProductOutputSchema.parse(none.structured)).toEqual({
+        products: [],
+        truncated: true,
+      });
+      expect(wide.log.bundles).toHaveLength(FIND_PRODUCT_SCAN_HORIZON);
+      expect(wide.log.bundles).toEqual(ids.slice(0, FIND_PRODUCT_SCAN_HORIZON));
+      expect(onlyAudit(wide.audits)).toMatchObject({
+        tool: "find_product",
+        outcome: "ok",
+        resultCount: 0,
+        truncated: true,
+      });
+
+      // Every document matches and one is wanted: reads stop once the limit is reached — no
+      // more than one pool's worth are ever in flight — and the answer is the first entitled id.
+      wide.log.bundles.length = 0;
+      const one = await callTool(wide, "find_product", { query: store.productNameA, limit: 1 });
+      const output = FindProductOutputSchema.parse(one.structured);
+      expect(output.products.map(({ document }) => document.bundleId)).toEqual([ids[0]]);
+      expect(output.truncated).toBe(true);
+      expect(wide.log.bundles.length).toBeGreaterThanOrEqual(1);
+      expect(wide.log.bundles.length).toBeLessThanOrEqual(FIND_PRODUCT_CONCURRENCY);
+    } finally {
+      await wide.close();
+    }
+
+    // Within the horizon nothing is truncated, and the record says so.
+    await withHarness(PRINCIPAL_A, async (harness) => {
+      const answer = await callTool(harness, "find_product", { query: "no-such-product-anywhere" });
+      expect(FindProductOutputSchema.parse(answer.structured)).toEqual({
+        products: [],
+        truncated: false,
+      });
+      expect(harness.log.bundles).toHaveLength(2);
+      expect(onlyAudit(harness.audits).truncated).toBe(false);
     });
   });
 
@@ -447,15 +539,23 @@ describe("ePI query service, phase 1", () => {
     );
   });
 
-  it("least privilege, proven", (context) => {
-    const tfPath = path.resolve("infra/query.tf");
-    if (!existsSync(tfPath)) {
-      // This test depends on infra/query.tf, which the service's Terraform builder owns.
-      context.skip();
-      return;
-    }
+  it("least privilege, proven", () => {
+    // Every Terraform file is read, not just the one named after the service: a role bound to
+    // the query service account from any file counts, and a missing infra directory fails.
+    const infra = path.resolve("infra");
+    const files = readdirSync(infra)
+      .filter((name) => name.endsWith(".tf"))
+      .sort()
+      .map((name) => readFileSync(path.join(infra, name), "utf8"));
+    expect(files.length).toBeGreaterThan(0);
 
-    const roles = queryServiceAccountRoles(readFileSync(tfPath, "utf8"));
+    const terraform = files.join("\n");
+    const blocks = terraformBlocks(terraform);
+    expect(
+      blocks.some(({ type, body }) => type === "google_service_account" && /query/i.test(body)),
+    ).toBe(true);
+
+    const roles = queryServiceAccountRoles(terraform);
     expect(new Set(roles.map(({ role }) => role))).toEqual(
       new Set(["roles/healthcare.fhirResourceReader", "roles/logging.logWriter"]),
     );
@@ -512,9 +612,11 @@ function captureLines(): { lines: string[]; restore: () => void } {
 
 type TerraformBinding = { type: string; role: string };
 
-// Reads the IAM bindings Terraform declares for the query service account. It is deliberately
-// tolerant about naming — the Terraform is another builder's file — and strict about what it
-// asserts: the set of roles, and where each one is bound.
+// Reads the IAM bindings Terraform declares for the query service account: `*_iam_member`,
+// `*_iam_binding`, and `*_iam_policy` resources alike, so a grant made through a binding or a
+// policy is counted and not overlooked. It is deliberately tolerant about naming — the
+// Terraform is another builder's file — and strict about what it asserts: the set of roles,
+// and where each one is bound.
 export function queryServiceAccountRoles(terraform: string): TerraformBinding[] {
   const blocks = terraformBlocks(terraform);
   const accountNames = blocks
@@ -522,7 +624,7 @@ export function queryServiceAccountRoles(terraform: string): TerraformBinding[] 
     .map(({ name }) => name);
 
   return blocks.flatMap(({ type, body }) => {
-    if (!type.endsWith("_iam_member")) return [];
+    if (!/_iam_(member|binding|policy)$/.test(type)) return [];
     const mentionsAccount =
       accountNames.some((name) => new RegExp(`google_service_account\\.${name}\\b`).test(body)) ||
       body.includes("ema-flow-query");

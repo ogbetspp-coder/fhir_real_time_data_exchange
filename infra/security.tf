@@ -169,6 +169,11 @@ resource "google_logging_project_bucket_config" "regulated_audit" {
   retention_days = min(var.evidence_retention_days, 3650)
   bucket_id      = "${local.name_prefix}-regulated-audit"
   description    = "Regional retained application, workflow, and Cloud Audit Logs"
+  # false by default. Setting lock_regulated_audit_log_bucket = true locks the bucket, which
+  # cannot be undone: the retention period can no longer be changed and the bucket cannot be
+  # deleted until every entry in it has aged past retention_days. Terraform will not unlock it
+  # if the variable is later set back to false.
+  locked = var.lock_regulated_audit_log_bucket
 
   depends_on = [google_project_service.required]
 }

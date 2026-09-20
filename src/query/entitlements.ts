@@ -1,22 +1,26 @@
 import { z } from "zod";
 
-import { FhirId, PrincipalId, Token } from "../contracts/common.js";
+import { FhirId, PrincipalId } from "../contracts/common.js";
 
 // Who may read what. Phase 1 backs this with a Terraform-managed map parsed once at startup;
 // Firestore replaces the backing in phase 2 without changing this interface. A principal with
 // no entry has no entitlements at all, and outside a caller's entitlement every document is
 // `document-not-found`: existence is never disclosed (design note, constraint 4).
+//
+// A phase 1 entitlement is a list of document Bundle ids per principal and nothing else. There
+// is no organisation field: no authorization decision reads one, and a field that is parsed but
+// never consulted would only look like a control. Organisation scoping arrives with the
+// Firestore directory in phase 2, together with a document-to-organisation binding.
 
-export type Entitlements = { organisation: string; bundles: readonly string[] };
+export type Entitlements = { bundles: readonly string[] };
 
 export type EntitlementDirectory = {
   entitlementsFor(principal: string): Entitlements | undefined;
 };
 
-// `organisation` is an identifier, not prose: it is compared, never displayed as narrative, and
-// it must not be able to carry text into a log line.
+// Strict: a key this schema does not know (an `organisation` from an older map, say) is a
+// configuration error and fails startup rather than being silently ignored.
 const EntitlementSchema = z.strictObject({
-  organisation: Token,
   bundles: z.array(FhirId).max(10_000),
 });
 
@@ -41,7 +45,7 @@ export function parseEntitlements(json: string): EntitlementDirectory {
   const directory = new Map<string, Entitlements>(
     Object.entries(result.data).map(([principal, entitlements]) => [
       principal,
-      { organisation: entitlements.organisation, bundles: [...entitlements.bundles] },
+      { bundles: [...entitlements.bundles] },
     ]),
   );
 

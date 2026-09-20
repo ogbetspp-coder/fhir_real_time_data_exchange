@@ -62,8 +62,10 @@ bucket, and the submission itself names its fidelity report and extracted text. 
 contract, the ingress gate, the reference resolver, the `document` route, and the Workflows
 `document` branch exist; no Zone A service produces submissions yet, so in practice the only
 producer is `src/fixtures/synthetic-submission.ts`. The `fixture` and `healthcare-api` sources
-are pre-existing trusted inputs guarded by IAM, not by this gate; deployments where Zone A is
-the only producer should disable them. See
+are pre-existing trusted inputs guarded by IAM, not by this gate; the worker's run-source
+allowlist (`ENABLED_RUN_SOURCES`, Terraform `enabled_run_sources`, default all three; set
+`["document"]` where Zone A is the only producer) disables them. That allowlist is built and
+tested in commit `d241065` on a separate branch and is not yet merged into this tree. See
 [docs/adr/0002-two-trust-zones-and-canonical-submission.md](docs/adr/0002-two-trust-zones-and-canonical-submission.md)
 and
 [docs/adr/0003-mechanical-narrative-fidelity.md](docs/adr/0003-mechanical-narrative-fidelity.md)
@@ -107,7 +109,9 @@ curl -X POST http://127.0.0.1:8080/v1/runs \
 ```
 
 `GET /healthz` reports `documentSource: false` when no submission bucket is configured, and the
-route then answers `503 document-source-not-configured` rather than failing obscurely.
+route then answers `503 document-source-not-configured` rather than failing obscurely. A source
+outside `ENABLED_RUN_SOURCES` answers `422 { "error": "source-disabled" }` before any reader,
+fixture, or client is touched (on the separate branch named above).
 
 ## Google Cloud deployment
 
@@ -171,7 +175,10 @@ The bootstrapped deployer service account needs
 `roles/healthcare.datasetAdmin` for the Healthcare dataset and
 `roles/healthcare.fhirStoreAdmin` for the R5 REST reconciler. Its other provisioning roles
 depend on the resources in this Terraform configuration. The runtime worker remains separate
-and has the narrower `roles/healthcare.fhirResourceEditor` role.
+and has the narrower `roles/healthcare.fhirResourceEditor` role — bound at project level
+today (`google_project_iam_member.worker_healthcare` in `infra/security.tf`), whereas the
+query service's reader role is bound on the dataset; tightening the worker's binding to the
+dataset is listed in `docs/roadmap.md` under "Needs a person".
 
 Run the real demonstration:
 
@@ -211,7 +218,8 @@ Do not run that command for a disposable prototype project.
 
 `ema-flow-<env>-query` (`docs/architecture.md`, `docs/design/epi-mcp-query-service.md`) is a
 separate Cloud Run deployable from the worker: read-only, its own service account, its own
-Terraform variables. Two things must be granted before it answers anything:
+Terraform variables. It is built and its tests pass (`test/query/`); it has not yet been
+deployed to a project. Two things must be granted before it answers anything:
 
 1. **Invocation** — add your principal to `query_invokers` (a Terraform variable, so the grant
    is in version control):
@@ -219,12 +227,27 @@ Terraform variables. Two things must be granted before it answers anything:
    query_invokers = ["user:you@example.com"]
    ```
 2. **Entitlement** — add your token's `sub` claim to `query_entitlements_json`, keyed by that
-   subject:
+   subject. A Google `sub` is an opaque numeric string, never an e-mail address; the service
+   rejects a key containing `@` at startup, and the map carries only `bundles` per principal
+   (an older map with an `organisation` key also fails startup):
    ```hcl
    query_entitlements_json = jsonencode({
-     "you@example.com" = { organisation = "demo", bundles = ["synthetic-type2-smpc"] }
+     "112233445566778899001" = { bundles = ["synthetic-type2-smpc"] }
    })
    ```
+
+The service accepts two credential kinds on `Authorization: Bearer`, told apart by shape
+(`src/query/auth.ts`):
+
+- a bearer that is three base64url segments is verified as a Google-signed OIDC **ID token**
+  for `QUERY_AUDIENCE` (audit `credentialType` = `id-token`) — the path for a user, a service
+  account, or the ADK agent;
+- anything else is treated as a Google OAuth 2.0 **access token** (audit `credentialType` =
+  `access-token`) — the end user's token as Gemini Enterprise forwards it. It is verified
+  through Google's tokeninfo endpoint and accepted only when its `aud` or `azp` is listed in
+  `query_oauth_client_ids`. With that list empty (the default) every access token is rejected.
+  Successful access-token verifications are cached in process memory, keyed by the token's
+  SHA-256, for at most 300 seconds and never past the token's own expiry, at most 1,000 entries.
 
 Both a user account and a service account can call the service; only the token-minting command
 differs. Cloud Run's own edge check and the service's own `QUERY_AUDIENCE` check both require
@@ -251,8 +274,11 @@ TOKEN="$(gcloud auth print-identity-token --audiences="$SERVICE_URL")"
 printf '%s' "$TOKEN" | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null | jq -r .sub
 ```
 
-Then call the service. `/healthz` needs no application-level auth, but Cloud Run's own IAM
-check still applies to it, so the same bearer token is required:
+Then call the service. `GET /healthz` performs no application-level check: it answers
+`{ "status": "ok", "service": "ema-flow-query", "version": <QUERY_SERVICE_VERSION> }` from the
+process's own configuration, without a token check and without touching the FHIR store, so it
+proves the container started and nothing more. Cloud Run's own IAM check still applies to it,
+so the same bearer token is required:
 
 ```bash
 TOKEN="$(gcloud auth print-identity-token --audiences="$SERVICE_URL")"
@@ -268,16 +294,59 @@ curl -s -X POST "$SERVICE_URL/mcp" \
         "id": 1,
         "method": "initialize",
         "params": {
-          "protocolVersion": "<protocol version pinned by the query service>",
+          "protocolVersion": "2025-11-25",
           "capabilities": {},
           "clientInfo": { "name": "curl", "version": "0.0.0" }
         }
       }'
 ```
 
-A missing or invalid token returns `401` with body `{ "error": "unauthenticated" }` and nothing
-else. `QUERY_AUDIENCE` is set from the service's own URL and needs a two-apply bootstrap the
-first time the service is created — see the comment on that variable in `infra/query.tf`.
+`2025-11-25` is `LATEST_PROTOCOL_VERSION` of the pinned `@modelcontextprotocol/sdk` 1.30.0.
+
+What `/mcp` answers before any protocol message is dispatched, in this order
+(`src/query/app.ts`):
+
+| Condition                                                     | Answer                                  |
+| ------------------------------------------------------------- | --------------------------------------- |
+| No, malformed, or unverifiable bearer                         | `401 { "error": "unauthenticated" }`    |
+| Verified principal with no entry in `query_entitlements_json` | `403 { "error": "not-entitled" }`       |
+| Method other than `POST`                                      | `405 { "error": "method-not-allowed" }` |
+| `X-Query-Turn-Id` present but not a UUID                      | `400 { "error": "invalid-request" }`    |
+| Body not JSON, or larger than 4 MiB                           | `400 { "error": "invalid-request" }`    |
+| JSON-RPC batch of more than 8 messages                        | `400 { "error": "invalid-request" }`    |
+
+The `401` line logged carries nothing derived from the credential; the `403` line carries the
+principal (the `sub` an operator would entitle). Inside the protocol, a document outside the
+caller's entitlement is `document-not-found` from every tool — `not-entitled` is an audit
+outcome only, never a returned error code. `find_product` reads at most the first 200 entitled
+Bundle ids (8 reads in flight) and answers `truncated: true` when the entitlement holds more, so
+an empty `products` with `truncated: true` is not "no such product".
+
+`X-Query-Turn-Id`, when present and a UUID, is copied into every audit record of the request
+as `turnId`; the agent sends it on every request of a turn so its own `AgentTurnRecord` can be
+joined to the service's records.
+
+`QUERY_AUDIENCE` defaults to Cloud Run's deterministic URL
+(`https://ema-flow-<env>-query-<project number>.<region>.run.app`), which is known before the
+service exists, so no bootstrap apply is needed; a Terraform postcondition fails the apply if
+that URL is not one Cloud Run reports for the service. This has been checked by `terraform
+validate` only, not by an apply against a project.
+
+Query-service Terraform variables beyond `query_invokers` and `query_entitlements_json`
+(supply them through `TF_VAR_<name>` or an `infra/*.auto.tfvars` file; `scripts/gcp/deploy.sh`
+passes only project, region, environment, `service_version`, and the image references):
+
+| Variable                          | Default   | Effect                                                                                                                      |
+| --------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `query_oauth_client_ids`          | `[]`      | OAuth 2.0 client ids whose access tokens are accepted (`QUERY_OAUTH_CLIENT_IDS`); the env var is omitted when empty         |
+| `query_audience`                  | `""`      | Empty means the deterministic URL above; set only to front the service with another hostname                                |
+| `service_version`                 | `"local"` | `QUERY_SERVICE_VERSION` in every audit record; `deploy.sh` passes the commit SHA                                            |
+| `query_image`                     | —         | Must be an image reference by digest when the service is planned; the digest part becomes `IMAGE_DIGEST` in every record    |
+| `alert_notification_email`        | `""`      | The entitlement-denial log metric always exists; the e-mail channel and alert policy (> 5 denials in an hour) only when set |
+| `lock_regulated_audit_log_bucket` | `false`   | Locks the retained audit log bucket. Irreversible: retention cannot then change and Terraform will not unlock it            |
+
+The metric filter and the alert threshold have been checked by `terraform validate` only; no
+plan or apply has run against a project.
 
 ## Standards and validation
 
@@ -300,10 +369,13 @@ The HL7 and EMA examples are regression references, not mapping specifications.
 
 ## Control posture supporting GxP qualification
 
-The package supports ALCOA+ evidence with correlated run IDs, UTC timestamps, immutable
-inputs/outputs, hashes, KMS signatures, Cloud Audit Logs, retained evidence, deterministic
-replay, and controlled image provenance. Development, validation, and production are separate
-Terraform environments with distinct service identities.
+The evidence model makes each run attributable (one run id propagated through logs, evidence
+objects, the ledger, and the FHIR transaction), timestamped in UTC, and hash-bound (SHA-256 of
+inputs and outputs, a KMS-signed manifest, retained evidence objects, Cloud Audit Logs,
+deterministic replay, and digest-pinned images). It does not claim ALCOA+ or any other
+data-integrity standard; whether the evidence meets one is an assessment the owning
+organisation makes. Development, validation, and production are separate Terraform
+environments with distinct service identities.
 
 Google Cloud operates under shared responsibility. Intended use, risk assessment, procedural
 controls, personnel qualification, electronic signatures, application validation, and final
@@ -314,25 +386,13 @@ organization adds, and it is not a Part 11 or Annex 11 content signature.
 
 ## Repository access
 
-Browse: [khs-dev/ema-flow](https://cursor.com/codebase/khs-dev/ema-flow). The repository is
-private; visibility can be changed in settings on that page.
+The repository is
+[github.com/ogbetspp-coder/fhir_real_time_data_exchange](https://github.com/ogbetspp-coder/fhir_real_time_data_exchange)
+(private). Clone it with git over HTTPS, or with the GitHub CLI installed from your platform's
+package manager — no `curl | sh` installer is used or recommended here:
 
 ```bash
-# Install the Origin CLI
-curl -fsSL https://downloads.cursor.com/origin/install.sh | sh
-
-# Sign in (also sets up git credentials)
-origin auth login
-
-# Clone the repository
-origin repo clone khs-dev/ema-flow
+git clone https://github.com/ogbetspp-coder/fhir_real_time_data_exchange.git
+# or, with gh installed from a package manager (brew install gh / apt install gh):
+gh repo clone ogbetspp-coder/fhir_real_time_data_exchange
 ```
-
-If `origin` is not found:
-
-```bash
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
-source ~/.zshrc
-```
-
-[Origin CLI documentation](https://cursor.com/docs/origin/cli)

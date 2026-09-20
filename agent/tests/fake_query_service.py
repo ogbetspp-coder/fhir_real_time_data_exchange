@@ -139,13 +139,15 @@ def load_sections() -> dict[str, Section]:
 @final
 @dataclass(slots=True)
 class FakeQueryService:
-    """The running fake. ``seen_authorization`` is what the agent actually put on the wire."""
+    """The running fake. ``seen_*`` are the header values the agent actually put on the wire."""
 
     url: str
     sections: dict[str, Section]
     seen_authorization: list[str | None] = field(default_factory=list)
+    seen_turn_id: list[str | None] = field(default_factory=list)
     corrupt_section: str | None = None
     break_schema_for: str | None = None
+    truncate_find_product: bool = False
 
 
 def _sha256_hex(text: str) -> str:
@@ -176,7 +178,10 @@ def _build_server(state: FakeQueryService) -> Any:
                     "language": "en",
                     "sections": sorted(state.sections),
                 }
-            ]
+            ],
+            # query-tools 2.0.0: required. True means the service stopped searching before it
+            # had covered the caller's whole entitlement.
+            "truncated": state.truncate_find_product,
         }
 
     @mcp.tool(name="get_section", description="One QRD section, verbatim, with its hashes.")
@@ -259,6 +264,7 @@ def _build_server(state: FakeQueryService) -> Any:
             if scope["type"] == "http":
                 headers = {key.decode(): value.decode() for key, value in scope["headers"]}
                 state.seen_authorization.append(headers.get("authorization"))
+                state.seen_turn_id.append(headers.get("x-query-turn-id"))
             await self._inner(scope, receive, send)
 
     return _Capture(app)
@@ -266,7 +272,10 @@ def _build_server(state: FakeQueryService) -> Any:
 
 @contextmanager
 def running_query_service(
-    *, corrupt_section: str | None = None, break_schema_for: str | None = None
+    *,
+    corrupt_section: str | None = None,
+    break_schema_for: str | None = None,
+    truncate_find_product: bool = False,
 ) -> Iterator[FakeQueryService]:
     """Serve the four tools on an ephemeral loopback port for the life of the block."""
     listener = socket.socket()
@@ -277,6 +286,7 @@ def running_query_service(
         sections=load_sections(),
         corrupt_section=corrupt_section,
         break_schema_for=break_schema_for,
+        truncate_find_product=truncate_find_product,
     )
     config = uvicorn.Config(_build_server(state), log_level="error")
     server = uvicorn.Server(config)

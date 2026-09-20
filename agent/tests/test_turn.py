@@ -21,13 +21,19 @@ from google.adk.tools.tool_context import ToolContext
 from verifiable_answer_agent.audit import ToolCallRecord
 from verifiable_answer_agent.contract import ToolResult
 from verifiable_answer_agent.postcheck import VerifyQuote
-from verifiable_answer_agent.tools import build_query_toolset, read_tool_result, record_for
+from verifiable_answer_agent.tools import (
+    TURN_ID_STATE_KEY,
+    build_query_toolset,
+    read_tool_result,
+    record_for,
+)
 from verifiable_answer_agent.turn import answer_turn
 
 from .conftest import config_for, invocation_context
 from .fake_query_service import FakeQueryService, running_query_service
 
 SECTION_KEYS = ["smpc.4.3", "smpc.4.4"]
+TURN_ID = "0f6b3a2e-4c1d-4e8f-9a7b-1c2d3e4f5a6b"
 
 
 class Wiring:
@@ -77,7 +83,9 @@ class Wiring:
 @contextlib.asynccontextmanager
 async def wired(service: FakeQueryService) -> AsyncIterator[Wiring]:
     toolset = build_query_toolset(config_for(service.url))
-    context = invocation_context()
+    # What begin_turn does at the start of a real invocation: the id is in state before the
+    # first request, so every request of the turn carries it.
+    context = invocation_context(turn_id=TURN_ID)
     try:
         tools = {tool.name: tool for tool in await toolset.get_tools(ReadonlyContext(context))}
         yield Wiring(toolset, tools, context)
@@ -100,9 +108,11 @@ async def test_an_honest_turn_verifies_every_block(
             principal="urn:reviewer:synthetic-01",
             service_version="agent/0.1.0",
             tool_calls=wiring.calls,
-            turn_id="synthetic-turn",
+            turn_id=wiring.context.session.state[TURN_ID_STATE_KEY],
         )
 
+    assert turn.audit.turn_id == TURN_ID
+    assert set(query_service.seen_turn_id) == {TURN_ID}
     assert len(turn.answer.blocks) == len(SECTION_KEYS)
     assert turn.answer.flagged_blocks == ()
     assert turn.audit.spans_verified == len(SECTION_KEYS)
@@ -123,6 +133,7 @@ async def test_a_block_the_store_no_longer_contains_is_flagged_on_the_card() -> 
                 surface="a2ui",
                 principal="urn:reviewer:synthetic-01",
                 service_version="agent/0.1.0",
+                turn_id=TURN_ID,
                 tool_calls=wiring.calls,
             )
 
@@ -156,6 +167,7 @@ async def test_a_section_the_contract_refuses_never_reaches_the_answer() -> None
                 surface="text",
                 principal="urn:reviewer:synthetic-01",
                 service_version="agent/0.1.0",
+                turn_id=TURN_ID,
                 tool_calls=wiring.calls,
             )
 

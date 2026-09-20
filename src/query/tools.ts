@@ -24,6 +24,17 @@ import {
 } from "../contracts/query-tools.js";
 import { NORMALIZATION_VERSION, normalizeText, xhtmlToText } from "../fidelity/index.js";
 import type { EmaMapping, SectionRule } from "../fhir/mapping.js";
+import {
+  APPROVAL_CONTENT_EXTENSION_URL,
+  APPROVER_IDENTIFIER_SYSTEM,
+  APPROVER_ROLE_SYSTEM,
+  FIDELITY_REPORT_IDENTIFIER_SYSTEM,
+  MODEL_IDENTIFIER_SYSTEM,
+  PARTICIPANT_TYPE_ASSEMBLER,
+  PARTICIPANT_TYPE_ATTESTER,
+  PARTICIPANT_TYPE_SYSTEM,
+  SOURCE_DOCUMENT_IDENTIFIER_SYSTEM,
+} from "../fhir/provenance.js";
 import { isComposition, type CompositionSection, type FhirComposition } from "../fhir/types.js";
 import { sha256Utf8, stableUuid } from "../lib/hash.js";
 import type { Entitlements } from "./entitlements.js";
@@ -39,17 +50,20 @@ import type { FhirReader } from "./fhir-reader.js";
 type QueryErrorCodeValue = QueryError["error"];
 type QueryToolNameValue = QueryError["tool"];
 
+// What a call resolved, for the audit record: the document it named and, once a stored version
+// was read, which version. Neither is ever narrative.
+type Resolved = { bundleId?: string | undefined; versionId?: string | undefined };
+
 export type ToolOutcome<T> =
-  | { status: "ok"; value: T; resultCount: number; bundleId?: string | undefined }
-  | {
+  | ({ status: "ok"; value: T; resultCount: number; truncated?: boolean | undefined } & Resolved)
+  | ({
       status: "error";
       error: QueryError;
       // What the audit record records, which is not always what the caller is told: outside a
       // caller's entitlement the answer is `document-not-found` and the record is
       // `not-entitled`, so existence is not disclosed but the attempt is still visible.
       auditOutcome: Exclude<QueryAuditOutcome, "ok">;
-      bundleId?: string | undefined;
-    };
+    } & Resolved);
 
 export type ToolContext = {
   entitlements: Entitlements | undefined;
@@ -60,9 +74,9 @@ export type ToolContext = {
 function fail<T>(
   tool: QueryToolNameValue,
   code: QueryErrorCodeValue,
-  bundleId?: string,
+  resolved: Resolved = {},
 ): ToolOutcome<T> {
-  return { status: "error", error: { tool, error: code }, auditOutcome: code, bundleId };
+  return { status: "error", error: { tool, error: code }, auditOutcome: code, ...resolved };
 }
 
 function notEntitled<T>(tool: QueryToolNameValue, bundleId: string): ToolOutcome<T> {
@@ -177,13 +191,15 @@ async function loadDocument<T>(
     return fail<T>(
       tool,
       selector.versionId === undefined ? "document-not-found" : "version-not-found",
-      selector.bundleId,
+      {
+        bundleId: selector.bundleId,
+      },
     );
   }
 
   const first = bundle.entry[0]?.resource;
   if (first === undefined || !isComposition(first)) {
-    return fail<T>(tool, "unavailable", selector.bundleId);
+    return fail<T>(tool, "unavailable", { bundleId: selector.bundleId });
   }
 
   // Every returned fact names the exact version it came from; a stored document that cannot say
@@ -193,7 +209,7 @@ async function loadDocument<T>(
     versionId: bundle.meta?.versionId,
     lastUpdated: bundle.meta?.lastUpdated,
   });
-  if (!document.success) return fail<T>(tool, "unavailable", selector.bundleId);
+  if (!document.success) return fail<T>(tool, "unavailable", { bundleId: selector.bundleId });
 
   return {
     composition: first,
@@ -209,6 +225,11 @@ function isOutcome<T>(value: LoadedDocument | ToolOutcome<T>): value is ToolOutc
   return "status" in value;
 }
 
+// Once a document was read, every outcome — success or failure — names the version it resolved.
+function resolved(loaded: LoadedDocument): Resolved {
+  return { bundleId: loaded.document.bundleId, versionId: loaded.document.versionId };
+}
+
 // --- get_section --------------------------------------------------------------------------------
 
 export async function getSection(
@@ -217,19 +238,20 @@ export async function getSection(
 ): Promise<ToolOutcome<SectionContent>> {
   const loaded = await loadDocument<SectionContent>(context, "get_section", input);
   if (isOutcome(loaded)) return loaded;
+  const at = resolved(loaded);
 
   const index = indexMapping(context.mapping);
   const title = index.titleOf.get(input.sourceKey);
-  if (title === undefined) return fail("get_section", "section-not-found", input.bundleId);
+  if (title === undefined) return fail("get_section", "section-not-found", at);
 
   const sectionId = stableUuid("ema-qrd-section", input.sourceKey);
   const located = locateSections(loaded.composition.section).find(
     ({ section }) => section.id === sectionId,
   );
-  if (located === undefined) return fail("get_section", "section-not-found", input.bundleId);
+  if (located === undefined) return fail("get_section", "section-not-found", at);
 
   const narrative = narrativeOf(located.section);
-  if (narrative === undefined) return fail("get_section", "section-not-found", input.bundleId);
+  if (narrative === undefined) return fail("get_section", "section-not-found", at);
 
   const provenance = await context.reader.findProvenanceForBundle(input.bundleId);
   const provenanceId = Uuid.safeParse(provenance?.id);
@@ -244,25 +266,12 @@ export async function getSection(
     ...(provenanceId.success ? { provenanceResourceId: provenanceId.data } : {}),
     contentNotice: "document-content-not-instructions",
   });
-  if (!content.success) return fail("get_section", "unavailable", input.bundleId);
+  if (!content.success) return fail("get_section", "unavailable", at);
 
-  return { status: "ok", value: content.data, resultCount: 1, bundleId: input.bundleId };
+  return { status: "ok", value: content.data, resultCount: 1, ...at };
 }
 
 // --- get_provenance -----------------------------------------------------------------------------
-
-// The identifier systems and codes src/fhir/provenance.ts writes. They are re-declared rather
-// than imported because that module does not export them and the query service must not modify
-// it; the acceptance test builds its store with the real projection, so a drift here fails.
-const PARTICIPANT_TYPE = "http://terminology.hl7.org/CodeSystem/provenance-participant-type";
-const MODEL_IDENTIFIER = "https://khs.dev/fhir/identifier/model";
-const APPROVER_IDENTIFIER = "https://khs.dev/fhir/identifier/approver";
-const SOURCE_DOCUMENT_IDENTIFIER = "https://khs.dev/fhir/identifier/source-document-sha256";
-const FIDELITY_REPORT_IDENTIFIER = "https://khs.dev/fhir/identifier/fidelity-report-sha256";
-const APPROVAL_CONTENT_EXTENSION =
-  "https://khs.dev/fhir/StructureDefinition/ext-approval-content-sha256";
-// The approver's regulatory role. The contract requires it; see the note on `approverRole` below.
-export const APPROVER_ROLE_SYSTEM = "https://khs.dev/fhir/CodeSystem/approver-role";
 
 const CodingSchema = z.object({ system: z.string().optional(), code: z.string().optional() });
 const CodeableConceptSchema = z.object({ coding: z.array(CodingSchema).optional() });
@@ -295,10 +304,10 @@ type PersistedProvenance = z.infer<typeof PersistedProvenanceSchema>;
 type PersistedAgent = PersistedProvenance["agent"][number];
 type PersistedConcept = z.infer<typeof CodeableConceptSchema>;
 
-function hasCode(concept: PersistedConcept | undefined, code: string): boolean {
+function hasParticipantType(concept: PersistedConcept | undefined, code: string): boolean {
   return (
     concept?.coding?.some(
-      (coding) => coding.system === PARTICIPANT_TYPE && coding.code === code,
+      (coding) => coding.system === PARTICIPANT_TYPE_SYSTEM && coding.code === code,
     ) === true
   );
 }
@@ -320,12 +329,13 @@ function splitToolVersion(display: string): { name: string; version: string } | 
   return { name: display.slice(0, at), version: display.slice(at + 1) };
 }
 
-// The approver's role is read from the attester agent, never inferred. The FHIR participant type
-// says "attester"; it does not say whether that attester was a content reviewer or a QA
-// reviewer, and the difference is a regulatory fact this service must not guess at. A persisted
-// Provenance that does not carry the role is answered `unavailable`.
+// The approver's role is read from the attester agent's `role` coding under
+// APPROVER_ROLE_SYSTEM, never inferred. The FHIR participant type says "attester"; it does not
+// say whether that attester was a content reviewer or a QA reviewer, and the difference is a
+// regulatory fact this service must not guess at. A persisted Provenance that does not carry
+// the role is answered `unavailable`.
 function approverRole(agent: PersistedAgent): string | undefined {
-  const codings = [...(agent.role ?? []), ...(agent.type === undefined ? [] : [agent.type])]
+  const codings = (agent.role ?? [])
     .flatMap((concept) => concept.coding ?? [])
     .filter((coding) => coding.system === APPROVER_ROLE_SYSTEM);
   return codings.map((coding) => coding.code).find((code) => ApproverRole.safeParse(code).success);
@@ -337,43 +347,48 @@ export async function getProvenance(
 ): Promise<ToolOutcome<ProvenanceDetail>> {
   const loaded = await loadDocument<ProvenanceDetail>(context, "get_provenance", input);
   if (isOutcome(loaded)) return loaded;
+  const at = resolved(loaded);
 
   const resource = await context.reader.findProvenanceForBundle(input.bundleId);
-  if (resource === undefined) return fail("get_provenance", "unavailable", input.bundleId);
+  if (resource === undefined) return fail("get_provenance", "unavailable", at);
   const parsed = PersistedProvenanceSchema.safeParse(resource);
-  if (!parsed.success) return fail("get_provenance", "unavailable", input.bundleId);
+  if (!parsed.success) return fail("get_provenance", "unavailable", at);
   const persisted = parsed.data;
 
-  const assemblers = persisted.agent.filter((agent) => hasCode(agent.type, "assembler"));
+  const assemblers = persisted.agent.filter((agent) =>
+    hasParticipantType(agent.type, PARTICIPANT_TYPE_ASSEMBLER),
+  );
   const extractor = assemblers
     .map((agent) => agent.who?.display)
     .filter((display): display is string => display !== undefined)
     .map(splitToolVersion)
     .find((tool) => tool !== undefined);
   const modelId = assemblers
-    .map((agent) => agentIdentifier(agent, MODEL_IDENTIFIER))
+    .map((agent) => agentIdentifier(agent, MODEL_IDENTIFIER_SYSTEM))
     .find((id) => id !== undefined);
 
-  const attester = persisted.agent.find((agent) => hasCode(agent.type, "attester"));
+  const attester = persisted.agent.find((agent) =>
+    hasParticipantType(agent.type, PARTICIPANT_TYPE_ATTESTER),
+  );
   const approverId =
-    attester === undefined ? undefined : agentIdentifier(attester, APPROVER_IDENTIFIER);
+    attester === undefined ? undefined : agentIdentifier(attester, APPROVER_IDENTIFIER_SYSTEM);
   const role = attester === undefined ? undefined : approverRole(attester);
   if (extractor === undefined || approverId === undefined || role === undefined) {
-    return fail("get_provenance", "unavailable", input.bundleId);
+    return fail("get_provenance", "unavailable", at);
   }
 
   let section: ProvenanceDetail["section"];
   if (input.sourceKey !== undefined) {
     const index = indexMapping(context.mapping);
     if (!index.titleOf.has(input.sourceKey)) {
-      return fail("get_provenance", "section-not-found", input.bundleId);
+      return fail("get_provenance", "section-not-found", at);
     }
     const sectionId = stableUuid("ema-qrd-section", input.sourceKey);
     const located = locateSections(loaded.composition.section).find(
       (candidate) => candidate.section.id === sectionId,
     );
     const narrative = located === undefined ? undefined : narrativeOf(located.section);
-    if (narrative === undefined) return fail("get_provenance", "section-not-found", input.bundleId);
+    if (narrative === undefined) return fail("get_provenance", "section-not-found", at);
     // Recomputed live from the stored narrative, so a caller can compare them with any record
     // it holds independently of this service.
     section = {
@@ -387,18 +402,19 @@ export async function getProvenance(
     document: loaded.document,
     provenanceResourceId: persisted.id,
     recorded: persisted.recorded,
-    sourceDocumentSha256: entityValue(persisted, SOURCE_DOCUMENT_IDENTIFIER),
-    fidelityReportSha256: entityValue(persisted, FIDELITY_REPORT_IDENTIFIER),
-    approvedContentSha256: persisted.extension.find(({ url }) => url === APPROVAL_CONTENT_EXTENSION)
-      ?.valueString,
+    sourceDocumentSha256: entityValue(persisted, SOURCE_DOCUMENT_IDENTIFIER_SYSTEM),
+    fidelityReportSha256: entityValue(persisted, FIDELITY_REPORT_IDENTIFIER_SYSTEM),
+    approvedContentSha256: persisted.extension.find(
+      ({ url }) => url === APPROVAL_CONTENT_EXTENSION_URL,
+    )?.valueString,
     extractor,
     ...(modelId === undefined ? {} : { model: { id: modelId } }),
     approver: { id: approverId, role },
     ...(section === undefined ? {} : { section }),
   });
-  if (!detail.success) return fail("get_provenance", "unavailable", input.bundleId);
+  if (!detail.success) return fail("get_provenance", "unavailable", at);
 
-  return { status: "ok", value: detail.data, resultCount: 1, bundleId: input.bundleId };
+  return { status: "ok", value: detail.data, resultCount: 1, ...at };
 }
 
 // --- verify_quote --------------------------------------------------------------------------------
@@ -413,43 +429,50 @@ export async function verifyQuote(
   try {
     normalizedQuote = normalizeText(input.quote);
   } catch {
-    return fail("verify_quote", "invalid-request", input.bundleId);
+    return fail("verify_quote", "invalid-request", { bundleId: input.bundleId });
   }
-  if (normalizedQuote.length === 0) return fail("verify_quote", "invalid-request", input.bundleId);
+  if (normalizedQuote.length === 0) {
+    return fail("verify_quote", "invalid-request", { bundleId: input.bundleId });
+  }
 
   const loaded = await loadDocument<QuoteVerification>(context, "verify_quote", input);
   if (isOutcome(loaded)) return loaded;
+  const at = resolved(loaded);
 
   const index = indexMapping(context.mapping);
   let candidates = locateSections(loaded.composition.section).flatMap((located) => {
     const sourceKey = index.sourceKeyOfSectionId.get(located.section.id ?? "");
-    return sourceKey === undefined ? [] : [{ sourceKey, section: located.section }];
+    const div = located.section.text?.div;
+    return sourceKey === undefined || div === undefined ? [] : [{ sourceKey, div }];
   });
 
   if (input.sourceKey !== undefined) {
     const sourceKey = input.sourceKey;
     candidates = candidates.filter((candidate) => candidate.sourceKey === sourceKey);
-    if (candidates.length === 0) return fail("verify_quote", "section-not-found", input.bundleId);
+    if (candidates.length === 0) return fail("verify_quote", "section-not-found", at);
   }
 
+  // `sectionsSearched` is the number of candidate sections that carry a narrative, whether or
+  // not the search stopped early: it describes the scope of the answer, not the work done.
+  const sectionsSearched = candidates.length;
+
+  // The search normalises each section's text and stops at the first match; only the matched
+  // section's text is hashed.
   let match: QuoteVerification["match"];
-  let sectionsSearched = 0;
   for (const candidate of candidates) {
-    const narrative = narrativeOf(candidate.section);
-    if (narrative === undefined) continue;
-    sectionsSearched += 1;
-    if (match !== undefined) continue;
-    const at = narrative.text.indexOf(normalizedQuote);
-    if (at < 0) continue;
+    const text = normalizeText(xhtmlToText(candidate.div));
+    const found = text.indexOf(normalizedQuote);
+    if (found < 0) continue;
     // Offsets are code points in the section's normalised text, as every offset in this
     // repository is (ADR 0002), not UTF-16 indices.
-    const startOffset = codePointLength(narrative.text.slice(0, at));
+    const startOffset = codePointLength(text.slice(0, found));
     match = {
       sourceKey: candidate.sourceKey,
       startOffset,
       endOffset: startOffset + codePointLength(normalizedQuote),
-      normalizedTextSha256: narrative.normalizedTextSha256,
+      normalizedTextSha256: sha256Utf8(text),
     };
+    break;
   }
 
   const verification = QuoteVerificationSchema.safeParse({
@@ -462,17 +485,23 @@ export async function verifyQuote(
     sectionsSearched,
     ...(match === undefined ? {} : { match }),
   });
-  if (!verification.success) return fail("verify_quote", "unavailable", input.bundleId);
+  if (!verification.success) return fail("verify_quote", "unavailable", at);
 
   return {
     status: "ok",
     value: verification.data,
     resultCount: match === undefined ? 0 : 1,
-    bundleId: input.bundleId,
+    ...at,
   };
 }
 
 // --- find_product ---------------------------------------------------------------------------------
+
+// One find_product call reads at most this many of the caller's entitled documents, in
+// entitlement order; an entitlement longer than this is reported as `truncated`.
+export const FIND_PRODUCT_SCAN_HORIZON = 200;
+// At most this many store reads are in flight at once.
+export const FIND_PRODUCT_CONCURRENCY = 8;
 
 function productSummary(loaded: LoadedDocument, index: MappingIndex): ProductSummary | undefined {
   const product = loaded.entries.find(
@@ -545,21 +574,47 @@ export async function findProduct(
 
   const index = indexMapping(context.mapping);
   const limit = input.limit ?? 50;
-  const products: ProductSummary[] = [];
 
   // Only the caller's own entitled documents are ever read: there is no store-wide search here,
   // so an unentitled product cannot appear even for an exact query (design note, constraint 4).
-  for (const bundleId of context.entitlements?.bundles ?? []) {
-    if (products.length >= limit) break;
-    const loaded = await loadDocument<FindProductOutput>(context, "find_product", { bundleId });
-    if (isOutcome(loaded)) continue;
-    const summary = productSummary(loaded, index);
-    if (summary !== undefined && matches(needle, summary)) products.push(summary);
-  }
+  // Phase 1 has no search against the store, so each entitled document is read and inspected;
+  // the reads run through a bounded pool, cover at most the first FIND_PRODUCT_SCAN_HORIZON
+  // entitled ids, and stop being launched once `limit` matches are in hand.
+  const entitled = context.entitlements?.bundles ?? [];
+  const scanned = entitled.slice(0, FIND_PRODUCT_SCAN_HORIZON);
+  const truncated = entitled.length > scanned.length;
 
-  // Phase 1 scans every entitled document, so nothing is ever left unsearched.
-  const output = FindProductOutputSchema.safeParse({ products, truncated: false });
+  const found: (ProductSummary | undefined)[] = new Array<ProductSummary | undefined>(
+    scanned.length,
+  ).fill(undefined);
+  let next = 0;
+  let matched = 0;
+  const worker = async (): Promise<void> => {
+    while (next < scanned.length && matched < limit) {
+      const position = next;
+      next += 1;
+      const bundleId = scanned[position];
+      if (bundleId === undefined) return;
+      const loaded = await loadDocument<FindProductOutput>(context, "find_product", { bundleId });
+      if (isOutcome(loaded)) continue;
+      const summary = productSummary(loaded, index);
+      if (summary !== undefined && matches(needle, summary)) {
+        found[position] = summary;
+        matched += 1;
+      }
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(FIND_PRODUCT_CONCURRENCY, scanned.length) }, () => worker()),
+  );
+
+  // Matches are reported in entitlement order regardless of the order the reads completed in.
+  const products = found
+    .filter((summary): summary is ProductSummary => summary !== undefined)
+    .slice(0, limit);
+
+  const output = FindProductOutputSchema.safeParse({ products, truncated });
   if (!output.success) return fail("find_product", "unavailable");
 
-  return { status: "ok", value: output.data, resultCount: products.length };
+  return { status: "ok", value: output.data, resultCount: products.length, truncated };
 }
