@@ -8,24 +8,33 @@ function compareKeys(left: string, right: string): number {
   return 0;
 }
 
-function canonicalize(value: unknown): unknown {
+// JSON.stringify omits these as object members and writes them as null as array elements.
+function isOmittedMember(child: unknown): boolean {
+  return child === undefined || typeof child === "function" || typeof child === "symbol";
+}
+
+// The canonical string is built directly, never by sorting keys into a JavaScript object and
+// serialising that: a JavaScript object re-emits integer-like keys ("2", "10") first and in
+// numeric order whatever the insertion order, which silently discards the sort and yields a
+// hash no other language reproduces. Scalars and strings go through JSON.stringify so their
+// formatting (numbers, escapes, lone surrogates as \udXXX) is exactly its own.
+export function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) {
-    return value.map(canonicalize);
+    return `[${value.map((child) => canonicalJson(child)).join(",")}]`;
   }
 
   if (value !== null && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>)
-        .sort(([left], [right]) => compareKeys(left, right))
-        .map(([key, child]) => [key, canonicalize(child)]),
-    );
+    const members = Object.entries(value as Record<string, unknown>)
+      .filter(([, child]) => !isOmittedMember(child))
+      .sort(([left], [right]) => compareKeys(left, right))
+      .map(([key, child]) => `${JSON.stringify(key)}:${canonicalJson(child)}`);
+    return `{${members.join(",")}}`;
   }
 
-  return value;
-}
-
-export function canonicalJson(value: unknown): string {
-  return JSON.stringify(canonicalize(value));
+  // JSON.stringify is typed as always returning a string; it returns undefined for these, and
+  // an array element of that kind is written as null.
+  if (isOmittedMember(value)) return "null";
+  return JSON.stringify(value);
 }
 
 export function sha256(value: unknown): string {

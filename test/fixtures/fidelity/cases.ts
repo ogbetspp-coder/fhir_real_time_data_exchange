@@ -255,6 +255,11 @@ const HYPHEN_ACROSS_PAGES = customSource([
 ]);
 const WORD_ACROSS_PAGES = customSource(["Give nor", "​floxacin twice daily."]);
 
+// A page carrying an unpaired UTF-16 surrogate. Section 2 rejects the page, so every span on it
+// is `span-not-found`; the report's `extractedTextSha256` is nevertheless the canonical JSON
+// hash of a source containing it, which is what makes this case worth pinning.
+const LONE_SURROGATE_SOURCE = customSource(["Dose information.\uD800 Tail text."]);
+
 export const verifyCases: VerifyCase[] = [
   // A body boundary inside a line, or a body that excludes more than a header/footer could hold,
   // invalidates the page: the extractor-declared range is bounded, not trusted.
@@ -874,6 +879,24 @@ export const verifyCases: VerifyCase[] = [
       reasons: { "smpc.4.1": "forbidden-character" },
     },
   },
+  // The page is rejected by section 2, but the report still hashes the source that contains the
+  // unpaired surrogate: `extractedTextSha256` is the canonical JSON of `input.source`. This is
+  // the only place in the system where a hash is taken over a string a UTF-8 encoder cannot
+  // encode, and it pins the one escape (`\udXXX`) a re-implementation has to reproduce.
+  {
+    name: "lone-surrogate-page",
+    input: toInput(
+      LONE_SURROGATE_SOURCE,
+      single("smpc.4.1", paragraphs("Dose information."), [
+        spanFor(LONE_SURROGATE_SOURCE, 1, "Dose information."),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.1": "span-not-found" },
+      reasons: { "smpc.4.1": "page-malformed" },
+    },
+  },
 ];
 
 export const throwCases: ThrowCase[] = [
@@ -973,6 +996,37 @@ export const xhtmlCases: XhtmlCase[] = [
     input: div('<p class="a b c d">t</p>'),
     expected: { error: "forbidden-attribute" },
   },
+  // An attribute grammar is a whole-value grammar. A re-implementation whose "matches" means
+  // "matches a prefix", or whose `$` also matches before a trailing newline (Python's does),
+  // accepts a value with text after the last line break — exactly the channel section 5 closes.
+  {
+    name: "rejects-id-with-trailing-newline",
+    input: div('<p id="a\n">t</p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-class-with-text-after-newline",
+    input: div('<p class="a\nhidden text">t</p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-href-with-trailing-newline",
+    input: div('<p><a href="#x\n">t</a></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  // `\d` is ASCII in this dialect and Unicode-aware in Python's. A numeric character reference
+  // written with fullwidth digits is not a character reference at all: the `&` is stray.
+  {
+    name: "rejects-fullwidth-digit-entity",
+    input: div("<p>&#６５;</p>"),
+    expected: { error: "stray-amp" },
+  },
+  {
+    name: "rejects-fullwidth-digit-hex-entity",
+    input: div("<p>&#x４２;</p>"),
+    expected: { error: "stray-amp" },
+  },
+  { name: "accepts-decimal-entity", input: div("<p>&#65;</p>"), expected: "\n\nA\n\n" },
   // Renderer-generated characters (list numbers, quotation marks) and table sections placed
   // out of document order would show text or an order the source does not contain.
   { name: "rejects-ol", input: div("<ol><li>a</li></ol>"), expected: { error: "unknown-element" } },

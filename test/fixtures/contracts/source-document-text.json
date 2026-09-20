@@ -1,0 +1,23 @@
+{
+  "extractorVersion": "synthetic-extractor/1.0.0",
+  "pages": [
+    {
+      "page": 1,
+      "text": "Synthetic Paracetamol 500 mg tablets - synthetic demonstration extract\nSynthetic demonstration content for smpc; not for clinical use.\nSynthetic demonstration content for smpc.1; not for clinical use.\nSynthetic demonstration content for smpc.2; not for clinical use.\nSynthetic demonstration content for smpc.3; not for clinical use.\nSynthetic demonstration content for smpc.4; not for clinical use.\nSynthetic demonstration content for smpc.4.1; not for clinical use.\nSynthetic demonstration content for smpc.4.2; not for clinical use.\nSynthetic demonstration content for smpc.4.2.posology; not for clinical use.\nSynthetic demonstration content for smpc.4.2.administration; not for clinical use.\nSynthetic demonstration content for smpc.4.3; not for clinical use.\nSynthetic demonstration content for smpc.4.4; not for clinical use.\nPage 1 of 3",
+      "bodyStart": 71,
+      "bodyEnd": 831
+    },
+    {
+      "page": 2,
+      "text": "Synthetic Paracetamol 500 mg tablets - synthetic demonstration extract\nSynthetic demonstration content for smpc.4.5; not for clinical use.\nSynthetic demonstration content for smpc.4.6; not for clinical use.\nSynthetic demonstration content for smpc.4.7; not for clinical use.\nSynthetic demonstration content for smpc.4.8; not for clinical use.\nSynthetic demonstration content for smpc.4.8.reporting; not for clinical use.\nSynthetic demonstration content for smpc.4.9; not for clinical use.\nSynthetic demonstration content for smpc.5; not for clinical use.\nSynthetic demonstration content for smpc.5.1; not for clinical use.\nSynthetic demonstration content for smpc.5.2; not for clinical use.\nSynthetic demonstration content for smpc.5.3; not for clinical use.\nSynthetic demonstration content for smpc.6; not for clinical use.\nPage 2 of 3",
+      "bodyStart": 71,
+      "bodyEnd": 825
+    },
+    {
+      "page": 3,
+      "text": "Synthetic Paracetamol 500 mg tablets - synthetic demonstration extract\nSynthetic demonstration content for smpc.6.1; not for clinical use.\nSynthetic demonstration content for smpc.6.2; not for clinical use.\nSynthetic demonstration content for smpc.6.3; not for clinical use.\nSynthetic demonstration content for smpc.6.4; not for clinical use.\nSynthetic demonstration content for smpc.6.5; not for clinical use.\nSynthetic demonstration content for smpc.6.6; not for clinical use.\nSynthetic demonstration content for smpc.7; not for clinical use.\nSynthetic demonstration content for smpc.8; not for clinical use.\nSynthetic demonstration content for smpc.9; not for clinical use.\nSynthetic demonstration content for smpc.10; not for clinical use.\nPage 3 of 3",
+      "bodyStart": 71,
+      "bodyEnd": 744
+    }
+  ]
+}

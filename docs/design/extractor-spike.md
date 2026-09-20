@@ -9,7 +9,7 @@
 
 The Zone A design assumes an extractor can turn a label PDF into `SourceDocumentText` — pages
 with body ranges that exclude running headers and footers, discretionary hyphens emitted as
-U+00AD, tables as row-major TAB/LF — such that the fidelity check (`fidelity-norm/1.1.0`)
+U+00AD, tables as row-major TAB/LF — such that the fidelity check (`fidelity-norm/1.1.1`)
 passes for narrative that a human would accept as the same text. That contract was written
 from first principles. No extractor has met it. Everything in roadmap items 2–6 is built on
 it, so it is tested first, cheaply, with a written verdict at the end.

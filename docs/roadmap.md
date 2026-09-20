@@ -28,16 +28,16 @@ Three rules decided the sequence below.
 
 ## Delivered
 
-| Item                                                                                              | Components                                       |
-| ------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| Deterministic Type 2 → EMA ePI transform, profile validation, persistence, signed evidence        | Cloud Run, Cloud Healthcare API, GCS, Cloud KMS  |
-| Near-real-time analytical projection                                                              | Healthcare API native BigQuery stream, Workflows |
-| Zone A / Zone B trust boundary: `CanonicalSubmission` contract, hash-bound approval, ingress gate | Zod → generated JSON Schema, checked in CI       |
-| Mechanical narrative fidelity check (`fidelity-norm/1.1.0`) with language-neutral golden vectors  | Pure library, no cloud dependency                |
-| By-reference submission transport, `document` run source, Workflows document branch               | Cloud Storage, Cloud Run, Workflows              |
-| Queryable transformation ledger incl. approval and fidelity columns                               | BigQuery                                         |
-| Per-client retention as native Cloud Storage policy                                               | Cloud Storage, Terraform variables               |
-| Deploy pipeline with a quality gate that runs before any cloud credential exists                  | GitHub Actions, Terraform, Cloud Build           |
+| Item                                                                                                                      | Components                                       |
+| ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Deterministic Type 2 → EMA ePI transform, profile validation, persistence, signed evidence                                | Cloud Run, Cloud Healthcare API, GCS, Cloud KMS  |
+| Near-real-time analytical projection                                                                                      | Healthcare API native BigQuery stream, Workflows |
+| Zone A / Zone B trust boundary: `CanonicalSubmission` contract, hash-bound approval, ingress gate                         | Zod → generated JSON Schema, checked in CI       |
+| Mechanical narrative fidelity check (`fidelity-norm/1.1.1`) with golden vectors and a cross-language differential harness | Pure library, no cloud dependency                |
+| By-reference submission transport, `document` run source, Workflows document branch                                       | Cloud Storage, Cloud Run, Workflows              |
+| Queryable transformation ledger incl. approval and fidelity columns                                                       | BigQuery                                         |
+| Per-client retention as native Cloud Storage policy                                                                       | Cloud Storage, Terraform variables               |
+| Deploy pipeline with a quality gate that runs before any cloud credential exists                                          | GitHub Actions, Terraform, Cloud Build           |
 
 ## Next, in order
 
