@@ -40,3 +40,72 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  zone-a:
+    name: Zone A
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash --noprofile --norc -eo pipefail {0}
+        working-directory: zone-a
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      # The differential corpus is produced by the TypeScript implementation, so this job needs
+      # the Node toolchain as well: the whole point is that the two languages are compared, and
+      # a corpus committed to the repository would only prove agreement with a past revision.
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22.14.0
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install Node dependencies
+        working-directory: .
+        run: npm ci --no-audit --no-fund
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          # ADR 0003 pins the Unicode Character Database, and the UCD ships with the
+          # interpreter: 3.14 is Unicode 16.0, the same as the Zone B runtime image.
+          # tests/test_environment.py asserts this rather than trusting it.
+          python-version: "3.14"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.12.17"
+          enable-cache: true
+          cache-dependency-glob: zone-a/uv.lock
+
+      - name: Install Python dependencies
+        run: uv sync --frozen
+
+      - name: Lint
+        run: uv run --frozen ruff check .
+
+      - name: Format
+        run: uv run --frozen ruff format --check .
+
+      - name: Type-check
+        run: uv run --frozen mypy --strict
+
+      - name: Check generated models
+        run: uv run --frozen python scripts/generate_models.py --check
+
+      # Seed and count are pinned so a failure is reproducible: the same two numbers rebuild the
+      # same corpus anywhere. A divergence is reported by case tag, class and digest, never by
+      # input text, so a failing CI log still carries no narrative.
+      - name: Generate the differential corpus from the TypeScript implementation
+        working-directory: .
+        run: npx tsx scripts/fidelity/differential.ts --seed 20260920 --count 2000 > differential.jsonl
+
+      - name: Test
+        env:
+          DIFFERENTIAL_CORPUS: ${{ github.workspace }}/differential.jsonl
+        run: uv run --frozen pytest

@@ -65,7 +65,7 @@ const PROSE_PATTERN = /\S+(?:\s+\S+){3,}/u;
 
 // The closed list of shapes a report string may take. Nothing here can hold a space, so nothing
 // here can hold a phrase.
-//   - a token: rule names, statuses, source keys (`smpc.4.1`), versions (`fidelity-norm/1.1.0`),
+//   - a token: rule names, statuses, source keys (`smpc.4.1`), versions (`fidelity-norm/1.1.1`),
 //     paths (`Composition.section[3].section[1]`), block-type keys, Unicode category names;
 //   - a 64-hex SHA-256 digest;
 //   - an ISO 8601 UTC timestamp.

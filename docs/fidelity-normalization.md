@@ -1,6 +1,6 @@
 # Narrative fidelity normalisation specification
 
-Version: `fidelity-norm/1.1.0` (`NORMALIZATION_VERSION` in `src/fidelity/normalize.ts`; history
+Version: `fidelity-norm/1.1.1` (`NORMALIZATION_VERSION` in `src/fidelity/normalize.ts`; history
 in section 9)
 
 This document is the language-neutral specification of the text normalisation and XHTML
@@ -30,7 +30,19 @@ text and to the narrative text; nothing is applied to one side only.
 - Every hash of a JSON value (`reportHash`, `extractedTextSha256`, `narrativeBindingSha256`,
   the contract hashes) is the SHA-256 of canonical JSON: object keys sorted by UTF-16 code
   unit order (RFC 8785), no insignificant whitespace, `JSON.stringify` number and string
-  formatting. Locale-aware sorting is never used.
+  formatting. Locale-aware sorting is never used. Two consequences an implementation must
+  honour explicitly: the sorted order must be emitted directly, never obtained by inserting
+  keys into a language-native object or map that reorders integer-like keys (`"2"`, `"10"`);
+  and strings are written as `JSON.stringify` writes them, so an unpaired surrogate is emitted
+  as the escape `\udXXX`, never as a raw code unit. Every number in a hashed structure is an
+  integer; a value such as `1.0` is the integer 1 wherever it is read.
+- `extractedTextSha256` is the hash of the whole `SourceDocumentText` value the check ran
+  against. `reportHash` is the hash of the report with its own `reportHash` member removed;
+  every other member of the report, including `issues` and each section result, is inside it.
+- `narrativeBindingSha256` is the hash of an array, in Composition section order, of objects
+  `{ "sourceKey", "normalizedTextSha256" }`, where `normalizedTextSha256` is the SHA-256 of the
+  UTF-8 bytes of the section's normalised narrative (section 5 then section 3), or JSON `null`
+  when the narrative cannot be normalised. It is computable from the Bundle alone.
 
 ## 2. Rejection (before any normalisation)
 
@@ -122,11 +134,55 @@ blockquote dl dt dd hr`. `br` emits U+000A. Inline elements contribute only thei
   stray `&`, unbalanced or misnested tags reject.
 - Entities: `&amp; &lt; &gt; &quot; &apos;`, decimal `&#N;`, and hexadecimal `&#xH;` only.
   Decoded code points are subject to section 2. Named HTML entities such as `&nbsp;` reject.
-- The extracted text is then normalised (section 3). An empty result rejects
-  (`empty-narrative`).
+- The extracted text is then normalised (section 3) by the verifier, which is where an empty
+  result is decided: a narrative whose normalised text is empty is `malformed-narrative` with
+  reason `empty-narrative`. The scanner itself never produces that reason.
 
 Because block boundaries become U+000A and the whitespace step collapses them, paragraph and
 table-cell boundaries are structure, not content. Cell text is content.
+
+### Tokeniser
+
+The scanner is a single left-to-right pass over the `div` string, matching at the current
+offset only (sticky matching). The grammar is given as regular expressions in a dialect where
+every class is spelled out: `[0-9]` never means a non-ASCII digit, `$` never matches before a
+trailing line break, and `WS` stands for the JavaScript `\s` class exactly — U+0009, U+000A,
+U+000B, U+000C, U+000D, U+0020, U+00A0, U+1680, U+2000–U+200A, U+2028, U+2029, U+202F, U+205F,
+U+3000, U+FEFF. An implementation whose regex dialect differs in any of these must spell the
+class out; a port that copies the reference's regex text verbatim is wrong.
+
+- Start tag: `<(NAME)(ATTRS)WS*(/?)>` where `NAME` is `[A-Za-z][A-Za-z0-9]*` and `ATTRS` is
+  zero or more of `WS+ ANAME WS* = WS* ( "[^"<]*" | '[^'<]*' )`, with `ANAME` =
+  `[A-Za-z_:][-A-Za-z0-9_:.]*`. Attribute values may not contain `<` or their own quote
+  character; the value grammars of the previous bullet are then applied to the unquoted value
+  as whole-string matches.
+- End tag: `</(NAME)WS*>`.
+- Entity: `&( [A-Za-z]+ | #[0-9]{1,7} | #x[0-9A-Fa-f]{1,6} );`. Named entities are only the
+  five listed; a decoded code point above U+10FFFF rejects.
+- At `<`: a comment (`<!--`), CDATA section (`<![CDATA[`), any other `<!`, and `<?` reject with
+  `comment`, `cdata`, `doctype`, `processing-instruction` respectively. A `</` that does not
+  match the end-tag grammar is `malformed-tag`. A `<` that matches neither grammar is
+  `malformed-tag` when the next character is an ASCII letter and `stray-lt` otherwise. An
+  element name containing an upper-case letter is `uppercase-element`, checked before the name
+  is looked up; a name outside the allowed lists is `unknown-element`.
+- Root: the first element must be `div`, else `root-not-div`; a second element at depth zero,
+  or any element after the root has closed, is `multiple-roots`; non-whitespace text (or an
+  entity) outside the root is `text-outside-root`, where whitespace means U+0009, U+000A,
+  U+000D, U+0020 only. A root `div` without `xmlns="http://www.w3.org/1999/xhtml"` is
+  `root-not-div`, checked after its attributes; `xmlns` anywhere else, or with any other
+  value, is `forbidden-attribute`.
+- Attributes are checked in document order: a repeated name, an unlisted name, `href` on an
+  element other than `a`, or a value failing its grammar is `forbidden-attribute`.
+- A block element's start tag emits U+000A; its end tag emits U+000A; a self-closing block
+  (`<hr/>`, `<td/>`) therefore emits two. `br` emits one. Before any of these emissions, an
+  immediately preceding U+00AD in the output is `soft-hyphen-at-boundary`.
+- An end tag with nothing open is `unbalanced-tag`; one not matching the innermost open
+  element is `misnested-tag`; input ending with elements still open is `unbalanced-tag`.
+- Table structure is checked at each start tag as in the earlier bullet, in this order:
+  parent checks (`misnested-tag`), then `table-structure`, then `table-section-order`.
+- At `&`: a run not matching the entity grammar is `stray-amp`.
+
+The first violation encountered in this pass decides the code; scanning does not continue.
 
 ## 6. Verification and report rules
 
@@ -156,6 +212,58 @@ table-cell boundaries are structure, not content. Cell text is content.
   `coveredCodePoints` (verified spans), and `uncoveredGaps` (non-blank body text between
   verified spans). Coverage never fails the check; it is evidence for reviewers.
 
+### Section results
+
+Each section of the Composition that carries the canonical source code system produces one
+result. Sections and provenance entries are matched by `sourceKey`; a duplicate key on either
+side is a structural error (below), not a result.
+
+- Members present in every result: `sourceKey`, `path` (the section's Composition path),
+  `status`, `spanCount` (number of provenance spans; 0 without provenance).
+- `normalizedTextSha256` is present whenever the narrative normalises (every status except
+  `malformed-narrative`), and equals the value that enters the binding hash.
+- `reason` is present for `malformed-narrative`, `span-not-found`, and `invalid-provenance`,
+  and absent otherwise. `details` is present for `mismatch` only. An absent member is absent,
+  never `null`; this decides `reportHash`.
+- The status is decided in this order, stopping at the first that applies: no provenance entry →
+  `missing-provenance`; narrative does not normalise → `malformed-narrative` with the scanner's
+  code, `forbidden-character` (section 2), or `empty-narrative`; span resolution fails → the
+  status and reason below; normalised source and narrative differ → `mismatch`; else
+  `verified`.
+- Span resolution examines the spans in order and stops at the first failure. Per span:
+  `span-not-found` with reason `page-not-found`, `page-malformed` (the page contains a section
+  2 character), `body-boundary` or `excluded-text` (section 1), `outside-body` (the span lies
+  outside the body or is empty), `hash-mismatch` (`textSha256`); then, against the previous
+  span, `invalid-provenance` with reason `span-order` (same page, starts before the previous
+  ends), `non-contiguous` (the gap does not normalise to nothing, or the pages are not
+  consecutive). After all spans, `invalid-provenance` with reason `word-cut` (the edge rules
+  above).
+- Overlap is decided after every section is resolved: the spans of all `verified` sections are
+  ordered by page, then start offset; whenever two consecutive spans on one page belong to
+  different sections and the later starts before the earlier ends, both sections are marked;
+  every marked section that was `verified` becomes `invalid-provenance` with reason `overlap`,
+  and its spans are left out of the coverage figures.
+- `details` (the diff hint) is computed on the two normalised texts as code-point sequences:
+  `expectedLength` and `actualLength`; `firstDifferingOffset`, the length of the common prefix;
+  `commonSuffixLength`, the length of the common suffix of what follows that prefix (so prefix
+  plus suffix never exceeds the shorter text); `expectedWordCount` and `actualWordCount`, the
+  number of U+0020-separated tokens of each normalised text, 0 for an empty text; and
+  `expectedSha256`, `actualSha256`, the SHA-256 of each text's UTF-8 bytes.
+
+### Report
+
+- `status` is `passed` if and only if every section is `verified` and `issues` is empty.
+- `issues` holds exactly these strings, each once per occurrence and in this order: for each
+  page that fails a section 1 rule, `Page <n>: body-boundary` or `Page <n>: excluded-text`
+  (in page order); `No narrative sections to verify` when there are no sections; `Orphan
+provenance <sourceKey>` for each provenance entry with no section, in provenance order.
+  The wording is normative because `issues` is inside `reportHash`.
+- `summary` is `{ "total": <sections>, "verified": <verified sections> }`.
+- Structural errors do not produce a report at all: a normalisation version other than the
+  implementation's own, a duplicate page number, a page whose body range is not a valid
+  range, a duplicate `sourceKey` among sections or among provenance entries. Their wording is
+  not normative.
+
 ## 7. Extractor contract
 
 The page text an extractor produces is the reference the narrative is checked against, so the
@@ -176,8 +284,31 @@ regenerated, every changed vector is reviewed by hand with a recorded reason, th
 amended, and previously approved submissions require re-approval because the version is part
 of the approved content hash.
 
+The increment states what changed. A **patch** increment documents behaviour the vectors
+already pin: no normalised text, extracted text, status, reason, coverage figure, or diff hint
+in any vector changes, and only the hashes that embed the version string move. A **minor**
+increment changes at least one vector's outcome. Anything that invalidates a span, a hash
+rule, or the extractor contract is **major**. Every increment, patch included, is part of the
+approved content and so still requires re-approval of anything approved under the previous
+version.
+
+A second-language implementation is proven by agreement with the reference on inputs neither
+author chose — a seeded differential run over generated inputs — and not by the golden vectors
+alone: vectors authored from the reference only establish agreement where its author already
+looked. The vectors remain the fixed, reviewed floor; the differential run is the proof.
+
 ## 9. Version history
 
+- `fidelity-norm/1.1.1` (patch) — documents behaviour the vectors already pinned but the text
+  left to the reference implementation, found when the check was re-implemented in a second
+  language: the tokeniser grammar and error-code precedence, the two line breaks of a
+  self-closing block, where `empty-narrative` is decided, what `reportHash` and
+  `narrativeBindingSha256` cover, the exact `issues` strings, the reason-code catalogue and
+  its order, overlap handling and its effect on coverage, the presence rules of section-result
+  members, the diff-hint definitions, and the `passed` rule (section 1, 5, 6). Also states the
+  canonical-JSON consequences an implementation must honour explicitly — no native-object
+  reordering of integer-like keys, `\udXXX` for unpaired surrogates, integers only — after the
+  reference itself was found to violate the first. No vector outcome changed.
 - `fidelity-norm/1.1.0` — U+00AD followed by a line break deletes the break (step 1);
   cross-page slices are concatenated verbatim including blank gaps (section 6); body ranges
   must sit on line boundaries and exclude at most 240 code points (section 1); span edges must

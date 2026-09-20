@@ -28,16 +28,16 @@ Three rules decided the sequence below.
 
 ## Delivered
 
-| Item                                                                                              | Components                                       |
-| ------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| Deterministic Type 2 → EMA ePI transform, profile validation, persistence, signed evidence        | Cloud Run, Cloud Healthcare API, GCS, Cloud KMS  |
-| Near-real-time analytical projection                                                              | Healthcare API native BigQuery stream, Workflows |
-| Zone A / Zone B trust boundary: `CanonicalSubmission` contract, hash-bound approval, ingress gate | Zod → generated JSON Schema, checked in CI       |
-| Mechanical narrative fidelity check (`fidelity-norm/1.1.0`) with language-neutral golden vectors  | Pure library, no cloud dependency                |
-| By-reference submission transport, `document` run source, Workflows document branch               | Cloud Storage, Cloud Run, Workflows              |
-| Queryable transformation ledger incl. approval and fidelity columns                               | BigQuery                                         |
-| Per-client retention as native Cloud Storage policy                                               | Cloud Storage, Terraform variables               |
-| Deploy pipeline with a quality gate that runs before any cloud credential exists                  | GitHub Actions, Terraform, Cloud Build           |
+| Item                                                                                                                      | Components                                       |
+| ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Deterministic Type 2 → EMA ePI transform, profile validation, persistence, signed evidence                                | Cloud Run, Cloud Healthcare API, GCS, Cloud KMS  |
+| Near-real-time analytical projection                                                                                      | Healthcare API native BigQuery stream, Workflows |
+| Zone A / Zone B trust boundary: `CanonicalSubmission` contract, hash-bound approval, ingress gate                         | Zod → generated JSON Schema, checked in CI       |
+| Mechanical narrative fidelity check (`fidelity-norm/1.1.1`) with golden vectors and a cross-language differential harness | Pure library, no cloud dependency                |
+| By-reference submission transport, `document` run source, Workflows document branch                                       | Cloud Storage, Cloud Run, Workflows              |
+| Queryable transformation ledger incl. approval and fidelity columns                                                       | BigQuery                                         |
+| Per-client retention as native Cloud Storage policy                                                                       | Cloud Storage, Terraform variables               |
+| Deploy pipeline with a quality gate that runs before any cloud credential exists                                          | GitHub Actions, Terraform, Cloud Build           |
 
 ## Next, in order
 
@@ -88,9 +88,17 @@ regulated narrative inside the system of record.
   address. The contract enforces the shape; the policy is an organisational decision.
 - Decide whether `fixture` and `healthcare-api` run sources stay enabled once Zone A is the
   intended producer (ADR 0002 recommends disabling them).
-- For item 0: run `gcloud auth application-default login` on the machine that executes the
-  live extraction, and decide whether the real-world characterisation may use a public EMA
-  document at runtime (nothing from it is committed or logged; see the design note).
+- For item 0, in order, on the machine that runs the live extraction:
+  1. `gcloud auth login` — the local session had expired.
+  2. `gcloud projects add-iam-policy-binding sage-ship-509104-b8 --member="serviceAccount:ema-flow-deployer@sage-ship-509104-b8.iam.gserviceaccount.com" --role="roles/documentai.editor"`
+     — the first deploy of the spike failed at exactly one resource, creating the Document AI
+     processor, because the deployer lacked `documentai.processors.create`; the deployer's
+     roles are bootstrapped outside Terraform by design. Then re-run the failed deploy.
+  3. `gcloud auth application-default login` — the client library needs ADC; the CLI login is
+     not enough.
+  4. Decide whether the real-world characterisation (Part B) may use a public EMA document
+     supplied by hand into `.cache/` (nothing from it is committed or logged; see the design
+     note). Part A runs regardless.
 
 ## Deliberately not on this roadmap
 

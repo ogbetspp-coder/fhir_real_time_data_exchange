@@ -10,3 +10,16 @@ fhir/vendor/
 artifacts/
 .terraform/
 package-lock.json
+
+# Zone A (Python). The two virtualenvs and the tool caches are local build output; nothing under
+# them is committed, and walking them would only slow the gate down. `.uv-bootstrap` holds `uv`
+# itself, which cannot live in `.venv` because `uv sync --frozen` prunes it.
+zone-a/.venv/
+zone-a/.uv-bootstrap/
+zone-a/.mypy_cache/
+zone-a/.pytest_cache/
+zone-a/.ruff_cache/
+
+# The differential corpora: JSONL, generated, and not formatted by anything.
+zone-a/tests/fixtures/differential-smoke.jsonl
+differential.jsonl

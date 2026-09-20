@@ -1,0 +1,87 @@
+[project]
+name = "zone-a"
+version = "0.1.0"
+description = "Zone A skeleton: contract models, cross-language canonical-hash parity, and the fidelity check re-implemented against the golden vectors"
+readme = "README.md"
+# ADR 0003 pins the Unicode Character Database, not just the language version: NFC output
+# depends on it. 3.14.x ships Unicode 16.0.0, the same version as the Zone B runtime image
+# (node:22.14.0, ICU 76.1). A different minor Python is a different UCD, so the range is closed.
+requires-python = ">=3.14,<3.15"
+dependencies = ["pydantic==2.13.5"]
+
+[dependency-groups]
+dev = [
+  "datamodel-code-generator==0.82.0",
+  "mypy==2.3.1",
+  "pytest==9.1.1",
+  "ruff==0.16.8",
+]
+
+[build-system]
+requires = ["hatchling==1.28.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/zone_a"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests", "scripts"]
+target-version = "py314"
+
+[tool.ruff.format]
+# A magic trailing comma is what makes model generation non-reproducible: datamodel-code-generator
+# emits one only when its own (undeclared) width estimate wraps a call, so the committed module
+# and the --check regeneration could differ by nothing but a comma. Collapsing is deterministic.
+skip-magic-trailing-comma = true
+
+[tool.ruff.lint.isort]
+# Paired with format.skip-magic-trailing-comma above; ruff warns if the two disagree.
+split-on-trailing-comma = false
+
+[tool.ruff.lint]
+select = [
+  "E",
+  "F",
+  "W",
+  "I",
+  "N",
+  "UP",
+  "B",
+  "A",
+  "C4",
+  "PIE",
+  "PT",
+  "RET",
+  "SIM",
+  "ARG",
+  "PTH",
+  "ERA",
+  "RUF",
+]
+# T201 (print) is deliberately NOT selected globally: scripts/ print progress. Tests are
+# forbidden from printing by test_no_narrative_leak.py, which is a stronger, targeted check.
+
+[tool.ruff.lint.per-file-ignores]
+# Generated models: datamodel-code-generator owns the formatting and the field names.
+"src/zone_a/contracts/*.py" = ["A003", "E501", "ERA001", "I001", "N805", "N815", "RUF012", "UP"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+files = ["src", "tests", "scripts"]
+mypy_path = "src"
+warn_unreachable = true
+enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+
+[[tool.mypy.overrides]]
+# Generated code: checked, but datamodel-code-generator emits no docstrings for fields and
+# pydantic's plugin covers the model semantics.
+module = "zone_a.contracts.*"
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers --strict-config"
+xfail_strict = true

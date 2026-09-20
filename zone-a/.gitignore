@@ -1,0 +1,16 @@
+# Local virtualenvs and tool caches. `uv sync --frozen` recreates .venv from uv.lock, which is
+# committed; nothing in here is an input to the build.
+#
+# .uv-bootstrap is the second virtualenv, and it exists for a reason worth writing down:
+# `uv sync --frozen` makes .venv match uv.lock exactly, and uv is not in uv.lock, so installing
+# uv into .venv and then running `uv sync` deletes uv. uv lives outside the environment it
+# manages. See the "Set-up" section of README.md.
+.venv/
+.uv-bootstrap/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Written by the CI differential step and by a local harness run; the committed corpus is the
+# small smoke one under tests/fixtures/.
+differential.jsonl

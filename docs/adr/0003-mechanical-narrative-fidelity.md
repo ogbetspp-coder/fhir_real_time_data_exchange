@@ -77,6 +77,14 @@ unit order, never locale-aware ordering, so a re-implementation can reproduce th
   on word boundaries (`docs/fidelity-normalization.md` section 6, reason `word-cut`), and a
   soft hyphen directly before a structural line break in the narrative rejects, so a word can
   be neither truncated at a section edge nor joined across markup.
+- Golden vectors are the fixed, reviewed floor of a re-implementation, not its proof. The first
+  second-language port (Python, 2026-09-20) passed all 130 vectors and then diverged from the
+  reference on inputs nobody had written a vector for — regex dialect (`\d`, `$`), unpaired
+  surrogates, JSON number integrality — and exposed that the reference's own canonical JSON
+  was not RFC 8785 for integer-like keys. Vectors authored from the reference establish
+  agreement only where its author already looked. A port is therefore proven by a seeded
+  differential run over generated inputs (spec section 8), and the specification was amended
+  (`fidelity-norm/1.1.1`) to state every rule the port had to read from the code.
 - NFC (step 3) depends on the Unicode Character Database of the runtime. Zone B pins its
   runtime image (`node:22.14.0`, ICU 76.1, Unicode 16.0) and any re-implementation must pin an
   equivalent; a runtime with a different Unicode version is a change to the normalisation

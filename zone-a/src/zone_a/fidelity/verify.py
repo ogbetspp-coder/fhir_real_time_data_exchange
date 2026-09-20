@@ -1,0 +1,479 @@
+"""Pure, synchronous narrative fidelity verifier, ported from ``src/fidelity/verify.ts``.
+
+ADR 0003 and ``docs/fidelity-normalization.md`` section 6. Per-section problems become statuses
+in the report; only structurally unusable input (wrong normalisation version, duplicate keys,
+invalid pages) raises. Nothing here logs, performs I/O, or places narrative text in its outputs:
+a report carries statuses, counts, offsets, lengths, reason codes and hashes only.
+
+Offsets are Unicode code points, which Python's ``str`` indexes natively; the TypeScript has to
+build a code point array first. Where the TypeScript reads past the end of that array it gets
+``undefined``; Python would wrap around to the end of the string for a negative index, so every
+such read goes through ``_at()``.
+
+Numbers are the other trap. JSON has one number type and JavaScript has one number type, so
+``1`` and ``1.0`` are the same value on the Zone B side and ``Number.isInteger`` accepts both;
+``json.loads`` gives Python an ``int`` for the first and a ``float`` for the second, and
+``isinstance(x, int)`` accepts only the first. A page written ``"page": 1.0`` — which the
+contract's ``{"type": "integer"}`` permits, because JSON Schema defines an integer as a number
+with a zero fractional part — therefore verified in Zone B and was refused here. Every offset
+read from the payload goes through ``_as_integer()``, which is ``Number.isInteger`` plus the
+normalisation to ``int`` that Python's slicing and arithmetic need afterwards.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Final
+
+from zone_a.canonical_json import sha256_json, sha256_utf8
+
+from .normalize import (
+    NORMALIZATION_VERSION,
+    NormalizationError,
+    count_words,
+    find_forbidden_character,
+    is_word_character,
+    normalize_text,
+)
+from .xhtml import SOFT_HYPHEN, XhtmlError, xhtml_to_text
+
+# Most text a page may exclude as running header/footer. The body range is declared by the
+# extractor, so it is bounded and must sit on line boundaries rather than trusted outright.
+MAX_EXCLUDED_CODE_POINTS_PER_PAGE: Final = 240
+
+type Json = Any
+
+
+class FidelityError(Exception):
+    """Structurally unusable input: the verifier cannot produce a report at all."""
+
+    def __init__(self, message: str, issues: list[str]) -> None:
+        super().__init__(message)
+        self.issues = issues
+
+
+@dataclass(slots=True)
+class PageIndex:
+    page: int
+    text: str
+    body_start: int
+    body_end: int
+    malformed: bool
+    body_issue: str | None
+
+
+@dataclass(slots=True)
+class _Piece:
+    index: PageIndex
+    start: int
+    end: int
+
+
+def _as_integer(value: Json) -> int | None:
+    """``Number.isInteger(value)`` with the value normalised to ``int``, else ``None``.
+
+    ``bool`` is excluded: it is a subclass of ``int`` in Python and a ``boolean`` in JSON, and
+    ``Number.isInteger(true)`` is ``false``. A ``float`` is accepted when it is finite and has
+    no fractional part, because that is the same JSON number as the corresponding ``int``.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    return None
+
+
+def _normalized_span(span: Json) -> dict[str, Json]:
+    """A span whose page and offsets are ``int`` wherever JSON gave an integral number.
+
+    A span is read as raw JSON, so ``1.0`` arrives as a ``float`` and would slice, subtract and
+    serialise differently from the ``1`` the Zone B verifier sees. Anything that is not an
+    integer is left alone: the contract forbids it, and inventing a coercion here would hide
+    the difference instead of reproducing it.
+    """
+    normalized: dict[str, Json] = dict(span)
+    for key in ("page", "startOffset", "endOffset"):
+        if key in normalized:
+            integral = _as_integer(normalized[key])
+            if integral is not None:
+                normalized[key] = integral
+    return normalized
+
+
+def _number_text(value: Json) -> str:
+    """A number as JavaScript writes it into an issue string: ``1.0`` is ``1``, not ``1.0``."""
+    integral = _as_integer(value)
+    return str(value) if integral is None else str(integral)
+
+
+def _at(text: str, offset: int) -> str | None:
+    """``text[offset]`` with JavaScript's out-of-range behaviour: None, never a wrapped index."""
+    if offset < 0 or offset >= len(text):
+        return None
+    return text[offset]
+
+
+def _soft_hyphen_break_before(text: str, offset: int) -> bool:
+    """True when the line break ending just before ``offset`` follows U+00AD.
+
+    Normalisation step 1 deletes such a break, so it lies inside a word, not between words.
+    """
+    if _at(text, offset - 1) != "\n":
+        return False
+    before = offset - 3 if _at(text, offset - 2) == "\r" else offset - 2
+    return _at(text, before) == SOFT_HYPHEN
+
+
+def _body_issue_for(text: str, body_start: int, body_end: int) -> str | None:
+    if body_start != 0 and (
+        _at(text, body_start - 1) != "\n" or _soft_hyphen_break_before(text, body_start)
+    ):
+        return "body-boundary"
+    if body_end != len(text) and _at(text, body_end - 1) != "\n":
+        return "body-boundary"
+    if len(text) - (body_end - body_start) > MAX_EXCLUDED_CODE_POINTS_PER_PAGE:
+        return "excluded-text"
+    return None
+
+
+def index_pages(source: Json) -> tuple[dict[int, PageIndex], list[str]]:
+    pages: dict[int, PageIndex] = {}
+    structural: list[str] = []
+    issues: list[str] = []
+    for page in source["pages"]:
+        text = page["text"]
+        # `Number.isInteger`, not `isinstance(..., int)`: a JSON `1.0` is the same number as `1`
+        # on the Zone B side, and the issue strings are inside `reportHash`, so the number is
+        # rendered the way JavaScript renders it rather than the way `str(1.0)` does.
+        number = _as_integer(page["page"])
+        body_start = _as_integer(page["bodyStart"])
+        body_end = _as_integer(page["bodyEnd"])
+        if number is not None and number in pages:
+            structural.append(f"Duplicate page number {_number_text(page['page'])}")
+        if (
+            number is None
+            or number < 1
+            or body_start is None
+            or body_end is None
+            or body_start < 0
+            or body_end < body_start
+            or body_end > len(text)
+        ):
+            structural.append(f"Invalid body range on page {_number_text(page['page'])}")
+            continue
+        body_issue = _body_issue_for(text, body_start, body_end)
+        if body_issue is not None:
+            issues.append(f"Page {number}: {body_issue}")
+        pages[number] = PageIndex(
+            page=number,
+            text=text,
+            body_start=body_start,
+            body_end=body_end,
+            malformed=find_forbidden_character(text) is not None,
+            body_issue=body_issue,
+        )
+    if structural:
+        raise FidelityError("Source document text is invalid", structural)
+    return pages, issues
+
+
+def _is_blank_slice(index: PageIndex, start: int, end: int) -> bool:
+    if end <= start:
+        return True
+    try:
+        return normalize_text(index.text[start:end]) == ""
+    except NormalizationError:
+        return False
+
+
+def _resolve_spans(spans: list[Json], pages: dict[int, PageIndex]) -> list[str] | tuple[str, str]:
+    """Locate and hash-check a section's spans.
+
+    Returns one contiguous raw slice per page — so the source's own characters, never
+    whitespace of ours, decide where words begin and end — or a ``(status, reason)`` pair.
+    """
+    pieces: list[_Piece] = []
+    previous: Json = None
+
+    for span in spans:
+        index = pages.get(span["page"])
+        if index is None:
+            return ("span-not-found", "page-not-found")
+        if index.malformed:
+            return ("span-not-found", "page-malformed")
+        if index.body_issue is not None:
+            return ("span-not-found", index.body_issue)
+        body_start, body_end = index.body_start, index.body_end
+        start_offset, end_offset = span["startOffset"], span["endOffset"]
+        if start_offset < body_start or end_offset > body_end or start_offset >= end_offset:
+            return ("span-not-found", "outside-body")
+        if sha256_utf8(index.text[start_offset:end_offset]) != span["textSha256"]:
+            return ("span-not-found", "hash-mismatch")
+
+        last = pieces[-1] if pieces else None
+        if previous is not None and last is not None:
+            if span["page"] == previous["page"]:
+                if start_offset < previous["endOffset"]:
+                    return ("invalid-provenance", "span-order")
+                if not _is_blank_slice(index, previous["endOffset"], start_offset):
+                    return ("invalid-provenance", "non-contiguous")
+                last.end = end_offset
+            elif span["page"] == previous["page"] + 1:
+                previous_index = pages.get(previous["page"])
+                if (
+                    previous_index is None
+                    or not _is_blank_slice(
+                        previous_index, previous["endOffset"], previous_index.body_end
+                    )
+                    or not _is_blank_slice(index, body_start, start_offset)
+                ):
+                    return ("invalid-provenance", "non-contiguous")
+                # The blank tails and heads around a page break are part of the text, not
+                # discarded: an invisible character hiding in them cannot change where a word ends.
+                last.end = previous_index.body_end
+                pieces.append(_Piece(index=index, start=body_start, end=end_offset))
+            else:
+                return ("invalid-provenance", "non-contiguous")
+        else:
+            pieces.append(_Piece(index=index, start=start_offset, end=end_offset))
+        previous = span
+
+    # The outer edges of a section must fall on word boundaries: a section may omit words, but
+    # it may not begin or end inside one (spec section 6).
+    if pieces:
+        first, last = pieces[0], pieces[-1]
+        head = first.index.text
+        before = _at(head, first.start - 1)
+        if (
+            first.start > first.index.body_start
+            and before is not None
+            and (is_word_character(before) or _soft_hyphen_break_before(head, first.start))
+        ):
+            return ("invalid-provenance", "word-cut")
+        tail = last.index.text
+        after = _at(tail, last.end)
+        cuts_after = _at(tail, last.end - 1) == SOFT_HYPHEN or (
+            (after is not None and is_word_character(after))
+            if last.end < last.index.body_end
+            else _soft_hyphen_break_before(tail, last.end)
+        )
+        if cuts_after:
+            return ("invalid-provenance", "word-cut")
+
+    return [piece.index.text[piece.start : piece.end] for piece in pieces]
+
+
+def _diff_hint(expected: str, actual: str) -> dict[str, Json]:
+    first = 0
+    while first < len(expected) and first < len(actual) and expected[first] == actual[first]:
+        first += 1
+    suffix = 0
+    while (
+        suffix < len(expected) - first
+        and suffix < len(actual) - first
+        and expected[len(expected) - 1 - suffix] == actual[len(actual) - 1 - suffix]
+    ):
+        suffix += 1
+    return {
+        "expectedLength": len(expected),
+        "actualLength": len(actual),
+        "firstDifferingOffset": first,
+        "commonSuffixLength": suffix,
+        "expectedWordCount": count_words(expected),
+        "actualWordCount": count_words(actual),
+        "expectedSha256": sha256_utf8(expected),
+        "actualSha256": sha256_utf8(actual),
+    }
+
+
+def normalize_narrative(div: str) -> dict[str, str]:
+    """Normalised narrative text of one section as ``{"text": ...}``, or ``{"reason": ...}``."""
+    try:
+        text = normalize_text(xhtml_to_text(div))
+    except XhtmlError as error:
+        return {"reason": error.code}
+    except NormalizationError as error:
+        return {"reason": error.code}
+    return {"reason": "empty-narrative"} if text == "" else {"text": text}
+
+
+def compute_narrative_binding(sections: list[Json]) -> tuple[list[Json], str]:
+    """Binding of a Bundle's narratives that Zone B can recompute without the source text."""
+    bindings: list[Json] = []
+    for section in sections:
+        normalized = normalize_narrative(section["div"])
+        bindings.append(
+            {
+                "sourceKey": section["sourceKey"],
+                "normalizedTextSha256": (
+                    sha256_utf8(normalized["text"]) if "text" in normalized else None
+                ),
+            }
+        )
+    return bindings, sha256_json(bindings)
+
+
+def _coverage(pages: dict[int, PageIndex], verified_spans: list[Json]) -> dict[str, int]:
+    page_code_points = 0
+    body_code_points = 0
+    covered_code_points = 0
+    uncovered_gaps = 0
+    for index in pages.values():
+        # Page totals are reported alongside body totals so a reviewer can see how much text the
+        # extractor-declared body range excludes; the body range itself is not trusted blindly.
+        page_code_points += len(index.text)
+        body_code_points += index.body_end - index.body_start
+        spans = sorted(
+            (span for span in verified_spans if span["page"] == index.page),
+            key=lambda span: span["startOffset"],
+        )
+        cursor = index.body_start
+        for span in spans:
+            if not _is_blank_slice(index, cursor, span["startOffset"]):
+                uncovered_gaps += 1
+            covered_code_points += span["endOffset"] - span["startOffset"]
+            cursor = span["endOffset"]
+        if not _is_blank_slice(index, cursor, index.body_end):
+            uncovered_gaps += 1
+    return {
+        "pageCodePoints": page_code_points,
+        "bodyCodePoints": body_code_points,
+        "coveredCodePoints": covered_code_points,
+        "uncoveredGaps": uncovered_gaps,
+    }
+
+
+def _assert_unique_keys(keys: list[str], what: str) -> None:
+    seen: set[str] = set()
+    duplicates: list[str] = []
+    for key in keys:
+        if key in seen:
+            duplicates.append(f"Ambiguous {what} {key}")
+        seen.add(key)
+    if duplicates:
+        raise FidelityError(f"Duplicate {what}", duplicates)
+
+
+def verify_narrative_fidelity(payload: Json) -> dict[str, Json]:
+    """Verify every narrative section against the extractor's page text and emit the report."""
+    if payload["normalizationVersion"] != NORMALIZATION_VERSION:
+        raise FidelityError(
+            "Normalization version mismatch",
+            [f"Expected {NORMALIZATION_VERSION}, received {payload['normalizationVersion']}"],
+        )
+    _assert_unique_keys([s["sourceKey"] for s in payload["sections"]], "source section")
+    _assert_unique_keys([e["sourceKey"] for e in payload["provenance"]], "provenance entry")
+    pages, issues = index_pages(payload["source"])
+    provenance = {entry["sourceKey"]: entry for entry in payload["provenance"]}
+    section_keys = {section["sourceKey"] for section in payload["sections"]}
+    if not payload["sections"]:
+        issues.append("No narrative sections to verify")
+    for key in provenance:
+        if key not in section_keys:
+            issues.append(f"Orphan provenance {key}")
+
+    results: list[dict[str, Json]] = []
+    verified_spans: list[tuple[str, Json]] = []
+
+    for section in payload["sections"]:
+        entry = provenance.get(section["sourceKey"])
+        base: dict[str, Json] = {"sourceKey": section["sourceKey"], "path": section["path"]}
+        normalized = normalize_narrative(section["div"])
+        normalized_hash: dict[str, Json] = (
+            {"normalizedTextSha256": sha256_utf8(normalized["text"])}
+            if "text" in normalized
+            else {}
+        )
+
+        if entry is None:
+            results.append(
+                {**base, "status": "missing-provenance", "spanCount": 0, **normalized_hash}
+            )
+            continue
+        spans = [_normalized_span(span) for span in entry["spans"]]
+        span_count = len(spans)
+        if "text" not in normalized:
+            results.append(
+                {
+                    **base,
+                    "status": "malformed-narrative",
+                    "spanCount": span_count,
+                    "reason": normalized["reason"],
+                }
+            )
+            continue
+        resolved = _resolve_spans(spans, pages)
+        if isinstance(resolved, tuple):
+            status, reason = resolved
+            results.append(
+                {
+                    **base,
+                    "status": status,
+                    "spanCount": span_count,
+                    "reason": reason,
+                    **normalized_hash,
+                }
+            )
+            continue
+        # Pieces from consecutive pages are concatenated verbatim: a page body ends with its own
+        # line terminator (or a soft hyphen when a word continues), so nothing is inserted here.
+        expected = normalize_text("".join(resolved))
+        if expected != normalized["text"]:
+            results.append(
+                {
+                    **base,
+                    "status": "mismatch",
+                    "spanCount": span_count,
+                    "details": _diff_hint(expected, normalized["text"]),
+                    **normalized_hash,
+                }
+            )
+            continue
+        results.append({**base, "status": "verified", "spanCount": span_count, **normalized_hash})
+        verified_spans.extend((section["sourceKey"], span) for span in spans)
+
+    # Spans of different sections may not overlap: stitching one source passage into two sections
+    # would otherwise pass every per-section check.
+    overlapping: set[str] = set()
+    ordered = sorted(verified_spans, key=lambda item: (item[1]["page"], item[1]["startOffset"]))
+    for position in range(1, len(ordered)):
+        previous_key, previous_span = ordered[position - 1]
+        current_key, current_span = ordered[position]
+        if (
+            previous_span["page"] == current_span["page"]
+            and current_span["startOffset"] < previous_span["endOffset"]
+            and previous_key != current_key
+        ):
+            overlapping.add(previous_key)
+            overlapping.add(current_key)
+    sections = [
+        {**result, "status": "invalid-provenance", "reason": "overlap"}
+        if result["sourceKey"] in overlapping and result["status"] == "verified"
+        else result
+        for result in results
+    ]
+
+    verified = sum(1 for section in sections if section["status"] == "verified")
+    status = "passed" if verified == len(sections) and not issues else "failed"
+    body: dict[str, Json] = {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": NORMALIZATION_VERSION,
+        "extractedTextSha256": sha256_json(payload["source"]),
+        "narrativeBindingSha256": compute_narrative_binding(payload["sections"])[1],
+        "status": status,
+        "sections": sections,
+        "issues": issues,
+        "summary": {"total": len(sections), "verified": verified},
+        "coverage": _coverage(
+            pages, [span for key, span in verified_spans if key not in overlapping]
+        ),
+    }
+    return {**body, "reportHash": sha256_json(body)}
+
+
+def verify_report_hash(report: dict[str, Json]) -> bool:
+    """Recompute a report's hash from its own content, the way ``verifyReportHash`` does."""
+    body = {key: value for key, value in report.items() if key != "reportHash"}
+    return bool(sha256_json(body) == report["reportHash"])

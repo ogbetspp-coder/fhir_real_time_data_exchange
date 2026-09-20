@@ -1,0 +1,1484 @@
+{
+  "schemaVersion": "1.0.0",
+  "submissionId": "4b1d2c3e-5f60-4a71-8b92-0c1d2e3f4a5b",
+  "createdAt": "2026-09-19T00:00:00Z",
+  "bundle": {
+    "resourceType": "Bundle",
+    "id": "synthetic-type2-smpc",
+    "meta": {
+      "profile": [
+        "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/Bundle-uv-epi"
+      ]
+    },
+    "identifier": {
+      "system": "https://khs.dev/fhir/identifier/type2-document",
+      "value": "synthetic-type2-smpc-v1"
+    },
+    "type": "document",
+    "timestamp": "2026-09-19T00:00:00Z",
+    "entry": [
+      {
+        "fullUrl": "https://khs.dev/fhir/Composition/synthetic-smpc",
+        "resource": {
+          "resourceType": "Composition",
+          "id": "synthetic-smpc",
+          "meta": {
+            "profile": [
+              "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/Composition-uv-epi"
+            ]
+          },
+          "language": "en",
+          "identifier": [
+            {
+              "system": "https://khs.dev/fhir/identifier/composition",
+              "value": "synthetic-smpc-v1"
+            }
+          ],
+          "status": "final",
+          "type": {
+            "coding": [
+              {
+                "system": "https://khs.dev/fhir/CodeSystem/document-type",
+                "code": "smpc",
+                "display": "Summary of Product Characteristics"
+              }
+            ]
+          },
+          "subject": [
+            {
+              "reference": "https://khs.dev/fhir/MedicinalProductDefinition/synthetic-paracetamol"
+            }
+          ],
+          "date": "2026-09-19T00:00:00Z",
+          "author": [
+            {
+              "reference": "https://khs.dev/fhir/Organization/synthetic-pharma"
+            }
+          ],
+          "title": "Synthetic Paracetamol 500 mg tablets SmPC",
+          "section": [
+            {
+              "id": "smpc",
+              "title": "SUMMARY OF PRODUCT CHARACTERISTICS",
+              "code": {
+                "coding": [
+                  {
+                    "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                    "code": "smpc",
+                    "display": "SUMMARY OF PRODUCT CHARACTERISTICS"
+                  }
+                ]
+              },
+              "text": {
+                "status": "generated",
+                "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc; not for clinical use.</p></div>"
+              },
+              "section": [
+                {
+                  "id": "smpc-1",
+                  "title": "1. NAME OF THE MEDICINAL PRODUCT",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.1",
+                        "display": "1. NAME OF THE MEDICINAL PRODUCT"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "generated",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.1; not for clinical use.</p></div>"
+                  }
+                },
+                {
+                  "id": "smpc-2",
+                  "title": "2. QUALITATIVE AND QUANTITATIVE COMPOSITION",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.2",
+                        "display": "2. QUALITATIVE AND QUANTITATIVE COMPOSITION"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "generated",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.2; not for clinical use.</p></div>"
+                  }
+                },
+                {
+                  "id": "smpc-3",
+                  "title": "3. PHARMACEUTICAL FORM",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.3",
+                        "display": "3. PHARMACEUTICAL FORM"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "generated",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.3; not for clinical use.</p></div>"
+                  }
+                },
+                {
+                  "id": "smpc-4",
+                  "title": "4. CLINICAL PARTICULARS",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.4",
+                        "display": "4. CLINICAL PARTICULARS"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "generated",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4; not for clinical use.</p></div>"
+                  },
+                  "section": [
+                    {
+                      "id": "smpc-4-1",
+                      "title": "4.1 Therapeutic indications",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.4.1",
+                            "display": "4.1 Therapeutic indications"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.1; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "smpc-4-2",
+                      "title": "4.2 Posology and method of administration",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.4.2",
+                            "display": "4.2 Posology and method of administration"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.2; not for clinical use.</p></div>"
+                      },
+                      "section": [
+                        {
+                          "id": "smpc-4-2-posology",
+                          "title": "Posology",
+                          "code": {
+                            "coding": [
+                              {
+                                "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                                "code": "smpc.4.2.posology",
+                                "display": "Posology"
+                              }
+                            ]
+                          },
+                          "text": {
+                            "status": "generated",
+                            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.2.posology; not for clinical use.</p></div>"
+                          }
+                        },
+                        {
+                          "id": "smpc-4-2-administration",
+                          "title": "Method of administration",
+                          "code": {
+                            "coding": [
+                              {
+                                "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                                "code": "smpc.4.2.administration",
+                                "display": "Method of administration"
+                              }
+                            ]
+                          },
+                          "text": {
+                            "status": "generated",
+                            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.2.administration; not for clinical use.</p></div>"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "id": "smpc-4-3",
+                      "title": "4.3 Contraindications",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.4.3",
+                            "display": "4.3 Contraindications"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.3; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "smpc-4-4",
+                      "title": "4.4 Special warnings and precautions for use",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.4.4",
+                            "display": "4.4 Special warnings and precautions for use"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.4; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "smpc-4-5",
+                      "title": "4.5 Interaction with other medicinal products and other forms of interaction",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.4.5",
+                            "display": "4.5 Interaction with other medicinal products and other forms of interaction"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.5; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "smpc-4-6",
+                      "title": "4.6 Fertility, pregnancy and lactation",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.4.6",
+                            "display": "4.6 Fertility, pregnancy and lactation"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.6; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "smpc-4-7",
+                      "title": "4.7 Effects on ability to drive and use machines",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.4.7",
+                            "display": "4.7 Effects on ability to drive and use machines"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.7; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "smpc-4-8",
+                      "title": "4.8 Undesirable effects",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.4.8",
+                            "display": "4.8 Undesirable effects"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.8; not for clinical use.</p></div>"
+                      },
+                      "section": [
+                        {
+                          "id": "smpc-4-8-reporting",
+                          "title": "Reporting of suspected adverse reactions",
+                          "code": {
+                            "coding": [
+                              {
+                                "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                                "code": "smpc.4.8.reporting",
+                                "display": "Reporting of suspected adverse reactions"
+                              }
+                            ]
+                          },
+                          "text": {
+                            "status": "generated",
+                            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.8.reporting; not for clinical use.</p></div>"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "id": "smpc-4-9",
+                      "title": "4.9 Overdose",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.4.9",
+                            "display": "4.9 Overdose"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.9; not for clinical use.</p></div>"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "smpc-5",
+                  "title": "5. PHARMACOLOGICAL PROPERTIES",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.5",
+                        "display": "5. PHARMACOLOGICAL PROPERTIES"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "generated",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.5; not for clinical use.</p></div>"
+                  },
+                  "section": [
+                    {
+                      "id": "smpc-5-1",
+                      "title": "5.1 Pharmacodynamic properties",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.5.1",
+                            "display": "5.1 Pharmacodynamic properties"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.5.1; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "smpc-5-2",
+                      "title": "5.2 Pharmacokinetic properties",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.5.2",
+                            "display": "5.2 Pharmacokinetic properties"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.5.2; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "smpc-5-3",
+                      "title": "5.3 Preclinical safety data",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.5.3",
+                            "display": "5.3 Preclinical safety data"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.5.3; not for clinical use.</p></div>"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "smpc-6",
+                  "title": "6. PHARMACEUTICAL PARTICULARS",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.6",
+                        "display": "6. PHARMACEUTICAL PARTICULARS"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "generated",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.6; not for clinical use.</p></div>"
+                  },
+                  "section": [
+                    {
+                      "id": "smpc-6-1",
+                      "title": "6.1 List of excipients",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.6.1",
+                            "display": "6.1 List of excipients"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.6.1; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "smpc-6-2",
+                      "title": "6.2 Incompatibilities",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.6.2",
+                            "display": "6.2 Incompatibilities"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.6.2; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "smpc-6-3",
+                      "title": "6.3 Shelf life",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.6.3",
+                            "display": "6.3 Shelf life"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.6.3; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "smpc-6-4",
+                      "title": "6.4 Special precautions for storage",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.6.4",
+                            "display": "6.4 Special precautions for storage"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.6.4; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "smpc-6-5",
+                      "title": "6.5 Nature and contents of container and special equipment for use, administration or implantation",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.6.5",
+                            "display": "6.5 Nature and contents of container and special equipment for use, administration or implantation"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.6.5; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "smpc-6-6",
+                      "title": "6.6 Special precautions for disposal and other handling",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.6.6",
+                            "display": "6.6 Special precautions for disposal and other handling"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.6.6; not for clinical use.</p></div>"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "smpc-7",
+                  "title": "7. MARKETING AUTHORISATION HOLDER",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.7",
+                        "display": "7. MARKETING AUTHORISATION HOLDER"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "generated",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.7; not for clinical use.</p></div>"
+                  }
+                },
+                {
+                  "id": "smpc-8",
+                  "title": "8. MARKETING AUTHORISATION NUMBER(S)",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.8",
+                        "display": "8. MARKETING AUTHORISATION NUMBER(S)"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "generated",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.8; not for clinical use.</p></div>"
+                  }
+                },
+                {
+                  "id": "smpc-9",
+                  "title": "9. DATE OF FIRST AUTHORISATION/RENEWAL OF THE AUTHORISATION",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.9",
+                        "display": "9. DATE OF FIRST AUTHORISATION/RENEWAL OF THE AUTHORISATION"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "generated",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.9; not for clinical use.</p></div>"
+                  }
+                },
+                {
+                  "id": "smpc-10",
+                  "title": "10. DATE OF REVISION OF THE TEXT",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.10",
+                        "display": "10. DATE OF REVISION OF THE TEXT"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "generated",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.10; not for clinical use.</p></div>"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "fullUrl": "https://khs.dev/fhir/Organization/synthetic-pharma",
+        "resource": {
+          "resourceType": "Organization",
+          "id": "synthetic-pharma",
+          "name": "Synthetic Pharma Ltd"
+        }
+      },
+      {
+        "fullUrl": "https://khs.dev/fhir/MedicinalProductDefinition/synthetic-paracetamol",
+        "resource": {
+          "resourceType": "MedicinalProductDefinition",
+          "id": "synthetic-paracetamol",
+          "identifier": [
+            {
+              "system": "https://khs.dev/fhir/identifier/product",
+              "value": "SYN-PARA-500"
+            }
+          ],
+          "type": {
+            "coding": [
+              {
+                "code": "MedicinalProduct"
+              }
+            ]
+          },
+          "domain": {
+            "coding": [
+              {
+                "code": "Human"
+              }
+            ]
+          },
+          "status": {
+            "coding": [
+              {
+                "code": "active"
+              }
+            ]
+          },
+          "name": [
+            {
+              "productName": "Synthetic Paracetamol 500 mg tablets",
+              "type": {
+                "coding": []
+              }
+            }
+          ]
+        }
+      },
+      {
+        "fullUrl": "https://khs.dev/fhir/RegulatedAuthorization/synthetic-authorization",
+        "resource": {
+          "resourceType": "RegulatedAuthorization",
+          "id": "synthetic-authorization",
+          "identifier": [
+            {
+              "system": "https://khs.dev/fhir/identifier/authorization",
+              "value": "EU/SYN/0001"
+            }
+          ],
+          "subject": [
+            {
+              "reference": "https://khs.dev/fhir/MedicinalProductDefinition/synthetic-paracetamol"
+            }
+          ],
+          "holder": {
+            "reference": "https://khs.dev/fhir/Organization/synthetic-pharma"
+          },
+          "status": {
+            "coding": [
+              {
+                "code": "active"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "fullUrl": "https://khs.dev/fhir/PackagedProductDefinition/synthetic-package",
+        "resource": {
+          "resourceType": "PackagedProductDefinition",
+          "id": "synthetic-package",
+          "packageFor": [
+            {
+              "reference": "https://khs.dev/fhir/MedicinalProductDefinition/synthetic-paracetamol"
+            }
+          ],
+          "packaging": {
+            "type": {
+              "coding": [
+                {
+                  "display": "Carton"
+                }
+              ]
+            },
+            "quantity": 1
+          }
+        }
+      },
+      {
+        "fullUrl": "https://khs.dev/fhir/ManufacturedItemDefinition/synthetic-tablet",
+        "resource": {
+          "resourceType": "ManufacturedItemDefinition",
+          "id": "synthetic-tablet",
+          "status": "active",
+          "manufacturedDoseForm": {
+            "coding": [
+              {
+                "display": "Tablet"
+              }
+            ]
+          },
+          "unitOfPresentation": {
+            "coding": [
+              {
+                "display": "Tablet"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "fullUrl": "https://khs.dev/fhir/AdministrableProductDefinition/synthetic-administrable",
+        "resource": {
+          "resourceType": "AdministrableProductDefinition",
+          "id": "synthetic-administrable",
+          "status": "active",
+          "formOf": [
+            {
+              "reference": "https://khs.dev/fhir/MedicinalProductDefinition/synthetic-paracetamol"
+            }
+          ],
+          "administrableDoseForm": {
+            "coding": [
+              {
+                "display": "Tablet"
+              }
+            ]
+          },
+          "routeOfAdministration": [
+            {
+              "code": {
+                "coding": [
+                  {
+                    "display": "Oral use"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "fullUrl": "https://khs.dev/fhir/Ingredient/synthetic-active-ingredient",
+        "resource": {
+          "resourceType": "Ingredient",
+          "id": "synthetic-active-ingredient",
+          "status": "active",
+          "for": [
+            {
+              "reference": "https://khs.dev/fhir/ManufacturedItemDefinition/synthetic-tablet"
+            }
+          ],
+          "role": {
+            "coding": [
+              {
+                "display": "Active"
+              }
+            ]
+          },
+          "substance": {
+            "code": {
+              "reference": {
+                "reference": "https://khs.dev/fhir/SubstanceDefinition/synthetic-paracetamol-substance"
+              }
+            },
+            "strength": [
+              {
+                "presentationRatio": {
+                  "numerator": {
+                    "value": 500,
+                    "unit": "mg",
+                    "system": "http://unitsofmeasure.org",
+                    "code": "mg"
+                  },
+                  "denominator": {
+                    "value": 1,
+                    "unit": "tablet"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "fullUrl": "https://khs.dev/fhir/SubstanceDefinition/synthetic-paracetamol-substance",
+        "resource": {
+          "resourceType": "SubstanceDefinition",
+          "id": "synthetic-paracetamol-substance",
+          "identifier": [
+            {
+              "system": "https://khs.dev/fhir/identifier/substance",
+              "value": "SYN-PARACETAMOL"
+            }
+          ],
+          "version": "1",
+          "status": {
+            "coding": [
+              {
+                "code": "active"
+              }
+            ]
+          },
+          "name": [
+            {
+              "name": "Paracetamol",
+              "status": {
+                "coding": [
+                  {
+                    "code": "current"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "bundleSha256": "8891a69b297b5bf2f054684102273866ef91215b743ca2a82d8630a15ef9aa6a",
+  "provenance": {
+    "sourceDocument": {
+      "sha256": "c226c77c373a69ba2a0e131298356e48916601fabdf85cb58d87a516c14674b4",
+      "byteLength": 1024,
+      "mediaType": "application/pdf",
+      "filename": "synthetic-smpc.pdf",
+      "pageCount": 3,
+      "extractedText": {
+        "uri": "gs://synthetic-bucket/synthetic-smpc.pages.json",
+        "sha256": "b5a4c2af57e35ddf8258eb9d84ace5d1ef15cb77f382c0ecc8393fe0d4d21641",
+        "extractorVersion": "synthetic-extractor/1.0.0"
+      }
+    },
+    "extraction": {
+      "extractionRunId": "7c8d9e0f-1a2b-4c3d-9e4f-5a6b7c8d9e0f",
+      "serviceVersion": "synthetic",
+      "parser": {
+        "name": "synthetic-extractor",
+        "version": "1.0.0"
+      },
+      "terminologyService": {
+        "name": "synthetic-terminology",
+        "version": "1.0.0",
+        "snapshotSha256": "a9b4ebe65101ef198490a271c7f4f398ea156135edd981dd48af1381435a41c6"
+      }
+    },
+    "sections": [
+      {
+        "sourceKey": "smpc",
+        "spans": [
+          {
+            "page": 1,
+            "startOffset": 71,
+            "endOffset": 134,
+            "textSha256": "ab3372db125a0b0e87b81686c5dd74e2f7e8aa18795b6989ec6026e5799d2cb7"
+          }
+        ],
+        "narrativeDivSha256": "edd8b9c0b3cdf7083d52e7bac61be2714e96940bad2730318a2e24ea0cfdbb18",
+        "normalizedTextSha256": "ab3372db125a0b0e87b81686c5dd74e2f7e8aa18795b6989ec6026e5799d2cb7"
+      },
+      {
+        "sourceKey": "smpc.1",
+        "spans": [
+          {
+            "page": 1,
+            "startOffset": 135,
+            "endOffset": 200,
+            "textSha256": "b1275dd181c1f5a0ffcc619a2a6c8e08728ca1a99ccb4800f42d805eb7df9c04"
+          }
+        ],
+        "narrativeDivSha256": "e22d4db966d04634d7db22295baefa6d9409c7a4773f201d761d9bd28270ba0a",
+        "normalizedTextSha256": "b1275dd181c1f5a0ffcc619a2a6c8e08728ca1a99ccb4800f42d805eb7df9c04"
+      },
+      {
+        "sourceKey": "smpc.2",
+        "spans": [
+          {
+            "page": 1,
+            "startOffset": 201,
+            "endOffset": 266,
+            "textSha256": "270a4b4efbbca89a2a0d41bf14452a0bbb5b35c043b636b4b5b4a7472522adfa"
+          }
+        ],
+        "narrativeDivSha256": "d29bd80d03050b80d7a4b7cbf0d84bddf6041dae9298993407c98dcef0c980c6",
+        "normalizedTextSha256": "270a4b4efbbca89a2a0d41bf14452a0bbb5b35c043b636b4b5b4a7472522adfa"
+      },
+      {
+        "sourceKey": "smpc.3",
+        "spans": [
+          {
+            "page": 1,
+            "startOffset": 267,
+            "endOffset": 332,
+            "textSha256": "0a17203a009cfa4cbbb9497809700b515d916ced6893accbe81022a6193c827f"
+          }
+        ],
+        "narrativeDivSha256": "efa61010619b92f9071416734bf106d36cfae4b5b8b81be5238923967aa9b860",
+        "normalizedTextSha256": "0a17203a009cfa4cbbb9497809700b515d916ced6893accbe81022a6193c827f"
+      },
+      {
+        "sourceKey": "smpc.4",
+        "spans": [
+          {
+            "page": 1,
+            "startOffset": 333,
+            "endOffset": 398,
+            "textSha256": "6b7b02ab00118a100b4d8eca9dfb58087615a596aaa811cb1c41cc0c4d31506c"
+          }
+        ],
+        "narrativeDivSha256": "db54406069f8157698bde83850acef50280d11ed5007bc4fe4019f7ac8f9903f",
+        "normalizedTextSha256": "6b7b02ab00118a100b4d8eca9dfb58087615a596aaa811cb1c41cc0c4d31506c"
+      },
+      {
+        "sourceKey": "smpc.4.1",
+        "spans": [
+          {
+            "page": 1,
+            "startOffset": 399,
+            "endOffset": 466,
+            "textSha256": "fd809f6517ece48bc064771d4e75eaf027ebaf06e9f398c1f9163afd3eb71184"
+          }
+        ],
+        "narrativeDivSha256": "5ec5f34e8c82439cd8c1358a6eae7b1c82147e911d4e4138413105ec5b6e76f0",
+        "normalizedTextSha256": "fd809f6517ece48bc064771d4e75eaf027ebaf06e9f398c1f9163afd3eb71184"
+      },
+      {
+        "sourceKey": "smpc.4.2",
+        "spans": [
+          {
+            "page": 1,
+            "startOffset": 467,
+            "endOffset": 534,
+            "textSha256": "b064949dfbb6402bb80a02627384b20a8470324e7680936a790bbc22f0eb923a"
+          }
+        ],
+        "narrativeDivSha256": "81a519da911516693715dd0a3cd788b75e1438e2f2838e5541d6c75dccac4ff1",
+        "normalizedTextSha256": "b064949dfbb6402bb80a02627384b20a8470324e7680936a790bbc22f0eb923a"
+      },
+      {
+        "sourceKey": "smpc.4.2.posology",
+        "spans": [
+          {
+            "page": 1,
+            "startOffset": 535,
+            "endOffset": 611,
+            "textSha256": "96c7bd940e0919d7c77ae27032b122ff9198fa7fe39bc9a1a41c82e20577989d"
+          }
+        ],
+        "narrativeDivSha256": "ff056b8b29a02e3362bab81cf7cbc3822b3b4e6a0748cae16852fe8b0eb23c5d",
+        "normalizedTextSha256": "96c7bd940e0919d7c77ae27032b122ff9198fa7fe39bc9a1a41c82e20577989d"
+      },
+      {
+        "sourceKey": "smpc.4.2.administration",
+        "spans": [
+          {
+            "page": 1,
+            "startOffset": 612,
+            "endOffset": 694,
+            "textSha256": "f299d828692cf5bca437c7fc6f15fed4285d3e6bc3681d224ea5cffc887ef4dd"
+          }
+        ],
+        "narrativeDivSha256": "128f118e16f320b47e05810567adb3977b580f1f24323ab20f120d3a60b481d5",
+        "normalizedTextSha256": "f299d828692cf5bca437c7fc6f15fed4285d3e6bc3681d224ea5cffc887ef4dd"
+      },
+      {
+        "sourceKey": "smpc.4.3",
+        "spans": [
+          {
+            "page": 1,
+            "startOffset": 695,
+            "endOffset": 762,
+            "textSha256": "6adf8c3f72e6673d252151f6e418fcce882739861720b7a0e11d82f49c50e657"
+          }
+        ],
+        "narrativeDivSha256": "ff6dbb7da9c2c902aa5a554df75ecbbec87146ab8752fbb2a168f4edc06ad617",
+        "normalizedTextSha256": "6adf8c3f72e6673d252151f6e418fcce882739861720b7a0e11d82f49c50e657"
+      },
+      {
+        "sourceKey": "smpc.4.4",
+        "spans": [
+          {
+            "page": 1,
+            "startOffset": 763,
+            "endOffset": 830,
+            "textSha256": "4f3ad9259211cfe5455ae65bc60f44ab1fe50e9873a0ae93da9fc6f017ec7bff"
+          }
+        ],
+        "narrativeDivSha256": "005f4ecfdae8a9079ecc9042c18b4681f9709007dbbc7be47c931cfd30282f69",
+        "normalizedTextSha256": "4f3ad9259211cfe5455ae65bc60f44ab1fe50e9873a0ae93da9fc6f017ec7bff"
+      },
+      {
+        "sourceKey": "smpc.4.5",
+        "spans": [
+          {
+            "page": 2,
+            "startOffset": 71,
+            "endOffset": 138,
+            "textSha256": "c3f159b97702ad72854fb8d04ce5ba580868c859cc21991927c6c630ea90302f"
+          }
+        ],
+        "narrativeDivSha256": "ae7811a4b74c581fc14cf72e30e9e97fb65014d0be70af24d6e8a77e92d2b6fe",
+        "normalizedTextSha256": "c3f159b97702ad72854fb8d04ce5ba580868c859cc21991927c6c630ea90302f"
+      },
+      {
+        "sourceKey": "smpc.4.6",
+        "spans": [
+          {
+            "page": 2,
+            "startOffset": 139,
+            "endOffset": 206,
+            "textSha256": "4acd4cce23b1a1d5974de69b9e99b39c0e5f5e8a32d1645d89a65c056a663f0c"
+          }
+        ],
+        "narrativeDivSha256": "fea5256e2adbcaf2205e70a401bcedde2797e7d4a60fffcc8620c205cc55c8cf",
+        "normalizedTextSha256": "4acd4cce23b1a1d5974de69b9e99b39c0e5f5e8a32d1645d89a65c056a663f0c"
+      },
+      {
+        "sourceKey": "smpc.4.7",
+        "spans": [
+          {
+            "page": 2,
+            "startOffset": 207,
+            "endOffset": 274,
+            "textSha256": "34f7c6b552077d690eee8f16b8de5dc8de22cd535f6b34d606eb004132bc099d"
+          }
+        ],
+        "narrativeDivSha256": "38943be7977d58ce7e7b3c524d1f47bbd2073d24290338b8fee81af4d4f6a5ba",
+        "normalizedTextSha256": "34f7c6b552077d690eee8f16b8de5dc8de22cd535f6b34d606eb004132bc099d"
+      },
+      {
+        "sourceKey": "smpc.4.8",
+        "spans": [
+          {
+            "page": 2,
+            "startOffset": 275,
+            "endOffset": 342,
+            "textSha256": "acc535a38784ac5e346abbb9ad97c4197c7af6590c9ce99124bee2c48f4b16b8"
+          }
+        ],
+        "narrativeDivSha256": "0ad8754943110f6ef5dcfd47da4741eaf1dcc7e0cc96c1a4ceab8f434a169e2c",
+        "normalizedTextSha256": "acc535a38784ac5e346abbb9ad97c4197c7af6590c9ce99124bee2c48f4b16b8"
+      },
+      {
+        "sourceKey": "smpc.4.8.reporting",
+        "spans": [
+          {
+            "page": 2,
+            "startOffset": 343,
+            "endOffset": 420,
+            "textSha256": "cea6f3c01eced1a63362a8301523fbf780ae470f3a501ae7e4c5195b9d0f9eac"
+          }
+        ],
+        "narrativeDivSha256": "d6cac16544a7838dd43478b2f3a6a470b179d6240aae318d8f8f45125d67bf30",
+        "normalizedTextSha256": "cea6f3c01eced1a63362a8301523fbf780ae470f3a501ae7e4c5195b9d0f9eac"
+      },
+      {
+        "sourceKey": "smpc.4.9",
+        "spans": [
+          {
+            "page": 2,
+            "startOffset": 421,
+            "endOffset": 488,
+            "textSha256": "adbf9b81eb2086eb40fd07fc95f55ea8461c6594537d84b2c793d41c0359b89e"
+          }
+        ],
+        "narrativeDivSha256": "aad453ab7106fcdea4faabd08fac5c0778d6e4eecc89691d54da04a696b33388",
+        "normalizedTextSha256": "adbf9b81eb2086eb40fd07fc95f55ea8461c6594537d84b2c793d41c0359b89e"
+      },
+      {
+        "sourceKey": "smpc.5",
+        "spans": [
+          {
+            "page": 2,
+            "startOffset": 489,
+            "endOffset": 554,
+            "textSha256": "63f67d62b6ad3f4bf9b04fca6b1128ef8ae606265e0d432671ab405c943296d7"
+          }
+        ],
+        "narrativeDivSha256": "71525df04ce0924ce6447fc2b463a484811138338730546d4cb2313632bfa24f",
+        "normalizedTextSha256": "63f67d62b6ad3f4bf9b04fca6b1128ef8ae606265e0d432671ab405c943296d7"
+      },
+      {
+        "sourceKey": "smpc.5.1",
+        "spans": [
+          {
+            "page": 2,
+            "startOffset": 555,
+            "endOffset": 622,
+            "textSha256": "724becae096cdce2c3b2593e52dbcf044fdd0de840767aefbca6e8a142f15eeb"
+          }
+        ],
+        "narrativeDivSha256": "eb719bd354348075e22f0def9db90b8578595243d0963c4425feb5c53ab05a36",
+        "normalizedTextSha256": "724becae096cdce2c3b2593e52dbcf044fdd0de840767aefbca6e8a142f15eeb"
+      },
+      {
+        "sourceKey": "smpc.5.2",
+        "spans": [
+          {
+            "page": 2,
+            "startOffset": 623,
+            "endOffset": 690,
+            "textSha256": "dc0e3102e014e42e56c73e7a12ba7a8f8489fb4f2199c87d558efd70ecf2b727"
+          }
+        ],
+        "narrativeDivSha256": "4d14e45298b6829d90b6c7f24047de2c87ca1b3e3c3bbb06371c0988b4fced00",
+        "normalizedTextSha256": "dc0e3102e014e42e56c73e7a12ba7a8f8489fb4f2199c87d558efd70ecf2b727"
+      },
+      {
+        "sourceKey": "smpc.5.3",
+        "spans": [
+          {
+            "page": 2,
+            "startOffset": 691,
+            "endOffset": 758,
+            "textSha256": "367d1feedbf4d0496d9ff2a83049d7337b7e38a45266a25f9628af97e33dcb49"
+          }
+        ],
+        "narrativeDivSha256": "d324a58d3d8e356473cd25f10542e63c1110cc45eaf57c2f5c5c0ba2d9884740",
+        "normalizedTextSha256": "367d1feedbf4d0496d9ff2a83049d7337b7e38a45266a25f9628af97e33dcb49"
+      },
+      {
+        "sourceKey": "smpc.6",
+        "spans": [
+          {
+            "page": 2,
+            "startOffset": 759,
+            "endOffset": 824,
+            "textSha256": "377325f7217dfb025dfa57fba44c7a42d13e5a84e91be461088d11da5853d52b"
+          }
+        ],
+        "narrativeDivSha256": "0a5479951bb8ff8c0d7f0480c14147aec9c99ef350c2b267c4f734a127e74413",
+        "normalizedTextSha256": "377325f7217dfb025dfa57fba44c7a42d13e5a84e91be461088d11da5853d52b"
+      },
+      {
+        "sourceKey": "smpc.6.1",
+        "spans": [
+          {
+            "page": 3,
+            "startOffset": 71,
+            "endOffset": 138,
+            "textSha256": "e4b392e1066aeef3156b0e637962529b362cdbb9f7a7a42aa7fc7883ea312677"
+          }
+        ],
+        "narrativeDivSha256": "a4117f1c2a031fa8f470c2680a4bc94cf1cf68482de08b99457b9645558b7f39",
+        "normalizedTextSha256": "e4b392e1066aeef3156b0e637962529b362cdbb9f7a7a42aa7fc7883ea312677"
+      },
+      {
+        "sourceKey": "smpc.6.2",
+        "spans": [
+          {
+            "page": 3,
+            "startOffset": 139,
+            "endOffset": 206,
+            "textSha256": "d67546696948994973bfbc1a133f9598ac722b623dab6029bd774c13217fcf7f"
+          }
+        ],
+        "narrativeDivSha256": "6b8939c3053d5111916bb1a5e425eb4d14c93db7eafe7bc1cb120967d72df656",
+        "normalizedTextSha256": "d67546696948994973bfbc1a133f9598ac722b623dab6029bd774c13217fcf7f"
+      },
+      {
+        "sourceKey": "smpc.6.3",
+        "spans": [
+          {
+            "page": 3,
+            "startOffset": 207,
+            "endOffset": 274,
+            "textSha256": "8bec7fe8e052e710407261ca36ed743ff5a0454800bfb6a7ce7a0a5c4c14a496"
+          }
+        ],
+        "narrativeDivSha256": "c43318cc85b424f3231035e3655ed8b8d33161f1871dcb8f8aad402504165e9e",
+        "normalizedTextSha256": "8bec7fe8e052e710407261ca36ed743ff5a0454800bfb6a7ce7a0a5c4c14a496"
+      },
+      {
+        "sourceKey": "smpc.6.4",
+        "spans": [
+          {
+            "page": 3,
+            "startOffset": 275,
+            "endOffset": 342,
+            "textSha256": "ac2a3a4aa9fde81b08de48af7d0fbc72b526057f6c78a667e69c162204739c73"
+          }
+        ],
+        "narrativeDivSha256": "27637b55c147c09dd32e8fce386333f0d0fda3bc7dba160089db77f47e769f2e",
+        "normalizedTextSha256": "ac2a3a4aa9fde81b08de48af7d0fbc72b526057f6c78a667e69c162204739c73"
+      },
+      {
+        "sourceKey": "smpc.6.5",
+        "spans": [
+          {
+            "page": 3,
+            "startOffset": 343,
+            "endOffset": 410,
+            "textSha256": "9edc425d74a3ae16fb90e4609264b6e06dc7710e699fd37f1194472714fbab2d"
+          }
+        ],
+        "narrativeDivSha256": "965c7fd56c08439643156e3306f61ae515e0a76efda81eb8c66b73912dd461ff",
+        "normalizedTextSha256": "9edc425d74a3ae16fb90e4609264b6e06dc7710e699fd37f1194472714fbab2d"
+      },
+      {
+        "sourceKey": "smpc.6.6",
+        "spans": [
+          {
+            "page": 3,
+            "startOffset": 411,
+            "endOffset": 478,
+            "textSha256": "5bf570ffb249ddca3a7b3f2bbc55700e953852971b392abfe064f5183ce41dec"
+          }
+        ],
+        "narrativeDivSha256": "f7138efd4cca6ccf4a2583816dbe10b7fbb87053c113280f6ca0663fec999f4c",
+        "normalizedTextSha256": "5bf570ffb249ddca3a7b3f2bbc55700e953852971b392abfe064f5183ce41dec"
+      },
+      {
+        "sourceKey": "smpc.7",
+        "spans": [
+          {
+            "page": 3,
+            "startOffset": 479,
+            "endOffset": 544,
+            "textSha256": "8f8ca0eb7981312a8d5ddc20153072c09aaffc8023f51cb5ce160b3559010df6"
+          }
+        ],
+        "narrativeDivSha256": "663f02416e8e3b6c672cf83574b70e8f59e894398f79b2577f9fc0eae07fe679",
+        "normalizedTextSha256": "8f8ca0eb7981312a8d5ddc20153072c09aaffc8023f51cb5ce160b3559010df6"
+      },
+      {
+        "sourceKey": "smpc.8",
+        "spans": [
+          {
+            "page": 3,
+            "startOffset": 545,
+            "endOffset": 610,
+            "textSha256": "276e3f829bf1044e0bc8c232442204a0dd9a8ca9abbc8d9fb222f9879fdfc6be"
+          }
+        ],
+        "narrativeDivSha256": "94d8d787a4042467b906594fdc242ef32e2ae23cfefa35881f05e0c8d6566391",
+        "normalizedTextSha256": "276e3f829bf1044e0bc8c232442204a0dd9a8ca9abbc8d9fb222f9879fdfc6be"
+      },
+      {
+        "sourceKey": "smpc.9",
+        "spans": [
+          {
+            "page": 3,
+            "startOffset": 611,
+            "endOffset": 676,
+            "textSha256": "f54d075e269e6b840c35cbbed0546468d1f55ea9710b371871a621be604b784a"
+          }
+        ],
+        "narrativeDivSha256": "79ed2a736425a847cbfffe391e1a39ae1c82e30d3e2131278f34cb9ccb0d5c25",
+        "normalizedTextSha256": "f54d075e269e6b840c35cbbed0546468d1f55ea9710b371871a621be604b784a"
+      },
+      {
+        "sourceKey": "smpc.10",
+        "spans": [
+          {
+            "page": 3,
+            "startOffset": 677,
+            "endOffset": 743,
+            "textSha256": "b839b07d0b9f0df32a3f4b472669e9bc586d8140edeced98d1cf72a999edc98c"
+          }
+        ],
+        "narrativeDivSha256": "c35cf855b68f5cfe163d1750bc94869fe17577a42afbaf2b2cc7dd39e456638a",
+        "normalizedTextSha256": "b839b07d0b9f0df32a3f4b472669e9bc586d8140edeced98d1cf72a999edc98c"
+      }
+    ],
+    "decisions": [
+      {
+        "target": "Composition.section[0]",
+        "sourceKey": "smpc",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[0]",
+        "sourceKey": "smpc.1",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[1]",
+        "sourceKey": "smpc.2",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[2]",
+        "sourceKey": "smpc.3",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[3]",
+        "sourceKey": "smpc.4",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[0]",
+        "sourceKey": "smpc.4.1",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[1]",
+        "sourceKey": "smpc.4.2",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[1].section[0]",
+        "sourceKey": "smpc.4.2.posology",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[1].section[1]",
+        "sourceKey": "smpc.4.2.administration",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[2]",
+        "sourceKey": "smpc.4.3",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[3]",
+        "sourceKey": "smpc.4.4",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[4]",
+        "sourceKey": "smpc.4.5",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[5]",
+        "sourceKey": "smpc.4.6",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[6]",
+        "sourceKey": "smpc.4.7",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[7]",
+        "sourceKey": "smpc.4.8",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[7].section[0]",
+        "sourceKey": "smpc.4.8.reporting",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[8]",
+        "sourceKey": "smpc.4.9",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[4]",
+        "sourceKey": "smpc.5",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[4].section[0]",
+        "sourceKey": "smpc.5.1",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[4].section[1]",
+        "sourceKey": "smpc.5.2",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[4].section[2]",
+        "sourceKey": "smpc.5.3",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[5]",
+        "sourceKey": "smpc.6",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[0]",
+        "sourceKey": "smpc.6.1",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[1]",
+        "sourceKey": "smpc.6.2",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[2]",
+        "sourceKey": "smpc.6.3",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[3]",
+        "sourceKey": "smpc.6.4",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[4]",
+        "sourceKey": "smpc.6.5",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[5]",
+        "sourceKey": "smpc.6.6",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[6]",
+        "sourceKey": "smpc.7",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[7]",
+        "sourceKey": "smpc.8",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[8]",
+        "sourceKey": "smpc.9",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[9]",
+        "sourceKey": "smpc.10",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.type",
+        "action": "code-mapped",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/document-type",
+          "code": "smpc",
+          "lookupId": "synthetic-lookup-1"
+        }
+      }
+    ],
+    "fidelity": {
+      "normalizationVersion": "fidelity-norm/1.1.1",
+      "status": "passed",
+      "sectionsChecked": 32,
+      "sectionsMatched": 32,
+      "narrativeBindingSha256": "dbc8cf153c23e248a34c79d2bb6176030b2b206646e92060ac9c7ce6e7b786dd",
+      "reportSha256": "1a6176a6bef82fd9ea6e3ceda45f326be6c795d56f701b292c0300a6561e759a",
+      "reportUri": "gs://synthetic-bucket/synthetic-smpc.fidelity-report.json"
+    }
+  },
+  "approval": {
+    "approverId": "urn:reviewer:synthetic-01",
+    "approverRole": "content-reviewer",
+    "approvedAt": "2026-09-19T00:00:00Z",
+    "method": "api-attestation",
+    "meaning": "reviewed-fidelity-and-structure",
+    "approvedContentSha256": "203155ef2032bc13f15f1c33e89c598a2078e410e956bc07d9d232be3a48ecac"
+  }
+}
