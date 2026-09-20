@@ -1,5 +1,13 @@
 import { createHash } from "node:crypto";
 
+// Keys are ordered by UTF-16 code units (RFC 8785 canonical JSON), never by locale: every hash in
+// the system must be reproducible on any host and in any language re-implementation.
+function compareKeys(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
+
 function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map(canonicalize);
@@ -8,7 +16,7 @@ function canonicalize(value: unknown): unknown {
   if (value !== null && typeof value === "object") {
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>)
-        .sort(([left], [right]) => left.localeCompare(right))
+        .sort(([left], [right]) => compareKeys(left, right))
         .map(([key, child]) => [key, canonicalize(child)]),
     );
   }
@@ -22,6 +30,12 @@ export function canonicalJson(value: unknown): string {
 
 export function sha256(value: unknown): string {
   return createHash("sha256").update(canonicalJson(value)).digest("hex");
+}
+
+// Digest of the raw UTF-8 bytes of a string. `sha256()` hashes the canonical JSON encoding,
+// so it would hash `"abc"` with its quotes; span and narrative hashes must use this instead.
+export function sha256Utf8(text: string): string {
+  return createHash("sha256").update(text, "utf8").digest("hex");
 }
 
 export function stableUuid(namespace: string, value: string): string {

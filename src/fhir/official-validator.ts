@@ -1,3 +1,4 @@
+import { sha256 } from "../lib/hash.js";
 import type { FhirResource, OperationOutcome } from "./types.js";
 
 export class OfficialFhirValidatorClient {
@@ -22,8 +23,9 @@ export class OfficialFhirValidatorClient {
     });
     const body: unknown = await response.json();
     if (!response.ok) {
+      // The body may quote the narrative just submitted; reference it by hash only.
       throw new Error(
-        `Official FHIR validator ${response.status} ${response.statusText}: ${JSON.stringify(body)}`,
+        `Official FHIR validator ${response.status} ${response.statusText} (response sha256 ${sha256(body)})`,
       );
     }
     if (

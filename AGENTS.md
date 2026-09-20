@@ -25,13 +25,16 @@ Google Cloud Healthcare API and observe their native near-real-time BigQuery str
 - Local deterministic demo: `npm run demo`
 - Service: `npm run dev`
 - Terraform: `terraform -chdir=infra fmt -check -recursive && terraform -chdir=infra validate`
+- Contracts and vectors: `npm run contracts:check` (regenerates `contracts/generated` and
+  `test/fixtures/fidelity/vectors.json` and fails on drift)
 
 ## Workflow
 
 1. Read `docs/architecture.md` and the relevant ADR before architectural changes.
 2. Add or update tests with every mapping or validation change.
 3. Keep transformations pure and deterministic; isolate Google API side effects.
-4. Update the mapping manifest and evidence schema together.
+4. Update the mapping manifest and the evidence schema (`src/contracts/run-manifest.ts`,
+   regenerated into `contracts/generated/`) together.
 5. Run the full local gate before commit. Cloud Build is the authoritative release gate.
 6. Use a separate git worktree for every parallel writing agent.
 

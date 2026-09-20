@@ -15,13 +15,27 @@ type LogFields = {
   [key: string]: string | number | boolean | undefined;
 };
 
-const forbiddenFieldPattern = /(?:payload|resource|narrative|text|token|secret|credential|xhtml)/i;
+const forbiddenFieldPattern =
+  /(?:payload|resource|narrative|text|token|secret|credential|xhtml|span|excerpt|diff|hint|div|content|prompt|issue)/i;
+
+// The only two field names allowed to contain a forbidden substring: both carry FHIR metadata,
+// never FHIR content.
+const allowedFieldNames = new Set(["resourceType", "resourceId"]);
+
+const maxValueLength = 512;
+
+function isSafeValue(value: string | number | boolean): boolean {
+  if (typeof value !== "string") return true;
+  return value.length <= maxValueLength && !value.includes("<");
+}
 
 function sanitize(fields: LogFields): LogFields {
   return Object.fromEntries(
-    Object.entries(fields).filter(
-      ([key, value]) => value !== undefined && !forbiddenFieldPattern.test(key),
-    ),
+    Object.entries(fields).filter(([key, value]) => {
+      if (value === undefined) return false;
+      if (!allowedFieldNames.has(key) && forbiddenFieldPattern.test(key)) return false;
+      return isSafeValue(value);
+    }),
   );
 }
 

@@ -9,10 +9,38 @@ trial-use profile is treated as a permanent internal master-data schema.
 EMA-only organizations could author directly against EMA profiles. This architecture retains
 a narrow canonical boundary because its purpose is to prove multi-jurisdiction interoperability.
 
+## Zone A structuring boundary
+
+Converting an authored label document into the Type 2 graph is not fully deterministic:
+locating section boundaries, metadata, and codes requires judgement, today delivered by
+AI-assisted extraction with human review. ADR 0002 and ADR 0003 split that concern into two
+trust zones enforced mechanically rather than by instruction.
+
+Zone A (a separate, probabilistic service) proposes section boundaries, metadata, and codes
+from an approved source document; it may never author, alter, reorder, or omit narrative
+words, and every code it assigns must cite a terminology lookup. Its output is a
+`CanonicalSubmission` proposal, passed by reference, until a human approves it. Zone B (this
+repository, deterministic) accepts only an approved `CanonicalSubmission`, re-verifies hash,
+approval, bijection, and terminology invariants at ingress, and only then runs the unchanged
+transform, validation, persistence, and evidence pipeline. `src/fhir/transform.ts`, the
+mapping manifest, and the generated artifacts are not touched by this boundary; their
+determinism and hashes stay frozen.
+
+Narrative fidelity is checked mechanically, not by prompt: a pure verifier
+(`src/fidelity/`) recomputes provenance-span hashes, applies the versioned normalisation in
+`docs/fidelity-normalization.md`, and requires an exact match before Zone B will transform a
+document source. The `CanonicalSubmission` contract (`src/contracts/`) is Zod-first, with
+generated JSON Schema checked into `contracts/generated/` and drift caught by
+`npm run contracts:check`. AI output can never reach the FHIR store or the evidence bucket
+without a hash-bound human approval and a passing fidelity check; UR-09 through UR-16 in
+`docs/validation/README.md` trace these controls to tests. See ADR 0002 and ADR 0003 for the
+full invariant list and versioning rules.
+
 ## Deterministic data flow
 
 ```mermaid
 sequenceDiagram
+  participant ZA as Zone A structuring
   participant WF as Cloud Workflows
   participant SRC as Healthcare API source R5
   participant APP as Cloud Run worker
@@ -21,8 +49,10 @@ sequenceDiagram
   participant BQ as BigQuery
   participant EV as Evidence and lineage
 
+  ZA->>WF: CanonicalSubmission by reference
   WF->>APP: Execute using source Bundle id and run id
   APP->>SRC: Read Type 2 document Bundle
+  APP->>APP: Ingress gate: hashes, approval, fidelity
   APP->>APP: Graph and mandatory-section preflight
   APP->>APP: Deterministic ConceptMap and structural mapping
   APP->>VAL: Validate Global and EMA profiles
@@ -47,6 +77,8 @@ or rejected. Missing and duplicate required sections are errors.
 
 Validation is deliberately redundant:
 
+0. for document sources, `docs/fidelity-normalization.md` defines the mechanical narrative
+   fidelity check that gates ingress before any transformation (ADR 0003);
 1. application preflight verifies graph completeness, uniqueness, expected profiles, and exact
    section hierarchy;
 2. the official HL7 Java validator evaluates the pinned packages, FHIRPath, slicing, and

@@ -1,0 +1,76 @@
+import { z } from "zod";
+
+import { IsoDateTime, NonEmptyString } from "./common.js";
+
+// Deliberately loose: FHIR resources are open by nature and `src/fhir/preflight.ts` remains the
+// authority on Type 2 graph structure. This schema only pins the handful of fields the contract
+// invariants and hashes rely on, so a submission cannot be a non-document or an empty Bundle.
+
+// Strict and token-limited: the identifier is copied into the Provenance resource, so it must
+// not be able to carry free text.
+const BundleIdentifierSchema = z.strictObject({
+  system: z
+    .string()
+    .regex(/^\S{1,256}$/)
+    .optional(),
+  value: z
+    .string()
+    .regex(/^[A-Za-z0-9._:-]{1,128}$/)
+    .optional(),
+});
+
+const BundleEntrySchema = z.looseObject({
+  fullUrl: NonEmptyString,
+  resource: z.looseObject({
+    resourceType: NonEmptyString,
+    id: NonEmptyString.optional(),
+  }),
+});
+
+const NarrativeSchema = z.looseObject({
+  status: z.enum(["generated", "extensions", "additional", "empty"]),
+  div: z.string(),
+});
+
+const CodingSchema = z.looseObject({
+  system: z.string().optional(),
+  code: z.string().optional(),
+});
+
+export type LooseSection = {
+  code?: { coding?: z.infer<typeof CodingSchema>[] | undefined } | undefined;
+  text?: z.infer<typeof NarrativeSchema> | undefined;
+  section?: LooseSection[] | undefined;
+};
+
+const SectionSchema: z.ZodType<LooseSection> = z.lazy(() =>
+  z.looseObject({
+    code: z.looseObject({ coding: z.array(CodingSchema).optional() }).optional(),
+    text: NarrativeSchema.optional(),
+    section: z.array(SectionSchema).optional(),
+  }),
+);
+
+// Validates the section tree of the first entry before any code walks it, so a malformed
+// Composition is a contract rejection rather than a runtime TypeError.
+export const LooseCompositionSchema = z.looseObject({
+  resourceType: z.literal("Composition"),
+  section: z.array(SectionSchema),
+});
+
+export const Type2BundleSchema = z
+  .looseObject({
+    resourceType: z.literal("Bundle"),
+    id: NonEmptyString.optional(),
+    type: z.literal("document"),
+    identifier: BundleIdentifierSchema,
+    timestamp: IsoDateTime,
+    entry: z.array(BundleEntrySchema).min(1),
+  })
+  .meta({
+    id: "Type2Bundle",
+    description:
+      "HL7 Global ePI Type 2 document Bundle (FHIR R5). Structural validation happens in Zone B preflight and the HL7 validator.",
+  });
+
+export type Type2Bundle = z.infer<typeof Type2BundleSchema>;

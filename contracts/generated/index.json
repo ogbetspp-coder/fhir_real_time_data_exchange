@@ -1,0 +1,33 @@
+{
+  "generator": "scripts/contracts/generate-schemas.ts",
+  "contracts": [
+    {
+      "name": "canonical-submission",
+      "version": "1.0.0",
+      "$id": "https://khs.dev/contracts/canonical-submission/1.0.0/schema.json",
+      "file": "canonical-submission.schema.json",
+      "sha256": "2d9227fbd3b33d301f97a5cda55e330bf1603d981f628a75d05beda68943a2bc"
+    },
+    {
+      "name": "ingestion-provenance",
+      "version": "1.0.0",
+      "$id": "https://khs.dev/contracts/ingestion-provenance/1.0.0/schema.json",
+      "file": "ingestion-provenance.schema.json",
+      "sha256": "59b4eb81cd06af14146243d92ee1b3e18047adc7cbaa16488da8242a5d98c86e"
+    },
+    {
+      "name": "fidelity-report",
+      "version": "1.0.0",
+      "$id": "https://khs.dev/contracts/fidelity-report/1.0.0/schema.json",
+      "file": "fidelity-report.schema.json",
+      "sha256": "84687c7b29f80f86605a9a6f39550f1e8c8f951d6c8ece2b7d27ff01e2b797c2"
+    },
+    {
+      "name": "run-manifest",
+      "version": "1.1.0",
+      "$id": "https://khs.dev/contracts/run-manifest/1.1.0/schema.json",
+      "file": "run-manifest.schema.json",
+      "sha256": "9a6158953f46c3bc0dc793f0b1126532d88252325b96f16484dedc82201e5775"
+    }
+  ]
+}

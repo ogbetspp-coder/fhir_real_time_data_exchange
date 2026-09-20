@@ -1,0 +1,264 @@
+import { beforeAll, describe, expect, it } from "vitest";
+
+import {
+  CanonicalSubmissionSchema,
+  SubmissionRejectedError,
+  approvedContent,
+  verifyDocumentSubmission,
+  type CanonicalSubmission,
+  type SectionProvenance,
+} from "../../src/contracts/index.js";
+import type { SourceDocumentText } from "../../src/fidelity/index.js";
+import { loadEmaMapping, type EmaMapping } from "../../src/fhir/mapping.js";
+import {
+  createSyntheticSubmission,
+  type SyntheticSubmission,
+} from "../../src/fixtures/synthetic-submission.js";
+import { sha256 } from "../../src/lib/hash.js";
+
+let mapping: EmaMapping;
+let fixture: SyntheticSubmission;
+
+beforeAll(async () => {
+  mapping = await loadEmaMapping();
+  fixture = createSyntheticSubmission(mapping);
+});
+
+function clone(): CanonicalSubmission {
+  return structuredClone(fixture.submission);
+}
+
+// Re-hashes a mutated submission so the tampering under test is the only invariant that fails.
+function seal(submission: CanonicalSubmission): CanonicalSubmission {
+  submission.bundleSha256 = sha256(submission.bundle);
+  submission.approval.approvedContentSha256 = sha256(approvedContent(submission));
+  return submission;
+}
+
+function firstSection(submission: CanonicalSubmission): SectionProvenance {
+  const [section] = submission.provenance.sections;
+  if (section === undefined) throw new Error("Synthetic submission requires provenance sections");
+  return section;
+}
+
+function reject(
+  submission: unknown,
+  sourceText: SourceDocumentText = fixture.sourceText,
+): SubmissionRejectedError {
+  let caught: unknown;
+  try {
+    verifyDocumentSubmission(
+      { submission, fidelityReport: fixture.fidelityReport, sourceText },
+      mapping.sourceCodeSystem,
+    );
+  } catch (error) {
+    caught = error;
+  }
+  expect(caught).toBeInstanceOf(SubmissionRejectedError);
+  if (!(caught instanceof SubmissionRejectedError)) throw new Error("expected a rejection");
+  return caught;
+}
+
+function rejectedByParse(submission: unknown, message: string): void {
+  const parsed = CanonicalSubmissionSchema.safeParse(submission);
+  expect(parsed.success).toBe(false);
+  expect(reject(submission).issues).toContain(message);
+}
+
+describe("canonical submission contract", () => {
+  it("accepts the synthetic Zone A hand-off", () => {
+    const parsed = CanonicalSubmissionSchema.safeParse(fixture.submission);
+
+    expect(parsed.success).toBe(true);
+    expect(fixture.submission.schemaVersion).toBe("1.0.0");
+    expect(fixture.submission.provenance.fidelity.status).toBe("passed");
+    expect(() =>
+      verifyDocumentSubmission(
+        {
+          submission: fixture.submission,
+          fidelityReport: fixture.fidelityReport,
+          sourceText: fixture.sourceText,
+        },
+        mapping.sourceCodeSystem,
+      ),
+    ).not.toThrow();
+  });
+
+  it("rejects an unknown top-level key", () => {
+    const smuggled: Record<string, unknown> = { ...clone(), extraneous: "content" };
+
+    rejectedByParse(smuggled, 'Unrecognized key: "extraneous"');
+  });
+
+  it("rejects a bundleSha256 that does not match the Bundle", () => {
+    const submission = clone();
+    submission.bundleSha256 = "0".repeat(64);
+
+    rejectedByParse(submission, "bundleSha256 does not match the Bundle");
+  });
+
+  it("rejects an approval hash that does not match the approved content", () => {
+    const submission = clone();
+    submission.approval.approvedContentSha256 = "0".repeat(64);
+
+    rejectedByParse(
+      submission,
+      "approval.approvedContentSha256 does not match the submitted content",
+    );
+  });
+
+  it("rejects a failed fidelity status", () => {
+    const submission = clone();
+    submission.provenance.fidelity.status = "failed";
+
+    rejectedByParse(seal(submission), "fidelity.status must be passed");
+  });
+
+  it("rejects a fidelity summary whose matched count is short of the checked count", () => {
+    const submission = clone();
+    submission.provenance.fidelity.sectionsMatched =
+      submission.provenance.fidelity.sectionsChecked - 1;
+
+    rejectedByParse(
+      seal(submission),
+      "fidelity.sectionsMatched must equal fidelity.sectionsChecked",
+    );
+  });
+
+  it("rejects a code-mapped decision without a terminology reference", () => {
+    const submission = clone();
+    submission.provenance.decisions = submission.provenance.decisions.map((decision) =>
+      decision.action === "code-mapped"
+        ? { target: decision.target, action: decision.action }
+        : decision,
+    );
+
+    rejectedByParse(
+      seal(submission),
+      "provenance.decisions[32]: code-mapped requires terminologyRef",
+    );
+  });
+
+  it("rejects code-mapped decisions when no terminology service is declared", () => {
+    const submission = clone();
+    const { extractionRunId, serviceVersion, parser } = submission.provenance.extraction;
+    submission.provenance.extraction = { extractionRunId, serviceVersion, parser };
+
+    expect(submission.provenance.decisions.some(({ action }) => action === "code-mapped")).toBe(
+      true,
+    );
+    rejectedByParse(
+      seal(submission),
+      "extraction.terminologyService is required when any decision is code-mapped",
+    );
+  });
+
+  it("rejects a human-edited decision without an editor id", () => {
+    const submission = clone();
+    const position = submission.provenance.decisions.length;
+    submission.provenance.decisions.push({
+      target: "Composition.title",
+      action: "human-edited",
+      reason: "metadata-correction",
+    });
+
+    rejectedByParse(
+      seal(submission),
+      `provenance.decisions[${position}]: human-edited requires editorId`,
+    );
+  });
+
+  it("rejects duplicate provenance sourceKeys", () => {
+    const submission = clone();
+    const [first, second] = submission.provenance.sections;
+    if (first === undefined || second === undefined) {
+      throw new Error("Synthetic submission requires at least two provenance sections");
+    }
+    second.sourceKey = first.sourceKey;
+
+    rejectedByParse(seal(submission), "provenance.sections contains duplicate sourceKey");
+  });
+
+  it("rejects an orphan provenance entry", () => {
+    const submission = clone();
+    submission.provenance.sections.push({
+      ...structuredClone(firstSection(submission)),
+      sourceKey: "smpc.99.orphan",
+    });
+    submission.provenance.fidelity.sectionsChecked = submission.provenance.sections.length;
+    submission.provenance.fidelity.sectionsMatched = submission.provenance.sections.length;
+
+    const parsed = CanonicalSubmissionSchema.safeParse(seal(submission));
+    expect(parsed.success).toBe(true);
+    expect(reject(submission).issues).toContain("Orphan provenance for section smpc.99.orphan");
+  });
+
+  it("rejects a Bundle section whose provenance entry was removed", () => {
+    const submission = clone();
+    const removed = firstSection(submission);
+    submission.provenance.sections = submission.provenance.sections.filter(
+      ({ sourceKey }) => sourceKey !== removed.sourceKey,
+    );
+    submission.provenance.fidelity.sectionsChecked = submission.provenance.sections.length;
+    submission.provenance.fidelity.sectionsMatched = submission.provenance.sections.length;
+
+    const parsed = CanonicalSubmissionSchema.safeParse(seal(submission));
+    expect(parsed.success).toBe(true);
+    expect(reject(submission).issues).toContain(
+      `Missing provenance for section ${removed.sourceKey}`,
+    );
+  });
+
+  it("rejects an approverId that looks like an e-mail address", () => {
+    const submission = clone();
+    submission.approval.approverId = "reviewer@example.com";
+
+    rejectedByParse(
+      submission,
+      "approval.approverId: approverId must be an opaque principal identifier, not an e-mail address",
+    );
+  });
+
+  it("rejects a superseded normalization version", () => {
+    const submission = clone();
+    submission.provenance.fidelity.normalizationVersion = "fidelity-norm/0.9.0";
+
+    rejectedByParse(seal(submission), "fidelity.normalizationVersion must be fidelity-norm/1.0.0");
+  });
+
+  it("rejects source text that does not match sourceDocument.extractedText.sha256", () => {
+    const altered = structuredClone(fixture.sourceText);
+    const [page] = altered.pages;
+    if (page === undefined) throw new Error("Synthetic source text requires pages");
+    page.text = page.text.replace("demonstration", "demonstratiom");
+
+    expect(reject(fixture.submission, altered).issues).toContain(
+      "Extracted source text does not match sourceDocument.extractedText.sha256",
+    );
+  });
+
+  it("rejects source text altered by one character even when its hash is re-declared", () => {
+    const altered = structuredClone(fixture.sourceText);
+    const [page] = altered.pages;
+    if (page === undefined) throw new Error("Synthetic source text requires pages");
+    page.text = page.text.replace("demonstration", "demonstratiom");
+
+    const submission = clone();
+    submission.provenance.sourceDocument.extractedText.sha256 = sha256(altered);
+
+    const parsed = CanonicalSubmissionSchema.safeParse(seal(submission));
+    expect(parsed.success).toBe(true);
+    expect(reject(submission, altered).issues).toContain(
+      "Re-executed fidelity check does not reproduce the declared report",
+    );
+  });
+
+  it("keeps every rejection reason free of narrative text", () => {
+    const submission = clone();
+    submission.provenance.fidelity.status = "failed";
+
+    for (const issue of reject(seal(submission)).issues) {
+      expect(issue).not.toContain("Synthetic demonstration content");
+    }
+  });
+});

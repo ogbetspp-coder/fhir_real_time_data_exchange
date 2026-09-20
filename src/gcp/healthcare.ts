@@ -2,6 +2,7 @@ import { GoogleAuth } from "google-auth-library";
 
 import type { AppConfig } from "../config.js";
 import type { BundleEntry, FhirBundle, FhirResource, OperationOutcome } from "../fhir/types.js";
+import { sha256 } from "../lib/hash.js";
 
 type HealthcareClientOptions = Pick<
   AppConfig,
@@ -56,8 +57,12 @@ export class HealthcareApiClient {
 
     const body = (await response.json()) as T;
     if (!response.ok) {
-      const detail = JSON.stringify(body);
-      throw new Error(`Healthcare API ${response.status} ${response.statusText}: ${detail}`);
+      // The body may quote FHIR content; reference it by hash and issue count only.
+      const issues = (body as { issue?: unknown }).issue;
+      const issueCount = Array.isArray(issues) ? issues.length : 0;
+      throw new Error(
+        `Healthcare API ${response.status} ${response.statusText} (response sha256 ${sha256(body)}, ${issueCount} issues)`,
+      );
     }
     return body;
   }
@@ -92,6 +97,7 @@ export class HealthcareApiClient {
     list: FhirResource,
     documentBundle: FhirBundle,
     runId: string,
+    extras: FhirResource[] = [],
   ): Promise<FhirBundle> {
     const store = this.options.TARGET_FHIR_STORE_ID;
     if (store === undefined) throw new Error("TARGET_FHIR_STORE_ID is required");
@@ -100,6 +106,7 @@ export class HealthcareApiClient {
       list,
       ...documentBundle.entry.map(({ resource }) => resource),
       documentBundle,
+      ...extras,
     ];
     const transactionEntries: BundleEntry[] = resources.map((resource) => {
       if (resource.id === undefined) {

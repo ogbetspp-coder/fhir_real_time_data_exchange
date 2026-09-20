@@ -3,50 +3,10 @@ import { KeyManagementServiceClient } from "@google-cloud/kms";
 import { Storage } from "@google-cloud/storage";
 
 import type { AppConfig } from "../config.js";
+import type { RunManifest } from "../contracts/run-manifest.js";
 import { canonicalJson, sha256 } from "../lib/hash.js";
 
-export type RunManifest = {
-  schemaVersion: "1.0.0";
-  runId: string;
-  startedAt: string;
-  completedAt: string;
-  status: "validated" | "persisted" | "rejected" | "failed";
-  dryRun: boolean;
-  source: {
-    kind: "fixture" | "healthcare-api";
-    resource: string;
-    hash: string;
-  };
-  standards: {
-    fhir: "5.0.0";
-    globalEpiPackage: string;
-    emaPackage: "EUePI#1.0.0";
-    qrdTemplate: string;
-    mappingVersion: string;
-  };
-  validation: {
-    preflightErrors: number;
-    officialValidationExecuted: boolean;
-    officialProfileErrors: number;
-    cloudValidationExecuted: boolean;
-    cloudProfileErrors: number;
-    profiles: string[];
-  };
-  transformation: {
-    inputHash: string;
-    outputHash: string;
-    decisions: number;
-  };
-  persistence?: {
-    targetStore: string;
-    transactionResponseHash: string;
-  };
-  runtime: {
-    sourceCommit: string;
-    imageDigest: string;
-    workflowRevision: string;
-  };
-};
+export type { RunManifest } from "../contracts/run-manifest.js";
 
 export type SignedManifest = {
   manifest: RunManifest;

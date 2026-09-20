@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://khs.dev/contracts/fidelity-report/1.0.0/schema.json",
+  "$ref": "#/$defs/FidelityReport",
+  "$defs": {
+    "FidelityReport": {
+      "type": "object",
+      "properties": {
+        "reportVersion": {
+          "type": "string",
+          "const": "1.0.0"
+        },
+        "normalizationVersion": {
+          "$ref": "#/$defs/NormalizationVersion"
+        },
+        "extractedTextSha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        },
+        "narrativeBindingSha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["passed", "failed"]
+        },
+        "sections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SectionResult"
+          }
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "summary": {
+          "type": "object",
+          "properties": {
+            "total": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "verified": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": ["total", "verified"],
+          "additionalProperties": false
+        },
+        "coverage": {
+          "type": "object",
+          "properties": {
+            "pageCodePoints": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "bodyCodePoints": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "coveredCodePoints": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "uncoveredGaps": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": ["pageCodePoints", "bodyCodePoints", "coveredCodePoints", "uncoveredGaps"],
+          "additionalProperties": false
+        },
+        "reportHash": {
+          "$ref": "#/$defs/Sha256Hex"
+        }
+      },
+      "required": [
+        "reportVersion",
+        "normalizationVersion",
+        "extractedTextSha256",
+        "narrativeBindingSha256",
+        "status",
+        "sections",
+        "issues",
+        "summary",
+        "coverage",
+        "reportHash"
+      ],
+      "additionalProperties": false
+    },
+    "NormalizationVersion": {
+      "type": "string",
+      "pattern": "^fidelity-norm\\/\\d+\\.\\d+\\.\\d+$",
+      "description": "Version of docs/fidelity-normalization.md the hashes were computed under."
+    },
+    "Sha256Hex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Lower-case hexadecimal SHA-256 digest."
+    },
+    "SectionResult": {
+      "type": "object",
+      "properties": {
+        "sourceKey": {
+          "$ref": "#/$defs/SourceKey"
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^Composition\\.section\\[\\d+\\](?:\\.section\\[\\d+\\])*$"
+        },
+        "status": {
+          "$ref": "#/$defs/SectionStatus"
+        },
+        "spanCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "reason": {
+          "type": "string",
+          "pattern": "^[a-z][a-z-]{0,40}$"
+        },
+        "details": {
+          "$ref": "#/$defs/DiffHint"
+        },
+        "normalizedTextSha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        }
+      },
+      "required": ["sourceKey", "path", "status", "spanCount"],
+      "additionalProperties": false
+    },
+    "SourceKey": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:\\.[a-z0-9]+)*$",
+      "description": "Canonical SmPC section identifier from the mapping manifest, e.g. smpc.4.2.posology."
+    },
+    "SectionStatus": {
+      "type": "string",
+      "enum": [
+        "verified",
+        "mismatch",
+        "span-not-found",
+        "invalid-provenance",
+        "missing-provenance",
+        "malformed-narrative"
+      ]
+    },
+    "DiffHint": {
+      "type": "object",
+      "properties": {
+        "expectedLength": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "actualLength": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "firstDifferingOffset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "commonSuffixLength": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "expectedWordCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "actualWordCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "expectedSha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        },
+        "actualSha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        }
+      },
+      "required": [
+        "expectedLength",
+        "actualLength",
+        "firstDifferingOffset",
+        "commonSuffixLength",
+        "expectedWordCount",
+        "actualWordCount",
+        "expectedSha256",
+        "actualSha256"
+      ],
+      "additionalProperties": false,
+      "description": "Lengths, offsets, counts, and hashes only; never text."
+    }
+  }
+}

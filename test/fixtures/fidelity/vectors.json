@@ -1,0 +1,3829 @@
+{
+  "normalizationVersion": "fidelity-norm/1.0.0",
+  "normalization": [
+    {
+      "name": "invisible-blocks-nfc",
+      "input": "cafe​́",
+      "expected": "café"
+    },
+    {
+      "name": "ligature-then-combining",
+      "input": "ﬁ́",
+      "expected": "fí"
+    },
+    {
+      "name": "plain",
+      "input": "Take one tablet daily.",
+      "expected": "Take one tablet daily."
+    },
+    {
+      "name": "collapse-whitespace",
+      "input": "  Take \t one\n\ntablet daily.  ",
+      "expected": "Take one tablet daily."
+    },
+    {
+      "name": "unicode-spaces",
+      "input": "a b c　d e",
+      "expected": "a b c d e"
+    },
+    {
+      "name": "nfc",
+      "input": "café",
+      "expected": "café"
+    },
+    {
+      "name": "soft-hyphen",
+      "input": "intra­venous",
+      "expected": "intravenous"
+    },
+    {
+      "name": "zero-width",
+      "input": "a​b﻿c⁠d",
+      "expected": "abcd"
+    },
+    {
+      "name": "ligatures",
+      "input": "ﬀ ﬁ ﬂ ﬃ ﬄ ﬆ",
+      "expected": "ff fi fl ffi ffl st"
+    },
+    {
+      "name": "bullets",
+      "input": "• one\n● two ▪ three",
+      "expected": "one two three"
+    },
+    {
+      "name": "keeps-case",
+      "input": "Take ONE",
+      "expected": "Take ONE"
+    },
+    {
+      "name": "keeps-typographic-quotes",
+      "input": "‘a’ “b”",
+      "expected": "‘a’ “b”"
+    },
+    {
+      "name": "keeps-dashes",
+      "input": "long-term – long—term − x",
+      "expected": "long-term – long—term − x"
+    },
+    {
+      "name": "keeps-superscripts",
+      "input": "m² H₂O",
+      "expected": "m² H₂O"
+    },
+    {
+      "name": "keeps-zwj-zwnj",
+      "input": "a‌b‍c",
+      "expected": "a‌b‍c"
+    },
+    {
+      "name": "keeps-hyphen-bullet",
+      "input": "- one - two",
+      "expected": "- one - two"
+    },
+    {
+      "name": "empty",
+      "input": "   \n\t ",
+      "expected": ""
+    },
+    {
+      "name": "rejects-replacement-character",
+      "input": "a�b",
+      "expected": {
+        "error": "forbidden-character"
+      }
+    },
+    {
+      "name": "rejects-control",
+      "input": "a\u0001b",
+      "expected": {
+        "error": "forbidden-character"
+      }
+    },
+    {
+      "name": "rejects-delete",
+      "input": "ab",
+      "expected": {
+        "error": "forbidden-character"
+      }
+    },
+    {
+      "name": "rejects-lone-surrogate",
+      "input": "a\ud800b",
+      "expected": {
+        "error": "forbidden-character"
+      }
+    },
+    {
+      "name": "allows-tab-lf-cr-ff-vt",
+      "input": "a\tb\nc\rd\fe\u000bf",
+      "expected": "a b c d e f"
+    }
+  ],
+  "xhtml": [
+    {
+      "name": "accepts-https-href",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"https://example.org/x?y=1#z\">t</a></p></div>",
+      "expected": "\n\nt\n\n"
+    },
+    {
+      "name": "rejects-javascript-href",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"javascript:alert(1)\">t</a></p></div>",
+      "expected": {
+        "error": "forbidden-attribute"
+      }
+    },
+    {
+      "name": "rejects-duplicate-attribute",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p id=\"a\" id=\"b\">t</p></div>",
+      "expected": {
+        "error": "forbidden-attribute"
+      }
+    },
+    {
+      "name": "rejects-free-text-class",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p class=\"do not take more than two tablets in any day\">t</p></div>",
+      "expected": {
+        "error": "forbidden-attribute"
+      }
+    },
+    {
+      "name": "rejects-non-token-id",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p id=\"take two tablets\">t</p></div>",
+      "expected": {
+        "error": "forbidden-attribute"
+      }
+    },
+    {
+      "name": "paragraphs",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>One.</p><p>Two.</p></div>",
+      "expected": "\n\nOne.\n\nTwo.\n\n"
+    },
+    {
+      "name": "inline-dropped",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a <b>b</b> <i>c</i> <sup>2</sup></p></div>",
+      "expected": "\n\na b c 2\n\n"
+    },
+    {
+      "name": "br",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a<br/>b</p></div>",
+      "expected": "\n\na\nb\n\n"
+    },
+    {
+      "name": "list",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><ul><li>x</li><li>y</li></ul></div>",
+      "expected": "\n\n\nx\n\ny\n\n\n"
+    },
+    {
+      "name": "table",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>a</td><td>b</td></tr></table></div>",
+      "expected": "\n\n\n\na\n\nb\n\n\n\n"
+    },
+    {
+      "name": "entities",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>&lt;a&gt; &amp; &quot;b&quot; &apos;c&apos; &#65;&#x42;</p></div>",
+      "expected": "\n\n<a> & \"b\" 'c' AB\n\n"
+    },
+    {
+      "name": "allowed-attributes",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\" lang=\"en\" id=\"s1\" class=\"c\"><p><a href=\"#x\">t</a></p></div>",
+      "expected": "\n\nt\n\n"
+    },
+    {
+      "name": "self-closing-block",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a</p><hr/><p>b</p></div>",
+      "expected": "\n\na\n\n\n\nb\n\n"
+    },
+    {
+      "name": "whitespace-outside-root",
+      "input": "  <div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a</p></div>\n",
+      "expected": "\n\na\n\n"
+    },
+    {
+      "name": "rejects-missing-namespace",
+      "input": "<div><p>a</p></div>",
+      "expected": {
+        "error": "root-not-div"
+      }
+    },
+    {
+      "name": "rejects-non-div-root",
+      "input": "<p xmlns=\"http://www.w3.org/1999/xhtml\">a</p>",
+      "expected": {
+        "error": "root-not-div"
+      }
+    },
+    {
+      "name": "rejects-text-outside-root",
+      "input": "x<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a</p></div>",
+      "expected": {
+        "error": "text-outside-root"
+      }
+    },
+    {
+      "name": "rejects-multiple-roots",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a</p></div><div xmlns=\"http://www.w3.org/1999/xhtml\"><p>b</p></div>",
+      "expected": {
+        "error": "multiple-roots"
+      }
+    },
+    {
+      "name": "rejects-unknown-element",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a</p><img/></div>",
+      "expected": {
+        "error": "unknown-element"
+      }
+    },
+    {
+      "name": "rejects-style-element",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><style>p{}</style><p>a</p></div>",
+      "expected": {
+        "error": "unknown-element"
+      }
+    },
+    {
+      "name": "rejects-uppercase",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><P>a</P></div>",
+      "expected": {
+        "error": "uppercase-element"
+      }
+    },
+    {
+      "name": "rejects-style-attribute",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"x\">a</p></div>",
+      "expected": {
+        "error": "forbidden-attribute"
+      }
+    },
+    {
+      "name": "rejects-hidden-attribute",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p hidden=\"hidden\">a</p></div>",
+      "expected": {
+        "error": "forbidden-attribute"
+      }
+    },
+    {
+      "name": "rejects-title-attribute",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p title=\"t\">a</p></div>",
+      "expected": {
+        "error": "forbidden-attribute"
+      }
+    },
+    {
+      "name": "rejects-href-off-anchor",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p href=\"#x\">a</p></div>",
+      "expected": {
+        "error": "forbidden-attribute"
+      }
+    },
+    {
+      "name": "rejects-nested-xmlns",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p xmlns=\"http://www.w3.org/1999/xhtml\">a</p></div>",
+      "expected": {
+        "error": "forbidden-attribute"
+      }
+    },
+    {
+      "name": "rejects-unquoted-attribute",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p class=x>a</p></div>",
+      "expected": {
+        "error": "malformed-tag"
+      }
+    },
+    {
+      "name": "rejects-comment",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><!-- c --><p>a</p></div>",
+      "expected": {
+        "error": "comment"
+      }
+    },
+    {
+      "name": "rejects-processing-instruction",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><?x?><p>a</p></div>",
+      "expected": {
+        "error": "processing-instruction"
+      }
+    },
+    {
+      "name": "rejects-cdata",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><![CDATA[x]]><p>a</p></div>",
+      "expected": {
+        "error": "cdata"
+      }
+    },
+    {
+      "name": "rejects-doctype",
+      "input": "<!DOCTYPE html><div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a</p></div>",
+      "expected": {
+        "error": "doctype"
+      }
+    },
+    {
+      "name": "rejects-stray-lt",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a < b</p></div>",
+      "expected": {
+        "error": "stray-lt"
+      }
+    },
+    {
+      "name": "rejects-stray-amp",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a & b</p></div>",
+      "expected": {
+        "error": "stray-amp"
+      }
+    },
+    {
+      "name": "rejects-nbsp",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a&nbsp;b</p></div>",
+      "expected": {
+        "error": "unknown-entity"
+      }
+    },
+    {
+      "name": "rejects-out-of-range-entity",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>&#x110000;</p></div>",
+      "expected": {
+        "error": "unknown-entity"
+      }
+    },
+    {
+      "name": "rejects-unbalanced",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a",
+      "expected": {
+        "error": "unbalanced-tag"
+      }
+    },
+    {
+      "name": "rejects-misnested",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><b>a</p></b></div>",
+      "expected": {
+        "error": "misnested-tag"
+      }
+    },
+    {
+      "name": "rejects-stray-end-tag",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a</p></div></p>",
+      "expected": {
+        "error": "unbalanced-tag"
+      }
+    }
+  ],
+  "verify": [
+    {
+      "name": "adjacent-spans-cannot-split-word",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.3",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Hypersensitivity to the active substance is a contra indication.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.3",
+            "spans": [
+              {
+                "page": 2,
+                "startOffset": 169,
+                "endOffset": 221,
+                "textSha256": "62852a02f020ff3b07afd883a4bb2939ab77e97109200832177e65544fcdfe04"
+              },
+              {
+                "page": 2,
+                "startOffset": 221,
+                "endOffset": 232,
+                "textSha256": "b198da2095448d60c9588a9b168072a96fa288acab0484e26672189c23e78769"
+              }
+            ],
+            "narrativeDivSha256": "5a23816d79476f17861e020f86a7f23347817ee079560d62cbc005025328ba64",
+            "normalizedTextSha256": "d9feaf318775708081dc244ffdacb57e1d8727b1896bd71867fdf61ad6245472"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "0b23f68c62326d47d255c499d96ce4f565d1848ab712cae26e0a5049c42210a2",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.3",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 2,
+            "details": {
+              "expectedLength": 63,
+              "actualLength": 64,
+              "firstDifferingOffset": 52,
+              "commonSuffixLength": 11,
+              "expectedWordCount": 8,
+              "actualWordCount": 9,
+              "expectedSha256": "64106ed6d7f37cfdd99c92713a2d600defc6f52c9463cf4d22aec33b1e7d83bc",
+              "actualSha256": "d9feaf318775708081dc244ffdacb57e1d8727b1896bd71867fdf61ad6245472"
+            },
+            "normalizedTextSha256": "d9feaf318775708081dc244ffdacb57e1d8727b1896bd71867fdf61ad6245472"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "c375a6fb9c0c605a9b34eea28ddf2a9b0785121c37a69e9e663294ab1edae531"
+      }
+    },
+    {
+      "name": "adjacent-spans-same-word-verifies",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.3",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Hypersensitivity to the active substance is a contraindication.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.3",
+            "spans": [
+              {
+                "page": 2,
+                "startOffset": 169,
+                "endOffset": 221,
+                "textSha256": "62852a02f020ff3b07afd883a4bb2939ab77e97109200832177e65544fcdfe04"
+              },
+              {
+                "page": 2,
+                "startOffset": 221,
+                "endOffset": 232,
+                "textSha256": "b198da2095448d60c9588a9b168072a96fa288acab0484e26672189c23e78769"
+              }
+            ],
+            "narrativeDivSha256": "5a750102ea48079e6ffc2ce40ae6e15e59749866ad94f54b92cc3899d6b0c357",
+            "normalizedTextSha256": "64106ed6d7f37cfdd99c92713a2d600defc6f52c9463cf4d22aec33b1e7d83bc"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "f2c425160545f67b3a17fc65484e4a1eca04233ef00fb788a50264cde49b24d9",
+        "status": "passed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.3",
+            "path": "Composition.section[0].section[0]",
+            "status": "verified",
+            "spanCount": 2,
+            "normalizedTextSha256": "64106ed6d7f37cfdd99c92713a2d600defc6f52c9463cf4d22aec33b1e7d83bc"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 1
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 63,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "d7b062e16d7cbb5a1d4cf1570b83492259752ffe38c75bc246d40cf4bc6ce2d4"
+      }
+    },
+    {
+      "name": "soft-hyphen-gap-cannot-split-word",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>The final dose is given by intra venous infusion over 10 minutes.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 134,
+                "endOffset": 165,
+                "textSha256": "51068468f2dd3ec2652e4b73203dcfb69fb2ac1b4a244e499690b0ddbe1c2fee"
+              },
+              {
+                "page": 1,
+                "startOffset": 166,
+                "endOffset": 198,
+                "textSha256": "059dc9dadaae5da6ae7d16dd6c8b8da504e1657e72bf89562ec4a2fa0aef11b4"
+              }
+            ],
+            "narrativeDivSha256": "7b6ba25f1a16a56aafa24d44cdd6f9b6758f31154553fa6a56cb6a9464dfb597",
+            "normalizedTextSha256": "c51d07dcadda47244a80d443e0a51819e570f3877aa8a095707ad87bb3759332"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "630ae5dbade7f56bc5b61801c5b086d00543edb059a7b1ee01b4702858f06d21",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 2,
+            "details": {
+              "expectedLength": 64,
+              "actualLength": 65,
+              "firstDifferingOffset": 32,
+              "commonSuffixLength": 32,
+              "expectedWordCount": 11,
+              "actualWordCount": 12,
+              "expectedSha256": "fbb703200b72fac4c0193fe83c8c3de301c5b340316217152ecc35c87fd4265c",
+              "actualSha256": "c51d07dcadda47244a80d443e0a51819e570f3877aa8a095707ad87bb3759332"
+            },
+            "normalizedTextSha256": "c51d07dcadda47244a80d443e0a51819e570f3877aa8a095707ad87bb3759332"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "381e21a6b690a39a0cfa247e4c6a813bbf5ceafdcac15e2aa8112acc06afe99d"
+      }
+    },
+    {
+      "name": "soft-hyphen-gap-joins-word",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>The final dose is given by intravenous infusion over 10 minutes.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 134,
+                "endOffset": 165,
+                "textSha256": "51068468f2dd3ec2652e4b73203dcfb69fb2ac1b4a244e499690b0ddbe1c2fee"
+              },
+              {
+                "page": 1,
+                "startOffset": 166,
+                "endOffset": 198,
+                "textSha256": "059dc9dadaae5da6ae7d16dd6c8b8da504e1657e72bf89562ec4a2fa0aef11b4"
+              }
+            ],
+            "narrativeDivSha256": "457720817ef37aa8dc696a8503999b006de9869d2fe579dd1e2b5ca41ca6c59f",
+            "normalizedTextSha256": "fbb703200b72fac4c0193fe83c8c3de301c5b340316217152ecc35c87fd4265c"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "3d2db72e06e36105c4e4a3d5207e9d961c1de62e2765973cf871a0876229e42a",
+        "status": "passed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "verified",
+            "spanCount": 2,
+            "normalizedTextSha256": "fbb703200b72fac4c0193fe83c8c3de301c5b340316217152ecc35c87fd4265c"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 1
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 63,
+          "uncoveredGaps": 4
+        },
+        "reportHash": "3b831ca4e522d048346fb8b37329ae393c825ae9361c240fe12b7f60e1956e9a"
+      }
+    },
+    {
+      "name": "empty-sections-fail",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [],
+        "provenance": []
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "status": "failed",
+        "sections": [],
+        "issues": ["No narrative sections to verify"],
+        "summary": {
+          "total": 0,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "d19e02f69a4f88fe95feb99943acb0edf0af7cd07c1945e8705eedfab5752f1a"
+      }
+    },
+    {
+      "name": "shrunken-body-reports-page-total",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 134
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for section 4.1; not for clinical use.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 63,
+                "endOffset": 133,
+                "textSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+              }
+            ],
+            "narrativeDivSha256": "cfc92af29edabba9d22b9d480a642c59532067477911fb050b502eda729ae042",
+            "normalizedTextSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "23ae9ee2c97c8080140cf34b71b9367b2d8b1496fcace5a165419fa28efc3ef3",
+        "narrativeBindingSha256": "b8c7f41230ed825bd6620dae99dd19fd3373a26ac7cd9108d62a5641d7f6fdb8",
+        "status": "passed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "verified",
+            "spanCount": 1,
+            "normalizedTextSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 1
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 426,
+          "coveredCodePoints": 70,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "625aadc7546e3b1412e302db3b8ebf67a57eb79e6b797b3862e7bf80cd294c45"
+      }
+    },
+    {
+      "name": "exact-pass",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for section 4.1; not for clinical use.</p></div>"
+          },
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[1].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Posology text part one continues on the next page.</p><p>Part two of the posology text is on page two.</p></div>"
+          },
+          {
+            "sourceKey": "smpc.4.3",
+            "path": "Composition.section[0].section[2]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Hypersensitivity to the active substance is a contraindication.</p></div>"
+          },
+          {
+            "sourceKey": "smpc.4.4",
+            "path": "Composition.section[0].section[3]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><ul><li>first warning item</li><li>second warning item</li></ul></div>"
+          },
+          {
+            "sourceKey": "smpc.4.5",
+            "path": "Composition.section[0].section[4]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><thead><tr><th>Dose</th><th>Frequency</th></tr></thead><tbody><tr><td>10 mg</td><td>Once daily</td></tr><tr><td>20 mg</td><td>Twice daily</td></tr></tbody></table></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 63,
+                "endOffset": 133,
+                "textSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+              }
+            ],
+            "narrativeDivSha256": "cfc92af29edabba9d22b9d480a642c59532067477911fb050b502eda729ae042",
+            "normalizedTextSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+          },
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 346,
+                "endOffset": 396,
+                "textSha256": "aed53c1d331a6e99f9172cf193583d6d2e2b00b690a314566cbaf192ab6a9661"
+              },
+              {
+                "page": 2,
+                "startOffset": 35,
+                "endOffset": 80,
+                "textSha256": "b6b2b026f0532025d8bfabc4f3d8773210b2c561d5e47a7581bc9c4cb78b6012"
+              }
+            ],
+            "narrativeDivSha256": "da83b19107da7314f91aba0d8aae40723748d6fce95d5c991cea22a2d7f9e69a",
+            "normalizedTextSha256": "87d4136e15b6fef09122b3cf1f2b46f306a75b76035356302e213a710a1fc856"
+          },
+          {
+            "sourceKey": "smpc.4.3",
+            "spans": [
+              {
+                "page": 2,
+                "startOffset": 169,
+                "endOffset": 232,
+                "textSha256": "64106ed6d7f37cfdd99c92713a2d600defc6f52c9463cf4d22aec33b1e7d83bc"
+              }
+            ],
+            "narrativeDivSha256": "5a750102ea48079e6ffc2ce40ae6e15e59749866ad94f54b92cc3899d6b0c357",
+            "normalizedTextSha256": "64106ed6d7f37cfdd99c92713a2d600defc6f52c9463cf4d22aec33b1e7d83bc"
+          },
+          {
+            "sourceKey": "smpc.4.4",
+            "spans": [
+              {
+                "page": 3,
+                "startOffset": 56,
+                "endOffset": 98,
+                "textSha256": "da9aff3c3678cf5d0a472319557c46eac69199b7e1edb3166bb7831c7e85efbd"
+              }
+            ],
+            "narrativeDivSha256": "12d7a1381c3818072511a99cc536b8e3bb445106ff5d18678faf4584b93c3a2c",
+            "normalizedTextSha256": "91abaf5cb3c3d363fb704d7116d2de0bdd2f557ec8631d6e96a4e0954e27a4cc"
+          },
+          {
+            "sourceKey": "smpc.4.5",
+            "spans": [
+              {
+                "page": 3,
+                "startOffset": 116,
+                "endOffset": 165,
+                "textSha256": "84ccd3efa995daf67736cffc491f2e2fee1b55d5bb5373b31f2448c1f7b6e5d4"
+              }
+            ],
+            "narrativeDivSha256": "c76e46b44c4ca61864986b1ccfcd5b67cf3f890b569b21d93e3e99c9deb0736e",
+            "normalizedTextSha256": "bb8031ddc9ca81245138ac52f6b3fb9f671aef70ca5320019e3773d90019e854"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "da63d8c73d863edc82fd49ab011bf85847246685ea4eaf86ab0a507e3b007171",
+        "status": "passed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "verified",
+            "spanCount": 1,
+            "normalizedTextSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+          },
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[1].section[0]",
+            "status": "verified",
+            "spanCount": 2,
+            "normalizedTextSha256": "87d4136e15b6fef09122b3cf1f2b46f306a75b76035356302e213a710a1fc856"
+          },
+          {
+            "sourceKey": "smpc.4.3",
+            "path": "Composition.section[0].section[2]",
+            "status": "verified",
+            "spanCount": 1,
+            "normalizedTextSha256": "64106ed6d7f37cfdd99c92713a2d600defc6f52c9463cf4d22aec33b1e7d83bc"
+          },
+          {
+            "sourceKey": "smpc.4.4",
+            "path": "Composition.section[0].section[3]",
+            "status": "verified",
+            "spanCount": 1,
+            "normalizedTextSha256": "91abaf5cb3c3d363fb704d7116d2de0bdd2f557ec8631d6e96a4e0954e27a4cc"
+          },
+          {
+            "sourceKey": "smpc.4.5",
+            "path": "Composition.section[0].section[4]",
+            "status": "verified",
+            "spanCount": 1,
+            "normalizedTextSha256": "bb8031ddc9ca81245138ac52f6b3fb9f671aef70ca5320019e3773d90019e854"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 5,
+          "verified": 5
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 319,
+          "uncoveredGaps": 5
+        },
+        "reportHash": "60f6a2cac4aa1fc0a065d520efd9736f3e2bc08e686fcb70ff6a90775d782f47"
+      }
+    },
+    {
+      "name": "whitespace-only-differences",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>  Synthetic   demonstration\n content for<br/>section 4.1;&#160;not for\tclinical</p><p>use.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 63,
+                "endOffset": 133,
+                "textSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+              }
+            ],
+            "narrativeDivSha256": "4504076c59e1712339a55806c64f779e9cfa3d250af2c8bdc1ca16a6eb91484a",
+            "normalizedTextSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "b8c7f41230ed825bd6620dae99dd19fd3373a26ac7cd9108d62a5641d7f6fdb8",
+        "status": "passed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "verified",
+            "spanCount": 1,
+            "normalizedTextSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 1
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 70,
+          "uncoveredGaps": 4
+        },
+        "reportHash": "1755ca7d5246036d3e2a0fbcd0983d0be5ca89c001cf21c3f1b0d222e97cc596"
+      }
+    },
+    {
+      "name": "ligature-and-soft-hyphen",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>The final dose is given by intravenous infusion over 10 minutes.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 134,
+                "endOffset": 198,
+                "textSha256": "a7bb4a186956ac581ba4339d0cd607a7c5ed9373b0a92350543e55cdf464197b"
+              }
+            ],
+            "narrativeDivSha256": "457720817ef37aa8dc696a8503999b006de9869d2fe579dd1e2b5ca41ca6c59f",
+            "normalizedTextSha256": "fbb703200b72fac4c0193fe83c8c3de301c5b340316217152ecc35c87fd4265c"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "3d2db72e06e36105c4e4a3d5207e9d961c1de62e2765973cf871a0876229e42a",
+        "status": "passed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "verified",
+            "spanCount": 1,
+            "normalizedTextSha256": "fbb703200b72fac4c0193fe83c8c3de301c5b340316217152ecc35c87fd4265c"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 1
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 64,
+          "uncoveredGaps": 4
+        },
+        "reportHash": "d4785177a1a6a1702db5aa40d5cd9261bd7100b7fc46902cddd7e2b1c36046e4"
+      }
+    },
+    {
+      "name": "soft-hyphen-entity-in-narrative",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>The final dose is given by intra&#173;venous infusion over 10 minutes.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 134,
+                "endOffset": 198,
+                "textSha256": "a7bb4a186956ac581ba4339d0cd607a7c5ed9373b0a92350543e55cdf464197b"
+              }
+            ],
+            "narrativeDivSha256": "511ea4df9e870a65188c268b1a71bf4fd0c881c1296f761c7ab37c7af998ad9b",
+            "normalizedTextSha256": "fbb703200b72fac4c0193fe83c8c3de301c5b340316217152ecc35c87fd4265c"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "3d2db72e06e36105c4e4a3d5207e9d961c1de62e2765973cf871a0876229e42a",
+        "status": "passed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "verified",
+            "spanCount": 1,
+            "normalizedTextSha256": "fbb703200b72fac4c0193fe83c8c3de301c5b340316217152ecc35c87fd4265c"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 1
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 64,
+          "uncoveredGaps": 4
+        },
+        "reportHash": "d4785177a1a6a1702db5aa40d5cd9261bd7100b7fc46902cddd7e2b1c36046e4"
+      }
+    },
+    {
+      "name": "superscript-markup-over-plain-digit",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Body surface area is expressed in m<sup>2</sup> and the volume in H<sub>2</sub>O.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 199,
+                "endOffset": 258,
+                "textSha256": "57f1707d802d9f2aad29a0069c9ed7de7051aebd621327fd6c5b1f3e5b1c63a8"
+              }
+            ],
+            "narrativeDivSha256": "36ae1b87c9fa67664e0a3f494332ff32391c6355bd2eded92b9dafb16b37e815",
+            "normalizedTextSha256": "57f1707d802d9f2aad29a0069c9ed7de7051aebd621327fd6c5b1f3e5b1c63a8"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "f67ddb7d0f874f4c6007daad19faaf6fa5903c3d210998d282dee8f1a624a40b",
+        "status": "passed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "verified",
+            "spanCount": 1,
+            "normalizedTextSha256": "57f1707d802d9f2aad29a0069c9ed7de7051aebd621327fd6c5b1f3e5b1c63a8"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 1
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 59,
+          "uncoveredGaps": 4
+        },
+        "reportHash": "4ff4cf9c345980cabc0fd9cc5a585f8aff56d1f01c06104040e7d03714aabff2"
+      }
+    },
+    {
+      "name": "page-break-two-contiguous-spans",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[1].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Posology text part one continues on the next page.</p><p>Part two of the posology text is on page two.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 346,
+                "endOffset": 396,
+                "textSha256": "aed53c1d331a6e99f9172cf193583d6d2e2b00b690a314566cbaf192ab6a9661"
+              },
+              {
+                "page": 2,
+                "startOffset": 35,
+                "endOffset": 80,
+                "textSha256": "b6b2b026f0532025d8bfabc4f3d8773210b2c561d5e47a7581bc9c4cb78b6012"
+              }
+            ],
+            "narrativeDivSha256": "da83b19107da7314f91aba0d8aae40723748d6fce95d5c991cea22a2d7f9e69a",
+            "normalizedTextSha256": "87d4136e15b6fef09122b3cf1f2b46f306a75b76035356302e213a710a1fc856"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "f5f093bf218e98d32bf56febe102999ecd208e83ad974efe160c81841a9c0a47",
+        "status": "passed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[1].section[0]",
+            "status": "verified",
+            "spanCount": 2,
+            "normalizedTextSha256": "87d4136e15b6fef09122b3cf1f2b46f306a75b76035356302e213a710a1fc856"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 1
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 95,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "ec0aceb3cc336843694195c6d10f32037786a57feaa0720c5dfbb98e892dc71e"
+      }
+    },
+    {
+      "name": "word-changed",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for section 4.1; not for veterinary use.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 63,
+                "endOffset": 133,
+                "textSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+              }
+            ],
+            "narrativeDivSha256": "7919921c846afbbe6b4c8f7f57d8f41d5c3a5c5189a1740a903e761a9983b811",
+            "normalizedTextSha256": "b835331bc98d3489edcc0b1d85118f1c3f65de90e45a65d498f704610c695036"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "e8bc58e66c57e33026a3c8dd51758fd3973b1800abfd296eeba7f36c9a150550",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 1,
+            "details": {
+              "expectedLength": 70,
+              "actualLength": 72,
+              "firstDifferingOffset": 57,
+              "commonSuffixLength": 5,
+              "expectedWordCount": 10,
+              "actualWordCount": 10,
+              "expectedSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66",
+              "actualSha256": "b835331bc98d3489edcc0b1d85118f1c3f65de90e45a65d498f704610c695036"
+            },
+            "normalizedTextSha256": "b835331bc98d3489edcc0b1d85118f1c3f65de90e45a65d498f704610c695036"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "e6d76caba7ed16c21ddb36d26ce5a1a005efb2c3d8acec2c813c0a4ca98e6268"
+      }
+    },
+    {
+      "name": "word-deleted",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for section 4.1; for clinical use.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 63,
+                "endOffset": 133,
+                "textSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+              }
+            ],
+            "narrativeDivSha256": "a5a5d663869e54742bdf2d13d9de48ce2b845ea28ddb5928b6a911ebc4716d72",
+            "normalizedTextSha256": "6fe4f37e40b21398d7ecad201ae9a1ffb52fa29307132d5866d47a6b7320a845"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "ced3dc1cf5a1d5479373830d7e72b18f4446d5b92530114f0479014aefa17ef7",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 1,
+            "details": {
+              "expectedLength": 70,
+              "actualLength": 66,
+              "firstDifferingOffset": 49,
+              "commonSuffixLength": 17,
+              "expectedWordCount": 10,
+              "actualWordCount": 9,
+              "expectedSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66",
+              "actualSha256": "6fe4f37e40b21398d7ecad201ae9a1ffb52fa29307132d5866d47a6b7320a845"
+            },
+            "normalizedTextSha256": "6fe4f37e40b21398d7ecad201ae9a1ffb52fa29307132d5866d47a6b7320a845"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "1178762a5b574f023da968478bcc36814e56577f006a1cd9436b46259025f554"
+      }
+    },
+    {
+      "name": "sentence-appended",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for section 4.1; not for clinical use.</p><p>Take with food.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 63,
+                "endOffset": 133,
+                "textSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+              }
+            ],
+            "narrativeDivSha256": "12067d96455084cc243e24c554da8ae32884e656516dde2677c4fb6c7de99fa8",
+            "normalizedTextSha256": "80a9950981551f94d33a5fa197352d8178c8c4f9a043a27df1f447072cff3c93"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "168dc859c053241697e32eb494a39c80c8cdca28069b56c2736239a32437019c",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 1,
+            "details": {
+              "expectedLength": 70,
+              "actualLength": 86,
+              "firstDifferingOffset": 70,
+              "commonSuffixLength": 0,
+              "expectedWordCount": 10,
+              "actualWordCount": 13,
+              "expectedSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66",
+              "actualSha256": "80a9950981551f94d33a5fa197352d8178c8c4f9a043a27df1f447072cff3c93"
+            },
+            "normalizedTextSha256": "80a9950981551f94d33a5fa197352d8178c8c4f9a043a27df1f447072cff3c93"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "98fcc312a74fd3440782a47c668459e1175450753594167bc0df6952cc06b8d3"
+      }
+    },
+    {
+      "name": "sentences-reordered",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Part two of the posology text is on page two.</p><p>Posology text part one continues on the next page.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 346,
+                "endOffset": 396,
+                "textSha256": "aed53c1d331a6e99f9172cf193583d6d2e2b00b690a314566cbaf192ab6a9661"
+              },
+              {
+                "page": 2,
+                "startOffset": 35,
+                "endOffset": 80,
+                "textSha256": "b6b2b026f0532025d8bfabc4f3d8773210b2c561d5e47a7581bc9c4cb78b6012"
+              }
+            ],
+            "narrativeDivSha256": "c73d6ef479e69cc83fc8458f1cdb34ff06eda0816166624629f2858013f55e4d",
+            "normalizedTextSha256": "f6c5f28a992003589e7e7c02441bf8cefdc80a94e7793de711e996f6e425d39d"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "d96225ddec9d87b47d1f0a8f08e979890e8a2ebe567e6d4f5ee724ad6af69b43",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 2,
+            "details": {
+              "expectedLength": 96,
+              "actualLength": 96,
+              "firstDifferingOffset": 1,
+              "commonSuffixLength": 1,
+              "expectedWordCount": 19,
+              "actualWordCount": 19,
+              "expectedSha256": "87d4136e15b6fef09122b3cf1f2b46f306a75b76035356302e213a710a1fc856",
+              "actualSha256": "f6c5f28a992003589e7e7c02441bf8cefdc80a94e7793de711e996f6e425d39d"
+            },
+            "normalizedTextSha256": "f6c5f28a992003589e7e7c02441bf8cefdc80a94e7793de711e996f6e425d39d"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "f2d65bada7de2d3a748c235515c8d9a830b32af8824d64878f00f44d4f6870ca"
+      }
+    },
+    {
+      "name": "number-changed",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.3",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>The recommended dose is 100 mg once daily for a long- term course.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.3",
+            "spans": [
+              {
+                "page": 2,
+                "startOffset": 81,
+                "endOffset": 146,
+                "textSha256": "039547e38e7679aeb441dd29a41e379fea8cfad4eb0cbe15f1970c22c2e911a2"
+              }
+            ],
+            "narrativeDivSha256": "394d99064981ec0b1ed3447001d50c668ccc7b7dc5e51460e63f009baa9cb57a",
+            "normalizedTextSha256": "ec3631135bba33175ae1e0f97f2185a0c67adfd3e188f277bcfff080d879fd62"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "3b64b4311fb31b25fb783570be9768de63a29bf0d2dd37bb9d584008749d7665",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.3",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 1,
+            "details": {
+              "expectedLength": 65,
+              "actualLength": 66,
+              "firstDifferingOffset": 26,
+              "commonSuffixLength": 39,
+              "expectedWordCount": 13,
+              "actualWordCount": 13,
+              "expectedSha256": "1c305b0140442613e7ac93bc360e5e6f6cd2f71c9c61b0ef28854db94942f841",
+              "actualSha256": "ec3631135bba33175ae1e0f97f2185a0c67adfd3e188f277bcfff080d879fd62"
+            },
+            "normalizedTextSha256": "ec3631135bba33175ae1e0f97f2185a0c67adfd3e188f277bcfff080d879fd62"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "a91071abd8956e237cdbd781cba35fd70ab911ffd3ac9990012aba2f3536fa87"
+      }
+    },
+    {
+      "name": "unit-changed",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.3",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>The recommended dose is 10 mcg once daily for a long- term course.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.3",
+            "spans": [
+              {
+                "page": 2,
+                "startOffset": 81,
+                "endOffset": 146,
+                "textSha256": "039547e38e7679aeb441dd29a41e379fea8cfad4eb0cbe15f1970c22c2e911a2"
+              }
+            ],
+            "narrativeDivSha256": "61eab9e7280bd66ffa9aaeb48029aa51f743826f9b17c1243b56ac26d9983bd5",
+            "normalizedTextSha256": "da78fe741bc68cb803287e9b4b93bd7da7e6e5bca9a65975cc30c9a070be4862"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "8068ccd9dd454c2a71ba191642a89af4f447820245bd349228231b99b43c1b3b",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.3",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 1,
+            "details": {
+              "expectedLength": 65,
+              "actualLength": 66,
+              "firstDifferingOffset": 28,
+              "commonSuffixLength": 37,
+              "expectedWordCount": 13,
+              "actualWordCount": 13,
+              "expectedSha256": "1c305b0140442613e7ac93bc360e5e6f6cd2f71c9c61b0ef28854db94942f841",
+              "actualSha256": "da78fe741bc68cb803287e9b4b93bd7da7e6e5bca9a65975cc30c9a070be4862"
+            },
+            "normalizedTextSha256": "da78fe741bc68cb803287e9b4b93bd7da7e6e5bca9a65975cc30c9a070be4862"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "33d972944fc1fa33b48999e0311295db4f8aedf5cf16f0e6fc8c792a94291378"
+      }
+    },
+    {
+      "name": "negation-added",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.3",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Hypersensitivity to the active substance is not a contraindication.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.3",
+            "spans": [
+              {
+                "page": 2,
+                "startOffset": 169,
+                "endOffset": 232,
+                "textSha256": "64106ed6d7f37cfdd99c92713a2d600defc6f52c9463cf4d22aec33b1e7d83bc"
+              }
+            ],
+            "narrativeDivSha256": "a608b01d2f28d6f6d65f02ea67b1bbcf62bc90d5921ae11b3734f1080a2060b4",
+            "normalizedTextSha256": "a99f0f5940cce30106e1148d2edb5cd4f08f0b5a1304c2394c1380e4c310d3ec"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "cf1e24bb2f2332489e97192a576470aecd2e883871eb80f85f5b804df733190b",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.3",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 1,
+            "details": {
+              "expectedLength": 63,
+              "actualLength": 67,
+              "firstDifferingOffset": 44,
+              "commonSuffixLength": 19,
+              "expectedWordCount": 8,
+              "actualWordCount": 9,
+              "expectedSha256": "64106ed6d7f37cfdd99c92713a2d600defc6f52c9463cf4d22aec33b1e7d83bc",
+              "actualSha256": "a99f0f5940cce30106e1148d2edb5cd4f08f0b5a1304c2394c1380e4c310d3ec"
+            },
+            "normalizedTextSha256": "a99f0f5940cce30106e1148d2edb5cd4f08f0b5a1304c2394c1380e4c310d3ec"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "dc8b4b332187d1f99a228d815a09f61b170f65406bda4bfab459742f17919bd4"
+      }
+    },
+    {
+      "name": "hard-hyphen-dehyphenated",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.3",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>The recommended dose is 10 mg once daily for a longterm course.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.3",
+            "spans": [
+              {
+                "page": 2,
+                "startOffset": 81,
+                "endOffset": 146,
+                "textSha256": "039547e38e7679aeb441dd29a41e379fea8cfad4eb0cbe15f1970c22c2e911a2"
+              }
+            ],
+            "narrativeDivSha256": "ccbb026c940e07c64ffac7737c99f34c6b17b65818f40935ec8e061c8f8b2c7f",
+            "normalizedTextSha256": "0363c0d1c017092f1e54fc8da70edb1bc43ae335e17a9218018a45f3bb439ce0"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "c31f36dd8aacfe74f94755264527c4fed491cece76a02525c589aa1f2cdc32fe",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.3",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 1,
+            "details": {
+              "expectedLength": 65,
+              "actualLength": 63,
+              "firstDifferingOffset": 51,
+              "commonSuffixLength": 12,
+              "expectedWordCount": 13,
+              "actualWordCount": 12,
+              "expectedSha256": "1c305b0140442613e7ac93bc360e5e6f6cd2f71c9c61b0ef28854db94942f841",
+              "actualSha256": "0363c0d1c017092f1e54fc8da70edb1bc43ae335e17a9218018a45f3bb439ce0"
+            },
+            "normalizedTextSha256": "0363c0d1c017092f1e54fc8da70edb1bc43ae335e17a9218018a45f3bb439ce0"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "171ec5d473365929ed4c9a5ed9d43a6316132742705cd5a9eddccd8aa1076ef6"
+      }
+    },
+    {
+      "name": "straight-vs-typographic-quotes",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>The 'quoted' phrase uses typographic quotes.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 259,
+                "endOffset": 303,
+                "textSha256": "ba085f9760af78cbb3fb4903f4b3fb0ec35efbf756a5b16a44486f634a774905"
+              }
+            ],
+            "narrativeDivSha256": "c5f77953e83e64ca54e59ef67de81645a70af4bc2bd568f4d663b0ba236fd841",
+            "normalizedTextSha256": "1e87d16c354e99d737421b2b855b66aeba702a7147bc443cb7236eb89904499d"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "c66798b96de897ca417d9e08ef7991ea219e8711229b9ee0ffbafe6bb9fb693a",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 1,
+            "details": {
+              "expectedLength": 44,
+              "actualLength": 44,
+              "firstDifferingOffset": 4,
+              "commonSuffixLength": 32,
+              "expectedWordCount": 6,
+              "actualWordCount": 6,
+              "expectedSha256": "ba085f9760af78cbb3fb4903f4b3fb0ec35efbf756a5b16a44486f634a774905",
+              "actualSha256": "1e87d16c354e99d737421b2b855b66aeba702a7147bc443cb7236eb89904499d"
+            },
+            "normalizedTextSha256": "1e87d16c354e99d737421b2b855b66aeba702a7147bc443cb7236eb89904499d"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "a708e483643c924246d6473d2dcb0f4dfe26ba41af232448a61d78a85883285b"
+      }
+    },
+    {
+      "name": "superscript-code-point-vs-digit",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Body surface area is expressed in m² and the volume in H₂O.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 199,
+                "endOffset": 258,
+                "textSha256": "57f1707d802d9f2aad29a0069c9ed7de7051aebd621327fd6c5b1f3e5b1c63a8"
+              }
+            ],
+            "narrativeDivSha256": "0946e3d50b85755bc8559871c8c844d920987694d4558a56f907596b4ce681cd",
+            "normalizedTextSha256": "a2b89b13ee84b667ff6a356161869a22edb3bcfc4d174958a173b2cbb906af34"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "23703513b4a58f2add7dc7e5c54f6852ac68b91ed5958d42518c60b14bf318c4",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 1,
+            "details": {
+              "expectedLength": 59,
+              "actualLength": 59,
+              "firstDifferingOffset": 35,
+              "commonSuffixLength": 2,
+              "expectedWordCount": 12,
+              "actualWordCount": 12,
+              "expectedSha256": "57f1707d802d9f2aad29a0069c9ed7de7051aebd621327fd6c5b1f3e5b1c63a8",
+              "actualSha256": "a2b89b13ee84b667ff6a356161869a22edb3bcfc4d174958a173b2cbb906af34"
+            },
+            "normalizedTextSha256": "a2b89b13ee84b667ff6a356161869a22edb3bcfc4d174958a173b2cbb906af34"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "8fe9ed11d8ad2cc421cc77bbc958e04c5d0213556a8e1b38696b78f5068b14d8"
+      }
+    },
+    {
+      "name": "text-not-in-source",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>This sentence does not exist in the document.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 63,
+                "endOffset": 133,
+                "textSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+              }
+            ],
+            "narrativeDivSha256": "8a2b04edf54ad7cf1cda0de0e4d0e6a7cd32624f34145db71aa433a2966469e9",
+            "normalizedTextSha256": "fdc7b73391f6c194bd2e801ab4b69f1dd77706ca10c01454fc218fc32e128c54"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "2ce363e53b9ce9b49ef613362c394ce9ed3888ddb0a65a240b25f184b8175d18",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 1,
+            "details": {
+              "expectedLength": 70,
+              "actualLength": 45,
+              "firstDifferingOffset": 0,
+              "commonSuffixLength": 1,
+              "expectedWordCount": 10,
+              "actualWordCount": 8,
+              "expectedSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66",
+              "actualSha256": "fdc7b73391f6c194bd2e801ab4b69f1dd77706ca10c01454fc218fc32e128c54"
+            },
+            "normalizedTextSha256": "fdc7b73391f6c194bd2e801ab4b69f1dd77706ca10c01454fc218fc32e128c54"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "b7e7bc552b04c4e0605da90c8f842a7c4b5a5a04e9a3ba173f98af87055365b4"
+      }
+    },
+    {
+      "name": "hidden-extra-element",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for section 4.1; not for clinical use.</p><p><span class=\"x\">extra</span></p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 63,
+                "endOffset": 133,
+                "textSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+              }
+            ],
+            "narrativeDivSha256": "fd5f43bd75fe23011e0967126eae93aa46d5a116126e061384d4d7127b67b3ed",
+            "normalizedTextSha256": "5a3f2fe2f5def4bba6ea37393c188ee5acefee4e73c2210eef0b30ec7a5b0926"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "547039730ab9db08255bef42abe2ed5ff0259533a5ca9e3a00c248697a733e8e",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 1,
+            "details": {
+              "expectedLength": 70,
+              "actualLength": 76,
+              "firstDifferingOffset": 70,
+              "commonSuffixLength": 0,
+              "expectedWordCount": 10,
+              "actualWordCount": 11,
+              "expectedSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66",
+              "actualSha256": "5a3f2fe2f5def4bba6ea37393c188ee5acefee4e73c2210eef0b30ec7a5b0926"
+            },
+            "normalizedTextSha256": "5a3f2fe2f5def4bba6ea37393c188ee5acefee4e73c2210eef0b30ec7a5b0926"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "ea06cc026972671176c3daf08af81fe4d1bcc66eaec63c734ee9b4c4574c30f4"
+      }
+    },
+    {
+      "name": "wrong-page-span",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for section 4.1; not for clinical use.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 2,
+                "startOffset": 63,
+                "endOffset": 133,
+                "textSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+              }
+            ],
+            "narrativeDivSha256": "cfc92af29edabba9d22b9d480a642c59532067477911fb050b502eda729ae042",
+            "normalizedTextSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "b8c7f41230ed825bd6620dae99dd19fd3373a26ac7cd9108d62a5641d7f6fdb8",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "span-not-found",
+            "spanCount": 1,
+            "reason": "hash-mismatch",
+            "normalizedTextSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "f35006fb871cb05808a59513c09cfa0540060124fa06db86323ce28386161620"
+      }
+    },
+    {
+      "name": "span-hash-tampered",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for section 4.1; not for clinical use.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 63,
+                "endOffset": 133,
+                "textSha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+              }
+            ],
+            "narrativeDivSha256": "cfc92af29edabba9d22b9d480a642c59532067477911fb050b502eda729ae042",
+            "normalizedTextSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "b8c7f41230ed825bd6620dae99dd19fd3373a26ac7cd9108d62a5641d7f6fdb8",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "span-not-found",
+            "spanCount": 1,
+            "reason": "hash-mismatch",
+            "normalizedTextSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "f35006fb871cb05808a59513c09cfa0540060124fa06db86323ce28386161620"
+      }
+    },
+    {
+      "name": "span-outside-body",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>ACME Demo Product — Synthetic SmPC</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 0,
+                "endOffset": 34,
+                "textSha256": "a5bee5c98a115641a8a58ed4b86235e865fed8f1b83d5994dfb7fd2594e49beb"
+              }
+            ],
+            "narrativeDivSha256": "27b01393de4203d2b30852f8dd0a5b31184d064a565b21a877832efc6161a8a4",
+            "normalizedTextSha256": "a5bee5c98a115641a8a58ed4b86235e865fed8f1b83d5994dfb7fd2594e49beb"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "a33e789caf5da9fa6130787efe09642e4d6cd6e00420deab8da2b023770ab3fa",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "span-not-found",
+            "spanCount": 1,
+            "reason": "outside-body",
+            "normalizedTextSha256": "a5bee5c98a115641a8a58ed4b86235e865fed8f1b83d5994dfb7fd2594e49beb"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "540a96bc68a1a22d057decfff1d61f066105901680c3ac2900891f3bfaaa7252"
+      }
+    },
+    {
+      "name": "stitched-non-adjacent-spans",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for section 4.1; not for clinical use.</p><p>The ‘quoted’ phrase uses typographic quotes.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 63,
+                "endOffset": 133,
+                "textSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+              },
+              {
+                "page": 1,
+                "startOffset": 259,
+                "endOffset": 303,
+                "textSha256": "ba085f9760af78cbb3fb4903f4b3fb0ec35efbf756a5b16a44486f634a774905"
+              }
+            ],
+            "narrativeDivSha256": "830390d0596e3dbfb10e53eca8399486255dc71fc4ff150cb4e5fd2f0d299e48",
+            "normalizedTextSha256": "942d0e848589b868d1574dd2f6cc8f9be15d8a162ddc647642932496e5894bb7"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "b31228e6632c3255b6a636d27aec5c7afa88622279e3562b69326822cc54dee7",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "invalid-provenance",
+            "spanCount": 2,
+            "reason": "non-contiguous",
+            "normalizedTextSha256": "942d0e848589b868d1574dd2f6cc8f9be15d8a162ddc647642932496e5894bb7"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "d0120ec83e2809221ed97276caac8668d319a173a51daeb358f139f2e7523d81"
+      }
+    },
+    {
+      "name": "overlapping-sections",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for section 4.1; not for clinical use.</p></div>"
+          },
+          {
+            "sourceKey": "smpc.4.2",
+            "path": "Composition.section[0].section[1]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>content for section 4.1; not for clinical use.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 63,
+                "endOffset": 133,
+                "textSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+              }
+            ],
+            "narrativeDivSha256": "cfc92af29edabba9d22b9d480a642c59532067477911fb050b502eda729ae042",
+            "normalizedTextSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+          },
+          {
+            "sourceKey": "smpc.4.2",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 87,
+                "endOffset": 133,
+                "textSha256": "88addba0fa9060eee05862adfc305b135cddbedafb154451bffeb004e0165b0b"
+              }
+            ],
+            "narrativeDivSha256": "99ec9f0fff725227ebf8f2c42e16e08fff9080f46101888ef3fa3dbd7ec1a169",
+            "normalizedTextSha256": "88addba0fa9060eee05862adfc305b135cddbedafb154451bffeb004e0165b0b"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "f02ad3bcca9f667a99ab13b3d233732f3a7b4236585b864fdeaabccda5bb6337",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "invalid-provenance",
+            "spanCount": 1,
+            "normalizedTextSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66",
+            "reason": "overlap"
+          },
+          {
+            "sourceKey": "smpc.4.2",
+            "path": "Composition.section[0].section[1]",
+            "status": "invalid-provenance",
+            "spanCount": 1,
+            "normalizedTextSha256": "88addba0fa9060eee05862adfc305b135cddbedafb154451bffeb004e0165b0b",
+            "reason": "overlap"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 2,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "a86677c775597f16f69506f6638d1355c9b606844020e6781e62830ffaa38581"
+      }
+    },
+    {
+      "name": "missing-provenance",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for section 4.1; not for clinical use.</p></div>"
+          }
+        ],
+        "provenance": []
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "b8c7f41230ed825bd6620dae99dd19fd3373a26ac7cd9108d62a5641d7f6fdb8",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "missing-provenance",
+            "spanCount": 0,
+            "normalizedTextSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "c6f54f299cf9031fc185eab4d237b623a7560c9446e3008e7bf80d524e51ffc9"
+      }
+    },
+    {
+      "name": "orphan-provenance",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for section 4.1; not for clinical use.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 63,
+                "endOffset": 133,
+                "textSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+              }
+            ],
+            "narrativeDivSha256": "cfc92af29edabba9d22b9d480a642c59532067477911fb050b502eda729ae042",
+            "normalizedTextSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+          },
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 346,
+                "endOffset": 396,
+                "textSha256": "aed53c1d331a6e99f9172cf193583d6d2e2b00b690a314566cbaf192ab6a9661"
+              },
+              {
+                "page": 2,
+                "startOffset": 35,
+                "endOffset": 80,
+                "textSha256": "b6b2b026f0532025d8bfabc4f3d8773210b2c561d5e47a7581bc9c4cb78b6012"
+              }
+            ],
+            "narrativeDivSha256": "da83b19107da7314f91aba0d8aae40723748d6fce95d5c991cea22a2d7f9e69a",
+            "normalizedTextSha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "b8c7f41230ed825bd6620dae99dd19fd3373a26ac7cd9108d62a5641d7f6fdb8",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "verified",
+            "spanCount": 1,
+            "normalizedTextSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+          }
+        ],
+        "issues": ["Orphan provenance smpc.4.2.posology"],
+        "summary": {
+          "total": 1,
+          "verified": 1
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 70,
+          "uncoveredGaps": 4
+        },
+        "reportHash": "96615b1bb79b52c0ecd0b7aa32210909c2d6efb24201a2df1d5ea38231c888e7"
+      }
+    },
+    {
+      "name": "empty-div",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 63,
+                "endOffset": 133,
+                "textSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+              }
+            ],
+            "narrativeDivSha256": "0cfc4203570c25f6f4f73d313c60e64ee5e0b9bce9058cf5ae4f64aecca2726d",
+            "normalizedTextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "malformed-narrative",
+            "spanCount": 1,
+            "reason": "empty-narrative"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "25b63909e1e2a960493aa05442e8cbc3c25b1b8bf037498e765fc6b035474838"
+      }
+    },
+    {
+      "name": "whitespace-only-div",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p> \n </p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 63,
+                "endOffset": 133,
+                "textSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+              }
+            ],
+            "narrativeDivSha256": "0d0bd9ae9e17a1a8f6612a0c6a5347de641e612205b48c099edc402384b81856",
+            "normalizedTextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "malformed-narrative",
+            "spanCount": 1,
+            "reason": "empty-narrative"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "25b63909e1e2a960493aa05442e8cbc3c25b1b8bf037498e765fc6b035474838"
+      }
+    },
+    {
+      "name": "style-attribute",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for section 4.1; not for clinical use.</p><p style=\"display:none\">extra</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 63,
+                "endOffset": 133,
+                "textSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+              }
+            ],
+            "narrativeDivSha256": "602fce22643d28ad932b53d83525d50f051d385003a3e00e7d9cdf62bb3ff58f",
+            "normalizedTextSha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "malformed-narrative",
+            "spanCount": 1,
+            "reason": "forbidden-attribute"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "ba2344e3a2f9de58946ee909db84348271b1032365a1df52007e0ab3221515ce"
+      }
+    },
+    {
+      "name": "script-element",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for section 4.1; not for clinical use.</p><script>x()</script></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 63,
+                "endOffset": 133,
+                "textSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+              }
+            ],
+            "narrativeDivSha256": "f797ac235b797588bf7cc5568d7aaa35c2ecd96037e0926aeda8e6d4c617fd03",
+            "normalizedTextSha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "malformed-narrative",
+            "spanCount": 1,
+            "reason": "unknown-element"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "3da739f76749a2d6fd4218ae0eb819ceb2a91f7d1f83f72654ece766b1c9e9fe"
+      }
+    },
+    {
+      "name": "comment-in-narrative",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for section 4.1; not for clinical use.</p><!-- hidden --></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 63,
+                "endOffset": 133,
+                "textSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+              }
+            ],
+            "narrativeDivSha256": "4826d489374b26b218a997d98e563505c63ba1c4f29a78f163a08258fa019d4a",
+            "normalizedTextSha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "malformed-narrative",
+            "spanCount": 1,
+            "reason": "comment"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "ce54fe484265d0445bd5f337ce0af0c0a349717281e4fca804e43f7dfa0aab05"
+      }
+    },
+    {
+      "name": "nbsp-named-entity",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic&nbsp;demonstration content for section 4.1; not for clinical use.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 63,
+                "endOffset": 133,
+                "textSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+              }
+            ],
+            "narrativeDivSha256": "cd412ccff230c3cd840795a120fab30d7bd41c1218821c7691e550b50121d280",
+            "normalizedTextSha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "malformed-narrative",
+            "spanCount": 1,
+            "reason": "unknown-entity"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "03b7a03bba4f16b4f7079a47ece361c912317f8c19dda47b4c2cbecaf05a96be"
+      }
+    },
+    {
+      "name": "uppercase-tag",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><P>Synthetic demonstration content for section 4.1; not for clinical use.</P></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 63,
+                "endOffset": 133,
+                "textSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+              }
+            ],
+            "narrativeDivSha256": "51daeeb73dc1130ca4bb3b56edcb6561f4955b602810cac39a0b80ec79fb8f0c",
+            "normalizedTextSha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "malformed-narrative",
+            "spanCount": 1,
+            "reason": "uppercase-element"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "04778b5f7821c19d9675079791235eb921abffaf868062aa58522ed671009850"
+      }
+    },
+    {
+      "name": "unbalanced-tag",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for section 4.1; not for clinical use.</div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 63,
+                "endOffset": 133,
+                "textSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+              }
+            ],
+            "narrativeDivSha256": "13a0d78017cc8aac4dc35f8badbaaf70bb1f689e7b35f4be65720c56d7ce8099",
+            "normalizedTextSha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "malformed-narrative",
+            "spanCount": 1,
+            "reason": "misnested-tag"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "760fbed1db15e8fac0769891e0e188c678eecdabddd6cd7f7d4b551eb4d72507"
+      }
+    },
+    {
+      "name": "replacement-character",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 396
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 232
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 165
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for section 4.1; not for clinical use.�</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 63,
+                "endOffset": 133,
+                "textSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+              }
+            ],
+            "narrativeDivSha256": "ca6135e754d051ff07448f0dc159d831e251d7a01c7a2d4127b9d2fa97cc4f63",
+            "normalizedTextSha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.0.0",
+        "extractedTextSha256": "97e4ec7682fa814254e4d8ac5440364ba01688deef41d51bbad6e4f950ce0e3d",
+        "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "malformed-narrative",
+            "spanCount": 1,
+            "reason": "forbidden-character"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 688,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "91fdfdbd2bee47e2db4af4a16d7320ea7ce5c6ad9c811cbb7e2f36cf34858503"
+      }
+    }
+  ]
+}

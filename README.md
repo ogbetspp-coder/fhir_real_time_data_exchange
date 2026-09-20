@@ -51,6 +51,19 @@ analytical schema.
 
 See [docs/architecture.md](docs/architecture.md) for trust boundaries, controls, and data flow.
 
+### Zone A hand-off contract
+
+Structuring a label document into the Type 2 graph is a separate, probabilistic Zone A
+service; this repository (Zone B) accepts only an approved `CanonicalSubmission`, passed by
+reference, and re-verifies it before running the frozen transform and validation pipeline. See
+[docs/adr/0002-two-trust-zones-and-canonical-submission.md](docs/adr/0002-two-trust-zones-and-canonical-submission.md)
+and
+[docs/adr/0003-mechanical-narrative-fidelity.md](docs/adr/0003-mechanical-narrative-fidelity.md)
+for the trust boundary and the mechanical narrative fidelity check. The contract's Zod schemas
+are the source of truth; generated JSON Schema is checked into `contracts/generated/` and kept
+in sync by `npm run contracts:check`. The golden vectors in `test/fixtures/fidelity/` are the
+executable specification for any re-implementation of the fidelity check.
+
 ## Local deterministic demonstration
 
 Requirements: Node.js 22.14 or newer.
@@ -118,11 +131,11 @@ The workflow runs for pushes to `main` and can also be started from
 It uses GitHub's OIDC token with Google Cloud Workload Identity Federation, so no
 service-account key is stored in GitHub. In that repository, set these Actions variables:
 
-| Variable | Example |
-| --- | --- |
-| `GCP_PROJECT_ID` | your Google Cloud project id |
-| `GCP_REGION` | `europe-west4` |
-| `GCP_DEPLOY_SERVICE_ACCOUNT` | `ema-flow-deployer@PROJECT_ID.iam.gserviceaccount.com` |
+| Variable                         | Example                                                                                  |
+| -------------------------------- | ---------------------------------------------------------------------------------------- |
+| `GCP_PROJECT_ID`                 | your Google Cloud project id                                                             |
+| `GCP_REGION`                     | `europe-west4`                                                                           |
+| `GCP_DEPLOY_SERVICE_ACCOUNT`     | `ema-flow-deployer@PROJECT_ID.iam.gserviceaccount.com`                                   |
 | `GCP_WORKLOAD_IDENTITY_PROVIDER` | `projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL/providers/PROVIDER` |
 
 The WIF attribute condition must allow

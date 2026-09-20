@@ -1,0 +1,407 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://khs.dev/contracts/run-manifest/1.1.0/schema.json",
+  "$ref": "#/$defs/RunManifest",
+  "$defs": {
+    "RunManifest": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "1.1.0"
+        },
+        "source": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": ["fixture", "healthcare-api", "document"]
+            },
+            "resource": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "hash": {
+              "$ref": "#/$defs/Sha256Hex"
+            }
+          },
+          "required": ["kind", "resource", "hash"],
+          "additionalProperties": false
+        },
+        "runId": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "startedAt": {
+          "$ref": "#/$defs/IsoDateTime"
+        },
+        "completedAt": {
+          "$ref": "#/$defs/IsoDateTime"
+        },
+        "status": {
+          "$ref": "#/$defs/RunStatus"
+        },
+        "dryRun": {
+          "type": "boolean"
+        },
+        "standards": {
+          "$ref": "#/$defs/ManifestStandards"
+        },
+        "validation": {
+          "$ref": "#/$defs/ManifestValidation"
+        },
+        "transformation": {
+          "$ref": "#/$defs/ManifestTransformation"
+        },
+        "persistence": {
+          "$ref": "#/$defs/ManifestPersistence"
+        },
+        "runtime": {
+          "$ref": "#/$defs/ManifestRuntime"
+        },
+        "ingestion": {
+          "$ref": "#/$defs/IngestionEvidence"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "source",
+        "runId",
+        "startedAt",
+        "completedAt",
+        "status",
+        "dryRun",
+        "standards",
+        "validation",
+        "transformation",
+        "runtime"
+      ],
+      "additionalProperties": false
+    },
+    "Sha256Hex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Lower-case hexadecimal SHA-256 digest."
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "IsoDateTime": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+      "description": "RFC 3339 timestamp with Z or a numeric offset."
+    },
+    "RunStatus": {
+      "type": "string",
+      "enum": ["validated", "persisted", "rejected", "failed"]
+    },
+    "ManifestStandards": {
+      "type": "object",
+      "properties": {
+        "fhir": {
+          "type": "string",
+          "const": "5.0.0"
+        },
+        "globalEpiPackage": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "emaPackage": {
+          "type": "string",
+          "const": "EUePI#1.0.0"
+        },
+        "qrdTemplate": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "mappingVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        }
+      },
+      "required": ["fhir", "globalEpiPackage", "emaPackage", "qrdTemplate", "mappingVersion"],
+      "additionalProperties": false
+    },
+    "ManifestValidation": {
+      "type": "object",
+      "properties": {
+        "preflightErrors": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "officialValidationExecuted": {
+          "type": "boolean"
+        },
+        "officialProfileErrors": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "cloudValidationExecuted": {
+          "type": "boolean"
+        },
+        "cloudProfileErrors": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "profiles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/HttpUrl"
+          }
+        }
+      },
+      "required": [
+        "preflightErrors",
+        "officialValidationExecuted",
+        "officialProfileErrors",
+        "cloudValidationExecuted",
+        "cloudProfileErrors",
+        "profiles"
+      ],
+      "additionalProperties": false
+    },
+    "HttpUrl": {
+      "type": "string",
+      "format": "uri"
+    },
+    "ManifestTransformation": {
+      "type": "object",
+      "properties": {
+        "inputHash": {
+          "$ref": "#/$defs/Sha256Hex"
+        },
+        "outputHash": {
+          "$ref": "#/$defs/Sha256Hex"
+        },
+        "decisions": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": ["inputHash", "outputHash", "decisions"],
+      "additionalProperties": false
+    },
+    "ManifestPersistence": {
+      "type": "object",
+      "properties": {
+        "targetStore": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "transactionResponseHash": {
+          "$ref": "#/$defs/Sha256Hex"
+        }
+      },
+      "required": ["targetStore", "transactionResponseHash"],
+      "additionalProperties": false
+    },
+    "ManifestRuntime": {
+      "type": "object",
+      "properties": {
+        "sourceCommit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "imageDigest": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "workflowRevision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        }
+      },
+      "required": ["sourceCommit", "imageDigest", "workflowRevision"],
+      "additionalProperties": false
+    },
+    "IngestionEvidence": {
+      "type": "object",
+      "properties": {
+        "submissionId": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "contractVersion": {
+          "type": "string",
+          "const": "1.0.0"
+        },
+        "sourceDocumentSha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        },
+        "extractionRunId": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "parser": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "modelId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "promptTemplateVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "fidelity": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["passed"]
+            },
+            "normalizationVersion": {
+              "$ref": "#/$defs/NormalizationVersion"
+            },
+            "sectionsChecked": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "sectionsMatched": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "reportSha256": {
+              "$ref": "#/$defs/Sha256Hex"
+            },
+            "narrativeBindingSha256": {
+              "$ref": "#/$defs/Sha256Hex"
+            },
+            "coverage": {
+              "type": "object",
+              "properties": {
+                "pageCodePoints": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "bodyCodePoints": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "coveredCodePoints": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "uncoveredGaps": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "pageCodePoints",
+                "bodyCodePoints",
+                "coveredCodePoints",
+                "uncoveredGaps"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "status",
+            "normalizationVersion",
+            "sectionsChecked",
+            "sectionsMatched",
+            "reportSha256",
+            "narrativeBindingSha256",
+            "coverage"
+          ],
+          "additionalProperties": false
+        },
+        "approval": {
+          "type": "object",
+          "properties": {
+            "approverId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "approverRole": {
+              "$ref": "#/$defs/ApproverRole"
+            },
+            "approvedAt": {
+              "$ref": "#/$defs/IsoDateTime"
+            },
+            "method": {
+              "$ref": "#/$defs/ApprovalMethod"
+            },
+            "meaning": {
+              "$ref": "#/$defs/ApprovalMeaning"
+            },
+            "approvedContentSha256": {
+              "$ref": "#/$defs/Sha256Hex"
+            },
+            "recordRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            }
+          },
+          "required": [
+            "approverId",
+            "approverRole",
+            "approvedAt",
+            "method",
+            "meaning",
+            "approvedContentSha256"
+          ],
+          "additionalProperties": false
+        },
+        "provenanceResourceId": {
+          "$ref": "#/$defs/Uuid"
+        }
+      },
+      "required": [
+        "submissionId",
+        "contractVersion",
+        "sourceDocumentSha256",
+        "extractionRunId",
+        "parser",
+        "fidelity",
+        "approval",
+        "provenanceResourceId"
+      ],
+      "additionalProperties": false,
+      "description": "Hashes, counts, enumerations, and identifiers only; never narrative."
+    },
+    "NormalizationVersion": {
+      "type": "string",
+      "pattern": "^fidelity-norm\\/\\d+\\.\\d+\\.\\d+$",
+      "description": "Version of docs/fidelity-normalization.md the hashes were computed under."
+    },
+    "ApproverRole": {
+      "type": "string",
+      "enum": ["content-reviewer", "qa-reviewer"]
+    },
+    "ApprovalMethod": {
+      "type": "string",
+      "enum": ["api-attestation", "manual-record"],
+      "description": "Attestation placeholders. Electronic signature is a future control boundary."
+    },
+    "ApprovalMeaning": {
+      "type": "string",
+      "enum": ["reviewed-fidelity-and-structure"]
+    }
+  }
+}

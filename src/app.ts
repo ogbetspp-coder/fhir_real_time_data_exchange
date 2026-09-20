@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import { loadConfig } from "./config.js";
+import { SubmissionRejectedError } from "./contracts/index.js";
 import { loadEmaMapping } from "./fhir/mapping.js";
 import type { FhirBundle } from "./fhir/types.js";
 import { createSyntheticType2Bundle } from "./fixtures/synthetic.js";
@@ -36,7 +37,13 @@ export function createApp(): Hono {
   );
 
   app.post("/v1/runs", async (context) => {
-    const parsed = RunRequestSchema.safeParse(await context.req.json());
+    let payload: unknown;
+    try {
+      payload = await context.req.json();
+    } catch {
+      return context.json({ error: "invalid-json" }, 400);
+    }
+    const parsed = RunRequestSchema.safeParse(payload);
     if (!parsed.success) {
       return context.json(
         {
@@ -90,17 +97,18 @@ export function createApp(): Hono {
     });
   });
 
+  // Error messages can embed upstream response bodies (which may quote narrative), so the HTTP
+  // surface returns only the error class; details stay in the evidence, never in a response.
   app.onError((error, context) => {
+    const rejected = error instanceof SubmissionRejectedError;
     log("error", "Request failed", {
       stage: "http",
       errorType: error.name,
+      ...(rejected ? { errorCount: error.issues.length } : {}),
     });
     return context.json(
-      {
-        error: "pipeline-failed",
-        message: error.message,
-      },
-      500,
+      { error: rejected ? "submission-rejected" : "pipeline-failed", errorType: error.name },
+      rejected ? 422 : 500,
     );
   });
 
