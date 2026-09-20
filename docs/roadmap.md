@@ -88,17 +88,10 @@ regulated narrative inside the system of record.
   address. The contract enforces the shape; the policy is an organisational decision.
 - Decide whether `fixture` and `healthcare-api` run sources stay enabled once Zone A is the
   intended producer (ADR 0002 recommends disabling them).
-- For item 0, in order, on the machine that runs the live extraction:
-  1. `gcloud auth login` — the local session had expired.
-  2. `gcloud projects add-iam-policy-binding sage-ship-509104-b8 --member="serviceAccount:ema-flow-deployer@sage-ship-509104-b8.iam.gserviceaccount.com" --role="roles/documentai.editor"`
-     — the first deploy of the spike failed at exactly one resource, creating the Document AI
-     processor, because the deployer lacked `documentai.processors.create`; the deployer's
-     roles are bootstrapped outside Terraform by design. Then re-run the failed deploy.
-  3. `gcloud auth application-default login` — the client library needs ADC; the CLI login is
-     not enough.
-  4. Decide whether the real-world characterisation (Part B) may use a public EMA document
-     supplied by hand into `.cache/` (nothing from it is committed or logged; see the design
-     note). Part A runs regardless.
+- (Done 2026-09-20 for item 0: the deployer was granted `roles/documentai.editor` by hand —
+  its roles are bootstrapped outside Terraform by design — and the spike's real-world inputs
+  were EudraLex Volume 2C documents, which carry no product information, so the synthetic-only
+  rule needed no exception.)
 
 ## Deliberately not on this roadmap
 

@@ -258,3 +258,10 @@ The recorded Document AI response for the synthetic PDF is committed as a regres
 and a test asserts the verdict's evidence — 32/32 verified, and the exact page-1 category
 diff that shows the straightening — so the finding is executable, not just written down. The
 rest of the spike code is disposable once item 3 exists.
+
+One more fact, learned from that test's first run in CI: the generated PDF's _text_ is
+reproducible across platforms, its _bytes_ are not (pdfkit on Linux under Node 22 produced a
+different file from macOS under Node 24 with identical content). This is why
+`sourceDocument.sha256` in the contract is, and must stay, the hash of the document bytes as
+received from the client — never of anything regenerated — and why the regression test pins
+the document by its content, not by a byte hash.

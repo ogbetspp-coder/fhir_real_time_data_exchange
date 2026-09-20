@@ -32,10 +32,6 @@ const ADAPTER_VERSION = "1.0.0";
 const EXPECTED_TIMEOUT_MS = 60_000;
 const LIGATURE = "ﬁ";
 
-// The SHA-256 of the PDF that was sent to the processor. The recording is only evidence about a
-// document if it is evidence about *this* document, so the generated PDF is pinned to it.
-const RECORDED_PDF_SHA256 = "ae565428c4f72e73c626814bd064ea2f715abea962bb329b14dc3a70aadfd805";
-
 // The `reportHash` the verdict quotes for Part A.
 const VERDICT_FIDELITY_REPORT_HASH =
   "12449bee74d936f9950b27378c2aaa9d3cd04789cae73bd9473878dd8c3a6a46";
@@ -78,12 +74,17 @@ function countCodePoint(text: string, codePoint: string): number {
 
 describe("recorded Document AI response, the regression fixture", () => {
   it(
-    "was recorded for the PDF this fixture set regenerates",
+    "was recorded for the document this fixture set regenerates",
     () => {
       // If the generator ever drifts, every number below would be measuring a different document
-      // against a recording of the old one. This is the assertion that makes them mean something.
-      expect(manifest.sha256).toBe(RECORDED_PDF_SHA256);
+      // against a recording of the old one. The guard is the document's content, never the PDF's
+      // bytes: pdfkit's output is byte-identical only on one platform and Node version (the first
+      // CI run of this test proved it — same text, different bytes on Linux), so a byte hash would
+      // assert something no one promised. The content facts below, and the exact character
+      // differences asserted further down, would all move if the document did.
       expect(manifest.pageCount).toBe(3);
+      expect(manifest.sectionCount).toBe(32);
+      expect(textLayer).toHaveLength(3);
     },
     EXPECTED_TIMEOUT_MS,
   );
