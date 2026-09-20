@@ -1,4 +1,6 @@
-FROM eclipse-temurin:21-jre-jammy
+# Pinned by digest for reproducible validator images (eclipse-temurin:21-jre-jammy's multi-arch
+# index as resolved on 2026-09-20). Move the digest deliberately, never by rebuilding a tag.
+FROM eclipse-temurin:21-jre-jammy@sha256:61d6c7b34d36aee3f45d043101259f97f3c6d428dc2a6f75513789983c5e254f
 
 ARG VALIDATOR_VERSION=6.10.4
 ARG VALIDATOR_SHA256=1106b9d58f9e363e47bea7c4fc065841e5fc91fe9d062775c3bfdd212bd653cc

@@ -20,3 +20,6 @@ __pycache__/
 agent-tools/
 fhir/vendor/
 artifacts/
+
+# Agent worktrees (Claude Code); each is its own checkout, never committed from here.
+.claude/worktrees/

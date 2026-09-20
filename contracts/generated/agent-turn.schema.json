@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://khs.dev/contracts/agent-turn/1.0.0/schema.json",
+  "$ref": "#/$defs/AgentTurnRecord",
+  "$defs": {
+    "AgentTurnRecord": {
+      "type": "object",
+      "properties": {
+        "service": {
+          "type": "string",
+          "const": "ema-flow-agent"
+        },
+        "serviceVersion": {
+          "$ref": "#/$defs/Token"
+        },
+        "at": {
+          "$ref": "#/$defs/IsoDateTime"
+        },
+        "principal": {
+          "$ref": "#/$defs/PrincipalId"
+        },
+        "turnId": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "tools": {
+          "maxItems": 200,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AgentToolCall"
+          }
+        },
+        "spansVerified": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "spansFlagged": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "sectionsDropped": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "flags": {
+          "maxItems": 6,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/VerificationFlag"
+          }
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "service",
+        "serviceVersion",
+        "at",
+        "principal",
+        "turnId",
+        "tools",
+        "spansVerified",
+        "spansFlagged",
+        "sectionsDropped",
+        "flags",
+        "durationMs"
+      ],
+      "additionalProperties": false,
+      "description": "One structured line per assistant turn: the principal, the tool calls made, how many quoted spans verified or were flagged, and which flags. Never narrative, never a quote, never an argument."
+    },
+    "Token": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$",
+      "description": "Identifier: letters, digits, and . _ : / @ + - only."
+    },
+    "IsoDateTime": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+      "description": "RFC 3339 timestamp with Z or a numeric offset."
+    },
+    "PrincipalId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+    },
+    "Uuid": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "AgentToolCall": {
+      "type": "object",
+      "properties": {
+        "tool": {
+          "$ref": "#/$defs/QueryToolName"
+        },
+        "outcome": {
+          "$ref": "#/$defs/AgentToolOutcome"
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "resultCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": ["tool", "outcome", "durationMs", "resultCount"],
+      "additionalProperties": false,
+      "description": "One tool call from a turn: which tool, how it went, how long. Never what was asked."
+    },
+    "QueryToolName": {
+      "type": "string",
+      "enum": ["find_product", "get_section", "get_provenance", "verify_quote"]
+    },
+    "AgentToolOutcome": {
+      "type": "string",
+      "enum": ["ok", "schema-invalid", "tool-error", "transport-error", "not-an-object"]
+    },
+    "VerificationFlag": {
+      "type": "string",
+      "enum": [
+        "no-match",
+        "verification-missing",
+        "verification-unavailable",
+        "section-mismatch",
+        "document-mismatch",
+        "empty-block"
+      ]
+    }
+  }
+}

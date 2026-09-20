@@ -109,3 +109,54 @@ jobs:
         env:
           DIFFERENTIAL_CORPUS: ${{ github.workspace }}/differential.jsonl
         run: uv run --frozen pytest
+
+  agent:
+    name: Agent
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash --noprofile --norc -eo pipefail {0}
+        working-directory: agent
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          # The highest version google-adk 2.9.2 and Vertex AI Agent Engine both support.
+          # agent/README.md "Why 3.14" carries the citations.
+          python-version: "3.14"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.12.17"
+          enable-cache: true
+          cache-dependency-glob: agent/uv.lock
+
+      - name: Install Python dependencies
+        run: uv sync --frozen
+
+      - name: Lint
+        run: uv run --frozen ruff check .
+
+      - name: Format
+        run: uv run --frozen ruff format --check .
+
+      - name: Type-check
+        run: uv run --frozen mypy --strict
+
+      # The vendored contracts must equal contracts/generated/query-tools.schema.json and
+      # contracts/generated/agent-turn.schema.json byte for byte: the agent ships them because
+      # Agent Engine has no repository root, and a second hand-maintained copy would be a
+      # second source of truth.
+      - name: Check the vendored contracts
+        run: uv run --frozen python scripts/sync_contract.py --check
+
+      # Hermetic: the tests stand up the four tools on a real MCP streamable-HTTP server on an
+      # ephemeral loopback port and connect the real ADK toolset to it. No model is called.
+      - name: Test
+        run: uv run --frozen pytest

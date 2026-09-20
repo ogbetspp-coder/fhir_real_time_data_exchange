@@ -12,12 +12,16 @@ export default tseslint.config(
       "agent-tools/**",
       ".cache/**",
       "artifacts/**",
+      ".claude/worktrees/**",
       // Zone A's two Python virtualenvs. They are not committed and they are not TypeScript, but
       // a dependency can vendor a stray `.js` (pip vendors one), and the project service then
       // fails on a file that is in no tsconfig. `.uv-bootstrap` holds `uv` itself, which cannot
       // live in `.venv` because `uv sync --frozen` prunes it.
       "zone-a/.venv/**",
       "zone-a/.uv-bootstrap/**",
+      // The agent's two virtualenvs, for the same reason.
+      "agent/.venv/**",
+      "agent/.uv-bootstrap/**",
     ],
   },
   eslint.configs.recommended,

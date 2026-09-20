@@ -78,6 +78,13 @@ export const SourceKey = z
       "Canonical SmPC section identifier from the mapping manifest, e.g. smpc.4.2.posology.",
   });
 
+// FHIR id grammar (R5 primitive types). Values are interpolated into store URLs, so they are
+// constrained here rather than trusted to be harmless once encoded.
+export const FhirId = z
+  .string()
+  .regex(/^[A-Za-z0-9\-.]{1,64}$/)
+  .meta({ id: "FhirId" });
+
 export const NonEmptyString = z.string().min(1).max(1024);
 
 export const Count = z.number().int().nonnegative();

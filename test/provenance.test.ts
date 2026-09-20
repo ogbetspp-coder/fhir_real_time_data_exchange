@@ -3,7 +3,14 @@ import { beforeAll, describe, expect, it } from "vitest";
 import type { CanonicalSubmission } from "../src/contracts/index.js";
 import type { EmaMapping } from "../src/fhir/mapping.js";
 import { loadEmaMapping } from "../src/fhir/mapping.js";
-import { toProvenanceResource, withEmaTarget } from "../src/fhir/provenance.js";
+import {
+  APPROVER_IDENTIFIER_SYSTEM,
+  APPROVER_ROLE_SYSTEM,
+  PARTICIPANT_TYPE_ATTESTER,
+  PARTICIPANT_TYPE_SYSTEM,
+  toProvenanceResource,
+  withEmaTarget,
+} from "../src/fhir/provenance.js";
 import type { FhirResource } from "../src/fhir/types.js";
 import { createSyntheticSubmission } from "../src/fixtures/synthetic-submission.js";
 import { stableUuid } from "../src/lib/hash.js";
@@ -55,6 +62,37 @@ describe("ingestion Provenance projection", () => {
     expect(arrayField(modelled, "agent")).toHaveLength(3);
     expect(arrayField(withoutModel, "entity")).toHaveLength(2);
     expect(arrayField(withoutModel, "extension")).toHaveLength(1);
+  });
+
+  it("names the approver and the approver's role on the attester agent", () => {
+    const { submission, fidelityReport } = createSyntheticSubmission(mapping);
+
+    const resource = toProvenanceResource(submission, fidelityReport);
+    const attesters = arrayField(resource, "agent").filter((agent) => {
+      const typed = agent as { type?: { coding?: { system?: string; code?: string }[] } };
+      return typed.type?.coding?.some(
+        ({ system, code }) =>
+          system === PARTICIPANT_TYPE_SYSTEM && code === PARTICIPANT_TYPE_ATTESTER,
+      );
+    });
+
+    // Exactly one attester, carrying the identity and the role of the approval record — the
+    // role as a coding under its own system, never inferred from the participant type.
+    expect(attesters).toEqual([
+      {
+        type: {
+          coding: [{ system: PARTICIPANT_TYPE_SYSTEM, code: PARTICIPANT_TYPE_ATTESTER }],
+        },
+        role: [
+          {
+            coding: [{ system: APPROVER_ROLE_SYSTEM, code: submission.approval.approverRole }],
+          },
+        ],
+        who: {
+          identifier: { system: APPROVER_IDENTIFIER_SYSTEM, value: submission.approval.approverId },
+        },
+      },
+    ]);
   });
 
   it("carries no narrative, XHTML, or clinical text", () => {

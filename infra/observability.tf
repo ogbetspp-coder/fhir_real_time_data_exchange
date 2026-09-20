@@ -97,6 +97,85 @@ resource "google_monitoring_alert_policy" "pipeline_failures" {
   }
 }
 
+# Entitlement denials on the query service. Two log lines can say "not-entitled": the audit
+# record of a tool call for a document outside the caller's entitlement
+# (jsonPayload.stage="query-tool", jsonPayload.outcome="not-entitled") and the pre-transport
+# 403 (jsonPayload.stage="query-http", jsonPayload.event="not-entitled"). Both carry
+# jsonPayload.service="ema-flow-query"; the resource labels scope the filter to this service's
+# revisions regardless.
+resource "google_logging_metric" "query_entitlement_denials" {
+  name        = "ema_flow/query_entitlement_denials"
+  description = "Count of query service requests refused for want of entitlement"
+  filter      = <<-EOT
+    resource.type="cloud_run_revision"
+    resource.labels.service_name="${google_cloud_run_v2_service.query.name}"
+    jsonPayload.service="ema-flow-query"
+    (jsonPayload.outcome="not-entitled" OR jsonPayload.event="not-entitled")
+  EOT
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+    unit        = "1"
+    labels {
+      key         = "stage"
+      value_type  = "STRING"
+      description = "query-tool (audit record) or query-http (pre-transport refusal)"
+    }
+  }
+
+  label_extractors = {
+    stage = "EXTRACT(jsonPayload.stage)"
+  }
+}
+
+resource "google_monitoring_notification_channel" "query_entitlement_denials_email" {
+  count = var.alert_notification_email != "" ? 1 : 0
+
+  display_name = "EMA Flow query entitlement denials (${var.environment})"
+  type         = "email"
+  labels = {
+    email_address = var.alert_notification_email
+  }
+}
+
+# Threshold: more than 5 denials in any rolling hour. A phase-1 tenant is a handful of
+# principals with a hand-written entitlement map, so a denial is either a caller naming a
+# document it was never given (one or two an hour from a mistyped id is plausible) or a
+# misconfigured map after a deploy; a sustained rate above that is a caller probing for
+# documents it is not entitled to, which the design note names as the existence oracle to
+# watch, or a broken entitlement map that is refusing everyone. Either deserves a person.
+resource "google_monitoring_alert_policy" "query_entitlement_denials" {
+  count = var.alert_notification_email != "" ? 1 : 0
+
+  display_name          = "EMA Flow query entitlement denials (${var.environment})"
+  combiner              = "OR"
+  notification_channels = [google_monitoring_notification_channel.query_entitlement_denials_email[0].id]
+
+  conditions {
+    display_name = "More than five entitlement denials in one hour"
+    condition_threshold {
+      filter = join(" AND ", [
+        "metric.type=\"logging.googleapis.com/user/${google_logging_metric.query_entitlement_denials.name}\"",
+        "resource.type=\"cloud_run_revision\"",
+      ])
+      comparison      = "COMPARISON_GT"
+      threshold_value = 5
+      duration        = "0s"
+
+      aggregations {
+        alignment_period     = "3600s"
+        per_series_aligner   = "ALIGN_SUM"
+        cross_series_reducer = "REDUCE_SUM"
+      }
+
+      trigger {
+        count = 1
+      }
+    }
+  }
+}
+
 resource "google_monitoring_dashboard" "operations" {
   dashboard_json = jsonencode({
     displayName = "EMA Flow — Interoperability and GxP Evidence (${var.environment})"

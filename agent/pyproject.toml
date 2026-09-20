@@ -1,0 +1,98 @@
+[project]
+name = "verifiable-answer-agent"
+version = "0.1.0"
+description = "Roadmap item 1b: the verifiable-answer agent. Calls the ePI query service's four MCP tools, composes answers deterministically from their results, re-checks every verbatim block through verify_quote, and emits one narrative-free audit record per turn."
+readme = "README.md"
+# The highest version google-adk and Vertex AI Agent Engine both support today, which is 3.14.
+# google-adk 2.9.2 declares `requires_python >=3.10` and classifies 3.10-3.14; Agent Engine's
+# `AgentEngineConfig.python_version` enumerates "3.10", "3.11", "3.12", "3.13", "3.14" and
+# defaults to 3.10, so the deploy script sets it explicitly rather than inheriting a default
+# that is four minors behind this lock. README.md "Why 3.14" carries the citations and the
+# caveat. The range is closed because a different minor is a different Agent Engine runtime
+# image, and because `uv.lock` is resolved for one interpreter.
+requires-python = ">=3.14,<3.15"
+# The `mcp` extra is not optional for this agent: `google-adk` 2.9.2 keeps the Model Context
+# Protocol SDK behind `google-adk[mcp]` (`mcp>=1.24,<2`), and `McpToolset` is the whole of
+# requirement (1). `uv.lock` pins the resolved `mcp` exactly.
+dependencies = ["google-adk[mcp]==2.9.2", "jsonschema==4.26.0", "pydantic==2.13.5"]
+
+[dependency-groups]
+dev = [
+  "mypy==2.3.1",
+  "pytest==9.1.1",
+  "pytest-asyncio==1.4.0",
+  "ruff==0.16.8",
+  "types-jsonschema==4.26.0.20260518",
+  "uvicorn==0.53.0",
+]
+
+[build-system]
+requires = ["hatchling==1.28.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/verifiable_answer_agent"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests", "scripts", "deploy"]
+target-version = "py314"
+
+[tool.ruff.format]
+skip-magic-trailing-comma = true
+
+[tool.ruff.lint.isort]
+split-on-trailing-comma = false
+
+[tool.ruff.lint]
+select = [
+  "E",
+  "F",
+  "W",
+  "I",
+  "N",
+  "UP",
+  "B",
+  "A",
+  "C4",
+  "PIE",
+  "PT",
+  "RET",
+  "SIM",
+  "ARG",
+  "PTH",
+  "ERA",
+  "RUF",
+  "T20",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# The deploy script and the contract sync script are operator tools: they report to a terminal.
+# Nothing they print is ever a tool result, and tests/test_no_narrative_leak.py proves it by
+# refusing any print anywhere under src/.
+"deploy/*.py" = ["T201"]
+"scripts/*.py" = ["T201"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+files = ["src", "tests", "scripts", "deploy"]
+mypy_path = "src"
+warn_unreachable = true
+enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+
+[[tool.mypy.overrides]]
+# The Vertex AI SDK is a DEPLOY-time dependency and is deliberately absent from uv.lock: it
+# pulls the whole Google Cloud client stack, none of which the agent runs, and nothing in CI
+# executes deploy/. The import is lazy and guarded, so the module is declared missing rather
+# than installed to satisfy the type checker. Everything the agent actually runs is checked.
+module = ["vertexai.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers --strict-config"
+xfail_strict = true
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

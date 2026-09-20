@@ -1,7 +1,9 @@
 import type { z } from "zod";
 
+import { AGENT_TURN_VERSION, AgentTurnRecordSchema } from "./agent-turn.js";
 import { CANONICAL_SUBMISSION_VERSION, CanonicalSubmissionSchema } from "./canonical-submission.js";
 import { FidelityReportSchema, SourceDocumentTextSchema } from "./fidelity-report.js";
+import { QUERY_TOOLS_VERSION, QueryToolsSchema } from "./query-tools.js";
 import { RUN_REQUEST_VERSION, RunRequestSchema } from "./run-request.js";
 import { IngestionProvenanceSchema } from "./ingestion-provenance.js";
 import { RUN_MANIFEST_VERSION, RunManifestSchema } from "./run-manifest.js";
@@ -24,6 +26,8 @@ export const CONTRACTS: readonly ContractDefinition[] = [
   { name: "fidelity-report", version: "1.0.0", schema: FidelityReportSchema },
   { name: "source-document-text", version: "1.0.0", schema: SourceDocumentTextSchema },
   { name: "run-request", version: RUN_REQUEST_VERSION, schema: RunRequestSchema },
+  { name: "query-tools", version: QUERY_TOOLS_VERSION, schema: QueryToolsSchema },
+  { name: "agent-turn", version: AGENT_TURN_VERSION, schema: AgentTurnRecordSchema },
   { name: "run-manifest", version: RUN_MANIFEST_VERSION, schema: RunManifestSchema },
 ];
 
@@ -31,10 +35,12 @@ export function contractId(name: string, version: string): string {
   return `https://khs.dev/contracts/${name}/${version}/schema.json`;
 }
 
+export * from "./agent-turn.js";
 export * from "./canonical-submission.js";
 export * from "./common.js";
 export * from "./fidelity-report.js";
 export * from "./ingestion-provenance.js";
+export * from "./query-tools.js";
 export * from "./run-manifest.js";
 export * from "./run-request.js";
 export * from "./type2-bundle.js";

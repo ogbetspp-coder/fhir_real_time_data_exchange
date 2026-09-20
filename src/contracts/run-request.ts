@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { Sha256Hex, StorageUri, Uuid } from "./common.js";
+import { FhirId, Sha256Hex, StorageUri, Uuid } from "./common.js";
 
 // The wire shape of POST /v1/runs. It is a published contract because Zone A and the Workflows
 // orchestration both construct it, and because it is where the by-reference rule is expressed:
@@ -17,13 +17,6 @@ export const SubmissionRefSchema = z.strictObject({ uri: StorageUri, sha256: Sha
 });
 
 export type SubmissionRef = z.infer<typeof SubmissionRefSchema>;
-
-// FHIR id grammar (R5 primitive types). The value is interpolated into a store URL, so it is
-// constrained here rather than trusted to be harmless once encoded.
-const FhirId = z
-  .string()
-  .regex(/^[A-Za-z0-9\-.]{1,64}$/)
-  .meta({ id: "FhirId" });
 
 export const RunRequestSchema = z
   .discriminatedUnion("source", [
