@@ -183,11 +183,23 @@ gcloud workflows run ema-flow-dev-pipeline \
 
 Terraform outputs direct links to workflow executions and BigQuery Studio.
 
-### Retention lock
+### Retention
 
-Terraform configures versioning and an unlocked evidence retention policy. Bucket Lock is
-irreversible and is intentionally a separate administrator action after the retention period,
-legal basis, recovery process, and costs are approved:
+Retention is a native Cloud Storage policy set from Terraform variables, never application
+logic, so each deployment carries the duration its owner requires:
+
+| Bucket      | Variable                    | Default                                        |
+| ----------- | --------------------------- | ---------------------------------------------- |
+| Evidence    | `evidence_retention_days`   | 2555 days (7 years), minimum 30                |
+| Submissions | `submission_retention_days` | 0 — no policy; set to 30 or more to enable one |
+
+Both policies are created unlocked. The submission default is 0 because this is a
+demonstrator and a retention policy makes every object in the bucket undeletable until it
+expires, which would outlive the demonstration by years; set it per client once they state a
+duration.
+
+Bucket Lock is irreversible and is intentionally a separate administrator action, taken only
+after the retention period, legal basis, recovery process, and costs are approved:
 
 ```bash
 gcloud storage buckets update "gs://EVIDENCE_BUCKET" --lock-retention-period

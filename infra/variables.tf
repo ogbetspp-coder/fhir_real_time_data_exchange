@@ -41,6 +41,17 @@ variable "evidence_retention_days" {
   }
 }
 
+variable "submission_retention_days" {
+  description = "Retention for approved Zone A submissions. 0 disables the policy; set per client."
+  type        = number
+  default     = 0
+
+  validation {
+    condition     = var.submission_retention_days == 0 || var.submission_retention_days >= 30
+    error_message = "Submission retention must be 0 (disabled) or at least 30 days."
+  }
+}
+
 variable "bigquery_partition_expiration_days" {
   description = "FHIR history partition retention. Set null to retain indefinitely."
   type        = number

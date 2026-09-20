@@ -139,8 +139,8 @@ Every run writes the following objects under `runs/<runId>/` in the evidence buc
 `signed-manifest`, `lineage-resources`, and, for document sources,
 `canonical-submission`, `ingestion-provenance`, `fidelity-report`, and `provenance-resource`.
 `source-type2`, `ema-list` (it carries the document title only), `ema-document-bundle`, and
-`canonical-submission` contain the narrative XHTML — the retention-locked evidence bucket and
-the FHIR store are the only places narrative rests — while `fidelity-report`,
+`canonical-submission` contain the narrative XHTML — the evidence bucket, the submission
+bucket, and the FHIR store are the only places narrative rests — while `fidelity-report`,
 `ingestion-provenance`, `provenance-resource`, the signed manifest, and the BigQuery ledger row
 never do. FHIR payloads and narrative are not written to Cloud Logging.
 

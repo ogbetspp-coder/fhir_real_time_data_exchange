@@ -3,7 +3,16 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["dist/**", "coverage/**", "fhir/vendor/**", "agent-tools/**"],
+    // `.cache/` is scratch space (it is in .gitignore): a file dropped there by a tool or an
+    // agent must never be able to fail the quality gate.
+    ignores: [
+      "dist/**",
+      "coverage/**",
+      "fhir/vendor/**",
+      "agent-tools/**",
+      ".cache/**",
+      "artifacts/**",
+    ],
   },
   eslint.configs.recommended,
   ...tseslint.configs.strictTypeChecked,

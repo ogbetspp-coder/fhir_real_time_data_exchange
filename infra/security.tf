@@ -114,6 +114,20 @@ resource "google_storage_bucket" "submissions" {
     enabled = true
   }
 
+  # Retention is a native Cloud Storage policy driven by configuration rather than by
+  # application logic, because each client sets their own duration for approved content. The
+  # demonstrator ships with it disabled so a project stays disposable: a retention policy makes
+  # every object undeletable until it expires, which would outlive the demonstration by years.
+  # Locking (Bucket Lock) stays a separate, deliberate, irreversible administrator action.
+  dynamic "retention_policy" {
+    for_each = var.submission_retention_days > 0 ? [1] : []
+
+    content {
+      retention_period = var.submission_retention_days * 86400
+      is_locked        = false
+    }
+  }
+
   encryption {
     default_kms_key_name = google_kms_crypto_key.evidence_encryption.id
   }
