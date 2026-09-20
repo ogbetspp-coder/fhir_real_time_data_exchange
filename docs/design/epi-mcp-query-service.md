@@ -1,11 +1,14 @@
 # Design note: ePI query service (Model Context Protocol)
 
-- Status: Phase 1 built and twice adversarially reviewed on branch `mcp-query-phase1`; not
-  deployed. "Phase 1 as built" below describes the code in this tree and each of its
-  acceptance tests exists as a named test under `test/query/` (criterion 18 under `test/ci/`).
-  Everything above that section — the tool surface, the component table, the phasing — is the
-  original plan and is not a description of the code. No `terraform apply` has created the
-  service, so every infrastructure statement is `terraform validate`-checked only.
+- Status: Phase 1 built, reviewed adversarially four times, merged to `main`, and **deployed**
+  to `sage-ship-509104-b8` (`ema-flow-dev-query`, europe-west4) on 2026-09-20. `tools/list` and
+  `find_product` have been answered by the live service through an impersonated caller token.
+  "Phase 1 as built" below describes the code in this tree and each of its acceptance tests
+  exists as a named test under `test/query/` (criterion 18 under `test/ci/`). Everything above
+  that section — the tool surface, the component table, the phasing — is the original plan and
+  is not a description of the code. The demonstration documents are not yet exercised: no
+  synthetic product has been seeded into the validated store since the deploy, so
+  `find_product` answers an empty list and `get_provenance` has nothing to answer about.
 - Date: 2026-09-20
 - Related: `docs/architecture.md`, `docs/adr/0002-two-trust-zones-and-canonical-submission.md`,
   `docs/adr/0003-mechanical-narrative-fidelity.md`
@@ -535,11 +538,23 @@ alpine` with a `RUN --mount ... from=alpine`, and a `FROM node:...@<digest> AS n
     records the service built. (`acceptance.test.ts`, "the written audit line is the published
     record"; `test/logger.test.ts`, "keeps credentialType while still dropping credential and
     credentials")
-24. **The demo path works.** A user access token of the shape `gcloud auth print-access-token`
-    yields — opaque, `aud` and `azp` the gcloud client id, a Google subject — is refused while
-    no client id is configured and accepted as `credentialType: access-token` once that client
-    id is in `QUERY_OAUTH_CLIENT_IDS`, without reaching ID-token verification. (`auth.test.ts`,
-    "accepts a user access token whose tokeninfo names a configured client id")
+24. **The service accepts an end user's access token.** A token of the shape
+    `gcloud auth print-access-token` yields — opaque, `aud` and `azp` the gcloud client id, a
+    Google subject — is refused while no client id is configured and accepted as
+    `credentialType: access-token` once that client id is in `QUERY_OAUTH_CLIENT_IDS`, without
+    reaching ID-token verification. (`auth.test.ts`, "accepts a user access token whose
+    tokeninfo names a configured client id")
+
+    This is the Gemini Enterprise path and only that path. Cloud Run's edge authenticates by an
+    ID token whose audience is the service and refuses a bare access token before the container
+    is reached — verified against the deployed service on 2026-09-20: `HTTP 401`,
+    `www-authenticate: Bearer error="invalid_token"`,
+    `error_description="The access token could not be verified"`. Gemini Enterprise satisfies
+    the edge with its service agent's ID token in `X-Serverless-Authorization` and presents the
+    end user's access token in `Authorization` for this service. A human at a terminal
+    impersonates the caller service account instead. The test proves what the service does with
+    the credential, not that the credential reaches it.
+
 25. **A short answer is never silent.** With eight entitled documents that all match and
     `limit: 1`, every document is read — the scan leaves nothing unsearched — and the answer is
     one product with `truncated: true`, in the result and in the record, because seven matches
@@ -587,9 +602,13 @@ on the page next to what it does.
   written to any store, never in an audit record — only the `sub` claim is retained as
   `principal`. Google's signing keys are cached for their published lifetime; the entitlement
   map is process-local and re-read on deploy.
-- **`/healthz`** is served on the Cloud Run IAM check alone and returns liveness, the service
-  name, and the build version only — never configuration values, principal, or entitlement
-  data.
+- **`/healthz` and `/readyz`** are served on the Cloud Run IAM check alone and return liveness,
+  the service name, and the build version only — never configuration values, principal, or
+  entitlement data. They answer identically. `/healthz` is the container's startup probe and is
+  not reachable from outside: Google's frontend answers that exact path on a `*.run.app`
+  hostname with its own HTML 404 and never forwards it, verified against the deployed service
+  on 2026-09-20 (no Cloud Run request log entry, while `/healthz/`, `/HEALTHZ` and `/readyz`
+  all arrived). `/readyz` exists so an operator has a path they can actually call.
 
 ## Audit trail
 

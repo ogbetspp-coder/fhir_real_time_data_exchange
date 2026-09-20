@@ -535,7 +535,13 @@ export function createQueryApp(
     const requestStartedAt = Date.now();
     const path = new URL(request.url ?? "/", "http://ema-flow-query.invalid").pathname;
 
-    if (path === "/healthz") {
+    // Two paths, one answer. `/healthz` is what Cloud Run's startup probe calls inside the
+    // container. It is NOT reachable from outside: Google's frontend answers that exact path
+    // on a `*.run.app` hostname with its own HTML 404 and the request never reaches the
+    // container — observed against this service on 2026-09-20, while `/healthz/`, `/HEALTHZ`
+    // and every other path arrived normally. `/readyz` exists so an operator has a health
+    // check they can actually call.
+    if (path === "/healthz" || path === "/readyz") {
       if (request.method !== "GET") {
         sendJson(response, 405, { error: "method-not-allowed" });
         return;

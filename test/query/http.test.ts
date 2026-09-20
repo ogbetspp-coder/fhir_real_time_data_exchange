@@ -154,6 +154,19 @@ describe("query service HTTP surface", () => {
     });
   });
 
+  it("answers /readyz identically, because /healthz is unreachable from outside Cloud Run", async () => {
+    // Google's frontend answers the exact path /healthz on a *.run.app hostname with its own
+    // 404 and never forwards it, so the probe path cannot double as an operator's check.
+    const response = await fetch(`${origin}/readyz`);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      status: "ok",
+      service: "ema-flow-query",
+      version: SERVICE_VERSION,
+    });
+  });
+
   it("rejects a request with no Authorization header", async () => {
     const response = await post(callBody("get_section", { bundleId: store.bundleIdA }));
 
