@@ -1,6 +1,34 @@
 import { z } from "zod";
 
+import type { RunRequest } from "./contracts/run-request.js";
+
 const optionalNonEmpty = z.string().trim().min(1).optional();
+
+export type RunSource = RunRequest["source"];
+
+// Every source the RunRequest contract names. The Record type keeps this object exactly equal to
+// the contract's discriminator set: a source added to the contract without being listed here, or
+// a name listed here that the contract lacks, is a compile error, so the allowlist can never
+// silently miss one. Key order is the order operators see in documentation and defaults.
+const runSourceSet: Record<RunSource, true> = {
+  fixture: true,
+  "healthcare-api": true,
+  document: true,
+};
+export const RUN_SOURCES = Object.keys(runSourceSet) as [RunSource, ...RunSource[]];
+
+// ADR 0002 consequences: the fixture and healthcare-api sources bypass the document gate, so a
+// deployment that handles anything but synthetic content narrows this to `document`. Unset means
+// every source is enabled. The value is a comma-separated subset of RUN_SOURCES; an unknown name
+// or an empty list is a startup failure, never a silently ignored entry.
+const EnabledRunSources = z
+  .string()
+  .optional()
+  .transform((value) =>
+    value === undefined ? [...RUN_SOURCES] : value.split(",").map((entry) => entry.trim()),
+  )
+  .pipe(z.array(z.enum(RUN_SOURCES)).min(1))
+  .transform((sources) => [...new Set(sources)] as readonly RunSource[]);
 
 const ConfigSchema = z
   .object({
@@ -15,6 +43,7 @@ const ConfigSchema = z
     // The single bucket Zone A writes approved submissions to. Absent, the document source is
     // simply unavailable: this repository never reads a submission from anywhere else.
     SUBMISSION_BUCKET: optionalNonEmpty,
+    ENABLED_RUN_SOURCES: EnabledRunSources,
     SUBMISSION_MAX_BYTES: z.coerce
       .number()
       .int()

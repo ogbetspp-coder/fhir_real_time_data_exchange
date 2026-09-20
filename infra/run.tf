@@ -115,6 +115,10 @@ resource "google_cloud_run_v2_service" "worker" {
         value = google_storage_bucket.submissions.name
       }
       env {
+        name  = "ENABLED_RUN_SOURCES"
+        value = join(",", var.enabled_run_sources)
+      }
+      env {
         name  = "FHIR_ANALYTICS_DATASET"
         value = google_bigquery_dataset.fhir_analytics.dataset_id
       }
