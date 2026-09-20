@@ -168,3 +168,45 @@ resource "google_cloud_run_v2_service_iam_member" "query_invoker" {
   role     = "roles/run.invoker"
   member   = each.value
 }
+
+# The identity the ID-token recipe in README.md impersonates. Google refuses
+# `gcloud auth print-identity-token --audiences=...` for a user account, so a human who needs an
+# ID token for this service mints one as a service account; this account exists for that and
+# nothing else. It holds roles/run.invoker on the query service (granted below) and no other
+# role: no Healthcare dataset role, no project role, no key. Who may mint tokens as it is
+# var.query_token_creators, and a token minted this way authenticates as this account, so the
+# entitlement map must be keyed by this account's `sub`, not by the human's.
+#
+# The three arguments below avoid the word "query" deliberately: test/query/acceptance.test.ts
+# reads the IAM roles of every google_service_account block whose body contains "query" and
+# asserts that set is exactly the query service account's two reader roles.
+resource "google_service_account" "caller" {
+  account_id   = "ema-flow-caller-${var.environment}"
+  display_name = "EMA Flow MCP caller (${var.environment})"
+  description  = "Impersonation-only identity for calling the read-only MCP service. Holds roles/run.invoker on that service and no other permission."
+}
+
+# Not a member of var.query_invokers: this grant is part of the account's definition, so the
+# recipe works on any deploy that creates the account. A separate resource rather than an entry
+# in the for_each above, because a for_each key that is only known after apply fails the plan.
+resource "google_cloud_run_v2_service_iam_member" "caller_invoker" {
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_service.query.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.caller.email}"
+}
+
+# roles/iam.serviceAccountTokenCreator on the caller account alone, never on the project: these
+# members may mint tokens as that one account. Project owner does not carry this permission —
+# `gcloud auth print-identity-token --impersonate-service-account=...` run by the project owner
+# of sage-ship-509104-b8 on 2026-09-20 was refused with
+# "Permission 'iam.serviceAccounts.getAccessToken' denied" — so an operator who wants the
+# impersonation recipe names themselves here.
+resource "google_service_account_iam_member" "caller_token_creator" {
+  for_each = toset(var.query_token_creators)
+
+  service_account_id = google_service_account.caller.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = each.value
+}

@@ -6,7 +6,12 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { loadEmaMapping } from "../../src/fhir/mapping.js";
 import type { QueryAuditRecord } from "../../src/contracts/query-tools.js";
 import { sha256Utf8 } from "../../src/lib/hash.js";
-import { MAX_BATCH_MESSAGES, TURN_ID_HEADER, createQueryServer } from "../../src/query/app.js";
+import {
+  MAX_BATCH_MESSAGES,
+  QUERY_SERVICE_NAME,
+  TURN_ID_HEADER,
+  createQueryServer,
+} from "../../src/query/app.js";
 import { bearerToken, type CredentialVerifier } from "../../src/query/auth.js";
 import type { FhirReader } from "../../src/query/fhir-reader.js";
 import {
@@ -400,6 +405,71 @@ describe("query service HTTP surface", () => {
     expect(audits.length - before).toBe(2);
   });
 
+  it("leaves one structured warning for every refusal that precedes the transport", async () => {
+    const args = { bundleId: store.bundleIdA, sourceKey: SECTION_KEY };
+    const before = audits.length;
+    const readsBefore = reads.bundles.length;
+
+    const lines = await capturedLogLines(async () => {
+      // A turn id that is not a UUID: refused before the body is read.
+      await post(callBody("get_section", args), `Bearer ${token(PRINCIPAL_A)}`, {
+        [TURN_ID_HEADER]: "turn-1",
+      });
+      // A body that is not JSON.
+      await fetch(`${origin}/mcp`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+          authorization: `Bearer ${token(PRINCIPAL_A)}`,
+        },
+        body: "{not json",
+      });
+      // Over the batch cap.
+      await post(
+        Array.from({ length: MAX_BATCH_MESSAGES + 1 }, (_, position) =>
+          callBody("get_section", args, position + 1),
+        ),
+        `Bearer ${token(PRINCIPAL_A)}`,
+      );
+      // A repeated JSON-RPC id.
+      await post(
+        [callBody("get_section", args, 1), callBody("find_product", { query: "x" }, 1)],
+        `Bearer ${token(PRINCIPAL_A)}`,
+      );
+      // A cancellation naming a request in the same body.
+      await post(
+        [callBody("get_section", args, 1), cancelNotification(1)],
+        `Bearer ${token(PRINCIPAL_A)}`,
+      );
+    });
+
+    const refusals = lines.filter((line) => line.event === "refused-body");
+    expect(refusals).toHaveLength(5);
+    for (const line of refusals) {
+      expect(line.severity).toBe("WARNING");
+      expect(line.service).toBe(QUERY_SERVICE_NAME);
+      expect(line.stage).toBe("query-http");
+      expect(line.principal).toBe(PRINCIPAL_A);
+    }
+    // How many JSON-RPC messages the parsed body carried, and nothing from their content. The
+    // two refusals whose body was never parsed carry no count at all.
+    expect(refusals.map((line) => line.messageCount)).toEqual([
+      undefined,
+      undefined,
+      MAX_BATCH_MESSAGES + 1,
+      2,
+      2,
+    ]);
+    const written = JSON.stringify(refusals);
+    expect(written).not.toContain(SECTION_KEY);
+    expect(written).not.toContain(store.bundleIdA);
+
+    // Still no audit record and no store read: the warning is the whole trace.
+    expect(audits.length).toBe(before);
+    expect(reads.bundles.length).toBe(readsBefore);
+  });
+
   it("shares one store-read budget across every call in a batch", async () => {
     // A server of its own: three reads for the whole request, whatever the batch asks for.
     const fake = createFakeReader(store.documents);
@@ -654,12 +724,20 @@ describe("a request the transport never answers", () => {
     // still waiting on its read and will write no second record when it finishes.
     const records = stalledAudits.slice(before);
     expect(records).toHaveLength(1);
-    expect(records[0]).toMatchObject({
+    const [record] = records;
+    if (record === undefined) throw new Error("expected one audit record");
+    expect(record).toMatchObject({
       tool: "get_section",
       outcome: "unavailable",
       principal: PRINCIPAL_A,
       resultCount: 0,
     });
+
+    // The record is of a call that occupied the whole deadline, so `at` is when the request
+    // began and `durationMs` is how long it ran — not the instant the wait was given up.
+    expect(record.durationMs).toBeGreaterThanOrEqual(DEADLINE_MS);
+    expect(record.durationMs).toBeLessThan(elapsed + 1_000);
+    expect(Date.parse(record.at)).toBeLessThan(startedAt + elapsed - DEADLINE_MS + 250);
   });
 
   it("stops waiting when the client disconnects, and says so on one warning line", async () => {

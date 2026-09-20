@@ -64,6 +64,11 @@ output "query_audience" {
   value       = local.query_audience
 }
 
+output "query_caller_service_account" {
+  description = "E-mail of the impersonation-only caller service account (infra/query.tf). It holds roles/run.invoker on the query service; `gcloud auth print-identity-token --impersonate-service-account=<this> --audiences=<query_audience> --include-email` mints a token for it, for members of var.query_token_creators."
+  value       = google_service_account.caller.email
+}
+
 output "workflow_name" {
   value = google_workflows_workflow.epi.name
 }

@@ -148,6 +148,12 @@ phase_apis() {
     fi
   fi
 
+  # The three placeholder images below carry no digest. The precondition on
+  # google_cloud_run_v2_service.query rejects a digest-less query_image, and that resource is
+  # not in the -target list, so on this apply the precondition is not evaluated. This phase has
+  # not run against a project since the query service was added: that is what the -target list
+  # implies, not something observed. If an apply here ever fails on that error message, the
+  # -target list is reaching further than it reads.
   terraform -chdir=infra apply \
     -input=false \
     -auto-approve \
@@ -245,8 +251,13 @@ export_effective_iam() {
   dataset="$(terraform -chdir=infra output -raw healthcare_dataset_id 2>/dev/null || true)"
   bucket="$(terraform -chdir=infra output -raw evidence_bucket 2>/dev/null || true)"
 
+  # The third account is the impersonation-only caller (google_service_account.caller). It is
+  # expected to hold no project role and no dataset role at all, so its two exports are
+  # expected to be empty: that emptiness is the evidence, since its only declared binding is
+  # roles/run.invoker on one Cloud Run service, which neither of these policies covers.
   for sa in "ema-flow-worker-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com" \
-    "ema-flow-query-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com"; do
+    "ema-flow-query-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com" \
+    "ema-flow-caller-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com"; do
     short_name="${sa%%@*}"
 
     echo "--- project ${PROJECT_ID}: roles held by ${sa} ---"
@@ -311,18 +322,20 @@ phase_apply() {
 
   # Query service access configuration, supplied by the environment (GitHub Actions repository
   # variables, see .github/workflows/deploy.yml). Unset means the Terraform defaults: no
-  # invoker, no entitlement, no accepted OAuth client id -- a service that deploys and passes
-  # its startup probe while authorising no caller, rather than a deploy that fails.
-  local query_invokers_json query_oauth_client_ids_json query_entitlements_json
+  # invoker, no token creator on the caller service account, no entitlement, no accepted OAuth
+  # client id -- a service that deploys and passes its startup probe while authorising no
+  # caller, rather than a deploy that fails.
+  local query_invokers_json query_token_creators_json query_oauth_client_ids_json query_entitlements_json
   query_invokers_json="$(ema_flow_json_array "${QUERY_INVOKERS:-}")"
+  query_token_creators_json="$(ema_flow_json_array "${QUERY_TOKEN_CREATORS:-}")"
   query_oauth_client_ids_json="$(ema_flow_json_array "${QUERY_OAUTH_CLIENT_IDS:-}")"
   query_entitlements_json="${QUERY_ENTITLEMENTS_JSON:-}"
   if [[ -z "$query_entitlements_json" ]]; then
     query_entitlements_json='{}'
   fi
-  # Sizes, not values: invoker members and entitlement keys are account identifiers, and this
-  # log is attached to a failure issue by .github/workflows/deploy.yml.
-  echo "query access configuration: query_invokers=${#query_invokers_json} bytes, query_oauth_client_ids=${#query_oauth_client_ids_json} bytes, query_entitlements_json=${#query_entitlements_json} bytes (2 bytes is the empty default)"
+  # Sizes, not values: invoker members, token-creator members and entitlement keys are account
+  # identifiers, and this log is attached to a failure issue by .github/workflows/deploy.yml.
+  echo "query access configuration: query_invokers=${#query_invokers_json} bytes, query_token_creators=${#query_token_creators_json} bytes, query_oauth_client_ids=${#query_oauth_client_ids_json} bytes, query_entitlements_json=${#query_entitlements_json} bytes (2 bytes is the empty default)"
 
   if ! terraform -chdir=infra apply \
     -input=false \
@@ -333,6 +346,7 @@ phase_apply() {
     -var="validator_image=${REPOSITORY}/validator@${VALIDATOR_DIGEST}" \
     -var="query_image=${REPOSITORY}/query@${QUERY_DIGEST}" \
     -var="query_invokers=${query_invokers_json}" \
+    -var="query_token_creators=${query_token_creators_json}" \
     -var="query_oauth_client_ids=${query_oauth_client_ids_json}" \
     -var="query_entitlements_json=${query_entitlements_json}"; then
     echo "=== terraform apply failed; dumping recent container logs for diagnosis ===" >&2
@@ -354,9 +368,11 @@ phase_apply() {
   fi
 
   # The endpoint and the audience are different hostnames; printing both here keeps a caller
-  # from minting a token for the wrong one (infra/outputs.tf).
+  # from minting a token for the wrong one (infra/outputs.tf). The third is the account the
+  # ID-token recipe in README.md impersonates.
   terraform -chdir=infra output query_service_url || true
   terraform -chdir=infra output query_audience || true
+  terraform -chdir=infra output query_caller_service_account || true
 
   export_effective_iam
 }

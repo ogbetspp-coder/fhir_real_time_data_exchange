@@ -27,7 +27,9 @@ import {
 // Usage:
 //   SUBMISSION_BUCKET=... WORKER_URL=https://... npx tsx scripts/demo/seed.ts [--dry-run]
 // Authentication is a Google-signed ID token for the worker's audience, from Application
-// Default Credentials, or `WORKER_ID_TOKEN` when one has already been minted.
+// Default Credentials, or `WORKER_ID_TOKEN` when one has already been minted. Whichever it
+// comes from, the token's `aud` claim is decoded locally and the script exits before the first
+// request when it is not the worker URL.
 
 function required(name: string): string {
   const value = process.env[name]?.trim();
@@ -38,16 +40,65 @@ function required(name: string): string {
   return value;
 }
 
+// The `aud` claim of a JWT, decoded locally. Nothing is verified here — the signature is
+// Cloud Run's business — and neither the token nor any other claim is read or printed.
+function audienceOf(token: string): string[] {
+  const payload = token.split(".")[1];
+  if (payload === undefined) return [];
+  let claims: unknown;
+  try {
+    claims = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+  } catch {
+    return [];
+  }
+  const aud = (claims as { aud?: unknown } | null)?.aud;
+  if (typeof aud === "string") return [aud];
+  return Array.isArray(aud)
+    ? aud.filter((value): value is string => typeof value === "string")
+    : [];
+}
+
+// Cloud Run checks the ID token's audience at the edge, so a token minted for anything but the
+// worker's URL is refused there with a 403 this script cannot explain. Application Default
+// Credentials of type `authorized_user` — a human's `gcloud auth application-default login` —
+// are the common case: google-auth-library ignores the requested audience for them and returns
+// an identity token whose `aud` is the ADC OAuth client id. That is checked here so the script
+// says which credential to use instead of failing at the worker.
+function requireWorkerAudience(token: string, audience: string, source: string): void {
+  if (audienceOf(token).includes(audience)) return;
+  console.error(
+    [
+      `The ${source} is not an ID token for ${audience}, so Cloud Run will refuse it.`,
+      "Application Default Credentials of type authorized_user cannot mint one: the audience is",
+      "ignored and the token is issued for the ADC OAuth client instead.",
+      "Set WORKER_ID_TOKEN to a token minted for the worker, for example with",
+      `  gcloud auth print-identity-token --impersonate-service-account=<deployer sa> --audiences=${audience}`,
+      "or run this script as a service account whose ADC is of type external_account or",
+      "service_account.",
+    ].join("\n"),
+  );
+  process.exit(1);
+}
+
 async function authorization(workerUrl: string): Promise<string> {
+  const audience = workerUrl.replace(/\/+$/, "");
   const minted = process.env.WORKER_ID_TOKEN?.trim();
-  if (minted !== undefined && minted !== "") return `Bearer ${minted}`;
+  if (minted !== undefined && minted !== "") {
+    requireWorkerAudience(minted, audience, "WORKER_ID_TOKEN");
+    return `Bearer ${minted}`;
+  }
   const auth = new GoogleAuth();
-  const client = await auth.getIdTokenClient(workerUrl.replace(/\/+$/, ""));
+  const client = await auth.getIdTokenClient(audience);
   const headers = await client.getRequestHeaders();
   const header = headers.get("authorization");
   if (header === null) {
     throw new Error("Application Default Credentials produced no ID token for the worker");
   }
+  requireWorkerAudience(
+    header.replace(/^Bearer\s+/i, ""),
+    audience,
+    "ID token from Application Default Credentials",
+  );
   return header;
 }
 

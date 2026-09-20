@@ -508,6 +508,43 @@ describe("ePI query service, phase 1", () => {
     }
   });
 
+  it("find_product reports truncated when the limit threw away matches it had already read", async () => {
+    const seeded = store.documents.get(store.bundleIdA);
+    if (seeded === undefined) throw new Error("expected a seeded document");
+
+    // An entitlement small enough that one pool reaches the end of it: every document is read,
+    // every one matches, and all but `limit` of those matches are dropped from the answer. The
+    // scan left nothing unsearched, so only the dropped matches can make `truncated` true.
+    const ids = Array.from({ length: FIND_PRODUCT_CONCURRENCY }, (_, position) =>
+      stableUuid("ema-bundle", `dropped-${String(position)}`),
+    );
+    const documents = new Map<string, SeededDocument>(ids.map((id) => [id, seeded]));
+    const harness = await connectHarness({
+      store,
+      principal: PRINCIPAL_A,
+      entitlements: { bundles: ids },
+      documents,
+    });
+    try {
+      const one = FindProductOutputSchema.parse(
+        (await callTool(harness, "find_product", { query: store.productNameA, limit: 1 }))
+          .structured,
+      );
+
+      expect(harness.log.bundles).toHaveLength(ids.length);
+      expect(one.products).toHaveLength(1);
+      expect(one.truncated).toBe(true);
+      expect(onlyAudit(harness.audits)).toMatchObject({
+        tool: "find_product",
+        outcome: "ok",
+        resultCount: 1,
+        truncated: true,
+      });
+    } finally {
+      await harness.close();
+    }
+  });
+
   it("bounds the store reads one request may make, and says so", async () => {
     const seeded = store.documents.get(store.bundleIdA);
     if (seeded === undefined) throw new Error("expected a seeded document");

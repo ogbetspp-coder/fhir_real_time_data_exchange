@@ -127,7 +127,18 @@ together with a document-to-organisation binding.
 
 The service's own service account is a reader: `roles/healthcare.fhirResourceReader` on the
 Healthcare dataset and `roles/logging.logWriter` on the project, and nothing else. A test
-asserts that Terraform-declared role set across every file under `infra/`. The _effective_ IAM
+asserts that Terraform-declared role set across every file under `infra/`.
+
+A second service account exists beside it and is not the service's identity: the caller
+account (`google_service_account.caller`, `infra/query.tf`), which holds `roles/run.invoker` on
+this service and no other role. It exists because Google refuses to mint an audience-scoped ID
+token for a user account, so a human with no agent behind them has no way to present an ID
+token for `QUERY_AUDIENCE` except by impersonating a service account. Who may do that is the
+`query_token_creators` variable, `roles/iam.serviceAccountTokenCreator` bound on that one
+account; the resulting token authenticates as that account, so its `sub` — not the human's —
+is what the entitlement map must be keyed by. That is a deliberate trade: the audit record
+names the caller account, and separating which human used it is the change-controlled grant in
+`query_token_creators`, not the token. The _effective_ IAM
 policy can still be widened outside Terraform, so `scripts/gcp/deploy.sh` exports the effective
 policy for this service account after each successful apply, into the deploy log and the
 evidence bucket (`docs/architecture.md`, "Evidence and observability"); that export has not yet
@@ -169,7 +180,13 @@ honestly" and traced as UR-20.
 - **The image-pinning gate is textual.** `check-dockerfiles.mjs` reads the Dockerfiles as text.
   It does not resolve build arguments, so `FROM ${BASE}` or `--from=$STAGE` passes unexamined,
   and it does not contact a registry, so it proves only that a digest was written — not that
-  the registry still serves the content that digest named.
+  the registry still serves the content that digest named. Its notion of a stage is also
+  textual: any `AS` name it reads is treated as a stage for the rest of the file, whether or
+  not the builder would accept that name.
+- **A refused body is audited only as a log line.** Bodies the service refuses before the
+  transport is connected write a `refused-body` warning and no audit record, so the refusal
+  surface is visible in logs but not in the audit trail the `QueryAuditRecord` contract
+  describes. Anything built on that contract alone will not see these attempts.
 - **The gcloud access-token path widens who can present a credential.** The OAuth client id an
   operator adds to `QUERY_OAUTH_CLIENT_IDS` to make the human demo work is the client id of the
   gcloud CLI, which is shared by every gcloud installation; it identifies the tool, not the
@@ -216,7 +233,12 @@ identity, and shares only pure libraries with the worker.
   not pinned by `@sha256` digest, or if two Node-based Dockerfiles pin different digests. It
   scans all three places a Dockerfile pulls bytes — `FROM`, `--from=` on `COPY` and `ADD`, and
   `from=` inside a `RUN --mount=` flag — and skips a reference that names a stage declared in
-  the same file or a stage index. The scan is textual: it joins line continuations and ignores
+  the same file or a stage index. Stage names are collected over the whole file before any
+  reference is judged, so a stage referenced above the instruction that declares it is still
+  recognised; the one name excluded is a `FROM`'s own `AS` name, which that instruction
+  declares rather than refers to, so `FROM busybox AS busybox` is judged as the image
+  `busybox` and fails, and a `FROM node:...@<digest> AS node` is held to the shared Node digest
+  like any other. The scan is textual: it joins line continuations and ignores
   comments, but it does not resolve build arguments (`FROM ${BASE}`, `--from=$STAGE`) and it
   does not contact a registry, so it cannot see indirection through a build arg and a digest it
   accepts is only as good as the registry content addressed by it.
@@ -281,6 +303,14 @@ identity, and shares only pure libraries with the worker.
     the SDK's JSON response — which it assembles only once every request id has a response —
     is never assembled. Ids are compared by value and type, as the SDK's own map keys them, so
     the number `1` and the string `"1"` are different ids.
+  - **A refusal here writes no audit record**, because nothing was dispatched: the audit
+    promise is one record per _dispatched_ tool call, and this is its zero-record case. What it
+    does write is one structured warning — `severity: WARNING, stage: "query-http",
+event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSON-RPC
+    messages the parsed body carried. `messageCount` is absent on the two refusals decided
+    before the body is parsed (a turn id that is not a UUID, and a body that is not JSON).
+    Nothing derived from the body's content is logged. So an entitled caller probing the
+    refusal surface is visible in the application log even though the audit trail is silent.
 - **Request deadline.** The service waits at most 30 seconds for the transport to answer, and
   stops waiting sooner if the client disconnects. On either bounded end it answers
   `503 {"error":"unavailable"}` (or closes the socket, when the client is already gone), closes
@@ -302,12 +332,15 @@ identity, and shares only pure libraries with the worker.
   documents one by one and inspects each. The reads run through a pool of at most 8 in flight,
   cover at most the first 200 entitled ids in entitlement order (`FIND_PRODUCT_SCAN_HORIZON`),
   stop being launched once `limit` matches are in hand, and stop when the request's read budget
-  is spent. `truncated` is the published contract's meaning and nothing narrower: true whenever
-  the caller's entitlement holds more documents than the call searched — because the horizon cut
-  the list, because `limit` stopped the scan, or because the budget ran out. So an empty or a
-  full `products` never silently means "that is all there is", and the same value is carried
-  into the audit record. Matches are reported in entitlement order regardless of the order the
-  reads completed in.
+  is spent. `truncated` covers both ways an answer can be shorter than what the entitlement
+  holds. The first is documents the call never searched — because the horizon cut the list,
+  because `limit` stopped the scan, or because the budget ran out. The second is matches the
+  call read and did not return: up to seven reads are already in flight when the limit is
+  reached, so a scan that runs to the end of a short entitlement can still have more matches in
+  hand than `limit` returns, and those dropped matches make `truncated` true on their own. So
+  an empty or a full `products` never silently means "that is all there is", and the same value
+  is carried into the audit record. Matches are reported in entitlement order regardless of the
+  order the reads completed in.
 - **`verify_quote`** decides entitlement before it looks at the quote, so every argument shape
   naming a document outside the caller's entitlement — including one whose quote carries a
   character the normalisation forbids — is `document-not-found` to the caller and
@@ -349,18 +382,26 @@ identity, and shares only pure libraries with the worker.
   (no id) produces none, because the protocol never answers it. The `outcome` enumeration is a
   superset of the returnable error codes: `not-entitled` is recorded and never returned. Records
   go through the same logger the worker uses, so its no-narrative guard applies;
-  `credentialType` is on the logger's allow-list — its value is one of two enum members and
-  cannot carry text — so the written line carries every field of the record, and a test parses
+  `credentialType` is on the logger's allow-list, paired there with the value shape that earns
+  the exemption — a short lowercase token, which both members of the enum are — so a value of
+  any other shape under that key is dropped by the logger rather than trusted because of where
+  it came from. The written line therefore carries every field of the record, and a test parses
   a written line back with `QueryAuditRecordSchema`. Cloud Audit Logs record the store reads
   themselves. "Exactly one" holds on the abandoned paths too: when the service gives up waiting
   (deadline or client disconnect) it writes the outstanding records itself — `unavailable` for
   a request that reached a tool handler and had not finished, `invalid-request` for one the
-  transport refused — and a tool that finishes afterwards writes no second record.
+  transport refused — and a tool that finishes afterwards writes no second record. Those
+  records date from the moment the request was taken up, captured once before the transport is
+  connected, so a call that occupied the whole deadline reads as having started when the
+  request did and as having lasted about the deadline. A body refused before the transport is
+  connected produces no record at all; the warning line above is its trace.
 - **Structured log lines** the service writes all carry `service: "ema-flow-query"`. A refused
   authentication is `severity: WARNING, stage: "query-http", event: "unauthenticated"` with no
   principal, no reason, and nothing derived from the credential; a refused entitlement is
   `severity: WARNING, stage: "query-http", event: "not-entitled", principal: <sub>` — the
-  opaque subject an operator would entitle; tool audit records are `stage: "query-tool"` with
+  opaque subject an operator would entitle; a body refused before the transport is connected is
+  `severity: WARNING, stage: "query-http", event: "refused-body", principal: <sub>` with
+  `messageCount` when the body was parsed; tool audit records are `stage: "query-tool"` with
   `outcome` as above; a request the transport never answered is `severity: WARNING,
 stage: "query-http", event: "deadline" | "client-closed", principal: <sub>` with the deadline
   and a count of the `tools/call` entries that never reached a handler. These are the fields
@@ -369,9 +410,10 @@ stage: "query-http", event: "deadline" | "client-closed", principal: <sub>` with
 ### Acceptance tests (phase 1)
 
 Each of these is an acceptance criterion for phase 1 — it exists as a named test under
-`test/query/`, except 18, which tests the image gate itself and lives in `test/ci/` — and each
-is also a demonstration. The first seven are the original criteria; the rest were added with
-the two adversarial reviews of 2026-09-20 and pin the behaviour described above.
+`test/query/`, except 18 and 28, which hold the repository's own scripts to what this note says
+about them and live in `test/ci/` — and each is also a demonstration. The first seven are the
+original criteria; the rest were added with the three adversarial reviews of 2026-09-20 and pin
+the behaviour described above.
 
 1. **Verbatim with citations.** `get_section` returns the stored narrative byte for byte, with
    `narrativeDivSha256` and `normalizedTextSha256` that the test recomputes independently
@@ -455,8 +497,11 @@ the two adversarial reviews of 2026-09-20 and pin the behaviour described above.
     fixture Dockerfiles: it passes digests and declared stage names, and fails an unpinned
     `FROM`, an unpinned `COPY --from`, an unpinned `ADD --from`, an unpinned `RUN --mount`
     source, an unpinned reference written after a line continuation, two node images pinned to
-    different digests, and a directory with no Dockerfile at all. (`test/ci/
-check-dockerfiles.test.ts`)
+    different digests, and a directory with no Dockerfile at all. It also passes a stage
+    referenced above the instruction that declares it, and fails a `FROM` whose own `AS` name
+    is its image name — `FROM busybox AS busybox` with a `COPY --from=busybox`, `FROM alpine AS
+alpine` with a `RUN --mount ... from=alpine`, and a `FROM node:...@<digest> AS node` whose
+    digest disagrees with the other Dockerfile's. (`test/ci/check-dockerfiles.test.ts`)
 19. **A body the transport cannot answer is refused.** A batch pairing a `tools/call` with a
     `notifications/cancelled` naming its id, and a batch repeating a JSON-RPC id, are each
     answered `400` with no tool run, no store read and no record; a cancellation naming an id
@@ -466,11 +511,12 @@ check-dockerfiles.test.ts`)
     repeats a JSON-RPC id, before the transport sees it")
 20. **The deadline, and the disconnect.** Against a store read that never returns, a request is
     answered `503 {"error":"unavailable"}` at the deadline rather than held open, and exactly
-    one audit record is written for the dispatched call with outcome `unavailable`; a client
-    that disconnects first ends the wait immediately and leaves one `client-closed` warning
-    line. (`http.test.ts`, "answers at the deadline instead of holding the request open, and
-    audits the call once", "stops waiting when the client disconnects, and says so on one
-    warning line")
+    one audit record is written for the dispatched call with outcome `unavailable`, dated from
+    when the request was taken up and with a `durationMs` of at least the deadline rather than
+    of about a millisecond; a client that disconnects first ends the wait immediately and
+    leaves one `client-closed` warning line. (`http.test.ts`, "answers at the deadline instead
+    of holding the request open, and audits the call once", "stops waiting when the client
+    disconnects, and says so on one warning line")
 21. **The read budget.** `find_product` over an entitlement larger than the budget reads exactly
     the budget and answers `truncated: true`; a call with no budget left answers `unavailable`
     without reading; one read is not enough for a `get_section`, because its provenance lookup
@@ -493,6 +539,27 @@ check-dockerfiles.test.ts`)
     no client id is configured and accepted as `credentialType: access-token` once that client
     id is in `QUERY_OAUTH_CLIENT_IDS`, without reaching ID-token verification. (`auth.test.ts`,
     "accepts a user access token whose tokeninfo names a configured client id")
+25. **A short answer is never silent.** With eight entitled documents that all match and
+    `limit: 1`, every document is read — the scan leaves nothing unsearched — and the answer is
+    one product with `truncated: true`, in the result and in the record, because seven matches
+    the call had already read were dropped by the limit. (`acceptance.test.ts`, "find_product
+    reports truncated when the limit threw away matches it had already read")
+26. **Every pre-transport refusal leaves a line.** A turn id that is not a UUID, a body that is
+    not JSON, a batch over the cap, a repeated JSON-RPC id and a cancellation naming a request
+    in the same body each write exactly one `WARNING` with `event: "refused-body"`, the
+    principal, and a message count where the body was parsed — with no bundle id, no source key
+    and nothing else from the body — while the audit trail and the read log stay empty.
+    (`http.test.ts`, "leaves one structured warning for every refusal that precedes the
+    transport")
+27. **The allow-list enforces its own claim.** A `credentialType` that is not a short lowercase
+    token is dropped by the logger, as are a `resourceType` and a `resourceId` outside their
+    shapes; both members of the credential type enum are kept. (`test/logger.test.ts`, "drops an
+    exempt key whose value is not the shape the exemption claims", "drops a credentialType that
+    is not a short lowercase token", "keeps both members of the credential type enum")
+28. **The demo seeder refuses a token Cloud Run would.** Run with a synthetic bearer whose `aud`
+    is not the worker URL — and with one that carries no decodable audience at all — the seed
+    script exits 1 naming `WORKER_ID_TOKEN` and the impersonation command, before any request;
+    a token whose audience is the worker URL is not stopped. (`test/ci/demo-seed-token.test.ts`)
 
 ## Security properties stated honestly
 
@@ -599,18 +666,43 @@ precisely so entitlements can be granted by a role separate from the developer.
   twice the `find_product` horizon: enough for one full scan plus the documents that scan
   named, and a quarter of what the batch cap times the horizon would otherwise allow. It is a
   per-request bound, not a per-principal quota. Decided 2026-09-20.
-- `truncated` is the contract's meaning — any entitled document the call did not search —
-  rather than the scan horizon alone, because the agent instruction tells the model that
-  `truncated` means the search was cut short. Decided 2026-09-20.
+- `truncated` is the contract's meaning — the answer is shorter than what the entitlement holds
+  — rather than the scan horizon alone, because the agent instruction tells the model that
+  `truncated` means the search was cut short. It covers both ways an answer can be short:
+  entitled documents the call did not search, and matches the call read and the limit dropped.
+  Decided 2026-09-20.
 - `credentialType` is added to the shared logger's allow-list (`src/lib/logger.ts`), so the
-  retained log line conforms to the published `QueryAuditRecord`. Its value is one of two enum
-  members and cannot carry text, and every other forbidden key is unchanged. This is a change
-  to a library the worker also uses (ADR 0004) and belongs in change control as such; the
-  worker never logs that key. Decided 2026-09-20.
+  retained log line conforms to the published `QueryAuditRecord`. Each allow-listed name is
+  paired with the value shape that earns its exemption, and a value outside that shape is
+  dropped: the exemption is enforced by the logger rather than promised by the contract in
+  another file. Every other forbidden key is unchanged. This is a change to a library the
+  worker also uses (ADR 0004) and belongs in change control as such; the worker never logs
+  that key. Decided 2026-09-20.
+- A body refused before the transport is connected writes one `event: "refused-body"` warning
+  and no audit record. The audit promise stays "exactly one record per dispatched tool call",
+  and this is its zero-record case, stated here so the absence is documented rather than
+  discovered. Decided 2026-09-20.
+- The audit records the service writes for calls that never finished are dated from when the
+  request was taken up, not from when the service gave up waiting, so the one path where a
+  record exists because a call ran long does not report it as instantaneous. Decided
+  2026-09-20.
+- The image-pinning gate collects stage names over the whole file — so a forward reference to a
+  stage is not mistaken for an image — but excludes a `FROM`'s own `AS` name when judging that
+  `FROM`, so naming a helper stage after the image it comes from cannot hide an unpinned
+  reference. Decided 2026-09-20.
+- `scripts/demo/seed.ts` decodes the `aud` claim of the bearer it is about to present and exits
+  before its first request when it is not the worker URL. Application Default Credentials of
+  type `authorized_user` cannot mint a token for an arbitrary audience — the library ignores
+  the requested one — so the script names `WORKER_ID_TOKEN` and the impersonation command
+  rather than letting Cloud Run answer 403. Decided 2026-09-20.
 - `verify_quote` decides entitlement before it normalises the caller's quote, so the tenant-wall
   audit promise holds for every argument shape. Decided 2026-09-20.
 - The image-pinning gate covers `COPY --from`, `ADD --from` and `RUN --mount ... from=` as well
   as `FROM`, and has its own negative fixture test. Decided 2026-09-20.
+- A pre-transport refusal is a 400 with no detail, and the warning it writes carries no field
+  derived from the body's content — only how many JSON-RPC messages the body held, and that
+  only when the body was parsed. A refusal must not become a way to have the service echo
+  something back. Decided 2026-09-20.
 
 ## Open questions
 

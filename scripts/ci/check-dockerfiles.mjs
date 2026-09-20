@@ -11,7 +11,9 @@ import path from "node:path";
 // Three places pull image bytes and all three are scanned: `FROM <ref>`, `--from=<ref>` on COPY
 // and ADD, and `from=<ref>` inside a `--mount=` flag on RUN. A reference that names a stage
 // declared in the same file (`FROM ... AS build`, or a stage index such as `--from=0`) pulls no
-// registry bytes and is skipped.
+// registry bytes and is skipped. One name is excluded from that skip: a `FROM`'s own `AS` name,
+// which the instruction declares rather than refers to, so `FROM busybox AS busybox` is judged
+// as the image reference `busybox` and not as a stage.
 //
 // The scan is textual. It does not resolve build arguments (`FROM ${BASE}`, `--from=$STAGE`),
 // it does not contact a registry, and a digest it accepts is only as good as the registry
@@ -100,8 +102,13 @@ for (const name of dockerfiles) {
   }
 
   for (const { line, text } of lines) {
+    // The `AS` name this instruction declares. It is in `stages` for every other instruction,
+    // and is removed here for this one: `FROM busybox AS busybox` pulls the image `busybox`.
+    const declared = FROM_LINE.exec(text)?.[3]?.toLowerCase();
+
     for (const { keyword, ref } of imageReferences(text)) {
-      if (stages.has(ref.toLowerCase()) || STAGE_INDEX.test(ref)) continue;
+      const referenced = ref.toLowerCase();
+      if ((stages.has(referenced) && referenced !== declared) || STAGE_INDEX.test(ref)) continue;
       if (!DIGEST.test(ref)) {
         failures.push(`${name}:${line}: ${keyword} ${ref} is not pinned by @sha256 digest`);
         continue;

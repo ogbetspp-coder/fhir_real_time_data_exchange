@@ -18,12 +18,25 @@ type LogFields = {
 const forbiddenFieldPattern =
   /(?:payload|resource|narrative|text|token|secret|credential|xhtml|span|excerpt|diff|hint|div|content|prompt|issue)/i;
 
-// The only field names allowed to contain a forbidden substring. `resourceType` and
-// `resourceId` carry FHIR metadata, never FHIR content. `credentialType` matches "credential"
-// but carries no credential: its value is one of the two members of the contract's
-// `CredentialType` enum (`id-token`, `access-token`), so it cannot carry text. The value guard
-// below still applies to all three.
-const allowedFieldNames = new Set(["resourceType", "resourceId", "credentialType"]);
+// The only field names allowed to contain a forbidden substring, each paired with the shape its
+// value must have. The name alone is not the exemption: a value that does not match its shape is
+// dropped here, so what these keys may carry is enforced by this file rather than promised by
+// the callers. `resourceType` and `resourceId` carry FHIR metadata — a resource type name and a
+// FHIR id — never FHIR content. `credentialType` matches "credential" but carries no credential:
+// its value is a short lowercase token, which is the shape of both members of the contract's
+// `CredentialType` enum (`id-token`, `access-token`). The value guard below still applies to all
+// three.
+const allowedFieldNames = new Map<string, RegExp>([
+  ["resourceType", /^[A-Za-z]{1,64}$/],
+  ["resourceId", /^[A-Za-z0-9.-]{1,64}$/],
+  ["credentialType", /^[a-z][a-z-]{0,30}$/],
+]);
+
+function isExempt(key: string, value: string | number | boolean): boolean {
+  const shape = allowedFieldNames.get(key);
+  if (shape === undefined) return false;
+  return typeof value === "string" && shape.test(value);
+}
 
 const maxValueLength = 512;
 
@@ -36,7 +49,7 @@ function sanitize(fields: LogFields): LogFields {
   return Object.fromEntries(
     Object.entries(fields).filter(([key, value]) => {
       if (value === undefined) return false;
-      if (!allowedFieldNames.has(key) && forbiddenFieldPattern.test(key)) return false;
+      if (forbiddenFieldPattern.test(key) && !isExempt(key, value)) return false;
       return isSafeValue(value);
     }),
   );

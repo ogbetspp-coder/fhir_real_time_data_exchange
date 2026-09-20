@@ -100,9 +100,52 @@ variable "query_image" {
 }
 
 variable "query_invokers" {
-  description = "IAM members granted roles/run.invoker on the query service, in gcloud member syntax (user:, serviceAccount:, group:). No allUsers. A human calling the service with their own account needs an entry here and an entitlement in query_entitlements_json."
+  description = <<-EOT
+    IAM members granted roles/run.invoker on the query service, in gcloud member syntax
+    (user:, serviceAccount:, group:). No allUsers.
+
+    Cloud Run resolves run.invoker against the identity inside the bearer token, so the entry
+    here has to be the identity the token authenticates as, not the person who typed the
+    command:
+
+    - access-token path (a human calling with `gcloud auth print-access-token`): the token
+      authenticates as the human, so list `user:<their e-mail>` here, and key their
+      query_entitlements_json entry by their own `sub`.
+    - impersonation path (`gcloud auth print-identity-token
+      --impersonate-service-account=...`): the token authenticates as the service account, so
+      nothing is needed here — infra/query.tf grants run.invoker to the caller service account
+      it creates. The human needs roles/iam.serviceAccountTokenCreator on that account
+      (var.query_token_creators) and the entitlement is keyed by the service account's `sub`.
+
+    An agent or workload with its own service account identity belongs here as
+    `serviceAccount:<its e-mail>`.
+  EOT
   type        = list(string)
   default     = []
+}
+
+variable "query_token_creators" {
+  description = <<-EOT
+    IAM members granted roles/iam.serviceAccountTokenCreator on the caller service account
+    created in infra/query.tf (`ema-flow-caller-<environment>`), in gcloud member syntax. That
+    role is bound on that one service account, never on the project, and it is what lets a
+    member run `gcloud auth print-identity-token --impersonate-service-account=<that account>
+    --audiences=<query_audience> --include-email`.
+
+    Project owner does not include this permission, so an operator who owns the project still
+    has to name themselves here. Empty (the default) means nobody can impersonate the account
+    and the ID-token recipe in README.md is unavailable.
+  EOT
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition = alltrue([
+      for member in var.query_token_creators :
+      can(regex("^(user|group|serviceAccount):[^\\s]+$", member))
+    ])
+    error_message = "Every query_token_creators entry must be user:, group:, or serviceAccount: followed by an identifier. allUsers and allAuthenticatedUsers are not accepted."
+  }
 }
 
 variable "query_entitlements_json" {
@@ -115,16 +158,18 @@ variable "query_entitlements_json" {
   default     = "{}"
   sensitive   = false
 
-  # Mirrors what src/query/entitlements.ts enforces at container start (PrincipalId and FhirId
-  # from src/contracts/common.ts), so a map the service would reject fails the plan instead of
-  # the startup probe. The decode and each shape check are wrapped in can()/try() so a
-  # malformed value produces this error message rather than an evaluation error.
+  # Checks the same four things src/query/entitlements.ts checks at container start (a JSON
+  # object; PrincipalId keys; each value an object whose only key is `bundles`; FhirId members),
+  # including the strictObject rule that rejects an unknown key such as a carried-forward
+  # `organisation`. The decode and each shape check are wrapped in can()/try() so a malformed
+  # value produces this error message rather than an evaluation error.
   validation {
     condition = (
       can(keys(jsondecode(var.query_entitlements_json)))
       && alltrue([
-        for principal, entitlement in try({ for k, v in jsondecode(var.query_entitlements_json) : k => v }, {}) :
+        for principal, entitlement in try(jsondecode(var.query_entitlements_json), {}) :
         can(regex("^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$", principal))
+        && try(keys(entitlement), []) == ["bundles"]
         && can(tolist(entitlement.bundles))
         && alltrue([
           for bundle in try(tolist(entitlement.bundles), ["invalid bundle id"]) :
@@ -132,7 +177,7 @@ variable "query_entitlements_json" {
         ])
       ])
     )
-    error_message = "query_entitlements_json must be a JSON object whose keys match ^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$ and whose values are objects with a \"bundles\" list of FHIR ids (^[A-Za-z0-9.-]{1,64}$)."
+    error_message = "query_entitlements_json must be a JSON object whose keys match ^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$ and whose values are objects carrying exactly one key, \"bundles\", a list of FHIR ids (^[A-Za-z0-9.-]{1,64}$). An extra key such as \"organisation\" is rejected here because the service rejects it at startup."
   }
 }
 

@@ -586,9 +586,25 @@ export function createQueryApp(
       return;
     }
 
+    // Every refusal that happens before the transport is connected answers 400 and writes no
+    // audit record, because nothing was dispatched. This is the one application-level trace
+    // such a request leaves, so a caller probing the refusal surface is visible. Nothing
+    // derived from the body's content is written: `messageCount` is how many JSON-RPC messages
+    // the parsed body carried, and it is absent when the body was not parsed.
+    const refuseBody = (messageCount?: number): void => {
+      log("warning", "Query request body refused", {
+        service: QUERY_SERVICE_NAME,
+        stage: "query-http",
+        event: "refused-body",
+        principal,
+        ...(messageCount === undefined ? {} : { messageCount }),
+      });
+      sendJson(response, 400, { error: "invalid-request" });
+    };
+
     const turn = turnIdOf(request.headers[TURN_ID_HEADER]);
     if (turn === "invalid") {
-      sendJson(response, 400, { error: "invalid-request" });
+      refuseBody();
       return;
     }
 
@@ -596,17 +612,19 @@ export function createQueryApp(
     try {
       body = await readBody(request);
     } catch {
-      sendJson(response, 400, { error: "invalid-request" });
+      refuseBody();
       return;
     }
 
+    const messageCount = Array.isArray(body) ? body.length : body === undefined ? 0 : 1;
+
     if (Array.isArray(body) && body.length > MAX_BATCH_MESSAGES) {
-      sendJson(response, 400, { error: "invalid-request" });
+      refuseBody(messageCount);
       return;
     }
 
     if (refusedBodyShape(body)) {
-      sendJson(response, 400, { error: "invalid-request" });
+      refuseBody(messageCount);
       return;
     }
 
@@ -633,6 +651,11 @@ export function createQueryApp(
     // what lets Cloud Run scale the service to zero and across instances: no session lives
     // between requests. The transport and the server are built per request for the same reason.
     const transport = new StreamableHTTPServerTransport({ enableJsonResponse: true });
+
+    // When the service writes a record for a call that never finished, this is the `at` and the
+    // start `durationMs` is measured from: the call occupied the request from here, not from
+    // the moment the wait was given up.
+    const requestStartedAt = Date.now();
 
     let end: RequestEnd = "answered";
     try {
@@ -673,7 +696,7 @@ export function createQueryApp(
             error: { tool: unanswered.tool, error: code },
             auditOutcome: code,
           },
-          Date.now(),
+          requestStartedAt,
         );
       }
       await transport.close();

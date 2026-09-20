@@ -102,6 +102,44 @@ describe("structured logger redaction", () => {
     expect(Object.keys(entry)).not.toContain("credentials");
   });
 
+  it("drops an exempt key whose value is not the shape the exemption claims", () => {
+    // The name is not the exemption: each exempt key carries a value shape, and a value outside
+    // it is dropped exactly as the key itself would be.
+    const entry = fieldsOf({
+      runId: "run-1",
+      credentialType: "a".repeat(512),
+      resourceType: "Bundle/1",
+      resourceId: "bundle 1",
+    });
+
+    expect(entry.runId).toBe("run-1");
+    expect(Object.keys(entry)).not.toContain("credentialType");
+    expect(Object.keys(entry)).not.toContain("resourceType");
+    expect(Object.keys(entry)).not.toContain("resourceId");
+  });
+
+  it("drops a credentialType that is not a short lowercase token", () => {
+    for (const value of [
+      "Synthetic demonstration content that a credential type could never be",
+      "ID-TOKEN",
+      "id token",
+      "id_token",
+      "",
+      "a".repeat(32),
+    ]) {
+      const entry = fieldsOf({ runId: "run-1", credentialType: value });
+
+      expect([value, Object.keys(entry).includes("credentialType")]).toEqual([value, false]);
+      expect(entry.runId).toBe("run-1");
+    }
+  });
+
+  it("keeps both members of the credential type enum", () => {
+    for (const value of ["id-token", "access-token"]) {
+      expect(fieldsOf({ credentialType: value }).credentialType).toBe(value);
+    }
+  });
+
   it("drops every other forbidden key", () => {
     for (const key of forbiddenKeys) {
       const entry = fieldsOf({ runId: "run-1", [key]: "Synthetic demonstration content" });

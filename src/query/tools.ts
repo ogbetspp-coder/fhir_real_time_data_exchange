@@ -667,16 +667,19 @@ export async function findProduct(
     Array.from({ length: Math.min(FIND_PRODUCT_CONCURRENCY, scanned.length) }, () => worker()),
   );
 
-  // The published contract: `truncated` is true when the caller's entitlement holds more
-  // documents than the service searched in one call. That is every entitled id this call did
-  // not attempt — because the scan horizon cut the list, because `limit` stopped the scan, or
-  // because the request's read budget ran out — not the horizon alone.
-  const truncated = entitled.length > attempted;
-
   // Matches are reported in entitlement order regardless of the order the reads completed in.
-  const products = found
-    .filter((summary): summary is ProductSummary => summary !== undefined)
-    .slice(0, limit);
+  // The pool can finish more matches than `limit` — up to FIND_PRODUCT_CONCURRENCY - 1 reads
+  // are already in flight when the limit is reached — so the slice can drop some.
+  const matchedSummaries = found.filter(
+    (summary): summary is ProductSummary => summary !== undefined,
+  );
+  const products = matchedSummaries.slice(0, limit);
+
+  // `truncated` covers both ways this answer can be shorter than what the entitlement holds:
+  // entitled documents the call never attempted — because the scan horizon cut the list,
+  // because `limit` stopped the scan, or because the request's read budget ran out — and
+  // matches the call found and the slice did not return.
+  const truncated = entitled.length > attempted || matchedSummaries.length > products.length;
 
   const output = FindProductOutputSchema.safeParse({ products, truncated });
   if (!output.success) return fail("find_product", "unavailable");

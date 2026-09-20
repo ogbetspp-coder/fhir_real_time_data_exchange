@@ -93,29 +93,47 @@ regulated narrative inside the system of record.
 
 ### Before the first demonstration, in this order
 
-1. **Deploy the worker from this branch first.** The Provenance projection now writes the
-   approver's role on the attester agent (`src/fhir/provenance.ts`), and `get_provenance` reads
-   only that coding and never infers one. Every document already in the demonstrator's
-   validated store was written before that change, so `get_provenance` answers `unavailable`
-   for all of them.
-2. **Re-ingest the demonstration documents** with `npx tsx scripts/demo/seed.ts` (rehearse with
-   `--dry-run`). A re-ingest adds a second `Provenance` resource rather than replacing the
-   first, because its id is derived from the submission id.
-3. **Deploy the query service, then check `get_provenance` before the meeting.** It resolves a
-   Provenance with `Provenance?target=Bundle/<id>&_count=1` and no `_sort`, so which of two
-   resources for the same document it returns is not fixed by the code. A fresh store or a
-   fresh document id avoids the ambiguity. `docs/demo/verifiable-label.md` repeats this.
-4. **Set the three GitHub Actions repository variables** (Settings → Secrets and variables →
+1. **Deploy this branch.** The Provenance projection now writes the approver's role on the
+   attester agent (`src/fhir/provenance.ts`), and `get_provenance` reads only that coding and
+   never infers one. Every document already in the demonstrator's validated store was written
+   before that change, so `get_provenance` answers `unavailable` for all of them until step 2.
+   There is no worker-only deploy to run first: `scripts/gcp/deploy.sh` has one untargeted
+   `terraform apply` that reconciles the worker and the query service together. What has to be
+   ordered is the re-ingest, not the two services.
+2. **Re-ingest the demonstration documents** with `scripts/demo/seed.ts` (rehearse with
+   `--dry-run`). It needs `SUBMISSION_BUCKET` and `WORKER_URL` exported — it exits at load
+   without them — and a `WORKER_ID_TOKEN` minted by impersonating a service account that holds
+   `run.invoker` on the worker: a human's Application Default Credentials cannot mint an ID
+   token for the worker's audience. The whole command is in README.md, "Re-ingesting with
+   `scripts/demo/seed.ts`". A re-ingest adds a second `Provenance` resource rather than
+   replacing the first, because its id is derived from the submission id.
+3. **Check `get_provenance` before the meeting.** It resolves a Provenance with
+   `Provenance?target=Bundle/<id>&_count=1` and no `_sort`, so which of two resources for the
+   same document it returns is not fixed by the code. A fresh store or a fresh document id
+   avoids the ambiguity. `docs/demo/verifiable-label.md` repeats this.
+4. **Set the four GitHub Actions repository variables** (Settings → Secrets and variables →
    Actions → Variables). They are variables and not secrets: an IAM member string, an opaque
    subject id, a bundle id and an OAuth client id are identifiers, and holding one grants
    nothing. Each is optional and an unset one leaves the Terraform default, so a deploy with
    none of them set succeeds and authorises nobody.
    - `QUERY_INVOKERS` — comma-separated IAM members that receive `run.invoker` on the query
      service, e.g. `user:you@example.com,serviceAccount:agent@proj.iam.gserviceaccount.com`.
-     Default `[]`.
+     This is for callers presenting a credential that authenticates as themselves: a human on
+     the access-token path, or an agent with its own service account. A caller using the
+     impersonation recipe does not belong here — the caller service account created in
+     `infra/query.tf` already holds `run.invoker`. Default `[]`.
+   - `QUERY_TOKEN_CREATORS` — comma-separated IAM members that receive
+     `roles/iam.serviceAccountTokenCreator` on that caller service account, and so may mint ID
+     tokens as it. Bound on that one account, never on the project. Project owner does not
+     carry the permission, so an owner who wants the recipe still names themselves here.
+     Default `[]`, which makes the ID-token recipe in README.md unavailable.
    - `QUERY_ENTITLEMENTS_JSON` — the raw JSON map, e.g.
-     `{"112233445566778899000":{"bundles":["synthetic-type2-smpc"]}}`; the key is the token's
-     `sub`, never an e-mail address (an e-mail-shaped key fails startup). Default `{}`.
+     `{"112233445566778899000":{"bundles":["synthetic-type2-smpc"]}}`; the key is the `sub` of
+     the identity the token authenticates as — the caller service account's on the
+     impersonation path, the human's on the access-token path — never an e-mail address (an
+     e-mail-shaped key fails startup). `bundles` is the only key a value may carry; a
+     carried-forward `organisation` is now rejected by the Terraform variable validation as
+     well as at startup. Default `{}`.
    - `QUERY_OAUTH_CLIENT_IDS` — comma-separated OAuth 2.0 client ids whose access tokens are
      accepted. Default `[]`, which rejects every access token.
 5. **Decide `query_oauth_client_ids` deliberately.** Two different ids could go in it. The

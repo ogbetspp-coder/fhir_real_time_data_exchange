@@ -55,15 +55,22 @@ projection now writes the approver's role on the attester agent (`src/fhir/prove
 validated store was written before that change, so `get_provenance` answers `unavailable` for
 it: no approver, no role, no error that explains why.
 
-1. Deploy the **worker** from this branch.
+There is no worker-only or query-only deploy to order: `scripts/gcp/deploy.sh` runs one
+untargeted `terraform apply` that reconciles both Cloud Run services together. What has to be
+ordered is the re-ingest, which must land after the new worker is serving and before anyone
+asks `get_provenance` anything.
+
+1. Deploy this branch — the `Deploy to Google Cloud` workflow, or `bash scripts/gcp/deploy.sh`.
+   Worker and query service both come up from this commit, and until step 2 the query service
+   answers `unavailable` from `get_provenance` for every document already in the store.
 2. **Re-ingest** with the seeding script below. That writes a second `Provenance` resource for
    the document rather than replacing the first, because the resource id is derived from the
    submission id.
-3. Deploy the **query service**, then call `get_provenance` for the document you plan to show
-   and confirm an approver role comes back. Do this before anyone is in the room:
-   `get_provenance` resolves a resource with `Provenance?target=Bundle/<id>&_count=1` and no
-   `_sort`, so which of two resources for the same document it returns is not fixed by the
-   code. Seeding into a fresh store, or under fresh product ids, removes the ambiguity.
+3. Call `get_provenance` for the document you plan to show and confirm an approver role comes
+   back. Do this before anyone is in the room: `get_provenance` resolves a resource with
+   `Provenance?target=Bundle/<id>&_count=1` and no `_sort`, so which of two resources for the
+   same document it returns is not fixed by the code. Seeding into a fresh store, or under
+   fresh product ids, removes the ambiguity.
 
 Scenes 1 and 2 as written below use the console and BigQuery and do not depend on any of this;
 it matters for the `get_provenance` parts, which are marked _(item 1 — built, not deployed)_.
@@ -74,9 +81,22 @@ One command, once per environment. It writes three synthetic products at version
 first product at version 2, each through the ordinary `document` run path: Cloud Storage
 hand-off, ingress gate, fidelity check, transform, validation, store write, ledger row.
 
+Both exports are required: the script reads them when it loads and exits immediately without
+them. `terraform output` needs the real backend — a working copy initialised with
+`-backend=false` answers `Error: Backend initialization required` — so run
+`terraform -chdir=infra init -input=false -backend-config="bucket=<PROJECT_ID>-ema-flow-tfstate" -backend-config="prefix=terraform/state"`
+first.
+
 ```bash
 export SUBMISSION_BUCKET="$(terraform -chdir=infra output -raw submission_bucket)"
 export WORKER_URL="$(terraform -chdir=infra output -raw cloud_run_service_uri)"
+
+# An ID token for $WORKER_URL, minted as a service account that holds run.invoker on the
+# worker. A human's Application Default Credentials cannot mint one; see the README.
+export WORKER_ID_TOKEN="$(gcloud auth print-identity-token \
+  --impersonate-service-account="ema-flow-workflow-<ENV>@<PROJECT_ID>.iam.gserviceaccount.com" \
+  --audiences="$WORKER_URL" \
+  --include-email)"
 
 npx tsx scripts/demo/seed.ts --dry-run   # rehearse: prints locations and hashes, writes nothing
 npx tsx scripts/demo/seed.ts
@@ -84,8 +104,17 @@ npx tsx scripts/demo/seed.ts
 
 The bucket is `<PROJECT_ID>-ema-flow-<ENV>-submissions` and the evidence bucket beside it is
 `<PROJECT_ID>-ema-flow-<ENV>-evidence`; take both from the Terraform outputs rather than typing
-them. Authentication is a Google-signed ID token for the worker's audience, taken from
-Application Default Credentials, or from `WORKER_ID_TOKEN` when one is already minted.
+them.
+
+Authentication is a Google-signed ID token whose `aud` is `$WORKER_URL`. Application Default
+Credentials of type `authorized_user` — what `gcloud auth application-default login` leaves —
+cannot produce one: `google-auth-library` ignores the requested audience for that credential
+type and returns a token minted for the ADC OAuth client instead, which Cloud Run refuses
+(reproduced 2026-09-20). Mint it by impersonation as above and pass it in `WORKER_ID_TOKEN`,
+which needs `roles/iam.serviceAccountTokenCreator` on that service account — project owner does
+not include it. `--dry-run` needs no token at all, only the two exports. The full recipe,
+including the one-time grant, is in the README under "Re-ingesting with
+`scripts/demo/seed.ts`".
 
 It prints one line per run — product id, version, run id, status, manifest hash, EMA Bundle id —
 and nothing else. Keep that output: it is the placeholder table above, filled in.

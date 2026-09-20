@@ -109,6 +109,54 @@ describe("Dockerfile image pinning gate", () => {
     expect(result.stderr).toContain("Dockerfile:2: RUN --mount from busybox:latest is not pinned");
   });
 
+  it("passes a stage referenced before the instruction that declares it", () => {
+    const result = check({
+      Dockerfile: [
+        `FROM ${PINNED_NODE} AS build`,
+        "COPY --from=runtime /app/package.json ./",
+        `FROM ${PINNED_NODE} AS runtime`,
+      ].join("\n"),
+    });
+
+    expect([result.status, result.stderr]).toEqual([0, ""]);
+  });
+
+  it("fails a FROM whose own stage name is its image name", () => {
+    const result = check({
+      Dockerfile: [
+        `FROM ${PINNED_NODE} AS build`,
+        "FROM busybox AS busybox",
+        "COPY --from=busybox /bin/sh /bin/sh",
+      ].join("\n"),
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Dockerfile:2: FROM busybox is not pinned by @sha256 digest");
+  });
+
+  it("fails a self-named stage whose image a RUN --mount then mounts", () => {
+    const result = check({
+      Dockerfile: [
+        `FROM ${PINNED_NODE} AS build`,
+        "FROM alpine AS alpine",
+        "RUN --mount=type=bind,from=alpine,target=/mnt /mnt/bin/true",
+      ].join("\n"),
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Dockerfile:2: FROM alpine is not pinned by @sha256 digest");
+  });
+
+  it("holds a self-named node stage to the shared digest", () => {
+    const result = check({
+      Dockerfile: `FROM ${PINNED_NODE} AS node\nCOPY --from=node /usr/local/bin/node ./\n`,
+      "Dockerfile.query": `FROM node:22.14.0-bookworm-slim@${OTHER_DIGEST} AS build\n`,
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("pin different digests");
+  });
+
   it("fails when two Dockerfiles start FROM node images pinned to different digests", () => {
     const result = check({
       Dockerfile: `FROM ${PINNED_NODE} AS build\n`,

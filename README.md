@@ -168,20 +168,26 @@ service-account key is stored in GitHub. In that repository, set these Actions v
 | `GCP_DEPLOY_SERVICE_ACCOUNT`     | `ema-flow-deployer@PROJECT_ID.iam.gserviceaccount.com`                                   |
 | `GCP_WORKLOAD_IDENTITY_PROVIDER` | `projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL/providers/PROVIDER` |
 
-Three further Actions variables configure who may call the query service. They are variables,
+Four further Actions variables configure who may call the query service. They are variables,
 not secrets: an IAM member string, an opaque subject id, a FHIR bundle id, and an OAuth client
 id are identifiers, and holding one grants nothing. Each is optional; an unset variable leaves
-the Terraform default, and a deploy with all three unset succeeds and authorises no caller.
+the Terraform default, and a deploy with all four unset succeeds and authorises no caller.
 
 | Variable                  | Example                                                           | Default when unset |
 | ------------------------- | ----------------------------------------------------------------- | ------------------ |
 | `QUERY_INVOKERS`          | `user:you@example.com,serviceAccount:a@p.iam.gserviceaccount.com` | `[]`               |
+| `QUERY_TOKEN_CREATORS`    | `user:you@example.com`                                            | `[]`               |
 | `QUERY_ENTITLEMENTS_JSON` | `{"112233445566778899000":{"bundles":["synthetic-type2-smpc"]}}`  | `{}`               |
 | `QUERY_OAUTH_CLIENT_IDS`  | `32555940559.apps.googleusercontent.com`                          | `[]`               |
 
-`scripts/gcp/deploy.sh` turns the two comma-separated values into Terraform list arguments and
-passes the entitlement map through unchanged; it logs byte counts, never values, because the
-deploy log is attached to a GitHub issue on failure.
+`QUERY_INVOKERS` and `QUERY_TOKEN_CREATORS` are not alternatives to each other: the first
+grants `run.invoker` to a caller that authenticates as itself, the second grants the right to
+mint ID tokens as the caller service account. "Calling the query service" below says which one
+a given credential needs.
+
+`scripts/gcp/deploy.sh` turns the three comma-separated values into Terraform list arguments
+and passes the entitlement map through unchanged; it logs byte counts, never values, because
+the deploy log is attached to a GitHub issue on failure.
 
 The WIF attribute condition must allow
 `repo:ogbetspp-coder/fhir_real_time_data_exchange:ref:refs/heads/main` (or the whole
@@ -235,29 +241,56 @@ Do not run that command for a disposable prototype project.
 `ema-flow-<env>-query` (`docs/architecture.md`, `docs/design/epi-mcp-query-service.md`) is a
 separate Cloud Run deployable from the worker: read-only, its own service account, its own
 Terraform variables. It is built and its tests pass (`test/query/`); it has not yet been
-deployed to a project. Two things must be granted before it answers anything:
+deployed to a project.
 
-1. **Invocation** — add your principal to `query_invokers` (a Terraform variable, so the grant
-   is in version control):
+Two things must be granted before it answers anything — invocation, then entitlement — and
+**which principal receives them depends on the credential you intend to call with**. Cloud Run
+resolves `run.invoker` against the identity inside the bearer token, not against the account
+that typed the command, and the service keys entitlements by that same identity's `sub`. The
+two paths below are not interchangeable: grant the human for one, the service account for the
+other.
+
+| Credential (see "Minting a token")                      | Authenticates as     | `run.invoker` grant                                                  | Entitlement keyed by       |
+| ------------------------------------------------------- | -------------------- | -------------------------------------------------------------------- | -------------------------- |
+| `gcloud auth print-access-token`, your own account      | you                  | `user:you@example.com` in `query_invokers`                           | your own `sub`             |
+| ID token minted by impersonating the caller account     | the caller account   | already granted in `infra/query.tf`; put nothing in `query_invokers` | the caller account's `sub` |
+| An agent or workload calling as its own service account | that service account | `serviceAccount:<its e-mail>` in `query_invokers`                    | that account's `sub`       |
+
+1. **Invocation** — for the access-token path, add the human to `query_invokers` (a Terraform
+   variable, so the grant is in version control):
    ```hcl
    query_invokers = ["user:you@example.com"]
    ```
-2. **Entitlement** — add your token's `sub` claim to `query_entitlements_json`, keyed by that
-   subject. A Google `sub` is an opaque numeric string, never an e-mail address; the service
-   rejects a key containing `@` at startup, and the map carries only `bundles` per principal
-   (an older map with an `organisation` key also fails startup):
+   For the impersonation path, add nothing here. `infra/query.tf` creates the caller service
+   account and grants it `run.invoker` on the service; what the human needs is the right to
+   mint tokens as it, which is `query_token_creators`:
+   ```hcl
+   query_token_creators = ["user:you@example.com"]
+   ```
+   That binds `roles/iam.serviceAccountTokenCreator` on that one service account and nothing
+   else. Putting the human in `query_invokers` does not make the impersonation path work, and
+   putting the caller account in `query_token_creators` does not make the access-token path
+   work.
+2. **Entitlement** — add the calling identity's `sub` claim to `query_entitlements_json`, keyed
+   by that subject. A Google `sub` is an opaque numeric string, never an e-mail address; the
+   service rejects a key containing `@` at startup, and the map carries exactly `bundles` per
+   principal — an older map with an `organisation` key fails the Terraform validation and would
+   fail startup:
    ```hcl
    query_entitlements_json = jsonencode({
      "112233445566778899001" = { bundles = ["synthetic-type2-smpc"] }
    })
    ```
+   On the impersonation path that `sub` is the caller service account's, not yours. "Minting a
+   token" below prints it.
 
 The service accepts two credential kinds on `Authorization: Bearer`, told apart by shape
 (`src/query/auth.ts`):
 
 - a bearer that is three base64url segments is verified as a Google-signed OIDC **ID token**
-  for `QUERY_AUDIENCE` (audit `credentialType` = `id-token`) — the path for a user, a service
-  account, or the ADK agent;
+  for `QUERY_AUDIENCE` (audit `credentialType` = `id-token`) — the path for a service account
+  or the ADK agent, and the path a human reaches only by impersonating the caller service
+  account, since Google will not mint an audience-scoped ID token for a user account;
 - anything else is treated as a Google OAuth 2.0 **access token** (audit `credentialType` =
   `access-token`) — the end user's token as Gemini Enterprise forwards it. It is verified
   through Google's tokeninfo endpoint and accepted only when its `aud` or `azp` is listed in
@@ -292,26 +325,82 @@ That 401 was reproduced in review against the service's verification code. It ha
 observed against a deployed service, because no `terraform apply` has created one; the two
 URL shapes above were confirmed on the already-deployed worker in the same project and region.
 
-#### Minting a token
-
-**A service account you can impersonate** — needs `roles/iam.serviceAccountTokenCreator` on it,
-and does not switch your active gcloud account:
+<a id="terraform-output-needs-the-backend"></a>
+**`terraform output` needs the real backend first**, here and everywhere else in this file. A
+working copy whose `infra/.terraform` was initialised with `-backend=false` — which is what the
+local gate (`terraform -chdir=infra init -backend=false`) leaves behind, and the state this
+repository's checkout is in — answers every `terraform output` with
+`Error: Backend initialization required, please run "terraform init"` (reproduced 2026-09-20).
+Point it at the state bucket first, with the two values `scripts/gcp/deploy.sh` uses:
 
 ```bash
-TOKEN="$(gcloud auth print-identity-token \
-  --impersonate-service-account="ema-flow-query-caller@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
-  --audiences="$AUDIENCE")"
-
-# The subject to entitle is that token's `sub`. Decode the payload without printing the token.
-printf '%s' "$TOKEN" | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null | jq -r .sub
+terraform -chdir=infra init -input=false \
+  -backend-config="bucket=${GOOGLE_CLOUD_PROJECT}-ema-flow-tfstate" \
+  -backend-config="prefix=terraform/state"
 ```
 
-**Your own Google account** cannot mint an ID token for this service at all.
-`gcloud auth print-identity-token --audiences=...` answers
-`ERROR: (gcloud.auth.print-identity-token) Invalid account type for --audiences. Requires valid service account.`
-for a user account, and a user's plain identity token carries gcloud's own OAuth client id as
-its audience rather than `QUERY_AUDIENCE`. The path that does work for a human is the
-access-token path. Read the client id and the subject gcloud presents:
+Re-running the local gate's `-backend=false` init afterwards puts it back.
+
+#### Minting a token
+
+**The caller service account.** `infra/query.tf` creates one service account whose entire
+purpose is to be impersonated: `ema-flow-caller-<env>`, holding `roles/run.invoker` on the
+query service and no other role — no Healthcare dataset role, no project role, no key. Take its
+e-mail from the Terraform output rather than typing it; nothing else in this repository or in
+the project answers to that name until an apply creates it.
+
+Minting a token as it needs `roles/iam.serviceAccountTokenCreator` on it, which is what
+`query_token_creators` grants, and does not switch your active gcloud account. **Project owner
+does not include that permission**: run as the owner of `sage-ship-509104-b8` on 2026-09-20,
+without the grant, `gcloud auth print-identity-token --impersonate-service-account=...` answered
+`PERMISSION_DENIED … Permission 'iam.serviceAccounts.getAccessToken' denied on resource`.
+
+```bash
+CALLER="$(terraform -chdir=infra output -raw query_caller_service_account)"
+
+TOKEN="$(gcloud auth print-identity-token \
+  --impersonate-service-account="$CALLER" \
+  --audiences="$AUDIENCE" \
+  --include-email)"
+```
+
+`--include-email` is what puts the `email` and `email_verified` claims into the token:
+`gcloud auth print-identity-token --help` describes the flag as adding exactly those two
+claims and reserves it for impersonated service accounts. Without it the token carries
+neither. Whether Cloud Run's invoker check needs them has not been observed here — there is no
+deployed query service to call — so include the flag rather than find out during a
+demonstration.
+
+The subject to entitle is that token's `sub`. Decode the payload locally — never print the
+token, and never pass it as a command argument:
+
+```bash
+# JWT segments are base64url (`-_` where base64 has `+/`) and carry no `=` padding, so both
+# have to be repaired before base64(1) will decode. A payload segment whose length is not a
+# multiple of four fails without the padding, which is most of them. No `2>/dev/null` here —
+# a decode that fails has to say so rather than hand jq a truncated object.
+PAYLOAD="$(printf '%s' "$TOKEN" | cut -d. -f2 | tr '_-' '/+')"
+while [ $((${#PAYLOAD} % 4)) -ne 0 ]; do PAYLOAD="${PAYLOAD}="; done
+printf '%s' "$PAYLOAD" | base64 -d | jq -r '.sub, .email'
+```
+
+It prints two lines: the `sub` to key `query_entitlements_json` by, then the `email` claim — an
+empty second line means `--include-email` was left off. That decode was run on 2026-09-20
+against real Google-signed ID tokens with payload segments of 407 and 498 characters (the two
+residues at which the unpadded form fails) and against synthetic payloads at every residue. The
+`gcloud … --impersonate-service-account` command above it has not been run to completion,
+because the caller service account does not exist until a `terraform apply` creates it.
+
+**Your own Google account** cannot mint an ID token for this service at all. For a user
+account, `gcloud auth print-identity-token --audiences=...` answers, verbatim on 2026-09-20:
+
+```text
+ERROR: (gcloud.auth.print-identity-token) Invalid account type for `--audiences`. Requires valid service account.
+```
+
+and a user's plain identity token carries a Google OAuth client id as its audience rather than
+`QUERY_AUDIENCE`. The path that does work for a human is the access-token path. Read the client
+id and the subject gcloud presents:
 
 ```bash
 curl -s -X POST -H "Authorization: Bearer $(gcloud auth print-access-token)" \
@@ -399,9 +488,10 @@ service exists, so no bootstrap apply is needed; a Terraform postcondition fails
 that URL is not one Cloud Run reports for the service. This has been checked by `terraform
 validate` only, not by an apply against a project.
 
-Query-service Terraform variables beyond `query_invokers`, `query_entitlements_json`, and
-`query_oauth_client_ids` — those three `scripts/gcp/deploy.sh` passes from the Actions
-variables above; supply the rest through `TF_VAR_<name>` or an `infra/*.auto.tfvars` file:
+Query-service Terraform variables beyond `query_invokers`, `query_token_creators`,
+`query_entitlements_json`, and `query_oauth_client_ids` — those four `scripts/gcp/deploy.sh`
+passes from the Actions variables above; supply the rest through `TF_VAR_<name>` or an
+`infra/*.auto.tfvars` file:
 
 | Variable                          | Default   | Effect                                                                                                                      |
 | --------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------- |
@@ -417,28 +507,90 @@ plan or apply has run against a project.
 
 ### Deploy order before the first demonstration
 
-Do these three in this order. The order matters because of one change in this branch: the
-worker's Provenance projection now writes the approver's role on the attester agent
-(`src/fhir/provenance.ts`, `APPROVER_ROLE_SYSTEM`), and `get_provenance` reads only that coding
-and never infers it. Every document already in the demonstrator's validated store was written
-by a worker built before that change, so its persisted `Provenance` carries no role — and
-`get_provenance` answers `unavailable` for all of them, with nothing to indicate the cause but
-this paragraph.
+The ordering constraint is real but it is not a choice of deploy targets. One change in this
+branch causes it: the worker's Provenance projection now writes the approver's role on the
+attester agent (`src/fhir/provenance.ts`, `APPROVER_ROLE_SYSTEM`), and `get_provenance` reads
+only that coding and never infers it. Every document already in the demonstrator's validated
+store was written by a worker built before that change, so its persisted `Provenance` carries
+no role — and `get_provenance` answers `unavailable` for all of them, with nothing to indicate
+the cause but this paragraph. **Re-ingestion has to happen after the new worker is serving and
+before anyone asks `get_provenance` anything.**
 
-1. **Deploy the worker** from this branch, so the projection that writes the role is running.
-2. **Re-ingest the documents** through the ordinary document path: `npx tsx scripts/demo/seed.ts`
-   (rehearse with `--dry-run`). That writes a second `Provenance` resource for the document —
-   its id is derived from the submission id (`stableUuid("ingestion-provenance", submissionId)`),
-   so a re-ingest adds one rather than replacing the old one.
-3. **Deploy the query service**, then call `get_provenance` for the document you intend to show
-   and confirm it answers an approver role before anyone is in the room. Confirming it is not
-   optional: `get_provenance` resolves the resource with
-   `Provenance?target=Bundle/<id>&_count=1` and no `_sort` (`src/query/fhir-reader.ts`), so
-   which of two Provenance resources for the same document it returns is not fixed by this
-   code. A fresh store, or a fresh document id, avoids the ambiguity entirely.
+There is no worker-only or query-only deploy to sequence. `scripts/gcp/deploy.sh` has one
+untargeted `terraform apply` (its `apply` phase) that reconciles both Cloud Run services
+together, and the phases it does offer are `preflight`, `deps`, `init`, `apis`, `images`,
+`apply`, `bootstrap`. So:
+
+1. **Deploy this branch** — the `Deploy to Google Cloud` workflow, or `bash scripts/gcp/deploy.sh`
+   locally. The worker and the query service both come up from this commit. Between this step
+   and the next, the query service is deployed and answering `unavailable` from
+   `get_provenance` for every existing document; that is the expected state, not a fault.
+2. **Re-ingest the documents** through the ordinary document path with `scripts/demo/seed.ts`.
+   It needs two environment variables and a credential it cannot get from a human's
+   Application Default Credentials — see
+   [Re-ingesting with `scripts/demo/seed.ts`](#re-ingesting-with-scriptsdemoseedts) below, which
+   is the only complete copy of that command. The re-ingest writes a second `Provenance`
+   resource for the document — its id is derived from the submission id
+   (`stableUuid("ingestion-provenance", submissionId)`), so it adds one rather than replacing
+   the old one.
+3. **Call `get_provenance`** for the document you intend to show and confirm it answers an
+   approver role, before anyone is in the room. Confirming it is not optional: `get_provenance`
+   resolves the resource with `Provenance?target=Bundle/<id>&_count=1` and no `_sort`
+   (`src/query/fhir-reader.ts`), so which of two Provenance resources for the same document it
+   returns is not fixed by this code. A fresh store, or a fresh document id, avoids the
+   ambiguity entirely.
 
 Nothing here is a data migration: a `Provenance` already written is never rewritten, and this
 repository has no tool that would rewrite one.
+
+#### Re-ingesting with `scripts/demo/seed.ts`
+
+The script reads `SUBMISSION_BUCKET` and `WORKER_URL` when it loads and exits immediately
+without them, so both exports are part of the command. Both come from Terraform outputs, which
+need the real backend first
+([`terraform output` needs the real backend](#terraform-output-needs-the-backend)):
+
+```bash
+export SUBMISSION_BUCKET="$(terraform -chdir=infra output -raw submission_bucket)"
+export WORKER_URL="$(terraform -chdir=infra output -raw cloud_run_service_uri)"
+```
+
+Authentication is a Google-signed ID token whose `aud` is `$WORKER_URL`. **A human's
+Application Default Credentials cannot produce one.** ADC created by
+`gcloud auth application-default login` is of type `authorized_user`, and for that type
+`google-auth-library` returns a token minted for the ADC OAuth client id and ignores the
+audience asked for — reproduced on 2026-09-20 by requesting a token for the deployed worker's
+URL through `GoogleAuth().getIdTokenClient(...)` and decoding it: the `aud` claim was
+`764086051850-…apps.googleusercontent.com` for both that URL and an unrelated one. Cloud Run
+refuses such a token.
+
+Mint the token as a service account that holds `run.invoker` on the worker and pass it in
+`WORKER_ID_TOKEN`, which `scripts/demo/seed.ts` uses in preference to ADC. In this repository
+the worker's only declared invoker is the Workflows service account (`infra/run.tf`):
+
+```bash
+# One-time, and a deliberate grant: roles/owner does not carry this permission. Impersonating
+# a service account in sage-ship-509104-b8 as the project owner, without it, was refused with
+# "Permission 'iam.serviceAccounts.getAccessToken' denied" on 2026-09-20.
+gcloud iam service-accounts add-iam-policy-binding \
+  "ema-flow-workflow-${EMA_FLOW_ENVIRONMENT:-dev}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
+  --member="user:$(gcloud config get-value account)" \
+  --role="roles/iam.serviceAccountTokenCreator"
+
+export WORKER_ID_TOKEN="$(gcloud auth print-identity-token \
+  --impersonate-service-account="ema-flow-workflow-${EMA_FLOW_ENVIRONMENT:-dev}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
+  --audiences="$WORKER_URL" \
+  --include-email)"
+
+npx tsx scripts/demo/seed.ts --dry-run   # rehearse: prints locations and hashes, writes nothing
+npx tsx scripts/demo/seed.ts
+```
+
+The token lives about an hour; the seed run is minutes. The `add-iam-policy-binding` and the
+mint above have not been run here — the first changes IAM and the second fails without it — so
+they are written from `gcloud`'s own help and from the `PERMISSION_DENIED` an unprivileged
+impersonation attempt returned on 2026-09-20. `--dry-run` still needs both exports, but takes
+the branch that never builds a cloud client, so it needs no token and writes nothing.
 
 ## Standards and validation
 

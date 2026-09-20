@@ -156,22 +156,29 @@ workflow executions, and architectural guidance. Data Access audit logging is en
 Healthcare API, Storage, BigQuery, and KMS and routed to a retained regional log bucket.
 
 After a successful `terraform apply`, `scripts/gcp/deploy.sh` reads the effective IAM policy
-held by the worker and query service accounts — at project level and on the Healthcare dataset
-— prints it into the deploy log and copies it to
+held by the worker, query and caller service accounts — at project level and on the Healthcare
+dataset — prints it into the deploy log and copies it to
 `gs://<evidence bucket>/deploy-evidence/<YYYY>/<MM>/<DD>/<UTC stamp>-<environment>-<commit>/`.
 This is what closes the gap between the Terraform-declared role set a test asserts and the
 policy actually in force (ADR 0004, decision 5). Every step of it is warning-only: a denied
 `get-iam-policy`, a missing output, or a failed upload prints a `::warning::` naming the
 permission needed and never fails the deploy, so an absent export is visible rather than
-silent. It has not yet run against a project.
+silent. The caller account's two exports are expected to come back empty — its only declared
+binding is `run.invoker` on one Cloud Run service, which neither policy covers — and that
+emptiness is the evidence that it holds nothing else. It has not yet run against a project.
 
 ## Security boundaries
 
 - Cloud Run requires IAM authentication on both services; no `allUsers` invoker is granted
   anywhere. On the worker, the Workflow service account is the only invoker. On the query
-  service, `run.invoker` is granted to exactly the members listed in the `query_invokers`
-  variable (`infra/query.tf`), which is empty by default — a deploy that sets nothing
-  authorises no caller.
+  service, `run.invoker` is granted to the members listed in the `query_invokers` variable,
+  which is empty by default, plus one service account the configuration creates for the
+  purpose: `ema-flow-caller-<env>` (`google_service_account.caller`, `infra/query.tf`). That
+  account exists only to be impersonated — a human cannot mint a Cloud Run ID token with their
+  own Google account — and holds `run.invoker` on the query service and nothing else. Who may
+  mint tokens as it is the `query_token_creators` variable, bound as
+  `roles/iam.serviceAccountTokenCreator` on that one account and empty by default. A deploy
+  that sets neither variable authorises no caller: the account exists and nobody can use it.
 - The worker uses a dedicated service account with the narrow
   `roles/healthcare.fhirResourceEditor` role plus evidence-object, ledger-writer,
   lineage-editor, logger, and signing permissions. That editor role is bound at project level
@@ -214,7 +221,8 @@ only.
   differs. `query_image` must be a by-digest reference when the service is planned; the digest
   part becomes `IMAGE_DIGEST`.
 - **Authentication.** Cloud Run requires authentication at the edge (no `allUsers` invoker;
-  invocation is per caller through `query_invokers`), and the service verifies the credential
+  invocation is per caller through `query_invokers` and the caller service account described
+  under "Security boundaries"), and the service verifies the credential
   again itself, so the edge is not trusted alone. Two kinds arrive on `Authorization: Bearer`,
   distinguished by shape: a JWT-shaped bearer is verified as a Google-signed OIDC ID token for
   `QUERY_AUDIENCE` (`credentialType` `id-token`); any other bearer is treated as a Google
