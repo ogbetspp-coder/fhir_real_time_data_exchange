@@ -6,9 +6,23 @@ import type {
   FhirResource,
 } from "../fhir/types.js";
 import { isComposition } from "../fhir/types.js";
+import {
+  DEFAULT_SYNTHETIC_PRODUCT_ID,
+  SYNTHETIC_DOCUMENT_DATE,
+  syntheticProduct,
+  syntheticSectionDiv,
+  type SyntheticFixtureOptions,
+  type SyntheticProduct,
+  type SyntheticVersion,
+} from "./synthetic-products.js";
 
-function sourceSection(rule: SectionRule, mapping: EmaMapping): CompositionSection {
-  const narrative = `<div xmlns="http://www.w3.org/1999/xhtml"><p>Synthetic demonstration content for ${rule.sourceKey}; not for clinical use.</p></div>`;
+function sourceSection(
+  rule: SectionRule,
+  mapping: EmaMapping,
+  product: SyntheticProduct,
+  version: SyntheticVersion,
+): CompositionSection {
+  const narrative = syntheticSectionDiv(product, rule.sourceKey, version);
   return {
     id: rule.sourceKey.replaceAll(".", "-"),
     title: rule.title,
@@ -24,7 +38,7 @@ function sourceSection(rule: SectionRule, mapping: EmaMapping): CompositionSecti
     text: { status: "generated", div: narrative },
     ...(rule.children === undefined
       ? {}
-      : { section: rule.children.map((child) => sourceSection(child, mapping)) }),
+      : { section: rule.children.map((child) => sourceSection(child, mapping, product, version)) }),
   };
 }
 
@@ -35,10 +49,18 @@ function entry(resource: FhirResource): { fullUrl: string; resource: FhirResourc
   };
 }
 
-export function createSyntheticType2Bundle(mapping: EmaMapping): FhirBundle {
+export function createSyntheticType2Bundle(
+  mapping: EmaMapping,
+  options: SyntheticFixtureOptions = {},
+): FhirBundle {
+  const product = syntheticProduct(options.product ?? DEFAULT_SYNTHETIC_PRODUCT_ID);
+  const version = options.version ?? 1;
+  const productUrl = `https://khs.dev/fhir/MedicinalProductDefinition/${product.id}`;
+  const organizationUrl = `https://khs.dev/fhir/Organization/${product.organizationId}`;
+
   const composition: FhirComposition = {
     resourceType: "Composition",
-    id: "synthetic-smpc",
+    id: product.compositionId,
     meta: {
       profile: [
         "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/Composition-uv-epi",
@@ -48,7 +70,7 @@ export function createSyntheticType2Bundle(mapping: EmaMapping): FhirBundle {
     identifier: [
       {
         system: "https://khs.dev/fhir/identifier/composition",
-        value: "synthetic-smpc-v1",
+        value: product.compositionIdentifier,
       },
     ],
     status: "final",
@@ -63,65 +85,65 @@ export function createSyntheticType2Bundle(mapping: EmaMapping): FhirBundle {
     },
     subject: [
       {
-        reference: "https://khs.dev/fhir/MedicinalProductDefinition/synthetic-paracetamol",
+        reference: productUrl,
       },
     ],
-    date: "2026-09-19T00:00:00Z",
+    date: SYNTHETIC_DOCUMENT_DATE,
     author: [
       {
-        reference: "https://khs.dev/fhir/Organization/synthetic-pharma",
+        reference: organizationUrl,
       },
     ],
-    title: "Synthetic Paracetamol 500 mg tablets SmPC",
-    section: [sourceSection(mapping.root, mapping)],
+    title: product.documentTitle,
+    section: [sourceSection(mapping.root, mapping, product, version)],
   };
 
   const resources: FhirResource[] = [
     composition,
     {
       resourceType: "Organization",
-      id: "synthetic-pharma",
-      name: "Synthetic Pharma Ltd",
+      id: product.organizationId,
+      name: product.organizationName,
     },
     {
       resourceType: "MedicinalProductDefinition",
-      id: "synthetic-paracetamol",
+      id: product.id,
       identifier: [
         {
           system: "https://khs.dev/fhir/identifier/product",
-          value: "SYN-PARA-500",
+          value: product.productIdentifier,
         },
       ],
       type: { coding: [{ code: "MedicinalProduct" }] },
       domain: { coding: [{ code: "Human" }] },
       status: { coding: [{ code: "active" }] },
-      name: [{ productName: "Synthetic Paracetamol 500 mg tablets", type: { coding: [] } }],
+      name: [{ productName: product.productName, type: { coding: [] } }],
     },
     {
       resourceType: "RegulatedAuthorization",
-      id: "synthetic-authorization",
+      id: product.authorizationId,
       identifier: [
         {
           system: "https://khs.dev/fhir/identifier/authorization",
-          value: "EU/SYN/0001",
+          value: product.marketingAuthorizationNumber,
         },
       ],
       subject: [
         {
-          reference: "https://khs.dev/fhir/MedicinalProductDefinition/synthetic-paracetamol",
+          reference: productUrl,
         },
       ],
       holder: {
-        reference: "https://khs.dev/fhir/Organization/synthetic-pharma",
+        reference: organizationUrl,
       },
       status: { coding: [{ code: "active" }] },
     },
     {
       resourceType: "PackagedProductDefinition",
-      id: "synthetic-package",
+      id: product.packageId,
       packageFor: [
         {
-          reference: "https://khs.dev/fhir/MedicinalProductDefinition/synthetic-paracetamol",
+          reference: productUrl,
         },
       ],
       packaging: {
@@ -131,18 +153,18 @@ export function createSyntheticType2Bundle(mapping: EmaMapping): FhirBundle {
     },
     {
       resourceType: "ManufacturedItemDefinition",
-      id: "synthetic-tablet",
+      id: product.itemId,
       status: "active",
       manufacturedDoseForm: { coding: [{ display: "Tablet" }] },
       unitOfPresentation: { coding: [{ display: "Tablet" }] },
     },
     {
       resourceType: "AdministrableProductDefinition",
-      id: "synthetic-administrable",
+      id: product.administrableId,
       status: "active",
       formOf: [
         {
-          reference: "https://khs.dev/fhir/MedicinalProductDefinition/synthetic-paracetamol",
+          reference: productUrl,
         },
       ],
       administrableDoseForm: { coding: [{ display: "Tablet" }] },
@@ -154,25 +176,25 @@ export function createSyntheticType2Bundle(mapping: EmaMapping): FhirBundle {
     },
     {
       resourceType: "Ingredient",
-      id: "synthetic-active-ingredient",
+      id: product.ingredientId,
       status: "active",
       for: [
         {
-          reference: "https://khs.dev/fhir/ManufacturedItemDefinition/synthetic-tablet",
+          reference: `https://khs.dev/fhir/ManufacturedItemDefinition/${product.itemId}`,
         },
       ],
       role: { coding: [{ display: "Active" }] },
       substance: {
         code: {
           reference: {
-            reference: "https://khs.dev/fhir/SubstanceDefinition/synthetic-paracetamol-substance",
+            reference: `https://khs.dev/fhir/SubstanceDefinition/${product.substanceId}`,
           },
         },
         strength: [
           {
             presentationRatio: {
               numerator: {
-                value: 500,
+                value: product.strengthMg,
                 unit: "mg",
                 system: "http://unitsofmeasure.org",
                 code: "mg",
@@ -185,31 +207,34 @@ export function createSyntheticType2Bundle(mapping: EmaMapping): FhirBundle {
     },
     {
       resourceType: "SubstanceDefinition",
-      id: "synthetic-paracetamol-substance",
+      id: product.substanceId,
       identifier: [
         {
           system: "https://khs.dev/fhir/identifier/substance",
-          value: "SYN-PARACETAMOL",
+          value: product.substanceIdentifier,
         },
       ],
       version: "1",
       status: { coding: [{ code: "active" }] },
-      name: [{ name: "Paracetamol", status: { coding: [{ code: "current" }] } }],
+      name: [{ name: product.substanceName, status: { coding: [{ code: "current" }] } }],
     },
   ];
 
   return {
     resourceType: "Bundle",
-    id: "synthetic-type2-smpc",
+    id: product.bundleId,
     meta: {
       profile: ["http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/Bundle-uv-epi"],
     },
+    // Version-independent on purpose: transform.ts derives the EMA document Bundle id from this
+    // value, so version 2 must carry the identifier version 1 carried or the store would hold
+    // two documents instead of two versions of one.
     identifier: {
       system: "https://khs.dev/fhir/identifier/type2-document",
-      value: "synthetic-type2-smpc-v1",
+      value: product.bundleIdentifier,
     },
     type: "document",
-    timestamp: "2026-09-19T00:00:00Z",
+    timestamp: SYNTHETIC_DOCUMENT_DATE,
     entry: resources.map(entry),
   };
 }
