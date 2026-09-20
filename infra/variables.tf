@@ -76,3 +76,36 @@ variable "enforce_binary_authorization" {
   type        = bool
   default     = false
 }
+
+variable "query_image" {
+  description = "Immutable Artifact Registry query service image reference, preferably by digest."
+  type        = string
+}
+
+variable "query_invokers" {
+  description = "IAM members granted roles/run.invoker on the query service. No allUsers."
+  type        = list(string)
+  default     = []
+}
+
+variable "query_entitlements_json" {
+  description = "Phase-1 entitlement map, JSON-encoded: principal subject to organisation and bundles."
+  type        = string
+  default     = "{}"
+  sensitive   = false
+
+  validation {
+    condition     = can(jsondecode(var.query_entitlements_json))
+    error_message = "query_entitlements_json must be valid JSON."
+  }
+}
+
+variable "query_audience" {
+  description = <<-EOT
+    OIDC audience the query service checks incoming tokens against: its own Cloud Run URI.
+    Unknown before the service first exists, so this is a two-apply bootstrap -- leave the
+    default on the first apply, then re-apply with this set to the query_service_url output.
+  EOT
+  type        = string
+  default     = ""
+}

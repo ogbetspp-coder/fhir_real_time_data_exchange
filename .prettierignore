@@ -33,3 +33,7 @@ agent/.mypy_cache/
 agent/.pytest_cache/
 agent/.ruff_cache/
 agent/src/verifiable_answer_agent/contracts/query-tools.schema.json
+
+# Agent worktrees that Claude Code creates under the repository; each is its own checkout and
+# is never part of this tree's gate or its commits.
+.claude/worktrees/

@@ -101,6 +101,7 @@ phase_apis() {
         "${tf_common_vars[@]}" \
         -var="worker_image=us-docker.pkg.dev/cloudrun/container/hello" \
         -var="validator_image=us-docker.pkg.dev/cloudrun/container/hello" \
+        -var="query_image=us-docker.pkg.dev/cloudrun/container/hello" \
         google_artifact_registry_repository.images \
         "projects/${PROJECT_ID}/locations/${REGION}/repositories/ema-flow"
     fi
@@ -116,7 +117,8 @@ phase_apis() {
     -target=google_logging_project_sink.regulated_audit \
     "${tf_common_vars[@]}" \
     -var="worker_image=us-docker.pkg.dev/cloudrun/container/hello" \
-    -var="validator_image=us-docker.pkg.dev/cloudrun/container/hello"
+    -var="validator_image=us-docker.pkg.dev/cloudrun/container/hello" \
+    -var="query_image=us-docker.pkg.dev/cloudrun/container/hello"
 
   # google_logging_project_sink.regulated_audit's auto-provisioned writer_identity
   # isn't reliably readable back through Terraform (two separate apply passes both
@@ -188,12 +190,14 @@ phase_apply() {
   echo "=== terraform apply ==="
   WORKER_DIGEST="$(resolve_image_digest worker "$TAG")"
   VALIDATOR_DIGEST="$(resolve_image_digest validator "$TAG")"
+  QUERY_DIGEST="$(resolve_image_digest query "$TAG")"
   if ! terraform -chdir=infra apply \
     -input=false \
     -auto-approve \
     "${tf_common_vars[@]}" \
     -var="worker_image=${REPOSITORY}/worker@${WORKER_DIGEST}" \
-    -var="validator_image=${REPOSITORY}/validator@${VALIDATOR_DIGEST}"; then
+    -var="validator_image=${REPOSITORY}/validator@${VALIDATOR_DIGEST}" \
+    -var="query_image=${REPOSITORY}/query@${QUERY_DIGEST}"; then
     echo "=== terraform apply failed; dumping recent container logs for diagnosis ===" >&2
     # Only the worker's structured logs, whose fields are sanitised by src/lib/logger.ts; the
     # validator sidecar's free-text console output is never copied into deploy logs.

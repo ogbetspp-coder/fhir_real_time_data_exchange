@@ -43,6 +43,10 @@ output "cloud_run_service_uri" {
   value = google_cloud_run_v2_service.worker.uri
 }
 
+output "query_service_url" {
+  value = google_cloud_run_v2_service.query.uri
+}
+
 output "workflow_name" {
   value = google_workflows_workflow.epi.name
 }

@@ -131,7 +131,7 @@ The deployment:
 
 1. creates Artifact Registry and required APIs;
 2. GitHub Actions runs `npm run check` as the Quality gate step before deploy; Cloud Build
-   (`cloudbuild.images.yaml`) only builds the worker and validator images; `cloudbuild.yaml` is
+   (`cloudbuild.images.yaml`) only builds the worker, validator, and query images; `cloudbuild.yaml` is
    a separate, manual/CI-optional configuration that additionally runs the quality gate,
    standards-integrity check, and Terraform format/validate before building those same images;
 3. deploys immutable image digests; Binary Authorization is configurable
@@ -206,6 +206,78 @@ gcloud storage buckets update "gs://EVIDENCE_BUCKET" --lock-retention-period
 ```
 
 Do not run that command for a disposable prototype project.
+
+### Calling the query service
+
+`ema-flow-<env>-query` (`docs/architecture.md`, `docs/design/epi-mcp-query-service.md`) is a
+separate Cloud Run deployable from the worker: read-only, its own service account, its own
+Terraform variables. Two things must be granted before it answers anything:
+
+1. **Invocation** — add your principal to `query_invokers` (a Terraform variable, so the grant
+   is in version control):
+   ```hcl
+   query_invokers = ["user:you@example.com"]
+   ```
+2. **Entitlement** — add your token's `sub` claim to `query_entitlements_json`, keyed by that
+   subject:
+   ```hcl
+   query_entitlements_json = jsonencode({
+     "you@example.com" = { organisation = "demo", bundles = ["synthetic-type2-smpc"] }
+   })
+   ```
+
+Both a user account and a service account can call the service; only the token-minting command
+differs. Cloud Run's own edge check and the service's own `QUERY_AUDIENCE` check both require
+the token's audience to equal the service URL, so mint it for that URL in either case:
+
+```bash
+SERVICE_URL="$(terraform -chdir=infra output -raw query_service_url)"
+
+# As your own logged-in user credential:
+gcloud auth print-identity-token --audiences="$SERVICE_URL"
+
+# As a service account, without switching your active gcloud account (needs
+# roles/iam.serviceAccountTokenCreator on that service account):
+gcloud auth print-identity-token \
+  --impersonate-service-account="ema-flow-query-caller@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
+  --audiences="$SERVICE_URL"
+```
+
+A caller's subject is the `sub` claim of that same token. Read it locally without printing the
+token itself anywhere it could be logged — decode the payload in memory and keep only the claim:
+
+```bash
+TOKEN="$(gcloud auth print-identity-token --audiences="$SERVICE_URL")"
+printf '%s' "$TOKEN" | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null | jq -r .sub
+```
+
+Then call the service. `/healthz` needs no application-level auth, but Cloud Run's own IAM
+check still applies to it, so the same bearer token is required:
+
+```bash
+TOKEN="$(gcloud auth print-identity-token --audiences="$SERVICE_URL")"
+
+curl -s -H "Authorization: Bearer $TOKEN" "$SERVICE_URL/healthz"
+
+curl -s -X POST "$SERVICE_URL/mcp" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "protocolVersion": "<protocol version pinned by the query service>",
+          "capabilities": {},
+          "clientInfo": { "name": "curl", "version": "0.0.0" }
+        }
+      }'
+```
+
+A missing or invalid token returns `401` with body `{ "error": "unauthenticated" }` and nothing
+else. `QUERY_AUDIENCE` is set from the service's own URL and needs a two-apply bootstrap the
+first time the service is created — see the comment on that variable in `infra/query.tf`.
 
 ## Standards and validation
 

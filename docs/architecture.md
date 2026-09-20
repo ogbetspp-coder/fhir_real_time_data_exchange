@@ -166,6 +166,30 @@ Healthcare API, Storage, BigQuery, and KMS and routed to a retained regional log
   Assured Workloads where applicable, Access Transparency/Approval, and approved CMEK/HSM
   policies.
 
+## Query service
+
+`ema-flow-<env>-query` (ADR 0004, `docs/design/epi-mcp-query-service.md`) is a second, discrete
+Cloud Run deployable, not a mode of the worker.
+
+- **Intended use.** A read-only Model Context Protocol endpoint that lets an AI assistant answer
+  questions about product information with verifiable answers: every result names the FHIR
+  resource and version it came from and carries the hashes needed to check it against the store
+  without trusting the service.
+- **Identity.** Its own service account, `ema-flow-query-<env>`, holds exactly two roles:
+  `roles/healthcare.fhirResourceReader` scoped to the Healthcare dataset (not the project) and
+  `roles/logging.logWriter`. No write role, no bucket, no BigQuery, no KMS access — nothing the
+  worker's service account holds.
+- **Authentication.** Cloud Run requires a Google-signed OIDC ID token at the edge for every
+  request (no `allUsers` invoker); the service verifies that token again itself against
+  `QUERY_AUDIENCE` before serving `/mcp`, so the edge is not trusted alone. Invocation is
+  granted per caller through the `query_invokers` Terraform variable.
+- **What it must never do.** Write, amend, draft, rewrite, or summarise regulated narrative;
+  return narrative without its hash; disclose a document outside a caller's entitlement (every
+  such document is `document-not-found`, not `not-entitled`).
+- **Audit.** Every tool call produces one `QueryAuditRecord` (`src/contracts/query-tools.ts`):
+  principal, tool, a digest of the arguments, outcome, and counts — never narrative, never an
+  argument value — through the same logger the worker uses.
+
 ## Scale and failure behavior
 
 Each document is an independent, idempotent run. Workflows provides retries and execution
