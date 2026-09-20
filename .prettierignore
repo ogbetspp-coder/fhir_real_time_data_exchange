@@ -23,3 +23,13 @@ zone-a/.ruff_cache/
 # The differential corpora: JSONL, generated, and not formatted by anything.
 zone-a/tests/fixtures/differential-smoke.jsonl
 differential.jsonl
+
+# The agent (Python). Same shape as Zone A: two virtualenvs and the tool caches are local
+# build output. The vendored contract is a byte copy of contracts/generated/ written by
+# scripts/sync_contract.py; formatting it would make the --check comparison fail.
+agent/.venv/
+agent/.uv-bootstrap/
+agent/.mypy_cache/
+agent/.pytest_cache/
+agent/.ruff_cache/
+agent/src/verifiable_answer_agent/contracts/query-tools.schema.json
