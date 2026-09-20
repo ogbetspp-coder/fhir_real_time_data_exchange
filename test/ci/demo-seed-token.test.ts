@@ -62,5 +62,11 @@ describe("demo seed worker token audience", () => {
     const result = seed(syntheticToken(WORKER_URL));
 
     expect(result.stderr).not.toContain(REFUSAL);
+    // Absence of the refusal proves nothing on its own: a script that failed to start, or
+    // exited at one of its `required()` environment checks, also never prints it. So assert the
+    // run reached the work — it gets as far as trying to reach Cloud Storage, which is the
+    // first thing that happens after the token is accepted.
+    expect(result.stderr).not.toContain("is required");
+    expect(result.stderr).toMatch(/storage|credential|ENOENT/i);
   });
 });

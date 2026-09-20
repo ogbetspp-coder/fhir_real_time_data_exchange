@@ -753,11 +753,17 @@ describe("ePI query service, phase 1", () => {
 
     const terraform = files.join("\n");
     const blocks = terraformBlocks(terraform);
-    expect(
-      blocks.some(({ type, body }) => type === "google_service_account" && /query/i.test(body)),
-    ).toBe(true);
 
-    const roles = queryServiceAccountRoles(terraform);
+    // Both identities are named by their Terraform resource name, not matched by a word in the
+    // block. A name-matching test can be evaded by choosing a different name, which is exactly
+    // what a boundary test must not permit.
+    const declared = blocks
+      .filter(({ type }) => type === "google_service_account")
+      .map(({ name }) => name);
+    expect(declared).toContain("query");
+    expect(declared).toContain("caller");
+
+    const roles = serviceAccountRoles(terraform, "query");
     expect(new Set(roles.map(({ role }) => role))).toEqual(
       new Set(["roles/healthcare.fhirResourceReader", "roles/logging.logWriter"]),
     );
@@ -768,6 +774,14 @@ describe("ePI query service, phase 1", () => {
     // The FHIR reader role is bound on the dataset, never on the project.
     expect(reader?.type).toBe("google_healthcare_dataset_iam_member");
     expect(writer?.type).toBe("google_project_iam_member");
+
+    // The impersonation-only caller identity may invoke the query service and do nothing else.
+    // It reads no store, writes no log, and holds no project or dataset role; the token-creator
+    // binding is a role others hold over it, so it is not counted here.
+    const callerRoles = serviceAccountRoles(terraform, "caller");
+    expect(callerRoles).toEqual([
+      { type: "google_cloud_run_v2_service_iam_member", role: "roles/run.invoker" },
+    ]);
   });
 });
 
@@ -827,18 +841,18 @@ type TerraformBinding = { type: string; role: string };
 // policy is counted and not overlooked. It is deliberately tolerant about naming — the
 // Terraform is another builder's file — and strict about what it asserts: the set of roles,
 // and where each one is bound.
-export function queryServiceAccountRoles(terraform: string): TerraformBinding[] {
-  const blocks = terraformBlocks(terraform);
-  const accountNames = blocks
-    .filter(({ type, body }) => type === "google_service_account" && /query/i.test(body))
-    .map(({ name }) => name);
+export function serviceAccountRoles(terraform: string, account: string): TerraformBinding[] {
+  // Only a binding that names the account as a *member* is a role the account holds. A binding
+  // whose `service_account_id` is the account is the opposite direction — someone else holding
+  // a role over it, as the token-creator grant does — and must not be counted as a permission
+  // this identity has.
+  const member = new RegExp(
+    `\\bmembers?\\s*=[^\\n]*google_service_account\\.${account}\\.email|\\bmembers?\\s*=\\s*\\[[^\\]]*google_service_account\\.${account}\\.email`,
+  );
 
-  return blocks.flatMap(({ type, body }) => {
+  return terraformBlocks(terraform).flatMap(({ type, body }) => {
     if (!/_iam_(member|binding|policy)$/.test(type)) return [];
-    const mentionsAccount =
-      accountNames.some((name) => new RegExp(`google_service_account\\.${name}\\b`).test(body)) ||
-      body.includes("ema-flow-query");
-    if (!mentionsAccount) return [];
+    if (!member.test(body)) return [];
     const role = /\brole\s*=\s*"([^"]+)"/.exec(body)?.[1];
     return role === undefined ? [] : [{ type, role }];
   });

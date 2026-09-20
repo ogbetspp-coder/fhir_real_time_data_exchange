@@ -87,16 +87,32 @@ them. `terraform output` needs the real backend — a working copy initialised w
 `terraform -chdir=infra init -input=false -backend-config="bucket=<PROJECT_ID>-ema-flow-tfstate" -backend-config="prefix=terraform/state"`
 first.
 
+Minting the token below needs a one-time grant that project ownership does not include.
+Impersonating the workflow account as the project owner was refused with
+`Permission 'iam.serviceAccounts.getAccessToken' denied` (reproduced 2026-09-20), so do this
+first, once per environment:
+
+```bash
+gcloud iam service-accounts add-iam-policy-binding \
+  "ema-flow-workflow-<ENV>@<PROJECT_ID>.iam.gserviceaccount.com" \
+  --member="user:<you>@<your-domain>" \
+  --role="roles/iam.serviceAccountTokenCreator" \
+  --project="<PROJECT_ID>"
+```
+
 ```bash
 export SUBMISSION_BUCKET="$(terraform -chdir=infra output -raw submission_bucket)"
 export WORKER_URL="$(terraform -chdir=infra output -raw cloud_run_service_uri)"
 
 # An ID token for $WORKER_URL, minted as a service account that holds run.invoker on the
-# worker. A human's Application Default Credentials cannot mint one; see the README.
-export WORKER_ID_TOKEN="$(gcloud auth print-identity-token \
+# worker. A human's Application Default Credentials cannot mint one; see the README. The
+# assignment fails loudly rather than exporting an empty token, which the script would read
+# as "not set" and silently fall back to ADC for.
+WORKER_ID_TOKEN="$(gcloud auth print-identity-token \
   --impersonate-service-account="ema-flow-workflow-<ENV>@<PROJECT_ID>.iam.gserviceaccount.com" \
   --audiences="$WORKER_URL" \
-  --include-email)"
+  --include-email)" || { echo 'token mint failed — do the grant above first' >&2; return 1; }
+export WORKER_ID_TOKEN
 
 npx tsx scripts/demo/seed.ts --dry-run   # rehearse: prints locations and hashes, writes nothing
 npx tsx scripts/demo/seed.ts
@@ -323,9 +339,10 @@ _(Items 1 and 1b — built, not deployed.)_ The assistant version: the same ques
 answered from `find_product` plus `get_section`, every quoted sentence followed by its product,
 version, `sourceKey` and hash, and each quote re-checked through `verify_quote` after the answer
 is composed. One honesty point for the room: `find_product` answers `truncated: true` whenever
-the caller's entitlement holds more documents than the call actually searched — the scan
-horizon of 200, the `limit` argument, or the request's read budget can each cut it short. With
-three entitled products and no small `limit` it will be false here. The assistant is instructed
+the answer is shorter than the caller's entitlement holds — either documents went unsearched
+(the scan horizon of 200, or the request's read budget) or more documents matched than `limit`
+returns. So the assistant is never able to present a short list as a complete one. With three
+entitled products and no small `limit` it will be false here. The assistant is instructed
 never to say "no such product" when it is true. The promise is narrow and worth repeating exactly as
 `docs/design/verifiable-answers.md` states it: every sentence presented as label content is
 verbatim, hashed, and re-checked — not that the assistant is right.

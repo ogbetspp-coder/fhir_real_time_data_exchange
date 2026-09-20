@@ -196,9 +196,10 @@ Four places, recorded because each cost time and a second implementer would hit 
 
 Two changes reach this agent.
 
-- **`find_product` output carries `truncated`, required.** True means the service stopped
-  searching before it had covered the caller's whole entitlement, so an empty `products` with
-  `truncated` true is not "no such product". The agent does not compose `find_product` results
+- **`find_product` output carries `truncated`, required.** True means the list is shorter than
+  the caller's entitlement holds — documents left unsearched, or matches dropped by `limit` —
+  so an empty `products` with `truncated` true is not "no such product", and a full one is not
+  the whole list. The agent does not compose `find_product` results
   — only `get_section` results become blocks — so this lands in the system instruction: the
   model is told to say the search was cut short and to ask for a narrower product name, and
   never to say there is no such product when `truncated` is true. That is a layer-3 instruction

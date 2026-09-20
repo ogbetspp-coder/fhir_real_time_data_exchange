@@ -177,9 +177,9 @@ resource "google_cloud_run_v2_service_iam_member" "query_invoker" {
 # var.query_token_creators, and a token minted this way authenticates as this account, so the
 # entitlement map must be keyed by this account's `sub`, not by the human's.
 #
-# The three arguments below avoid the word "query" deliberately: test/query/acceptance.test.ts
-# reads the IAM roles of every google_service_account block whose body contains "query" and
-# asserts that set is exactly the query service account's two reader roles.
+# test/query/acceptance.test.ts asserts this account's roles are exactly one: run.invoker on
+# the query service. It names both accounts by their Terraform resource name, so nothing here
+# needs to be worded to avoid a test.
 resource "google_service_account" "caller" {
   account_id   = "ema-flow-caller-${var.environment}"
   display_name = "EMA Flow MCP caller (${var.environment})"

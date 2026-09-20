@@ -181,8 +181,8 @@ honestly" and traced as UR-20.
   It does not resolve build arguments, so `FROM ${BASE}` or `--from=$STAGE` passes unexamined,
   and it does not contact a registry, so it proves only that a digest was written — not that
   the registry still serves the content that digest named. Its notion of a stage is also
-  textual: any `AS` name it reads is treated as a stage for the rest of the file, whether or
-  not the builder would accept that name.
+  textual: an `AS` name it reads becomes a stage for the instructions below it, whether or not
+  the builder would accept that name.
 - **A refused body is audited only as a log line.** Bodies the service refuses before the
   transport is connected write a `refused-body` warning and no audit record, so the refusal
   surface is visible in logs but not in the audit trail the `QueryAuditRecord` contract
@@ -232,13 +232,14 @@ identity, and shares only pure libraries with the worker.
   of `npm run check`) fails if any root `Dockerfile*` pulls image bytes from a reference that is
   not pinned by `@sha256` digest, or if two Node-based Dockerfiles pin different digests. It
   scans all three places a Dockerfile pulls bytes — `FROM`, `--from=` on `COPY` and `ADD`, and
-  `from=` inside a `RUN --mount=` flag — and skips a reference that names a stage declared in
-  the same file or a stage index. Stage names are collected over the whole file before any
-  reference is judged, so a stage referenced above the instruction that declares it is still
-  recognised; the one name excluded is a `FROM`'s own `AS` name, which that instruction
-  declares rather than refers to, so `FROM busybox AS busybox` is judged as the image
-  `busybox` and fails, and a `FROM node:...@<digest> AS node` is held to the shared Node digest
-  like any other. The scan is textual: it joins line continuations and ignores
+  `from=` inside a `RUN --mount=` flag — and skips a reference that names a stage declared
+  earlier in the same file, or a stage index. A stage counts only from the instruction below
+  the one that declares it, which is Docker's own rule and is what stops a name from shielding
+  an image: `FROM busybox AS busybox` is judged as the image `busybox` and fails, and so does
+  the pair `FROM alpine AS busybox` / `FROM busybox AS alpine`, in which each line would
+  otherwise be excused by the other's name. Node digests are keyed per instruction, so two
+  Node stages in one file pinned to different digests fail rather than the second overwriting
+  the first. The scan is textual: it joins line continuations and ignores
   comments, but it does not resolve build arguments (`FROM ${BASE}`, `--from=$STAGE`) and it
   does not contact a registry, so it cannot see indirection through a build arg and a digest it
   accepts is only as good as the registry content addressed by it.
@@ -686,10 +687,14 @@ precisely so entitlements can be granted by a role separate from the developer.
   request was taken up, not from when the service gave up waiting, so the one path where a
   record exists because a call ran long does not report it as instantaneous. Decided
   2026-09-20.
-- The image-pinning gate collects stage names over the whole file — so a forward reference to a
-  stage is not mistaken for an image — but excludes a `FROM`'s own `AS` name when judging that
-  `FROM`, so naming a helper stage after the image it comes from cannot hide an unpinned
-  reference. Decided 2026-09-20.
+- The image-pinning gate resolves a stage name only against stages declared **above** the
+  instruction that uses it, which is Docker's own rule, and it adds a `FROM`'s `AS` name only
+  after that `FROM` has been judged. So an unpinned image cannot be hidden behind a name the
+  file happens to declare: neither `FROM busybox AS busybox` nor the pair
+  `FROM alpine AS busybox` / `FROM busybox AS alpine` passes. Node digests are collected per
+  instruction rather than per file, so two stages in one Dockerfile pinned to different Node
+  digests fail the agreement check instead of the later one overwriting the earlier. Decided
+  2026-09-20.
 - `scripts/demo/seed.ts` decodes the `aud` claim of the bearer it is about to present and exits
   before its first request when it is not the worker URL. Application Default Credentials of
   type `authorized_user` cannot mint a token for an arbitrary audience — the library ignores

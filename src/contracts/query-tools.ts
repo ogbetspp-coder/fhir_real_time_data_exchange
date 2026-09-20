@@ -121,9 +121,10 @@ export const ProductSummarySchema = z
 export const FindProductOutputSchema = z
   .strictObject({
     products: z.array(ProductSummarySchema).max(50),
-    // True when the caller's entitlement holds more documents than the service searched in one
-    // call, so an empty `products` never silently means "no such product": the caller can
-    // narrow the query, and the audit record carries the same fact.
+    // True when this answer is shorter than what the caller's entitlement holds — either
+    // because documents were left unsearched, or because more documents matched than `limit`
+    // returns — so neither an empty nor a full `products` ever silently means "that is all
+    // there is": the caller can narrow the query, and the audit record carries the same fact.
     truncated: z.boolean(),
   })
   .meta({ id: "FindProductOutput" });
@@ -271,7 +272,8 @@ export const QueryAuditRecordSchema = z
     argumentsSha256: Sha256Hex,
     outcome: QueryAuditOutcome,
     resultCount: Count,
-    // find_product only: the entitlement held more documents than one call searches.
+    // find_product only: the answer was shorter than the entitlement holds — documents left
+    // unsearched, or matches the limit dropped.
     truncated: z.boolean().optional(),
     durationMs: Count,
     bundleId: FhirId.optional(),

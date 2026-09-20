@@ -65,8 +65,12 @@ def test_the_instruction_says_the_four_things_it_is_meant_to_say() -> None:
 
 
 def test_the_instruction_covers_a_truncated_product_search() -> None:
-    # query-tools 2.0.0: an empty find_product result with truncated true is not "no such
-    # product". Again not a wording test, only that the instruction addresses the field.
+    # query-tools 2.0.0: truncated true means the list is shorter than the entitlement holds,
+    # either because documents went unsearched or because more matched than the limit returns.
+    # So neither an empty result nor a full one may be presented as the whole answer. Not a
+    # wording test, only that the instruction addresses the field and both of its causes.
     assert "truncated" in SYSTEM_INSTRUCTION
-    assert "cut short" in SYSTEM_INSTRUCTION
+    assert "incomplete" in SYSTEM_INSTRUCTION
     assert "narrower" in SYSTEM_INSTRUCTION
+    assert "no such product" in SYSTEM_INSTRUCTION
+    assert "complete" in SYSTEM_INSTRUCTION

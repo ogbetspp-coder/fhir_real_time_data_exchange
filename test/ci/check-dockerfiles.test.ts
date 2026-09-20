@@ -109,7 +109,10 @@ describe("Dockerfile image pinning gate", () => {
     expect(result.stderr).toContain("Dockerfile:2: RUN --mount from busybox:latest is not pinned");
   });
 
-  it("passes a stage referenced before the instruction that declares it", () => {
+  it("fails a reference to a stage declared below it, because Docker resolves it as an image", () => {
+    // Docker only lets `COPY --from` name a stage declared above it, so `runtime` here is not
+    // the stage two lines down: it is an image reference, unpinned. Treating it as a stage
+    // would let any unpinned image be shielded by choosing a name the file declares later.
     const result = check({
       Dockerfile: [
         `FROM ${PINNED_NODE} AS build`,
@@ -118,7 +121,41 @@ describe("Dockerfile image pinning gate", () => {
       ].join("\n"),
     });
 
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("COPY --from runtime is not pinned");
+  });
+
+  it("passes a stage referenced after the instruction that declares it", () => {
+    const result = check({
+      Dockerfile: [
+        `FROM ${PINNED_NODE} AS build`,
+        `FROM ${PINNED_NODE} AS runtime`,
+        "COPY --from=build /app/package.json ./",
+      ].join("\n"),
+    });
+
     expect([result.status, result.stderr]).toEqual([0, ""]);
+  });
+
+  it("fails two stages in one file pinned to different node digests", () => {
+    // Keying the digest by file would let the second FROM overwrite the first, hiding exactly
+    // the drift ADR 0003 cares about: a build stage moved to a different Unicode database.
+    const other = `node:22.14.0-bookworm-slim@sha256:${"2".repeat(64)}`;
+    const result = check({
+      Dockerfile: [`FROM ${PINNED_NODE} AS build`, `FROM ${other} AS runtime`].join("\n"),
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("pin different digests");
+  });
+
+  it("fails two unpinned images that shield each other with the other's stage name", () => {
+    const result = check({
+      Dockerfile: ["FROM alpine AS busybox", "FROM busybox AS alpine"].join("\n"),
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("FROM alpine is not pinned");
   });
 
   it("fails a FROM whose own stage name is its image name", () => {

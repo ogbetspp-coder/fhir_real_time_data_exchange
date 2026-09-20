@@ -316,9 +316,21 @@ token check of its own, still returns 200, while every `/mcp` call is answered
 `401 {"error":"unauthenticated"}`. Mint tokens for `query_audience` and send them to
 `query_service_url`.
 
+Before the first `terraform output` in this file will answer anything, point the working copy
+at the real backend: see [`terraform output` needs the backend
+first](#terraform-output-needs-the-backend) immediately below. Without it every output fails,
+and inside `$( )` that failure is silent — the variable is set to an empty string and the first
+symptom is a token minted for an empty audience.
+
 ```bash
-SERVICE_URL="$(terraform -chdir=infra output -raw query_service_url)"
-AUDIENCE="$(terraform -chdir=infra output -raw query_audience)"
+SERVICE_URL="$(terraform -chdir=infra output -raw query_service_url)" || {
+  echo 'run the backend init below first' >&2
+  return 1 2>/dev/null || exit 1
+}
+AUDIENCE="$(terraform -chdir=infra output -raw query_audience)" || {
+  echo 'run the backend init below first' >&2
+  return 1 2>/dev/null || exit 1
+}
 ```
 
 That 401 was reproduced in review against the service's verification code. It has not been
@@ -471,10 +483,11 @@ The `401` line logged carries nothing derived from the credential; the `403` lin
 principal (the `sub` an operator would entitle). Inside the protocol, a document outside the
 caller's entitlement is `document-not-found` from every tool — `not-entitled` is an audit
 outcome only, never a returned error code. `find_product` reads at most the first 200 entitled
-Bundle ids (8 reads in flight) and answers `truncated: true` whenever the caller's entitlement
-holds more documents than the call searched — because the horizon cut the list, because `limit`
-stopped the scan, or because the request's read budget ran out — so an empty `products` with
-`truncated: true` is not "no such product". One HTTP request may make 400 store reads across
+Bundle ids (8 reads in flight) and answers `truncated: true` whenever the answer is shorter
+than the caller's entitlement holds — because documents were left unsearched (the horizon cut
+the list, or the request's read budget ran out) or because more documents matched than `limit`
+returns — so an empty `products` with `truncated: true` is not "no such product", and a full
+one is not "that is all there is". One HTTP request may make 400 store reads across
 its whole JSON-RPC batch; past that, `find_product` stops scanning and every other tool answers
 `unavailable` rather than reading. That is a per-request bound and not a per-principal quota.
 

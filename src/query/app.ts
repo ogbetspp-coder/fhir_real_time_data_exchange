@@ -529,6 +529,10 @@ export function createQueryApp(
   const deadlineMs = deps.requestDeadlineMs ?? REQUEST_DEADLINE_MS;
 
   return async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
+    // Taken before anything else this request does, including reading the body, so a record
+    // written for a call that never finished dates from when the request arrived rather than
+    // from when the service gave up waiting or finished uploading.
+    const requestStartedAt = Date.now();
     const path = new URL(request.url ?? "/", "http://ema-flow-query.invalid").pathname;
 
     if (path === "/healthz") {
@@ -616,7 +620,7 @@ export function createQueryApp(
       return;
     }
 
-    const messageCount = Array.isArray(body) ? body.length : body === undefined ? 0 : 1;
+    const messageCount = Array.isArray(body) ? body.length : 1;
 
     if (Array.isArray(body) && body.length > MAX_BATCH_MESSAGES) {
       refuseBody(messageCount);
@@ -651,11 +655,6 @@ export function createQueryApp(
     // what lets Cloud Run scale the service to zero and across instances: no session lives
     // between requests. The transport and the server are built per request for the same reason.
     const transport = new StreamableHTTPServerTransport({ enableJsonResponse: true });
-
-    // When the service writes a record for a call that never finished, this is the `at` and the
-    // start `durationMs` is measured from: the call occupied the request from here, not from
-    // the moment the wait was given up.
-    const requestStartedAt = Date.now();
 
     let end: RequestEnd = "answered";
     try {

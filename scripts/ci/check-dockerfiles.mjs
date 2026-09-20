@@ -93,30 +93,33 @@ const nodeDigests = new Map();
 for (const name of dockerfiles) {
   const lines = instructions(readFileSync(path.join(root, name), "utf8"));
 
-  // Collected over the whole file first, so a reference is judged against every stage the file
-  // declares rather than only the ones above it.
+  // Stages are collected as the file is walked, so a reference resolves to a stage only if that
+  // stage was declared ABOVE it. That is Docker's own rule — `COPY --from` and `RUN --mount`
+  // cannot name a later stage — and it is what keeps the check from being weakened by a name:
+  // judged against the whole file, `FROM alpine AS busybox` followed by `FROM busybox AS alpine`
+  // shields both of its unpinned images behind the other's stage name.
   const stages = new Set();
-  for (const { text } of lines) {
-    const stage = FROM_LINE.exec(text)?.[3];
-    if (stage !== undefined) stages.add(stage.toLowerCase());
-  }
 
   for (const { line, text } of lines) {
-    // The `AS` name this instruction declares. It is in `stages` for every other instruction,
-    // and is removed here for this one: `FROM busybox AS busybox` pulls the image `busybox`.
-    const declared = FROM_LINE.exec(text)?.[3]?.toLowerCase();
-
     for (const { keyword, ref } of imageReferences(text)) {
       const referenced = ref.toLowerCase();
-      if ((stages.has(referenced) && referenced !== declared) || STAGE_INDEX.test(ref)) continue;
+      if (stages.has(referenced) || STAGE_INDEX.test(ref)) continue;
       if (!DIGEST.test(ref)) {
         failures.push(`${name}:${line}: ${keyword} ${ref} is not pinned by @sha256 digest`);
         continue;
       }
       if (keyword === "FROM" && ref.startsWith("node:")) {
-        nodeDigests.set(name, ref.slice(ref.indexOf("@") + 1));
+        // Keyed by line, not by file: two node stages in one Dockerfile pinned to different
+        // digests is exactly the drift this check exists to catch, and keying by file would
+        // let the later stage overwrite the earlier one and hide it.
+        nodeDigests.set(`${name}:${line}`, ref.slice(ref.indexOf("@") + 1));
       }
     }
+
+    // Added after the instruction is judged, so `FROM busybox AS busybox` still pulls the
+    // image `busybox` and is checked as one.
+    const declared = FROM_LINE.exec(text)?.[3];
+    if (declared !== undefined) stages.add(declared.toLowerCase());
   }
 }
 

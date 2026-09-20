@@ -256,9 +256,9 @@ only.
   outside the caller's entitlement is `document-not-found` from every tool; `not-entitled` is an
   audit outcome, never a returned error code. `find_product` reads at most the first 200
   entitled ids in entitlement order through a pool of 8, stops launching reads once `limit`
-  matches are in hand, and reports `truncated: true` whenever the entitlement holds more
-  documents than the call searched — the horizon, the limit, or an exhausted read budget — in
-  the result and in the audit record. One HTTP request may make 400 store reads across its
+  matches are in hand, and reports `truncated: true` whenever the answer is shorter than the
+  entitlement holds — documents left unsearched (the horizon or an exhausted read budget) or
+  matches dropped by the limit — in the result and in the audit record. One HTTP request may make 400 store reads across its
   whole batch; past that `find_product` stops scanning and every other tool answers
   `unavailable` without reading. It is a per-request bound, not a per-principal quota.
 - **What it must never do.** Write, amend, draft, rewrite, or summarise regulated narrative;
