@@ -37,7 +37,13 @@ Services are discrete in **identity and state**, never in code.
    system produces.
 5. **Boundaries are proven, not asserted.** Every service has negative tests for what it must
    not be able to do — an identity that cannot write, a tenant that cannot read another's
-   product — and the Terraform that grants its roles is the only place they are granted.
+   product — and carries, in `docs/validation/README.md`, a traceability row per prohibition
+   naming its test. Tests assert the Terraform-declared role set; the effective IAM policy can
+   be widened outside Terraform, so each deployment's evidence includes an effective-policy
+   export per service account. Role grants that cannot be Terraform-managed — today the
+   deployer's bootstrap roles, `roles/documentai.editor` on the deployer, and the audit log
+   sink's writer identity — are listed in `docs/architecture.md` with the reason, and
+   re-confirmed at each deployment.
 6. **One repository, until a second team exists.** Discrete deployables share one repository,
    one CI, and one release cadence. A repository split is a coordination decision, not a
    compliance one, and is deferred (ADR 0002, roadmap).
@@ -45,10 +51,14 @@ Services are discrete in **identity and state**, never in code.
 ## Consequences
 
 - Each new service adds: a service account, its IAM, a Cloud Run service, an image build, an
-  entry in the deploy pipeline, and a section in `docs/architecture.md` naming its intended use
-  and its permissions. That is the cost of a validation boundary and is paid deliberately.
+  entry in the deploy pipeline, a section in `docs/architecture.md` naming its intended use and
+  its permissions, its own intended-use paragraph and traceability rows in
+  `docs/validation/README.md`, and the negative tests decision 5 requires. That is the cost of
+  a validation boundary and is paid deliberately.
 - Shared libraries change under change control: a change to a shared pure library is a change
-  to every service that imports it, and the release notes say so.
+  to every service that imports it. The procedure in `docs/validation/README.md` — impact
+  assessment across importing services, then approval by a role other than the author —
+  applies to `src/contracts/`, `src/fidelity/`, `src/lib/hash.ts`, and `src/lib/logger.ts`.
 - The evidence model gains a `service` identity where it did not have one: the query service's
   audit records name the service and its image digest, as the worker's manifest already does.
 - What is _not_ done: no service mesh, no shared helper packages published to a registry, no

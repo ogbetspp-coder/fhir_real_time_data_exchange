@@ -100,9 +100,13 @@ the raw slice. See ADR 0003.
 
 ## Consequences
 
-- AI output can never reach the FHIR store or the evidence bucket without a hash-bound human
-  approval and a passing mechanical fidelity check. UR-09 to UR-17 in
-  `docs/validation/README.md` trace these controls to tests.
+- No `document`-source content can reach the FHIR store or the evidence bucket without a
+  hash-bound human approval and a passing mechanical fidelity check; UR-09 to UR-17 in
+  `docs/validation/README.md` trace these controls to tests. The `fixture` and
+  `healthcare-api` sources bypass this gate entirely and are controlled by IAM alone. A
+  deployment that handles anything but synthetic content must disable them (a run-source
+  allowlist is the planned control, roadmap "needs a person"); until it does, the sentence
+  above describes the `document` path, not a property of the deployed system.
 - `RunManifest` moves to `schemaVersion` 1.1.0 with an optional `ingestion` block containing
   hashes, counts, enumerations, and identifiers only. Version 1.0.0 remains readable.
 - A Zone A implementation in another language must generate its models from

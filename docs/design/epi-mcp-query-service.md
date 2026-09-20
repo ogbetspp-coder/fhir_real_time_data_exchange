@@ -1,6 +1,8 @@
 # Design note: ePI query service (Model Context Protocol)
 
-- Status: Proposed, not implemented
+- Status: Proposed; phase 1 in implementation on branch `mcp-query-phase1`. "Phase 1 as
+  built" below is the build specification and its acceptance tests are criteria until the
+  named test files under `test/query/` are merged — this line is updated when they are.
 - Date: 2026-09-20
 - Related: `docs/architecture.md`, `docs/adr/0002-two-trust-zones-and-canonical-submission.md`,
   `docs/adr/0003-mechanical-narrative-fidelity.md`
@@ -52,7 +54,10 @@ These are design constraints, not preferences. They follow from `AGENTS.md`.
    market entitlements are resolved first and pushed into the FHIR search; results are never
    fetched and then filtered.
 5. **Every call is audited** — principal, tool, argument digest, result count — and no returned
-   narrative is ever logged, exactly as `src/lib/logger.ts` already enforces for the pipeline.
+   narrative is logged. `src/lib/logger.ts` drops fields whose names match a forbidden pattern
+   and any value over 512 characters or containing `<`; that is a defence-in-depth guard, not a
+   proof. The proof is that no code path passes narrative to the logger, asserted by the
+   narrative-leak tests.
 
 ## Tool surface
 
@@ -97,7 +102,9 @@ A caller presents an OIDC token from Identity Platform or Workforce Identity Fed
 token subject maps to an organisation and an entitlement set. That set is resolved once per
 request and pushed into every FHIR search and BigQuery query as a filter. The service's own
 service account holds read-only access to the FHIR store and the ledger, and nothing else — it
-is a reader, and no misconfiguration of it can produce a write.
+is a reader. Its Terraform-declared role set contains no write role and a test asserts that set
+exactly; the _effective_ IAM policy can still be widened outside Terraform, so each
+deployment's evidence includes an effective-policy export for this service account.
 
 Cross-tenant isolation is the highest-risk area of this design and needs its own test suite:
 every tool needs a negative test proving that an entitled caller cannot reach an unentitled
@@ -176,7 +183,8 @@ identity, and shares only pure libraries with the worker.
 
 ### Acceptance tests (phase 1)
 
-Each of these is a test in the repository, and each is also a demonstration.
+Each of these is an acceptance criterion for phase 1 — it must exist as a named test under
+`test/query/` before the phase is called complete — and each is also a demonstration.
 
 1. **Verbatim with citations.** `get_section` returns the stored narrative byte for byte, with
    `narrativeDivSha256` and `normalizedTextSha256` that the test recomputes independently
@@ -200,6 +208,58 @@ Each of these is a test in the repository, and each is also a demonstration.
 7. **Least privilege, proven.** The Terraform-declared role set of the query service account is
    asserted by a test to be exactly the two roles above.
 
+## Security properties stated honestly
+
+Written after an assessor-style review of this note, so that what the service does not do is
+on the page next to what it does.
+
+- **Existence disclosure.** Outside a caller's entitlement every document is
+  `document-not-found`. That requires the _returnable_ error set to exclude `not-entitled`; the
+  contract keeps `not-entitled` only as an audit outcome. `verify_quote`'s `sectionsSearched`
+  is returned only for a document the caller is entitled to.
+- **Timing.** Entitlement is resolved before any store read, so an unentitled request returns
+  without I/O and is distinguishable by latency from an entitled miss. This is a usable
+  existence oracle. It is accepted for a demonstration and must be closed with a fixed-cost
+  miss path before multi-tenant use (UR-20).
+- **Prompt injection is not mitigated by the server.** `ContentNotice` is a declaration to the
+  client, not a control; a client may ignore it. What the server does is remove the
+  consequences it can: no write tool exists, the service account holds no write role, nothing
+  is cached across requests, so an injected instruction cannot change any state on this side
+  of the boundary. A steered assistant on the client side remains the integrator's risk.
+- **`verify_quote` is an oracle over section text.** Acceptable only because entitlement is
+  document-level and an entitled caller can already read the section; any future section- or
+  field-level entitlement must re-assess it.
+- **Token handling.** The bearer token is verified in memory and discarded: never logged, never
+  written to any store, never in an audit record — only the `sub` claim is retained as
+  `principal`. Google's signing keys are cached for their published lifetime; the entitlement
+  map is process-local and re-read on deploy.
+- **`/healthz`** is served on the Cloud Run IAM check alone and returns liveness, the service
+  name, and the build version only — never configuration values, principal, or entitlement
+  data.
+
+## Audit trail
+
+One `QueryAuditRecord` per tool call, through the regulated-audit sink to the retained log
+bucket (`min(evidence_retention_days, 3650)` days). Needed before a pilot, and listed in
+`docs/validation/README.md` UR-24: the record gains `versionId` (which version of a label was
+served), `credentialType`, and a `turnId` correlating it with the agent's per-turn record;
+the retained log bucket is locked; readers are a named role on that bucket only; a log-based
+alert fires on `not-entitled` outcomes. The trail is not cryptographically tamper-evident —
+Cloud Logging immutability plus IAM is the control, unlike the worker's KMS-signed manifest —
+and this note says so rather than implying otherwise.
+
+## Entitlement changes are change-controlled
+
+In phase 1 entitlements are a Terraform variable, which makes an access-control decision a
+code change. It therefore goes through the same pull-request, review, and promotion path as
+code, with an approver who is not the requester, and phase 2's Firestore backing exists
+precisely so entitlements can be granted by a role separate from the developer.
+
+## Decided
+
+- The tool schemas are a published, versioned contract (`contracts/generated/query-tools.schema.json`),
+  as the Zone A hand-off already is. Decided 2026-09-20.
+
 ## Open questions
 
 - Snippet length cap for `search_sections`, and whether snippets need their own span hashes.
@@ -207,5 +267,3 @@ Each of these is a test in the repository, and each is also a demonstration.
   `_history` (authoritative), and how to keep the two consistent in the answer.
 - Language scoping: ePI is per-language, so every search and section read must name a language
   explicitly rather than defaulting.
-- Whether to publish the tool schemas as a versioned contract in `contracts/generated/`, as the
-  Zone A hand-off already is.

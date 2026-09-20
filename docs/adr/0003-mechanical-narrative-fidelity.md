@@ -43,9 +43,12 @@ forgives. False failures are acceptable; false passes are not.
 
 Golden vectors in `test/fixtures/fidelity/` are the executable specification. Any
 re-implementation must reproduce every vector's output and `reportHash` byte-for-byte. Any
-change to the normalisation lists or the scanner's allow-lists is a new `NORMALIZATION_VERSION`,
-regenerates the vectors, and follows the change-control checklist in
-`docs/validation/README.md`.
+change within the scope that `docs/fidelity-normalization.md` section 8 defines — including a
+runtime whose Unicode or ICU version differs from the pinned one, with no code change — is a
+new `NORMALIZATION_VERSION`, regenerates the vectors, and follows the change-control checklist
+in `docs/validation/README.md`. Section 8 is the single normative statement of the trigger;
+this ADR and the validation README defer to it. `test/runtime.test.ts` fails the build if the
+runtime's Unicode version drifts from the pin, so the trigger cannot fire unnoticed.
 
 Zone B runs the verifier as a gate before `transformType2ToEma` for every `document` source:
 the report must parse against its contract schema, be `passed`, on the current normalisation

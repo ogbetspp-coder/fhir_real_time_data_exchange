@@ -1,7 +1,8 @@
 # Design note: verifiable answers on Google-native surfaces
 
-- Status: Proposed, 2026-09-20; Google product capabilities verified against documentation
-  dated 2026-09-18 (sources inline)
+- Status: Proposed, 2026-09-20. Google product capabilities below were read from Google's
+  public documentation (dated per source, inline); none has been exercised in this project's
+  tenant, and each must be re-confirmed in the console before it is relied on
 - Related: `docs/design/epi-mcp-query-service.md`, `docs/adr/0004-service-boundaries-and-shared-code.md`,
   `docs/roadmap.md` items 1, 1b, 1c
 
@@ -10,12 +11,19 @@
 An assistant's prose cannot be made trustworthy, and no one should claim it in front of a
 regulated buyer. What can be made true is this:
 
-> Every sentence an answer presents as label content is verbatim from the store, carries a
-> hash a reader can recompute, and has been mechanically re-checked against the store after
-> the assistant wrote it. Anything else in the answer is visibly the assistant's own words.
+> Every span the assistant presents as a quotation is verbatim from the store, carries a hash
+> a reader can recompute, and has been mechanically re-checked against the store after the
+> assistant wrote it. Whether the assistant marks label content as a quotation is a model
+> behaviour, not a guarantee: what is not marked is the assistant's own words, and is
+> unverified.
 
-That is a different promise from "the assistant is correct". It is achievable, it is testable,
-and it is the promise a QA function can put an intended-use statement around. The assistant is
+That is a different promise from "the assistant is correct", and a narrower one than "every
+sentence is checked". It is achievable, it is testable, and it is the promise a QA function
+can put an intended-use statement around. Two design consequences keep it honest: the agent
+fills a quotation slot only by reference to a tool result received in that turn — it never
+copies text into one — so an unverified string cannot be presented as a quotation; and an
+acceptance test flags an answer whose free-text part contains a span matching a stored section
+above a threshold, which is the paraphrase the post-check would otherwise miss. The assistant is
 never the source of truth; it is a guide to the source of truth, and every pointer it gives
 can be checked. This is the brand rule — AI proposes, math proves, humans decide — applied to
 reading.
@@ -35,14 +43,19 @@ reading.
    results, to quote rather than paraphrase, and to cite. This is the least reliable layer and
    is treated as such — it improves quality; it proves nothing.
 
-Layers 1 and 2 are ours. Layer 3 and everything a user sees are Google's.
+Layers 1 and 2 are ours; layer 3 and everything a user sees are Google's. The **validated
+boundary** is narrower than "ours": it is the query service, the fidelity library, and the
+store. The post-check is our code, but it runs inside the agent at the model's discretion, so
+its _invocation_ lies outside the boundary — an answer card without a verification stamp is,
+procedurally, unverified.
 
 ## Google-native surfaces, no custom frontend — what is confirmed
 
 The standing decision is that no custom UI is built where a Google surface serves the
 purpose. For an assistant that is the strongest version of the decision, because the surface
-is where a product would otherwise sink most of its effort. Every row below was checked
-against Google's documentation on 2026-09-20.
+is where a product would otherwise sink most of its effort. Every row below was read from
+Google's public documentation on 2026-09-20; nothing here has yet been exercised in this
+project's tenant.
 
 | Role                        | Google component                                                                                                                                                         | Ours?                         |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------- |
@@ -124,8 +137,17 @@ else:
    own words in a separate, labelled part.
 3. Runs the post-check: every verbatim block back through `verify_quote`; flags any
    `no-match` on the card.
-4. Emits one structured record per turn — tools called, spans verified — through the same
-   no-narrative logging discipline as everything else.
+4. Emits one structured record per turn through the same no-narrative logging discipline as
+   everything else. Its shape is a published contract like every other evidence artefact —
+   `AgentTurnRecord`: turn id, principal, model id and version, each tool call with its
+   `argumentsSha256`, one entry per presented span with `sourceKey`, `quoteSha256`, and
+   `match` or `no-match`; counts only, never prose. Without it, the demonstration's first two
+   scenes would produce no assessable evidence, so it is part of item 1b, not an afterthought.
+
+The user's token reaches the query service through Agent Engine's brokered Agent Identity
+(three-legged OAuth in which the agent never holds the raw credential) where it is available;
+the `header_provider` path that holds the token in session state for the turn is the
+fallback, and the design note says which was built.
 
 The same agent is exposed as a Google Chat app through Google's quickstart when a Workspace
 surface is wanted.
@@ -141,17 +163,55 @@ surface is wanted.
   not EU); some features fall back to global. Confirm against the client's residency bar
   before promising EU-only.
 
-## What this is and is not, for the intended-use statement
+## Intended use
 
-- It is an information-retrieval aid for trained staff. The validated boundary is the store,
-  the hashes, the tools, and the post-check. The model sits outside it, like a browser.
-- It does not make regulatory decisions, does not replace review, and is not patient-facing.
-  Patient-facing use is a separate, later, higher bar.
-- Residual risks are the ones already named for the query service: prompt injection through
-  document content (bounded by `ContentNotice` and by the model, not eliminated), and prose
-  omission (the assistant may leave something out; the post-check catches alteration, not
-  absence — which is why "the answer is the tool result" matters more than "the assistant is
-  careful").
+Written so that a risk assessment has something to assess rather than a sentence to argue
+with.
+
+- **Intended use.** A read-only information-retrieval aid that helps named, trained users in
+  Regulatory Affairs, Medical Information, and Promotional Review locate approved ePI content
+  and verify quotations against the validated store.
+- **Users.** Access is granted per principal (`query_entitlements_json` in phase 1, a
+  Firestore-backed grant in phase 2). Only staff who have completed the assistant training —
+  what the hash proves, what the post-check does not prove, and when to open the cited
+  section — are granted access. Training records are held by the owning organisation.
+- **Procedural control.** An answer is a pointer, never a record. Any use of retrieved content
+  in a regulatory, medical, promotional, or quality decision requires the user to open the
+  cited section by `bundleId`, `versionId`, and `sourceKey` and confirm the displayed hash.
+  Assistant answers are not filed as evidence and are not a controlled copy of the product
+  information.
+- **It must not be used for** regulatory decisions, promotional-copy approval, responses to
+  health authorities, safety reporting, patient- or healthcare-professional-facing
+  communication, or any use where the _absence_ of information matters: the post-check
+  detects alteration, never omission.
+- **Outputs and retention.** The system retains only the per-turn record (who, which tools,
+  which spans verified); answer text is not retained by this system.
+- **Periodic review.** Annually, and on any change to the model version, the normalisation
+  version, or the tool contract.
+
+## Residual risks, stated plainly
+
+- **Prompt injection** through document content is not mitigated by the server;
+  `ContentNotice` is a declaration the client may ignore. The server removes the consequences
+  it can (no write tool, no write role, no cross-request state); a steered assistant on the
+  client side remains the integrator's risk.
+- **Omission.** The post-check catches alteration, never absence. The assistant may leave
+  something out, which is why "the answer is the tool result" matters more than "the assistant
+  is careful", and why absence-dependent uses are excluded above.
+- **Mis-attribution.** `verify_quote` proves a span is in the document the assistant _named_;
+  it does not prove the assistant named the right product, version, or language. The card
+  displays product, `bundleId`, `versionId`, and language for the user to confirm, and the
+  demonstration shows this being checked.
+- **Data handling outside the boundary.** Regulated narrative leaves the validated boundary at
+  the tool-result hop and is processed by Gemini and Agent Engine. Before anything but
+  synthetic data crosses that hop, three things must be written down here: the contractual
+  basis on which prompts and tool results are processed (no-training, no human review,
+  prompt-log retention), the confirmed region of each component and whether it matches the
+  query service's `europe-west4` (Gemini Enterprise offers the `eu` multi-region and London;
+  some features fall back to global), and the data-processing agreement relied on. Until that
+  paragraph exists, the assistant path handles synthetic data only. This is the item a
+  security assessor will hold the assistant path on, and it is independent of the query
+  service, which stays within the project's own region.
 
 ## The demonstration (item 1c)
 
@@ -160,14 +220,24 @@ version, section — and everything here hangs off that address. PDFs do not hav
 
 1. **One truth, three windows.** Section 4.4 of a synthetic label as the validated EMA ePI, as
    the BigQuery row that appeared seconds after the write, and as an assistant answer with its
-   hash and approver. Same resource, same hash, no copies.
+   hash and approver. Same resource, same hash, no copies. The approver shown is synthetic —
+   `api-attestation` by a placeholder principal, because the approval service (roadmap item 4)
+   is not built — and the presenter says so _before_ the card appears: "no human approved this
+   content; what is real is that the store refuses content without an approval." Showing a
+   synthetic approver as "who signed off" without that sentence is the most damaging thing
+   this demonstration could do in front of a QA lead.
 2. **Change one word, watch the world know.** Version 2 of the same label with one sentence
    changed. FHIR history holds both; the ledger shows two hashes; `get_section` gives
    different hashes per version; `verify_quote` with the old sentence matches version 1 and
-   not version 2. Then the assistant is asked what changed, and every line of its answer is
-   checkable.
-3. **A question a regulator cannot ask a PDF.** Across all products, which list hepatic
-   impairment in section 4.3 — answered from coded sections, with citations.
+   not version 2. The assistant is then asked to _quote_ the sentence from each version — two
+   verified quotations — rather than to characterise the change: "what changed" is a
+   difference, and the post-check verifies presence, never completeness. The list of changes
+   comes from the hash comparison on screen; the assistant's part is two checked quotes.
+3. **A question a regulator cannot ask a PDF.** Across all products, which section 4.3
+   contains the exact phrase "hepatic impairment" — answered with one `verify_quote` per
+   product, match or no-match per product, each a mechanical result with a citation. Not "which
+   products mention hepatic impairment": that is an absence claim over model judgement, the one
+   class of answer this architecture cannot verify, and it must not be the closing scene.
 
 Enablers, all synthetic: a second version of the synthetic label differing by one sentence
 (consistently in source text and narrative, so it passes the gate honestly); two or three more
