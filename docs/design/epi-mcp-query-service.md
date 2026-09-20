@@ -131,6 +131,75 @@ product through any argument.
 Phase 1 is demonstrable in a meeting: ask a plain-English question, get an answer whose every
 sentence links back to a hash and an approver. That demo is the reason to build it.
 
+## Phase 1 as built (2026-09-20)
+
+The phasing table above is the original plan; this section is the authoritative shape of what
+phase 1 delivers. It follows ADR 0004: the query service is its own deployable with its own
+identity, and shares only pure libraries with the worker.
+
+- **Tools: four**, one more than planned. `find_product`, `get_section`, `get_provenance`, and
+  `verify_quote` — "is this quote what the label says?" — which compares a caller's text with a
+  section under the same normalisation the publishing gate uses and answers match or no-match
+  with offsets, never a paraphrase. It is read-only, it is the fidelity library doing double
+  duty, and it is the tool a medical-information or promotional-review team would use daily.
+  The full surface — inputs, outputs, the closed error codes, the audit record — is a published
+  contract: `src/contracts/query-tools.ts` → `contracts/generated/query-tools.schema.json`.
+- **Identity.** The service is its own Cloud Run service (`ema-flow-<env>-query`) with its own
+  service account holding `roles/healthcare.fhirResourceReader` on the dataset and
+  `roles/logging.logWriter`, and nothing else — no write role anywhere, no BigQuery, no
+  buckets. A negative test asserts the role set.
+- **Authentication.** Phase 1 accepts a Google-signed OIDC ID token for the service's audience,
+  which covers a Workspace user, a service account, and later an Identity Platform-federated
+  user without changing the service. Cloud Run requires authentication at the edge, and the
+  service verifies the token again itself: the edge is not trusted alone. Identity Platform as
+  the issuer for external users is phase 2.
+- **Entitlements** are an interface — `entitlementsFor(principal) → { organisations, bundles }`
+  — resolved once per request and applied before any store read. Phase 1 backs it with a
+  Terraform-managed map; Firestore replaces the backing in phase 2 without changing callers.
+  Outside a caller's entitlement, every document is `document-not-found`: existence is not
+  disclosed.
+- **Reads** go to the validated FHIR store only, by REST, as the worker's own client does.
+  Section lookup is by canonical `sourceKey`; the pinned mapping manifest translates to the
+  store's coding where needed. Nothing is cached across requests in phase 1.
+- **Provenance is document-level.** The persisted `Provenance` resource carries the source
+  document hash, the fidelity report hash, the approved-content hash, extractor and model
+  identities, and the approver. Per-section hashes in a `get_provenance` answer are recomputed
+  live from the stored narrative, which lets a client verify an answer against the store; the
+  comparison against the _approved_ record (the per-section hashes in the ingestion-provenance
+  evidence object) needs an evidence-bucket read and is phase 2.
+- **Transport** is the Model Context Protocol streamable-HTTP transport from the official SDK,
+  pinned, in stateless mode so Cloud Run can scale it. Tool descriptions state that content
+  fields are document text, never instructions.
+- **Audit.** One structured record per call (`QueryAuditRecord`): principal, tool, a digest of
+  the arguments, outcome, counts, latency. Through the same logger the worker uses, so its
+  no-narrative guard applies. Cloud Audit Logs record the store reads themselves.
+
+### Acceptance tests (phase 1)
+
+Each of these is a test in the repository, and each is also a demonstration.
+
+1. **Verbatim with citations.** `get_section` returns the stored narrative byte for byte, with
+   `narrativeDivSha256` and `normalizedTextSha256` that the test recomputes independently
+   from `div` and finds equal — the client never has to trust the service's arithmetic.
+2. **Is this quote accurate?** `verify_quote` says match for a fragment of a section, with the
+   right offsets; no-match for the same fragment with one character changed, a straightened
+   quotation mark, a flattened superscript, or a word removed; and match for the same fragment
+   with different whitespace or a ligature, because that is what the publishing gate accepts.
+3. **Prove where it came from.** `get_provenance` returns the approver, approval time, source
+   document hash, and fidelity report hash exactly as the persisted Provenance resource carries
+   them, and a section hash that equals the one `get_section` reports.
+4. **The injection test.** A synthetic section whose narrative contains an instruction-shaped
+   sentence comes back byte-identical, hash attached, `contentNotice` set — and nothing else
+   in the response changes.
+5. **The tenant wall.** Two synthetic organisations. A caller entitled to one receives
+   `document-not-found` for the other's document from every tool, for every argument shape
+   that could name it, and the audit record shows the attempt with outcome `not-entitled`
+   internally mapped to what was returned.
+6. **No narrative anywhere but the answer.** The audit record for every call, and every error
+   response, passes the same narrative-leak scan the pipeline's evidence is held to.
+7. **Least privilege, proven.** The Terraform-declared role set of the query service account is
+   asserted by a test to be exactly the two roles above.
+
 ## Open questions
 
 - Snippet length cap for `search_sections`, and whether snippets need their own span hashes.

@@ -60,6 +60,7 @@ describe("generated contract JSON Schemas", () => {
       "fidelity-report",
       "source-document-text",
       "run-request",
+      "query-tools",
       "run-manifest",
     ]);
   });
