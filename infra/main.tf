@@ -101,8 +101,10 @@ resource "google_bigquery_table" "transformation_runs" {
   }
 
   # Columns added after the first release are NULLABLE so BigQuery evolves the schema in place
-  # and existing rows stay valid; removing or retyping one would force a replacement, which
-  # deletion_protection would (correctly) refuse.
+  # and existing rows stay valid. Removing or retyping one is a different matter: the provider
+  # would plan a replacement, and `deletion_protection` defaults to false, so nothing here would
+  # stop it. Treat an edit to an existing column as a migration requiring an explicit plan
+  # review, not as an ordinary schema change.
   schema = jsonencode([
     { name = "run_id", type = "STRING", mode = "REQUIRED" },
     { name = "completed_at", type = "TIMESTAMP", mode = "REQUIRED" },

@@ -14,6 +14,7 @@ import {
 import {
   GcsSubmissionReader,
   SubmissionReadError,
+  submissionDownloadOptions,
   type GcsObjectFetcher,
   type SubmissionPart,
   type SubmissionReadReason,
@@ -222,6 +223,13 @@ describe("by-reference submission reader", () => {
       "malformed-json",
       "fidelity-report",
     );
+  });
+
+  // The size cap is only a cap if the client is told not to decompress: a range request
+  // suppresses server-side transcoding, so the client would otherwise gunzip a gzip-stored
+  // object and buffer a result up to a thousand times the cap.
+  it("asks Cloud Storage for a bounded range and refuses decompression", () => {
+    expect(submissionDownloadOptions(64)).toEqual({ start: 0, end: 64, decompress: false });
   });
 
   it("requires a configured submission bucket", () => {

@@ -16,8 +16,14 @@ import { log } from "../lib/logger.js";
 //
 // Trust model: the caller (Workflows, authenticated by IAM) chooses both the URI and the hash,
 // so this layer cannot decide whether a submission is legitimate. Its controls are narrow and
-// deliberate: reads are confined to one configured bucket, sizes are capped, and every object is
-// hash-checked. Legitimacy is the ingress gate's job.
+// deliberate: reads are confined to one configured bucket, stored bytes are capped, and every
+// object is hash-checked. Legitimacy is the ingress gate's job.
+//
+// Failures attributable to the submission — a disallowed URI, a missing, oversized, unparseable
+// or mis-hashed object — are closed reason codes carrying no document content. A failure of the
+// infrastructure itself (a Storage outage, a permission error) is deliberately not dressed up as
+// one: it propagates and is served as a 500, because it is not the caller's request that is
+// wrong and a retry is the right response.
 
 export type SubmissionPart = "submission" | "fidelity-report" | "source-text";
 
@@ -89,8 +95,23 @@ function declaredReportHash(report: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-function isNotFound(error: unknown): boolean {
-  return typeof error === "object" && error !== null && (error as { code?: unknown }).code === 404;
+function statusCode(error: unknown): unknown {
+  if (typeof error !== "object" || error === null) return undefined;
+  return (error as { code?: unknown }).code;
+}
+
+// The cap has to apply to what is transferred and held, so decompression is refused: the Storage
+// client otherwise requests gzip, and a range request suppresses server-side transcoding, so it
+// gunzips client-side and buffers the result. A deflate stream expands by up to 1032:1, which
+// would let an object well inside the cap arrive as gigabytes before `bytes.length` is ever
+// looked at. With `decompress: false` the range bounds the bytes that actually arrive, and a
+// gzip-stored object simply fails as invalid JSON — which is correct: Zone A stores plain JSON.
+export function submissionDownloadOptions(maxBytes: number): {
+  start: number;
+  end: number;
+  decompress: false;
+} {
+  return { start: 0, end: maxBytes, decompress: false };
 }
 
 function storageFetcher(projectId: string): GcsObjectFetcher {
@@ -102,10 +123,14 @@ function storageFetcher(projectId: string): GcsObjectFetcher {
       const [contents] = await storage
         .bucket(bucket)
         .file(object)
-        .download({ start: 0, end: maxBytes });
+        .download(submissionDownloadOptions(maxBytes));
       return contents;
     } catch (error) {
-      if (isNotFound(error)) return undefined;
+      const code = statusCode(error);
+      if (code === 404) return undefined;
+      // A ranged read of a zero-byte object answers 416. That is an unusable submission object,
+      // not an infrastructure failure, so it resolves to empty bytes and fails as invalid JSON.
+      if (code === 416) return Buffer.alloc(0);
       throw error;
     }
   };
@@ -179,7 +204,9 @@ export class GcsSubmissionReader implements SubmissionReader {
       stage: "submission-read",
       submissionBytes: submission.byteLength,
       reportBytes: fidelityReport.byteLength,
-      sourceTextBytes: sourceText.byteLength,
+      // Not `sourceTextBytes`: the logger drops any field whose name contains `text`, and this
+      // one is a byte count that should survive.
+      pagesBytes: sourceText.byteLength,
     });
 
     return {

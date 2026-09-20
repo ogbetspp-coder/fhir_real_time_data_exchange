@@ -141,8 +141,12 @@ resource "google_cloud_run_v2_service" "worker" {
     }
   }
 
-  # The ledger table is listed so its schema is updated before a revision that writes the new
-  # columns starts serving; an insert naming a column the table does not have is rejected.
+  # The ledger table is listed so its schema is patched before a revision that writes the new
+  # columns is created. That orders the apply; it does not close the window entirely, because
+  # BigQuery's streaming path caches a table's schema for a few minutes, so an insert naming a
+  # freshly added column can still be rejected shortly after the patch. Columns are only
+  # populated by document runs, which no Zone A service produces yet, so the window is currently
+  # unreachable; a retry on writeLedger is the fix when it stops being.
   depends_on = [
     google_project_service.required,
     google_project_iam_member.worker_healthcare,

@@ -7,21 +7,33 @@ export const MAX_JSON_NODES = 200_000;
 
 export function jsonShapeIssues(name: string, value: unknown): string[] {
   const stack: { value: unknown; depth: number }[] = [{ value, depth: 0 }];
-  let nodes = 0;
+  let nodes = 1;
+
   while (stack.length > 0) {
     const item = stack.pop();
     if (item === undefined) break;
-    nodes += 1;
-    if (nodes > MAX_JSON_NODES) return [`${name} exceeds ${MAX_JSON_NODES} JSON nodes`];
     if (item.depth > MAX_JSON_DEPTH) return [`${name} nesting exceeds depth ${MAX_JSON_DEPTH}`];
+
     const current = item.value;
+    let children: unknown[];
     if (Array.isArray(current)) {
-      for (const child of current) stack.push({ value: child, depth: item.depth + 1 });
+      children = current;
     } else if (current !== null && typeof current === "object") {
-      for (const child of Object.values(current as Record<string, unknown>)) {
-        stack.push({ value: child, depth: item.depth + 1 });
-      }
+      children = Object.values(current as Record<string, unknown>);
+    } else {
+      continue;
     }
+
+    // The budget is consulted before a node's children reach the work stack, never after. A
+    // single wide array would otherwise be expanded in full — one stack entry per element,
+    // gigabytes for a document well inside the size cap — to arrive at the rejection the node
+    // count was supposed to reach first. Arrays are counted without being copied.
+    if (nodes + children.length > MAX_JSON_NODES) {
+      return [`${name} exceeds ${MAX_JSON_NODES} JSON nodes`];
+    }
+    nodes += children.length;
+    for (const child of children) stack.push({ value: child, depth: item.depth + 1 });
   }
+
   return [];
 }
