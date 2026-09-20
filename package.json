@@ -56,8 +56,12 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@google-cloud/documentai": "10.1.0",
     "@types/node": "^26.6.2",
+    "@types/pdfkit": "0.17.6",
     "eslint": "^10.11.0",
+    "pdfjs-dist": "6.3.289",
+    "pdfkit": "0.20.2",
     "prettier": "^3.9.8",
     "tsx": "^4.23.13",
     "typescript": "^6.0.3",

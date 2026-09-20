@@ -13,6 +13,8 @@ gha-creds-*.json
 .idea/
 .vscode/
 .cache/
+# .cache/spikes/document-ai/ holds the extractor spike's run-time output (raw Document AI
+# responses, generated PDFs, reports); already covered by .cache/ above.
 __pycache__/
 *.pyc
 agent-tools/

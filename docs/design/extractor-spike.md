@@ -44,10 +44,13 @@ their cell structure, and the character-level agreement between Document AI's te
 PDF's own embedded text layer.
 
 Part B is the informative half. It is also the half that touches real product information,
-so it is bounded: the document is fetched at run time and never committed; no text from it is
-written to any output, log, or fixture; only integers and hashes leave the script. This is
-consistent with the intent of the synthetic-only rule in `AGENTS.md`, but it is a judgment
-call and is run only with explicit approval.
+so it is bounded: the document is fetched by hand into the git-ignored `.cache/` directory and
+never committed (no script downloads it, so no URL to a real product is ever written down in
+the repository either); no text from it is written to any output, log, or fixture; only
+integers and hashes leave the script, and `assertTextFree` refuses to emit a report containing
+anything that is not a token, a hash, or a timestamp. This is consistent with the intent of the
+synthetic-only rule in `AGENTS.md`, but it is a judgment call and is run only with explicit
+approval.
 
 ### The measurement that decides most
 

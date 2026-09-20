@@ -42,6 +42,7 @@ resource "google_project_service" "required" {
     "workflowexecutions.googleapis.com",
     "datalineage.googleapis.com",
     "dataplex.googleapis.com",
+    "documentai.googleapis.com",
   ])
 
   project            = var.project_id

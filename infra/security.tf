@@ -228,6 +228,12 @@ resource "google_project_iam_member" "worker_lineage_editor" {
   member  = "serviceAccount:${google_service_account.worker.email}"
 }
 
+resource "google_project_iam_member" "worker_documentai_user" {
+  project = var.project_id
+  role    = "roles/documentai.apiUser"
+  member  = "serviceAccount:${google_service_account.worker.email}"
+}
+
 resource "google_project_iam_member" "worker_log_writer" {
   project = var.project_id
   role    = "roles/logging.logWriter"

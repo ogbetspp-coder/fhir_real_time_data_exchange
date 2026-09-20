@@ -1,0 +1,921 @@
+{
+  "_note": "Hand-authored Document AI Layout Parser response for the synthetic SmPC of src/fixtures/synthetic-submission.ts. Written to the shape declared in node_modules/@google-cloud/documentai/build/protos/protos.d.ts (google.cloud.documentai.v1.Document), not recorded from the live API; it will be replaced by a recorded live response once the spike runs against Document AI. Synthetic text only.",
+  "document": {
+    "revisions": [
+      {
+        "id": "hand-authored",
+        "processor": "projects/synthetic/locations/eu/processors/synthetic/processorVersions/hand-authored-layout-v1"
+      }
+    ],
+    "documentLayout": {
+      "blocks": [
+        {
+          "blockId": "b001",
+          "pageSpan": {
+            "pageStart": 1,
+            "pageEnd": 1
+          },
+          "textBlock": {
+            "text": "Synthetic Paracetamol 500 mg tablets - synthetic demonstration extract",
+            "type": "header"
+          }
+        },
+        {
+          "blockId": "b002",
+          "pageSpan": {
+            "pageStart": 1,
+            "pageEnd": 1
+          },
+          "textBlock": {
+            "text": "Synthetic Paracetamol 500 mg tablets SmPC",
+            "type": "title"
+          }
+        },
+        {
+          "blockId": "b003",
+          "pageSpan": {
+            "pageStart": 1,
+            "pageEnd": 1
+          },
+          "textBlock": {
+            "text": "SUMMARY OF PRODUCT CHARACTERISTICS",
+            "type": "heading-1"
+          }
+        },
+        {
+          "blockId": "b004",
+          "pageSpan": {
+            "pageStart": 1,
+            "pageEnd": 1
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for smpc; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b005",
+          "pageSpan": {
+            "pageStart": 1,
+            "pageEnd": 1
+          },
+          "textBlock": {
+            "text": "1. NAME OF THE MEDICINAL PRODUCT",
+            "type": "heading-2"
+          }
+        },
+        {
+          "blockId": "b006",
+          "pageSpan": {
+            "pageStart": 1,
+            "pageEnd": 1
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for smpc.1; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b007",
+          "pageSpan": {
+            "pageStart": 1,
+            "pageEnd": 1
+          },
+          "textBlock": {
+            "text": "2. QUALITATIVE AND QUANTITATIVE COMPOSITION",
+            "type": "heading-2"
+          }
+        },
+        {
+          "blockId": "b008",
+          "pageSpan": {
+            "pageStart": 1,
+            "pageEnd": 1
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for smpc.2;\nnot for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b009",
+          "pageSpan": {
+            "pageStart": 1,
+            "pageEnd": 1
+          },
+          "textBlock": {
+            "text": "3. PHARMACEUTICAL FORM",
+            "type": "heading-2"
+          }
+        },
+        {
+          "blockId": "b010",
+          "pageSpan": {
+            "pageStart": 1,
+            "pageEnd": 1
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for smpc.3; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b011",
+          "pageSpan": {
+            "pageStart": 1,
+            "pageEnd": 1
+          },
+          "textBlock": {
+            "text": "4. CLINICAL PARTICULARS",
+            "type": "heading-2"
+          }
+        },
+        {
+          "blockId": "b012",
+          "pageSpan": {
+            "pageStart": 1,
+            "pageEnd": 1
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for smpc.4; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b013",
+          "pageSpan": {
+            "pageStart": 1,
+            "pageEnd": 1
+          },
+          "textBlock": {
+            "text": "4.1 Therapeutic indications",
+            "type": "heading-3"
+          }
+        },
+        {
+          "blockId": "b014",
+          "pageSpan": {
+            "pageStart": 1,
+            "pageEnd": 1
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for\nsmpc.4.1; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b015",
+          "pageSpan": {
+            "pageStart": 1,
+            "pageEnd": 1
+          },
+          "textBlock": {
+            "text": "4.2 Posology and method of administration",
+            "type": "heading-3"
+          }
+        },
+        {
+          "blockId": "b016",
+          "pageSpan": {
+            "pageStart": 1,
+            "pageEnd": 1
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for smpc.4.2; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b017",
+          "pageSpan": {
+            "pageStart": 1,
+            "pageEnd": 1
+          },
+          "textBlock": {
+            "text": "Posology",
+            "type": "heading-4"
+          }
+        },
+        {
+          "blockId": "b018",
+          "pageSpan": {
+            "pageStart": 1,
+            "pageEnd": 1
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for smpc.4.2.posology; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b019",
+          "pageSpan": {
+            "pageStart": 1,
+            "pageEnd": 1
+          },
+          "textBlock": {
+            "text": "Method of administration",
+            "type": "heading-4"
+          }
+        },
+        {
+          "blockId": "b020",
+          "pageSpan": {
+            "pageStart": 1,
+            "pageEnd": 1
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for\nsmpc.4.2.administration; not for clinical\nuse.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b021",
+          "pageSpan": {
+            "pageStart": 1,
+            "pageEnd": 1
+          },
+          "textBlock": {
+            "text": "4.3 Contraindications",
+            "type": "heading-3"
+          }
+        },
+        {
+          "blockId": "b022",
+          "pageSpan": {
+            "pageStart": 1,
+            "pageEnd": 1
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for smpc.4.3; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b023",
+          "pageSpan": {
+            "pageStart": 1,
+            "pageEnd": 1
+          },
+          "textBlock": {
+            "text": "4.4 Special warnings and precautions for use",
+            "type": "heading-3"
+          }
+        },
+        {
+          "blockId": "b024",
+          "pageSpan": {
+            "pageStart": 1,
+            "pageEnd": 1
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for smpc.4.4; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b025",
+          "pageSpan": {
+            "pageStart": 1,
+            "pageEnd": 1
+          },
+          "textBlock": {
+            "text": "The ﬁrst synthetic batch carries the label “demonstration” and the mark ‘demo’.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b026",
+          "pageSpan": {
+            "pageStart": 1,
+            "pageEnd": 1
+          },
+          "textBlock": {
+            "text": "Page 1 of 3",
+            "type": "footer"
+          }
+        },
+        {
+          "blockId": "b027",
+          "pageSpan": {
+            "pageStart": 2,
+            "pageEnd": 2
+          },
+          "textBlock": {
+            "text": "Synthetic Paracetamol 500 mg tablets - synthetic demonstration extract",
+            "type": "header"
+          }
+        },
+        {
+          "blockId": "b028",
+          "pageSpan": {
+            "pageStart": 2,
+            "pageEnd": 2
+          },
+          "textBlock": {
+            "text": "4.5 Interaction with other medicinal products and other forms of interaction",
+            "type": "heading-3"
+          }
+        },
+        {
+          "blockId": "b029",
+          "pageSpan": {
+            "pageStart": 2,
+            "pageEnd": 2
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for smpc.4.5; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b030",
+          "pageSpan": {
+            "pageStart": 2,
+            "pageEnd": 2
+          },
+          "textBlock": {
+            "text": "4.6 Fertility, pregnancy and lactation",
+            "type": "heading-3"
+          }
+        },
+        {
+          "blockId": "b031",
+          "pageSpan": {
+            "pageStart": 2,
+            "pageEnd": 2
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for smpc.4.6; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b032",
+          "pageSpan": {
+            "pageStart": 2,
+            "pageEnd": 2
+          },
+          "textBlock": {
+            "text": "4.7 Effects on ability to drive and use machines",
+            "type": "heading-3"
+          }
+        },
+        {
+          "blockId": "b033",
+          "pageSpan": {
+            "pageStart": 2,
+            "pageEnd": 2
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for\nsmpc.4.7; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b034",
+          "pageSpan": {
+            "pageStart": 2,
+            "pageEnd": 2
+          },
+          "textBlock": {
+            "text": "4.8 Undesirable effects",
+            "type": "heading-3"
+          }
+        },
+        {
+          "blockId": "b035",
+          "pageSpan": {
+            "pageStart": 2,
+            "pageEnd": 2
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for smpc.4.8; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b036",
+          "pageSpan": {
+            "pageStart": 2,
+            "pageEnd": 2
+          },
+          "textBlock": {
+            "text": "Reporting of suspected adverse reactions",
+            "type": "heading-4"
+          }
+        },
+        {
+          "blockId": "b037",
+          "pageSpan": {
+            "pageStart": 2,
+            "pageEnd": 2
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for smpc.4.8.reporting; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b038",
+          "pageSpan": {
+            "pageStart": 2,
+            "pageEnd": 2
+          },
+          "textBlock": {
+            "text": "4.9 Overdose",
+            "type": "heading-3"
+          }
+        },
+        {
+          "blockId": "b039",
+          "pageSpan": {
+            "pageStart": 2,
+            "pageEnd": 2
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for\nsmpc.4.9; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b040",
+          "pageSpan": {
+            "pageStart": 2,
+            "pageEnd": 2
+          },
+          "textBlock": {
+            "text": "5. PHARMACOLOGICAL PROPERTIES",
+            "type": "heading-2"
+          }
+        },
+        {
+          "blockId": "b041",
+          "pageSpan": {
+            "pageStart": 2,
+            "pageEnd": 2
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for smpc.5; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b042",
+          "pageSpan": {
+            "pageStart": 2,
+            "pageEnd": 2
+          },
+          "textBlock": {
+            "text": "5.1 Pharmacodynamic properties",
+            "type": "heading-3"
+          }
+        },
+        {
+          "blockId": "b043",
+          "pageSpan": {
+            "pageStart": 2,
+            "pageEnd": 2
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for smpc.5.1; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b044",
+          "pageSpan": {
+            "pageStart": 2,
+            "pageEnd": 2
+          },
+          "textBlock": {
+            "text": "5.2 Pharmacokinetic properties",
+            "type": "heading-3"
+          }
+        },
+        {
+          "blockId": "b045",
+          "pageSpan": {
+            "pageStart": 2,
+            "pageEnd": 2
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for\nsmpc.5.2; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b046",
+          "pageSpan": {
+            "pageStart": 2,
+            "pageEnd": 2
+          },
+          "textBlock": {
+            "text": "5.3 Preclinical safety data",
+            "type": "heading-3"
+          }
+        },
+        {
+          "blockId": "b047",
+          "pageSpan": {
+            "pageStart": 2,
+            "pageEnd": 2
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for smpc.5.3; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b048",
+          "pageSpan": {
+            "pageStart": 2,
+            "pageEnd": 2
+          },
+          "textBlock": {
+            "text": "6. PHARMACEUTICAL PARTICULARS",
+            "type": "heading-2"
+          }
+        },
+        {
+          "blockId": "b049",
+          "pageSpan": {
+            "pageStart": 2,
+            "pageEnd": 2
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for smpc.6; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b050",
+          "pageSpan": {
+            "pageStart": 2,
+            "pageEnd": 2
+          },
+          "tableBlock": {
+            "caption": "Table 1. Synthetic posology summary",
+            "headerRows": [
+              {
+                "cells": [
+                  {
+                    "blocks": [
+                      {
+                        "blockId": "b051",
+                        "textBlock": {
+                          "text": "Age group",
+                          "type": "paragraph"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "blocks": [
+                      {
+                        "blockId": "b052",
+                        "textBlock": {
+                          "text": "Synthetic dose",
+                          "type": "paragraph"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "bodyRows": [
+              {
+                "cells": [
+                  {
+                    "blocks": [
+                      {
+                        "blockId": "b053",
+                        "textBlock": {
+                          "text": "Adults",
+                          "type": "paragraph"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "blocks": [
+                      {
+                        "blockId": "b054",
+                        "textBlock": {
+                          "text": "500 mg",
+                          "type": "paragraph"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "cells": [
+                  {
+                    "blocks": [
+                      {
+                        "blockId": "b055",
+                        "textBlock": {
+                          "text": "Adolescents",
+                          "type": "paragraph"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "blocks": [
+                      {
+                        "blockId": "b056",
+                        "textBlock": {
+                          "text": "250 mg",
+                          "type": "paragraph"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "blockId": "b057",
+          "pageSpan": {
+            "pageStart": 2,
+            "pageEnd": 2
+          },
+          "textBlock": {
+            "text": "Tablets are supplied in a syn-\nthetic blister pack; each synthetic pack is sealed.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b058",
+          "pageSpan": {
+            "pageStart": 2,
+            "pageEnd": 2
+          },
+          "textBlock": {
+            "text": "Page 2 of 3",
+            "type": "footer"
+          }
+        },
+        {
+          "blockId": "b059",
+          "pageSpan": {
+            "pageStart": 3,
+            "pageEnd": 3
+          },
+          "textBlock": {
+            "text": "Synthetic Paracetamol 500 mg tablets - synthetic demonstration extract",
+            "type": "header"
+          }
+        },
+        {
+          "blockId": "b060",
+          "pageSpan": {
+            "pageStart": 3,
+            "pageEnd": 3
+          },
+          "textBlock": {
+            "text": "6.1 List of excipients",
+            "type": "heading-3"
+          }
+        },
+        {
+          "blockId": "b061",
+          "pageSpan": {
+            "pageStart": 3,
+            "pageEnd": 3
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for smpc.6.1; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b062",
+          "pageSpan": {
+            "pageStart": 3,
+            "pageEnd": 3
+          },
+          "textBlock": {
+            "text": "6.2 Incompatibilities",
+            "type": "heading-3"
+          }
+        },
+        {
+          "blockId": "b063",
+          "pageSpan": {
+            "pageStart": 3,
+            "pageEnd": 3
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for smpc.6.2; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b064",
+          "pageSpan": {
+            "pageStart": 3,
+            "pageEnd": 3
+          },
+          "textBlock": {
+            "text": "6.3 Shelf life",
+            "type": "heading-3"
+          }
+        },
+        {
+          "blockId": "b065",
+          "pageSpan": {
+            "pageStart": 3,
+            "pageEnd": 3
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for\nsmpc.6.3; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b066",
+          "pageSpan": {
+            "pageStart": 3,
+            "pageEnd": 3
+          },
+          "textBlock": {
+            "text": "6.4 Special precautions for storage",
+            "type": "heading-3"
+          }
+        },
+        {
+          "blockId": "b067",
+          "pageSpan": {
+            "pageStart": 3,
+            "pageEnd": 3
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for smpc.6.4; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b068",
+          "pageSpan": {
+            "pageStart": 3,
+            "pageEnd": 3
+          },
+          "textBlock": {
+            "text": "6.5 Nature and contents of container and special equipment for use, administration or implantation",
+            "type": "heading-3"
+          }
+        },
+        {
+          "blockId": "b069",
+          "pageSpan": {
+            "pageStart": 3,
+            "pageEnd": 3
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for smpc.6.5; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b070",
+          "pageSpan": {
+            "pageStart": 3,
+            "pageEnd": 3
+          },
+          "textBlock": {
+            "text": "6.6 Special precautions for disposal and other handling",
+            "type": "heading-3"
+          }
+        },
+        {
+          "blockId": "b071",
+          "pageSpan": {
+            "pageStart": 3,
+            "pageEnd": 3
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for\nsmpc.6.6; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b072",
+          "pageSpan": {
+            "pageStart": 3,
+            "pageEnd": 3
+          },
+          "textBlock": {
+            "text": "7. MARKETING AUTHORISATION HOLDER",
+            "type": "heading-2"
+          }
+        },
+        {
+          "blockId": "b073",
+          "pageSpan": {
+            "pageStart": 3,
+            "pageEnd": 3
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for smpc.7; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b074",
+          "pageSpan": {
+            "pageStart": 3,
+            "pageEnd": 3
+          },
+          "textBlock": {
+            "text": "8. MARKETING AUTHORISATION NUMBER(S)",
+            "type": "heading-2"
+          }
+        },
+        {
+          "blockId": "b075",
+          "pageSpan": {
+            "pageStart": 3,
+            "pageEnd": 3
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for smpc.8; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b076",
+          "pageSpan": {
+            "pageStart": 3,
+            "pageEnd": 3
+          },
+          "textBlock": {
+            "text": "9. DATE OF FIRST AUTHORISATION/RENEWAL OF THE AUTHORISATION",
+            "type": "heading-2"
+          }
+        },
+        {
+          "blockId": "b077",
+          "pageSpan": {
+            "pageStart": 3,
+            "pageEnd": 3
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for smpc.9;\nnot for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b078",
+          "pageSpan": {
+            "pageStart": 3,
+            "pageEnd": 3
+          },
+          "textBlock": {
+            "text": "10. DATE OF REVISION OF THE TEXT",
+            "type": "heading-2"
+          }
+        },
+        {
+          "blockId": "b079",
+          "pageSpan": {
+            "pageStart": 3,
+            "pageEnd": 3
+          },
+          "textBlock": {
+            "text": "Synthetic demonstration content for smpc.10; not for clinical use.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b080",
+          "pageSpan": {
+            "pageStart": 3,
+            "pageEnd": 3
+          },
+          "textBlock": {
+            "text": "Store below 25 C in the ori-\nginal carton to protect from light.",
+            "type": "paragraph"
+          }
+        },
+        {
+          "blockId": "b081",
+          "pageSpan": {
+            "pageStart": 3,
+            "pageEnd": 3
+          },
+          "textBlock": {
+            "text": "Page 3 of 3",
+            "type": "footer"
+          }
+        }
+      ]
+    }
+  }
+}
