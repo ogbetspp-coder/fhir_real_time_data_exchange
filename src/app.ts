@@ -59,6 +59,12 @@ export function createApp(overrides: AppOverrides = {}): Hono {
     }
 
     const request = parsed.data;
+    // The run-source allowlist (ADR 0002 consequences) is checked before any reader, fixture,
+    // client, or store is touched: a disabled source does no work and leaves only this line.
+    if (!config.ENABLED_RUN_SOURCES.includes(request.source)) {
+      log("warning", "Run source is disabled", { stage: "http", source: request.source });
+      return context.json({ error: "source-disabled" }, 422);
+    }
     if (request.source === "document" && submissionReader === undefined) {
       return context.json({ error: "document-source-not-configured" }, 503);
     }

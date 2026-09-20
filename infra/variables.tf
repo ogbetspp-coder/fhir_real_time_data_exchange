@@ -77,6 +77,23 @@ variable "enforce_binary_authorization" {
   default     = false
 }
 
+variable "enabled_run_sources" {
+  description = <<-EOT
+    Run sources the worker accepts on POST /v1/runs (ENABLED_RUN_SOURCES). fixture and
+    healthcare-api bypass the document gate (ADR 0002); a deployment that handles anything but
+    synthetic content sets this to ["document"]. Default: every source.
+  EOT
+  type        = list(string)
+  default     = ["fixture", "healthcare-api", "document"]
+
+  validation {
+    condition = length(var.enabled_run_sources) > 0 && alltrue([
+      for source in var.enabled_run_sources : contains(["fixture", "healthcare-api", "document"], source)
+    ])
+    error_message = "enabled_run_sources must be a non-empty subset of fixture, healthcare-api, document."
+  }
+}
+
 variable "query_image" {
   description = "Immutable Artifact Registry query service image reference, preferably by digest."
   type        = string
