@@ -1,0 +1,11 @@
+# Local virtualenvs and tool caches, exactly as in zone-a/. `uv sync --frozen` recreates .venv
+# from uv.lock, which is committed; nothing in here is an input to the build.
+#
+# .uv-bootstrap is the second virtualenv and exists because `uv sync --frozen` makes .venv match
+# uv.lock exactly, uv is not in uv.lock, and so installing uv into .venv and then syncing deletes
+# uv. uv lives outside the environment it manages. See the "Set-up" section of README.md.
+.venv/
+.uv-bootstrap/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/

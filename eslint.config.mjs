@@ -18,6 +18,9 @@ export default tseslint.config(
       // live in `.venv` because `uv sync --frozen` prunes it.
       "zone-a/.venv/**",
       "zone-a/.uv-bootstrap/**",
+      // The agent's two virtualenvs, for the same reason.
+      "agent/.venv/**",
+      "agent/.uv-bootstrap/**",
     ],
   },
   eslint.configs.recommended,
