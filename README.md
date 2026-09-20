@@ -49,7 +49,8 @@ The document `Bundle` is retained as the exchange artifact. Its entries are also
 as top-level resources because BigQuery intentionally omits `Bundle.entry.resource` from its
 analytical schema.
 
-See [docs/architecture.md](docs/architecture.md) for trust boundaries, controls, and data flow.
+See [docs/architecture.md](docs/architecture.md) for trust boundaries, controls, and data flow,
+and [docs/roadmap.md](docs/roadmap.md) for what is built and what is planned.
 
 ### Zone A hand-off contract
 
