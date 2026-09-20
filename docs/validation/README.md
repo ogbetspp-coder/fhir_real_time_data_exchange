@@ -45,7 +45,7 @@ Before regulated use, the owning organization should approve:
 | UR-03 Require all selected profiles         | Invalid EMA output            | Explicit profile-by-profile validation                                                                                                                                                                                            | HL7 and Healthcare outcomes                                                                              |
 | UR-04 Prevent unvalidated writes            | Uncontrolled record           | Write gate after outcomes                                                                                                                                                                                                         | Pipeline tests and transaction receipt                                                                   |
 | UR-05 Prove source-to-target identity       | Untraceable transformation    | SHA-256 hashes and lineage                                                                                                                                                                                                        | Signed run manifest                                                                                      |
-| UR-06 Preserve audit history                | Data-integrity loss           | FHIR versioning, retained logs/artifacts                                                                                                                                                                                          | Audit exports and restore test                                                                           |
+| UR-06 Preserve audit history                | Data-integrity loss           | FHIR versioning, retained logs/artifacts                                                                                                                                                                                          | Audit log sink and retention in infra/security.tf; restore test not yet automated                        |
 | UR-07 Observe analytical availability       | Stale downstream data         | Native stream and Workflow query                                                                                                                                                                                                  | Recorded stream lag                                                                                      |
 | UR-08 Control software changes              | Unapproved executable         | Cloud Build image builds; Binary Authorization configurable but not enforced in the prototype (enforce_binary_authorization defaults to false); SLSA provenance and SBOM not yet configured                                       | Build records, infra/variables.tf                                                                        |
 | UR-09 Narrative fidelity to source document | AI-altered labeling           | Every narrative block byte-matches one source span after pinned normalization; any miss rejects                                                                                                                                   | test/fidelity.test.ts, test/fixtures/fidelity/vectors.json                                               |
@@ -63,8 +63,10 @@ A release candidate is not production eligible until all automated gates pass, t
 evidence is reviewed, deviations are resolved or accepted, an independent approver authorizes
 deployment, and the organization’s quality process records the release decision.
 
-Cloud Deploy approval controls software promotion only. Product-content approval and
-electronic signature require a separately validated business workflow with signer identity,
+Software promotion is currently unattended (`terraform apply` from GitHub Actions after the
+quality gate); a human promotion gate is a change-control addition and controls software
+promotion only. Product-content approval and electronic signature require a separately
+validated business workflow with signer identity,
 signature meaning, re-authentication where required, and permanent signature-to-record
 linkage.
 

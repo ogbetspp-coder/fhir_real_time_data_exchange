@@ -2,7 +2,7 @@
 // docs/fidelity-normalization.md sections 2-4; the golden vectors in test/fixtures/fidelity are
 // the language-neutral proof. Any change here is a new NORMALIZATION_VERSION.
 
-export const NORMALIZATION_VERSION = "fidelity-norm/1.0.0";
+export const NORMALIZATION_VERSION = "fidelity-norm/1.1.0";
 
 export class NormalizationError extends Error {
   public constructor(
@@ -36,6 +36,21 @@ const WHITESPACE = new Set([
 
 function isWhitespace(codePoint: number): boolean {
   return WHITESPACE.has(codePoint) || (codePoint >= 0x2000 && codePoint <= 0x200a);
+}
+
+const WORD_CHARACTER = /^[\p{L}\p{N}\p{M}]$/u;
+
+// A character that belongs to a word (spec section 6): letters, digits, combining marks, the
+// invisible formatting characters of step 1, and the zero-width (non-)joiners. A span edge that
+// touches one of these cuts a word.
+export function isWordCharacter(character: string): boolean {
+  const codePoint = character.codePointAt(0) ?? 0;
+  return (
+    WORD_CHARACTER.test(character) ||
+    INVISIBLE_FORMATTING.has(codePoint) ||
+    codePoint === 0x200c ||
+    codePoint === 0x200d
+  );
 }
 
 function isForbidden(codePoint: number): boolean {

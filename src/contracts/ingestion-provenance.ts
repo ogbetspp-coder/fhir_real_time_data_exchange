@@ -6,6 +6,8 @@ import {
   IsoDateTime,
   NormalizationVersion,
   PositiveInt,
+  PrincipalId,
+  RecordRef,
   Sha256Hex,
   SourceKey,
   StorageUri,
@@ -194,23 +196,13 @@ export const ApprovalMeaning = z
 
 export const ApprovalSchema = z
   .strictObject({
-    approverId: z
-      .string()
-      .min(1)
-      .max(256)
-      .regex(
-        /^[^\s@]+$/,
-        "approverId must be an opaque principal identifier, not an e-mail address",
-      ),
+    approverId: PrincipalId,
     approverRole: ApproverRole,
     approvedAt: IsoDateTime,
     method: ApprovalMethod,
     meaning: ApprovalMeaning,
     approvedContentSha256: Sha256Hex,
-    recordRef: z
-      .string()
-      .regex(/^\S{1,512}$/)
-      .optional(),
+    recordRef: RecordRef.optional(),
   })
   .meta({ id: "Approval" });
 

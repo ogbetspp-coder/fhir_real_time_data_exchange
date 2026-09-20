@@ -6,14 +6,14 @@
       "version": "1.0.0",
       "$id": "https://khs.dev/contracts/canonical-submission/1.0.0/schema.json",
       "file": "canonical-submission.schema.json",
-      "sha256": "938601f7c790fcb1554a8628aa55b64dd0c0e0bc2f358b1fe8838e28edeb54de"
+      "sha256": "d98dc6390e252f6a44f52ac8f4353db0e46d5513b3d414a6ffd3818dfede04b1"
     },
     {
       "name": "ingestion-provenance",
       "version": "1.0.0",
       "$id": "https://khs.dev/contracts/ingestion-provenance/1.0.0/schema.json",
       "file": "ingestion-provenance.schema.json",
-      "sha256": "c77e8305c6fb091a82bdce118b9a9aa6f634c7897d68ae8cac51ee362b1bae2a"
+      "sha256": "d7710265eaece6bd519075d627ddb83ccc526f1cac9515c00fb7cf74453ac19b"
     },
     {
       "name": "fidelity-report",
@@ -34,7 +34,7 @@
       "version": "1.1.0",
       "$id": "https://khs.dev/contracts/run-manifest/1.1.0/schema.json",
       "file": "run-manifest.schema.json",
-      "sha256": "9a451906b0832e695526eaa03ef084305d9302db83d0be138726e733e4275a35"
+      "sha256": "eaeab3340b1ff831c82278ee8027a9280348411a888f0dac97ab48e7565a3bdb"
     }
   ]
 }

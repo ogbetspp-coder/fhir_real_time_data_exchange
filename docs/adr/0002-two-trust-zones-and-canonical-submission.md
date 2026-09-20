@@ -36,7 +36,7 @@ into `contracts/generated/` and enforced by `npm run contracts:check`):
 - `CanonicalSubmission` = `schemaVersion` + the Type 2 Bundle + `IngestionProvenance` +
   `Approval`, plus hashes of the Bundle and of the approved content.
 - `IngestionProvenance` records the source document (byte hash, media type, size, optional
-  source-system identity, optional reference to the extracted text), the extraction tooling
+  source-system identity, required reference to the extracted text), the extraction tooling
   (run id, service version, parser, optional model, prompt template, terminology service), one
   provenance entry per narrative section (source spans and hashes), every structuring decision
   classified as `extracted-verbatim`, `code-mapped`, `defaulted-by-rule`, `human-edited`, or
@@ -100,10 +100,14 @@ the raw slice. See ADR 0003.
   here claims Annex 11 or 21 CFR Part 11 compliance.
 - Strict objects make every minor contract change a Zone B-first deployment.
 - The fidelity check proves the narrative sections only. Every other string in the Bundle
-  (titles, display names, identifiers, property names) is bounded at ingress — token-limited
-  where it is an identifier, and otherwise at most 300 characters and 20 words with no markup —
-  which limits how much unverified text can travel but does not prove it. Binding structured
-  fields to master data with field-level provenance is the next control boundary.
+  (titles, display names, identifiers, property names) is bounded at ingress — token- or
+  grammar-limited where it is an identifier or URL, and otherwise at most 300 characters and 20
+  words (ICU word segmentation, so scripts without inter-word spaces are counted too) with no
+  markup, at most 3,000 such strings and 40,000 characters per Bundle, at most 500 entries, and
+  JSON nesting at most 48 deep — which limits how much unverified text can travel but does not
+  prove it. Binding structured fields to master data with field-level provenance is the next
+  control boundary.
 - Provenance identifier fields (tool names, versions, model and prompt ids, decision targets,
-  editor ids) are token-limited so that a manifest, ledger row, or Provenance resource can never
-  carry prose; `recordRef` is a single opaque reference.
+  editor ids, `approverId`, `Bundle.identifier.system`, `fullUrl`) are token- or grammar-limited
+  so that a manifest, ledger row, or Provenance resource can never carry prose; `recordRef` is a
+  single URL-safe locator.

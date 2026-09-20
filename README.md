@@ -207,8 +207,10 @@ Terraform environments with distinct service identities.
 
 Google Cloud operates under shared responsibility. Intended use, risk assessment, procedural
 controls, personnel qualification, electronic signatures, application validation, and final
-release approval remain the regulated organization’s responsibility. Cloud Deploy approval is
-software change control; it is not a Part 11 or Annex 11 content signature.
+release approval remain the regulated organization’s responsibility. Deployment today is an
+unattended `terraform apply` from GitHub Actions after the quality gate; a human promotion
+gate (GitHub environment approval or Cloud Deploy) is software change control the owning
+organization adds, and it is not a Part 11 or Annex 11 content signature.
 
 ## Repository access
 

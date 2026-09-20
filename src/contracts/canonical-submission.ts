@@ -25,9 +25,48 @@ export const CANONICAL_SUBMISSION_VERSION = "1.0.0";
 // structured fields (ADR 0002: those belong to master data and field-level provenance).
 const MAX_UNVERIFIED_STRING_LENGTH = 300;
 // The longest QRD section title ("6.5 Nature and contents of container and special equipment
-// for use, administration or implantation") is 14 words; a sentence of prose is longer.
+// for use, administration or implantation") is 14 words; a sentence of prose is longer. Words
+// are counted with the ICU word segmenter so scripts without inter-word spaces are counted too.
 const MAX_UNVERIFIED_WORDS = 20;
+// Aggregate budget across the whole Bundle, so many short strings cannot add up to a document.
+// The synthetic Type 2 Bundle carries ~270 strings / ~7,000 characters outside its narratives.
+const MAX_UNVERIFIED_STRINGS = 3_000;
+const MAX_UNVERIFIED_TOTAL_LENGTH = 40_000;
 const JSON_KEY = /^_?[A-Za-z][A-Za-z0-9]{0,63}$/;
+// Structural bounds checked before anything recursive (hashing, walking) touches the input, so
+// a pathological document is a contract rejection rather than a stack overflow.
+const MAX_JSON_DEPTH = 48;
+const MAX_JSON_NODES = 200_000;
+
+const WORD_SEGMENTER = new Intl.Segmenter(undefined, { granularity: "word" });
+
+function countWordsAnyScript(value: string): number {
+  let words = 0;
+  for (const segment of WORD_SEGMENTER.segment(value)) if (segment.isWordLike === true) words += 1;
+  return words;
+}
+
+// Iterative (never recursive) depth and size check of untrusted JSON.
+function structureIssues(name: string, value: unknown): string[] {
+  const stack: { value: unknown; depth: number }[] = [{ value, depth: 0 }];
+  let nodes = 0;
+  while (stack.length > 0) {
+    const item = stack.pop();
+    if (item === undefined) break;
+    nodes += 1;
+    if (nodes > MAX_JSON_NODES) return [`${name} exceeds ${MAX_JSON_NODES} JSON nodes`];
+    if (item.depth > MAX_JSON_DEPTH) return [`${name} nesting exceeds depth ${MAX_JSON_DEPTH}`];
+    const current = item.value;
+    if (Array.isArray(current)) {
+      for (const child of current) stack.push({ value: child, depth: item.depth + 1 });
+    } else if (current !== null && typeof current === "object") {
+      for (const child of Object.values(current as Record<string, unknown>)) {
+        stack.push({ value: child, depth: item.depth + 1 });
+      }
+    }
+  }
+  return [];
+}
 
 const CanonicalSubmissionBase = z.strictObject({
   schemaVersion: z.literal(CANONICAL_SUBMISSION_VERSION),
@@ -163,15 +202,19 @@ function narrativeDivPath(sectionPath: string): string {
 // the fidelity proof covers coded sections, so prose anywhere else is unverified by definition.
 function unverifiedTextIssues(bundle: unknown, verifiedDivPaths: Set<string>): string[] {
   const issues: string[] = [];
+  let strings = 0;
+  let totalLength = 0;
   const walk = (value: unknown, path: string): void => {
     if (typeof value === "string") {
       if (verifiedDivPaths.has(path)) return;
+      strings += 1;
+      totalLength += value.length;
       if (path.endsWith(".text.div")) {
         issues.push(`Narrative outside verified sections at ${path}`);
       } else if (
         value.length > MAX_UNVERIFIED_STRING_LENGTH ||
         value.includes("<") ||
-        value.trim().split(/\s+/).length > MAX_UNVERIFIED_WORDS
+        countWordsAnyScript(value) > MAX_UNVERIFIED_WORDS
       ) {
         issues.push(`Unverified free text at ${path}`);
       }
@@ -193,6 +236,12 @@ function unverifiedTextIssues(bundle: unknown, verifiedDivPaths: Set<string>): s
     }
   };
   walk(bundle, "");
+  if (strings > MAX_UNVERIFIED_STRINGS) {
+    issues.push(`Bundle carries more than ${MAX_UNVERIFIED_STRINGS} unverified strings`);
+  }
+  if (totalLength > MAX_UNVERIFIED_TOTAL_LENGTH) {
+    issues.push(`Unverified strings exceed ${MAX_UNVERIFIED_TOTAL_LENGTH} characters in total`);
+  }
   return issues;
 }
 
@@ -202,6 +251,14 @@ export function verifyDocumentSubmission(
   input: DocumentSubmissionInput,
   sourceCodeSystem: string,
 ): DocumentGateResult {
+  const structural = [
+    ...structureIssues("submission", input.submission),
+    ...structureIssues("fidelityReport", input.fidelityReport),
+    ...structureIssues("sourceText", input.sourceText),
+  ];
+  if (structural.length > 0) {
+    throw new SubmissionRejectedError("Document submission rejected", structural);
+  }
   const parsed = CanonicalSubmissionSchema.safeParse(input.submission);
   if (!parsed.success) {
     throw new SubmissionRejectedError("Canonical submission is invalid", zodIssues(parsed.error));

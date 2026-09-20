@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { format, resolveConfig } from "prettier";
@@ -45,6 +45,13 @@ for (const contract of CONTRACTS) {
     file,
     sha256: sha256(document),
   });
+}
+
+// A renamed or removed contract must not leave its old schema behind.
+for (const name of await readdir(output)) {
+  if (name.endsWith(".schema.json") && !index.some(({ file }) => file === name)) {
+    await unlink(path.join(output, name));
+  }
 }
 
 await writeFile(

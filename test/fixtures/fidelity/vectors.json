@@ -1,5 +1,5 @@
 {
-  "normalizationVersion": "fidelity-norm/1.0.0",
+  "normalizationVersion": "fidelity-norm/1.1.0",
   "normalization": [
     {
       "name": "invisible-blocks-nfc",
@@ -194,6 +194,58 @@
       "expected": {
         "error": "misnested-tag"
       }
+    },
+    {
+      "name": "rejects-loose-row-after-tfoot",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tfoot><tr><td>f</td></tr></tfoot><tr><td>b</td></tr></table></div>",
+      "expected": {
+        "error": "table-structure"
+      }
+    },
+    {
+      "name": "rejects-loose-row-before-thead",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>b</td></tr><thead><tr><th>h</th></tr></thead></table></div>",
+      "expected": {
+        "error": "table-structure"
+      }
+    },
+    {
+      "name": "rejects-caption-after-body",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tbody><tr><td>a</td></tr></tbody><caption>c</caption></table></div>",
+      "expected": {
+        "error": "table-structure"
+      }
+    },
+    {
+      "name": "accepts-caption-first",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><caption>c</caption><tr><td>a</td></tr></table></div>",
+      "expected": "\n\n\nc\n\n\na\n\n\n\n"
+    },
+    {
+      "name": "rejects-cell-outside-row",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><td>a</td></table></div>",
+      "expected": {
+        "error": "misnested-tag"
+      }
+    },
+    {
+      "name": "rejects-soft-hyphen-before-br",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>intra&#173;<br/>venous</p></div>",
+      "expected": {
+        "error": "soft-hyphen-at-boundary"
+      }
+    },
+    {
+      "name": "rejects-soft-hyphen-before-block-end",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><h2>intra&#173;</h2><p>venous</p></div>",
+      "expected": {
+        "error": "soft-hyphen-at-boundary"
+      }
+    },
+    {
+      "name": "accepts-soft-hyphen-inside-text",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>intra&#173;venous</p></div>",
+      "expected": "\n\nintra­venous\n\n"
     },
     {
       "name": "rejects-javascript-href",
@@ -441,7 +493,7 @@
     {
       "name": "body-boundary-mid-line",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -478,7 +530,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "b6f93229a6401898a14067fb7e11d4e23b1479ee1de12090ddac6809e1836c79",
         "narrativeBindingSha256": "97a3da6e2d1deb0272b5df67c5931790f2fd84b5167b2e88db14abf04c138438",
         "status": "failed",
@@ -503,13 +555,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "b9eec6d1830bd7f2daae6a8ea91e93dbec43d5cfbc63f71d9b9e22bc4a2268a1"
+        "reportHash": "4dd412271f19f0877c5b726126db5c0bb21de4829a73518338bc11049353a33d"
       }
     },
     {
       "name": "excluded-text-budget",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -558,7 +610,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "7212abbf0e40bb9b187824210109f9d23902e319cd6526ded9cd9e1d1cdce035",
         "narrativeBindingSha256": "b8c7f41230ed825bd6620dae99dd19fd3373a26ac7cd9108d62a5641d7f6fdb8",
         "status": "failed",
@@ -583,13 +635,474 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "569f505ff209e1385ed2b9f1cd884b122b281b104e9e4c1fc31a177c357c6646"
+        "reportHash": "d82a88e69bf0819027b876ddb75642f26b14a3c507e3d282657e9287e7c7f2e5"
+      }
+    },
+    {
+      "name": "body-boundary-after-soft-hyphen-break",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.1.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME intra­\nvenous infusion.\n",
+              "bodyStart": 12,
+              "bodyEnd": 29
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>venous infusion.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 12,
+                "endOffset": 28,
+                "textSha256": "b585a597826ab5d5bee941c6d4d36d471ba463510f2d2cd8873fd8670efbf9db"
+              }
+            ],
+            "narrativeDivSha256": "a84cfd757ed754869aacf640abc8e72bbe6375e73fe270d9e744a2b0ab41a403",
+            "normalizedTextSha256": "b585a597826ab5d5bee941c6d4d36d471ba463510f2d2cd8873fd8670efbf9db"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
+        "extractedTextSha256": "b4c501f7e3066e69e2a5196939f85ca43d2add751091ac25d22c09266b750d08",
+        "narrativeBindingSha256": "891eb342d58545a091a099871883362c21f19a6dd9a1ba965fcd11a5e113833d",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "span-not-found",
+            "spanCount": 1,
+            "reason": "body-boundary",
+            "normalizedTextSha256": "b585a597826ab5d5bee941c6d4d36d471ba463510f2d2cd8873fd8670efbf9db"
+          }
+        ],
+        "issues": ["Page 1: body-boundary"],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 29,
+          "bodyCodePoints": 17,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "1621a73672d233bc7854aa3a10ba8d603e78e6b4cd74b113bb315045a8ef195c"
+      }
+    },
+    {
+      "name": "span-starts-mid-word",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.1.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 397
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 233
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 166
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>nal dose is given by intravenous infusion over 10 minutes.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 139,
+                "endOffset": 198,
+                "textSha256": "d377a943b1bee77f656abc1ed24a2948cbe727348dd568834f6fa67eecec6312"
+              }
+            ],
+            "narrativeDivSha256": "21ccc705cbab94124eda8c144fc76379d618ea9919179a2c7ffa53cc356bbad9",
+            "normalizedTextSha256": "ede57a7f9c2065294b89354a754cb919d5750a8c4c0a52238ca19494182daf94"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
+        "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
+        "narrativeBindingSha256": "27de94c82023c168e1eb2ab2f8b396a341df3309f295f03cbf8c4fa9532fc21a",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "invalid-provenance",
+            "spanCount": 1,
+            "reason": "word-cut",
+            "normalizedTextSha256": "ede57a7f9c2065294b89354a754cb919d5750a8c4c0a52238ca19494182daf94"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 691,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "c8042bd8dc907f3795f32bcaa4d0535d145e28822d04534a12532c2b40da1264"
+      }
+    },
+    {
+      "name": "span-ends-mid-word",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.1.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 397
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 233
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 166
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for section 4.1; not for clin</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 63,
+                "endOffset": 124,
+                "textSha256": "4aaba2f523a67ec4df2cb827e819737a304418bab6c9922da8d5f20597aa9d6a"
+              }
+            ],
+            "narrativeDivSha256": "28cfbda31840d5e15eec587b05156572bb7638baee3b57c9678962cb4edc78ab",
+            "normalizedTextSha256": "4aaba2f523a67ec4df2cb827e819737a304418bab6c9922da8d5f20597aa9d6a"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
+        "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
+        "narrativeBindingSha256": "54a28d7aa5dfd0efec8cd062c8f58a439f0dfc7de5a53526f99631ebeacf37c4",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "invalid-provenance",
+            "spanCount": 1,
+            "reason": "word-cut",
+            "normalizedTextSha256": "4aaba2f523a67ec4df2cb827e819737a304418bab6c9922da8d5f20597aa9d6a"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 691,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "0bbad66c9c9b8cd648e006defbfce1b28dcbf7bcd41864d5931ecc80f41a51f9"
+      }
+    },
+    {
+      "name": "span-ends-before-soft-hyphen",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.1.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 397
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 233
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 166
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>The final dose is given by intra</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 134,
+                "endOffset": 165,
+                "textSha256": "51068468f2dd3ec2652e4b73203dcfb69fb2ac1b4a244e499690b0ddbe1c2fee"
+              }
+            ],
+            "narrativeDivSha256": "8bc22c453bcf457bbfd4a10c899adcf13ec441a385dc945b04b7e1f29b95e366",
+            "normalizedTextSha256": "58c349bbb7381f8bb7f516b2ba1cefeae96f9fa21d670d833517ccc05c2e98eb"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
+        "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
+        "narrativeBindingSha256": "da830d0971a7e42c9fa2c72abf01bb44dca09a4e32939dd0fa143a9bb9b4de0d",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "invalid-provenance",
+            "spanCount": 1,
+            "reason": "word-cut",
+            "normalizedTextSha256": "58c349bbb7381f8bb7f516b2ba1cefeae96f9fa21d670d833517ccc05c2e98eb"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 691,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "86b279ecfabacfcad33e6a5737f683d4398ff8e1c171f4e8e19b7f82dc396ef6"
+      }
+    },
+    {
+      "name": "span-ends-before-punctuation-passes",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.1.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 397
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 233
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\nDose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 166
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for section 4.1; not for clinical use</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 63,
+                "endOffset": 132,
+                "textSha256": "3d24f17fd709dfd9b1ff4b77a314efea0c8354bc654549954703153199a962e2"
+              }
+            ],
+            "narrativeDivSha256": "3941df02276a531e6601c4a3be01ace82b0028c09e58085ee61ffe50e87ff31c",
+            "normalizedTextSha256": "3d24f17fd709dfd9b1ff4b77a314efea0c8354bc654549954703153199a962e2"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
+        "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
+        "narrativeBindingSha256": "90a7e96c471d8bbe39372408789152b924508f5879cd793df0b073b2c1f663f8",
+        "status": "passed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "verified",
+            "spanCount": 1,
+            "normalizedTextSha256": "3d24f17fd709dfd9b1ff4b77a314efea0c8354bc654549954703153199a962e2"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 1
+        },
+        "coverage": {
+          "pageCodePoints": 829,
+          "bodyCodePoints": 691,
+          "coveredCodePoints": 69,
+          "uncoveredGaps": 4
+        },
+        "reportHash": "0f6940be5c97aebae9c82052faa2673e4125e88a30a69defdd5bdb8710774b51"
+      }
+    },
+    {
+      "name": "section-ends-at-hyphenated-page-end",
+      "input": {
+        "normalizationVersion": "fidelity-norm/1.1.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nThe dose is given by intra­\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 63
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nvenous infusion over 10 minutes.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 68
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>The dose is given by intra</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 62,
+                "textSha256": "0f9506b2fa50fc89970c7a1fd24d835f11741cf505b868ad3eafca585d272d98"
+              }
+            ],
+            "narrativeDivSha256": "cf656247e7bb4179fee606cfd4a39cf55f9fd1663b0cd66e6aaea62bb023120d",
+            "normalizedTextSha256": "248fe9c49eb6d2ff99e37d61cd472b9604a1c8b1b4a88194a534b00c238ec37b"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
+        "extractedTextSha256": "79f31879194134300d14e49deb17d2c35c72c82dd56ae149aeba2eb7adcfc679",
+        "narrativeBindingSha256": "90ddc3f99452858145cda13aa47ffd2b77b58cb79a9e86e6c061772c3ce8e419",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "invalid-provenance",
+            "spanCount": 1,
+            "reason": "word-cut",
+            "normalizedTextSha256": "248fe9c49eb6d2ff99e37d61cd472b9604a1c8b1b4a88194a534b00c238ec37b"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 153,
+          "bodyCodePoints": 61,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 2
+        },
+        "reportHash": "d2554c2472e099a9cb2239cb6ab6eb8a276ec021a542c5297d2ee71fdbd2d2d3"
       }
     },
     {
       "name": "soft-hyphen-across-pages-joins-word",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -638,7 +1151,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "79f31879194134300d14e49deb17d2c35c72c82dd56ae149aeba2eb7adcfc679",
         "narrativeBindingSha256": "795acadbb4ad3e00052a3d5f0a73bd3c5607982f674b11083b5f3f2041b4deaa",
         "status": "passed",
@@ -662,13 +1175,13 @@
           "coveredCodePoints": 59,
           "uncoveredGaps": 0
         },
-        "reportHash": "eea88daa82f004f5ae8a677fdef6e1423e4f005fb9d1163f6dcade10f3323b3f"
+        "reportHash": "1181e491b26a8296ab77e3a739df40dce3beeefa352853d5dedee67ae267f25f"
       }
     },
     {
       "name": "soft-hyphen-across-pages-cannot-split-word",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -717,7 +1230,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "79f31879194134300d14e49deb17d2c35c72c82dd56ae149aeba2eb7adcfc679",
         "narrativeBindingSha256": "65393833d1542029d72fc37acd7526ccc113e76f14c653a5ce19e0b3c2b604e2",
         "status": "failed",
@@ -751,13 +1264,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 2
         },
-        "reportHash": "51b3b52f33a4df8021ad3328bbc12f0bfe0fd1c1573eeaa5b3ddd378a0985e1a"
+        "reportHash": "20e2f8c6b9d8412c694c03dfac562f47873acf3463172b592626eacdd2323e57"
       }
     },
     {
       "name": "line-break-across-pages-separates-words",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -806,7 +1319,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "563f9215659f7154a80b8518a7bb62a9e91dca32265af7bd7ea35f41a3fda98e",
         "narrativeBindingSha256": "e577aeca8ca8568c6a316add2ed2a1bdb47e7e24b638f4ac25128f7e20810a9b",
         "status": "passed",
@@ -830,13 +1343,13 @@
           "coveredCodePoints": 29,
           "uncoveredGaps": 0
         },
-        "reportHash": "1db3a274c35c961f9d30338a21ab25e11a97ed6b407744582168afd6b45e3165"
+        "reportHash": "521bfe0a320ac2836b8a8a748ac4a341228d378d2c18f5c265be483f7f943fb4"
       }
     },
     {
       "name": "invisible-page-gap-cannot-join-word",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -885,7 +1398,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "563f9215659f7154a80b8518a7bb62a9e91dca32265af7bd7ea35f41a3fda98e",
         "narrativeBindingSha256": "28b618958c1c8dc5e8735d90cb4c1f6bcf229f0e6c6c2c71ab4d1b570cb52273",
         "status": "failed",
@@ -919,13 +1432,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 2
         },
-        "reportHash": "a395b41ae6448c7b1dc6588796e36ca335136320675cdc6d3538fed7e4aafbea"
+        "reportHash": "3a16481d37f38ecd09b76ce75392b5892f400d8eb81cf3a2ab65c1f18085ad9c"
       }
     },
     {
       "name": "adjacent-spans-cannot-split-word",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -980,7 +1493,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "0b23f68c62326d47d255c499d96ce4f565d1848ab712cae26e0a5049c42210a2",
         "status": "failed",
@@ -1014,13 +1527,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "465f90e8becec68bd7fe1f6d09fcaabe4f0ccc8251fc46a37be2e4270a34b942"
+        "reportHash": "81fe88e7a7ed8360314b51901e9379bdbd57a908e6bbd669bc41601be0270195"
       }
     },
     {
       "name": "adjacent-spans-same-word-verifies",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -1075,7 +1588,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "f2c425160545f67b3a17fc65484e4a1eca04233ef00fb788a50264cde49b24d9",
         "status": "passed",
@@ -1099,13 +1612,13 @@
           "coveredCodePoints": 63,
           "uncoveredGaps": 3
         },
-        "reportHash": "7c8fb6fa90b00df235190641ea00948af7d6485c4dc6d3c6cca8f5fe069954ff"
+        "reportHash": "5150b9df5218aa0a1249bfb85949f8239eb7cc494240c66ddf8e04b990269951"
       }
     },
     {
       "name": "soft-hyphen-gap-cannot-split-word",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -1160,7 +1673,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "630ae5dbade7f56bc5b61801c5b086d00543edb059a7b1ee01b4702858f06d21",
         "status": "failed",
@@ -1194,13 +1707,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "8a587df5de4da558020dbff69396760d5298d11ef7ea76a8a9d6d11f88750647"
+        "reportHash": "a54e268aabd95597bc130de62efb075d86df4ad981b76c7c67c57579f89ef775"
       }
     },
     {
       "name": "soft-hyphen-gap-joins-word",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -1255,7 +1768,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "3d2db72e06e36105c4e4a3d5207e9d961c1de62e2765973cf871a0876229e42a",
         "status": "passed",
@@ -1279,13 +1792,13 @@
           "coveredCodePoints": 63,
           "uncoveredGaps": 4
         },
-        "reportHash": "db80d3684cb3631d4c323284f78d875dbb9a5948b9e42739574ba5d6ed17a9ed"
+        "reportHash": "aba32afa3ee2e904d8bb1df0c5e558ba9ddd5aaf278489a320138300cc98650a"
       }
     },
     {
       "name": "empty-sections-fail",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -1314,7 +1827,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "status": "failed",
@@ -1330,13 +1843,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "f4a8cefe0b8bb41b3bcc5db05111e39bf560e26277a6b69d9f7082aaaa7fe276"
+        "reportHash": "f8452faac2cdca6b76d71d68936b188dcfdfbc7b3562bc78dd78af468c42f817"
       }
     },
     {
       "name": "exact-pass",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -1463,7 +1976,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "da63d8c73d863edc82fd49ab011bf85847246685ea4eaf86ab0a507e3b007171",
         "status": "passed",
@@ -1515,13 +2028,13 @@
           "coveredCodePoints": 319,
           "uncoveredGaps": 5
         },
-        "reportHash": "5b234d842197b99bea3296f81922b51fe451001d0bf1fcc5ceb300dcea7be33a"
+        "reportHash": "fac03b7473beda81a5c9c222406c6cc44aa3d377c4e8391b9be1fc0ff76dc356"
       }
     },
     {
       "name": "whitespace-only-differences",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -1570,7 +2083,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "b8c7f41230ed825bd6620dae99dd19fd3373a26ac7cd9108d62a5641d7f6fdb8",
         "status": "passed",
@@ -1594,13 +2107,13 @@
           "coveredCodePoints": 70,
           "uncoveredGaps": 4
         },
-        "reportHash": "3f3b7d5c9f3f6d836b011e21e9980904ab272b36091fcb12e2a1e58445b8a3d3"
+        "reportHash": "d52d3ec71aabc0a163e8a3adec357029ad89cb2b48e6d0a000b9a131d3ad6b82"
       }
     },
     {
       "name": "ligature-and-soft-hyphen",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -1649,7 +2162,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "3d2db72e06e36105c4e4a3d5207e9d961c1de62e2765973cf871a0876229e42a",
         "status": "passed",
@@ -1673,13 +2186,13 @@
           "coveredCodePoints": 64,
           "uncoveredGaps": 4
         },
-        "reportHash": "26b6cc153a58cd07c461b4fcc5254a2a5acad2f0f5f1f60a54609f7d873a91d9"
+        "reportHash": "c89c9b7dccf4838c0def634330b49e13c885d254966e23ca936cd66dd2404637"
       }
     },
     {
       "name": "soft-hyphen-entity-in-narrative",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -1728,7 +2241,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "3d2db72e06e36105c4e4a3d5207e9d961c1de62e2765973cf871a0876229e42a",
         "status": "passed",
@@ -1752,13 +2265,13 @@
           "coveredCodePoints": 64,
           "uncoveredGaps": 4
         },
-        "reportHash": "26b6cc153a58cd07c461b4fcc5254a2a5acad2f0f5f1f60a54609f7d873a91d9"
+        "reportHash": "c89c9b7dccf4838c0def634330b49e13c885d254966e23ca936cd66dd2404637"
       }
     },
     {
       "name": "superscript-markup-over-plain-digit",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -1807,7 +2320,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "f67ddb7d0f874f4c6007daad19faaf6fa5903c3d210998d282dee8f1a624a40b",
         "status": "passed",
@@ -1831,13 +2344,13 @@
           "coveredCodePoints": 59,
           "uncoveredGaps": 4
         },
-        "reportHash": "b128f848695d53a1639c95b5b4a25cf2b7ac81231aaea2b4d4deb4ee4fc32845"
+        "reportHash": "e540a207fe55b03a639d58437ff6b12861602d395a47b81356e82846e8a73f01"
       }
     },
     {
       "name": "page-break-two-contiguous-spans",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -1892,7 +2405,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "f5f093bf218e98d32bf56febe102999ecd208e83ad974efe160c81841a9c0a47",
         "status": "passed",
@@ -1916,13 +2429,13 @@
           "coveredCodePoints": 95,
           "uncoveredGaps": 3
         },
-        "reportHash": "1baac728c5e20a35f1e7ebbfa07ce509e34f82b7d28d60674243b5e44182e15c"
+        "reportHash": "0c771f94e6ed314d326514611fd576266c757abe22b2b144348f796f23eda2dc"
       }
     },
     {
       "name": "word-changed",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -1971,7 +2484,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "e8bc58e66c57e33026a3c8dd51758fd3973b1800abfd296eeba7f36c9a150550",
         "status": "failed",
@@ -2005,13 +2518,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "19823e3d405b27ed2b8f84b3e2d94c97fa523484f8ed09925759384d56b19cc5"
+        "reportHash": "f4f4e6180fd0401b8180767d7f1163245e5d1ef31c29b44815cbf3b703864899"
       }
     },
     {
       "name": "word-deleted",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -2060,7 +2573,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "ced3dc1cf5a1d5479373830d7e72b18f4446d5b92530114f0479014aefa17ef7",
         "status": "failed",
@@ -2094,13 +2607,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "e1ca5171f7ce97466f8c1df34723e30afb3829ac44563fd1e754c3b735621bae"
+        "reportHash": "1caffb91b645499c1fdbbb4a962aa48999487ff402c6f6ad194bf6cd3811c33a"
       }
     },
     {
       "name": "sentence-appended",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -2149,7 +2662,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "168dc859c053241697e32eb494a39c80c8cdca28069b56c2736239a32437019c",
         "status": "failed",
@@ -2183,13 +2696,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "e43fb4eaa38f9611fa43b512babd0a72e40715f40593d9ef1f8b4cee194365f8"
+        "reportHash": "d44863743ee80ac3b987f30593a01ee750d8e12de5a3f31ccd78d883c36d8ae2"
       }
     },
     {
       "name": "sentences-reordered",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -2244,7 +2757,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "d96225ddec9d87b47d1f0a8f08e979890e8a2ebe567e6d4f5ee724ad6af69b43",
         "status": "failed",
@@ -2278,13 +2791,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "35b4fe645a248d384f04e7f6adba7e62065c029df54b5bbc7d9aa9946e8a70a3"
+        "reportHash": "0d9ac03ffd55ef9f3db642f5ad53525f5265eb04a190cbb132a90737ffc53fe6"
       }
     },
     {
       "name": "number-changed",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -2333,7 +2846,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "3b64b4311fb31b25fb783570be9768de63a29bf0d2dd37bb9d584008749d7665",
         "status": "failed",
@@ -2367,13 +2880,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "daac39d4bcef290cc83dd95103b3f912d7baeb2e5cba791c0cdd7ae2e584e133"
+        "reportHash": "3bf468a42e79b41137648df4ae4f7e817717794c24f9f188648ebffff06031c0"
       }
     },
     {
       "name": "unit-changed",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -2422,7 +2935,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "8068ccd9dd454c2a71ba191642a89af4f447820245bd349228231b99b43c1b3b",
         "status": "failed",
@@ -2456,13 +2969,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "861237ad03fe4df410580473ba74f04b7cf097040284f553072d7196f9b0cc69"
+        "reportHash": "a639983da916c29b3473d58b9ad9f61ddc1c5484875437883375009a501633d2"
       }
     },
     {
       "name": "negation-added",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -2511,7 +3024,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "cf1e24bb2f2332489e97192a576470aecd2e883871eb80f85f5b804df733190b",
         "status": "failed",
@@ -2545,13 +3058,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "6c5105daedbef02d34d09f9d768e8388665aa30fd80f9126804c64c4abb84752"
+        "reportHash": "9d82334af5e3b4d665076e35e3451761d3a6ba93b2888a2298cc660238fce825"
       }
     },
     {
       "name": "hard-hyphen-dehyphenated",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -2600,7 +3113,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "c31f36dd8aacfe74f94755264527c4fed491cece76a02525c589aa1f2cdc32fe",
         "status": "failed",
@@ -2634,13 +3147,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "53675c6140806e9ecc088f376a3a641fdc347dacea3b3826fd0eff64dc20e040"
+        "reportHash": "4755004035b7facb10a33dc1d45862b27bdedfcc952d58fe3cb762d7063ee3f4"
       }
     },
     {
       "name": "straight-vs-typographic-quotes",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -2689,7 +3202,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "c66798b96de897ca417d9e08ef7991ea219e8711229b9ee0ffbafe6bb9fb693a",
         "status": "failed",
@@ -2723,13 +3236,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "ade9e5c65186f90b520a3cc2e3cff028a3e5af6ea64978cd56bf3eb0d0aa7d9d"
+        "reportHash": "f6b44f3913daffd62a42c8b9438e6326c7db0a5f720993991e3a402f99be827a"
       }
     },
     {
       "name": "superscript-code-point-vs-digit",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -2778,7 +3291,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "23703513b4a58f2add7dc7e5c54f6852ac68b91ed5958d42518c60b14bf318c4",
         "status": "failed",
@@ -2812,13 +3325,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "dc20564e42ed46ee1572ebf1d3bf7d5fd3fbd09e136012a5ad2412e4673d241d"
+        "reportHash": "e336bb28229fc01a358cbd9cf6903650ae1c4fb84869a62558c3fc89c1059d94"
       }
     },
     {
       "name": "text-not-in-source",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -2867,7 +3380,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "2ce363e53b9ce9b49ef613362c394ce9ed3888ddb0a65a240b25f184b8175d18",
         "status": "failed",
@@ -2901,13 +3414,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "2efb751cb6b797711214e323f7b0a0d5358bc7071b3da4b9f11e5f1dae58373c"
+        "reportHash": "408e009266ffbe555e3e06615744552eccf819ddc2f98d3caf484dd3e81e373b"
       }
     },
     {
       "name": "hidden-extra-element",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -2956,7 +3469,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "547039730ab9db08255bef42abe2ed5ff0259533a5ca9e3a00c248697a733e8e",
         "status": "failed",
@@ -2990,13 +3503,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "dc053819c87ea8b297edd879144a246c4f5ec20730447613eee108c21e782f17"
+        "reportHash": "4d7bbb19511d5ee27ece338842755316111987b10bfcfcd2be732b87a1fe3b88"
       }
     },
     {
       "name": "wrong-page-span",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -3045,7 +3558,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "b8c7f41230ed825bd6620dae99dd19fd3373a26ac7cd9108d62a5641d7f6fdb8",
         "status": "failed",
@@ -3070,13 +3583,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "e982d4b7a10e8edb701160b4c0dffbd60aa6c0c937811b63015aea7ee500177c"
+        "reportHash": "c4908af66ca07693461d5409949083ad19c6b4e12423ea4dc4891c8b063eb198"
       }
     },
     {
       "name": "span-hash-tampered",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -3125,7 +3638,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "b8c7f41230ed825bd6620dae99dd19fd3373a26ac7cd9108d62a5641d7f6fdb8",
         "status": "failed",
@@ -3150,13 +3663,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "e982d4b7a10e8edb701160b4c0dffbd60aa6c0c937811b63015aea7ee500177c"
+        "reportHash": "c4908af66ca07693461d5409949083ad19c6b4e12423ea4dc4891c8b063eb198"
       }
     },
     {
       "name": "span-outside-body",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -3205,7 +3718,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "a33e789caf5da9fa6130787efe09642e4d6cd6e00420deab8da2b023770ab3fa",
         "status": "failed",
@@ -3230,13 +3743,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "098d43c21a0e53eb295a296d3d1f73414bdab729b4a8471331b046e23605e984"
+        "reportHash": "73f5456ce86dee0dac5268b9be263c9d0540c9f58cdf5b42114ff2782b66181a"
       }
     },
     {
       "name": "stitched-non-adjacent-spans",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -3291,7 +3804,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "b31228e6632c3255b6a636d27aec5c7afa88622279e3562b69326822cc54dee7",
         "status": "failed",
@@ -3316,13 +3829,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "c756542fe559431a1de73742c62b35633cfd4eb27eb044b6674385e0102d898e"
+        "reportHash": "715031b61756d2ac098380e2def11fea4c745b6c9b7896e2135c224303cdda1f"
       }
     },
     {
       "name": "overlapping-sections",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -3389,7 +3902,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "f02ad3bcca9f667a99ab13b3d233732f3a7b4236585b864fdeaabccda5bb6337",
         "status": "failed",
@@ -3422,13 +3935,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "9d6fabc04f33c25c423453f895296c793bc07aa8324c34c8c0687804c9208208"
+        "reportHash": "62a947f8fc399a0ea0365c7fb6e0ab85f6d65cee666fb2c82afaa796dbfc075b"
       }
     },
     {
       "name": "missing-provenance",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -3463,7 +3976,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "b8c7f41230ed825bd6620dae99dd19fd3373a26ac7cd9108d62a5641d7f6fdb8",
         "status": "failed",
@@ -3487,13 +4000,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "9b6fa40306afbea0c6f58db8faf15eed34e933fd92127a627c0260cd4aeb8692"
+        "reportHash": "3bc470d9fd20c392ef3955115fed6e6af5db02aa2140675b4b658eb70e8839a5"
       }
     },
     {
       "name": "orphan-provenance",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -3561,7 +4074,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "b8c7f41230ed825bd6620dae99dd19fd3373a26ac7cd9108d62a5641d7f6fdb8",
         "status": "failed",
@@ -3585,13 +4098,13 @@
           "coveredCodePoints": 70,
           "uncoveredGaps": 4
         },
-        "reportHash": "4fcfa76dd88d6729b57785f864d963a0d65b143ad44684e1aec4221003f2231b"
+        "reportHash": "1ba09beeec6e65ee28c8983e7b8d66e58ae98e5cc9fd934c16e3dec8e0692db4"
       }
     },
     {
       "name": "empty-div",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -3640,7 +4153,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
         "status": "failed",
@@ -3664,13 +4177,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "e8eec66b2d0c6302262ff7240049be3f9d377b2dad5ee3931f7471dc41520c8f"
+        "reportHash": "5579c33909fb8899f19d9db0b83cdbfe3f4938f7f205e3d2dac4677553c3fe8e"
       }
     },
     {
       "name": "whitespace-only-div",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -3719,7 +4232,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
         "status": "failed",
@@ -3743,13 +4256,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "e8eec66b2d0c6302262ff7240049be3f9d377b2dad5ee3931f7471dc41520c8f"
+        "reportHash": "5579c33909fb8899f19d9db0b83cdbfe3f4938f7f205e3d2dac4677553c3fe8e"
       }
     },
     {
       "name": "style-attribute",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -3798,7 +4311,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
         "status": "failed",
@@ -3822,13 +4335,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "0bc29fd7cf8cb27c97556d1d0cf76cfff4d8a06865150fa4e1002c258859eb8a"
+        "reportHash": "6440433e2c9d126d99677afbe085ac20ac00d791bba042b2064b98fb8964905b"
       }
     },
     {
       "name": "script-element",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -3877,7 +4390,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
         "status": "failed",
@@ -3901,13 +4414,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "af2e1a718618b77a2b31b68e6fe6a366330471f7b11625306789ba6cf3419cbe"
+        "reportHash": "a13c3320c9a67e16056aacbb33e968e34a29a284b357ac3865b6de7283906c94"
       }
     },
     {
       "name": "comment-in-narrative",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -3956,7 +4469,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
         "status": "failed",
@@ -3980,13 +4493,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "c1d0217d83ba640a1888d1dc9ce7c3016c626478f319edaaf7bc5d671b0475bc"
+        "reportHash": "10e9b76d40955ddc255ffabc9eb9d878e8d1152e709d0a92931571f5e1f59511"
       }
     },
     {
       "name": "nbsp-named-entity",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -4035,7 +4548,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
         "status": "failed",
@@ -4059,13 +4572,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "a168a9a14915d89672181acd6b59ea5ddc3f6f695ec97162459f36a2cc52b75c"
+        "reportHash": "d0aec7b5d82cf80891f7cee7c19ff973ed6df8bae4c0ef54b90843a1527c2ab7"
       }
     },
     {
       "name": "uppercase-tag",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -4114,7 +4627,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
         "status": "failed",
@@ -4138,13 +4651,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "e46db39e1a2ef815df1e0dfe75ecbe039fb01a819abf18738111e91c96c5db08"
+        "reportHash": "30139ac09c41ab44c058d13f11115fdab364c69ff36983e3c78c784566b2ea8d"
       }
     },
     {
       "name": "unbalanced-tag",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -4193,7 +4706,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
         "status": "failed",
@@ -4217,13 +4730,13 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "b5ccf1286c805f725d387a094fb18b7b30a50b807df357b160ca6d44a4669041"
+        "reportHash": "a35729677fae67e66e1955fcb5bc62468abf29348d262c672e935ebe554a1011"
       }
     },
     {
       "name": "replacement-character",
       "input": {
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "source": {
           "extractorVersion": "synthetic-extractor/1.0.0",
           "pages": [
@@ -4272,7 +4785,7 @@
       },
       "expected": {
         "reportVersion": "1.0.0",
-        "normalizationVersion": "fidelity-norm/1.0.0",
+        "normalizationVersion": "fidelity-norm/1.1.0",
         "extractedTextSha256": "817e1ecea280402e855551b511295519a4b075e3a6856e03f656257190783c18",
         "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
         "status": "failed",
@@ -4296,7 +4809,7 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 3
         },
-        "reportHash": "91e64ee2f64bed2795766bd56c47feb2cf68a54692a9d6047899dc5a4274cdeb"
+        "reportHash": "221090c3b0517cbf398171fa268b4de915bfc2522229584bb0d8becb957886be"
       }
     }
   ]

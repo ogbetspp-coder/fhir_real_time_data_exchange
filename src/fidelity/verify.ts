@@ -5,6 +5,7 @@ import {
   NormalizationError,
   countWords,
   findForbiddenCharacter,
+  isWordCharacter,
   normalizeText,
 } from "./normalize.js";
 import { XhtmlError, xhtmlToText } from "./xhtml.js";
@@ -121,9 +122,22 @@ type PageIndex = {
   bodyIssue: string | undefined;
 };
 
+// True when the line break that ends just before `offset` follows U+00AD: normalisation step 1
+// deletes such a break, so it is inside a word, not between words.
+function softHyphenBreakBefore(codePoints: string[], offset: number): boolean {
+  if (codePoints[offset - 1] !== "\n") return false;
+  const before = codePoints[offset - 2] === "\r" ? offset - 3 : offset - 2;
+  return codePoints[before] === "­";
+}
+
 function bodyIssueFor(page: SourcePage, codePoints: string[]): string | undefined {
   const { bodyStart, bodyEnd } = page;
-  if (bodyStart !== 0 && codePoints[bodyStart - 1] !== "\n") return "body-boundary";
+  if (
+    bodyStart !== 0 &&
+    (codePoints[bodyStart - 1] !== "\n" || softHyphenBreakBefore(codePoints, bodyStart))
+  ) {
+    return "body-boundary";
+  }
   if (bodyEnd !== codePoints.length && codePoints[bodyEnd - 1] !== "\n") return "body-boundary";
   if (codePoints.length - (bodyEnd - bodyStart) > MAX_EXCLUDED_CODE_POINTS_PER_PAGE) {
     return "excluded-text";
@@ -240,6 +254,31 @@ function resolveSpans(
     }
     previous = span;
   }
+
+  // The outer edges of a section must fall on word boundaries: a section may omit words, but
+  // it may not begin or end inside one (spec section 6).
+  const first = pieces[0];
+  const last = pieces[pieces.length - 1];
+  if (first !== undefined && last !== undefined) {
+    const head = first.index.codePoints;
+    const before = head[first.start - 1];
+    if (
+      first.start > first.index.page.bodyStart &&
+      before !== undefined &&
+      (isWordCharacter(before) || softHyphenBreakBefore(head, first.start))
+    ) {
+      return { status: "invalid-provenance", reason: "word-cut" };
+    }
+    const tail = last.index.codePoints;
+    const after = tail[last.end];
+    const cutsAfter =
+      tail[last.end - 1] === "­" ||
+      (last.end < last.index.page.bodyEnd
+        ? after !== undefined && isWordCharacter(after)
+        : softHyphenBreakBefore(tail, last.end));
+    if (cutsAfter) return { status: "invalid-provenance", reason: "word-cut" };
+  }
+
   return { raw: pieces.map((piece) => slice(piece.index, piece.start, piece.end)) };
 }
 

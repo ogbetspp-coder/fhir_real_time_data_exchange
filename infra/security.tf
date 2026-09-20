@@ -143,7 +143,7 @@ resource "google_logging_project_sink" "regulated_audit" {
   unique_writer_identity = true
   filter                 = <<-EOT
     resource.type=("cloud_run_revision" OR "workflows.googleapis.com/Workflow" OR "healthcare_fhir_store")
-    OR protoPayload.serviceName=("healthcare.googleapis.com" OR "run.googleapis.com" OR "workflows.googleapis.com")
+    OR protoPayload.serviceName=("healthcare.googleapis.com" OR "run.googleapis.com" OR "workflows.googleapis.com" OR "storage.googleapis.com" OR "bigquery.googleapis.com" OR "cloudkms.googleapis.com")
   EOT
 }
 

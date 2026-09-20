@@ -73,8 +73,12 @@ unit order, never locale-aware ordering, so a re-implementation can reproduce th
   capacity of that channel; they do not eliminate it. `ol` and `q` are not allowed because
   renderers generate visible characters for them, and table sections must appear in rendering
   order.
+- A section may omit words but never begin or end inside one: the outer span edges must fall
+  on word boundaries (`docs/fidelity-normalization.md` section 6, reason `word-cut`), and a
+  soft hyphen directly before a structural line break in the narrative rejects, so a word can
+  be neither truncated at a section edge nor joined across markup.
 - NFC (step 3) depends on the Unicode Character Database of the runtime. Zone B pins its
-  runtime image (`node:22.14`, Unicode 15.1 via ICU) and any re-implementation must pin an
+  runtime image (`node:22.14.0`, ICU 76.1, Unicode 16.0) and any re-implementation must pin an
   equivalent; a runtime with a different Unicode version is a change to the normalisation
   version even though no code changes.
 - The verifier is a second, independent narrative gate alongside the existing

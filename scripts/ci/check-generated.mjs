@@ -5,9 +5,11 @@ import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
-// Runs a generator and fails if it changed, added, or removed any file under the given paths.
+// Runs a generator and fails if it changed, added, or removed any file under the given paths,
+// or left a file under them untouched (a stale artifact the generator no longer produces).
 // Unlike `git diff --exit-code`, this sees untracked files, so generated artifacts that were
-// never committed cannot pass the gate.
+// never committed cannot pass the gate. Generators must rewrite every file they own on each
+// run; a file whose modification time does not move is treated as not generated.
 //
 // usage: node scripts/ci/check-generated.mjs --run "<command>" -- <path> [<path>...]
 
@@ -33,7 +35,10 @@ function snapshot(paths) {
       for (const name of readdirSync(entry).sort()) visit(path.join(entry, name));
       return;
     }
-    digests.set(entry, createHash("sha256").update(readFileSync(entry)).digest("hex"));
+    digests.set(entry, {
+      digest: createHash("sha256").update(readFileSync(entry)).digest("hex"),
+      mtimeMs: statSync(entry).mtimeMs,
+    });
   };
   for (const target of paths) visit(target);
   return digests;
@@ -43,13 +48,25 @@ const before = snapshot(targets);
 execSync(command, { stdio: "inherit" });
 const after = snapshot(targets);
 
-const changed = [...new Set([...before.keys(), ...after.keys()])]
-  .filter((file) => before.get(file) !== after.get(file))
-  .sort();
+const files = [...new Set([...before.keys(), ...after.keys()])].sort();
+const changed = files.filter((file) => before.get(file)?.digest !== after.get(file)?.digest);
+const stale = files.filter((file) => {
+  const previous = before.get(file);
+  const current = after.get(file);
+  return previous !== undefined && current !== undefined && previous.mtimeMs === current.mtimeMs;
+});
 
 if (changed.length > 0) {
   console.error(
     `Generated files are out of date; run the generator and commit the result:\n${changed
+      .map((file) => `  ${file}`)
+      .join("\n")}`,
+  );
+  process.exit(1);
+}
+if (stale.length > 0) {
+  console.error(
+    `Files under the guarded paths were not produced by the generator; remove them:\n${stale
       .map((file) => `  ${file}`)
       .join("\n")}`,
   );

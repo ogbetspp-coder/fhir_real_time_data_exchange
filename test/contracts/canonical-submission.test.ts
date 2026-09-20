@@ -223,7 +223,7 @@ describe("canonical submission contract", () => {
     const submission = clone();
     submission.provenance.fidelity.normalizationVersion = "fidelity-norm/0.9.0";
 
-    rejectedByParse(seal(submission), "fidelity.normalizationVersion must be fidelity-norm/1.0.0");
+    rejectedByParse(seal(submission), "fidelity.normalizationVersion must be fidelity-norm/1.1.0");
   });
 
   it("rejects source text that does not match sourceDocument.extractedText.sha256", () => {
@@ -286,6 +286,76 @@ describe("canonical submission contract", () => {
       seal(submission),
       "provenance.extraction.parser.name: Invalid string: must match pattern /^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$/",
     );
+  });
+
+  it("rejects prose in approverId and recordRef", () => {
+    const withApprover = clone();
+    withApprover.approval.approverId = "患者は本剤を一日二回服用すること";
+    rejectedByParse(
+      withApprover,
+      "approval.approverId: approverId must be an opaque principal identifier, not an e-mail address",
+    );
+
+    const withRecord = clone();
+    withRecord.approval.recordRef = "take_one_tablet_twice_daily_with_food_<script>";
+    const parsed = CanonicalSubmissionSchema.safeParse(withRecord);
+    expect(parsed.success).toBe(false);
+    expect(reject(withRecord).issues.some((issue) => issue.startsWith("approval.recordRef"))).toBe(
+      true,
+    );
+  });
+
+  it("rejects URL fields that carry whitespace or unbounded paths", () => {
+    const withSystem = clone();
+    const decision = withSystem.provenance.decisions.find(
+      ({ terminologyRef }) => terminologyRef !== undefined,
+    );
+    if (decision?.terminologyRef === undefined)
+      throw new Error("fixture needs a code-mapped decision");
+    decision.terminologyRef.system = "https://example.org/take one tablet twice daily";
+    expect(
+      reject(seal(withSystem)).issues.some((issue) => issue.includes("terminologyRef.system")),
+    ).toBe(true);
+
+    const withUri = clone();
+    withUri.provenance.sourceDocument.extractedText.uri = `gs://evidence/${"word_".repeat(200)}`;
+    expect(reject(seal(withUri)).issues.some((issue) => issue.includes("extractedText.uri"))).toBe(
+      true,
+    );
+  });
+
+  it("rejects an aggregate of short strings that adds up to a document", () => {
+    const submission = clone();
+    const organization = submission.bundle.entry[1]?.resource as
+      Record<string, unknown> | undefined;
+    if (organization === undefined) throw new Error("Synthetic bundle requires a second entry");
+    organization.alias = Array.from({ length: 3_001 }, (_, index) => `alias-${index}`);
+
+    const parsed = CanonicalSubmissionSchema.safeParse(seal(submission));
+    expect(parsed.success).toBe(true);
+    expect(reject(submission).issues).toContain("Bundle carries more than 3000 unverified strings");
+  });
+
+  it("counts words in scripts without inter-word spaces", () => {
+    const submission = clone();
+    const organization = submission.bundle.entry[1]?.resource as
+      Record<string, unknown> | undefined;
+    if (organization === undefined) throw new Error("Synthetic bundle requires a second entry");
+    organization.name =
+      "本剤は肝機能障害のある患者には慎重に投与すること。重篤な肝障害が報告されているため、投与開始前および投与中は定期的に肝機能検査を実施すること。";
+
+    const parsed = CanonicalSubmissionSchema.safeParse(seal(submission));
+    expect(parsed.success).toBe(true);
+    expect(reject(submission).issues).toContain("Unverified free text at entry[1].resource.name");
+  });
+
+  it("rejects pathological nesting before anything recursive touches it", () => {
+    const submission = clone() as unknown as Record<string, unknown>;
+    let nested: unknown = "x";
+    for (let depth = 0; depth < 5_000; depth += 1) nested = [nested];
+    (submission.bundle as Record<string, unknown>).extension = nested;
+
+    expect(reject(submission).issues).toContain("submission nesting exceeds depth 48");
   });
 
   it("rejects malformed source text as a contract issue rather than a type error", () => {

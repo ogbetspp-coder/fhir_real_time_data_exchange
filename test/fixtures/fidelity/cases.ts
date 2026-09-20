@@ -236,6 +236,19 @@ function midLineBodySource(): SourceDocumentText {
   return { ...source, pages: [{ ...first, bodyEnd }] };
 }
 
+// A page whose declared body starts right after a soft-hyphen line break: the header would
+// have to end mid-word, so the boundary is illegal.
+const BODY_AFTER_SOFT_HYPHEN: SourceDocumentText = {
+  extractorVersion: "synthetic-extractor/1.0.0",
+  pages: [
+    (() => {
+      const text = "ACME intra­\nvenous infusion.\n";
+      const bodyStart = Array.from(text).indexOf("v");
+      return { page: 1, text, bodyStart, bodyEnd: Array.from(text).length };
+    })(),
+  ],
+};
+
 const HYPHEN_ACROSS_PAGES = customSource([
   "The dose is given by intra­",
   "venous infusion over 10 minutes.",
@@ -272,6 +285,92 @@ export const verifyCases: VerifyCase[] = [
       status: "failed",
       sections: { "smpc.4.1": "span-not-found" },
       reasons: { "smpc.4.1": "excluded-text" },
+    },
+  },
+  {
+    name: "body-boundary-after-soft-hyphen-break",
+    input: toInput(
+      BODY_AFTER_SOFT_HYPHEN,
+      single("smpc.4.2.posology", paragraphs("venous infusion."), [
+        spanFor(BODY_AFTER_SOFT_HYPHEN, 1, "venous infusion."),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "span-not-found" },
+      reasons: { "smpc.4.2.posology": "body-boundary" },
+    },
+  },
+  // A section may omit words but never begin or end inside one: the outer span edges must fall
+  // on word boundaries (punctuation and whitespace are boundaries; a soft hyphen is not).
+  {
+    name: "span-starts-mid-word",
+    input: toInput(
+      S,
+      single("smpc.4.1", paragraphs("nal dose is given by intravenous infusion over 10 minutes."), [
+        spanFor(S, 1, "nal dose is given by intra­venous infusion over 10 minutes."),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.1": "invalid-provenance" },
+      reasons: { "smpc.4.1": "word-cut" },
+    },
+  },
+  {
+    name: "span-ends-mid-word",
+    input: toInput(
+      S,
+      single(
+        "smpc.4.1",
+        paragraphs("Synthetic demonstration content for section 4.1; not for clin"),
+        [spanFor(S, 1, "Synthetic demonstration content for section 4.1; not for clin")],
+      ),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.1": "invalid-provenance" },
+      reasons: { "smpc.4.1": "word-cut" },
+    },
+  },
+  {
+    name: "span-ends-before-soft-hyphen",
+    input: toInput(
+      S,
+      single("smpc.4.1", paragraphs("The final dose is given by intra"), [
+        spanFor(S, 1, "The ﬁnal dose is given by intra"),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.1": "invalid-provenance" },
+      reasons: { "smpc.4.1": "word-cut" },
+    },
+  },
+  {
+    name: "span-ends-before-punctuation-passes",
+    input: toInput(
+      S,
+      single(
+        "smpc.4.1",
+        paragraphs("Synthetic demonstration content for section 4.1; not for clinical use"),
+        [spanFor(S, 1, "Synthetic demonstration content for section 4.1; not for clinical use")],
+      ),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.1": "verified" } },
+  },
+  {
+    name: "section-ends-at-hyphenated-page-end",
+    input: toInput(
+      HYPHEN_ACROSS_PAGES,
+      single("smpc.4.2.posology", paragraphs("The dose is given by intra"), [
+        spanFor(HYPHEN_ACROSS_PAGES, 1, "The dose is given by intra­"),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
     },
   },
   // Across a page break the verifier concatenates the bodies verbatim: a soft hyphen at the end
@@ -903,6 +1002,50 @@ export const xhtmlCases: XhtmlCase[] = [
     name: "rejects-tbody-outside-table",
     input: div("<tbody><tr><td>b</td></tr></tbody>"),
     expected: { error: "misnested-tag" },
+  },
+  // Rows directly under `table` render inside an implicit body and a caption always renders
+  // first, so they may not be mixed with sections or placed after content.
+  {
+    name: "rejects-loose-row-after-tfoot",
+    input: div("<table><tfoot><tr><td>f</td></tr></tfoot><tr><td>b</td></tr></table>"),
+    expected: { error: "table-structure" },
+  },
+  {
+    name: "rejects-loose-row-before-thead",
+    input: div("<table><tr><td>b</td></tr><thead><tr><th>h</th></tr></thead></table>"),
+    expected: { error: "table-structure" },
+  },
+  {
+    name: "rejects-caption-after-body",
+    input: div("<table><tbody><tr><td>a</td></tr></tbody><caption>c</caption></table>"),
+    expected: { error: "table-structure" },
+  },
+  {
+    name: "accepts-caption-first",
+    input: div("<table><caption>c</caption><tr><td>a</td></tr></table>"),
+    expected: "\n\n\nc\n\n\na\n\n\n\n",
+  },
+  {
+    name: "rejects-cell-outside-row",
+    input: div("<table><td>a</td></table>"),
+    expected: { error: "misnested-tag" },
+  },
+  // A soft hyphen directly before a structural line break would render as a hyphenated break
+  // while normalisation joins the word.
+  {
+    name: "rejects-soft-hyphen-before-br",
+    input: div("<p>intra&#173;<br/>venous</p>"),
+    expected: { error: "soft-hyphen-at-boundary" },
+  },
+  {
+    name: "rejects-soft-hyphen-before-block-end",
+    input: div("<h2>intra&#173;</h2><p>venous</p>"),
+    expected: { error: "soft-hyphen-at-boundary" },
+  },
+  {
+    name: "accepts-soft-hyphen-inside-text",
+    input: div("<p>intra&#173;venous</p>"),
+    expected: "\n\nintra­venous\n\n",
   },
   {
     name: "rejects-javascript-href",

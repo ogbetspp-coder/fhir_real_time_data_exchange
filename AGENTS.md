@@ -35,7 +35,9 @@ Google Cloud Healthcare API and observe their native near-real-time BigQuery str
 3. Keep transformations pure and deterministic; isolate Google API side effects.
 4. Update the mapping manifest and the evidence schema (`src/contracts/run-manifest.ts`,
    regenerated into `contracts/generated/`) together.
-5. Run the full local gate before commit. Cloud Build is the authoritative release gate.
+5. Run the full local gate before commit. The GitHub Actions `Quality gate` step
+   (`npm run check`) in `.github/workflows/deploy.yml` is the authoritative release gate; Cloud
+   Build only builds images.
 6. Use a separate git worktree for every parallel writing agent.
 
 ## Cursor Cloud specific instructions

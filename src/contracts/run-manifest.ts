@@ -6,7 +6,10 @@ import {
   IsoDateTime,
   NonEmptyString,
   NormalizationVersion,
+  PrincipalId,
+  RecordRef,
   Sha256Hex,
+  Token,
   Uuid,
 } from "./common.js";
 import {
@@ -94,9 +97,9 @@ export const IngestionEvidenceSchema = z
     contractVersion: z.literal("1.0.0"),
     sourceDocumentSha256: Sha256Hex,
     extractionRunId: Uuid,
-    parser: NonEmptyString,
-    modelId: NonEmptyString.optional(),
-    promptTemplateVersion: NonEmptyString.optional(),
+    parser: Token,
+    modelId: Token.optional(),
+    promptTemplateVersion: Token.optional(),
     fidelity: z.strictObject({
       status: FidelityStatus.extract(["passed"]),
       normalizationVersion: NormalizationVersion,
@@ -112,13 +115,13 @@ export const IngestionEvidenceSchema = z
       }),
     }),
     approval: z.strictObject({
-      approverId: NonEmptyString,
+      approverId: PrincipalId,
       approverRole: ApproverRole,
       approvedAt: IsoDateTime,
       method: ApprovalMethod,
       meaning: ApprovalMeaning,
       approvedContentSha256: Sha256Hex,
-      recordRef: NonEmptyString.optional(),
+      recordRef: RecordRef.optional(),
     }),
     provenanceResourceId: Uuid,
   })

@@ -15,7 +15,39 @@ export const IsoDateTime = z.iso
   .datetime({ offset: true })
   .meta({ id: "IsoDateTime", description: "RFC 3339 timestamp with Z or a numeric offset." });
 
-export const HttpUrl = z.url().max(256).meta({ id: "HttpUrl" });
+// URL-class strings are grammar-limited rather than `z.url()`: the WHATWG parser accepts
+// spaces and opaque schemes, which would let a URL field carry a sentence.
+const URL_TAIL = "[A-Za-z0-9._~:/?#@!$&'()*+,;=%|-]";
+
+export const HttpUrl = z
+  .string()
+  .regex(new RegExp(`^https?://[A-Za-z0-9.-]{1,253}(?::\\d{1,5})?(?:[/?#]${URL_TAIL}*)?$`))
+  .max(256)
+  .meta({ id: "HttpUrl", description: "http(s) URL without whitespace; may carry |version." });
+
+// Identifier namespaces and document fullUrls: an http(s) URL or a URN.
+export const CanonicalUri = z
+  .string()
+  .regex(new RegExp(`^(?:https?://[A-Za-z0-9.-]{1,253}(?:[/?#]${URL_TAIL}*)?|urn:${URL_TAIL}+)$`))
+  .max(256)
+  .meta({ id: "CanonicalUri" });
+
+// Opaque principal identifier for an approver (IdP subject, service account id); never an
+// e-mail address and never prose.
+export const PrincipalId = z
+  .string()
+  .regex(
+    /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/,
+    "approverId must be an opaque principal identifier, not an e-mail address",
+  )
+  .meta({ id: "PrincipalId" });
+
+// Locator of an approval record in an external system (URL or record key), no whitespace and
+// no characters outside the URL-safe set.
+export const RecordRef = z
+  .string()
+  .regex(/^[A-Za-z0-9][A-Za-z0-9._:/#?=&%+-]{0,511}$/)
+  .meta({ id: "RecordRef" });
 
 // Identifier-class strings (tool names, versions, ids, codes). Token-limited so that no
 // provenance field can carry prose into a manifest, ledger row, or Provenance resource.
@@ -33,7 +65,8 @@ export const TargetPath = z
 
 export const StorageUri = z
   .string()
-  .regex(/^gs:\/\/[a-z0-9][a-z0-9._-]{1,220}[a-z0-9]\/\S+$/)
+  .regex(/^gs:\/\/[a-z0-9][a-z0-9._-]{1,220}[a-z0-9]\/[A-Za-z0-9._/-]{1,256}$/)
+  .max(512)
   .meta({ id: "StorageUri", description: "Cloud Storage object URI (gs://bucket/object)." });
 
 export const SourceKey = z

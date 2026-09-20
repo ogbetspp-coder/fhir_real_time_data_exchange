@@ -19,7 +19,9 @@ export type XhtmlErrorCode =
   | "doctype"
   | "unbalanced-tag"
   | "misnested-tag"
-  | "table-section-order";
+  | "table-section-order"
+  | "table-structure"
+  | "soft-hyphen-at-boundary";
 
 export class XhtmlError extends Error {
   public constructor(
@@ -79,7 +81,13 @@ const INLINE_ELEMENTS = new Set([
 // Elements whose renderer-generated characters (list numbers, quotation marks) would show text
 // the source does not contain are excluded above: `ol` and `q`.
 
-type TableState = { head: boolean; body: boolean; foot: boolean };
+type TableState = {
+  caption: boolean;
+  head: boolean;
+  body: boolean;
+  foot: boolean;
+  rows: boolean;
+};
 
 const NAMED_ENTITIES = new Map<string, string>([
   ["amp", "&"],
@@ -162,20 +170,40 @@ function decodeEntity(match: RegExpExecArray, offset: number): string {
   return String.fromCodePoint(codePoint);
 }
 
-// Table sections render in a fixed order (head, body, foot) regardless of document order, so
-// only that document order is accepted; anything else would display rows in a different order
-// from the source the text was verified against.
-function enterTableSection(
+// Renderers place table parts by role, not by document position: a caption always renders
+// first, sections render head → body → foot, and rows placed directly under `table` are
+// wrapped in an implicit body. Only the one document order that renders as written is
+// accepted, so displayed text order equals the order the source was verified in.
+function enterTableElement(
   name: string,
   stack: string[],
   tables: TableState[],
   offset: number,
 ): void {
-  if (name !== "thead" && name !== "tbody" && name !== "tfoot") return;
-  const state = tables[tables.length - 1];
-  if (stack[stack.length - 1] !== "table" || state === undefined) {
-    throw new XhtmlError("misnested-tag", offset);
+  const parent = stack[stack.length - 1];
+  if (name === "td" || name === "th") {
+    if (parent !== "tr") throw new XhtmlError("misnested-tag", offset);
+    return;
   }
+  if (name === "tr") {
+    if (parent === "thead" || parent === "tbody" || parent === "tfoot") return;
+    const state = tables[tables.length - 1];
+    if (parent !== "table" || state === undefined) throw new XhtmlError("misnested-tag", offset);
+    if (state.head || state.body || state.foot) throw new XhtmlError("table-structure", offset);
+    state.rows = true;
+    return;
+  }
+  if (name !== "caption" && name !== "thead" && name !== "tbody" && name !== "tfoot") return;
+  const state = tables[tables.length - 1];
+  if (parent !== "table" || state === undefined) throw new XhtmlError("misnested-tag", offset);
+  if (name === "caption") {
+    if (state.caption || state.head || state.body || state.foot || state.rows) {
+      throw new XhtmlError("table-structure", offset);
+    }
+    state.caption = true;
+    return;
+  }
+  if (state.rows) throw new XhtmlError("table-structure", offset);
   if (name === "thead" && (state.head || state.body || state.foot)) {
     throw new XhtmlError("table-section-order", offset);
   }
@@ -193,6 +221,15 @@ export function xhtmlToText(div: string): string {
   let rootSeen = false;
   let rootClosed = false;
   let index = 0;
+
+  // A structural line break (block boundary or `br`) directly after U+00AD would let
+  // normalisation step 1 join a word across markup that renders as a hyphenated break.
+  const boundary = (offset: number): void => {
+    if (output[output.length - 1] === "­") {
+      throw new XhtmlError("soft-hyphen-at-boundary", offset);
+    }
+    output.push("\n");
+  };
 
   while (index < div.length) {
     const character = div[index] ?? "";
@@ -213,7 +250,7 @@ export function xhtmlToText(div: string): string {
         if (open === undefined) throw new XhtmlError("unbalanced-tag", index);
         if (open !== name) throw new XhtmlError("misnested-tag", index);
         if (name === "table") tables.pop();
-        if (BLOCK_ELEMENTS.has(name) || name === "br") output.push("\n");
+        if (BLOCK_ELEMENTS.has(name) || name === "br") boundary(index);
         if (stack.length === 0) rootClosed = true;
         index = END_TAG.lastIndex;
         continue;
@@ -237,15 +274,17 @@ export function xhtmlToText(div: string): string {
         rootSeen = true;
       }
       checkAttributes(name, start[2] ?? "", isRoot, index);
-      enterTableSection(name, stack, tables, index);
+      enterTableElement(name, stack, tables, index);
 
-      if (BLOCK_ELEMENTS.has(name) || name === "br") output.push("\n");
+      if (BLOCK_ELEMENTS.has(name) || name === "br") boundary(index);
       if ((start[3] ?? "") === "/") {
-        if (BLOCK_ELEMENTS.has(name)) output.push("\n");
+        if (BLOCK_ELEMENTS.has(name)) boundary(index);
         if (isRoot) rootClosed = true;
       } else {
         stack.push(name);
-        if (name === "table") tables.push({ head: false, body: false, foot: false });
+        if (name === "table") {
+          tables.push({ caption: false, head: false, body: false, foot: false, rows: false });
+        }
       }
       index = START_TAG.lastIndex;
       continue;

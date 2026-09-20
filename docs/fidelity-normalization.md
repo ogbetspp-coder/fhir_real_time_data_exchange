@@ -1,6 +1,7 @@
 # Narrative fidelity normalisation specification
 
-Version: `fidelity-norm/1.0.0` (`NORMALIZATION_VERSION` in `src/fidelity/normalize.ts`)
+Version: `fidelity-norm/1.1.0` (`NORMALIZATION_VERSION` in `src/fidelity/normalize.ts`; history
+in section 9)
 
 This document is the language-neutral specification of the text normalisation and XHTML
 extraction used by the narrative fidelity check (ADR 0003). The TypeScript implementation in
@@ -19,10 +20,13 @@ text and to the narrative text; nothing is applied to one side only.
   by contiguity checks, but the report records the whole page length (`pageCodePoints`) next
   to the body length so excluded text is visible.
 - The body range is declared by the extractor and is bounded rather than trusted: `bodyStart`
-  must be 0 or immediately follow U+000A; `bodyEnd` must be the page length or the code point
-  before it must be U+000A (a body ends with its own line terminator); and a page may exclude
-  at most 240 code points in total. A page that violates any of these makes every span on it
-  `span-not-found` (reason `body-boundary` or `excluded-text`) and the report `failed`.
+  must be 0 or immediately follow U+000A, and that U+000A must not itself follow U+00AD (step 1
+  would delete it, so it lies inside a word); `bodyEnd` must be the page length or the code
+  point before it must be U+000A (a body ends with its own line terminator; U+00AD U+000A is
+  allowed there because a word may continue on the next page — section 6 decides whether the
+  section may end there); and a page may exclude at most 240 code points in total. A page that
+  violates any of these makes every span on it `span-not-found` (reason `body-boundary` or
+  `excluded-text`) and the report `failed`.
 - Every hash of a JSON value (`reportHash`, `extractedTextSha256`, `narrativeBindingSha256`,
   the contract hashes) is the SHA-256 of canonical JSON: object keys sorted by UTF-16 code
   unit order (RFC 8785), no insignificant whitespace, `JSON.stringify` number and string
@@ -72,7 +76,7 @@ These are treated as content; a difference is a mismatch:
   U+201C, U+201D and others);
 - hyphen and dash variants (U+002D, U+2010–U+2015, U+2212) and line-break de-hyphenation
   (`intra-` at a line end followed by `venous` stays `intra- venous`; the extractor must emit
-  discretionary hyphens as U+00AD so that step 2 removes them);
+  discretionary hyphens as U+00AD so that step 1 removes them together with the line break);
 - superscript and subscript code points (`m²`, `H₂O`) versus plain digits;
 - footnote and reference markers, numbered-list markers (`1.`, `a)`), and other punctuation;
 - U+200C ZERO WIDTH NON-JOINER and U+200D ZERO WIDTH JOINER;
@@ -86,12 +90,22 @@ The narrative `text.div` is scanned without a DOM. Any violation makes the secti
 - Exactly one root element `div` carrying `xmlns="http://www.w3.org/1999/xhtml"`; only
   whitespace may appear outside it.
 - Element names are lower-case. Block elements emit U+000A before their start tag and after
-  their end tag: `div p h1 h2 h3 h4 h5 h6 ul ol li table thead tbody tfoot tr td th caption pre
+  their end tag: `div p h1 h2 h3 h4 h5 h6 ul li table thead tbody tfoot tr td th caption pre
 blockquote dl dt dd hr`. `br` emits U+000A. Inline elements contribute only their text:
-  `span b i u em strong sup sub small a abbr cite code q`. Self-closing syntax (`<br/>`,
+  `span b i u em strong sup sub small a abbr cite code`. Self-closing syntax (`<br/>`,
   `<td/>`) is accepted for any allowed element.
 - Any other element (including `script`, `style`, `img`, `svg`, `object`, `iframe`, `del`,
-  `s`, `strike`, `math`, form controls) rejects.
+  `s`, `strike`, `math`, form controls, and `ol` and `q`, whose renderers generate list
+  numbers and quotation marks the source may not contain) rejects (`unknown-element`).
+- Table parts must appear in the one document order that renders as written, because
+  renderers place them by role: `caption` (at most one) first; then either rows (`tr`)
+  directly under `table`, or sections in the order `thead` (at most one), `tbody` (any
+  number), `tfoot` (at most one), never both forms in one table. `caption`, `thead`, `tbody`,
+  `tfoot` must be direct children of `table`; `tr` of `table` or a section; `td` and `th` of
+  `tr`. Violations reject (`table-structure`, `table-section-order`, or `misnested-tag`).
+- U+00AD directly before a structural U+000A (a block boundary or `br`) rejects
+  (`soft-hyphen-at-boundary`): step 1 would join the word across markup that renders as a
+  hyphenated line break.
 - Allowed attributes: `xmlns` (root only), `xml:lang`, `lang`, `id`, `class`, `href` (on `a`
   only), `colspan`, `rowspan`, `scope`. Values must be double- or single-quoted. Any other
   attribute — in particular `style`, `hidden`, and `title` — rejects, and so does a repeated
@@ -126,6 +140,15 @@ table-cell boundaries are structure, not content. Cell text is content.
   and the slices are concatenated verbatim with no separator: the body's own final line
   terminator, or a soft hyphen when a word continues, decides how the pages join. The verifier
   never inserts a character of its own.
+- A section may omit words but never begin or end inside one. Its first span must start at a
+  word boundary and its last span must end at one: unless the first span starts at `bodyStart`,
+  the code point before it must not be a word character and must not be a U+000A that follows
+  U+00AD; the last span must not end in U+00AD; unless it ends at `bodyEnd`, the code point at
+  its end must not be a word character; and if it ends at `bodyEnd`, that end must not be a
+  U+00AD U+000A pair (the word continues on the next page, so the section must continue too).
+  Word characters are Unicode letters, digits, and combining marks (`\p{L}`, `\p{N}`, `\p{M}`),
+  the step 1 invisible characters, U+200C, and U+200D; whitespace and punctuation are
+  boundaries. Violations are `invalid-provenance` with reason `word-cut`.
 - The joined text is normalised (section 3) and must equal the normalised narrative exactly.
 - A report with zero narrative sections is `failed` (issue `No narrative sections to verify`);
   "nothing to check" is never a pass.
@@ -152,3 +175,14 @@ Any change to sections 2–6 is a new `NORMALIZATION_VERSION`. The golden vector
 regenerated, every changed vector is reviewed by hand with a recorded reason, the ADR is
 amended, and previously approved submissions require re-approval because the version is part
 of the approved content hash.
+
+## 9. Version history
+
+- `fidelity-norm/1.1.0` — U+00AD followed by a line break deletes the break (step 1);
+  cross-page slices are concatenated verbatim including blank gaps (section 6); body ranges
+  must sit on line boundaries and exclude at most 240 code points (section 1); span edges must
+  fall on word boundaries (section 6); `ol` and `q` reject, table parts must be in rendering
+  order, and U+00AD before a structural line break rejects (section 5); attribute grammars
+  tightened (section 5). Closes review rounds 2 and 3. No submission was ever approved under
+  1.0.0, so no re-approval was due.
+- `fidelity-norm/1.0.0` — initial specification.

@@ -172,7 +172,8 @@
     "HttpUrl": {
       "type": "string",
       "maxLength": 256,
-      "format": "uri"
+      "pattern": "^https?:\\/\\/[A-Za-z0-9.-]{1,253}(?::\\d{1,5})?(?:[/?#][A-Za-z0-9._~:/?#@!$&'()*+,;=%|-]*)?$",
+      "description": "http(s) URL without whitespace; may carry |version."
     },
     "ManifestTransformation": {
       "type": "object",
@@ -246,19 +247,13 @@
           "$ref": "#/$defs/Uuid"
         },
         "parser": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "$ref": "#/$defs/Token"
         },
         "modelId": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "$ref": "#/$defs/Token"
         },
         "promptTemplateVersion": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "$ref": "#/$defs/Token"
         },
         "fidelity": {
           "type": "object",
@@ -334,9 +329,7 @@
           "type": "object",
           "properties": {
             "approverId": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 1024
+              "$ref": "#/$defs/PrincipalId"
             },
             "approverRole": {
               "$ref": "#/$defs/ApproverRole"
@@ -354,9 +347,7 @@
               "$ref": "#/$defs/Sha256Hex"
             },
             "recordRef": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 1024
+              "$ref": "#/$defs/RecordRef"
             }
           },
           "required": [
@@ -386,10 +377,19 @@
       "additionalProperties": false,
       "description": "Hashes, counts, enumerations, and identifiers only; never narrative."
     },
+    "Token": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$",
+      "description": "Identifier: letters, digits, and . _ : / @ + - only."
+    },
     "NormalizationVersion": {
       "type": "string",
       "pattern": "^fidelity-norm\\/\\d+\\.\\d+\\.\\d+$",
       "description": "Version of docs/fidelity-normalization.md the hashes were computed under."
+    },
+    "PrincipalId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
     },
     "ApproverRole": {
       "type": "string",
@@ -403,6 +403,10 @@
     "ApprovalMeaning": {
       "type": "string",
       "enum": ["reviewed-fidelity-and-structure"]
+    },
+    "RecordRef": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/#?=&%+-]{0,511}$"
     }
   }
 }

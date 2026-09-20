@@ -105,7 +105,8 @@
     },
     "StorageUri": {
       "type": "string",
-      "pattern": "^gs:\\/\\/[a-z0-9][a-z0-9._-]{1,220}[a-z0-9]\\/\\S+$",
+      "maxLength": 512,
+      "pattern": "^gs:\\/\\/[a-z0-9][a-z0-9._-]{1,220}[a-z0-9]\\/[A-Za-z0-9._/-]{1,256}$",
       "description": "Cloud Storage object URI (gs://bucket/object)."
     },
     "ExtractedTextRef": {
@@ -327,7 +328,8 @@
     "HttpUrl": {
       "type": "string",
       "maxLength": 256,
-      "format": "uri"
+      "pattern": "^https?:\\/\\/[A-Za-z0-9.-]{1,253}(?::\\d{1,5})?(?:[/?#][A-Za-z0-9._~:/?#@!$&'()*+,;=%|-]*)?$",
+      "description": "http(s) URL without whitespace; may carry |version."
     },
     "DecisionReason": {
       "type": "string",

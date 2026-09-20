@@ -1,18 +1,15 @@
 import { z } from "zod";
 
-import { IsoDateTime, NonEmptyString } from "./common.js";
+import { CanonicalUri, IsoDateTime, NonEmptyString } from "./common.js";
 
 // Deliberately loose: FHIR resources are open by nature and `src/fhir/preflight.ts` remains the
 // authority on Type 2 graph structure. This schema only pins the handful of fields the contract
 // invariants and hashes rely on, so a submission cannot be a non-document or an empty Bundle.
 
-// Strict and token-limited: the identifier is copied into the Provenance resource, so it must
-// not be able to carry free text.
+// Strict and grammar-limited: the identifier and the first entry's fullUrl are copied into the
+// Provenance resource, so they must not be able to carry free text.
 const BundleIdentifierSchema = z.strictObject({
-  system: z
-    .string()
-    .regex(/^\S{1,256}$/)
-    .optional(),
+  system: CanonicalUri.optional(),
   value: z
     .string()
     .regex(/^[A-Za-z0-9._:-]{1,128}$/)
@@ -20,7 +17,7 @@ const BundleIdentifierSchema = z.strictObject({
 });
 
 const BundleEntrySchema = z.looseObject({
-  fullUrl: NonEmptyString,
+  fullUrl: CanonicalUri,
   resource: z.looseObject({
     resourceType: NonEmptyString,
     id: NonEmptyString.optional(),
@@ -65,7 +62,7 @@ export const Type2BundleSchema = z
     type: z.literal("document"),
     identifier: BundleIdentifierSchema,
     timestamp: IsoDateTime,
-    entry: z.array(BundleEntrySchema).min(1),
+    entry: z.array(BundleEntrySchema).min(1).max(500),
   })
   .meta({
     id: "Type2Bundle",
