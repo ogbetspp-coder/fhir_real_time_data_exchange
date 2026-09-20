@@ -122,6 +122,33 @@ export function createApp(overrides: AppOverrides = {}): Hono {
   // Error messages can embed upstream response bodies (which may quote narrative), so the HTTP
   // surface returns only the error class; details stay in the evidence, never in a response.
   app.onError((error, context) => {
+    // Which of this service's own gates threw, as a closed code. The map is keyed by the exact
+    // message literals thrown in src/pipeline.ts, src/gcp/healthcare.ts and src/gcp/evidence.ts,
+    // so nothing derived from an upstream response body can reach it: a message this service
+    // did not write is `unclassified`. "pipeline-failed" alone told an operator only that
+    // something threw, which in a system whose product is traceable evidence is not enough.
+    function pipelineFailureReason(failure: Error): string {
+      const reasons: Record<string, string> = {
+        "runId must be a UUID": "bad-run-id",
+        "Canonical Type 2 preflight failed": "source-preflight-failed",
+        "EMA structural preflight failed": "ema-preflight-failed",
+        "Ingestion Provenance requires an id": "provenance-id-missing",
+        "FHIR_VALIDATOR_URL is required": "validator-not-configured",
+        "Transformed Composition is missing": "composition-missing",
+        "Official HL7 FHIR profile validation failed": "official-validation-failed",
+        "Cloud Healthcare API profile validation failed": "cloud-validation-failed",
+        "GOOGLE_CLOUD_PROJECT is required": "project-not-configured",
+        "EVIDENCE_BUCKET is required": "evidence-bucket-not-configured",
+        "Cloud KMS returned no manifest signature": "kms-no-signature",
+        "Healthcare API project and dataset configuration are required":
+          "healthcare-not-configured",
+        "Application Default Credentials returned no access token": "no-access-token",
+        "SOURCE_FHIR_STORE_ID is required": "source-store-not-configured",
+        "TARGET_FHIR_STORE_ID is required": "target-store-not-configured",
+      };
+      return reasons[failure.message] ?? "unclassified";
+    }
+
     if (error instanceof SubmissionReadError) {
       log("error", "Submission reference could not be read", {
         stage: "http",
@@ -141,9 +168,14 @@ export function createApp(overrides: AppOverrides = {}): Hono {
       stage: "http",
       errorType: error.name,
       ...(rejected ? { errorCount: error.issues.length } : {}),
+      ...(rejected ? {} : { reason: pipelineFailureReason(error) }),
     });
     return context.json(
-      { error: rejected ? "submission-rejected" : "pipeline-failed", errorType: error.name },
+      {
+        error: rejected ? "submission-rejected" : "pipeline-failed",
+        errorType: error.name,
+        ...(rejected ? {} : { reason: pipelineFailureReason(error) }),
+      },
       rejected ? 422 : 500,
     );
   });

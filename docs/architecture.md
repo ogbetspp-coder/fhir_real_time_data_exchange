@@ -263,10 +263,12 @@ only.
   `unavailable` without reading. It is a per-request bound, not a per-principal quota.
 - **What it must never do.** Write, amend, draft, rewrite, or summarise regulated narrative;
   return narrative without its hash; disclose a document outside a caller's entitlement.
-- **`/healthz`.** Answers `status`, `service`, and `version` from the process's configuration
-  only; it performs no token check of its own (Cloud Run IAM still applies), calls no store,
-  and reads nothing at request time. It proves the container is up, not that the store is
-  reachable.
+- **`/readyz` (and `/healthz`).** Answers `status`, `service`, and `version` from the process's
+  configuration only; it performs no token check of its own (Cloud Run IAM still applies),
+  calls no store, and reads nothing at request time. It proves the container is up, not that
+  the store is reachable. Call `/readyz` from outside: `/healthz` is the container's startup
+  probe, and Google's frontend answers that exact path on a `*.run.app` hostname itself without
+  forwarding it, so its 404 means nothing.
 - **Audit.** One `QueryAuditRecord` (`src/contracts/query-tools.ts`) per dispatched `tools/call`
   request: `service` (`ema-flow-query`), `serviceVersion`, `imageDigest`, `at`, `principal`,
   `credentialType`, `tool`, `argumentsSha256`, `outcome`, `resultCount`, `truncated`

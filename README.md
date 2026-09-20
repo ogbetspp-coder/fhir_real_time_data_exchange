@@ -250,11 +250,26 @@ that typed the command, and the service keys entitlements by that same identity'
 two paths below are not interchangeable: grant the human for one, the service account for the
 other.
 
-| Credential (see "Minting a token")                      | Authenticates as     | `run.invoker` grant                                                  | Entitlement keyed by       |
-| ------------------------------------------------------- | -------------------- | -------------------------------------------------------------------- | -------------------------- |
-| `gcloud auth print-access-token`, your own account      | you                  | `user:you@example.com` in `query_invokers`                           | your own `sub`             |
-| ID token minted by impersonating the caller account     | the caller account   | already granted in `infra/query.tf`; put nothing in `query_invokers` | the caller account's `sub` |
-| An agent or workload calling as its own service account | that service account | `serviceAccount:<its e-mail>` in `query_invokers`                    | that account's `sub`       |
+| Credential (see "Minting a token")                      | Authenticates as     | `run.invoker` grant                                                  | Entitlement keyed by       | Reaches the service with  |
+| ------------------------------------------------------- | -------------------- | -------------------------------------------------------------------- | -------------------------- | ------------------------- |
+| ID token minted by impersonating the caller account     | the caller account   | already granted in `infra/query.tf`; put nothing in `query_invokers` | the caller account's `sub` | `curl`, and anything else |
+| An agent or workload calling as its own service account | that service account | `serviceAccount:<its e-mail>` in `query_invokers`                    | that account's `sub`       | `curl`, and anything else |
+| `gcloud auth print-access-token`, your own account      | you                  | `user:you@example.com` in `query_invokers`                           | your own `sub`             | Gemini Enterprise only    |
+
+**An access token alone never reaches the container.** Cloud Run's edge authenticates a caller
+by an ID token whose audience is the service; an OAuth 2.0 access token in `Authorization` is
+refused before the request is routed. Verified against the deployed service on 2026-09-20:
+`HTTP 401` with `www-authenticate: Bearer error="invalid_token"`,
+`error_description="The access token could not be verified"`, and an HTML body rather than this
+service's JSON. A user's plain ID token fares no better — the audience is a Google OAuth client
+id rather than `QUERY_AUDIENCE`, and Cloud Run answers `404` to hide whether the service exists.
+
+The access-token row is therefore not a `curl` recipe. It exists because Gemini Enterprise
+presents **two** credentials: its service agent's ID token in `X-Serverless-Authorization`,
+which satisfies Cloud Run's edge, and the end user's access token in `Authorization`, which
+this service verifies and keys entitlements by. That is the whole reason the service accepts
+two credential kinds (`src/query/auth.ts`). For a human at a terminal, impersonate the caller
+account.
 
 1. **Invocation** — for the access-token path, add the human to `query_invokers` (a Terraform
    variable, so the grant is in version control):
@@ -411,8 +426,10 @@ ERROR: (gcloud.auth.print-identity-token) Invalid account type for `--audiences`
 ```
 
 and a user's plain identity token carries a Google OAuth client id as its audience rather than
-`QUERY_AUDIENCE`. The path that does work for a human is the access-token path. Read the client
-id and the subject gcloud presents:
+`QUERY_AUDIENCE`. The path that works for a human at a terminal is impersonating the caller
+account, above; the access token below is for the Gemini Enterprise path, which pairs it with a
+service agent's ID token that satisfies Cloud Run's edge. Read the client id and the subject
+gcloud presents:
 
 ```bash
 curl -s -X POST -H "Authorization: Bearer $(gcloud auth print-access-token)" \
@@ -432,15 +449,24 @@ nothing else. It is `[]` by default; adding it is a deliberate act.
 
 #### Calling it
 
-`GET /healthz` performs no application-level check: it answers
+`GET /readyz` performs no application-level check: it answers
 `{ "status": "ok", "service": "ema-flow-query", "version": <QUERY_SERVICE_VERSION> }` from the
 process's own configuration, without a token check and without touching the FHIR store, so it
 proves the container started and nothing more. Cloud Run's own IAM check still applies to it,
-so a bearer token is still required. `$TOKEN` below is either the impersonated ID token above
-or `$(gcloud auth print-access-token)`:
+so a bearer token is still required.
+
+**Use `/readyz`, not `/healthz`, from outside.** The service answers both identically, and
+Cloud Run's startup probe calls `/healthz` inside the container, but Google's frontend answers
+that exact path on a `*.run.app` hostname with its own HTML 404 and never forwards the request.
+Observed against the deployed service on 2026-09-20: `/healthz` returned a Google 404 on both
+hostnames and appeared in no Cloud Run request log, while `/healthz/`, `/HEALTHZ`, `/readyz`
+and every other path reached the container normally. A `/healthz` 404 therefore says nothing
+about whether the service is healthy. `$TOKEN` below is the impersonated ID token above. An
+access token does not work here: Cloud Run's edge refuses it before the container is reached
+(see the credential table).
 
 ```bash
-curl -s -H "Authorization: Bearer $TOKEN" "$SERVICE_URL/healthz"
+curl -s -H "Authorization: Bearer $TOKEN" "$SERVICE_URL/readyz"
 
 curl -s -X POST "$SERVICE_URL/mcp" \
   -H "Authorization: Bearer $TOKEN" \
