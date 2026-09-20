@@ -33,6 +33,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
+    "validate:official": "node scripts/ci/official-validate.mjs",
     "demo": "tsx scripts/run-demo.ts"
   },
   "repository": {

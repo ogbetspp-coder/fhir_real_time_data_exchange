@@ -86,6 +86,77 @@ Before regulated use, the owning organization should approve:
 | UR-43 The written audit line is the published record | Retained evidence narrower than the contract claims | `credentialType` is exempt from the shared logger's forbidden-key pattern (`src/lib/logger.ts`), and the exemption is a name paired with a value shape: a value that is not a short lowercase token is dropped, so the key cannot carry text whatever its length. `credential` and `credentials` are still dropped | `test/query/acceptance.test.ts` "the written audit line is the published record" (lines parsed back, the logger's four fields stripped, validated against `QueryAuditRecordSchema` and compared field for field with the records the service built); `test/logger.test.ts` "keeps credentialType while still dropping credential and credentials" |
 | UR-44 A person authenticates with their own Google account only through the access-token path | A documented path that cannot work; an audience widened without intent | `gcloud auth print-identity-token --audiences=` is refused for a user account, so the only route for a human's own Google account is an access token whose tokeninfo `aud`/`azp` is listed in `QUERY_OAUTH_CLIENT_IDS`; that list is empty by default and an entry there never widens the accepted ID-token audiences | `test/query/auth.test.ts` "accepts a user access token whose tokeninfo names a configured client id" — refused while the list is empty, accepted as `credentialType: access-token` once the id is configured, never routed to ID-token verification. Tested against a fake tokeninfo response with an invented client id; Google's tokeninfo endpoint was not called from the tests and nothing was run against a deployed service. The gcloud client id is shared by every gcloud installation, so it identifies the tool and not the caller: `run.invoker` and the per-subject entitlement are the only remaining walls |
 | UR-45 The ID token audience is one named string, not "the service URL" | 401 on every call, looking like a service fault | `QUERY_AUDIENCE` is Cloud Run's deterministic `https://<service>-<project number>.<region>.run.app`; Terraform publishes it as output `query_audience`, the request endpoint as `query_service_url` (the same string unless `var.query_audience` overrides it) and every hostname as `query_service_urls`, whose description states it is not an audience; a postcondition fails the apply if the audience is not a URL Cloud Run reports for the service | No test. `infra/outputs.tf`, `infra/query.tf`, `terraform validate` only. No apply has run, so the postcondition and both output values are unexecuted; the URL shapes were confirmed against the already-deployed worker in the same project and region, and the 401 was reproduced in review against the service's verification code rather than against a deployed service |
+| UR-46 Official HL7 validation runs before merge, and a deploy proves one run completes | Non-conformant content reaches the pipeline unseen; a deploy reads as green while the pipeline has never completed a run | CI job "Official validation" (`scripts/ci/official-validate.mjs`, `npm run validate:official`) runs the pinned `validator_cli.jar` with the four pinned packages and the sidecar's flags, all parsed from `Dockerfile.validator`, over the four resources a fixture run sends the worker, against the worker's profiles; fails on any `Error @` or `Fatal @` line and on a run that did not load every package. After every apply, `scripts/gcp/deploy.sh smoke` POSTs `{"source":"fixture"}` to the deployed worker as the deployer and requires HTTP 200 with status `persisted`; `422 source-disabled` skips with a notice | Run locally 2026-09-20 against the pinned validator: 22 error lines on the tree before the conformance change (13 source Type 2, 1 EMA List, 6 EMA Bundle, 2 EMA Composition — the Composition's two are the same display-name errors the Bundle reports, so 20 distinct), 1 on a hand-fixed copy of the Composition, and 0 on the tree as it now stands, so the verdict comes from the output and not the exit code. Failure paths exercised: the List code and `Bundle.language` put back produced exactly those two validator errors and exit 1; a package altered by one byte failed on its pinned checksum. Neither the GitHub Actions job nor the smoke step has run yet. Branch protection on `main` exists but lists contexts by display name (`Check`, `Zone A`, `Agent`), so adding "Official validation" is a setting a person must make (see "Official validation gate") |
+
+## Official validation gate
+
+Until 2026-09-20 the official HL7 validator ran in exactly one place: the sidecar of the deployed
+worker. `npm run check` and `npm run demo` run the local structural preflights only. The worker
+had never completed a run in this project, and the reason was that its own synthetic fixture
+did not conform: 20 distinct errors across the source Type 2 Bundle, the EMA List and the EMA
+document Bundle. Three of those were defects that would reach a real label, because they live in
+the mapping and the transform rather than the fixture: two QRD display names, and one List code
+absent from the EMA code system. The rest, including the empty coding array, were defects of the
+synthetic fixture's own product graph and could not affect a real submission. The pipeline failed
+closed, as designed, and nothing outside the pipeline had ever asked the validator the question.
+Two gates close that.
+
+**Before merge — `npm run validate:official`** (`scripts/ci/official-validate.mjs`, the
+"Official validation" job in `.github/workflows/ci.yml`):
+
+- One source of truth. The validator version, the four package URLs, every SHA-256 and the
+  sidecar's validation flags (`-version 5.0.0 -tx n/a` and the ordered `-ig` list) are parsed
+  from `Dockerfile.validator` at run time. A Dockerfile whose `ARG`, `RUN` or `CMD` lines cannot
+  be parsed fails the run; nothing is restated in the script or the workflow.
+- The same four resources, against the same profiles. `scripts/ci/emit-validation-set.ts`
+  builds the set the way `src/app.ts` and `src/pipeline.ts` do for `{"source":"fixture"}`:
+  `createSyntheticType2Bundle` through `transformType2ToEma`, the two structural preflights
+  first, then the source Bundle against the Global ePI Bundle profile, the List and the document
+  Bundle against the EMA profiles, and the Composition against its four profiles in one run.
+- The verdict is read from the output, not the exit code. Every `Error @` and `Fatal @` line is
+  printed and counted; a run that does not report every `-ig` package loaded fails as a
+  validator failure (a validator that runs without its packages reports zero errors and exits
+  0); a non-zero exit with no error line is a validator failure, not a pass.
+- Downloads are cached by the Dockerfile's content and verified against the pinned checksum
+  before every use, so a stale or tampered cache entry is re-downloaded, never trusted. The job
+  is separate from `npm run check` because it needs a JVM and about 200 MB of downloads.
+- It validates the synthetic fixture only. A real document run's content is validated by the
+  worker at run time; this gate proves the mapping and the fixture conform, and nothing about
+  any particular submission.
+
+**After deploy — `scripts/gcp/deploy.sh smoke`** (step "Smoke run through the deployed worker"
+in `.github/workflows/deploy.yml`, after the stores are reconciled and the profiles imported):
+one `{"source":"fixture"}` POST to the deployed worker, authenticating as the deployer service
+account, which `infra/run.tf` grants `roles/run.invoker` on the worker for exactly this
+(`google_cloud_run_v2_service_iam_member.deployer_invoker`, from the `deployer_account` the
+apply passes). The ID token is minted by the workflow's `google-github-actions/auth` step and
+carried to the script in `WORKER_ID_TOKEN`, not minted by gcloud: a deploy runs under an
+external-account credential and gcloud refuses `print-identity-token --audiences=` for those,
+exactly as it refuses a human's account. The script falls back to gcloud only for the credential
+kinds that do support the flag. The deploy fails unless the answer is HTTP 200 with status `persisted`; any other
+answer prints the closed `reason` (for example `official-validation-failed`) and nothing else
+from the body. A `422 source-disabled` answer — an environment whose `enabled_run_sources`
+excludes `fixture`, as production should — skips the step with a notice, because that answer is
+the allowlist working as configured.
+
+**Status (2026-09-20).** The two gates are evidenced to different depths, and the difference
+matters.
+
+The CI gate was exercised locally against the pinned validator: 22 error lines on the tree
+before the conformance change, 1 on a hand-fixed copy, and 0 on the tree as it now stands. Its
+failure paths were exercised too — a copy with the List code and `Bundle.language` put back
+produced exactly those two validator errors and exit 1, and a package altered by one byte failed
+on its checksum. It has not yet run in GitHub Actions, and it is not a required check: branch
+protection lists contexts by display name, so "Official validation" must be added by a person
+(see "Release criteria") or the job will run without blocking a merge.
+
+The smoke step is evidenced far more thinly. Its verdict logic was exercised on sample answers
+only; no run against a deployed worker has happened. The ID-token source was corrected after
+review — gcloud cannot mint one from the external-account credential a deploy runs under — but
+that correction is itself reasoned from gcloud's documented behaviour and its source, not from
+an observed green run. The IAM propagation retry and the `run.invoker` grant are likewise
+written from documentation and review. Treat the first deploy after this change as the test of
+this step, not as a confirmation of it.
 
 ## Release criteria (target state — not implemented in this repository)
 
@@ -206,3 +277,119 @@ exempt keys loses that field from the line rather than leaking it. The failure m
 field, which a contract check on the written line catches, rather than content in the log.
 
 **Approval (step 8).** Not obtained, for the same reason as the record above.
+
+### Recorded change: `fhir/mappings/cap-smpc-en.json` QRD coding displays and EMA List code, 2026-09-20
+
+**What changed.** Three things, one in the manifest, one in the transform, one in the synthetic
+fixture the demonstration runs on.
+
+1. The manifest's `mappingVersion` moved from `1.0.0` to `1.1.0`, and two section rules gained a
+   `display` field: `smpc.6.5` (`200000029841`) and `smpc.6.6` (`200000029842`). `display` is the
+   EMA QRD code system's own string for the code and is what the transform now writes into
+   `Composition.section.code.coding.display` (`rule.display ?? rule.title`, in
+   `src/fhir/transform.ts` and in the ConceptMap generator `scripts/fhir/generate-artifacts.ts`).
+   The `title` of every rule is unchanged, so `Composition.section.title` — the heading the label
+   carries — is unchanged in both the source and the EMA output. The loader `src/fhir/mapping.ts`
+   accepts the optional field; the other thirty rules' titles already equal the code system's
+   displays, which `test/type2-conformance.test.ts` now asserts for all thirty-two against
+   `test/fixtures/terminology/ema-displays.json`, a verbatim extract of the two EMA code systems
+   from the pinned `EUePI#1.0.0` package. The split follows the EMA EPI-23-1022 English sample
+   (`fhir/standards.lock.json`), whose section 6.6 is titled "6.6 Special precautions for
+   disposal" while its coding display is "6.6 Special precautions for disposal [and other
+   handling]".
+2. `src/fhir/transform.ts` codes the EMA List with `100000155539` "Combined File of all
+   Documents" instead of `100000155527` "ePI Master List". The EMA Document Type code system
+   `http://ema.europa.eu/fhir/CodeSystem/100000155531` has no `100000155527`; `100000155539` is
+   its concept for the whole set of a product's documents, and the EMA sample's own List carries
+   exactly this coding.
+3. `src/fixtures/synthetic.ts` and `src/fixtures/synthetic-products.ts`: the Type 2 Bundle now
+   declares `language`, every product-graph entry declares its Global ePI profile in
+   `meta.profile`, the Organization, ManufacturedItemDefinition, AdministrableProductDefinition
+   and PackagedProductDefinition (resource and `packaging`) carry invented identifiers under
+   `https://khs.dev/fhir/identifier/...`, the package has a name, the package's
+   `packaging.containedItem` names the manufactured item and the administrable product is
+   `producedFrom` it, and the empty `MedicinalProductDefinition.name.type.coding` array is gone.
+   No narrative, no id, no Bundle identifier and no date changed.
+
+**Why.** The official HL7 validator (`validator_cli.jar` 6.10.4 with the four packages pinned in
+`Dockerfile.validator`), run over the four resources a fixture run sends the worker, reported 20
+distinct errors, and the deployed worker had therefore never completed a run. The three mapping
+errors, quoted:
+
+- `Wrong Display Name '6.5 Nature and contents of container and special equipment for use,
+administration or implantation' for http://ema.europa.eu/fhir/CodeSystem/200000029659#200000029841.
+Valid display is one of 2 choices: '6.5 Nature and contents of container [and special
+equipment for use, administration or implantation]' or ... (en)`
+- `Wrong Display Name '6.6 Special precautions for disposal and other handling' for
+http://ema.europa.eu/fhir/CodeSystem/200000029659#200000029842. Valid display is one of 2
+choices: '6.6 Special precautions for disposal [and other handling]' or ... (en)`
+- `Unknown code '100000155527' in the CodeSystem 'http://ema.europa.eu/fhir/CodeSystem/100000155531'
+version '1.0.0'`
+
+The fixture errors were `Bundle.language: minimum required = 1, but only found 0`,
+`Organization.identifier: minimum required = 1, but only found 0`,
+`PackagedProductDefinition.name: minimum required = 1, but only found 0`,
+`PackagedProductDefinition.packaging.identifier: minimum required = 1, but only found 0`,
+`ManufacturedItemDefinition.identifier: minimum required = 1, but only found 0`,
+`AdministrableProductDefinition.identifier: minimum required = 1, but only found 0`,
+`Unable to find a profile match for https://khs.dev/fhir/Organization/synthetic-pharma among
+choices: ...Organization-uv-epi` (twice: `Composition.author[0]` and
+`RegulatedAuthorization.holder`), `Unable to find a profile match for
+https://khs.dev/fhir/ManufacturedItemDefinition/synthetic-tablet among choices: ...` on
+`Ingredient.for[0]`, `Array cannot be empty - the property should not be present if it has no
+values` on `MedicinalProductDefinition.name[0].type.coding`, and `Entry '...' isn't reachable by
+traversing links (forward or backward) from the Composition` for the ManufacturedItemDefinition,
+the Ingredient and the SubstanceDefinition, in both the source and the EMA Bundle. After the
+change all four validations report `Success: 0 errors` (source Type 2 Bundle, EMA List, EMA
+document Bundle, EMA Composition against its four profiles).
+
+**Impact assessment (step 0).** Importers of the mapping: the worker (`src/app.ts`,
+`src/pipeline.ts` through `src/fhir/transform.ts` and `src/fhir/preflight.ts`), the fixtures
+(`src/fixtures/*`), the artifact generator, the contract-fixture exporter and the Document AI
+spike scripts. The Python agent and Zone A read only the exported fixtures. What moved:
+
+- `test/fixtures/contracts/canonical-submission.json`: `bundleSha256`
+  `8891a69b297b5bf2f054684102273866ef91215b743ca2a82d8630a15ef9aa6a` →
+  `e95421e1d5de87f5e637edb5900487ab0bd5cc6942e0861c629d129f03836490` and
+  `approvedContentSha256`
+  `203155ef2032bc13f15f1c33e89c598a2078e410e956bc07d9d232be3a48ecac` →
+  `350d284889933aed5a835a77e0060c82f8b90382f098f6a61c5401759a9a5027`, because the Bundle's
+  product graph is part of the approved content; `test/fixtures/contracts/run-request.json`:
+  `sha256` `f07f2d19333a435863a9e3f8fce0fd3b371f1b85488bb03339dfd9803452db5e` →
+  `90b8d3a123938bddb0ea8dd88ccbd5248940e70e054077cccf822333eea9abf2`.
+- `fhir/generated/ConceptMap-canonical-to-ema-cap-smpc-en.json`: the two target displays and the
+  version.
+- The transform's `outputHash` for every synthetic product (not pinned anywhere; the
+  `transform.test.ts` determinism test compares two runs, not a literal).
+- Unchanged, byte for byte: `test/fixtures/contracts/fidelity-report.json`,
+  `test/fixtures/contracts/source-document-text.json`, `test/fixtures/fidelity/vectors.json`,
+  `zone-a/tests/fixtures/differential-smoke.jsonl` — every hash that is computed over narrative
+  or extracted text is the same as before, which is the first proof that no narrative changed.
+- The second proof is a test: `test/fixtures/narrative/section-divs.json` holds every QRD
+  section `div` of every product and version (3 × 2 × 32), captured from the tree at commit
+  `1b58a79` before any of this change, and `test/type2-conformance.test.ts` "carries
+  byte-identical section divs, source and EMA target, for every product and version" compares
+  every source div and every EMA target div against it.
+- No literal pin in `test/**` changed: the decision count is still 32, the section count 32,
+  the page count 3. The Document AI spike (`test/spikes/document-ai-verdict.test.ts`) still
+  replays its recorded response against the regenerated PDF unchanged, which is what fixed the
+  design: a first attempt that changed the two rule titles broke it, because the PDF headings
+  are the titles, and the recorded verdict's numbers are evidence, not pins.
+- EMA document Bundle ids are unchanged, because `Bundle.identifier.value` is unchanged:
+  `0c18c50e-a284-5d5c-a570-ba8519726c75` (paracetamol),
+  `2ee34ea0-41f7-587c-a373-0891d915192e` (demoxetine),
+  `a5363206-eb44-5bed-a6e4-b109fd539d66` (placebolol). The deployed entitlement map keyed by
+  them needs no change. The Type 2 Bundle ids are unchanged too.
+- Step 7 (re-approval): `approvedContentSha256` moved for every synthetic submission, so any
+  synthetic submission seeded before this change would be rejected by the ingress gate and has to
+  be re-seeded (`scripts/demo/*` recompute it). No document has ever been persisted by the
+  deployed pipeline, so nothing in a store needs re-approval. Zone A's parity suite was run
+  against the regenerated fixtures (221 passed, 1 skipped) and `npm run check` is green.
+
+**Blast radius.** A real label's Composition now carries the code system's display on 6.5 and
+6.6 and its own heading in `title`; a consumer that read `coding.display` as the heading will see
+the bracketed form. The List code changes the meaning recorded on every future List from an
+undefined code to "Combined File of all Documents"; nothing persisted carries the old one.
+
+**Approval (step 8).** Not obtained: author and releaser are the same identity and branch
+protection does not exist yet (see "Release criteria").

@@ -170,6 +170,39 @@ resource "google_cloud_run_v2_service_iam_member" "workflow_invoker" {
   member   = "serviceAccount:${google_service_account.workflow.email}"
 }
 
+# The deployer service account, which the post-apply smoke run authenticates as. It is
+# bootstrapped outside this configuration (README.md), so it is named by the deploy rather than
+# declared here: scripts/gcp/deploy.sh phase_apply passes the active gcloud account, and passes
+# it only when that account is a service account. Declared next to its only use. Empty (the
+# default) declares no binding.
+#
+# A human's account is deliberately not accepted. gcloud refuses `print-identity-token
+# --audiences=` for user credentials, so a person cannot present a token this binding would
+# authorise, and granting one would leave a standing privilege on the worker that no documented
+# path can exercise. A local operator supplies WORKER_ID_TOKEN instead, minted by impersonating
+# a service account that already holds run.invoker.
+variable "deployer_account" {
+  description = "E-mail of the service account running the deploy, granted roles/run.invoker on the worker so the post-apply smoke run (scripts/gcp/deploy.sh phase_smoke) can call it. Empty declares no binding."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.deployer_account == "" || endswith(var.deployer_account, ".gserviceaccount.com")
+    error_message = "deployer_account must be a service account e-mail or empty: a user account cannot mint an ID token for the worker's audience, so a binding for one would never be usable."
+  }
+}
+
+# roles/run.invoker on the worker for the deployer, and nothing else: the smoke run POSTs one
+# fixture run and reads the answer.
+resource "google_cloud_run_v2_service_iam_member" "deployer_invoker" {
+  count    = var.deployer_account == "" ? 0 : 1
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_service.worker.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${var.deployer_account}"
+}
+
 resource "google_workflows_workflow" "epi" {
   name                = "${local.name_prefix}-pipeline"
   region              = var.region

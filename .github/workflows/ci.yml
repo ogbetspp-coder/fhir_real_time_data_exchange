@@ -41,6 +41,62 @@ jobs:
       - name: Build
         run: npm run build
 
+  # The official HL7 validator over the four resources a fixture run sends it, at the pins of
+  # Dockerfile.validator (scripts/ci/official-validate.mjs reads the version, URLs, checksums
+  # and flags from that file, so this job has no pin of its own). It is its own job rather than
+  # part of `npm run check` because it needs a JVM and ~200 MB of downloads; the downloads are
+  # cached by the Dockerfile's content, so a pin change is a cache miss and a checksum check.
+  # Make this a required check on main once it is green.
+  official-validation:
+    name: Official validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash --noprofile --norc -eo pipefail {0}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22.14.0
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      # Keyed by the Dockerfile's content: the script verifies every cached artefact against
+      # the pinned checksum before use, so a stale or tampered cache entry is re-downloaded,
+      # never trusted.
+      - name: Cache the validator and its packages
+        uses: actions/cache@v6
+        with:
+          path: .cache/official-validator
+          key: official-validator-${{ hashFiles('Dockerfile.validator') }}
+
+      # The validator fetches the FHIR core and dependency packages it needs beyond the four
+      # pinned -ig files into its own package cache on first use; caching that directory only
+      # saves the download, since the four pinned packages are checked by checksum regardless.
+      - name: Cache the validator's package cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.fhir/packages
+          key: fhir-packages-${{ hashFiles('Dockerfile.validator') }}
+          restore-keys: |
+            fhir-packages-
+
+      - name: Validate the fixture against the official HL7 validator
+        run: npm run validate:official
+
   zone-a:
     name: Zone A
     runs-on: ubuntu-24.04
