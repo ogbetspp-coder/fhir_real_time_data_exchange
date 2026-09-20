@@ -40,7 +40,7 @@ const PAGE_COUNT = 3;
 const HEADER = "Synthetic Paracetamol 500 mg tablets - synthetic demonstration extract\n";
 
 function footer(page: number): string {
-  return `\nPage ${page} of ${PAGE_COUNT}`;
+  return `Page ${page} of ${PAGE_COUNT}`;
 }
 
 function narrativeText(div: string): string {
@@ -83,7 +83,8 @@ function buildSourceText(sections: NarrativeSection[]): PagedSource {
       lines.push(line);
       cursor = endOffset + 1;
     }
-    const body = lines.join("\n");
+    // A page body ends with its final line terminator (docs/fidelity-normalization.md section 7).
+    const body = `${lines.join("\n")}\n`;
     pages.push({
       page,
       text: `${HEADER}${body}${footer(page)}`,

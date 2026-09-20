@@ -1,7 +1,7 @@
 import type { z } from "zod";
 
 import { CANONICAL_SUBMISSION_VERSION, CanonicalSubmissionSchema } from "./canonical-submission.js";
-import { FidelityReportSchema } from "./fidelity-report.js";
+import { FidelityReportSchema, SourceDocumentTextSchema } from "./fidelity-report.js";
 import { IngestionProvenanceSchema } from "./ingestion-provenance.js";
 import { RUN_MANIFEST_VERSION, RunManifestSchema } from "./run-manifest.js";
 
@@ -21,6 +21,7 @@ export const CONTRACTS: readonly ContractDefinition[] = [
   },
   { name: "ingestion-provenance", version: "1.0.0", schema: IngestionProvenanceSchema },
   { name: "fidelity-report", version: "1.0.0", schema: FidelityReportSchema },
+  { name: "source-document-text", version: "1.0.0", schema: SourceDocumentTextSchema },
   { name: "run-manifest", version: RUN_MANIFEST_VERSION, schema: RunManifestSchema },
 ];
 

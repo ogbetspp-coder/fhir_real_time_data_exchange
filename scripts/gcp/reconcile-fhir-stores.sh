@@ -101,6 +101,41 @@ cat >"$TMP/target.json" <<JSON
 }
 JSON
 
+summarize_response() {
+  node -e '
+const fs = require("node:fs");
+const crypto = require("node:crypto");
+const raw = fs.readFileSync(process.argv[1]);
+const digest = () =>
+  `unrecognised body sha256=${crypto.createHash("sha256").update(raw).digest("hex")}`;
+const token = (value, pattern) => (typeof value === "string" && pattern.test(value) ? value : "?");
+let body;
+try {
+  body = JSON.parse(raw.toString("utf8"));
+} catch {
+  body = undefined;
+}
+if (body === null || typeof body !== "object") {
+  console.log(digest());
+} else if (body.error !== null && typeof body.error === "object") {
+  const code = Number.isInteger(body.error.code) ? String(body.error.code) : "?";
+  console.log(`code=${code} status=${token(body.error.status, /^[A-Z0-9_]{1,64}$/)}`);
+} else if (body.resourceType === "OperationOutcome") {
+  const issues = Array.isArray(body.issue) ? body.issue : [];
+  const column = (name) =>
+    issues
+      .map((issue) =>
+        issue === null || typeof issue !== "object" ? "?" : token(issue[name], /^[a-z-]{1,64}$/),
+      )
+      .join(",");
+  const summary = `issues=${issues.length} codes=${column("code")} severities=${column("severity")}`;
+  console.log(`OperationOutcome ${summary}`);
+} else {
+  console.log(digest());
+}
+' "$1" 2>/dev/null || echo "unrecognised body sha256=unavailable"
+}
+
 request() {
   local method="$1"
   local url="$2"
@@ -128,7 +163,7 @@ reconcile() {
 
   if [[ "$status" == "404" ]]; then
     if ! request POST "${COLLECTION}?fhirStoreId=${store_id}" "$body" >"$current"; then
-      cat "$current" >&2
+      echo "Response summary: $(summarize_response "$current")" >&2
       echo "Failed to create ${store_id}." >&2
       exit 1
     fi
@@ -136,7 +171,7 @@ reconcile() {
     return
   fi
   if [[ "$status" != "200" ]]; then
-    cat "$current" >&2
+    echo "Response summary: $(summarize_response "$current")" >&2
     echo "Failed to inspect ${store_id}: HTTP ${status}" >&2
     exit 1
   fi
@@ -154,7 +189,7 @@ reconcile() {
     update_mask="${update_mask},notificationConfigs,streamConfigs"
   fi
   if ! request PATCH "${resource}?updateMask=${update_mask}" "$body" >"$current"; then
-    cat "$current" >&2
+    echo "Response summary: $(summarize_response "$current")" >&2
     echo "Failed to update ${store_id}." >&2
     exit 1
   fi

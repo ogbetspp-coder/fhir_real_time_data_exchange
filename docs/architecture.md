@@ -19,7 +19,12 @@ trust zones enforced mechanically rather than by instruction.
 Zone A (a separate, probabilistic service) proposes section boundaries, metadata, and codes
 from an approved source document; it may never author, alter, reorder, or omit narrative
 words, and every code it assigns must cite a terminology lookup. Its output is a
-`CanonicalSubmission` proposal, passed by reference, until a human approves it. Zone B (this
+`CanonicalSubmission` proposal, passed by reference, until a human approves it. Status: the
+contract and the ingress gate exist; the reference resolver, the `/v1/runs` `document` route,
+and the Workflows branch are the next phase, so today the document path is reachable only from
+tests and `src/fixtures/synthetic-submission.ts`. The `fixture` and `healthcare-api` sources are
+pre-existing trusted inputs guarded by IAM, not by this gate; deployments where Zone A is the
+only producer should disable them. Zone B (this
 repository, deterministic) accepts only an approved `CanonicalSubmission`, re-verifies hash,
 approval, bijection, and terminology invariants at ingress, and only then runs the unchanged
 transform, validation, persistence, and evidence pipeline. `src/fhir/transform.ts`, the
@@ -126,9 +131,15 @@ Every run receives one UUID propagated as:
 - lineage run request ID; and
 - transaction identifier.
 
-The evidence bucket stores source, target, mapping decisions, validation outcomes, lineage
-resource names, and the KMS-signed manifest. FHIR payloads and narrative are not written to
-Cloud Logging.
+Every run writes the following objects under `runs/<runId>/` in the evidence bucket:
+`source-type2`, `ema-list`, `ema-document-bundle`, `mapping-decisions`, `validation-outcomes`,
+`signed-manifest`, `lineage-resources`, and, for document sources,
+`canonical-submission`, `ingestion-provenance`, `fidelity-report`, and `provenance-resource`.
+`source-type2`, `ema-list` (it carries the document title only), `ema-document-bundle`, and
+`canonical-submission` contain the narrative XHTML — the retention-locked evidence bucket and
+the FHIR store are the only places narrative rests — while `fidelity-report`,
+`ingestion-provenance`, `provenance-resource`, the signed manifest, and the BigQuery ledger row
+never do. FHIR payloads and narrative are not written to Cloud Logging.
 
 Cloud Monitoring presents throughput, failures, validation rejections, service latency,
 workflow executions, and architectural guidance. Data Access audit logging is enabled for
@@ -146,8 +157,8 @@ Healthcare API, Storage, BigQuery, and KMS and routed to a retained regional log
 - The Cloud Healthcare service agent can publish change notices and edit only the analytics
   dataset.
 - No credentials are built into images or stored in the repository.
-- Cloud Build emits SLSA provenance; Artifact Registry stores image/SBOM evidence; Binary
-  Authorization evaluates deploy-time policy.
+- Binary Authorization is configurable via `enforce_binary_authorization` and is disabled for
+  the prototype; SLSA provenance and SBOM generation are not yet configured.
 - Production should use separate projects, organization policies, VPC Service Controls,
   Assured Workloads where applicable, Access Transparency/Approval, and approved CMEK/HSM
   policies.

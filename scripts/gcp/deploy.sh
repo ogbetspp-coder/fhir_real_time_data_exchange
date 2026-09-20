@@ -69,6 +69,8 @@ phase_init() {
   terraform -chdir=infra init -input=false \
     -backend-config="bucket=${state_bucket}" \
     -backend-config="prefix=terraform/state"
+  terraform -chdir=infra fmt -check -recursive
+  terraform -chdir=infra validate
 }
 
 phase_apis() {
@@ -193,13 +195,15 @@ phase_apply() {
     -var="worker_image=${REPOSITORY}/worker@${WORKER_DIGEST}" \
     -var="validator_image=${REPOSITORY}/validator@${VALIDATOR_DIGEST}"; then
     echo "=== terraform apply failed; dumping recent container logs for diagnosis ===" >&2
+    # Only the worker's structured logs, whose fields are sanitised by src/lib/logger.ts; the
+    # validator sidecar's free-text console output is never copied into deploy logs.
     gcloud --quiet logging read \
-      "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"ema-flow-${ENVIRONMENT}-worker\"" \
+      "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"ema-flow-${ENVIRONMENT}-worker\" AND resource.labels.container_name=\"worker\"" \
       --project="$PROJECT_ID" \
       --order=asc \
       --freshness=1h \
       --limit=500 \
-      --format="value(timestamp,resource.labels.container_name,severity,textPayload,jsonPayload.message)" || true
+      --format="value(timestamp,severity,jsonPayload.stage,jsonPayload.message,jsonPayload.errorCount)" || true
     return 1
   fi
 }

@@ -62,9 +62,20 @@ unit order, never locale-aware ordering, so a re-implementation can reproduce th
   `bodyStart`/`bodyEnd` so repeated headers and footers are excluded from spans.
 - Tail-of-page omissions are visible only through the report's coverage figures, which are
   recorded as evidence for reviewers but do not fail the check. Because the body range is
-  declared by the extractor, the report records the full page length alongside it so a
-  shrunken body cannot masquerade as complete coverage.
+  declared by the extractor, it is bounded rather than trusted: bodies must sit on line
+  boundaries and may exclude at most 240 code points per page (`docs/fidelity-normalization.md`
+  section 1), and the report records the full page length alongside the body length.
+- Across a page break the verifier concatenates the page bodies verbatim, blank gaps included,
+  so the source's own characters (a final line terminator or a soft hyphen) decide whether a
+  word continues; the verifier never inserts a character of its own.
 - Attribute values in narrative markup are token-limited (`docs/fidelity-normalization.md`
-  section 5) because they are never compared against the source.
+  section 5) because they are never compared against the source. The bounds limit the
+  capacity of that channel; they do not eliminate it. `ol` and `q` are not allowed because
+  renderers generate visible characters for them, and table sections must appear in rendering
+  order.
+- NFC (step 3) depends on the Unicode Character Database of the runtime. Zone B pins its
+  runtime image (`node:22.14`, Unicode 15.1 via ICU) and any re-implementation must pin an
+  equivalent; a runtime with a different Unicode version is a change to the normalisation
+  version even though no code changes.
 - The verifier is a second, independent narrative gate alongside the existing
   byte-preservation assertion in `src/fhir/transform.ts` (UR-01); the new control is UR-09.

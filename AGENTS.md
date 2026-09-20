@@ -40,6 +40,6 @@ Google Cloud Healthcare API and observe their native near-real-time BigQuery str
 
 ## Cursor Cloud specific instructions
 
-The project requires Node 22+, Java 21 for the official HL7 validator, and Terraform 1.9+.
+The project requires Node 22+, Java 21 for the official HL7 validator, and Terraform 1.16+.
 Read-only development and unit tests need no cloud credentials. Real-cloud smoke tests use
 Application Default Credentials and an explicitly configured non-production GCP project.

@@ -197,16 +197,15 @@ describe("narrative fidelity verification", () => {
     );
   });
 
-  it("exposes text excluded by the declared body range through page totals", () => {
-    const shrunken = verifyCases.find(({ name }) => name === "shrunken-body-reports-page-total");
+  it("reports page totals next to body totals and bounds what a body may exclude", () => {
     const full = verifyCases.find(({ name }) => name === "exact-pass");
-    if (shrunken === undefined || full === undefined) throw new Error("fixture");
-    const report = verifyNarrativeFidelity(shrunken.input);
+    const shrunken = verifyCases.find(({ name }) => name === "excluded-text-budget");
+    if (full === undefined || shrunken === undefined) throw new Error("fixture");
     const baseline = verifyNarrativeFidelity(full.input);
-    expect(report.status).toBe("passed");
-    expect(report.coverage.pageCodePoints).toBe(baseline.coverage.pageCodePoints);
-    expect(report.coverage.bodyCodePoints).toBeLessThan(baseline.coverage.bodyCodePoints);
-    expect(report.coverage.pageCodePoints).toBeGreaterThan(report.coverage.bodyCodePoints);
+    expect(baseline.coverage.pageCodePoints).toBeGreaterThan(baseline.coverage.bodyCodePoints);
+    const report = verifyNarrativeFidelity(shrunken.input);
+    expect(report.status).toBe("failed");
+    expect(report.issues.some((issue) => issue.endsWith("excluded-text"))).toBe(true);
   });
 
   it("verifies random word-aligned substrings of any page body", () => {

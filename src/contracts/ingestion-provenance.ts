@@ -4,12 +4,13 @@ import {
   Count,
   HttpUrl,
   IsoDateTime,
-  NonEmptyString,
   NormalizationVersion,
   PositiveInt,
   Sha256Hex,
   SourceKey,
   StorageUri,
+  TargetPath,
+  Token,
   Uuid,
 } from "./common.js";
 
@@ -26,9 +27,9 @@ export const MediaType = z
 
 export const SourceSystemRefSchema = z
   .strictObject({
-    name: NonEmptyString,
-    documentId: NonEmptyString,
-    versionId: NonEmptyString.optional(),
+    name: Token,
+    documentId: Token,
+    versionId: Token.optional(),
   })
   .meta({
     id: "SourceSystemRef",
@@ -39,7 +40,7 @@ export const ExtractedTextRefSchema = z
   .strictObject({
     uri: StorageUri,
     sha256: Sha256Hex,
-    extractorVersion: NonEmptyString,
+    extractorVersion: Token,
   })
   .meta({
     id: "ExtractedTextRef",
@@ -62,25 +63,25 @@ export const SourceDocumentSchema = z
   .meta({ id: "SourceDocument" });
 
 export const ToolVersionSchema = z
-  .strictObject({ name: NonEmptyString, version: NonEmptyString })
+  .strictObject({ name: Token, version: Token })
   .meta({ id: "ToolVersion" });
 
 export const ModelRefSchema = z
-  .strictObject({ provider: NonEmptyString, id: NonEmptyString })
+  .strictObject({ provider: Token, id: Token })
   .meta({ id: "ModelRef" });
 
 export const PromptTemplateRefSchema = z
-  .strictObject({ id: NonEmptyString, version: NonEmptyString, sha256: Sha256Hex })
+  .strictObject({ id: Token, version: Token, sha256: Sha256Hex })
   .meta({ id: "PromptTemplateRef" });
 
 export const TerminologyServiceRefSchema = z
-  .strictObject({ name: NonEmptyString, version: NonEmptyString, snapshotSha256: Sha256Hex })
+  .strictObject({ name: Token, version: Token, snapshotSha256: Sha256Hex })
   .meta({ id: "TerminologyServiceRef" });
 
 export const ExtractionToolingSchema = z
   .strictObject({
     extractionRunId: Uuid,
-    serviceVersion: NonEmptyString,
+    serviceVersion: Token,
     parser: ToolVersionSchema,
     model: ModelRefSchema.optional(),
     promptTemplate: PromptTemplateRefSchema.optional(),
@@ -133,9 +134,9 @@ export const DecisionReason = z
 export const TerminologyRefSchema = z
   .strictObject({
     system: HttpUrl,
-    code: NonEmptyString,
-    version: NonEmptyString.optional(),
-    lookupId: NonEmptyString,
+    code: Token,
+    version: Token.optional(),
+    lookupId: Token,
   })
   .meta({
     id: "TerminologyRef",
@@ -144,12 +145,12 @@ export const TerminologyRefSchema = z
 
 export const StructuringDecisionSchema = z
   .strictObject({
-    target: NonEmptyString,
+    target: TargetPath,
     sourceKey: SourceKey.optional(),
     action: DecisionAction,
-    ruleId: NonEmptyString.optional(),
+    ruleId: Token.optional(),
     terminologyRef: TerminologyRefSchema.optional(),
-    editorId: NonEmptyString.optional(),
+    editorId: Token.optional(),
     reason: DecisionReason.optional(),
   })
   .meta({ id: "StructuringDecision" });
@@ -206,7 +207,10 @@ export const ApprovalSchema = z
     method: ApprovalMethod,
     meaning: ApprovalMeaning,
     approvedContentSha256: Sha256Hex,
-    recordRef: z.string().min(1).max(512).optional(),
+    recordRef: z
+      .string()
+      .regex(/^\S{1,512}$/)
+      .optional(),
   })
   .meta({ id: "Approval" });
 

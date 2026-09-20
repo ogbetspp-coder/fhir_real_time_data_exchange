@@ -15,7 +15,21 @@ export const IsoDateTime = z.iso
   .datetime({ offset: true })
   .meta({ id: "IsoDateTime", description: "RFC 3339 timestamp with Z or a numeric offset." });
 
-export const HttpUrl = z.url().meta({ id: "HttpUrl" });
+export const HttpUrl = z.url().max(256).meta({ id: "HttpUrl" });
+
+// Identifier-class strings (tool names, versions, ids, codes). Token-limited so that no
+// provenance field can carry prose into a manifest, ledger row, or Provenance resource.
+export const Token = z
+  .string()
+  .regex(/^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$/)
+  .meta({ id: "Token", description: "Identifier: letters, digits, and . _ : / @ + - only." });
+
+// JSON path of a target field inside the Bundle, e.g. Composition.section[0].section[1].code.
+export const TargetPath = z
+  .string()
+  .regex(/^[A-Za-z][A-Za-z0-9]*(?:\[\d+\])?(?:\.[A-Za-z][A-Za-z0-9]*(?:\[\d+\])?)*$/)
+  .max(256)
+  .meta({ id: "TargetPath" });
 
 export const StorageUri = z
   .string()

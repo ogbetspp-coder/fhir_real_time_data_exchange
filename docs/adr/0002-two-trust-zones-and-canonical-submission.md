@@ -99,3 +99,11 @@ the raw slice. See ADR 0003.
   and signature-to-record binding beyond hash reference are future control boundaries. Nothing
   here claims Annex 11 or 21 CFR Part 11 compliance.
 - Strict objects make every minor contract change a Zone B-first deployment.
+- The fidelity check proves the narrative sections only. Every other string in the Bundle
+  (titles, display names, identifiers, property names) is bounded at ingress — token-limited
+  where it is an identifier, and otherwise at most 300 characters and 20 words with no markup —
+  which limits how much unverified text can travel but does not prove it. Binding structured
+  fields to master data with field-level provenance is the next control boundary.
+- Provenance identifier fields (tool names, versions, model and prompt ids, decision targets,
+  editor ids) are token-limited so that a manifest, ledger row, or Provenance resource can never
+  carry prose; `recordRef` is a single opaque reference.

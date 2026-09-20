@@ -72,9 +72,18 @@ export function normalizeText(text: string): string {
   // NFC would otherwise be blocked from (e.g. "e" + ZWSP + combining acute) is applied in the
   // first pass; this is what makes the procedure idempotent.
   const expanded: string[] = [];
-  for (const character of text) {
+  const points = Array.from(text);
+  for (let position = 0; position < points.length; position += 1) {
+    const character = points[position] ?? "";
     const codePoint = character.codePointAt(0) ?? 0;
-    if (INVISIBLE_FORMATTING.has(codePoint)) continue;
+    if (INVISIBLE_FORMATTING.has(codePoint)) {
+      // A soft hyphen at a line end marks a word broken across lines: the break goes with it.
+      if (codePoint === 0x00ad) {
+        if (points[position + 1] === "\r" && points[position + 2] === "\n") position += 2;
+        else if (points[position + 1] === "\n") position += 1;
+      }
+      continue;
+    }
     expanded.push(LIGATURES.get(codePoint) ?? character);
   }
 

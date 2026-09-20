@@ -81,6 +81,11 @@ jobs:
       - name: Install Node dependencies
         run: bash scripts/gcp/deploy.sh deps 2>&1 | tee -a deploy-run.log
 
+      # Not tee'd into deploy-run.log: a failing test prints fixture diffs, and that log is
+      # published into an issue on failure.
+      - name: Quality gate
+        run: npm run check
+
       - name: Terraform init
         run: bash scripts/gcp/deploy.sh init 2>&1 | tee -a deploy-run.log
 

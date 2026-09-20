@@ -171,6 +171,7 @@
     },
     "HttpUrl": {
       "type": "string",
+      "maxLength": 256,
       "format": "uri"
     },
     "ManifestTransformation": {

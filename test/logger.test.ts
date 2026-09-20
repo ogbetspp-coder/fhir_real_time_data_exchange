@@ -138,6 +138,20 @@ describe("structured logger redaction", () => {
     expect(Object.keys(entry)).not.toContain("stage");
   });
 
+  it("redacts a message that fails the value guard instead of trusting the caller", () => {
+    const { out } = capture(() => {
+      log("info", '<div xmlns="http://www.w3.org/1999/xhtml"><p>Synthetic</p></div>', {});
+      log("info", "x".repeat(513), {});
+      log("info", "Run completed", {});
+    });
+
+    expect(out.map((entry) => entry.message)).toEqual([
+      "[message redacted]",
+      "[message redacted]",
+      "Run completed",
+    ]);
+  });
+
   it("writes error level to console.error and redacts there too", () => {
     const { out, err } = capture(() => {
       log("error", "Request failed", { stage: "http", errorType: "Error", payload: "x" });

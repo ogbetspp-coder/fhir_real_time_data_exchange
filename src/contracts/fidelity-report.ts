@@ -1,6 +1,26 @@
 import { z } from "zod";
 
-import { Count, NormalizationVersion, Sha256Hex, SourceKey } from "./common.js";
+import { Count, NormalizationVersion, PositiveInt, Sha256Hex, SourceKey, Token } from "./common.js";
+
+// The extractor's page text. It contains narrative, so it travels by reference and is never
+// logged or placed in a submission; it is validated here because it is untrusted input to the
+// Zone B re-execution of the fidelity check.
+export const SourceDocumentTextSchema = z
+  .strictObject({
+    extractorVersion: Token,
+    pages: z
+      .array(
+        z.strictObject({
+          page: PositiveInt,
+          text: z.string().max(500_000),
+          bodyStart: Count,
+          bodyEnd: Count,
+        }),
+      )
+      .min(1)
+      .max(2_000),
+  })
+  .meta({ id: "SourceDocumentText" });
 
 // Wire schema for the FidelityReport that Zone A produces and Zone B re-verifies. It mirrors
 // `src/fidelity/verify.ts`'s FidelityReport type field for field so that a report crossing the

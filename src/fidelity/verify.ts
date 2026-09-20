@@ -110,17 +110,36 @@ export class FidelityError extends Error {
   }
 }
 
+// Most text a page may exclude as running header/footer. The body range is declared by the
+// extractor, so it is bounded and must sit on line boundaries rather than trusted outright.
+const MAX_EXCLUDED_CODE_POINTS_PER_PAGE = 240;
+
 type PageIndex = {
   page: SourcePage;
   codePoints: string[];
   malformed: boolean;
+  bodyIssue: string | undefined;
 };
 
-function indexPages(source: SourceDocumentText): Map<number, PageIndex> {
+function bodyIssueFor(page: SourcePage, codePoints: string[]): string | undefined {
+  const { bodyStart, bodyEnd } = page;
+  if (bodyStart !== 0 && codePoints[bodyStart - 1] !== "\n") return "body-boundary";
+  if (bodyEnd !== codePoints.length && codePoints[bodyEnd - 1] !== "\n") return "body-boundary";
+  if (codePoints.length - (bodyEnd - bodyStart) > MAX_EXCLUDED_CODE_POINTS_PER_PAGE) {
+    return "excluded-text";
+  }
+  return undefined;
+}
+
+function indexPages(source: SourceDocumentText): {
+  pages: Map<number, PageIndex>;
+  issues: string[];
+} {
   const pages = new Map<number, PageIndex>();
+  const structural: string[] = [];
   const issues: string[] = [];
   for (const page of source.pages) {
-    if (pages.has(page.page)) issues.push(`Duplicate page number ${page.page}`);
+    if (pages.has(page.page)) structural.push(`Duplicate page number ${page.page}`);
     const codePoints = Array.from(page.text);
     if (
       !Number.isInteger(page.page) ||
@@ -131,16 +150,20 @@ function indexPages(source: SourceDocumentText): Map<number, PageIndex> {
       page.bodyEnd < page.bodyStart ||
       page.bodyEnd > codePoints.length
     ) {
-      issues.push(`Invalid body range on page ${page.page}`);
+      structural.push(`Invalid body range on page ${page.page}`);
+      continue;
     }
+    const bodyIssue = bodyIssueFor(page, codePoints);
+    if (bodyIssue !== undefined) issues.push(`Page ${page.page}: ${bodyIssue}`);
     pages.set(page.page, {
       page,
       codePoints,
       malformed: findForbiddenCharacter(page.text) !== undefined,
+      bodyIssue,
     });
   }
-  if (issues.length > 0) throw new FidelityError("Source document text is invalid", issues);
-  return pages;
+  if (structural.length > 0) throw new FidelityError("Source document text is invalid", structural);
+  return { pages, issues };
 }
 
 function slice(index: PageIndex, start: number, end: number): string {
@@ -172,6 +195,7 @@ function resolveSpans(
     const index = pages.get(span.page);
     if (index === undefined) return { status: "span-not-found", reason: "page-not-found" };
     if (index.malformed) return { status: "span-not-found", reason: "page-malformed" };
+    if (index.bodyIssue !== undefined) return { status: "span-not-found", reason: index.bodyIssue };
     const { bodyStart, bodyEnd } = index.page;
     if (
       span.startOffset < bodyStart ||
@@ -204,7 +228,10 @@ function resolveSpans(
         ) {
           return { status: "invalid-provenance", reason: "non-contiguous" };
         }
-        pieces.push({ index, start: span.startOffset, end: span.endOffset });
+        // The blank tails and heads around a page break are part of the text, not discarded:
+        // an invisible character hiding in them cannot change where a word ends.
+        last.end = previousIndex.page.bodyEnd;
+        pieces.push({ index, start: bodyStart, end: span.endOffset });
       } else {
         return { status: "invalid-provenance", reason: "non-contiguous" };
       }
@@ -216,14 +243,10 @@ function resolveSpans(
   return { raw: pieces.map((piece) => slice(piece.index, piece.start, piece.end)) };
 }
 
-// Pieces from consecutive pages are separated by a line break, except when the earlier piece
-// ends in a discretionary hyphen: the word continues on the next page.
+// Pieces from consecutive pages are concatenated verbatim: a page body ends with its own line
+// terminator (or a soft hyphen when a word continues), so the verifier never inserts one.
 function joinPieces(raw: string[]): string {
-  return raw.reduce(
-    (joined, piece, position) =>
-      position === 0 ? piece : `${joined}${joined.endsWith("­") ? "" : "\n"}${piece}`,
-    "",
-  );
+  return raw.join("");
 }
 
 function diffHint(expected: string, actual: string): DiffHint {
@@ -362,10 +385,9 @@ export function verifyNarrativeFidelity(input: FidelityInput): FidelityReport {
     input.provenance.map(({ sourceKey }) => sourceKey),
     "provenance entry",
   );
-  const pages = indexPages(input.source);
+  const { pages, issues } = indexPages(input.source);
   const provenance = new Map(input.provenance.map((entry) => [entry.sourceKey, entry]));
   const sectionKeys = new Set(input.sections.map(({ sourceKey }) => sourceKey));
-  const issues: string[] = [];
   if (input.sections.length === 0) issues.push("No narrative sections to verify");
   for (const key of provenance.keys()) {
     if (!sectionKeys.has(key)) issues.push(`Orphan provenance ${key}`);

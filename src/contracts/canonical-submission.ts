@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  FidelityError,
   NORMALIZATION_VERSION,
   collectNarrativeSections,
   computeNarrativeBinding,
@@ -8,21 +9,25 @@ import {
   verifyReportHash,
   type FidelityReport,
   type NarrativeSection,
-  type SourceDocumentText,
 } from "../fidelity/index.js";
 import type { FhirBundle } from "../fhir/types.js";
 import { sha256, sha256Utf8 } from "../lib/hash.js";
 import { IsoDateTime, Sha256Hex, Uuid } from "./common.js";
-import { FidelityReportSchema } from "./fidelity-report.js";
+import { FidelityReportSchema, SourceDocumentTextSchema } from "./fidelity-report.js";
 import { ApprovalSchema, IngestionProvenanceSchema } from "./ingestion-provenance.js";
 import { LooseCompositionSchema, Type2BundleSchema, type Type2Bundle } from "./type2-bundle.js";
 
 export const CANONICAL_SUBMISSION_VERSION = "1.0.0";
 
-// Longest string permitted anywhere in the Bundle outside the verified narratives. Product-graph
+// Bounds on strings anywhere in the Bundle outside the verified narratives. Product-graph
 // fields are names, codes, identifiers, and URLs; regulated prose is longer than this and must
-// travel as a verified narrative section instead.
+// travel as a verified narrative section instead. This bounds smuggling; it does not prove the
+// structured fields (ADR 0002: those belong to master data and field-level provenance).
 const MAX_UNVERIFIED_STRING_LENGTH = 300;
+// The longest QRD section title ("6.5 Nature and contents of container and special equipment
+// for use, administration or implantation") is 14 words; a sentence of prose is longer.
+const MAX_UNVERIFIED_WORDS = 20;
+const JSON_KEY = /^_?[A-Za-z][A-Za-z0-9]{0,63}$/;
 
 const CanonicalSubmissionBase = z.strictObject({
   schemaVersion: z.literal(CANONICAL_SUBMISSION_VERSION),
@@ -131,7 +136,7 @@ export class SubmissionRejectedError extends Error {
 export type DocumentSubmissionInput = {
   submission: unknown;
   fidelityReport: unknown;
-  sourceText: SourceDocumentText;
+  sourceText: unknown;
 };
 
 export type DocumentGateResult = {
@@ -163,7 +168,11 @@ function unverifiedTextIssues(bundle: unknown, verifiedDivPaths: Set<string>): s
       if (verifiedDivPaths.has(path)) return;
       if (path.endsWith(".text.div")) {
         issues.push(`Narrative outside verified sections at ${path}`);
-      } else if (value.length > MAX_UNVERIFIED_STRING_LENGTH || value.includes("<")) {
+      } else if (
+        value.length > MAX_UNVERIFIED_STRING_LENGTH ||
+        value.includes("<") ||
+        value.trim().split(/\s+/).length > MAX_UNVERIFIED_WORDS
+      ) {
         issues.push(`Unverified free text at ${path}`);
       }
       return;
@@ -174,6 +183,11 @@ function unverifiedTextIssues(bundle: unknown, verifiedDivPaths: Set<string>): s
     }
     if (value !== null && typeof value === "object") {
       for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+        // Property names are a channel too: FHIR JSON keys are identifiers, never prose.
+        if (!JSON_KEY.test(key)) {
+          issues.push(`Unverified free text in a property name at ${path}`);
+          continue;
+        }
         walk(child, path.length === 0 ? key : `${path}.${key}`);
       }
     }
@@ -271,17 +285,32 @@ export function verifyDocumentSubmission(
     ),
   );
 
-  if (sha256(input.sourceText) !== extractedText.sha256) {
+  const sourceText = SourceDocumentTextSchema.safeParse(input.sourceText);
+  if (!sourceText.success) {
+    issues.push(...zodIssues(sourceText.error).map((issue) => `sourceText.${issue}`));
+  } else if (sha256(sourceText.data) !== extractedText.sha256) {
     issues.push("Extracted source text does not match sourceDocument.extractedText.sha256");
   } else {
-    const fresh = verifyNarrativeFidelity({
-      normalizationVersion: NORMALIZATION_VERSION,
-      source: input.sourceText,
-      sections: narrativeSections,
-      provenance: submission.provenance.sections,
-    });
-    if (fresh.reportHash !== report.reportHash) {
-      issues.push("Re-executed fidelity check does not reproduce the declared report");
+    // Every rejection must surface as a classified contract rejection, so structural failures of
+    // the re-execution are folded into the issue list rather than escaping as another error type.
+    try {
+      const fresh = verifyNarrativeFidelity({
+        normalizationVersion: NORMALIZATION_VERSION,
+        source: sourceText.data,
+        sections: narrativeSections,
+        provenance: submission.provenance.sections,
+      });
+      if (fresh.reportHash !== report.reportHash) {
+        issues.push("Re-executed fidelity check does not reproduce the declared report");
+      }
+    } catch (error) {
+      if (error instanceof FidelityError) {
+        issues.push(...error.issues.map((issue) => `Fidelity re-execution: ${issue}`));
+      } else {
+        issues.push(
+          `Fidelity re-execution failed: ${error instanceof Error ? error.name : "Error"}`,
+        );
+      }
     }
   }
 

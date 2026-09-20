@@ -205,24 +205,23 @@
       "type": "object",
       "properties": {
         "name": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "$ref": "#/$defs/Token"
         },
         "documentId": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "$ref": "#/$defs/Token"
         },
         "versionId": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "$ref": "#/$defs/Token"
         }
       },
       "required": ["name", "documentId"],
       "additionalProperties": false,
       "description": "Identity of the document in its system of record."
+    },
+    "Token": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$",
+      "description": "Identifier: letters, digits, and . _ : / @ + - only."
     },
     "StorageUri": {
       "type": "string",
@@ -239,9 +238,7 @@
           "$ref": "#/$defs/Sha256Hex"
         },
         "extractorVersion": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "$ref": "#/$defs/Token"
         }
       },
       "required": ["uri", "sha256", "extractorVersion"],
@@ -255,9 +252,7 @@
           "$ref": "#/$defs/Uuid"
         },
         "serviceVersion": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "$ref": "#/$defs/Token"
         },
         "parser": {
           "$ref": "#/$defs/ToolVersion"
@@ -279,14 +274,10 @@
       "type": "object",
       "properties": {
         "name": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "$ref": "#/$defs/Token"
         },
         "version": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "$ref": "#/$defs/Token"
         }
       },
       "required": ["name", "version"],
@@ -296,14 +287,10 @@
       "type": "object",
       "properties": {
         "provider": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "$ref": "#/$defs/Token"
         },
         "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "$ref": "#/$defs/Token"
         }
       },
       "required": ["provider", "id"],
@@ -313,14 +300,10 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "$ref": "#/$defs/Token"
         },
         "version": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "$ref": "#/$defs/Token"
         },
         "sha256": {
           "$ref": "#/$defs/Sha256Hex"
@@ -333,14 +316,10 @@
       "type": "object",
       "properties": {
         "name": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "$ref": "#/$defs/Token"
         },
         "version": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "$ref": "#/$defs/Token"
         },
         "snapshotSha256": {
           "$ref": "#/$defs/Sha256Hex"
@@ -407,9 +386,7 @@
       "type": "object",
       "properties": {
         "target": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "$ref": "#/$defs/TargetPath"
         },
         "sourceKey": {
           "$ref": "#/$defs/SourceKey"
@@ -418,17 +395,13 @@
           "$ref": "#/$defs/DecisionAction"
         },
         "ruleId": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "$ref": "#/$defs/Token"
         },
         "terminologyRef": {
           "$ref": "#/$defs/TerminologyRef"
         },
         "editorId": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "$ref": "#/$defs/Token"
         },
         "reason": {
           "$ref": "#/$defs/DecisionReason"
@@ -436,6 +409,11 @@
       },
       "required": ["target", "action"],
       "additionalProperties": false
+    },
+    "TargetPath": {
+      "type": "string",
+      "maxLength": 256,
+      "pattern": "^[A-Za-z][A-Za-z0-9]*(?:\\[\\d+\\])?(?:\\.[A-Za-z][A-Za-z0-9]*(?:\\[\\d+\\])?)*$"
     },
     "DecisionAction": {
       "type": "string",
@@ -448,19 +426,13 @@
           "$ref": "#/$defs/HttpUrl"
         },
         "code": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "$ref": "#/$defs/Token"
         },
         "version": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "$ref": "#/$defs/Token"
         },
         "lookupId": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "$ref": "#/$defs/Token"
         }
       },
       "required": ["system", "code", "lookupId"],
@@ -469,6 +441,7 @@
     },
     "HttpUrl": {
       "type": "string",
+      "maxLength": 256,
       "format": "uri"
     },
     "DecisionReason": {
@@ -557,8 +530,7 @@
         },
         "recordRef": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 512
+          "pattern": "^\\S{1,512}$"
         }
       },
       "required": [

@@ -18,7 +18,8 @@ export type XhtmlErrorCode =
   | "cdata"
   | "doctype"
   | "unbalanced-tag"
-  | "misnested-tag";
+  | "misnested-tag"
+  | "table-section-order";
 
 export class XhtmlError extends Error {
   public constructor(
@@ -42,7 +43,6 @@ const BLOCK_ELEMENTS = new Set([
   "h5",
   "h6",
   "ul",
-  "ol",
   "li",
   "table",
   "thead",
@@ -74,8 +74,12 @@ const INLINE_ELEMENTS = new Set([
   "abbr",
   "cite",
   "code",
-  "q",
 ]);
+
+// Elements whose renderer-generated characters (list numbers, quotation marks) would show text
+// the source does not contain are excluded above: `ol` and `q`.
+
+type TableState = { head: boolean; body: boolean; foot: boolean };
 
 const NAMED_ENTITIES = new Map<string, string>([
   ["amp", "&"],
@@ -97,11 +101,11 @@ function isAsciiWhitespace(character: string): boolean {
 
 // Attribute values are never compared against the source, so they must not be able to carry
 // text: each allowed attribute is restricted to a short token alphabet or a safe link form.
-const TOKEN_VALUE = /^[A-Za-z0-9_.:-]{1,64}$/;
-const TOKEN_LIST_VALUE = /^[A-Za-z0-9_.:-]{1,64}(?: [A-Za-z0-9_.:-]{1,64}){0,7}$/;
+const TOKEN_VALUE = /^[A-Za-z0-9_.:-]{1,32}$/;
+const TOKEN_LIST_VALUE = /^[A-Za-z0-9_.:-]{1,32}(?: [A-Za-z0-9_.:-]{1,32}){0,2}$/;
 const SPAN_VALUE = /^[1-9][0-9]{0,2}$/;
 const HREF_VALUE =
-  /^(?:https?:\/\/[A-Za-z0-9._~:/?#@!$&'()*+,;=%-]{1,512}|#[A-Za-z0-9_.:-]{1,64})$/;
+  /^(?:https:\/\/[A-Za-z0-9.-]{1,64}(?:\/[A-Za-z0-9._~-]{0,32}){0,8}\/?|#[A-Za-z0-9_.:-]{1,32})$/;
 
 const ATTRIBUTE_VALUE_RULES = new Map<string, RegExp>([
   ["xml:lang", TOKEN_VALUE],
@@ -158,11 +162,34 @@ function decodeEntity(match: RegExpExecArray, offset: number): string {
   return String.fromCodePoint(codePoint);
 }
 
+// Table sections render in a fixed order (head, body, foot) regardless of document order, so
+// only that document order is accepted; anything else would display rows in a different order
+// from the source the text was verified against.
+function enterTableSection(
+  name: string,
+  stack: string[],
+  tables: TableState[],
+  offset: number,
+): void {
+  if (name !== "thead" && name !== "tbody" && name !== "tfoot") return;
+  const state = tables[tables.length - 1];
+  if (stack[stack.length - 1] !== "table" || state === undefined) {
+    throw new XhtmlError("misnested-tag", offset);
+  }
+  if (name === "thead" && (state.head || state.body || state.foot)) {
+    throw new XhtmlError("table-section-order", offset);
+  }
+  if (name === "tbody" && state.foot) throw new XhtmlError("table-section-order", offset);
+  if (name === "tfoot" && state.foot) throw new XhtmlError("table-section-order", offset);
+  state[name === "thead" ? "head" : name === "tbody" ? "body" : "foot"] = true;
+}
+
 // Converts a FHIR narrative `div` to text. Block boundaries become U+000A; inline markup is
 // dropped; the result still needs `normalizeText()` before comparison.
 export function xhtmlToText(div: string): string {
   const output: string[] = [];
   const stack: string[] = [];
+  const tables: TableState[] = [];
   let rootSeen = false;
   let rootClosed = false;
   let index = 0;
@@ -185,6 +212,7 @@ export function xhtmlToText(div: string): string {
         const open = stack.pop();
         if (open === undefined) throw new XhtmlError("unbalanced-tag", index);
         if (open !== name) throw new XhtmlError("misnested-tag", index);
+        if (name === "table") tables.pop();
         if (BLOCK_ELEMENTS.has(name) || name === "br") output.push("\n");
         if (stack.length === 0) rootClosed = true;
         index = END_TAG.lastIndex;
@@ -209,6 +237,7 @@ export function xhtmlToText(div: string): string {
         rootSeen = true;
       }
       checkAttributes(name, start[2] ?? "", isRoot, index);
+      enterTableSection(name, stack, tables, index);
 
       if (BLOCK_ELEMENTS.has(name) || name === "br") output.push("\n");
       if ((start[3] ?? "") === "/") {
@@ -216,6 +245,7 @@ export function xhtmlToText(div: string): string {
         if (isRoot) rootClosed = true;
       } else {
         stack.push(name);
+        if (name === "table") tables.push({ head: false, body: false, foot: false });
       }
       index = START_TAG.lastIndex;
       continue;

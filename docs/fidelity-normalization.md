@@ -18,6 +18,11 @@ text and to the narrative text; nothing is applied to one side only.
   inside the body. Text outside the body (running headers, footers, page numbers) is ignored
   by contiguity checks, but the report records the whole page length (`pageCodePoints`) next
   to the body length so excluded text is visible.
+- The body range is declared by the extractor and is bounded rather than trusted: `bodyStart`
+  must be 0 or immediately follow U+000A; `bodyEnd` must be the page length or the code point
+  before it must be U+000A (a body ends with its own line terminator); and a page may exclude
+  at most 240 code points in total. A page that violates any of these makes every span on it
+  `span-not-found` (reason `body-boundary` or `excluded-text`) and the report `failed`.
 - Every hash of a JSON value (`reportHash`, `extractedTextSha256`, `narrativeBindingSha256`,
   the contract hashes) is the SHA-256 of canonical JSON: object keys sorted by UTF-16 code
   unit order (RFC 8785), no insignificant whitespace, `JSON.stringify` number and string
@@ -39,7 +44,9 @@ it `span-not-found`.
 ## 3. Normalisation steps (ordered)
 
 1. Delete invisible formatting characters — closed list: U+00AD SOFT HYPHEN, U+200B ZERO WIDTH
-   SPACE, U+FEFF ZERO WIDTH NO-BREAK SPACE, U+2060 WORD JOINER.
+   SPACE, U+FEFF ZERO WIDTH NO-BREAK SPACE, U+2060 WORD JOINER. When U+00AD is immediately
+   followed by U+000A (or U+000D U+000A), that line break is deleted with it: a soft hyphen at a
+   line end marks a word broken across lines.
 2. Expand ligatures — closed list: U+FB00 → `ff`, U+FB01 → `fi`, U+FB02 → `fl`, U+FB03 → `ffi`,
    U+FB04 → `ffl`, U+FB06 → `st`. (NFKC is not used: it would also flatten superscripts and
    subscripts, which are content.)
@@ -91,10 +98,12 @@ blockquote dl dt dd hr`. `br` emits U+000A. Inline elements contribute only thei
   attribute name on one element.
 - Attribute values are never compared against the source, so they must not be able to carry
   text. Each value must match its token form or the element rejects: `xml:lang`, `lang`,
-  `id`, `scope` — `[A-Za-z0-9_.:-]{1,64}`; `class` — up to eight such tokens separated by
-  single spaces; `colspan`, `rowspan` — an integer 1–999; `href` — `https?://` followed by up
-  to 512 URL characters, or `#` followed by a token. Anything else (`javascript:` links,
-  spaces, `<`, `&`) rejects.
+  `id`, `scope` — `[A-Za-z0-9_.:-]{1,32}`; `class` — up to three such tokens separated by
+  single spaces; `colspan`, `rowspan` — an integer 1–999; `href` — `https://` host and up to
+  eight path segments of at most 32 unreserved characters (no query or fragment), or `#`
+  followed by a token. Anything else (`javascript:` links, spaces, `<`, `&`, query strings)
+  rejects. These bounds limit, but do not eliminate, what attribute values can carry; narrative
+  markup should not need links.
 - Comments, processing instructions, CDATA sections, DOCTYPE declarations, a stray `<`, a
   stray `&`, unbalanced or misnested tags reject.
 - Entities: `&amp; &lt; &gt; &quot; &apos;`, decimal `&#N;`, and hexadecimal `&#xH;` only.
@@ -112,9 +121,11 @@ table-cell boundaries are structure, not content. Cell text is content.
   between consecutive spans (which must normalise to nothing). The source's own characters
   therefore decide where words begin and end; the verifier never inserts whitespace between
   spans on the same page, so adjacent spans cannot split a word.
-- Slices from consecutive pages are joined with U+000A, except when the earlier slice ends in
-  U+00AD SOFT HYPHEN, in which case they are joined without a separator and the word continues
-  on the next page.
+- When a section continues onto the next page, the page-1 slice is extended to `bodyEnd` and
+  the page-2 slice starts at `bodyStart` (the blank tail and head must normalise to nothing),
+  and the slices are concatenated verbatim with no separator: the body's own final line
+  terminator, or a soft hyphen when a word continues, decides how the pages join. The verifier
+  never inserts a character of its own.
 - The joined text is normalised (section 3) and must equal the normalised narrative exactly.
 - A report with zero narrative sections is `failed` (issue `No narrative sections to verify`);
   "nothing to check" is never a pass.
@@ -130,7 +141,9 @@ extractor is a controlled component: its name and version are recorded in
 
 - emit table cells row-major separated by U+0009 and rows by U+000A;
 - emit discretionary (line-break) hyphens as U+00AD and hard hyphens verbatim;
-- declare `bodyStart`/`bodyEnd` per page so repeated headers and footers are excluded;
+- declare `bodyStart`/`bodyEnd` per page so repeated headers and footers are excluded, with the
+  body ending in its final line terminator (section 1), and never exclude more than a running
+  header and footer;
 - not apply any normalisation of its own beyond faithful text extraction.
 
 ## 8. Change control

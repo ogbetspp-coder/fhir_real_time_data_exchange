@@ -16,6 +16,41 @@ SOURCE_STORE="$(terraform -chdir=infra output -raw source_fhir_store_id)"
 TARGET_STORE="$(terraform -chdir=infra output -raw target_fhir_store_id)"
 PROFILE_BUCKET="$(terraform -chdir=infra output -raw profile_staging_bucket)"
 
+summarize_response() {
+  node -e '
+const fs = require("node:fs");
+const crypto = require("node:crypto");
+const raw = fs.readFileSync(process.argv[1]);
+const digest = () =>
+  `unrecognised body sha256=${crypto.createHash("sha256").update(raw).digest("hex")}`;
+const token = (value, pattern) => (typeof value === "string" && pattern.test(value) ? value : "?");
+let body;
+try {
+  body = JSON.parse(raw.toString("utf8"));
+} catch {
+  body = undefined;
+}
+if (body === null || typeof body !== "object") {
+  console.log(digest());
+} else if (body.error !== null && typeof body.error === "object") {
+  const code = Number.isInteger(body.error.code) ? String(body.error.code) : "?";
+  console.log(`code=${code} status=${token(body.error.status, /^[A-Z0-9_]{1,64}$/)}`);
+} else if (body.resourceType === "OperationOutcome") {
+  const issues = Array.isArray(body.issue) ? body.issue : [];
+  const column = (name) =>
+    issues
+      .map((issue) =>
+        issue === null || typeof issue !== "object" ? "?" : token(issue[name], /^[a-z-]{1,64}$/),
+      )
+      .join(",");
+  const summary = `issues=${issues.length} codes=${column("code")} severities=${column("severity")}`;
+  console.log(`OperationOutcome ${summary}`);
+} else {
+  console.log(digest());
+}
+' "$1" 2>/dev/null || echo "unrecognised body sha256=unavailable"
+}
+
 npm run standards:fetch
 
 TMP="$(mktemp -d)"
@@ -56,21 +91,23 @@ for prefix in terminology extensions global ema; do
     --gcs-uri="gs://${PROFILE_BUCKET}/${prefix}/*.json" \
     --content-structure=resource-pretty 2>&1 | tee "$import_log"; then
     # The CLI only reports a summary error pointing at metadata.logsUrl for the
-    # per-resource details; describing the operation surfaces that (and often a
-    # sample of the actual failures) instead of just the bare invalid_argument.
+    # per-resource details; describing the operation surfaces the counters and
+    # that URL instead of just the bare invalid_argument. Neither the describe
+    # output nor the log read may carry response text: upstream messages can
+    # quote FHIR content, so only codes, counters and identifiers are printed.
     operation_id="$(grep -oE 'operations/[0-9]+' "$import_log" | head -1 | cut -d/ -f2)"
     if [[ -n "$operation_id" ]]; then
       echo "=== operation details for ${prefix} import (operation ${operation_id}) ===" >&2
       gcloud --quiet healthcare operations describe "$operation_id" \
         --project="$PROJECT_ID" --location="$REGION" --dataset="$DATASET" \
-        --format=json >&2 || true
+        --format="value(done,error.code,metadata.counter.failure,metadata.counter.success,metadata.logsUrl)" >&2 || true
       # The operation's own metadata only has success/failure counts, not the
       # per-resource errors -- those are in Cloud Logging under this operation id.
       echo "=== per-resource import errors for ${prefix} (operation ${operation_id}) ===" >&2
       gcloud --quiet logging read \
         "operation.id=\"projects/${PROJECT_ID}/locations/${REGION}/datasets/${DATASET}/operations/${operation_id}\"" \
         --project="$PROJECT_ID" \
-        --format="value(timestamp,severity,jsonPayload,textPayload)" \
+        --format="value(timestamp,severity,jsonPayload.resourceId,jsonPayload.error.code)" \
         --limit=100 >&2 || true
     fi
     exit 1
@@ -92,7 +129,7 @@ if ! curl --fail-with-body --silent --show-error \
   --header "X-Goog-Healthcare-Audit-AppName: ema-flow-bootstrap" \
   --data-binary "@$TMP/synthetic-type2.json" \
   "${FHIR_BASE}/Bundle/synthetic-type2-smpc" >"$TMP/bootstrap-response.json"; then
-  cat "$TMP/bootstrap-response.json" >&2
+  echo "Response summary: $(summarize_response "$TMP/bootstrap-response.json")" >&2
   echo "Failed to seed the synthetic Type 2 bundle." >&2
   exit 1
 fi

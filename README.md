@@ -55,7 +55,12 @@ See [docs/architecture.md](docs/architecture.md) for trust boundaries, controls,
 
 Structuring a label document into the Type 2 graph is a separate, probabilistic Zone A
 service; this repository (Zone B) accepts only an approved `CanonicalSubmission`, passed by
-reference, and re-verifies it before running the frozen transform and validation pipeline. See
+reference, and re-verifies it before running the frozen transform and validation pipeline.
+Status: the contract and the ingress gate exist; the reference resolver, the `/v1/runs`
+`document` route, and the Workflows branch are the next phase, so today the document path is
+reachable only from tests and `src/fixtures/synthetic-submission.ts`. The `fixture` and
+`healthcare-api` sources are pre-existing trusted inputs guarded by IAM, not by this gate;
+deployments where Zone A is the only producer should disable them. See
 [docs/adr/0002-two-trust-zones-and-canonical-submission.md](docs/adr/0002-two-trust-zones-and-canonical-submission.md)
 and
 [docs/adr/0003-mechanical-narrative-fidelity.md](docs/adr/0003-mechanical-narrative-fidelity.md)
@@ -103,14 +108,18 @@ The default is `europe-west4`.
 ```bash
 export GOOGLE_CLOUD_PROJECT="your-project-id"
 export EMA_FLOW_ENVIRONMENT="dev"
-scripts/gcp/deploy.sh
+bash scripts/gcp/deploy.sh
 ```
 
 The deployment:
 
 1. creates Artifact Registry and required APIs;
-2. runs Cloud Build quality, standards-integrity, provenance, Terraform, and image builds;
-3. deploys immutable image digests with Binary Authorization enabled;
+2. GitHub Actions runs `npm run check` as the Quality gate step before deploy; Cloud Build
+   (`cloudbuild.images.yaml`) only builds the worker and validator images; `cloudbuild.yaml` is
+   a separate, manual/CI-optional configuration that additionally runs the quality gate,
+   standards-integrity check, and Terraform format/validate before building those same images;
+3. deploys immutable image digests; Binary Authorization is configurable
+   (`enforce_binary_authorization`) and is disabled by default;
 4. reconciles the R5 stores and native BigQuery stream through the Healthcare REST API;
 5. imports checksum-pinned profile cards and profiles; and
 6. seeds `Bundle/synthetic-type2-smpc` in the source store.
@@ -189,7 +198,7 @@ The current normative validation targets are:
 
 The HL7 and EMA examples are regression references, not mapping specifications.
 
-## GxP-ready control posture
+## Control posture supporting GxP qualification
 
 The package supports ALCOA+ evidence with correlated run IDs, UTC timestamps, immutable
 inputs/outputs, hashes, KMS signatures, Cloud Audit Logs, retained evidence, deterministic

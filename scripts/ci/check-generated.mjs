@@ -24,7 +24,11 @@ if (command === undefined || targets.length === 0) {
 function snapshot(paths) {
   const digests = new Map();
   const visit = (entry) => {
-    if (!existsSync(entry)) return;
+    if (!existsSync(entry)) {
+      // A guarded path that does not exist would make the gate pass vacuously; fail closed.
+      console.error(`Guarded path does not exist: ${entry}`);
+      process.exit(1);
+    }
     if (statSync(entry).isDirectory()) {
       for (const name of readdirSync(entry).sort()) visit(path.join(entry, name));
       return;

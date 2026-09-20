@@ -253,6 +253,64 @@ describe("canonical submission contract", () => {
     );
   });
 
+  it("rejects prose in a non-narrative Bundle string by word count, not only by length", () => {
+    const submission = clone();
+    const composition = submission.bundle.entry[0]?.resource as { title?: string } | undefined;
+    if (composition === undefined) throw new Error("Synthetic bundle requires a Composition");
+    composition.title =
+      "Take one tablet twice daily with food and do not exceed two tablets in any twenty four hour period at all";
+
+    const parsed = CanonicalSubmissionSchema.safeParse(seal(submission));
+    expect(parsed.success).toBe(true);
+    expect(reject(submission).issues).toContain("Unverified free text at entry[0].resource.title");
+  });
+
+  it("rejects prose smuggled as a property name", () => {
+    const submission = clone();
+    const composition = submission.bundle.entry[0]?.resource as Record<string, unknown> | undefined;
+    if (composition === undefined) throw new Error("Synthetic bundle requires a Composition");
+    composition["take one tablet twice daily"] = "x";
+
+    const parsed = CanonicalSubmissionSchema.safeParse(seal(submission));
+    expect(parsed.success).toBe(true);
+    expect(reject(submission).issues).toContain(
+      "Unverified free text in a property name at entry[0].resource",
+    );
+  });
+
+  it("rejects prose in a provenance identifier field", () => {
+    const submission = clone();
+    submission.provenance.extraction.parser.name = "take one tablet twice daily";
+
+    rejectedByParse(
+      seal(submission),
+      "provenance.extraction.parser.name: Invalid string: must match pattern /^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$/",
+    );
+  });
+
+  it("rejects malformed source text as a contract issue rather than a type error", () => {
+    const malformed = { extractorVersion: "x", pages: "not-an-array" };
+
+    const { issues } = reject(fixture.submission, malformed as unknown as SourceDocumentText);
+    expect(issues.some((issue) => issue.startsWith("sourceText.pages"))).toBe(true);
+  });
+
+  it("folds a structurally unusable re-execution into the rejection", () => {
+    const duplicated = structuredClone(fixture.sourceText);
+    const [page] = duplicated.pages;
+    if (page === undefined) throw new Error("Synthetic source text requires pages");
+    duplicated.pages.push(structuredClone(page));
+
+    const submission = clone();
+    submission.provenance.sourceDocument.extractedText.sha256 = sha256(duplicated);
+
+    const parsed = CanonicalSubmissionSchema.safeParse(seal(submission));
+    expect(parsed.success).toBe(true);
+    expect(reject(submission, duplicated).issues).toContain(
+      "Fidelity re-execution: Duplicate page number 1",
+    );
+  });
+
   it("keeps every rejection reason free of narrative text", () => {
     const submission = clone();
     submission.provenance.fidelity.status = "failed";

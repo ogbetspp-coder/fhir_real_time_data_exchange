@@ -43,7 +43,8 @@ export function log(level: LogLevel, message: string, fields: LogFields = {}): v
   const spanContext = trace.getActiveSpan()?.spanContext();
   const entry: Record<string, unknown> = {
     severity: level.toUpperCase(),
-    message,
+    // The message is a caller-supplied string like any field value; the same guard applies.
+    message: isSafeValue(message) ? message : "[message redacted]",
     timestamp: new Date().toISOString(),
     ...sanitize(fields),
   };

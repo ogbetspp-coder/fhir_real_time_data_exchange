@@ -58,6 +58,7 @@ describe("generated contract JSON Schemas", () => {
       "canonical-submission",
       "ingestion-provenance",
       "fidelity-report",
+      "source-document-text",
       "run-manifest",
     ]);
   });

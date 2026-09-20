@@ -59,7 +59,7 @@ export function paragraphs(...texts: string[]): string {
 // Synthetic three-page source document. Headers and footers sit outside the body ranges.
 
 const HEADER = "ACME Demo Product — Synthetic SmPC\n";
-const FOOTER = (page: number): string => `\nPage ${page} of 3`;
+const FOOTER = (page: number): string => `Page ${page} of 3`;
 
 const PAGE_BODIES = [
   [
@@ -86,10 +86,12 @@ const PAGE_BODIES = [
   ].join("\n"),
 ];
 
+// A page body ends with its own line terminator (spec section 7), so bodyEnd sits just after it.
 function buildPage(page: number, body: string): SourcePage {
-  const text = `${HEADER}${body}${FOOTER(page)}`;
+  const terminated = `${body}\n`;
+  const text = `${HEADER}${terminated}${FOOTER(page)}`;
   const bodyStart = Array.from(HEADER).length;
-  const bodyEnd = bodyStart + Array.from(body).length;
+  const bodyEnd = bodyStart + Array.from(terminated).length;
   return { page, text, bodyStart, bodyEnd };
 }
 
@@ -97,6 +99,14 @@ export function buildSource(): SourceDocumentText {
   return {
     extractorVersion: "synthetic-extractor/1.0.0",
     pages: PAGE_BODIES.map((body, index) => buildPage(index + 1, body)),
+  };
+}
+
+// A source with arbitrary page bodies, for cases that need a specific page-break layout.
+export function customSource(bodies: string[]): SourceDocumentText {
+  return {
+    extractorVersion: "synthetic-extractor/1.0.0",
+    pages: bodies.map((body, index) => buildPage(index + 1, body)),
   };
 }
 
@@ -206,16 +216,120 @@ const CONTRA_TAIL = "indication.";
 const INFUSION_HEAD = "The ﬁnal dose is given by intra";
 const INFUSION_TAIL = "venous infusion over 10 minutes.";
 
+// Page 1 with its body cut at the line break before INFUSION: a legal boundary, but the excluded
+// tail far exceeds what a header/footer could be.
 function shrunkenBodySource(): SourceDocumentText {
   const source = buildSource();
   const [first] = source.pages;
   if (first === undefined) throw new Error("fixture");
-  const cut = Array.from(first.text).join("").indexOf(INFUSION);
+  const cut = first.text.indexOf(INFUSION);
   const bodyEnd = Array.from(first.text.slice(0, cut)).length;
   return { ...source, pages: [{ ...first, bodyEnd }, ...source.pages.slice(1)] };
 }
 
+// Page 1 with its body cut in the middle of "100 mg": an illegal boundary.
+function midLineBodySource(): SourceDocumentText {
+  const source = customSource(["Do not exceed 100 mg per day."]);
+  const [first] = source.pages;
+  if (first === undefined) throw new Error("fixture");
+  const bodyEnd = Array.from(first.text.slice(0, first.text.indexOf("100") + 2)).length;
+  return { ...source, pages: [{ ...first, bodyEnd }] };
+}
+
+const HYPHEN_ACROSS_PAGES = customSource([
+  "The dose is given by intra­",
+  "venous infusion over 10 minutes.",
+]);
+const WORD_ACROSS_PAGES = customSource(["Give nor", "​floxacin twice daily."]);
+
 export const verifyCases: VerifyCase[] = [
+  // A body boundary inside a line, or a body that excludes more than a header/footer could hold,
+  // invalidates the page: the extractor-declared range is bounded, not trusted.
+  {
+    name: "body-boundary-mid-line",
+    input: (() => {
+      const source = midLineBodySource();
+      return toInput(
+        source,
+        single("smpc.4.2.posology", paragraphs("Do not exceed 10"), [
+          { ...spanFor(source, 1, "Do not exceed 10"), page: 1 },
+        ]),
+      );
+    })(),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "span-not-found" },
+      reasons: { "smpc.4.2.posology": "body-boundary" },
+    },
+  },
+  {
+    name: "excluded-text-budget",
+    input: toInput(
+      shrunkenBodySource(),
+      single("smpc.4.1", paragraphs(INDICATIONS), [spanFor(S, 1, INDICATIONS)]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.1": "span-not-found" },
+      reasons: { "smpc.4.1": "excluded-text" },
+    },
+  },
+  // Across a page break the verifier concatenates the bodies verbatim: a soft hyphen at the end
+  // of page 1 joins the word, and an invisible character in the head gap cannot split one.
+  {
+    name: "soft-hyphen-across-pages-joins-word",
+    input: toInput(
+      HYPHEN_ACROSS_PAGES,
+      single(
+        "smpc.4.2.posology",
+        paragraphs("The dose is given by intravenous infusion over 10 minutes."),
+        [
+          spanFor(HYPHEN_ACROSS_PAGES, 1, "The dose is given by intra­"),
+          spanFor(HYPHEN_ACROSS_PAGES, 2, "venous infusion over 10 minutes."),
+        ],
+      ),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "soft-hyphen-across-pages-cannot-split-word",
+    input: toInput(
+      HYPHEN_ACROSS_PAGES,
+      single(
+        "smpc.4.2.posology",
+        paragraphs("The dose is given by intra venous infusion over 10 minutes."),
+        [
+          spanFor(HYPHEN_ACROSS_PAGES, 1, "The dose is given by intra­"),
+          spanFor(HYPHEN_ACROSS_PAGES, 2, "venous infusion over 10 minutes."),
+        ],
+      ),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  // Without a soft hyphen, the page-1 body's own line terminator separates the words; an
+  // invisible character in the head gap of page 2 cannot join them.
+  {
+    name: "line-break-across-pages-separates-words",
+    input: toInput(
+      WORD_ACROSS_PAGES,
+      single("smpc.4.2.posology", paragraphs("Give nor floxacin twice daily."), [
+        spanFor(WORD_ACROSS_PAGES, 1, "Give nor"),
+        spanFor(WORD_ACROSS_PAGES, 2, "floxacin twice daily."),
+      ]),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "invisible-page-gap-cannot-join-word",
+    input: toInput(
+      WORD_ACROSS_PAGES,
+      single("smpc.4.2.posology", paragraphs("Give norfloxacin twice daily."), [
+        spanFor(WORD_ACROSS_PAGES, 1, "Give nor"),
+        spanFor(WORD_ACROSS_PAGES, 2, "floxacin twice daily."),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
   // Adjacent spans must never let the narrative insert whitespace inside a source word: the
   // source's own characters between spans decide, never a separator of ours.
   {
@@ -269,16 +383,6 @@ export const verifyCases: VerifyCase[] = [
     name: "empty-sections-fail",
     input: toInput(S, []),
     expect: { status: "failed", issueCount: 1 },
-  },
-  // A body range that excludes page text still verifies, but the report exposes the excluded
-  // amount through pageCodePoints so a reviewer can see it.
-  {
-    name: "shrunken-body-reports-page-total",
-    input: toInput(
-      shrunkenBodySource(),
-      single("smpc.4.1", paragraphs(INDICATIONS), [spanFor(S, 1, INDICATIONS)]),
-    ),
-    expect: { status: "passed", sections: { "smpc.4.1": "verified" } },
   },
   {
     name: "exact-pass",
@@ -715,6 +819,9 @@ export const normalizationCases: NormalizationCase[] = [
   // Invisible characters are removed before NFC, so a composition they would otherwise block
   // happens in the first pass and the procedure stays idempotent.
   { name: "invisible-blocks-nfc", input: "cafe​́", expected: "café" },
+  { name: "soft-hyphen-line-break", input: "intra­\nvenous", expected: "intravenous" },
+  { name: "soft-hyphen-crlf", input: "intra­\r\nvenous", expected: "intravenous" },
+  { name: "soft-hyphen-then-space-stays", input: "intra­ venous", expected: "intra venous" },
   { name: "ligature-then-combining", input: "ﬁ́", expected: "fí" },
   { name: "plain", input: "Take one tablet daily.", expected: "Take one tablet daily." },
   {
@@ -754,8 +861,48 @@ export const xhtmlCases: XhtmlCase[] = [
   // Attribute values are never compared against the source, so they are token-limited.
   {
     name: "accepts-https-href",
-    input: div('<p><a href="https://example.org/x?y=1#z">t</a></p>'),
+    input: div('<p><a href="https://example.org/x/y.html">t</a></p>'),
     expected: "\n\nt\n\n",
+  },
+  {
+    name: "rejects-href-with-query",
+    input: div('<p><a href="https://example.org/x?q=text">t</a></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-four-class-tokens",
+    input: div('<p class="a b c d">t</p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  // Renderer-generated characters (list numbers, quotation marks) and table sections placed
+  // out of document order would show text or an order the source does not contain.
+  { name: "rejects-ol", input: div("<ol><li>a</li></ol>"), expected: { error: "unknown-element" } },
+  { name: "rejects-q", input: div("<p><q>a</q></p>"), expected: { error: "unknown-element" } },
+  {
+    name: "accepts-table-section-order",
+    input: div(
+      "<table><thead><tr><th>h</th></tr></thead><tbody><tr><td>b</td></tr></tbody><tfoot><tr><td>f</td></tr></tfoot></table>",
+    ),
+    expected: "\n\n\n\n\nh\n\n\n\n\n\nb\n\n\n\n\n\nf\n\n\n\n\n",
+  },
+  {
+    name: "rejects-tfoot-before-tbody",
+    input: div(
+      "<table><tfoot><tr><td>f</td></tr></tfoot><tbody><tr><td>b</td></tr></tbody></table>",
+    ),
+    expected: { error: "table-section-order" },
+  },
+  {
+    name: "rejects-thead-after-tbody",
+    input: div(
+      "<table><tbody><tr><td>b</td></tr></tbody><thead><tr><th>h</th></tr></thead></table>",
+    ),
+    expected: { error: "table-section-order" },
+  },
+  {
+    name: "rejects-tbody-outside-table",
+    input: div("<tbody><tr><td>b</td></tr></tbody>"),
+    expected: { error: "misnested-tag" },
   },
   {
     name: "rejects-javascript-href",
