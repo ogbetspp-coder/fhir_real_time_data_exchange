@@ -1,7 +1,7 @@
 # Design note: verifiable answers on Google-native surfaces
 
-- Status: Proposed, 2026-09-20 — Google product capabilities marked _(verify)_ are being
-  checked against current documentation before item 1b starts
+- Status: Proposed, 2026-09-20; Google product capabilities verified against documentation
+  dated 2026-09-18 (sources inline)
 - Related: `docs/design/epi-mcp-query-service.md`, `docs/adr/0004-service-boundaries-and-shared-code.md`,
   `docs/roadmap.md` items 1, 1b, 1c
 
@@ -37,52 +37,109 @@ reading.
 
 Layers 1 and 2 are ours. Layer 3 and everything a user sees are Google's.
 
-## Google-native surfaces, no custom frontend
+## Google-native surfaces, no custom frontend — what is confirmed
 
 The standing decision is that no custom UI is built where a Google surface serves the
 purpose. For an assistant that is the strongest version of the decision, because the surface
-is where a product would otherwise sink most of its effort.
+is where a product would otherwise sink most of its effort. Every row below was checked
+against Google's documentation on 2026-09-20.
 
-| Role                        | Google component                                                                     | Ours?                         |
-| --------------------------- | ------------------------------------------------------------------------------------ | ----------------------------- |
-| Chat surface for staff      | Gemini Enterprise: a registered agent in the organisation's agent gallery _(verify)_ | No                            |
-| Chat surface in Workspace   | A Google Chat app backed by the same agent _(verify)_                                | No                            |
-| Embeddable chat on a portal | Conversational Agents messenger widget, Google-hosted _(verify)_                     | No                            |
-| The agent's logic           | Agent Development Kit (Python) agent with an MCP toolset pointing at our service     | **Yes — small, and the moat** |
-| Agent runtime               | Vertex AI Agent Engine, EU region _(verify availability)_                            | No                            |
-| The model                   | Gemini, pinned by version                                                            | No                            |
-| The tools                   | The read-only query service (item 1)                                                 | **Yes**                       |
-| The record                  | Cloud Healthcare API FHIR store, Provenance, evidence bucket, ledger                 | Yes — already built           |
-| Analytics beside the chat   | Looker / Looker Studio over the BigQuery stream                                      | No                            |
+| Role                        | Google component                                                                                                                                                         | Ours?                         |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------- |
+| Chat surface for staff      | **Gemini Enterprise**: connects a custom MCP server directly as a tool source, and lists a registered Agent Engine agent in the organisation's Agent Gallery (confirmed) | No                            |
+| Chat surface in Workspace   | A **Google Chat app** backed by the same Agent Engine agent, via Google's own quickstart (confirmed)                                                                     | No                            |
+| The agent's logic (layer 2) | **Agent Development Kit** (Python, `google-adk`) agent with an MCP toolset over streamable HTTP (confirmed)                                                              | **Yes — small, and the moat** |
+| Agent runtime               | **Vertex AI Agent Engine**; `europe-west4` reported available since 2025-11 (partially confirmed — confirm in console before committing to it)                           | No                            |
+| The model                   | Gemini, pinned by version                                                                                                                                                | No                            |
+| The tools                   | The read-only query service (item 1)                                                                                                                                     | **Yes**                       |
+| Structured display          | **A2UI**: an agent emits a structured UI message that Gemini Enterprise renders as a card — the mechanism for showing hashes and citations as widgets (confirmed)        | Card definitions only         |
+| The record                  | Cloud Healthcare API FHIR store, Provenance, evidence bucket, ledger                                                                                                     | Yes — already built           |
+| Analytics beside the chat   | Looker / Looker Studio over the BigQuery stream                                                                                                                          | No                            |
+
+Not used: the Conversational Agents (Dialogflow CX) messenger widget — it fronts a CX
+playbook, not an Agent Engine agent, so it would add a hop for nothing. Grounding-style
+inline citations do not coexist with strict JSON output, which is why structured display goes
+through A2UI cards instead.
+
+Sources: Gemini Enterprise custom MCP server set-up and Agent Gallery registration
+(docs.cloud.google.com/gemini/enterprise, 2026-09-18); ADK MCP tools
+(google.github.io/adk-docs/tools-custom/mcp-tools); Agent Engine Agent Identity
+(docs.cloud.google.com/agent-builder/agent-engine/agent-identity, 2026-09-18); Chat + ADK
+quickstart (developers.google.com/workspace/add-ons/chat/quickstart-adk-agent, 2026-09-03);
+A2UI (cloud.google.com/blog, Gemini Enterprise and A2UI integration).
 
 The MCP service is model-agnostic by construction: the same server serves Gemini Enterprise,
 Claude, or an in-house agent. That is a sales point, not an accident.
 
-## The agent (item 1b)
+## The identity question, settled
 
-A Python ADK agent, its own deployable under ADR 0004 (`agent/`, own identity, shares only
-the published contracts), doing four things and nothing else:
+Entitlements are per principal, so the question was whose identity reaches the query service.
+**Answer: the end user's, natively.** When Gemini Enterprise calls a custom MCP server hosted
+on Cloud Run it sends two headers on every request: `X-Serverless-Authorization`, a
+Google-signed ID token for the Gemini Enterprise service agent, and `Authorization`, the end
+user's own OAuth 2.0 token, forwarded intact after a consent flow Gemini Enterprise manages
+(confirmed, docs dated 2026-09-18). That is exactly the two-layer model the query service was
+designed for:
 
-1. Calls the query service's tools through an MCP toolset over streamable HTTP with a bearer
-   token.
-2. Composes answers in a fixed shape: verbatim blocks from tool results, each followed by its
-   citation (document, version, `sourceKey`, hash); the assistant's own words in a separate,
-   labelled part.
+- **Edge:** Cloud Run IAM authenticates the service agent from `X-Serverless-Authorization`.
+  The Gemini Enterprise service agent is granted `roles/run.invoker` through the existing
+  `query_invokers` variable — no new mechanism.
+- **In-service:** the query service verifies the end user's token itself and resolves
+  entitlements for that principal, as designed.
+
+**One change to item 1 follows.** The service as built verifies a Google-signed OIDC _ID_
+token for its own audience. Gemini Enterprise forwards an OAuth 2.0 _access_ token. The
+service must accept both: an ID token (verified by signature and audience, as now — the path
+a Workspace user, a service account, or an ADK agent with a per-user `header_provider` uses)
+and a Google OAuth 2.0 access token (verified through Google's token-info endpoint; the
+token's audience must equal the OAuth client registered for the connector, and its `sub` is
+the principal). Same principal namespace, same entitlements, same audit record; the record
+gains a `credentialType` of `id-token` or `access-token`. This is a follow-up to the phase 1
+build, with the same negative tests as the ID-token path (wrong audience, expired, revoked,
+wrong issuer).
+
+For the ADK agent path (item 1b), propagation is not automatic: ADK's MCP toolset takes a
+per-request `header_provider` callback that reads the user's token from session state, and
+Agent Engine's Agent Identity offers a brokered three-legged OAuth in which the agent never
+holds the raw credential. Either satisfies the design; the delegated-trust fallback (the agent
+asserting a user under its own identity) is **not needed** and is not built.
+
+## Rollout, in two steps
+
+**Step 1 — Gemini Enterprise straight onto the MCP service (layers 1 and 3).** No agent code.
+Register the query service as a custom MCP server with OAuth 2.0 in Gemini Enterprise; grant
+its service agent `run.invoker`; ship the access-token path above. Staff ask questions in
+Google's chat; every tool result is verbatim with hashes. This is the fastest demonstrable
+form of (a), and it already proves the tool surface and the tenant wall in a real UI.
+
+**Step 2 — the ADK agent adds layer 2 (item 1b).** A Python `google-adk` agent, its own
+deployable under ADR 0004 (`agent/`, own identity, shares only the published contracts),
+deployed to Agent Engine and registered in the Agent Gallery, doing four things and nothing
+else:
+
+1. Calls the query service's tools through the MCP toolset over streamable HTTP, passing the
+   user's token per request.
+2. Composes answers in a fixed shape: verbatim blocks from tool results, each with its
+   citation (document, version, `sourceKey`, hash), rendered as A2UI cards; the assistant's
+   own words in a separate, labelled part.
 3. Runs the post-check: every verbatim block back through `verify_quote`; flags any
-   `no-match`.
-4. Emits one structured record per turn — which tools were called, which spans verified —
-   through the same no-narrative logger discipline as everything else.
+   `no-match` on the card.
+4. Emits one structured record per turn — tools called, spans verified — through the same
+   no-narrative logging discipline as everything else.
 
-**The open question that decides the design:** whose identity reaches the query service.
-Entitlements are per principal, so a tool call made under the agent's own service account
-loses the user. Two candidate answers, to be settled by what Google supports today
-_(verify)_: (a) Gemini Enterprise / Agent Engine passes an end-user authorization to tool
-calls, in which case the query service verifies the user's token as designed; or (b) the agent
-calls with its own service-account token and asserts the end-user principal in a separate
-claim, in which case the query service must accept that assertion **only** from the agent's
-service account — a delegated-trust extension that must be stated in the design note, tested
-negatively, and recorded in the audit record as "on behalf of". (a) is preferred; (b) is
-acceptable for the demonstrator and must be named as a control boundary if used.
+The same agent is exposed as a Google Chat app through Google's quickstart when a Workspace
+surface is wanted.
+
+## Human and organisational prerequisites
+
+- Gemini Enterprise is a licensed product. Confirm the organisation (or the demonstration
+  tenant) has it before step 1 is scheduled; the MCP service and item 1c do not depend on it.
+- An OAuth 2.0 client (internal consent screen) for the MCP connector — created in the Cloud
+  console, not by Terraform; its client id becomes the access-token audience the service
+  accepts.
+- EU residency: Gemini Enterprise offers the `eu` multi-region and `europe-west2` (London,
+  not EU); some features fall back to global. Confirm against the client's residency bar
+  before promising EU-only.
 
 ## What this is and is not, for the intended-use statement
 
