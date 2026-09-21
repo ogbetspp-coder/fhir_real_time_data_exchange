@@ -68,6 +68,13 @@ encryption is fixed when it is created, so in `dev` this means recreating the da
 re-seeding — which the project has done twice already and has a script for. _Before features:_
 decide it; if yes, do it in `dev` now so production is built the proven way.
 
+_Status 2026-09-21: planned and reviewed; step 0 in progress._ The rollout is
+`docs/design/cmek-rollout.md`. Its first draft was reviewed adversarially before anything ran,
+and four findings would each have destroyed data — an ordinary deploy deleting the ledger after
+an in-place key change, rows lost from BigQuery's streaming buffer, a renamed dataset destroying
+its stores unseen, and a needless log bucket rebuild. Step 0 closes the first three for good:
+nothing that holds a record can now be destroyed by an apply.
+
 **A4. The manifest signing key is software-protected.** `manifest-signing` is
 `ASYMMETRIC_SIGN` at protection level `SOFTWARE`. For evidence a regulator may rely on, the
 best-in-class answer is an HSM-protected key. Manifests already signed stay verifiable against
@@ -184,6 +191,11 @@ the same JVM properties and fails on any download attempt; every image build pro
 validator starts with networking disabled. Details in `docs/validation/README.md`, "Official
 validation gate".
 
+**C10. A perpetual plan difference on the monitoring dashboard.** Every plan shows
+`google_monitoring_dashboard.operations` changing: the API reformats the dashboard JSON
+(adds `targetAxis`, drops zero positions) and Terraform re-applies it. Harmless, but noise in a
+plan is where a real change hides. Write the JSON in the form the API returns.
+
 ### D. The repository
 
 **D1. No licence.** The repository has no `LICENSE`. For a product whose value is a small,
@@ -202,16 +214,18 @@ identifiers, never credentials — but nothing would stop one.
 
 ### E. Performance
 
-**E1. Both services scale to zero.** A Gemini Enterprise user's first question after an idle
-period waits for a cold start of the query service. Measure it; if it is more than about a
-second, set a minimum of one instance on the query service in production.
+**E1. Both services scale to zero.** Measured 2026-09-21.
 
-The worker's cold start is measured: **57 seconds** to ready, of which the validator sidecar
-takes 49, both before and after C9's fix. It is not the download — C9 removed that and the time
-did not move — but the validator loading and indexing its packages. Nothing waits on the worker
-interactively today, so it can stay at zero in `dev`; for production the candidates, cheapest
-first, are Cloud Run's startup CPU boost, building the validator's package indexes into the image
-at build time so they are not regenerated on every start, and a minimum of one instance.
+- **Query service** — what a Gemini Enterprise user waits for. Cold start about 3 to 5 seconds
+  from process start to ready; a warm tool call 4 to 10 milliseconds, one that reads the FHIR
+  store about 200 milliseconds. For production, a minimum of one instance removes the cold start
+  for a small, fixed monthly cost; in `dev` it can stay at zero.
+- **Worker** — 57 seconds to ready, of which the validator sidecar takes 49, before and after C9.
+  It is package loading and indexing, not the download. Startup CPU boost is **already on** for
+  the validator container, so the 49 seconds are measured with it; an earlier draft of this
+  document listed it as a candidate. The real candidates are building the validator's package
+  indexes into the image at build time, so they are not regenerated on every start, and a
+  minimum instance. Nothing waits on the worker interactively today.
 
 ## Order of work
 

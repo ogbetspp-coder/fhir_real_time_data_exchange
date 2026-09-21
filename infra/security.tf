@@ -113,6 +113,12 @@ resource "google_storage_bucket" "evidence" {
   }
 
   depends_on = [google_kms_crypto_key_iam_member.gcs_evidence_encryption]
+
+  # Never destroyed by an apply (docs/foundations.md; docs/design/cmek-rollout.md, step 0).
+  # Signed evidence for every run.
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # Landing zone for approved Zone A hand-offs. The worker reads submissions only from here, so
@@ -149,6 +155,12 @@ resource "google_storage_bucket" "submissions" {
   }
 
   depends_on = [google_kms_crypto_key_iam_member.gcs_evidence_encryption]
+
+  # Never destroyed by an apply (docs/foundations.md; docs/design/cmek-rollout.md, step 0).
+  # Approved submissions, the input every run is evidenced against.
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "google_storage_bucket" "profiles" {
@@ -192,6 +204,12 @@ resource "google_logging_project_bucket_config" "regulated_audit" {
   locked = var.lock_regulated_audit_log_bucket
 
   depends_on = [google_project_service.required]
+
+  # Never destroyed by an apply (docs/foundations.md; docs/design/cmek-rollout.md, step 0).
+  # Destroying this deletes the retained audit log; renaming bucket_id is a destroy.
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "google_logging_project_sink" "regulated_audit" {
