@@ -9,6 +9,7 @@ import {
 } from "../../src/fhir/preflight.js";
 import { transformType2ToEma } from "../../src/fhir/transform.js";
 import type { FhirResource } from "../../src/fhir/types.js";
+import { SMOKE_PRODUCT_ID } from "../../src/fixtures/synthetic-products.js";
 import { createSyntheticType2Bundle } from "../../src/fixtures/synthetic.js";
 
 // Emits the four resources the deployed worker sends to the official HL7 validator for a
@@ -16,7 +17,8 @@ import { createSyntheticType2Bundle } from "../../src/fixtures/synthetic.js";
 // scripts/ci/official-validate.mjs can run the pinned validator_cli.jar over exactly that set.
 //
 // The set is built the way src/app.ts and src/pipeline.ts build it: the fixture is
-// `createSyntheticType2Bundle(mapping)` (not the published-Type-2 variant that
+// `createSyntheticType2Bundle(mapping, { product: SMOKE_PRODUCT_ID })` — the smoke product, which
+// is what a `fixture` run actually sends, and not the published-Type-2 variant that
 // scripts/fhir/export-validation-set.ts uses), the target is `transformType2ToEma`, and the
 // Composition is `documentBundle.entry[0]`. The two structural preflights run first for the
 // same reason they run first in the worker: a fixture that fails them never reaches official
@@ -40,7 +42,7 @@ if (!destinationArg) {
 }
 
 const mapping = await loadEmaMapping();
-const source = createSyntheticType2Bundle(mapping);
+const source = createSyntheticType2Bundle(mapping, { product: SMOKE_PRODUCT_ID });
 
 const sourcePreflight = validateType2Preflight(source);
 if (hasValidationErrors(sourcePreflight)) {

@@ -4,6 +4,7 @@ import { loadConfig, type AppConfig } from "./config.js";
 import { RunRequestSchema, SubmissionRejectedError } from "./contracts/index.js";
 import { loadEmaMapping } from "./fhir/mapping.js";
 import type { FhirBundle } from "./fhir/types.js";
+import { SMOKE_PRODUCT_ID } from "./fixtures/synthetic-products.js";
 import { createSyntheticType2Bundle } from "./fixtures/synthetic.js";
 import { HealthcareApiClient, HealthcareApiError } from "./gcp/healthcare.js";
 import {
@@ -76,11 +77,15 @@ export function createApp(overrides: AppOverrides = {}): Hono {
     let input: PipelineInput;
 
     if (request.source === "fixture") {
+      // The smoke product, not the default one. A `fixture` run is what the deploy's smoke step
+      // posts, and it persists a document like any other run; using a demonstration product here
+      // meant every deploy wrote a fixture-sourced version over a label the demonstration is
+      // about. This product exists only for this path (src/fixtures/synthetic-products.ts).
       input = {
         runId,
         sourceKind: "fixture",
-        source: createSyntheticType2Bundle(mapping),
-        sourceResource: "fixture:synthetic-type2-smpc",
+        source: createSyntheticType2Bundle(mapping, { product: SMOKE_PRODUCT_ID }),
+        sourceResource: `fixture:${SMOKE_PRODUCT_ID}`,
       };
     } else if (request.source === "healthcare-api") {
       const healthcare = new HealthcareApiClient(config);
