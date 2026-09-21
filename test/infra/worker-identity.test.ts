@@ -38,3 +38,18 @@ describe("the worker identity", () => {
     expect(roles.some(({ role }) => role.startsWith("roles/documentai."))).toBe(false);
   });
 });
+
+describe("the deploy identity's access to FHIR data", () => {
+  it("is declared in Terraform and scoped to the one dataset", () => {
+    // It was a grant made by hand on the old dataset, and was lost in the switch to the new one.
+    const infra = readInfra();
+    const grant =
+      /resource "google_healthcare_dataset_iam_member" "deployer_fhir_editor" \{([\s\S]*?)\n\}/.exec(
+        infra,
+      )?.[1];
+    expect(grant).toBeDefined();
+    expect(grant).toContain("dataset_id = google_healthcare_dataset.record.id");
+    expect(grant).toContain('role       = "roles/healthcare.fhirResourceEditor"');
+    expect(grant).toContain('member     = "serviceAccount:${var.deployer_account}"');
+  });
+});
