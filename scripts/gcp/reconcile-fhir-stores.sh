@@ -18,6 +18,14 @@ ANALYTICS_DATASET="$(terraform -chdir=infra output -raw fhir_analytics_dataset)"
 CHANGES_TOPIC="$(terraform -chdir=infra output -raw fhir_changes_topic)"
 PARTITION_DAYS="${BIGQUERY_PARTITION_EXPIRATION_DAYS:-2555}"
 PARTITION_MS="$((PARTITION_DAYS * 86400000))"
+# SubstanceDefinition streams at a shallower recursion depth than the other resource types, and
+# needs its own stream config to get one. In R5 the type is self-recursive — SubstanceDefinition
+# .name.synonym and .name.translation are themselves SubstanceDefinition.name, and .relationship
+# refers back to a SubstanceDefinition — so at depth 5 its ANALYTICS_V2 schema expands to 67,989
+# leaf fields against BigQuery's limit of 10,000. The table was the only one of the eleven that
+# BigQuery refused to create: "Too many total leaf fields". The other ten stream fine at 5 and are
+# left alone.
+SUBSTANCE_RECURSION_DEPTH="${SUBSTANCE_RECURSION_DEPTH:-2}"
 
 TOKEN="$(ema_flow_access_token)"
 PARENT="projects/${PROJECT_ID}/locations/${REGION}/datasets/${DATASET}"
@@ -77,8 +85,7 @@ cat >"$TMP/target.json" <<JSON
       "PackagedProductDefinition",
       "ManufacturedItemDefinition",
       "AdministrableProductDefinition",
-      "Ingredient",
-      "SubstanceDefinition"
+      "Ingredient"
     ],
     "bigqueryDestination": {
       "datasetUri": "bq://${PROJECT_ID}.${ANALYTICS_DATASET}",
@@ -86,6 +93,22 @@ cat >"$TMP/target.json" <<JSON
       "schemaConfig": {
         "schemaType": "ANALYTICS_V2",
         "recursiveStructureDepth": "5",
+        "lastUpdatedPartitionConfig": {
+          "type": "DAY",
+          "expirationMs": "${PARTITION_MS}"
+        }
+      }
+    }
+  }, {
+    "resourceTypes": [
+      "SubstanceDefinition"
+    ],
+    "bigqueryDestination": {
+      "datasetUri": "bq://${PROJECT_ID}.${ANALYTICS_DATASET}",
+      "writeDisposition": "WRITE_APPEND",
+      "schemaConfig": {
+        "schemaType": "ANALYTICS_V2",
+        "recursiveStructureDepth": "${SUBSTANCE_RECURSION_DEPTH}",
         "lastUpdatedPartitionConfig": {
           "type": "DAY",
           "expirationMs": "${PARTITION_MS}"
