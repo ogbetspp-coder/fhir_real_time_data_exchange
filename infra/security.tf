@@ -203,7 +203,16 @@ resource "google_logging_project_bucket_config" "regulated_audit" {
   # if the variable is later set back to false.
   locked = var.lock_regulated_audit_log_bucket
 
-  depends_on = [google_project_service.required]
+  # Retained audit log on the audit-logs key (CMEK step 6), set in place: a log bucket's key can be
+  # added without recreating the bucket. It applies to entries written from now on; entries already
+  # in the bucket stay as they were written. The logging service account holds its grant on this
+  # key (keys.tf). If the key is ever unavailable, Cloud Logging buffers new entries for about three
+  # hours and then discards them — which is why the key availability alert must fire in minutes.
+  cmek_settings {
+    kms_key_name = google_kms_crypto_key.record["audit-logs"].id
+  }
+
+  depends_on = [google_project_service.required, google_kms_crypto_key_iam_member.record_agent]
 
   # Never destroyed by an apply (docs/foundations.md; docs/design/cmek-rollout.md, step 0).
   # Destroying this deletes the retained audit log; renaming bucket_id is a destroy.

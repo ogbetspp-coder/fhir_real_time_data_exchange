@@ -168,3 +168,12 @@ describe("the FHIR dataset on the fhir-record key", () => {
     expect(dataset).toContain("google_kms_crypto_key_iam_member.record_agent");
   });
 });
+
+describe("the retained audit log on the audit-logs key", () => {
+  it("is encrypted in place with the audit-logs key", () => {
+    const bucket = block("google_logging_project_bucket_config", "regulated_audit");
+    expect(bucket).toMatch(
+      /cmek_settings\s*\{\s*kms_key_name\s*=\s*google_kms_crypto_key\.record\["audit-logs"\]\.id/,
+    );
+  });
+});
