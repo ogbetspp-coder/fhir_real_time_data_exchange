@@ -159,7 +159,11 @@ phase_apis() {
     -auto-approve \
     -target=google_project_service.required \
     -target=google_artifact_registry_repository.images \
-    -target=google_project_iam_member.cloudbuild_default_compute_builder \
+    -target=google_service_account.build \
+    -target=google_storage_bucket.build_staging \
+    -target=google_storage_bucket_iam_member.build_staging_reader \
+    -target=google_artifact_registry_repository_iam_member.build_writer \
+    -target=google_project_iam_member.build_log_writer \
     -target=google_logging_project_bucket_config.regulated_audit \
     -target=google_logging_project_sink.regulated_audit \
     "${tf_common_vars[@]}" \
@@ -186,14 +190,22 @@ phase_apis() {
 
 phase_images() {
   echo "=== cloud build images ==="
-  # The IAM grant for Cloud Build's default runtime service account (phase_apis)
-  # can take several minutes to propagate on a cold-started project, so retry a
-  # transient permission-denied here rather than failing the whole deploy on it.
+  # Regional, staged in the EU, and run as the build identity (infra/build.tf,
+  # docs/foundations.md A2/B3). Without these three flags gcloud defaults to a global
+  # build as the default compute service account, staging the source in a US bucket.
+  # The build identity's grants are made by phase_apis moments earlier and can take
+  # minutes to propagate on first creation, so a transient permission-denied is retried
+  # rather than failing the deploy.
+  local build_account="ema-flow-build-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com"
+  local staging_dir="gs://${PROJECT_ID}-ema-flow-${ENVIRONMENT}-build-staging/source"
   local max_attempts=8
   local attempt
   for attempt in $(seq 1 "$max_attempts"); do
     if gcloud --quiet builds submit \
       --project="$PROJECT_ID" \
+      --region="$REGION" \
+      --service-account="projects/${PROJECT_ID}/serviceAccounts/${build_account}" \
+      --gcs-source-staging-dir="$staging_dir" \
       --config=cloudbuild.images.yaml \
       --substitutions="_REGION=${REGION},_IMAGE_TAG=${TAG}" \
       .; then
