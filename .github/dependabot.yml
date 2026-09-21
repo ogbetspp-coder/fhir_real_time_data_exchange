@@ -5,12 +5,27 @@
 #
 # Weekly and grouped, so the proposals arrive as one reviewable pull request per ecosystem
 # rather than one per package.
+#
+# Minor and patch versions only. A major version is a change to review deliberately — its
+# release notes read, its migration done — not a routine bump that happens to pass the gates.
+# The first run, on 2026-09-21, proposed TypeScript 6 to 7, three Actions majors, and Node 22 to
+# 26 in every image, all at once and all but TypeScript green.
+#
+# The Node base image moves by digest only, never by version. ADR 0003 pins the runtime to
+# node:22.14.0 because NFC — step 3 of the fidelity normalisation — depends on the runtime's
+# Unicode tables, and a different Node can change every NFC-dependent hash. CI would not have
+# noticed: it tests on its own Node install, not the one inside the image. Moving it is a change
+# under ADR 0003's change control; test/ci/runtime-pin.test.ts fails if any image or workflow
+# drifts from the version the ADR names.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       actions:
         patterns: ["*"]
@@ -19,6 +34,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       npm:
         patterns: ["*"]
@@ -27,6 +45,9 @@ updates:
     directory: /agent
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       agent:
         patterns: ["*"]
@@ -35,6 +56,9 @@ updates:
     directory: /zone-a
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       zone-a:
         patterns: ["*"]
@@ -43,6 +67,16 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "node"
+        update-types:
+          [
+            "version-update:semver-major",
+            "version-update:semver-minor",
+            "version-update:semver-patch",
+          ]
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       base-images:
         patterns: ["*"]
@@ -51,6 +85,9 @@ updates:
     directory: /infra
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       terraform:
         patterns: ["*"]
