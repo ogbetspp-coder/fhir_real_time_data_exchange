@@ -171,14 +171,15 @@ service-account key is stored in GitHub. In that repository, set these Actions v
 Four further Actions variables configure who may call the query service. They are variables,
 not secrets: an IAM member string, an opaque subject id, a FHIR bundle id, and an OAuth client
 id are identifiers, and holding one grants nothing. Each is optional; an unset variable leaves
-the Terraform default, and a deploy with all four unset succeeds and authorises no caller.
+the Terraform default, and a deploy with all of them unset succeeds and authorises no caller.
 
-| Variable                  | Example                                                           | Default when unset |
-| ------------------------- | ----------------------------------------------------------------- | ------------------ |
-| `QUERY_INVOKERS`          | `user:you@example.com,serviceAccount:a@p.iam.gserviceaccount.com` | `[]`               |
-| `QUERY_TOKEN_CREATORS`    | `user:you@example.com`                                            | `[]`               |
-| `QUERY_ENTITLEMENTS_JSON` | `{"112233445566778899000":{"bundles":["synthetic-type2-smpc"]}}`  | `{}`               |
-| `QUERY_OAUTH_CLIENT_IDS`  | `32555940559.apps.googleusercontent.com`                          | `[]`               |
+| Variable                   | Example                                                           | Default when unset |
+| -------------------------- | ----------------------------------------------------------------- | ------------------ |
+| `QUERY_INVOKERS`           | `user:you@example.com,serviceAccount:a@p.iam.gserviceaccount.com` | `[]`               |
+| `QUERY_TOKEN_CREATORS`     | `user:you@example.com`                                            | `[]`               |
+| `QUERY_ENTITLEMENTS_JSON`  | `{"112233445566778899000":{"bundles":["synthetic-type2-smpc"]}}`  | `{}`               |
+| `QUERY_OAUTH_CLIENT_IDS`   | `123456789012-abc.apps.googleusercontent.com` (the connector's)   | `[]`               |
+| `ALERT_NOTIFICATION_EMAIL` | `security@example.com`                                            | `""` (no alert)    |
 
 `QUERY_INVOKERS` and `QUERY_TOKEN_CREATORS` are not alternatives to each other: the first
 grants `run.invoker` to a caller that authenticates as itself, the second grants the right to
@@ -445,7 +446,10 @@ three things: that client id in `query_oauth_client_ids`, `user:<your e-mail>` i
 That client id is built into every gcloud installation worldwide, so naming it proves only that
 a token came from gcloud and never who presented it. What still stands between such a caller
 and a document is Cloud Run's `run.invoker` on the service and the per-subject entitlement —
-nothing else. It is `[]` by default; adding it is a deliberate act.
+nothing else. It is `[]` by default; adding it is a deliberate act. **Decided for `dev` on
+2026-09-21: not set.** It was set while no connector client existed, and removed once the
+Gemini Enterprise connector's own internal client was in place; a human at a terminal uses the
+impersonation recipe above instead.
 
 #### Calling it
 

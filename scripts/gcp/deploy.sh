@@ -337,6 +337,19 @@ phase_apply() {
   # identifiers, and this log is attached to a failure issue by .github/workflows/deploy.yml.
   echo "query access configuration: query_invokers=${#query_invokers_json} bytes, query_token_creators=${#query_token_creators_json} bytes, query_oauth_client_ids=${#query_oauth_client_ids_json} bytes, query_entitlements_json=${#query_entitlements_json} bytes (2 bytes is the empty default)"
 
+  # The entitlement-denial alert's recipient (infra/variables.tf `alert_notification_email`).
+  # Until 2026-09-21 nothing passed it, so the variable existed, the metric was created, and no
+  # alert could ever fire from a deploy. Presence only is logged: an address is personal data
+  # and this log can be attached to a failure issue. Unset, like the query variables above,
+  # means the Terraform default -- which also means a deploy run without it removes a channel
+  # an earlier deploy created, so set it wherever deploys run.
+  local alert_notification_email="${ALERT_NOTIFICATION_EMAIL:-}"
+  if [[ -n "$alert_notification_email" ]]; then
+    echo "alert configuration: alert_notification_email is set; the denial alert and its e-mail channel are declared"
+  else
+    echo "alert configuration: alert_notification_email is not set; the denial metric exists with no alert"
+  fi
+
   # The account this deploy runs as, granted roles/run.invoker on the worker
   # (google_cloud_run_v2_service_iam_member.deployer_invoker in infra/run.tf) so phase_smoke can
   # call the service this apply just deployed. Only a service account is passed: a human's
@@ -365,7 +378,8 @@ phase_apply() {
     -var="query_invokers=${query_invokers_json}" \
     -var="query_token_creators=${query_token_creators_json}" \
     -var="query_oauth_client_ids=${query_oauth_client_ids_json}" \
-    -var="query_entitlements_json=${query_entitlements_json}"; then
+    -var="query_entitlements_json=${query_entitlements_json}" \
+    -var="alert_notification_email=${alert_notification_email}"; then
     echo "=== terraform apply failed; dumping recent container logs for diagnosis ===" >&2
     # Only the worker's and the query service's structured logs, whose fields are sanitised by
     # src/lib/logger.ts, and only the five fields named in --format; the validator sidecar's

@@ -33,12 +33,15 @@ misbehaves. What is still not deployed is the self-checking agent (item 1b): Gem
 tool's text today because the tool returns it verbatim, not because anything re-checks the
 quote after the answer is composed. Say that distinction, do not blur it.
 
-**The assistant will drift to the public web if you let it.** Asked the same paracetamol
-question on 2026-09-21 with web search on and the connector not selected, Gemini answered
-confidently from third-party labels found on the web and never called the service. Before any
-assistant scene: start a new chat, turn web search off, select `epi verified labels`, and name
-it in the question ("Using epi verified labels, …"). That wrong answer is worth showing first,
-deliberately — see Scene 0.
+**The assistant cannot drift to the public web in the demonstration app.** Asked the
+paracetamol question on 2026-09-21 with web search on and the connector not selected, Gemini
+answered confidently from third-party labels found on the web and never called the service. Web
+grounding was then switched off for the whole app (`webGroundingType =
+WEB_GROUNDING_TYPE_DISABLED` on the default assistant), so it is a setting of the environment
+and not a step for the presenter to remember. Still select `epi verified labels` and name it in
+the question ("Using epi verified labels, …"), because that is what makes Gemini call the tools
+rather than answer from nothing. The wrong answer is worth showing first, deliberately, in a
+different tool — see Scene 0.
 
 ## Placeholders
 
@@ -161,15 +164,17 @@ sentence in section 4.4.
 
 ## Scene 0 — the wrong answer first
 
-Sixty seconds, before anything else. In a fresh Gemini Enterprise chat with web search **on**
-and the connector **not** selected, ask: _"Find the synthetic paracetamol label and show me
-section 4.4."_ On 2026-09-21 Gemini answered with a confident, well-formatted section 4.4
+Sixty seconds, before anything else, in **public Gemini** (`gemini.google.com`, or any
+consumer assistant) — the tool the room's staff are already using without anyone's permission.
+Ask: _"Find the synthetic paracetamol label and show me section 4.4."_ The demonstration app
+can no longer produce this answer, because its web grounding is off; that is the point. On
+2026-09-21, with web search on, Gemini answered with a confident, well-formatted section 4.4
 assembled from real paracetamol labels by other companies in other countries — hepatotoxicity,
 HAGMA, skin reactions, all of it — and none of it from the label that was asked about. It
 looked authoritative. It was wrong about the one thing that mattered: which document it came
 from.
 
-Then a new chat, web search off, `epi verified labels` selected, the same question. One
+Then the Gemini Enterprise app, `epi verified labels` selected, the same question. One
 sentence, quoted exactly, with the bundle id and version id. **What the audience should see:**
 the difference between an answer that sounds right and an answer that can be checked. Everything
 after this scene is about how the second kind is produced.
