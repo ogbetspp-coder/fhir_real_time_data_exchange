@@ -18,6 +18,7 @@ const records: [type: string, name: string][] = [
   ["google_bigquery_dataset", "ledger"],
   ["google_bigquery_table", "transformation_runs"],
   ["google_logging_project_bucket_config", "regulated_audit"],
+  ["google_logging_project_bucket_config", "regulated_audit_cmek"],
   ["google_storage_bucket", "evidence"],
   ["google_storage_bucket", "submissions"],
   ["google_kms_crypto_key", "evidence_encryption"],
