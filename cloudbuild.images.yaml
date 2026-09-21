@@ -3,7 +3,7 @@ options:
 
 substitutions:
   _REGION: europe-west4
-  _REPOSITORY: ema-flow
+  _REPOSITORY: ema-flow-images
   _IMAGE_TAG: manual
 
 steps:

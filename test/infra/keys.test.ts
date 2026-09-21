@@ -131,3 +131,30 @@ describe("BigQuery on the ledger-analytics key", () => {
     expect(convert).toMatch(/if \[\[ "\$after" != "\$before" \|\| "\$now_key" != "\$KEY" \]\]/);
   });
 });
+
+describe("the image registry on the artifacts key", () => {
+  const deploy = readFileSync("scripts/gcp/deploy.sh", "utf8");
+  const repositoryId = /^REPOSITORY_ID="([^"]+)"$/m.exec(deploy)?.[1];
+
+  it("is encrypted with the artifacts key", () => {
+    const repo = block("google_artifact_registry_repository", "images_cmek");
+    expect(repo).toContain('kms_key_name  = google_kms_crypto_key.record["artifacts"].id');
+    expect(repo).toContain(`repository_id = "${String(repositoryId)}"`);
+  });
+
+  it("is named once, in deploy.sh, and every build and lookup takes it from there", () => {
+    expect(repositoryId).toBe("ema-flow-images");
+    // No second spelling of a repository path anywhere in the deploy.
+    expect(deploy).not.toMatch(/docker\.pkg\.dev\/[^"\n]*\/ema-flow[/"]/);
+    expect(deploy).not.toMatch(/repositories\/ema-flow"/);
+    expect(deploy).toContain("_REPOSITORY=${REPOSITORY_ID}");
+    for (const file of ["cloudbuild.images.yaml", "cloudbuild.yaml"]) {
+      expect(readFileSync(file, "utf8")).toContain(`_REPOSITORY: ${String(repositoryId)}\n`);
+    }
+  });
+
+  it("is where the build identity may push, and the only place", () => {
+    const grant = block("google_artifact_registry_repository_iam_member", "build_writer");
+    expect(grant).toContain("repository = google_artifact_registry_repository.images_cmek.name");
+  });
+});

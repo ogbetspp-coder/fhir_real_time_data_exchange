@@ -1,6 +1,6 @@
 # Customer-managed keys on the record — rollout plan
 
-Status: **steps 0–3 done and proven.** Revised after independent review. Foundations review
+Status: **steps 0–3 done and proven; step 4 in progress.** Revised after independent review. Foundations review
 findings A3 (the record on Google-managed keys), A4 (software signing key), C4 (worker's
 Healthcare role project-wide) and C5 (Terraform state open to project viewers). Owner decision
 2026-09-21: do it in `dev` now, so production copies a setup that has been proven rather than
@@ -151,6 +151,10 @@ be destroyed` on the ledger table — step 0 refusing the replacement the provid
    `_REPOSITORY`, and the build identity's writer grant. _Verify:_ services run images from the new
    repository by digest. Then the old repository is deleted — from which point rolling back to a
    revision older than the switch is no longer possible, which is stated in the pull request.
+   _In progress 2026-09-21. Planned against the live state: `2 to add, 1 to change, 1 to destroy`
+   — the new repository, and the build identity's push grant replaced onto it (the destroy is
+   the old grant); the change is the known dashboard difference. The repository name now lives
+   once, in `deploy.sh`, and reaches the builds as a substitution._
 5. **FHIR dataset, and the worker's role.** In three moves, so nothing points at an empty dataset:
    (a) a second dataset block with the `fhir-record` key, created empty, nothing switched;
    (b) the old target store's BigQuery stream detached, then the reconcile script run against the

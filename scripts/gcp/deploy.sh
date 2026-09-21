@@ -21,7 +21,11 @@ else
   TAG="${GITHUB_SHA:-manual}"
   TAG="${TAG:0:12}"
 fi
-REPOSITORY="${REGION}-docker.pkg.dev/${PROJECT_ID}/ema-flow"
+# The image repository: named once, here. It is encrypted with the `artifacts` key
+# (infra/main.tf, google_artifact_registry_repository.images_cmek; CMEK step 4). The builds, the
+# digest lookups and the Cloud Run image references all take it from this variable.
+REPOSITORY_ID="ema-flow-images"
+REPOSITORY="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY_ID}"
 
 # Recorded by the query service in every audit record as QUERY_SERVICE_VERSION, so a record
 # can be tied to the commit that produced it. GITHUB_SHA is the full commit in Actions; a
@@ -135,16 +139,16 @@ phase_apis() {
   # run) without being in the current Terraform state (e.g. after the state backend
   # was lost or reset). Reconcile that drift with an import instead of failing on a
   # 409 from `apply`.
-  if ! terraform -chdir=infra state show google_artifact_registry_repository.images >/dev/null 2>&1; then
-    if gcloud --quiet artifacts repositories describe ema-flow --location="$REGION" --project="$PROJECT_ID" >/dev/null 2>&1; then
+  if ! terraform -chdir=infra state show google_artifact_registry_repository.images_cmek >/dev/null 2>&1; then
+    if gcloud --quiet artifacts repositories describe "$REPOSITORY_ID" --location="$REGION" --project="$PROJECT_ID" >/dev/null 2>&1; then
       echo "Importing pre-existing Artifact Registry repository into Terraform state."
       terraform -chdir=infra import \
         "${tf_common_vars[@]}" \
         -var="worker_image=us-docker.pkg.dev/cloudrun/container/hello" \
         -var="validator_image=us-docker.pkg.dev/cloudrun/container/hello" \
         -var="query_image=us-docker.pkg.dev/cloudrun/container/hello" \
-        google_artifact_registry_repository.images \
-        "projects/${PROJECT_ID}/locations/${REGION}/repositories/ema-flow"
+        google_artifact_registry_repository.images_cmek \
+        "projects/${PROJECT_ID}/locations/${REGION}/repositories/${REPOSITORY_ID}"
     fi
   fi
 
@@ -158,7 +162,7 @@ phase_apis() {
     -input=false \
     -auto-approve \
     -target=google_project_service.required \
-    -target=google_artifact_registry_repository.images \
+    -target=google_artifact_registry_repository.images_cmek \
     -target=google_service_account.build \
     -target=google_storage_bucket.build_staging \
     -target=google_storage_bucket_iam_member.build_staging_reader \
@@ -209,7 +213,7 @@ phase_images() {
       --service-account="projects/${PROJECT_ID}/serviceAccounts/${build_account}" \
       --gcs-source-staging-dir="$staging_dir" \
       --config=cloudbuild.images.yaml \
-      --substitutions="_REGION=${REGION},_IMAGE_TAG=${TAG}" \
+      --substitutions="_REGION=${REGION},_REPOSITORY=${REPOSITORY_ID},_IMAGE_TAG=${TAG}" \
       . 2>&1 | tee "$build_log"; then
       rm -f "$build_log"
       return 0
@@ -249,7 +253,7 @@ resolve_image_digest() {
   digest="$(curl --fail --silent --show-error --head \
     --user "oauth2accesstoken:$(ema_flow_access_token)" \
     --header "Accept: application/vnd.docker.distribution.manifest.v2+json,application/vnd.oci.image.manifest.v1+json" \
-    "https://${REGION}-docker.pkg.dev/v2/${PROJECT_ID}/ema-flow/${image_name}/manifests/${tag}" \
+    "https://${REGION}-docker.pkg.dev/v2/${PROJECT_ID}/${REPOSITORY_ID}/${image_name}/manifests/${tag}" \
     | tr -d '\r' | grep -i '^docker-content-digest:' | awk '{print $2}')"
   if [[ -z "$digest" ]]; then
     echo "Could not resolve a digest for ${image_name}:${tag} from the registry manifest response." >&2

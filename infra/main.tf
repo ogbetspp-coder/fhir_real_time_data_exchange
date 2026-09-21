@@ -68,6 +68,22 @@ resource "google_artifact_registry_repository" "images" {
   depends_on = [google_project_service.required]
 }
 
+# The image repository on the `artifacts` key (CMEK step 4). A repository's encryption is fixed at
+# creation, so this is a second repository beside the Google-managed `images` one above, not a
+# change to it: renaming `images` in place would destroy it. Builds push here and Cloud Run runs
+# from here; `images` is removed once a deploy from here is verified.
+resource "google_artifact_registry_repository" "images_cmek" {
+  location      = var.region
+  repository_id = "ema-flow-images"
+  description   = "Signed and provenance-attached ema-flow containers, encrypted with the artifacts key"
+  format        = "DOCKER"
+  kms_key_name  = google_kms_crypto_key.record["artifacts"].id
+  labels        = local.labels
+
+  # The Artifact Registry service agent must hold its grant before a CMEK repository is created.
+  depends_on = [google_project_service.required, google_kms_crypto_key_iam_member.record_agent]
+}
+
 resource "google_bigquery_dataset" "fhir_analytics" {
   dataset_id                 = "ema_flow_fhir_${var.environment}"
   friendly_name              = "EMA Flow FHIR Analytics (${var.environment})"
