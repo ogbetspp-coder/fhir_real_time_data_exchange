@@ -87,6 +87,21 @@ describe("the deploy's image build", () => {
     );
   });
 
+  it("grants the build identity nothing imperatively", () => {
+    // The Terraform reader cannot see a grant made by a shell script. No script may make one.
+    for (const file of [
+      "scripts/gcp/deploy.sh",
+      "scripts/gcp/bootstrap.sh",
+      "scripts/gcp/common.sh",
+    ]) {
+      const text = readFileSync(file, "utf8");
+      expect([file, /add-iam-policy-binding[^\n]*ema-flow-build/.test(text)]).toEqual([
+        file,
+        false,
+      ]);
+    }
+  });
+
   it("logs to Cloud Logging only, which a user-specified service account requires", () => {
     expect(readFileSync("cloudbuild.images.yaml", "utf8")).toMatch(/logging:\s*CLOUD_LOGGING_ONLY/);
   });

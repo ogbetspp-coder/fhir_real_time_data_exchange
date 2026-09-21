@@ -18,7 +18,9 @@ resource "google_service_account" "build" {
 }
 
 # Build sources only — never a record, so a short life and no retention. Objects are deleted a
-# week after upload; a build that needs its source again resubmits it.
+# week after upload, and the bucket's default soft-delete window keeps a deleted object
+# recoverable for a further seven days, so a source tarball exists for up to about two weeks.
+# A build that needs its source again resubmits it.
 resource "google_storage_bucket" "build_staging" {
   name                        = "${var.project_id}-${local.name_prefix}-build-staging"
   location                    = var.region
