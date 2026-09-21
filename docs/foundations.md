@@ -88,7 +88,10 @@ _Status 2026-09-21: closed._ The condition now requires the repository by numeri
 `refs/heads/main`, and the deploy workflow on main, all three. `scripts/gcp/deploy-identity.sh` is
 its source of truth and `--check` reports drift; `test/infra/deploy-identity.test.ts` pins it. A
 GitHub environment was not added: protection rules on environments need a paid plan for a
-private repository, and the ref and workflow clauses already refuse what an environment would.
+private repository, and the ref and workflow clauses already refuse what an environment would. Proved both ways on 2026-09-21: the deploy of PR #45's merge authenticated from main (run
+`35632667284`), and the same workflow dispatched from a branch `probe/wif-refusal` was refused at
+the token exchange — `failed to generate Google Cloud federated token` — and never reached the
+build or the apply (run `35632866108`).
 
 **B2. Third-party GitHub Actions are pinned by tag, not by commit.** Nine actions, including
 `google-github-actions/auth`, the step that mints the deployer's credentials. A moved tag runs
@@ -166,6 +169,21 @@ and an empty cache it refuses to run, which is the check the fix will use. The s
 the validator adopting the machine's locale and jurisdiction (Denmark on the owner's laptop),
 which is a second reproducibility gap to pin.
 
+_Status 2026-09-21: closed, verified deployed._ Proved three ways: the CI gate passed offline
+(every resource: twelve packages loaded, every one pinned, zero errors); Cloud Build started the
+production image with `--network none` (`Jurisdiction: Global (Whole world)`, full package
+summary, service started — build `eb873394…`); and the deploy's smoke run through the worker
+persisted, with the sidecar's log showing no install and only policy refusals. It did not make
+cold starts faster; see E1. Worse than first recorded: the deployed
+sidecar downloaded all nine packages **on every cold start** and validated EMA content under
+United States jurisdiction. The packages are now
+pinned in `fhir/validator-packages.lock`, installed into the image, and the validator runs with
+`-no-http-access`, no route to the network and `-jurisdiction uv -locale en-US` — which also
+closes a request-forgery path from submitted content to internal addresses; the CI gate uses the same list and
+the same JVM properties and fails on any download attempt; every image build proves the
+validator starts with networking disabled. Details in `docs/validation/README.md`, "Official
+validation gate".
+
 ### D. The repository
 
 **D1. No licence.** The repository has no `LICENSE`. For a product whose value is a small,
@@ -186,8 +204,14 @@ identifiers, never credentials — but nothing would stop one.
 
 **E1. Both services scale to zero.** A Gemini Enterprise user's first question after an idle
 period waits for a cold start of the query service. Measure it; if it is more than about a
-second, set a minimum of one instance on the query service in production. The worker can stay
-at zero: nothing waits on it interactively.
+second, set a minimum of one instance on the query service in production.
+
+The worker's cold start is measured: **57 seconds** to ready, of which the validator sidecar
+takes 49, both before and after C9's fix. It is not the download — C9 removed that and the time
+did not move — but the validator loading and indexing its packages. Nothing waits on the worker
+interactively today, so it can stay at zero in `dev`; for production the candidates, cheapest
+first, are Cloud Run's startup CPU boost, building the validator's package indexes into the image
+at build time so they are not regenerated on every start, and a minimum of one instance.
 
 ## Order of work
 

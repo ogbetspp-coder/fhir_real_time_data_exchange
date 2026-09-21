@@ -200,6 +200,8 @@ phase_images() {
   local staging_dir="gs://${PROJECT_ID}-ema-flow-${ENVIRONMENT}-build-staging/source"
   local max_attempts=8
   local attempt
+  local build_log
+  build_log="$(mktemp)"
   for attempt in $(seq 1 "$max_attempts"); do
     if gcloud --quiet builds submit \
       --project="$PROJECT_ID" \
@@ -208,14 +210,25 @@ phase_images() {
       --gcs-source-staging-dir="$staging_dir" \
       --config=cloudbuild.images.yaml \
       --substitutions="_REGION=${REGION},_IMAGE_TAG=${TAG}" \
-      .; then
+      . 2>&1 | tee "$build_log"; then
+      rm -f "$build_log"
       return 0
     fi
+    # Retry only what a retry can fix: a grant made moments ago by phase_apis that has not
+    # propagated yet. A failed build step — a test, a checksum, the validator refusing to start
+    # offline — fails the same way every time, and rebuilding three images eight times over
+    # four minutes to learn that helps nobody.
+    if ! grep -Eqi "PERMISSION_DENIED|does not have permission|permission denied|403 Forbidden" "$build_log"; then
+      echo "Cloud Build failed for a reason other than permission propagation; not retrying." >&2
+      rm -f "$build_log"
+      return 1
+    fi
     if [[ "$attempt" -lt "$max_attempts" ]]; then
-      echo "Cloud Build submit failed (attempt ${attempt}/${max_attempts}); retrying in 30s in case the IAM grant is still propagating." >&2
+      echo "Cloud Build submit was refused permission (attempt ${attempt}/${max_attempts}); retrying in 30s in case the IAM grant is still propagating." >&2
       sleep 30
     fi
   done
+  rm -f "$build_log"
   return 1
 }
 

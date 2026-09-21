@@ -123,25 +123,63 @@ Two gates close that.
 - It validates the synthetic fixture only. A real document run's content is validated by the
   worker at run time; this gate proves the mapping and the fixture conform, and nothing about
   any particular submission.
-- **It is not hermetic, and the four pinned packages are not the only ones it loads.** Measured
-  on 2026-09-21 by running the validator with exactly the gate's flags and reading its `Load`
-  lines: alongside the four checksum-pinned packages it resolved seven further package versions
-  from the FHIR registry over the network — `hl7.terminology.r5` at 5.0.0, 6.2.0 and 7.1.0,
-  `hl7.terminology` at 7.3.0, and `hl7.fhir.uv.extensions.r5` at 1.0.0, 5.2.0 and 5.3.0. The
-  validator's own help states the behaviour: where a package is not in its cache, "the
-  PackageCacheManager will load the latest" from the registry. One consequence is visible in the
-  same log: the pinned `extensions-package.tgz` loads **0 resources**, because the identical
-  package had already been fetched from the network first, so that pin currently contributes
-  nothing.
+- **It is hermetic, as of 2026-09-21, and so is the deployed sidecar.** Until then it was not.
+  Measured that day in a clean sandbox with exactly the gate's flags: alongside the four
+  checksum-pinned packages the validator installed **nine** further packages from the FHIR
+  registry over the network — `hl7.fhir.r5.core` 5.0.0 (the base specification itself),
+  `hl7.fhir.xver-extensions` 0.1.0, `hl7.terminology` 7.3.0, `hl7.terminology.r5` 5.0.0, 6.2.0
+  and 7.1.0, and `hl7.fhir.uv.extensions.r5` 1.0.0, 5.2.0 and 5.3.0. An earlier measurement had
+  counted seven, missing the first two. The pinned `extensions-package.tgz` loaded 0 resources,
+  because the identical package had been fetched first. The CI job also restored an earlier
+  copy of `~/.fhir/packages` from any previous key, so on a warm runner the downloads were
+  hidden and the cache could hold packages nobody had pinned.
 
-  What this means, stated plainly: a validation outcome here is reproducible only as far as the
-  registry's contents are stable. An upstream change to a transitive dependency could change a
-  result with no change in this repository, and AGENTS.md's requirement to pin and checksum
-  external FHIR packages is met for the four we name and not for what they pull in. Making the
-  gate hermetic — pre-seeding the validator's package cache with pinned dependency tarballs and
-  proving no fetch occurs — is open work, recorded on the roadmap. It does not invalidate the
-  results recorded here, which were obtained against the registry as it stood on those dates, but
-  it is the difference between "pinned" and "pinned and proven".
+  The deployed sidecar did the same **on every cold start**: its log for the revision deployed
+  at 17:16 UTC shows each package installed from the network, the validator ready at 48
+  seconds and the worker at 57. So the worker could not start at all if the registry was
+  unreachable, and validated against whatever the registry served.
+
+  **A correction to what was first claimed here.** The first version of this fix said the
+  downloads accounted for about 45 of those 57 seconds, and so implied it would make cold starts
+  faster. That was an inference from the log's order of events, not a measurement, and it was
+  wrong. Measured after the fix, on revision `ema-flow-dev-worker-00041-xqp`: the validator
+  ready at 49 seconds, the worker at 57 — the same as before. Inside Google's network the
+  downloads were quick; the time is the validator loading and indexing the packages. The fix is
+  about reproducibility, availability and request forgery, not speed. Cold start is a separate
+  performance item (`docs/foundations.md`, E1). The same log showed a second gap: with no flags to say
+  otherwise, the validator took its locale and jurisdiction from the container — **United
+  States** — while validating EMA content.
+
+  The fix, one list read three ways:
+
+  - `fhir/validator-packages.lock` pins the nine packages by the SHA-256 of their registry
+    tarballs. Every content file of each tarball was compared with what the validator had
+    installed from the network and found byte-identical; only the validator's own
+    `.index.json` files differ, and it regenerates those.
+  - `Dockerfile.validator` installs them into the image's package cache at build time, each
+    verified before it is unpacked. The validator runs with `-no-http-access` — its own switch,
+    which refuses every HTTP(S) request inside the application — and, as a second layer, a JVM
+    proxy on a closed local port. It validates with `-jurisdiction uv -locale en-US`, which it
+    reports as `Jurisdiction: Global (Whole world)` and `Locale: United States/US`.
+  - This gate seeds its own cache from the same list and runs with the sidecar's own JVM
+    properties and flags. It fails if the validator installs anything (a needed package is not
+    listed), if any fetch gets as far as a socket, or if the validator's own `Package Summary`
+    names any package outside the pinned set — the nine listed plus the four `-ig` files, by the
+    id each declares in its `package.json`. A lookup the policy refused is reported, not failed:
+    the validator checks for a newer `hl7.terminology` on every run, the first CI run with the
+    network closed showed it, and it recovers from the refusal with the pinned version.
+  - Every image build starts the validator image with `--network none` in Cloud Build and fails
+    unless it comes up without reaching for the network (`cloudbuild.images.yaml`,
+    step `validator-starts-offline`).
+
+  `-no-http-access` also closes a request-forgery path. The validator's own documentation warns
+  that content being validated can direct it to fetch URLs of the content's choosing, including
+  internal network addresses — on Cloud Run that includes the metadata server, which serves
+  credentials over plain HTTP — and the sidecar validates content that arrives in submissions.
+
+  Blocking the network was tested before it was relied on: with an empty cache and the closed
+  proxy, the validator refused to start — `Error fetching … Failed to connect to /127.0.0.1:9`,
+  `Unable to load validationEngine` — rather than proceeding without its packages.
 
 **After deploy — `scripts/gcp/deploy.sh smoke`** (step "Smoke run through the deployed worker"
 in `.github/workflows/deploy.yml`, after the stores are reconciled and the profiles imported):
