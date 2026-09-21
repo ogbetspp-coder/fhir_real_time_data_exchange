@@ -3,7 +3,7 @@ output "region" {
 }
 
 output "healthcare_dataset_id" {
-  value = google_healthcare_dataset.epi.name
+  value = google_healthcare_dataset.record.name
 }
 
 output "source_fhir_store_id" {

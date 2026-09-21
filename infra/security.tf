@@ -247,10 +247,13 @@ resource "google_storage_bucket_iam_member" "worker_submission_reader" {
 # software key stays enabled, and protected, so that every manifest it signed stays verifiable
 # against its public key; nothing may sign with it any more, so the worker holds no grant on it.
 
-resource "google_project_iam_member" "worker_healthcare" {
-  project = var.project_id
-  role    = "roles/healthcare.fhirResourceEditor"
-  member  = "serviceAccount:${google_service_account.worker.email}"
+# Bound on the one dataset the worker works in, never on the project (foundations C4). Until CMEK
+# step 5c this was a project-level grant, so the worker could edit FHIR resources in any dataset in
+# the project; the query service's reader was always dataset-scoped.
+resource "google_healthcare_dataset_iam_member" "worker_fhir_editor" {
+  dataset_id = google_healthcare_dataset.record.id
+  role       = "roles/healthcare.fhirResourceEditor"
+  member     = "serviceAccount:${google_service_account.worker.email}"
 }
 
 resource "google_bigquery_dataset_iam_member" "worker_ledger_writer" {
@@ -265,11 +268,8 @@ resource "google_project_iam_member" "worker_lineage_editor" {
   member  = "serviceAccount:${google_service_account.worker.email}"
 }
 
-resource "google_project_iam_member" "worker_documentai_user" {
-  project = var.project_id
-  role    = "roles/documentai.apiUser"
-  member  = "serviceAccount:${google_service_account.worker.email}"
-}
+# No Document AI role: nothing the worker runs calls Document AI. The extractor spike does, as a
+# person running scripts/spikes/document-ai by hand, not as this identity. Removed in CMEK step 5c.
 
 resource "google_project_iam_member" "worker_log_writer" {
   project = var.project_id

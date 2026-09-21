@@ -96,7 +96,7 @@ resource "google_cloud_run_v2_service" "worker" {
       }
       env {
         name  = "HEALTHCARE_DATASET_ID"
-        value = google_healthcare_dataset.epi.name
+        value = google_healthcare_dataset.record.name
       }
       env {
         name  = "SOURCE_FHIR_STORE_ID"
@@ -155,7 +155,7 @@ resource "google_cloud_run_v2_service" "worker" {
   # unreachable; a retry on writeLedger is the fix when it stops being.
   depends_on = [
     google_project_service.required,
-    google_project_iam_member.worker_healthcare,
+    google_healthcare_dataset_iam_member.worker_fhir_editor,
     google_storage_bucket_iam_member.worker_evidence_writer,
     google_storage_bucket_iam_member.worker_submission_reader,
     google_kms_crypto_key_iam_member.worker_manifest_signer_hsm,

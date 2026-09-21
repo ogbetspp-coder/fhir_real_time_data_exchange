@@ -175,17 +175,16 @@ resource "google_pubsub_topic" "dead_letter" {
   depends_on                 = [google_project_service.required]
 }
 
-resource "google_healthcare_dataset" "epi" {
-  name     = "${local.name_prefix}-dataset"
-  location = var.region
+# The Google-managed dataset the stores lived in until CMEK step 5c. Released from Terraform's
+# management without being destroyed: the dataset keeps its stores until the switch to `record` is
+# verified, and is then deleted by hand, deliberately, as the plan records. A `removed` block
+# rather than deleting the resource block, because deleting the block would plan its destruction —
+# which prevent_destroy would refuse, and which would take every store inside it with it.
+removed {
+  from = google_healthcare_dataset.epi
 
-  depends_on = [google_project_service.required]
-
-  # Never destroyed by an apply (docs/foundations.md; docs/design/cmek-rollout.md, step 0).
-  # The FHIR stores live inside this dataset but outside Terraform (scripts/gcp/reconcile-fhir-stores.sh),
-  # so a plan that destroys it shows one resource and deletes every store.
   lifecycle {
-    prevent_destroy = true
+    destroy = false
   }
 }
 

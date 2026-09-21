@@ -196,6 +196,15 @@ validation gate".
 (adds `targetAxis`, drops zero positions) and Terraform re-applies it. Harmless, but noise in a
 plan is where a real change hides. Write the JSON in the form the API returns.
 
+**C11. Deploy failure issues were never closed.** The deploy workflow opens an issue on every
+failure and nothing closed them: 27 were open on 2026-09-21, the oldest from the first day, each
+for a failure long since fixed — noise that would bury a real one. Closed by hand, each with the
+reason; the workflow should close its own once a later deploy succeeds.
+
+**C12. The worker's evidence-bucket role is object admin.** It creates objects; `objectCreator`
+would do. The bucket's seven-year retention policy already stops it deleting or overwriting
+evidence, so this is least privilege rather than a live exposure.
+
 ### D. The repository
 
 **D1. No licence.** The repository has no `LICENSE`. For a product whose value is a small,

@@ -30,7 +30,7 @@ resource "google_service_account" "query" {
 # Dataset-level, not project-level: the query service can read FHIR resources in this dataset
 # and nothing outside it, unlike the worker's project-level editor role.
 resource "google_healthcare_dataset_iam_member" "query_fhir_reader" {
-  dataset_id = google_healthcare_dataset.epi.id
+  dataset_id = google_healthcare_dataset.record.id
   role       = "roles/healthcare.fhirResourceReader"
   member     = "serviceAccount:${google_service_account.query.email}"
 }
@@ -102,7 +102,7 @@ resource "google_cloud_run_v2_service" "query" {
       }
       env {
         name  = "HEALTHCARE_DATASET_ID"
-        value = google_healthcare_dataset.epi.name
+        value = google_healthcare_dataset.record.name
       }
       env {
         name  = "TARGET_FHIR_STORE_ID"
