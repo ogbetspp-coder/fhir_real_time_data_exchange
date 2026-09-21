@@ -204,7 +204,8 @@ So the claim is narrow and should stay narrow:
      well as at startup. Default `{}`.
    - `QUERY_OAUTH_CLIENT_IDS` — comma-separated OAuth 2.0 client ids whose access tokens are
      accepted. Default `[]`, which rejects every access token.
-6. **Decide `query_oauth_client_ids` deliberately.** Two different ids could go in it. The
+6. **(Decided 2026-09-21: the connector's client only.)** For the record of why it was a decision:
+   **Decide `query_oauth_client_ids` deliberately.** Two different ids could go in it. The
    Gemini Enterprise MCP connector's own internal OAuth client (created in the console, not by
    Terraform) is the production intent. The other is gcloud's client id,
    `32555940559.apps.googleusercontent.com` — the only way a human can call the service with
@@ -212,11 +213,15 @@ So the claim is narrow and should stay narrow:
    refused for user accounts. That id is built into every gcloud installation worldwide, so it
    identifies the tool and never the caller: adding it means any Google identity with a gcloud
    login can present a credential the service will verify, and the only walls left are
-   `run.invoker` and the per-subject entitlement. Decide it, do not drift into it.
+   `run.invoker` and the per-subject entitlement. Decide it, do not drift into it. In `dev` the
+   gcloud id was set while no connector client existed and was removed on 2026-09-21, leaving
+   the Gemini Enterprise connector's internal client as the only accepted id.
 
 ### Standing items
 
-- Enable GitHub branch protection on `main` requiring the CI check.
+- ~~Enable GitHub branch protection on `main` requiring the CI check.~~ **Done.** Required checks
+  are `Check`, `Zone A`, `Agent` and, since 2026-09-21, `Official validation` — until then the
+  official HL7 gate ran on every pull request without being able to block a merge.
 - Confirm the `approverId` policy: an opaque identity-provider subject id, never an e-mail
   address. The contract enforces the shape; the policy is an organisational decision.
 - Set `enabled_run_sources` per environment (ADR 0002: production = `["document"]`). The
@@ -224,9 +229,28 @@ So the claim is narrow and should stay narrow:
   (`test/run-sources.test.ts`), and the default is still all three sources, so nothing narrows
   until an operator sets it. `scripts/gcp/deploy.sh` does not pass it: supply it through
   `TF_VAR_enabled_run_sources` or an `infra/*.auto.tfvars` file.
-- Provide `alert_notification_email`: the entitlement-denial log metric is created on every
-  apply, but the e-mail channel and the alert policy (more than five denials in a rolling hour)
-  exist only when it is set.
+- ~~Provide `alert_notification_email`.~~ **Plumbed 2026-09-21.** The variable existed but no
+  deploy passed it, so the alert could not fire from any deploy. It now flows from the
+  `ALERT_NOTIFICATION_EMAIL` repository variable through `deploy.yml` and `deploy.sh`; the
+  metric already existed, so the channel and the policy (more than five denials in a rolling
+  hour) are created on the first deploy after the address is set.
+
+### Production gate — required before any environment holds a client's real content
+
+Deliberately not done in `dev`, which is the owner's own experimental environment. Each is a
+deploy-time setting of a production environment, not a code change, and a production deploy
+that skips one is not a production deploy.
+
+- **Gemini Enterprise app in an EU location.** The `dev` app is `global`, which is acceptable
+  for synthetic labels only. The location of an app cannot be changed after creation, so this
+  is a new app, a new connector, and a new internal OAuth client — not a setting. The Agent
+  Engine region follows the app (an EU app takes `europe-*`).
+- **Lock the retained audit log bucket** (below).
+- **Narrow run sources to `["document"]`** (`enabled_run_sources`, under Standing items).
+- **The worker's Healthcare role scoped to the dataset** (below).
+- **Web grounding off** on the production assistant, as in `dev` since 2026-09-21.
+- **Only the connector's OAuth client** in `query_oauth_client_ids`, as in `dev` since 2026-09-21.
+
 - Decide whether to set `lock_regulated_audit_log_bucket = true`. It is irreversible: the
   retained audit log bucket's retention can then never be changed and Terraform will not
   unlock it. Take the decision after the retention period, legal basis, and costs are approved;
@@ -248,9 +272,11 @@ So the claim is narrow and should stay narrow:
   step is warning-only, so a deployer lacking `resourcemanager.projects.getIamPolicy`,
   `healthcare.datasets.getIamPolicy`, or write access to the evidence bucket leaves a
   `::warning::` in the log and no file in the bucket.
-- For item 1b: confirm the organisation has a Gemini Enterprise licence; confirm Agent Engine
-  offers a 3.14 runtime in the intended region before the first deploy. All steps are written
-  out in `agent/deploy/README.md`.
+- For item 1b: ~~confirm the organisation has a Gemini Enterprise licence~~ **confirmed 2026-09-21** —
+  a free trial, 50 seats, active until 2026-10-20, with the app already created. Still open:
+  confirm Agent Engine offers a 3.14 runtime in `europe-west4` at the first real deploy; the
+  deploy script's dry run passes but does not ask the service. Steps are in
+  `agent/deploy/README.md`.
 - (Done 2026-09-20 for item 0: the deployer was granted `roles/documentai.editor` by hand —
   its roles are bootstrapped outside Terraform by design — and the spike's real-world inputs
   were EudraLex Volume 2C documents, which carry no product information, so the synthetic-only
