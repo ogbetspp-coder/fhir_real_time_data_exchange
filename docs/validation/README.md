@@ -123,6 +123,25 @@ Two gates close that.
 - It validates the synthetic fixture only. A real document run's content is validated by the
   worker at run time; this gate proves the mapping and the fixture conform, and nothing about
   any particular submission.
+- **It is not hermetic, and the four pinned packages are not the only ones it loads.** Measured
+  on 2026-09-21 by running the validator with exactly the gate's flags and reading its `Load`
+  lines: alongside the four checksum-pinned packages it resolved seven further package versions
+  from the FHIR registry over the network — `hl7.terminology.r5` at 5.0.0, 6.2.0 and 7.1.0,
+  `hl7.terminology` at 7.3.0, and `hl7.fhir.uv.extensions.r5` at 1.0.0, 5.2.0 and 5.3.0. The
+  validator's own help states the behaviour: where a package is not in its cache, "the
+  PackageCacheManager will load the latest" from the registry. One consequence is visible in the
+  same log: the pinned `extensions-package.tgz` loads **0 resources**, because the identical
+  package had already been fetched from the network first, so that pin currently contributes
+  nothing.
+
+  What this means, stated plainly: a validation outcome here is reproducible only as far as the
+  registry's contents are stable. An upstream change to a transitive dependency could change a
+  result with no change in this repository, and AGENTS.md's requirement to pin and checksum
+  external FHIR packages is met for the four we name and not for what they pull in. Making the
+  gate hermetic — pre-seeding the validator's package cache with pinned dependency tarballs and
+  proving no fetch occurs — is open work, recorded on the roadmap. It does not invalidate the
+  results recorded here, which were obtained against the registry as it stood on those dates, but
+  it is the difference between "pinned" and "pinned and proven".
 
 **After deploy — `scripts/gcp/deploy.sh smoke`** (step "Smoke run through the deployed worker"
 in `.github/workflows/deploy.yml`, after the stores are reconciled and the profiles imported):
@@ -160,6 +179,42 @@ that correction is itself reasoned from gcloud's documented behaviour and its so
 an observed green run. The IAM propagation retry and the `run.invoker` grant are likewise
 written from documentation and review. Treat the first deploy after this change as the test of
 this step, not as a confirmation of it.
+
+## Runs of record
+
+The runs this document's claims rest on, so a reader can check them rather than take them. All
+are in project `sage-ship-509104-b8`, region `europe-west4`, against synthetic product
+information only. Evidence artefacts are under
+`gs://sage-ship-509104-b8-ema-flow-dev-evidence/runs/<run id>/`; ledger rows are in
+`ema_flow_ledger_dev.transformation_runs`.
+
+| Run id                                 | Source     | Date       | What it establishes                                                                                                                                                                                                                                                                                                                                                     |
+| -------------------------------------- | ---------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `c0648d78-5a4e-403e-af70-31c3775ccd92` | `fixture`  | 2026-09-21 | The first run ever to complete in this project. `persisted`; 0 preflight, official and Cloud Healthcare validation errors; 32 mapping decisions; 7 artefacts. Its manifest hash was recomputed from the manifest with the repository's own hash function and its signature verified against the KMS public key with RSA-PSS SHA-256 (`Signature Verified Successfully`) |
+| `23481d23-90be-45a3-884e-b83384837fd1` | `document` | 2026-09-21 | The first `document` run to complete: `synthetic-paracetamol` v1 through the ingress gate                                                                                                                                                                                                                                                                               |
+| `30f08ec0-a23e-4736-8cb1-58d9ea0540bc` | `document` | 2026-09-21 | `synthetic-demoxetine` v1. The document `get_section`, `get_provenance` and `verify_quote` were proved against                                                                                                                                                                                                                                                          |
+| `a6ea3c5d-4a90-4d27-95ac-68d7f10dbb7c` | `document` | 2026-09-21 | `synthetic-placebolol` v1                                                                                                                                                                                                                                                                                                                                               |
+| `24e8aa7d-b588-4fc6-8186-abc7ecc5239c` | `document` | 2026-09-21 | `synthetic-paracetamol` v2, a second version of an existing document rather than a new one                                                                                                                                                                                                                                                                              |
+
+Each `document` run wrote 11 evidence artefacts — the 7 a fixture run writes plus
+`canonical-submission.json`, `ingestion-provenance.json`, `fidelity-report.json` and
+`provenance-resource.json` — and a ledger row carrying `source_kind = document`,
+`contract_version = 1.0.0`, `fidelity_status = passed`, and the approval and ingestion source
+hashes. The fixture run's row leaves those four columns null, which is what distinguishes the
+two paths in the ledger.
+
+**What `verify_quote` was shown to do**, on `2ee34ea0-41f7-587c-a373-0891d915192e` section 4.4:
+a verbatim span answered `match` with offsets 0–82 and the section's normalised hash; the same
+sentence with the strength changed from 10 mg to 20 mg answered `no-match`; the same sentence
+with the negation removed from "not for clinical use" answered `no-match`. That is the system's
+central claim — that a quote can be checked rather than trusted — exercised against a published
+document rather than a fixture.
+
+**What these runs do not establish.** The content is synthetic throughout, so nothing here says
+anything about a real label. The Workflows `document` branch is still unexercised: the seeding
+script posts to the worker directly. And the validator's package resolution is not hermetic (see
+"Official validation gate"), so these outcomes are reproducible only as far as the FHIR registry
+is stable.
 
 ## Release criteria (target state — not implemented in this repository)
 

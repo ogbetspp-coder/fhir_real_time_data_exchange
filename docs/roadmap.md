@@ -28,16 +28,49 @@ Three rules decided the sequence below.
 
 ## Delivered
 
-| Item                                                                                                                      | Components                                       |
-| ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| Deterministic Type 2 → EMA ePI transform, profile validation, persistence, signed evidence                                | Cloud Run, Cloud Healthcare API, GCS, Cloud KMS  |
-| Near-real-time analytical projection                                                                                      | Healthcare API native BigQuery stream, Workflows |
-| Zone A / Zone B trust boundary: `CanonicalSubmission` contract, hash-bound approval, ingress gate                         | Zod → generated JSON Schema, checked in CI       |
-| Mechanical narrative fidelity check (`fidelity-norm/1.1.1`) with golden vectors and a cross-language differential harness | Pure library, no cloud dependency                |
-| By-reference submission transport, `document` run source, Workflows document branch                                       | Cloud Storage, Cloud Run, Workflows              |
-| Queryable transformation ledger incl. approval and fidelity columns                                                       | BigQuery                                         |
-| Per-client retention as native Cloud Storage policy                                                                       | Cloud Storage, Terraform variables               |
-| Deploy pipeline with a quality gate that runs before any cloud credential exists                                          | GitHub Actions, Terraform, Cloud Build           |
+**"Delivered" means it has run in the deployed environment and there is a run id, an object, or a
+row to point at.** Code that exists and passes tests is not delivered; it is built. That
+distinction is not pedantry. Until 2026-09-21 this table claimed a working pipeline while the
+deployed worker had never completed a single run — four separate defects, each hidden behind the
+one before it, and the deploy had been green throughout because nothing outside the worker ever
+asked it to do its job. Anything below whose evidence column says "not yet run in the deployed
+environment" is built, not delivered.
+
+| Item                                                                                                                      | Components                                      | Evidence it has actually run                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Deterministic Type 2 → EMA ePI transform, profile validation, persistence, signed evidence                                | Cloud Run, Cloud Healthcare API, GCS, Cloud KMS | Run `c0648d78-5a4e-403e-af70-31c3775ccd92`, 2026-09-21: `persisted`, 0 preflight/official/Cloud validation errors, 32 mapping decisions, 7 evidence artefacts, manifest signature verified against the KMS public key                                            |
+| Queryable transformation ledger incl. approval and fidelity columns                                                       | BigQuery                                        | One row in `ema_flow_ledger_dev.transformation_runs` for that run, `manifest_hash` matching the signed manifest                                                                                                                                                  |
+| Near-real-time analytical projection                                                                                      | Healthcare API native BigQuery stream           | 11 resource tables and their views in `ema_flow_fhir_dev`, populated by that run's persistence                                                                                                                                                                   |
+| Read-only ePI query service over the published store                                                                      | Cloud Run, Model Context Protocol               | All four tools answered live 2026-09-21 over an impersonated caller ID token: `find_product`, `get_section` (div, both hashes, normalisation version), `get_provenance` (source, fidelity and approval hashes, extractor, approver and role), and `verify_quote` |
+| Verifiable quoting: a quote is machine-checked against the published narrative                                            | Cloud Run, `fidelity-norm/1.1.1`                | `verify_quote` 2026-09-21 on `2ee34ea0…` §4.4: verbatim span → `match` at offsets 0–82; the same sentence with 10 mg changed to 20 mg → `no-match`; the same sentence with the negation removed → `no-match`                                                     |
+| Zone A / Zone B trust boundary: `CanonicalSubmission` contract, hash-bound approval, ingress gate                         | Zod → generated JSON Schema, checked in CI      | Four `document` runs persisted 2026-09-21 through the real ingress gate (`23481d23…`, `30f08ec0…`, `a6ea3c5d…`, `24e8aa7d…`), each writing 11 evidence artefacts including the canonical submission and the approval-bound provenance                            |
+| Mechanical narrative fidelity check (`fidelity-norm/1.1.1`) with golden vectors and a cross-language differential harness | Pure library, no cloud dependency               | Fully covered by tests, and now exercised in the deployed pipeline: all four document runs recorded `fidelity_status = passed` in the ledger                                                                                                                     |
+| By-reference submission transport, `document` run source                                                                  | Cloud Storage, Cloud Run                        | Those same four runs: three hand-off objects per product written to `gs://…-submissions/demo/<product>/v<n>/` and named by URI and hash in the run request. **The Workflows document branch is still unexercised** — the seed posts to the worker directly       |
+| Per-client retention as native Cloud Storage policy                                                                       | Cloud Storage, Terraform variables              | Applied by Terraform; no object has yet aged to test expiry                                                                                                                                                                                                      |
+| Official HL7 validation before merge, and one proven run after every deploy                                               | GitHub Actions, HL7 validator 6.10.4            | CI job "Official validation" green 2026-09-20 (run 35545408243); deploy smoke step green 2026-09-21 with `status: persisted`                                                                                                                                     |
+| Deploy pipeline with a quality gate that runs before any cloud credential exists                                          | GitHub Actions, Terraform, Cloud Build          | Green end to end, repeatedly                                                                                                                                                                                                                                     |
+| Local full-pipeline runner against the deployed environment's own configuration                                           | `scripts/dev/run-pipeline.ts`, pinned validator | Dry run exercised 2026-09-21; written because four defects each cost a twelve-minute deploy to find                                                                                                                                                              |
+
+## Open gaps in delivered controls
+
+Things above that work but are weaker than they look. Listed here rather than buried, because a
+control believed to be stronger than it is is worse than a control known to be weak.
+
+- **Official validation is not hermetic.** The validator loads the four checksum-pinned packages
+  and then resolves seven further package versions from the FHIR registry over the network at
+  run time, and the pinned extensions package currently contributes nothing because the same
+  package is fetched first. A validation result is therefore reproducible only as far as the
+  registry is stable. The fix is to pre-seed the validator's package cache with pinned dependency
+  tarballs and prove no fetch occurs. Measured and written up in `docs/validation/README.md`,
+  "Official validation gate". **S**
+- **The deploy's smoke run writes to the demonstrator on every deploy.** It publishes the fixture
+  document, so a demonstration store accumulates a fixture-sourced version of the paracetamol
+  label alongside the document-sourced ones. Setting `enabled_run_sources = ["document"]` for a
+  demonstration environment makes the step skip with a notice, which is the intended production
+  setting anyway (ADR 0002). **S, configuration only**
+- **`get_provenance` resolves with `_count=1` and no `_sort`.** Which Provenance it returns for a
+  document with more than one is not fixed by the code, so re-seeding an environment makes the
+  answer ambiguous. Seed once, or give the resolution a deterministic order. **S**
 
 ## Next, in order
 
@@ -117,26 +150,26 @@ So the claim is narrow and should stay narrow:
 
 ### Before the first demonstration, in this order
 
-1. **Deploy this branch.** The Provenance projection now writes the approver's role on the
-   attester agent (`src/fhir/provenance.ts`), and `get_provenance` reads only that coding and
-   never infers one. Every document already in the demonstrator's validated store was written
-   before that change, so `get_provenance` answers `unavailable` for all of them until step 2.
-   There is no worker-only deploy to run first: `scripts/gcp/deploy.sh` has one untargeted
-   `terraform apply` that reconciles the worker and the query service together. What has to be
-   ordered is the re-ingest, not the two services.
-2. **Re-ingest the demonstration documents** with `scripts/demo/seed.ts` (rehearse with
-   `--dry-run`). It needs `SUBMISSION_BUCKET` and `WORKER_URL` exported — it exits at load
-   without them — and a `WORKER_ID_TOKEN` minted by impersonating a service account that holds
-   `run.invoker` on the worker: a human's Application Default Credentials cannot mint an ID
-   token for the worker's audience. The whole command is in README.md, "Re-ingesting with
-   `scripts/demo/seed.ts`". A re-ingest adds a second `Provenance` resource rather than
-   replacing the first, because its id is derived from the submission id.
+1. **(Done 2026-09-21.)** Deployed, and the validated store was deleted and rebuilt first, so its
+   version history contains no hand-written writes — only what the pipeline published.
+2. **(Done 2026-09-21.)** The demonstration set was seeded through the real document path:
+   `synthetic-paracetamol` v1 and v2, `synthetic-demoxetine` v1, `synthetic-placebolol` v1, all
+   `persisted`. Three documents and four `Provenance` resources are in the store. Re-running
+   `scripts/demo/seed.ts` would add a second `Provenance` per document rather than replacing the
+   first, because its id derives from the submission id, so do not re-seed without rebuilding.
 3. **Check `get_provenance` before the meeting.** It resolves a Provenance with
    `Provenance?target=Bundle/<id>&_count=1` and no `_sort`, so which of two resources for the
-   same document it returns is not fixed by the code. A fresh store or a fresh document id
-   avoids the ambiguity. `docs/demo/verifiable-label.md` repeats this.
-4. **Set the four GitHub Actions repository variables** (Settings → Secrets and variables →
-   Actions → Variables). They are variables and not secrets: an IAM member string, an opaque
+   same document it returns is not fixed by the code. Paracetamol already has two, because the
+   demonstration deliberately publishes a v2. Two calls on 2026-09-21 both returned the v2
+   record, which is the answer you would want — but that is what happened, not what the code
+   guarantees, so check it on the day. `docs/demo/verifiable-label.md` repeats this.
+4. **Do not deploy between seeding and demonstrating**, or set
+   `enabled_run_sources = ["document"]` first. The deploy's smoke step publishes the fixture
+   document, which writes a fixture-sourced version of the paracetamol label over the
+   document-sourced one. The `Provenance` resources survive, so `get_provenance` still answers,
+   but the document's latest version would no longer be the one the demonstration describes.
+5. **Set the four GitHub Actions repository variables** — done 2026-09-20; all four are set
+   (Settings → Secrets and variables → Actions → Variables). They are variables and not secrets: an IAM member string, an opaque
    subject id, a bundle id and an OAuth client id are identifiers, and holding one grants
    nothing. Each is optional and an unset one leaves the Terraform default, so a deploy with
    none of them set succeeds and authorises nobody.
@@ -160,7 +193,7 @@ So the claim is narrow and should stay narrow:
      well as at startup. Default `{}`.
    - `QUERY_OAUTH_CLIENT_IDS` — comma-separated OAuth 2.0 client ids whose access tokens are
      accepted. Default `[]`, which rejects every access token.
-5. **Decide `query_oauth_client_ids` deliberately.** Two different ids could go in it. The
+6. **Decide `query_oauth_client_ids` deliberately.** Two different ids could go in it. The
    Gemini Enterprise MCP connector's own internal OAuth client (created in the console, not by
    Terraform) is the production intent. The other is gcloud's client id,
    `32555940559.apps.googleusercontent.com` — the only way a human can call the service with
