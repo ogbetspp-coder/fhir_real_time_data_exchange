@@ -132,13 +132,16 @@ describe("reading how the validator used the network", () => {
       "Installing hl7.fhir.r5.core#5.0.0 to the package cache",
       "Error fetching https://packages2.fhir.org/packages/hl7.terminology: Access to the internet is not allowed by local security policy",
       "Error fetching https://packages.fhir.org/hl7.terminology: Failed to connect to /127.0.0.1:9",
-      "Failed to determine latest version of package hl7.terminology from server: x",
+      "Failed to determine latest version of package hl7.terminology from server: build.fhir.org",
+      "Failed to determine latest version of package hl7.terminology from server: x: Failed to connect to /127.0.0.1:9",
       "  Load hl7.terminology.r5#6.2.0 - 4288 resources (00:11.450)",
     ];
     const { installs, refused, other } = networkUse(output);
     expect(installs).toEqual([output[1]]);
-    expect(refused).toEqual([output[2]]);
-    expect(other).toEqual([output[3], output[4]]);
+    // The policy refusal and the bare latest-version lookup are refusals; anything that reached
+    // a socket is not.
+    expect(refused).toEqual([output[2], output[4]]);
+    expect(other).toEqual([output[3], output[5]]);
   });
 
   it("reads the validator's own list of loaded packages, and knows when it is missing", () => {
@@ -173,7 +176,9 @@ describe("the image build", () => {
     expect(build).toContain("- id: validator-starts-offline");
     expect(build).toMatch(/docker run --detach --name offline --network none/);
     expect(build).toMatch(/grep -E "Installing \[\^ \]\+ to the package cache" offline\.log/);
-    expect(build).toMatch(/grep -v "not allowed by local security policy"/);
+    expect(build).toContain(
+      'grep -Ev "not allowed by local security policy|Failed to determine latest version',
+    );
     expect(build).toContain('grep -q "Jurisdiction: Global (Whole world)" offline.log');
     expect(build).toContain('grep -q "Locale: United States/US" offline.log');
   });

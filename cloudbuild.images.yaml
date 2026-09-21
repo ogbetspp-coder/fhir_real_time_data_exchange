@@ -58,8 +58,11 @@ steps:
           echo "The validator needed a package that is not installed in the image." >&2
           exit 1
         fi
+        # Refused before any socket: the policy message, or a bare "Failed to determine latest
+        # version of package <id> from server: <server>" (the engine's hl7.terminology lookup,
+        # which falls back to the pinned package). Anything else is a real attempt.
         if grep -E "Error fetching|Failed to determine latest version of package|Failed to connect" offline.log \
-          | grep -v "not allowed by local security policy"; then
+          | grep -Ev "not allowed by local security policy|Failed to determine latest version of package [^ ]+ from server: [^ ]+[[:space:]]*$"; then
           echo "The validator attempted a network request that its policy did not refuse." >&2
           exit 1
         fi

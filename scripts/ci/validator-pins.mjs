@@ -207,10 +207,16 @@ export function readPackageLock(file) {
 //   installs — "Installing <id>#<version> to the package cache": a package it needed was not
 //              already installed. With the cache seeded from the list, any install means the
 //              list is incomplete, and it fails the gate.
-//   refused  — a fetch the validator's own `-no-http-access` policy refused ("Access to the
-//              internet is not allowed by local security policy"). These are optional lookups it
-//              recovers from — the version check it makes for hl7.terminology — and they prove no
-//              network was used. Reported, not failed.
+//   refused  — a request the validator's own `-no-http-access` policy refused before any socket
+//              was opened. Two forms: "Error fetching <url>: Access to the internet is not
+//              allowed by local security policy", and a bare "Failed to determine latest version
+//              of package <id> from server: <server>" with no connection error after it. The
+//              second is the engine asking for the newest hl7.terminology — no package declares
+//              that dependency; every declared version is exact — and falling back to the newest
+//              in the cache, which is the pinned one. Refusing it is what keeps the result
+//              reproducible: online, the engine would take whatever the registry had published.
+//              The gate's Package Summary check proves the fallback was pinned. Reported, not
+//              failed.
 //   other    — any other fetch error: an attempt that got as far as a socket. With the policy
 //              on there should be none, so any fails the gate.
 export function networkUse(lines) {
@@ -222,7 +228,10 @@ export function networkUse(lines) {
     else if (
       /Error fetching|Failed to determine latest version of package|Failed to connect/.test(line)
     ) {
-      if (/not allowed by local security policy/.test(line)) refused.push(line);
+      const policy = /not allowed by local security policy/.test(line);
+      const bareLatestLookup =
+        /Failed to determine latest version of package \S+ from server: \S+\s*$/.test(line);
+      if (policy || bareLatestLookup) refused.push(line);
       else other.push(line);
     }
   }
