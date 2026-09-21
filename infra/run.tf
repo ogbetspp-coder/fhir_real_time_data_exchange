@@ -134,7 +134,7 @@ resource "google_cloud_run_v2_service" "worker" {
       # crypto key (see infra/security.tf for why the version is named rather than looked up).
       env {
         name  = "KMS_MANIFEST_KEY"
-        value = "${google_kms_crypto_key.manifest_signing.id}/cryptoKeyVersions/${var.kms_manifest_key_version}"
+        value = "${google_kms_crypto_key.manifest_signing_hsm.id}/cryptoKeyVersions/${var.kms_manifest_key_version}"
       }
       env {
         name  = "FHIR_VALIDATOR_URL"
@@ -158,7 +158,7 @@ resource "google_cloud_run_v2_service" "worker" {
     google_project_iam_member.worker_healthcare,
     google_storage_bucket_iam_member.worker_evidence_writer,
     google_storage_bucket_iam_member.worker_submission_reader,
-    google_kms_crypto_key_iam_member.worker_manifest_signer,
+    google_kms_crypto_key_iam_member.worker_manifest_signer_hsm,
     google_bigquery_dataset_iam_member.worker_ledger_writer,
     google_bigquery_table.transformation_runs,
   ]

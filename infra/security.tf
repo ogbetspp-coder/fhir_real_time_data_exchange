@@ -72,7 +72,7 @@ resource "google_kms_crypto_key" "manifest_signing" {
 # Cloud KMS does not rotate asymmetric signing keys automatically, so this only changes when a
 # person deliberately creates a version — a configuration change, which is what this is.
 variable "kms_manifest_key_version" {
-  description = "Version of the manifest signing key the worker signs with. Cloud KMS does not rotate asymmetric signing keys automatically, so this changes only when a new version is created by hand."
+  description = "Version of manifest-signing-hsm (keys.tf) the worker signs with. Cloud KMS does not rotate asymmetric signing keys automatically, so this changes only when a new version is created by hand."
   type        = string
   default     = "1"
 
@@ -243,11 +243,9 @@ resource "google_storage_bucket_iam_member" "worker_submission_reader" {
   member = "serviceAccount:${google_service_account.worker.email}"
 }
 
-resource "google_kms_crypto_key_iam_member" "worker_manifest_signer" {
-  crypto_key_id = google_kms_crypto_key.manifest_signing.id
-  role          = "roles/cloudkms.signerVerifier"
-  member        = "serviceAccount:${google_service_account.worker.email}"
-}
+# The worker signs with manifest-signing-hsm (keys.tf) since CMEK step 2, 2026-09-21. This
+# software key stays enabled, and protected, so that every manifest it signed stays verifiable
+# against its public key; nothing may sign with it any more, so the worker holds no grant on it.
 
 resource "google_project_iam_member" "worker_healthcare" {
   project = var.project_id
