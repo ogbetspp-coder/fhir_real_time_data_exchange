@@ -58,20 +58,10 @@ resource "google_project_service_identity" "healthcare" {
   depends_on = [google_project_service.required]
 }
 
-resource "google_artifact_registry_repository" "images" {
-  location      = var.region
-  repository_id = "ema-flow"
-  description   = "Signed and provenance-attached ema-flow containers"
-  format        = "DOCKER"
-  labels        = local.labels
-
-  depends_on = [google_project_service.required]
-}
-
 # The image repository on the `artifacts` key (CMEK step 4). A repository's encryption is fixed at
-# creation, so this is a second repository beside the Google-managed `images` one above, not a
-# change to it: renaming `images` in place would destroy it. Builds push here and Cloud Run runs
-# from here; `images` is removed once a deploy from here is verified.
+# creation, so this was created as a second repository beside the Google-managed `ema-flow` one,
+# not a change to it. The old repository was removed in step 5a, after a deploy from this one was
+# verified on 2026-09-21; revisions built before the switch can no longer be rolled back to.
 resource "google_artifact_registry_repository" "images_cmek" {
   location      = var.region
   repository_id = "ema-flow-images"
@@ -194,6 +184,31 @@ resource "google_healthcare_dataset" "epi" {
   # Never destroyed by an apply (docs/foundations.md; docs/design/cmek-rollout.md, step 0).
   # The FHIR stores live inside this dataset but outside Terraform (scripts/gcp/reconcile-fhir-stores.sh),
   # so a plan that destroys it shows one resource and deletes every store.
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+# The FHIR dataset on the fhir-record key (CMEK step 5). A Healthcare dataset's encryption is
+# fixed at creation, so this is a second dataset beside `epi`, not a change to it; renaming `epi`
+# in place would destroy it and every store inside it. Created empty by step 5a; its stores are
+# reconciled into it by hand (scripts/gcp/reconcile-fhir-stores.sh with
+# HEALTHCARE_DATASET_OVERRIDE) and checked before step 5c switches the services to it.
+#
+# Its key must stay available: a dataset whose key is disabled, scheduled for destruction or
+# ungranted is disabled after one hour and deleted, with every store, after 30 days. keys.tf and
+# scripts/gcp/key-guard.sh exist for that reason.
+resource "google_healthcare_dataset" "record" {
+  name     = "${local.name_prefix}-fhir-record"
+  location = var.region
+
+  encryption_spec {
+    kms_key_name = google_kms_crypto_key.record["fhir-record"].id
+  }
+
+  # The Healthcare service agent must hold its grant on the key before the dataset is created.
+  depends_on = [google_project_service.required, google_kms_crypto_key_iam_member.record_agent]
+
   lifecycle {
     prevent_destroy = true
   }
