@@ -51,8 +51,8 @@ resource "google_storage_bucket_iam_member" "build_staging_reader" {
 # Pushes images to this product's repository and no other.
 resource "google_artifact_registry_repository_iam_member" "build_writer" {
   project    = var.project_id
-  location   = google_artifact_registry_repository.images.location
-  repository = google_artifact_registry_repository.images.name
+  location   = google_artifact_registry_repository.images_cmek.location
+  repository = google_artifact_registry_repository.images_cmek.name
   role       = "roles/artifactregistry.writer"
   member     = "serviceAccount:${google_service_account.build.email}"
 }
