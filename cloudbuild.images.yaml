@@ -25,6 +25,43 @@ steps:
       - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/validator:${_IMAGE_TAG}
       - .
 
+  # The validator image must start with no network at all (docs/foundations.md, C9). Its
+  # packages are installed at build time and its JVM has no route out, so this proves on every
+  # build that the deployed sidecar needs nothing from the internet to become ready. Bash
+  # variables are written $$name so Cloud Build does not read them as substitutions.
+  - id: validator-starts-offline
+    name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        image="${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/validator:${_IMAGE_TAG}"
+        docker run --detach --name offline --network none "$$image" >/dev/null
+        started=""
+        for attempt in $$(seq 1 120); do
+          if docker logs offline 2>&1 | grep -q "FHIR Validator HTTP Service started"; then
+            started="yes"
+            break
+          fi
+          if [ "$$(docker inspect --format '{{.State.Running}}' offline)" != "true" ]; then
+            break
+          fi
+          sleep 2
+        done
+        docker logs offline > offline.log 2>&1 || true
+        docker rm --force offline >/dev/null
+        if grep -E "Installing [^ ]+ to the package cache|Fetching:|Error fetching" offline.log; then
+          echo "The validator reached for the network while starting offline." >&2
+          exit 1
+        fi
+        if [ -z "$$started" ]; then
+          tail -40 offline.log >&2
+          echo "The validator did not start with networking disabled." >&2
+          exit 1
+        fi
+        grep -E "Jurisdiction:|Locale:|Package Summary|HTTP Service started" offline.log | cut -c1-200
+
   - id: build-query-image
     name: gcr.io/cloud-builders/docker
     args:
