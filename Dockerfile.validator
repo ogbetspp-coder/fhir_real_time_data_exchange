@@ -37,10 +37,10 @@ RUN curl -fL \
 
 # The packages the validator resolves on its own beyond the four -ig files, pinned by checksum in
 # fhir/validator-packages.lock and installed into the package cache at build time. Without this
-# the sidecar downloaded all nine from the FHIR registry on every cold start (about 45 of the
-# worker's 57 seconds to ready, measured 2026-09-21), validated against whatever the registry
-# served that day, and could not start without it. Each tarball is verified before it is
-# unpacked; a mismatch fails the build.
+# the sidecar downloaded all nine from the FHIR registry on every cold start, validated against
+# whatever the registry served that day, and could not start without it. Each tarball is verified
+# before it is unpacked; a mismatch fails the build. This is not a startup-speed change: the
+# worker was ready in 57 seconds before and after; the time is loading and indexing.
 COPY fhir/validator-packages.lock /opt/fhir/validator-packages.lock
 # Statements are separated by `;`, not chained with `&&`, and every step that can fail exits
 # explicitly. POSIX `set -e` is ignored for any command inside an AND-OR list other than the

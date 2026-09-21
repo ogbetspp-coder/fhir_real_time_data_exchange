@@ -136,9 +136,17 @@ Two gates close that.
 
   The deployed sidecar did the same **on every cold start**: its log for the revision deployed
   at 17:16 UTC shows each package installed from the network, the validator ready at 48
-  seconds and the worker at 57. So the pipeline's first run after an idle period waited about a
-  minute, could not start at all if the registry was unreachable, and validated against
-  whatever the registry served. The same log showed a second gap: with no flags to say
+  seconds and the worker at 57. So the worker could not start at all if the registry was
+  unreachable, and validated against whatever the registry served.
+
+  **A correction to what was first claimed here.** The first version of this fix said the
+  downloads accounted for about 45 of those 57 seconds, and so implied it would make cold starts
+  faster. That was an inference from the log's order of events, not a measurement, and it was
+  wrong. Measured after the fix, on revision `ema-flow-dev-worker-00041-xqp`: the validator
+  ready at 49 seconds, the worker at 57 — the same as before. Inside Google's network the
+  downloads were quick; the time is the validator loading and indexing the packages. The fix is
+  about reproducibility, availability and request forgery, not speed. Cold start is a separate
+  performance item (`docs/foundations.md`, E1). The same log showed a second gap: with no flags to say
   otherwise, the validator took its locale and jurisdiction from the container — **United
   States** — while validating EMA content.
 

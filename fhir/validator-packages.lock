@@ -1,8 +1,9 @@
 # Packages the official HL7 validator resolves on its own, beyond the four -ig files that
 # Dockerfile.validator downloads and names. Without this list the validator fetched every one of
 # them from the FHIR package registry on each start — in the deployed sidecar, on every cold start
-# (measured 2026-09-21: about 45 of the worker's 57 seconds to ready) — so what it validated
-# against was whatever the registry served that day, and it could not start without it.
+# — so what it validated against was whatever the registry served that day, and it could not
+# start without it. (Not a speed problem: the worker took 57 seconds to become ready before and
+# after this list existed; the time is package loading and indexing, not the download.)
 #
 # One list, three readers: Dockerfile.validator installs these into the image's package cache at
 # build time, scripts/ci/official-validate.mjs seeds the CI gate's cache from them, and both then
