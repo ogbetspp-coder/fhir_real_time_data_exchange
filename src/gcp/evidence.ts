@@ -57,6 +57,15 @@ export class GcpEvidenceStore {
     const keyVersion = this.config.KMS_MANIFEST_KEY;
     if (keyVersion === undefined) return { manifest, manifestHash };
 
+    // Cloud KMS signs with a crypto key VERSION. A name that stops at the crypto key is refused,
+    // and the refusal arrives as an opaque client error that says nothing about which of the
+    // pipeline's gates failed — which is how every run in this project came to write five
+    // evidence artefacts and then stop, with no signed manifest and no explanation. Checked here
+    // so the configuration is named as the fault, before a network call is made.
+    if (!keyVersion.includes("/cryptoKeyVersions/")) {
+      throw new Error("KMS_MANIFEST_KEY must name a crypto key version");
+    }
+
     const [response] = await this.#kms.asymmetricSign({
       name: keyVersion,
       digest: { sha256: Buffer.from(manifestHash, "hex") },

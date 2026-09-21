@@ -66,6 +66,16 @@ resource "google_kms_crypto_key" "manifest_signing" {
   }
 }
 
+# Cloud KMS signs with a crypto key VERSION, not a crypto key: AsymmetricSign's `name` must end
+# in /cryptoKeyVersions/<n>. `google_kms_crypto_key.manifest_signing.id` stops at the key, so
+# passing it to the worker meant every signing call was refused and no run ever produced a signed
+# manifest. This data source resolves the version so the worker is given something it can sign
+# with; on rotation it follows the new version, and the version that signed any given manifest
+# stays recorded in the manifest itself.
+data "google_kms_crypto_key_version" "manifest_signing" {
+  crypto_key = google_kms_crypto_key.manifest_signing.id
+}
+
 data "google_storage_project_service_account" "gcs" {
   project = var.project_id
 }

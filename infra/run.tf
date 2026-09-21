@@ -130,9 +130,11 @@ resource "google_cloud_run_v2_service" "worker" {
         name  = "TRANSFORMATION_LEDGER_TABLE"
         value = google_bigquery_table.transformation_runs.table_id
       }
+      # The key VERSION, not the key: Cloud KMS refuses an AsymmetricSign whose name stops at the
+      # crypto key (see the data source in infra/security.tf).
       env {
         name  = "KMS_MANIFEST_KEY"
-        value = google_kms_crypto_key.manifest_signing.id
+        value = data.google_kms_crypto_key_version.manifest_signing.name
       }
       env {
         name  = "FHIR_VALIDATOR_URL"
