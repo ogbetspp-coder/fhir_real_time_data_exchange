@@ -169,6 +169,16 @@ be destroyed` on the ledger table — step 0 refusing the replacement the provid
    under the same bundle ids the entitlement map names; **new rows stream into CMEK tables — the one
    behaviour the documentation does not cover, and the reason (b) comes before (c)**; notifications
    still fire. The Healthcare API allows ten CMEK datasets per project per 30 days; this uses one.
+   _(a) done 2026-09-21 (PR #61): `ema-flow-dev-fhir-record` created empty on the `fhir-record`
+   key. (b) done by hand the same day: both stores reconciled into it; their configurations hash
+   identically to the old stores'; the validated store holds the same 753 StructureDefinitions and
+   969 CodeSystems; the source bundle seeded. Already observed before (c): the Healthcare stream
+   writes into BigQuery tables on our key — step 3's smoke run landed a row in the converted
+   `Bundle` table. (c) planned against the live state: 2 to add, 3 to change, 3 to destroy — the
+   two dataset-scoped grants, both services' `HEALTHCARE_DATASET_ID` (the only attribute that
+   changes on them) and the dashboard difference; the three destroyed are IAM bindings (the old
+   reader grant being replaced, the worker's project-wide editor role, its unused Document AI
+   role); and `epi` "will no longer be managed by Terraform, but will not be destroyed"._
 6. **Audit log bucket in place.** The logging service account's grant, then `cmek_settings` on the
    existing bucket. _Verify:_ `gcloud logging buckets describe` reports the key; new entries
    arrive.
