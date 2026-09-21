@@ -15,20 +15,30 @@ The line the whole demonstration exists to land:
 
 Say this out loud at the start. It is the difference between a demonstration and a pitch.
 
-| Shown                                                                             | Built?                                                                                                                               |
-| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Canonical submission, ingress gate, fidelity check, EMA transform                 | Yes — `src/`, run by the deployed worker                                                                                             |
-| Validated resources in the Cloud Healthcare FHIR store                            | Yes                                                                                                                                  |
-| Near-real-time BigQuery projection of those resources                             | Yes — the store's native ANALYTICS_V2 stream                                                                                         |
-| Transformation ledger rows with approval and fidelity columns                     | Yes — `ema_flow_ledger_<ENV>.transformation_runs`                                                                                    |
-| Signed evidence and a Provenance resource per approval                            | Yes                                                                                                                                  |
-| MCP query tools (`find_product`, `get_section`, `verify_quote`, `get_provenance`) | **Built and tested, not deployed** — roadmap item 1, `src/query/`, `test/query/`; no `terraform apply` has created the service yet   |
-| An assistant that answers from those tools                                        | **Built and tested, not deployed** — roadmap item 1b, `agent/`; the Agent Engine deploy is scripted in `agent/deploy/`, not executed |
+| Shown                                                                             | Built?                                                                                                                                 |
+| --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Canonical submission, ingress gate, fidelity check, EMA transform                 | Yes — `src/`, run by the deployed worker                                                                                               |
+| Validated resources in the Cloud Healthcare FHIR store                            | Yes                                                                                                                                    |
+| Near-real-time BigQuery projection of those resources                             | Yes — the store's native ANALYTICS_V2 stream                                                                                           |
+| Transformation ledger rows with approval and fidelity columns                     | Yes — `ema_flow_ledger_<ENV>.transformation_runs`                                                                                      |
+| Signed evidence and a Provenance resource per approval                            | Yes                                                                                                                                    |
+| MCP query tools (`find_product`, `get_section`, `verify_quote`, `get_provenance`) | Yes — deployed as `ema-flow-dev-query`; all four answered live 2026-09-21, one audit record per call                                   |
+| Gemini Enterprise answering from those tools (assistant rollout step 1)           | Yes — custom MCP connector `epi verified labels`; a person asked for section 4.4 on 2026-09-21 and got the version 2 sentence verbatim |
+| The self-checking agent (re-verifies every quote, writes an `AgentTurnRecord`)    | **Built and tested, not deployed** — roadmap item 1b, `agent/`; the Agent Engine deploy is scripted in `agent/deploy/`, not executed   |
 
-Where a scene below has an assistant window, it is marked _(item 1/1b — built, not deployed)_
-and a console-only equivalent that works today is given beside it. Nothing in this script
-requires the undeployed parts; do not show a local run of them as if it were the deployed
-service.
+Where a scene below has an assistant window, the Gemini Enterprise version works today through
+the connector. The console-only equivalent is kept beside it because it is the version that
+shows the hashes, and because it is the fallback if the room's network or the trial licence
+misbehaves. What is still not deployed is the self-checking agent (item 1b): Gemini quotes the
+tool's text today because the tool returns it verbatim, not because anything re-checks the
+quote after the answer is composed. Say that distinction, do not blur it.
+
+**The assistant will drift to the public web if you let it.** Asked the same paracetamol
+question on 2026-09-21 with web search on and the connector not selected, Gemini answered
+confidently from third-party labels found on the web and never called the service. Before any
+assistant scene: start a new chat, turn web search off, select `epi verified labels`, and name
+it in the question ("Using epi verified labels, …"). That wrong answer is worth showing first,
+deliberately — see Scene 0.
 
 ## Placeholders
 
@@ -73,7 +83,7 @@ asks `get_provenance` anything.
    resource id. Re-seeding therefore no longer changes which record answers.
 
 Scenes 1 and 2 as written below use the console and BigQuery and do not depend on any of this;
-it matters for the `get_provenance` parts, which are marked _(item 1 — built, not deployed)_.
+it matters for the `get_provenance` parts of the assistant scenes.
 
 ## Seed the set
 
@@ -149,6 +159,21 @@ The three products, all synthetic:
 Version 2 exists for `synthetic-paracetamol` only, and differs from version 1 by exactly one
 sentence in section 4.4.
 
+## Scene 0 — the wrong answer first
+
+Sixty seconds, before anything else. In a fresh Gemini Enterprise chat with web search **on**
+and the connector **not** selected, ask: _"Find the synthetic paracetamol label and show me
+section 4.4."_ On 2026-09-21 Gemini answered with a confident, well-formatted section 4.4
+assembled from real paracetamol labels by other companies in other countries — hepatotoxicity,
+HAGMA, skin reactions, all of it — and none of it from the label that was asked about. It
+looked authoritative. It was wrong about the one thing that mattered: which document it came
+from.
+
+Then a new chat, web search off, `epi verified labels` selected, the same question. One
+sentence, quoted exactly, with the bundle id and version id. **What the audience should see:**
+the difference between an answer that sounds right and an answer that can be checked. Everything
+after this scene is about how the second kind is produced.
+
 ## Scene 1 — one truth, three windows
 
 **What to say.** "This is one section of one label. I am going to show it to you three times, in
@@ -217,14 +242,15 @@ bytes the store streamed, with no code of ours in between.
 
 ### Window 3 — the answer with its receipt
 
-_(Items 1 and 1b — built, not deployed. Show the design note and the test names, not a mock.)_
-The tool call this becomes is `get_section` with the document reference, the language, and
-`sourceKey` `smpc.4.4`, returning the narrative verbatim with `narrativeDivSha256`, plus
-`get_provenance` for the approver, the approver's role, and the source document hash — as
-`test/query/acceptance.test.ts` "verbatim with citations" and "prove where it came from" assert.
+In the Gemini Enterprise web app, connector selected: _"Using epi verified labels, show me
+section 4.4 of the synthetic paracetamol label and tell me who approved it."_ Gemini calls
+`get_section` (the narrative verbatim with `narrativeDivSha256`) and `get_provenance` (the
+approver, the approver's role, the source document hash). Proved 2026-09-21: the answer was the
+version 2 sentence word for word, with the bundle id and version id. The audit records for
+those two calls carry the asking person's own identity, which is the point to make.
 
-What is real today, and worth showing instead: the approval behind that same section, from the
-ledger and from the signed evidence.
+Then show the same fact from the systems of record, because the hashes are what the room can
+check: the approval behind that same section, from the ledger and from the signed evidence.
 
 ```sql
 SELECT run_id, completed_at, status, fidelity_status, manifest_hash, approval_hash,
@@ -299,11 +325,11 @@ ORDER BY version, ema_code;
 sentence to say here: "a diff over a PDF tells you a byte moved; this tells you which regulated
 section of which version of which product changed, and nothing else did."
 
-_(Item 1 — built, not deployed.)_ The tool version of this scene: `get_section` for `smpc.4.4`
-at each version returns two different `narrativeDivSha256` values, and `verify_quote` with the
-version 1 sentence answers match against version 1 and no-match against version 2. That is the
-demonstration the design note asks for once the query service is deployed; until then the two
-queries above make the same point with the systems that are deployed.
+The tool version of this scene, proved live 2026-09-21: `get_section` for `smpc.4.4` at each
+version returns two different `narrativeDivSha256` values, and `verify_quote` with the version
+2 sentence answers `match` (offsets 54–109) while the version 1 sentence it replaced answers
+`no-match`. In the assistant: _"Using epi verified labels, is this sentence on the paracetamol
+label: '<version 1 sentence>'?"_ — the answer is no, and that is the scene.
 
 ## Scene 3 — a question a regulator cannot ask a PDF
 
@@ -335,10 +361,12 @@ answer is a filter over structured content and not a search over text.
 Say plainly what this is not: the narrative is still human-written regulated text; the query
 found it because the section is coded, not because anything understood it.
 
-_(Items 1 and 1b — built, not deployed.)_ The assistant version: the same question in English,
-answered from `find_product` plus `get_section`, every quoted sentence followed by its product,
-version, `sourceKey` and hash, and each quote re-checked through `verify_quote` after the answer
-is composed. One honesty point for the room: `find_product` answers `truncated: true` whenever
+The assistant version, in Gemini Enterprise today: the same question in English, answered from
+`find_product` plus `get_section`, each quote carrying its product, version and `sourceKey`.
+What today's version does **not** do is re-check each quote through `verify_quote` after the
+answer is composed; that is the self-checking agent (item 1b, built, not deployed), and it is
+the difference between "Gemini happened to quote correctly" and "the system refused to emit a
+quote it could not verify". Say which one is on screen. One honesty point for the room: `find_product` answers `truncated: true` whenever
 the answer is shorter than the caller's entitlement holds — either documents went unsearched
 (the scan horizon of 200, or the request's read budget) or more documents matched than `limit`
 returns. So the assistant is never able to present a short list as a complete one. With three
