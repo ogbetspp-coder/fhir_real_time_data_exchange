@@ -55,6 +55,11 @@ regional Cloud Build in `europe-west4` with an EU staging bucket, then set
 `gcp.resourceLocations` to `in:eu-locations` on the product folder. The order matters: the
 policy first would break the build.
 
+_Status 2026-09-21: builds moved, policy pending._ Image builds run in `europe-west4`, staged in
+an EU bucket, since PR #44 — proved on build `07fb41b9…` — and the US staging bucket is deleted;
+every bucket in the project is now in `europe-west4`. The location policy waits for the product
+folder (A1).
+
 **A3. The regulated record itself is on Google-managed keys.** The evidence bucket is CMEK;
 the FHIR dataset (`encryptionSpec` empty), both BigQuery datasets, the regulated audit log
 bucket, the Artifact Registry repository and the Terraform state bucket are not. The store and
@@ -79,10 +84,19 @@ else, so a workflow on any branch of the repository can become the deployer. The
 features:_ restrict the condition to `refs/heads/main` and the deploy workflow, and put the
 deploy job behind a GitHub environment.
 
+_Status 2026-09-21: closed._ The condition now requires the repository by numeric id, the ref
+`refs/heads/main`, and the deploy workflow on main, all three. `scripts/gcp/deploy-identity.sh` is
+its source of truth and `--check` reports drift; `test/infra/deploy-identity.test.ts` pins it. A
+GitHub environment was not added: protection rules on environments need a paid plan for a
+private repository, and the ref and workflow clauses already refuse what an environment would.
+
 **B2. Third-party GitHub Actions are pinned by tag, not by commit.** Nine actions, including
 `google-github-actions/auth`, the step that mints the deployer's credentials. A moved tag runs
 new code with those credentials. _Before features:_ pin every action to a full commit SHA, and
 let an update bot propose moves (C3).
+
+_Status 2026-09-21: closed._ All twenty `uses:` lines are pinned to the commit of the latest
+release in their major version, with that release in a comment; the test fails on any tag.
 
 **B3. Image builds run as the default compute service account** with
 `cloudbuild.builds.builder`. A dedicated build service account with only what building needs is
@@ -91,6 +105,9 @@ legacy Cloud Build service account (`<number>@cloudbuild.gserviceaccount.com`) a
 `cloudbuild.builds.builder`, granted by Google when the API was enabled and outside Terraform.
 Nothing runs as it once builds name their own identity; removing the grant is part of C2's
 trim.
+
+_Status 2026-09-21: closed._ Builds run as `ema-flow-build-dev`, which holds exactly three
+roles; the default compute account holds no project role.
 
 ### C. Hardening — cheap, and overdue
 
@@ -110,6 +127,10 @@ to what the product uses, and make Terraform the only list.
 **C3. No dependency update automation.** No Dependabot or Renovate configuration exists for npm,
 Python, Docker base-image digests, Terraform providers or Actions. Digest pinning without an
 update path means pinned and slowly rotting.
+
+_Status 2026-09-21: closed._ `.github/dependabot.yml` proposes weekly, grouped updates for
+Actions, npm, both uv projects, Docker base images and Terraform providers, each as a pull
+request through the required checks.
 
 **C4. The worker's Healthcare role is project-wide** (`healthcare.fhirResourceEditor` at
 project level) while the query service's reader is dataset-scoped. Already on the roadmap's

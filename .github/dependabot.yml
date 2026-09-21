@@ -1,0 +1,56 @@
+# Every dependency in this repository is pinned — actions by commit, images by digest, npm and
+# Python by lock file, Terraform providers by lock file. A pin without an update path rots
+# (docs/foundations.md, finding C3). Dependabot proposes each move as a pull request, where it
+# must pass the same four required checks as any other change; nothing updates on its own.
+#
+# Weekly and grouped, so the proposals arrive as one reviewable pull request per ecosystem
+# rather than one per package.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      npm:
+        patterns: ["*"]
+
+  - package-ecosystem: uv
+    directory: /agent
+    schedule:
+      interval: weekly
+    groups:
+      agent:
+        patterns: ["*"]
+
+  - package-ecosystem: uv
+    directory: /zone-a
+    schedule:
+      interval: weekly
+    groups:
+      zone-a:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      base-images:
+        patterns: ["*"]
+
+  - package-ecosystem: terraform
+    directory: /infra
+    schedule:
+      interval: weekly
+    groups:
+      terraform:
+        patterns: ["*"]
