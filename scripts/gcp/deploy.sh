@@ -169,6 +169,7 @@ phase_apis() {
     -target=google_artifact_registry_repository_iam_member.build_writer \
     -target=google_project_iam_member.build_log_writer \
     -target=google_logging_project_bucket_config.regulated_audit \
+    -target=google_logging_project_bucket_config.regulated_audit_cmek \
     -target=google_logging_project_sink.regulated_audit \
     "${tf_common_vars[@]}" \
     -var="worker_image=us-docker.pkg.dev/cloudrun/container/hello" \

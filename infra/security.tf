@@ -196,23 +196,18 @@ resource "google_logging_project_bucket_config" "regulated_audit" {
   location       = var.region
   retention_days = min(var.evidence_retention_days, 3650)
   bucket_id      = "${local.name_prefix}-regulated-audit"
-  description    = "Regional retained application, workflow, and Cloud Audit Logs"
+  description    = "Retained audit log until 2026-09-21, Google-managed key; kept until its entries age out"
   # false by default. Setting lock_regulated_audit_log_bucket = true locks the bucket, which
   # cannot be undone: the retention period can no longer be changed and the bucket cannot be
   # deleted until every entry in it has aged past retention_days. Terraform will not unlock it
   # if the variable is later set back to false.
   locked = var.lock_regulated_audit_log_bucket
 
-  # Retained audit log on the audit-logs key (CMEK step 6), set in place: a log bucket's key can be
-  # added without recreating the bucket. It applies to entries written from now on; entries already
-  # in the bucket stay as they were written. The logging service account holds its grant on this
-  # key (keys.tf). If the key is ever unavailable, Cloud Logging buffers new entries for about three
-  # hours and then discards them — which is why the key availability alert must fire in minutes.
-  cmek_settings {
-    kms_key_name = google_kms_crypto_key.record["audit-logs"].id
-  }
-
-  depends_on = [google_project_service.required, google_kms_crypto_key_iam_member.record_agent]
+  # Receives nothing since CMEK step 6: the sink below writes to regulated_audit_cmek. A log
+  # bucket's key can only be set at creation — the API refuses otherwise ("Cannot add a CMEK key to
+  # a non-CMEK bucket. CMEK must be enabled at bucket creation.") — so the entries written before
+  # the switch stay here, retained, until they age out.
+  depends_on = [google_project_service.required]
 
   # Never destroyed by an apply (docs/foundations.md; docs/design/cmek-rollout.md, step 0).
   # Destroying this deletes the retained audit log; renaming bucket_id is a destroy.
@@ -221,9 +216,32 @@ resource "google_logging_project_bucket_config" "regulated_audit" {
   }
 }
 
+# The retained audit log on the audit-logs key (CMEK step 6). Created with the key, because a log
+# bucket's key cannot be added afterwards. The logging service account holds its grant on the key
+# (keys.tf). If the key is ever unavailable, Cloud Logging buffers new entries for about three hours
+# and then discards them — which is why the key availability alert must fire in minutes.
+resource "google_logging_project_bucket_config" "regulated_audit_cmek" {
+  project        = var.project_id
+  location       = var.region
+  retention_days = min(var.evidence_retention_days, 3650)
+  bucket_id      = "${local.name_prefix}-regulated-audit-cmek"
+  description    = "Regional retained application, workflow, and Cloud Audit Logs, on the audit-logs key"
+  locked         = var.lock_regulated_audit_log_bucket
+
+  cmek_settings {
+    kms_key_name = google_kms_crypto_key.record["audit-logs"].id
+  }
+
+  depends_on = [google_project_service.required, google_kms_crypto_key_iam_member.record_agent]
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
 resource "google_logging_project_sink" "regulated_audit" {
   name                   = "${local.name_prefix}-regulated-audit"
-  destination            = "logging.googleapis.com/${google_logging_project_bucket_config.regulated_audit.id}"
+  destination            = "logging.googleapis.com/${google_logging_project_bucket_config.regulated_audit_cmek.id}"
   unique_writer_identity = true
   filter                 = <<-EOT
     resource.type=("cloud_run_revision" OR "workflows.googleapis.com/Workflow" OR "healthcare_fhir_store")

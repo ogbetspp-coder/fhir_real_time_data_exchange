@@ -37,9 +37,12 @@ locked) and the live estate before anything ran. Four findings would each have d
    dataset, a registry or a log bucket in Terraform is destroy-and-create — and because the FHIR
    stores live outside Terraform, the plan would have shown one dataset, never the stores in it,
    so the draft's own "no data-holding resource destroyed" rule could not have caught it.
-4. **The log bucket did not need recreating.** Its key can be set in place.
+4. ~~**The log bucket did not need recreating.** Its key can be set in place.~~ **Wrong, as the
+   API showed:** applied in step 6, the update was refused — "Cannot add a CMEK key to a non-CMEK
+   bucket. CMEK must be enabled at bucket creation." The draft's original approach, a new bucket,
+   was right. Recorded rather than erased: the review was valuable and this finding of it was not.
 
-Each is fixed below. Step 0 exists because of the first three.
+Each of the first three is fixed below; step 0 exists because of them. The fourth was reversed by the API.
 
 ## Key design
 
@@ -190,9 +193,13 @@ be destroyed` on the ledger table — step 0 refusing the replacement the provid
    dataset — holding only the superseded synthetic copy, referenced by nothing — was deleted. The
    project's only FHIR dataset is now on the `fhir-record` key. Lesson recorded: before migrating
    a resource, diff its live IAM against Terraform._
-6. **Audit log bucket in place.** The logging service account's grant, then `cmek_settings` on the
-   existing bucket. _Verify:_ `gcloud logging buckets describe` reports the key; new entries
-   arrive.
+6. **Audit log bucket, recreated.** A second bucket, `ema-flow-<env>-regulated-audit-cmek`,
+   created with the `audit-logs` key, same retention and lock setting, `prevent_destroy`; the sink
+   moved to it. The old bucket stays managed and protected, receiving nothing, keeping its entries
+   until they age out. _Verify:_ the new bucket reports the key; new entries arrive in it.
+   _2026-09-21: first attempted in place (PR #65); the deploy failed at the targeted apply because
+   the API refuses a key on an existing bucket, which left every deploy failing at that step until
+   this was fixed. No service was affected: the failure precedes the build and the apply._
 7. **Storage.** Default key on the profiles, build-staging and state buckets; existing objects
    rewritten. The state bucket is created by `deploy.sh`, not Terraform, so its key and IAM are set
    by script: the legacy project viewer, editor and owner bindings removed, leaving the deployer

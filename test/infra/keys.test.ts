@@ -170,8 +170,15 @@ describe("the FHIR dataset on the fhir-record key", () => {
 });
 
 describe("the retained audit log on the audit-logs key", () => {
-  it("is encrypted in place with the audit-logs key", () => {
-    const bucket = block("google_logging_project_bucket_config", "regulated_audit");
+  it("is a bucket created with the audit-logs key, and the sink writes to it", () => {
+    // A log bucket's key can only be set at creation; the API refused setting one in place.
+    expect(block("google_logging_project_bucket_config", "regulated_audit")).not.toContain(
+      "cmek_settings",
+    );
+    expect(block("google_logging_project_sink", "regulated_audit")).toContain(
+      "google_logging_project_bucket_config.regulated_audit_cmek.id",
+    );
+    const bucket = block("google_logging_project_bucket_config", "regulated_audit_cmek");
     expect(bucket).toMatch(
       /cmek_settings\s*\{\s*kms_key_name\s*=\s*google_kms_crypto_key\.record\["audit-logs"\]\.id/,
     );
