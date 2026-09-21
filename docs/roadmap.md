@@ -49,7 +49,7 @@ environment" is built, not delivered.
 | Per-client retention as native Cloud Storage policy                                                                       | Cloud Storage, Terraform variables              | Applied by Terraform; no object has yet aged to test expiry                                                                                                                                                                                                      |
 | Official HL7 validation before merge, and one proven run after every deploy                                               | GitHub Actions, HL7 validator 6.10.4            | CI job "Official validation" green 2026-09-20 (run 35545408243); deploy smoke step green 2026-09-21 with `status: persisted`                                                                                                                                     |
 | Deploy pipeline with a quality gate that runs before any cloud credential exists                                          | GitHub Actions, Terraform, Cloud Build          | Green end to end, repeatedly                                                                                                                                                                                                                                     |
-| Local full-pipeline runner against the deployed environment's own configuration                                           | `scripts/dev/run-pipeline.ts`, pinned validator | Dry run exercised 2026-09-21; written because four defects each cost a twelve-minute deploy to find                                                                                                                                                              |
+| Local full-pipeline runner against the deployed environment's own configuration                                           | `scripts/dev/run-pipeline.ts`, pinned validator | Run `627d1dbb-348f-43c3-9535-1d2a64594286`, 2026-09-21, `--persist` from a laptop: official and Cloud Healthcare validation both executed with 0 errors, `persisted`, manifest signed, 7 artefacts, **13.7 seconds** against a twelve-minute deploy              |
 
 ## Open gaps in delivered controls
 
@@ -166,9 +166,10 @@ So the claim is narrow and should stay narrow:
    guarantees, so check it on the day. `docs/demo/verifiable-label.md` repeats this.
 4. **Deploying between seeding and demonstrating is safe** as of 2026-09-21. The smoke step
    publishes `synthetic-smoketest`, which nothing demonstrates, so a deploy no longer writes over
-   a seeded label. It does leave a fourth document in the store that the demonstration does not
-   mention, and `find_product` will return it for a query broad enough to match — worth knowing
-   before someone types "synthetic" into the assistant in front of an audience.
+   a seeded label. It does leave a fourth document in the store — but the entitlement map names
+   only the three demonstration bundles, so the query service never returns it: `find_product`
+   on the deliberately broad query "synthetic" answers with exactly the three labels and
+   `truncated: false`. Entitlement, not tidiness, is what keeps it out of sight.
 5. **Set the four GitHub Actions repository variables** — done 2026-09-20; all four are set
    (Settings → Secrets and variables → Actions → Variables). They are variables and not secrets: an IAM member string, an opaque
    subject id, a bundle id and an OAuth client id are identifiers, and holding one grants
