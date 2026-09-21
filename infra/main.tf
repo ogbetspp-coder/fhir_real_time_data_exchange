@@ -88,6 +88,12 @@ resource "google_bigquery_dataset" "ledger" {
   labels                     = local.labels
 
   depends_on = [google_project_service.required]
+
+  # Never destroyed by an apply (docs/foundations.md; docs/design/cmek-rollout.md, step 0).
+  # Holds the transformation ledger, which is a record, not a projection.
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "google_bigquery_table" "transformation_runs" {
@@ -103,9 +109,9 @@ resource "google_bigquery_table" "transformation_runs" {
 
   # Columns added after the first release are NULLABLE so BigQuery evolves the schema in place
   # and existing rows stay valid. Removing or retyping one is a different matter: the provider
-  # would plan a replacement, and `deletion_protection` defaults to false, so nothing here would
-  # stop it. Treat an edit to an existing column as a migration requiring an explicit plan
-  # review, not as an ordinary schema change.
+  # would plan a replacement. `deletion_protection` (on by default) and `prevent_destroy` below
+  # now make that plan fail rather than apply; treat an edit to an existing column as a migration
+  # requiring an explicit plan review, not as an ordinary schema change.
   schema = jsonencode([
     { name = "run_id", type = "STRING", mode = "REQUIRED" },
     { name = "completed_at", type = "TIMESTAMP", mode = "REQUIRED" },
@@ -121,6 +127,12 @@ resource "google_bigquery_table" "transformation_runs" {
     { name = "fidelity_status", type = "STRING", mode = "NULLABLE", description = "Narrative fidelity outcome; only passed can be persisted" },
     { name = "approval_hash", type = "STRING", mode = "NULLABLE", description = "SHA-256 of the content a human approved" },
   ])
+
+  # Never destroyed by an apply (docs/foundations.md; docs/design/cmek-rollout.md, step 0).
+  # The ledger. deletion_protection covers a destroy; this also refuses a plan that would replace it.
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "google_pubsub_topic" "fhir_changes" {
@@ -144,6 +156,13 @@ resource "google_healthcare_dataset" "epi" {
   location = var.region
 
   depends_on = [google_project_service.required]
+
+  # Never destroyed by an apply (docs/foundations.md; docs/design/cmek-rollout.md, step 0).
+  # The FHIR stores live inside this dataset but outside Terraform (scripts/gcp/reconcile-fhir-stores.sh),
+  # so a plan that destroys it shows one resource and deletes every store.
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "google_bigquery_dataset_iam_member" "healthcare_stream_writer" {

@@ -66,9 +66,15 @@ variable "alert_notification_channels" {
 }
 
 variable "deletion_protection" {
-  description = "Protect Cloud Run and Healthcare resources from accidental deletion."
+  description = <<-EOT
+    Protect the ledger table, the Cloud Run services and the workflow from deletion by an apply.
+    On by default since 2026-09-21: while it defaulted to false, any change the provider treats as
+    forcing replacement of the ledger table — a retyped column, an encryption key — would have
+    been applied by the unattended deploy as a delete and a create. Set it false only for a
+    deliberate, reviewed teardown.
+  EOT
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "enforce_binary_authorization" {
