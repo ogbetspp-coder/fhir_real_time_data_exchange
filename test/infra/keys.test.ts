@@ -96,3 +96,18 @@ describe("the key deny policy", () => {
     );
   });
 });
+
+describe("who signs run manifests", () => {
+  it("the worker signs with the HSM key's named version, and holds nothing on the software key", () => {
+    const run = readFileSync("infra/run.tf", "utf8");
+    expect(run).toContain(
+      'value = "${google_kms_crypto_key.manifest_signing_hsm.id}/cryptoKeyVersions/${var.kms_manifest_key_version}"',
+    );
+    const grantsOnSoftwareKey = blocks.filter(
+      ({ type, body }) =>
+        type === "google_kms_crypto_key_iam_member" &&
+        /crypto_key_id\s*=\s*google_kms_crypto_key\.manifest_signing\.id/.test(body),
+    );
+    expect(grantsOnSoftwareKey).toEqual([]);
+  });
+});
