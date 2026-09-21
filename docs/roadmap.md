@@ -76,8 +76,11 @@ control believed to be stronger than it is is worse than a control known to be w
   verified honoured rather than assumed: reversing it swapped the two paracetamol records. The
   tie-break lives in code and not in a second sort key because a tie could not be produced
   against the live store without writing into it, and the validated store holds only what the
-  pipeline published. Residual, stated rather than hidden: a document with more approvals than
-  one page that all share the newest timestamp could still see the page composed differently.
+  pipeline published. Verified deployed: on revision `ema-flow-dev-query-00013-2fv`, three
+  `get_provenance` calls for `0c18c50e…` — the document with two approvals — each answered with
+  `17774cb7-3424-5580-a631-fdf871c00270`, `recorded` 2026-09-20, the version 2 record. Residual,
+  stated rather than hidden: a document with more approvals than one page that all share the
+  newest timestamp could still see the page composed differently.
 
 ## Next, in order
 
