@@ -88,7 +88,10 @@ _Status 2026-09-21: closed._ The condition now requires the repository by numeri
 `refs/heads/main`, and the deploy workflow on main, all three. `scripts/gcp/deploy-identity.sh` is
 its source of truth and `--check` reports drift; `test/infra/deploy-identity.test.ts` pins it. A
 GitHub environment was not added: protection rules on environments need a paid plan for a
-private repository, and the ref and workflow clauses already refuse what an environment would.
+private repository, and the ref and workflow clauses already refuse what an environment would. Proved both ways on 2026-09-21: the deploy of PR #45's merge authenticated from main (run
+`35632667284`), and the same workflow dispatched from a branch `probe/wif-refusal` was refused at
+the token exchange — `failed to generate Google Cloud federated token` — and never reached the
+build or the apply (run `35632866108`).
 
 **B2. Third-party GitHub Actions are pinned by tag, not by commit.** Nine actions, including
 `google-github-actions/auth`, the step that mints the deployer's credentials. A moved tag runs
@@ -165,6 +168,16 @@ what the validator installs; only its own `.index.json` files differ. With the n
 and an empty cache it refuses to run, which is the check the fix will use. The same run showed
 the validator adopting the machine's locale and jurisdiction (Denmark on the owner's laptop),
 which is a second reproducibility gap to pin.
+
+_Status 2026-09-21: fixed, pending deploy verification._ Worse than first recorded: the deployed
+sidecar downloaded all nine packages **on every cold start** — validator ready at 48 seconds,
+worker at 57 — and validated EMA content under United States jurisdiction. The packages are now
+pinned in `fhir/validator-packages.lock`, installed into the image, and the validator runs with
+`-no-http-access`, no route to the network and `-jurisdiction uv -locale en-US` — which also
+closes a request-forgery path from submitted content to internal addresses; the CI gate uses the same list and
+the same JVM properties and fails on any download attempt; every image build proves the
+validator starts with networking disabled. Details in `docs/validation/README.md`, "Official
+validation gate".
 
 ### D. The repository
 

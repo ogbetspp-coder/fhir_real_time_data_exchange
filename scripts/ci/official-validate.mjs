@@ -2,9 +2,25 @@
 
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+
+import {
+  PACKAGE_LOCK,
+  networkUse,
+  packageSummary,
+  readPackageLock,
+  readSidecarPins,
+} from "./validator-pins.mjs";
 
 // Runs the official HL7 FHIR validator — the same validator_cli.jar and the same four
 // implementation-guide packages the worker's sidecar runs, at the same pins — over the four
@@ -14,10 +30,16 @@ import path from "node:path";
 // run was attempted. This is the CI gate that makes that class of defect visible on the pull
 // request instead.
 //
-// One source of truth: the validator version, the package URLs, every checksum, and the
-// sidecar's flags (-version, -tx, and the ordered -ig list) are parsed from Dockerfile.validator
-// at run time, never restated here. A Dockerfile whose ARG, RUN, or CMD lines cannot be parsed
-// fails the run rather than validating with a guessed pin.
+// One source of truth: the validator version, the package URLs, every checksum, the sidecar's
+// flags (-version, -jurisdiction, -locale, -tx, and the ordered -ig list) and its JVM properties
+// are parsed from Dockerfile.validator at run time, and the packages the validator resolves on
+// its own come from fhir/validator-packages.lock — the same list the image installs. Nothing is
+// restated here. A Dockerfile or list that cannot be parsed fails the run rather than
+// validating with a guessed pin (scripts/ci/validator-pins.mjs).
+//
+// Hermetic: the validator runs with the sidecar's own closed proxy and a package cache seeded
+// from the list, so it cannot fetch anything. Any line showing it tried to — installing a
+// package, fetching, or failing to fetch — fails the run as a validator failure.
 //
 // Verdict: the run fails on any "Error @" or "Fatal @" line in the validator's output, and
 // every such line is printed. The validator's exit code alone is not trusted — a validator that
@@ -66,113 +88,6 @@ function parseArgs(argv) {
   return options;
 }
 
-// Comment lines dropped and continuation lines joined, as the builder reads them.
-function instructions(text) {
-  const joined = [];
-  let open = null;
-  for (const line of text.split(/\r?\n/)) {
-    if (/^\s*#/.test(line)) continue;
-    const continued = /\\\s*$/.test(line);
-    const body = continued ? line.replace(/\\\s*$/, "") : line;
-    if (open === null) open = body;
-    else open += ` ${body.trim()}`;
-    if (!continued) {
-      joined.push(open);
-      open = null;
-    }
-  }
-  if (open !== null) joined.push(open);
-  return joined;
-}
-
-const SHA256_HEX = /^[0-9a-f]{64}$/;
-
-// The pins: ARG name=value lines, the `curl ... "<url>" -o <file> && echo "${SHA} <file>" |
-// sha256sum --check` pairs of the RUN instruction with ${ARG} substituted, and the sidecar's
-// validator flags from the CMD line. Each is required; a Dockerfile that has drifted from this
-// shape fails here rather than being silently half-read.
-function readSidecarPins(dockerfile) {
-  const lines = instructions(readFileSync(dockerfile, "utf8"));
-  const name = path.basename(dockerfile);
-
-  const args = new Map();
-  for (const line of lines) {
-    const match = /^\s*ARG\s+([A-Z0-9_]+)=(\S+)\s*$/.exec(line);
-    if (match !== null) args.set(match[1], match[2]);
-  }
-  if (args.size === 0) throw new Error(`${name}: no ARG name=value line could be parsed`);
-
-  const substitute = (text) =>
-    text.replace(/\$\{([A-Z0-9_]+)\}/g, (_, key) => {
-      const value = args.get(key);
-      if (value === undefined) throw new Error(`${name}: \${${key}} is not declared by an ARG`);
-      return value;
-    });
-
-  const artefacts = [];
-  const download =
-    /curl\s+(?:-\S+\s+)*"([^"]+)"\s+-o\s+(\S+)\s+&&\s+echo\s+"\$\{([A-Z0-9_]+)\}\s+(\S+)"\s+\|\s+sha256sum\s+--check/g;
-  for (const line of lines) {
-    if (!/^\s*RUN\b/.test(line)) continue;
-    for (const match of line.matchAll(download)) {
-      const [, url, file, checksumArg, checkedFile] = match;
-      if (file !== checkedFile) {
-        throw new Error(`${name}: ${file} is downloaded but ${checkedFile} is checksummed`);
-      }
-      const sha256 = args.get(checksumArg);
-      if (sha256 === undefined || !SHA256_HEX.test(sha256)) {
-        throw new Error(`${name}: ARG ${checksumArg} is missing or is not a SHA-256 hex digest`);
-      }
-      artefacts.push({ file, url: substitute(url), sha256 });
-    }
-  }
-  const jar = artefacts.find(({ file }) => file === "validator_cli.jar");
-  if (jar === undefined) throw new Error(`${name}: no checksummed validator_cli.jar download`);
-
-  const cmd = lines.find((line) => /^\s*CMD\s+\[/.test(line));
-  if (cmd === undefined) throw new Error(`${name}: no CMD [...] line`);
-  let tokens;
-  try {
-    tokens = JSON.parse(cmd.replace(/^\s*CMD\s+/, ""));
-  } catch {
-    throw new Error(`${name}: the CMD line is not a JSON array`);
-  }
-  // The server-mode arguments (subcommand, port, -allowNetworkAccess) are the sidecar's; the
-  // validation arguments are shared with CLI mode and are what is reproduced here.
-  const flags = [];
-  const packages = [];
-  for (let index = 0; index < tokens.length; index += 1) {
-    const token = tokens[index];
-    if (token === "-version" || token === "-tx") {
-      const value = tokens[index + 1];
-      if (typeof value !== "string") throw new Error(`${name}: CMD ${token} has no value`);
-      flags.push(token, value);
-      index += 1;
-    } else if (token === "-ig") {
-      const value = tokens[index + 1];
-      if (typeof value !== "string") throw new Error(`${name}: CMD -ig has no value`);
-      const file = path.posix.basename(value);
-      if (!artefacts.some((artefact) => artefact.file === file)) {
-        throw new Error(`${name}: CMD loads ${value}, which the RUN line does not download`);
-      }
-      packages.push(file);
-      index += 1;
-    }
-  }
-  if (!flags.includes("-version") || !flags.includes("-tx")) {
-    throw new Error(`${name}: CMD does not carry both -version and -tx`);
-  }
-  if (packages.length === 0) throw new Error(`${name}: CMD loads no -ig package`);
-  const expectedPackages = artefacts.filter(({ file }) => file !== "validator_cli.jar");
-  if (packages.length !== expectedPackages.length) {
-    throw new Error(
-      `${name}: CMD loads ${packages.length} packages but the RUN line downloads ${expectedPackages.length}`,
-    );
-  }
-
-  return { version: args.get("VALIDATOR_VERSION") ?? "unknown", artefacts, flags, packages };
-}
-
 function sha256Of(file) {
   return createHash("sha256").update(readFileSync(file)).digest("hex");
 }
@@ -207,6 +122,56 @@ async function ensureArtefact(directory, { file, url, sha256 }, offline) {
   console.log(`  ${file}: ${bytes.length} bytes, checksum verified`);
 }
 
+// Installs one pinned package into the gate's own package cache, exactly as Dockerfile.validator
+// does in the image: the registry tarball, verified against the lock's checksum, unpacked into
+// <home>/.fhir/packages/<id>#<version>. A marker outside the cache records which checksum was
+// unpacked, so a changed pin re-unpacks and an unchanged one is not unpacked twice.
+async function seedPackage(validatorDir, home, entry, offline) {
+  const tarballs = path.join(validatorDir, "packages");
+  mkdirSync(tarballs, { recursive: true });
+  await ensureArtefact(
+    tarballs,
+    { file: `${entry.key}.tgz`, url: entry.url, sha256: entry.sha256 },
+    offline,
+  );
+
+  const cache = path.join(home, ".fhir", "packages");
+  const target = path.join(cache, entry.key);
+  const markers = path.join(validatorDir, "seeded");
+  const marker = path.join(markers, entry.key);
+  mkdirSync(markers, { recursive: true });
+  if (existsSync(target) && existsSync(marker) && readFileSync(marker, "utf8") === entry.sha256) {
+    return;
+  }
+  rmSync(target, { recursive: true, force: true });
+  mkdirSync(target, { recursive: true });
+  const untar = spawnSync("tar", ["-xzf", path.join(tarballs, `${entry.key}.tgz`), "-C", target], {
+    encoding: "utf8",
+  });
+  if (untar.error !== undefined || untar.status !== 0) {
+    throw new Error(`could not unpack ${entry.key}: ${untar.error?.message ?? untar.stderr}`);
+  }
+  writeFileSync(marker, entry.sha256);
+  console.log(`  ${entry.key}: unpacked into the package cache`);
+}
+
+// The id and version a package declares for itself, read from package/package.json inside the
+// tarball — the form the validator's "Package Summary" uses.
+function igPackageId(tarball) {
+  const read = spawnSync("tar", ["-xzOf", tarball, "package/package.json"], {
+    encoding: "utf8",
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  if (read.error !== undefined || read.status !== 0) {
+    throw new Error(`could not read package.json from ${path.basename(tarball)}`);
+  }
+  const { name, version } = JSON.parse(read.stdout);
+  if (typeof name !== "string" || typeof version !== "string") {
+    throw new Error(`${path.basename(tarball)}: package.json has no name and version`);
+  }
+  return `${name}#${version}`;
+}
+
 function emitValidationSet(setDir) {
   const tsx = path.join(root, "node_modules", ".bin", "tsx");
   const script = path.join(root, "scripts", "ci", "emit-validation-set.ts");
@@ -226,8 +191,14 @@ function javaExecutable() {
 
 const ISSUE_LINE = /^\s*(?:Error|Fatal) @/;
 
-function validate(java, pins, validatorDir, setDir, entry) {
+function validate(java, pins, validatorDir, home, setDir, entry) {
+  // The sidecar's own JVM properties — the closed proxy included — with the package cache moved
+  // to the gate's seeded copy.
+  const properties = pins.jvmProperties.map((property) =>
+    property.startsWith("-Duser.home=") ? `-Duser.home=${home}` : property,
+  );
   const args = [
+    ...properties,
     "-Xmx3g",
     "-jar",
     path.join(validatorDir, "validator_cli.jar"),
@@ -258,7 +229,14 @@ function validate(java, pins, validatorDir, setDir, entry) {
   });
   const issues = lines.filter((line) => ISSUE_LINE.test(line));
 
-  return { status: run.status, issues, unloaded, tail: lines.filter(Boolean).slice(-30) };
+  return {
+    status: run.status,
+    issues,
+    unloaded,
+    network: networkUse(lines),
+    loaded: packageSummary(lines),
+    tail: lines.filter(Boolean).slice(-30),
+  };
 }
 
 async function main() {
@@ -273,6 +251,30 @@ async function main() {
   for (const artefact of pins.artefacts) {
     await ensureArtefact(options.validatorDir, artefact, options.offline);
   }
+
+  // The packages the validator resolves beyond the -ig files, from the same list the image
+  // installs. The validator then runs with no network route: a dependency missing from the list
+  // is a failure, not a download.
+  const lock = readPackageLock(path.join(root, PACKAGE_LOCK));
+  const home = path.join(options.validatorDir, "home");
+  const cache = path.join(home, ".fhir", "packages");
+  mkdirSync(cache, { recursive: true });
+  writeFileSync(path.join(cache, "packages.ini"), "[cache]\nversion = 4\n");
+  console.log(`Package cache from ${PACKAGE_LOCK} (${lock.length} packages):`);
+  // A package dropped from the list must not linger in a local cache and keep a run passing.
+  const listed = new Set(lock.map(({ key }) => key));
+  for (const name of readdirSync(cache)) {
+    if (name.includes("#") && !listed.has(name)) {
+      rmSync(path.join(cache, name), { recursive: true, force: true });
+      console.log(`  ${name}: removed from the package cache, no longer listed`);
+    }
+  }
+  for (const entry of lock) await seedPackage(options.validatorDir, home, entry, options.offline);
+
+  // Everything the validator may load: the listed packages and the four -ig files, by the id and
+  // version each declares in its own package.json.
+  const pinned = new Set(listed);
+  for (const file of pins.packages) pinned.add(igPackageId(path.join(options.validatorDir, file)));
 
   const setDir =
     options.setDir ??
@@ -297,7 +299,39 @@ async function main() {
     const label = `${entry.file} (${entry.resourceType}) against ${entry.profiles.length} profile${entry.profiles.length === 1 ? "" : "s"}`;
     console.log(`\nValidating ${label}`);
     for (const profile of entry.profiles) console.log(`  -profile ${profile}`);
-    const result = validate(java, pins, options.validatorDir, setDir, entry);
+    const result = validate(java, pins, options.validatorDir, home, setDir, entry);
+
+    const { installs, refused, other } = result.network;
+    if (installs.length > 0 || other.length > 0) {
+      failed = true;
+      console.log("  VALIDATOR FAILURE: the validator needed something that is not pinned");
+      for (const line of [...installs, ...other]) console.log(`  | ${line.trim()}`);
+      summary.push(`${entry.file}: ${installs.length} install(s), ${other.length} fetch error(s)`);
+      continue;
+    }
+    if (result.loaded === undefined) {
+      failed = true;
+      console.log("  VALIDATOR FAILURE: no package summary, so what was loaded is unknown");
+      for (const line of result.tail) console.log(`  | ${line}`);
+      summary.push(`${entry.file}: no package summary`);
+      continue;
+    }
+    const unpinned = result.loaded.filter((key) => !pinned.has(key));
+    if (unpinned.length > 0) {
+      failed = true;
+      console.log(
+        `  VALIDATOR FAILURE: loaded packages that are not pinned: ${unpinned.join(", ")}`,
+      );
+      summary.push(`${entry.file}: loaded unpinned ${unpinned.join(", ")}`);
+      continue;
+    }
+    console.log(`  loaded ${result.loaded.length} packages, every one pinned`);
+    if (refused.length > 0) {
+      console.log(
+        `  ${refused.length} optional lookup(s) refused by -no-http-access; no network used:`,
+      );
+      for (const line of refused) console.log(`  | ${line.trim()}`);
+    }
 
     if (result.unloaded.length > 0) {
       failed = true;

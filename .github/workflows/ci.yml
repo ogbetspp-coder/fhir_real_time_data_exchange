@@ -72,25 +72,17 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      # Keyed by the Dockerfile's content: the script verifies every cached artefact against
-      # the pinned checksum before use, so a stale or tampered cache entry is re-downloaded,
-      # never trusted.
+      # Keyed by the Dockerfile and the package list: the script verifies every cached tarball
+      # against its pinned checksum before use, so a stale or tampered entry is re-downloaded,
+      # never trusted. The seeded package cache lives inside this directory too. There is no
+      # separate cache of ~/.fhir/packages any more: that one was restored from any earlier key,
+      # so on a warm runner it hid every download the validator made and could supply packages
+      # nobody had pinned.
       - name: Cache the validator and its packages
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .cache/official-validator
-          key: official-validator-${{ hashFiles('Dockerfile.validator') }}
-
-      # The validator fetches the FHIR core and dependency packages it needs beyond the four
-      # pinned -ig files into its own package cache on first use; caching that directory only
-      # saves the download, since the four pinned packages are checked by checksum regardless.
-      - name: Cache the validator's package cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.fhir/packages
-          key: fhir-packages-${{ hashFiles('Dockerfile.validator') }}
-          restore-keys: |
-            fhir-packages-
+          key: official-validator-${{ hashFiles('Dockerfile.validator', 'fhir/validator-packages.lock') }}
 
       - name: Validate the fixture against the official HL7 validator
         run: npm run validate:official

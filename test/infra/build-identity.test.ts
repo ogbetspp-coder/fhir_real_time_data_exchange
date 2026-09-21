@@ -49,7 +49,8 @@ describe("the image build identity", () => {
 
 describe("the deploy's image build", () => {
   const script = readFileSync("scripts/gcp/deploy.sh", "utf8");
-  const submit = /gcloud --quiet builds submit[^;]*?\.;\s*then/s.exec(script)?.[0] ?? "";
+  const submit =
+    /gcloud --quiet builds submit[^;]*?\. 2>&1 \| tee "\$build_log"; then/s.exec(script)?.[0] ?? "";
 
   it("is the one build submission, and it was found", () => {
     expect(submit).not.toBe("");

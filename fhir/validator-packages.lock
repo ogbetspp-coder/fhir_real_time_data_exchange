@@ -1,0 +1,25 @@
+# Packages the official HL7 validator resolves on its own, beyond the four -ig files that
+# Dockerfile.validator downloads and names. Without this list the validator fetched every one of
+# them from the FHIR package registry on each start — in the deployed sidecar, on every cold start
+# (measured 2026-09-21: about 45 of the worker's 57 seconds to ready) — so what it validated
+# against was whatever the registry served that day, and it could not start without it.
+#
+# One list, three readers: Dockerfile.validator installs these into the image's package cache at
+# build time, scripts/ci/official-validate.mjs seeds the CI gate's cache from them, and both then
+# run the validator with no network route, so an unlisted dependency fails loudly instead of
+# being fetched.
+#
+# Each line: <package id> <version> <sha256 of the tarball served at
+# https://packages2.fhir.org/packages/<id>/<version>>. Measured 2026-09-21 by running the pinned
+# validator with the gate's exact flags in an empty cache and recording every package it
+# installed; every content file of each tarball below is byte-identical to what the validator
+# installed from the network (only its own .index.json files differ, which it regenerates).
+hl7.fhir.r5.core 5.0.0 74b27cd1bfce9e80eaceac431edf230b0945a443564fbf5512f82e5fa50a80d4
+hl7.fhir.xver-extensions 0.1.0 f3bb9fa2083402e88a02b41f433655274e8a1cca563211c8f7ba6fd0badf537a
+hl7.terminology 7.3.0 8318f87cdcb44a6dfc5c197ca569c9b0499b06f45522324bfc4b4b810d51d4b9
+hl7.terminology.r5 5.0.0 0716450a0ee1fc452794c163c395782f5ebe4ecf177b426e20782dcfe3250906
+hl7.terminology.r5 6.2.0 4b492a0721d96f8c848142b581b1c87b58d427c358ec4b04be059d1b13d0d894
+hl7.terminology.r5 7.1.0 473303108b5607aad7b910581739e8bbf3e61a625ed9e739c66e0ca597d4aefe
+hl7.fhir.uv.extensions.r5 1.0.0 b60edfadff29ef16a5a253083f33b1c6f83646b3cda1691745453162edbd86b9
+hl7.fhir.uv.extensions.r5 5.2.0 e02fc6eff0f37c1611a35aa93ef9aaa3b55ab7371a5c96f4d2a5834106a13170
+hl7.fhir.uv.extensions.r5 5.3.0 f1039cac888d79ebd29878d7debe5e647ffe7ed962a9033da095258a03a06105

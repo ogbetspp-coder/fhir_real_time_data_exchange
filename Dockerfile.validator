@@ -35,11 +35,51 @@ RUN curl -fL \
       -o extensions-package.tgz \
     && echo "${EXTENSIONS_SHA256}  extensions-package.tgz" | sha256sum --check -
 
+# The packages the validator resolves on its own beyond the four -ig files, pinned by checksum in
+# fhir/validator-packages.lock and installed into the package cache at build time. Without this
+# the sidecar downloaded all nine from the FHIR registry on every cold start (about 45 of the
+# worker's 57 seconds to ready, measured 2026-09-21), validated against whatever the registry
+# served that day, and could not start without it. Each tarball is verified before it is
+# unpacked; a mismatch fails the build.
+COPY fhir/validator-packages.lock /opt/fhir/validator-packages.lock
+# Statements are separated by `;`, not chained with `&&`, and every step that can fail exits
+# explicitly. POSIX `set -e` is ignored for any command inside an AND-OR list other than the
+# last, so a loop chained with `&&` would carry on past a checksum mismatch and ship the package.
+RUN set -eu; \
+    cache=/opt/fhir/home/.fhir/packages; \
+    mkdir -p "$cache"; \
+    printf '[cache]\nversion = 4\n' > "$cache/packages.ini"; \
+    grep -Ev '^[[:space:]]*(#|$)' /opt/fhir/validator-packages.lock > /tmp/packages.txt; \
+    while read -r id version sha256; do \
+      curl -fsSL "https://packages2.fhir.org/packages/${id}/${version}" -o /tmp/package.tgz || exit 1; \
+      echo "${sha256}  /tmp/package.tgz" | sha256sum --check - || exit 1; \
+      mkdir -p "$cache/${id}#${version}" || exit 1; \
+      tar -xzf /tmp/package.tgz -C "$cache/${id}#${version}" || exit 1; \
+      rm /tmp/package.tgz; \
+    done < /tmp/packages.txt; \
+    installed="$(ls -d "$cache"/*#* | wc -l)"; \
+    listed="$(wc -l < /tmp/packages.txt)"; \
+    [ "$installed" -eq "$listed" ] || { echo "installed $installed packages, listed $listed" >&2; exit 1; }; \
+    rm /tmp/packages.txt
+
 EXPOSE 8090
-ENTRYPOINT ["java", "-Xms768m", "-Xmx1536m", "-jar", "/opt/fhir/validator_cli.jar"]
+# -Duser.home points the validator at the package cache installed above. The proxy settings give
+# it no route out: any attempt to fetch a package, a profile or anything else fails loudly at a
+# closed local port instead of reaching the internet, so an unlisted dependency is a startup
+# failure, never a silent download. Inbound requests from the worker are unaffected.
+ENTRYPOINT ["java", "-Xms768m", "-Xmx1536m", "-Duser.home=/opt/fhir/home", "-Djava.net.useSystemProxies=false", "-Dhttp.proxyHost=127.0.0.1", "-Dhttp.proxyPort=9", "-Dhttps.proxyHost=127.0.0.1", "-Dhttps.proxyPort=9", "-jar", "/opt/fhir/validator_cli.jar"]
 # -allowNetworkAccess: without it, FhirValidatorHttpService binds to the loopback
 # address only (127.0.0.1) regardless of the port given here, which Cloud Run's
 # sidecar networking/probes cannot reach -- the container never fails to start,
 # its startup probe just never succeeds. This service isn't itself internet
 # exposed: only the "worker" container publishes a port in infra/run.tf.
-CMD ["server", "8090", "-allowNetworkAccess", "-version", "5.0.0", "-ig", "/opt/fhir/terminology-package.tgz", "-ig", "/opt/fhir/extensions-package.tgz", "-ig", "/opt/fhir/global-epi-package.tgz", "-ig", "/opt/fhir/ema-epi-package.tgz", "-tx", "n/a"]
+# -jurisdiction uv and -locale en-US: without them the validator takes both from the container's
+# locale, which on 2026-09-21 meant EMA content was validated under United States jurisdiction.
+# -no-http-access: the validator's own switch that refuses every HTTP(S) request inside the
+# application ("Access to the internet is not allowed by local security policy"). The closed
+# proxy above stays as a second layer for any client that bypasses it. Beyond reproducibility this
+# closes a request-forgery path: the validator's documentation warns that content being
+# validated can direct it to fetch URLs of the content's choosing, including internal addresses
+# such as Cloud Run's metadata server, and this sidecar validates content that arrives in
+# submissions.
+CMD ["server", "8090", "-allowNetworkAccess", "-version", "5.0.0", "-jurisdiction", "uv", "-locale", "en-US", "-ig", "/opt/fhir/terminology-package.tgz", "-ig", "/opt/fhir/extensions-package.tgz", "-ig", "/opt/fhir/global-epi-package.tgz", "-ig", "/opt/fhir/ema-epi-package.tgz", "-tx", "n/a", "-no-http-access"]
