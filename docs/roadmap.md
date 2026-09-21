@@ -69,9 +69,15 @@ control believed to be stronger than it is is worse than a control known to be w
   label the demonstration is about. Before this, the store could be continuously proven or
   demonstration-ready, but not both. The official validation gate follows the same product,
   because it exists to validate what a `fixture` run actually sends.
-- **`get_provenance` resolves with `_count=1` and no `_sort`.** Which Provenance it returns for a
-  document with more than one is not fixed by the code, so re-seeding an environment makes the
-  answer ambiguous. Seed once, or give the resolution a deterministic order. **S**
+- ~~`get_provenance` resolves with `_count=1` and no `_sort`.~~ **Closed 2026-09-21.** The
+  search now asks the store for `recorded` descending over a bounded page, and the answer is
+  then chosen in code under a total order — newest approval first, ties broken by resource id —
+  so the same set of Provenance resources always yields the same one. The store's sort was
+  verified honoured rather than assumed: reversing it swapped the two paracetamol records. The
+  tie-break lives in code and not in a second sort key because a tie could not be produced
+  against the live store without writing into it, and the validated store holds only what the
+  pipeline published. Residual, stated rather than hidden: a document with more approvals than
+  one page that all share the newest timestamp could still see the page composed differently.
 
 ## Next, in order
 
@@ -158,12 +164,11 @@ So the claim is narrow and should stay narrow:
    `persisted`. Three documents and four `Provenance` resources are in the store. Re-running
    `scripts/demo/seed.ts` would add a second `Provenance` per document rather than replacing the
    first, because its id derives from the submission id, so do not re-seed without rebuilding.
-3. **Check `get_provenance` before the meeting.** It resolves a Provenance with
-   `Provenance?target=Bundle/<id>&_count=1` and no `_sort`, so which of two resources for the
-   same document it returns is not fixed by the code. Paracetamol already has two, because the
-   demonstration deliberately publishes a v2. Two calls on 2026-09-21 both returned the v2
-   record, which is the answer you would want — but that is what happened, not what the code
-   guarantees, so check it on the day. `docs/demo/verifiable-label.md` repeats this.
+3. **(Closed 2026-09-21 — no longer a thing to check on the day.)** `get_provenance` used to
+   resolve a Provenance without asking for an order, so which of paracetamol's two records it
+   returned was the store's choice and not the code's. It now asks for the newest approval and
+   decides ties itself, so the v2 record is the answer by construction. Re-seeding no longer
+   changes it.
 4. **Deploying between seeding and demonstrating is safe** as of 2026-09-21. The smoke step
    publishes `synthetic-smoketest`, which nothing demonstrates, so a deploy no longer writes over
    a seeded label. It does leave a fourth document in the store — but the entitlement map names

@@ -67,10 +67,10 @@ asks `get_provenance` anything.
    the document rather than replacing the first, because the resource id is derived from the
    submission id.
 3. Call `get_provenance` for the document you plan to show and confirm an approver role comes
-   back. Do this before anyone is in the room: `get_provenance` resolves a resource with
-   `Provenance?target=Bundle/<id>&_count=1` and no `_sort`, so which of two resources for the
-   same document it returns is not fixed by the code. Seeding into a fresh store, or under
-   fresh product ids, removes the ambiguity.
+   back. A document with two approved versions has two `Provenance` resources, and since
+   2026-09-21 the one you get is the most recent approval by construction: the search asks the
+   store for `recorded` descending and the answer is chosen under a total order, ties broken by
+   resource id. Re-seeding therefore no longer changes which record answers.
 
 Scenes 1 and 2 as written below use the console and BigQuery and do not depend on any of this;
 it matters for the `get_provenance` parts, which are marked _(item 1 — built, not deployed)_.
