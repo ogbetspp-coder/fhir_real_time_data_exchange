@@ -1,7 +1,10 @@
 // The synthetic product set the demonstration is built from (roadmap item 1c, scenes described
-// in docs/design/verifiable-answers.md). Three labels, two versions each, all invented: every
-// sentence says so in its own words, and every identifier is prefixed so it can never be read as
-// a real authorisation.
+// in docs/design/verifiable-answers.md). Three demonstration labels and one product used only by
+// the `fixture` run source, two versions each, all invented: every sentence says so in its own
+// words, and every identifier is prefixed so it can never be read as a real authorisation.
+//
+// `DEMONSTRATION_PRODUCT_IDS` and `SMOKE_PRODUCT_ID` below say which is which, and why the
+// separation exists.
 //
 // Two rules constrain everything below.
 //
@@ -15,7 +18,7 @@
 //    the same EMA Bundle id and the FHIR store versions one resource instead of creating two.
 
 export type SyntheticProductId =
-  "synthetic-paracetamol" | "synthetic-demoxetine" | "synthetic-placebolol";
+  "synthetic-paracetamol" | "synthetic-demoxetine" | "synthetic-placebolol" | "synthetic-smoketest";
 
 export type SyntheticVersion = 1 | 2;
 
@@ -222,16 +225,78 @@ const PLACEBOLOL: SyntheticProduct = {
   },
 };
 
-// Declaration order is demonstration order: the default product first.
+// Not part of the demonstration. The worker's `fixture` run source and the official validation
+// gate both use this product and nothing else uses it, so the smoke run that follows every deploy
+// proves the pipeline end to end without writing a version over a label the demonstration is
+// about. Before it existed, a deploy republished the default product from the fixture path, which
+// meant the store could not be both continuously proven and demonstration-ready at the same time.
+//
+// It is otherwise an ordinary synthetic product built by the same code as the others, so
+// validating it is representative of validating any of them.
+const SMOKETEST: SyntheticProduct = {
+  id: "synthetic-smoketest",
+  productName: "Synthetic Smoketest 1 mg tablets",
+  substanceName: "Smoketestium",
+  documentTitle: "Synthetic Smoketest 1 mg tablets SmPC",
+  strengthMg: 1,
+  organizationId: "synthetic-pharma",
+  organizationName: "Synthetic Pharma Ltd",
+  organizationIdentifier: "SYN-ORG-0001",
+  compositionId: "synthetic-smoketest-smpc",
+  compositionIdentifier: "synthetic-smoketest-smpc-v1",
+  bundleId: "synthetic-smoketest-type2-smpc",
+  bundleIdentifier: "synthetic-smoketest-type2-smpc-v1",
+  productIdentifier: "SYN-SMOK-001",
+  authorizationId: "synthetic-smoketest-authorization",
+  marketingAuthorizationNumber: "EU/SYN/0004",
+  packageId: "synthetic-smoketest-package",
+  itemId: "synthetic-smoketest-tablet",
+  administrableId: "synthetic-smoketest-administrable",
+  ingredientId: "synthetic-smoketest-active-ingredient",
+  substanceId: "synthetic-smoketest-substance",
+  substanceIdentifier: "SYN-SMOKETESTIUM",
+  sourceFilenameStem: "synthetic-smoketest-smpc",
+  namedInNarrative: true,
+  additionalSentences: {},
+  submissions: {
+    1: {
+      submissionId: "5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b",
+      extractionRunId: "6f7a8b9c-0d1e-4f2a-9b3c-4d5e6f7a8b9c",
+      createdAt: VERSION_ONE_APPROVAL,
+      approvedAt: VERSION_ONE_APPROVAL,
+    },
+    2: {
+      submissionId: "7a8b9c0d-1e2f-4a3b-8c4d-5e6f7a8b9c0d",
+      extractionRunId: "8b9c0d1e-2f3a-4b4c-9d5e-6f7a8b9c0d1e",
+      createdAt: VERSION_TWO_APPROVAL,
+      approvedAt: VERSION_TWO_APPROVAL,
+    },
+  },
+};
+
+// Declaration order is demonstration order: the default product first, the smoke product last
+// because it is not demonstrated.
 export const SYNTHETIC_PRODUCTS: readonly SyntheticProduct[] = [
   PARACETAMOL,
   DEMOXETINE,
   PLACEBOLOL,
+  SMOKETEST,
 ];
 
+// Every product the fixtures can build. Tests iterate this, so anything added here is covered.
 export const SYNTHETIC_PRODUCT_IDS: readonly SyntheticProductId[] = SYNTHETIC_PRODUCTS.map(
   ({ id }) => id,
 );
+
+// The product the worker's `fixture` run source builds, and so the one the deploy's smoke run
+// publishes and the official validation gate checks. Deliberately not a demonstration product.
+export const SMOKE_PRODUCT_ID: SyntheticProductId = "synthetic-smoketest";
+
+// The products the demonstration publishes through the document path. The smoke product is
+// excluded: seeding it would put it in front of an audience, and republishing it on the next
+// deploy is the behaviour this separation exists to make harmless.
+export const DEMONSTRATION_PRODUCT_IDS: readonly SyntheticProductId[] =
+  SYNTHETIC_PRODUCT_IDS.filter((id) => id !== SMOKE_PRODUCT_ID);
 
 export const SYNTHETIC_VERSIONS: readonly SyntheticVersion[] = [1, 2];
 

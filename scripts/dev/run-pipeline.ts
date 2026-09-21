@@ -6,6 +6,7 @@ import { createSyntheticSubmission } from "../../src/fixtures/synthetic-submissi
 import { createSyntheticType2Bundle } from "../../src/fixtures/synthetic.js";
 import { runPipeline, type PipelineInput } from "../../src/pipeline.js";
 import {
+  SMOKE_PRODUCT_ID,
   SYNTHETIC_PRODUCT_IDS,
   SYNTHETIC_VERSIONS,
   type SyntheticProductId,
@@ -63,7 +64,9 @@ function parseArgs(argv: string[]): Args {
     validatorUrl: "http://localhost:8090",
     persist: false,
     source: "fixture",
-    product: SYNTHETIC_PRODUCT_IDS[0] ?? "synthetic-paracetamol",
+    // The smoke product, like the worker's own fixture path: of the four it is the one a
+    // --persist run can overwrite without touching a label the demonstration is about.
+    product: SMOKE_PRODUCT_ID,
     version: SYNTHETIC_VERSIONS[0] ?? 1,
   };
   for (let index = 0; index < argv.length; index += 1) {

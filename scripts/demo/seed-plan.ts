@@ -5,7 +5,7 @@ import type { RunRequest } from "../../src/contracts/index.js";
 import type { EmaMapping } from "../../src/fhir/mapping.js";
 import {
   DEFAULT_SYNTHETIC_PRODUCT_ID,
-  SYNTHETIC_PRODUCT_IDS,
+  DEMONSTRATION_PRODUCT_IDS,
   type SyntheticProductId,
   type SyntheticVersion,
 } from "../../src/fixtures/synthetic-products.js";
@@ -73,7 +73,7 @@ function target(productId: SyntheticProductId, version: SyntheticVersion): DemoS
 // demonstration's second scene is "the same label, one sentence later", and that only reads as a
 // version if version 1 was published first.
 export const DEMO_SEED_ORDER: readonly DemoSeedTarget[] = [
-  ...SYNTHETIC_PRODUCT_IDS.map((productId) => target(productId, 1)),
+  ...DEMONSTRATION_PRODUCT_IDS.map((productId) => target(productId, 1)),
   target(DEFAULT_SYNTHETIC_PRODUCT_ID, 2),
 ];
 

@@ -63,11 +63,12 @@ control believed to be stronger than it is is worse than a control known to be w
   registry is stable. The fix is to pre-seed the validator's package cache with pinned dependency
   tarballs and prove no fetch occurs. Measured and written up in `docs/validation/README.md`,
   "Official validation gate". **S**
-- **The deploy's smoke run writes to the demonstrator on every deploy.** It publishes the fixture
-  document, so a demonstration store accumulates a fixture-sourced version of the paracetamol
-  label alongside the document-sourced ones. Setting `enabled_run_sources = ["document"]` for a
-  demonstration environment makes the step skip with a notice, which is the intended production
-  setting anyway (ADR 0002). **S, configuration only**
+- ~~The deploy's smoke run writes to the demonstrator on every deploy.~~ **Closed 2026-09-21.**
+  The `fixture` run source now builds `synthetic-smoketest`, a product that exists only for that
+  path, so the smoke run proves the pipeline after every deploy without writing a version over a
+  label the demonstration is about. Before this, the store could be continuously proven or
+  demonstration-ready, but not both. The official validation gate follows the same product,
+  because it exists to validate what a `fixture` run actually sends.
 - **`get_provenance` resolves with `_count=1` and no `_sort`.** Which Provenance it returns for a
   document with more than one is not fixed by the code, so re-seeding an environment makes the
   answer ambiguous. Seed once, or give the resolution a deterministic order. **S**
@@ -163,11 +164,11 @@ So the claim is narrow and should stay narrow:
    demonstration deliberately publishes a v2. Two calls on 2026-09-21 both returned the v2
    record, which is the answer you would want — but that is what happened, not what the code
    guarantees, so check it on the day. `docs/demo/verifiable-label.md` repeats this.
-4. **Do not deploy between seeding and demonstrating**, or set
-   `enabled_run_sources = ["document"]` first. The deploy's smoke step publishes the fixture
-   document, which writes a fixture-sourced version of the paracetamol label over the
-   document-sourced one. The `Provenance` resources survive, so `get_provenance` still answers,
-   but the document's latest version would no longer be the one the demonstration describes.
+4. **Deploying between seeding and demonstrating is safe** as of 2026-09-21. The smoke step
+   publishes `synthetic-smoketest`, which nothing demonstrates, so a deploy no longer writes over
+   a seeded label. It does leave a fourth document in the store that the demonstration does not
+   mention, and `find_product` will return it for a query broad enough to match — worth knowing
+   before someone types "synthetic" into the assistant in front of an audience.
 5. **Set the four GitHub Actions repository variables** — done 2026-09-20; all four are set
    (Settings → Secrets and variables → Actions → Variables). They are variables and not secrets: an IAM member string, an opaque
    subject id, a bundle id and an OAuth client id are identifiers, and holding one grants
