@@ -76,6 +76,12 @@ resource "google_bigquery_dataset" "fhir_analytics" {
   delete_contents_on_destroy = false
   labels                     = local.labels
 
+  # Every table the stream creates is encrypted with our key (CMEK step 3). Existing tables were
+  # converted in place by scripts/gcp/bq-cmek-convert.sh before this was set.
+  default_encryption_configuration {
+    kms_key_name = google_kms_crypto_key.record["ledger-analytics"].id
+  }
+
   depends_on = [google_project_service.required]
 }
 
@@ -86,6 +92,10 @@ resource "google_bigquery_dataset" "ledger" {
   location                   = var.region
   delete_contents_on_destroy = false
   labels                     = local.labels
+
+  default_encryption_configuration {
+    kms_key_name = google_kms_crypto_key.record["ledger-analytics"].id
+  }
 
   depends_on = [google_project_service.required]
 
@@ -105,6 +115,14 @@ resource "google_bigquery_table" "transformation_runs" {
   time_partitioning {
     type  = "DAY"
     field = "completed_at"
+  }
+
+  # The provider treats this as forcing replacement. It is set only after the live table was
+  # converted in place to exactly this key (scripts/gcp/bq-cmek-convert.sh), so the plan shows no
+  # change; were the string to differ in form, the plan would show a replacement, and
+  # deletion_protection and prevent_destroy make that plan fail rather than delete the ledger.
+  encryption_configuration {
+    kms_key_name = google_kms_crypto_key.record["ledger-analytics"].id
   }
 
   # Columns added after the first release are NULLABLE so BigQuery evolves the schema in place

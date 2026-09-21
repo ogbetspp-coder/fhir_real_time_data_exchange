@@ -111,3 +111,23 @@ describe("who signs run manifests", () => {
     expect(grantsOnSoftwareKey).toEqual([]);
   });
 });
+
+describe("BigQuery on the ledger-analytics key", () => {
+  const key = 'kms_key_name = google_kms_crypto_key.record["ledger-analytics"].id';
+
+  it("encrypts every new table in both datasets, and the ledger table itself", () => {
+    expect(block("google_bigquery_dataset", "ledger")).toContain(key);
+    expect(block("google_bigquery_dataset", "fhir_analytics")).toContain(key);
+    expect(block("google_bigquery_table", "transformation_runs")).toContain(key);
+  });
+
+  it("is converted by a script that refuses buffered tables and verifies every row", () => {
+    const convert = readFileSync("scripts/gcp/bq-cmek-convert.sh", "utf8");
+    // Streamed rows may be missing from a copy for up to 90 minutes: refuse, don't hope.
+    expect(convert).toMatch(/Refusing: these tables still have a streaming buffer/);
+    // A snapshot first, a count and fingerprint before and after, and a stop on any difference.
+    expect(convert).toContain("bq cp --snapshot --no_clobber");
+    expect(convert).toContain("BIT_XOR(FARM_FINGERPRINT(TO_JSON_STRING(t)))");
+    expect(convert).toMatch(/if \[\[ "\$after" != "\$before" \|\| "\$now_key" != "\$KEY" \]\]/);
+  });
+});
