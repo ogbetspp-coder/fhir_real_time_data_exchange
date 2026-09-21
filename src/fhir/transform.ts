@@ -11,6 +11,13 @@ import {
 
 const EMA_DOCUMENT_TYPE_SYSTEM = "http://ema.europa.eu/fhir/CodeSystem/100000155531";
 const EMA_SMPC_CODE = "100000155532";
+// The List indexes every document of the ePI package. EMA's Document Type code system has no
+// "master list" concept; the concept it does have for the whole set of documents is
+// 100000155539, and the EMA EPI-23-1022 English sample (fhir/standards.lock.json) codes its
+// List with exactly this coding. The display must be the code system's own string: the
+// validator rejects any other.
+const EMA_LIST_CODE = "100000155539";
+const EMA_LIST_DISPLAY = "Combined File of all Documents";
 const QRD_TEMPLATE_EXTENSION =
   "http://ema.europa.eu/fhir/StructureDefinition/ext-epi-qrdtemplate-version";
 
@@ -106,7 +113,7 @@ function mapSection(
         {
           system: mapping.targetCodeSystem,
           code: rule.targetCode,
-          display: rule.title,
+          display: rule.display ?? rule.title,
         },
       ],
     },
@@ -161,8 +168,8 @@ function createEmaList(
       coding: [
         {
           system: EMA_DOCUMENT_TYPE_SYSTEM,
-          code: "100000155527",
-          display: "ePI Master List",
+          code: EMA_LIST_CODE,
+          display: EMA_LIST_DISPLAY,
         },
       ],
     },

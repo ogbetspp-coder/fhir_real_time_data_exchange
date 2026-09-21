@@ -337,10 +337,27 @@ phase_apply() {
   # identifiers, and this log is attached to a failure issue by .github/workflows/deploy.yml.
   echo "query access configuration: query_invokers=${#query_invokers_json} bytes, query_token_creators=${#query_token_creators_json} bytes, query_oauth_client_ids=${#query_oauth_client_ids_json} bytes, query_entitlements_json=${#query_entitlements_json} bytes (2 bytes is the empty default)"
 
+  # The account this deploy runs as, granted roles/run.invoker on the worker
+  # (google_cloud_run_v2_service_iam_member.deployer_invoker in infra/run.tf) so phase_smoke can
+  # call the service this apply just deployed. Only a service account is passed: a human's
+  # account cannot mint an ID token for the worker's audience at all, so binding one would leave
+  # a standing privilege on the worker that no documented path can exercise. A local operator
+  # supplies WORKER_ID_TOKEN instead (phase_smoke says how), which authenticates as the
+  # impersonated service account and needs no binding for the human.
+  local deployer_account
+  deployer_account="$(gcloud --quiet auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null | head -n 1 || true)"
+  if [[ -z "$deployer_account" ]]; then
+    echo "::warning::Could not determine the active gcloud account; the deployer's run.invoker binding on the worker is not declared and the smoke run will be refused."
+  elif [[ "$deployer_account" != *.gserviceaccount.com ]]; then
+    echo "::notice::Deploying as a user account, so no deployer run.invoker binding is declared; phase_smoke needs WORKER_ID_TOKEN."
+    deployer_account=""
+  fi
+
   if ! terraform -chdir=infra apply \
     -input=false \
     -auto-approve \
     "${tf_common_vars[@]}" \
+    -var="deployer_account=${deployer_account}" \
     -var="service_version=${SERVICE_VERSION}" \
     -var="worker_image=${REPOSITORY}/worker@${WORKER_DIGEST}" \
     -var="validator_image=${REPOSITORY}/validator@${VALIDATOR_DIGEST}" \
@@ -386,6 +403,147 @@ phase_bootstrap() {
   terraform -chdir=infra output bigquery_console_url
 }
 
+# One fixture run through the worker this deploy just applied, which must answer HTTP 200 with
+# status "persisted". Until this step existed a deploy was green whether or not the pipeline
+# could complete a run, and in this project it never had: every source failed official
+# validation inside the worker, and nothing outside the worker ever asked. Runs after
+# phase_bootstrap rather than straight after phase_apply because a persisted run needs the
+# R5 stores reconciled and the profiles imported first.
+#
+# The ID token comes from WORKER_ID_TOKEN when the caller supplies one, because the credential
+# a deploy actually runs under cannot mint it. Under Workload Identity Federation gcloud holds
+# an *external account* credential, and `print-identity-token --audiences=` refuses those for
+# the same reason it refuses a human's account: neither has an ID token to hand out. The
+# workflow therefore mints it with google-github-actions/auth (token_format: id_token), which
+# reaches the deployer service account's generateIdToken through the
+# roles/iam.workloadIdentityUser binding the GitHub pool principal already holds, and passes it
+# in. The gcloud fallback below is kept for the credential kinds that do support the flag — a
+# key file, an impersonation-configured gcloud, or a GCE service account — so a local run still
+# works without the workflow.
+#
+# For Cloud Run to accept the token, the identity it authenticates as must be able to invoke
+# the worker. The deployer can today through its project-level roles/run.admin, which contains
+# run.routes.invoke; infra/run.tf additionally declares an explicit run.invoker binding
+# (google_cloud_run_v2_service_iam_member.deployer_invoker) from the account phase_apply passes
+# as deployer_account. A 403 here is therefore only expected if that project role is ever
+# narrowed and the explicit binding is still propagating, which is what the retry below covers.
+#
+# A production environment may set enabled_run_sources without "fixture" (ADR 0002): the worker
+# then answers 422 source-disabled before touching anything, and this step skips with a notice
+# instead of failing, because that answer is the allowlist working as configured.
+#
+# Only closed fields of the answer are printed (status, error, reason, runId, hashes, counts);
+# the deploy log is attached to a GitHub issue on failure and must carry no payload.
+phase_smoke() {
+  echo "=== smoke: one fixture run through the deployed worker ==="
+  local worker_url token body_file http_code attempt verdict
+  worker_url="$(terraform -chdir=infra output -raw cloud_run_service_uri 2>/dev/null || true)"
+  if [[ -z "$worker_url" ]]; then
+    echo "::error title=Smoke run::terraform output cloud_run_service_uri was empty; nothing to call." >&2
+    return 1
+  fi
+  echo "worker=${worker_url}"
+  # Which source produced the token is printed; the token itself never is.
+  token="${WORKER_ID_TOKEN:-}"
+  if [[ -n "$token" ]]; then
+    echo "token source: WORKER_ID_TOKEN supplied by the caller"
+  elif token="$(gcloud --quiet auth print-identity-token --audiences="$worker_url" 2>/dev/null)" &&
+    [[ -n "$token" ]]; then
+    echo "token source: gcloud print-identity-token as the active account"
+  else
+    # The impersonation recipe is not restated here: it needs a one-time
+    # roles/iam.serviceAccountTokenCreator grant that project owner does not carry, and a message
+    # that gave the command without the grant would send an operator into a PERMISSION_DENIED
+    # this repository has already recorded. README.md carries both, together.
+    echo "::error title=Smoke run::Could not obtain an ID token for ${worker_url}. gcloud refuses --audiences for external-account (Workload Identity Federation) and user credentials alike, so supply one in WORKER_ID_TOKEN. The recipe, including the one-time roles/iam.serviceAccountTokenCreator grant it needs first, is in README.md under 'Re-ingesting with scripts/demo/seed.ts'." >&2
+    return 1
+  fi
+
+  body_file="$(mktemp)"
+  # Only 403 is retried, and only because an apply seconds earlier may still be propagating an
+  # IAM binding. The other two codes a first draft retried are wrong to retry:
+  #
+  #   401 means the token was refused, not the caller. Sleeping does not mint a new one, so the
+  #   attempts only delay the failure while blaming an IAM binding that was never involved.
+  #   403 is what a missing or propagating binding actually answers.
+  #
+  #   000 is curl reporting no HTTP answer at all, and it cannot distinguish a connection that
+  #   never opened from a request the worker received and is still executing. A run is not
+  #   idempotent — it persists a document and writes evidence and a ledger row — so re-POSTing
+  #   after a timeout risks a second run of the first one. Failing honestly is the lesser harm.
+  #
+  # --max-time is 480s, comfortably inside the ID token's 10-minute maximum lifetime, so no
+  # attempt can outlive the credential it is carrying. With only 403 retried the answers are
+  # immediate, so the whole loop is bounded by the propagation budget (105s) rather than by
+  # eight timeouts, and cannot approach the job's timeout-minutes.
+  local max_attempts=8
+  for attempt in $(seq 1 "$max_attempts"); do
+    http_code="$(curl --silent --show-error --output "$body_file" --write-out '%{http_code}' \
+      --max-time 480 \
+      --request POST "${worker_url}/v1/runs" \
+      --header "Authorization: Bearer ${token}" \
+      --header 'Content-Type: application/json' \
+      --data '{"source":"fixture"}' || true)"
+    if [[ "$http_code" == "403" && "$attempt" -lt "$max_attempts" ]]; then
+      echo "worker answered HTTP 403 (attempt ${attempt}/${max_attempts}); retrying in 15s in case the run.invoker binding is still propagating."
+      sleep 15
+      continue
+    fi
+    case "$http_code" in
+      401)
+        echo "worker answered HTTP 401: the ID token was refused. Not retried — a retry presents the same token. Check the audience matches ${worker_url} and that the token carries an e-mail claim." >&2
+        ;;
+      000)
+        echo "worker returned no HTTP answer within 480s. Not retried, because a run that may already be executing is not safe to repeat." >&2
+        ;;
+    esac
+    break
+  done
+
+  # 0: persisted; 3: source disabled, skip; 1: anything else. Non-JSON bodies (Cloud Run's own
+  # 401/403/404 pages) yield no fields, and no body text is ever printed.
+  verdict=0
+  python3 - "$http_code" "$body_file" <<'PY' || verdict=$?
+import json
+import sys
+
+code, path = sys.argv[1], sys.argv[2]
+try:
+    with open(path, encoding="utf-8") as handle:
+        body = json.load(handle)
+except Exception:
+    body = None
+if not isinstance(body, dict):
+    body = {}
+fields = {
+    key: body[key]
+    for key in ("status", "error", "reason", "runId", "manifestHash", "targetBundleId", "mappingDecisions")
+    if key in body
+}
+validation = body.get("validation")
+if isinstance(validation, dict):
+    fields["validation"] = {key: value for key, value in validation.items() if key != "profiles"}
+print(f"HTTP {code}: {json.dumps(fields, sort_keys=True)}")
+if code == "422" and fields.get("error") == "source-disabled":
+    print("::notice title=Smoke run skipped::the worker's run-source allowlist (enabled_run_sources) excludes fixture, so no fixture run was attempted; this is the allowlist working as configured.")
+    sys.exit(3)
+if code == "200" and fields.get("status") == "persisted":
+    print(f"Smoke run persisted: runId={fields.get('runId')} targetBundleId={fields.get('targetBundleId')}")
+    sys.exit(0)
+if code == "200":
+    print(f"::error title=Smoke run failed::the worker answered 200 with status {fields.get('status')!r}, not \"persisted\" (is DRY_RUN set on the service?).")
+    sys.exit(1)
+print(f"::error title=Smoke run failed::HTTP {code}, error={fields.get('error')!r}, reason={fields.get('reason')!r}. A reason of official-validation-failed or cloud-validation-failed means the fixture does not conform; run `npm run validate:official` locally.")
+sys.exit(1)
+PY
+  rm -f "$body_file"
+  case "$verdict" in
+    0) return 0 ;;
+    3) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 case "$PHASE" in
   preflight) phase_preflight ;;
   deps) phase_deps ;;
@@ -394,6 +552,7 @@ case "$PHASE" in
   images) phase_images ;;
   apply) phase_apply ;;
   bootstrap) phase_bootstrap ;;
+  smoke) phase_smoke ;;
   all)
     phase_preflight
     phase_deps
@@ -402,6 +561,7 @@ case "$PHASE" in
     phase_images
     phase_apply
     phase_bootstrap
+    phase_smoke
     ;;
   *)
     echo "Unknown deploy phase: ${PHASE}" >&2

@@ -129,6 +129,43 @@ jobs:
       - name: Reconcile FHIR stores
         run: bash scripts/gcp/deploy.sh bootstrap 2>&1 | tee -a deploy-run.log
 
+      # The worker's own URL is the audience the next step mints a token for. Read from
+      # Terraform rather than reconstructed, so a renamed or relocated service cannot leave the
+      # audience silently pointing at a service that no longer answers.
+      - name: Read the worker's URL
+        id: worker
+        run: |
+          uri="$(terraform -chdir=infra output -raw cloud_run_service_uri)"
+          echo "uri=${uri}" >>"$GITHUB_OUTPUT"
+
+      # The deploy's own credential is an external account (Workload Identity Federation), and
+      # gcloud will not mint an ID token from one. This step does it through the auth action
+      # instead, which calls generateIdToken on the deployer service account — permitted by the
+      # roles/iam.workloadIdentityUser binding the GitHub pool principal already holds, so no
+      # new grant is needed. include_email is required: Cloud Run matches the IAM member by the
+      # token's e-mail claim.
+      - name: Mint an ID token for the worker
+        id: worker_token
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          create_credentials_file: false
+          export_environment_variables: false
+          token_format: id_token
+          id_token_audience: ${{ steps.worker.outputs.uri }}
+          id_token_include_email: true
+
+      # The step that would have shown the pipeline had never completed a run: one fixture run
+      # through the worker just deployed, as the deployer, which must answer 200 with status
+      # "persisted". A 422 source-disabled (enabled_run_sources without fixture) skips with a
+      # notice. Only closed fields of the answer reach the log.
+      - name: Smoke run through the deployed worker
+        env:
+          WORKER_ID_TOKEN: ${{ steps.worker_token.outputs.id_token }}
+        run: bash scripts/gcp/deploy.sh smoke 2>&1 | tee -a deploy-run.log
+
       - name: Publish failure log
         if: failure()
         env:

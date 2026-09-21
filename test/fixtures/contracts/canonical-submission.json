@@ -10,6 +10,7 @@
         "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/Bundle-uv-epi"
       ]
     },
+    "language": "en",
     "identifier": {
       "system": "https://khs.dev/fhir/identifier/type2-document",
       "value": "synthetic-type2-smpc-v1"
@@ -621,6 +622,17 @@
         "resource": {
           "resourceType": "Organization",
           "id": "synthetic-pharma",
+          "meta": {
+            "profile": [
+              "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/Organization-uv-epi"
+            ]
+          },
+          "identifier": [
+            {
+              "system": "https://khs.dev/fhir/identifier/organization",
+              "value": "SYN-ORG-0001"
+            }
+          ],
           "name": "Synthetic Pharma Ltd"
         }
       },
@@ -629,6 +641,11 @@
         "resource": {
           "resourceType": "MedicinalProductDefinition",
           "id": "synthetic-paracetamol",
+          "meta": {
+            "profile": [
+              "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/MedicinalProductDefinition-uv-epi"
+            ]
+          },
           "identifier": [
             {
               "system": "https://khs.dev/fhir/identifier/product",
@@ -658,10 +675,7 @@
           },
           "name": [
             {
-              "productName": "Synthetic Paracetamol 500 mg tablets",
-              "type": {
-                "coding": []
-              }
+              "productName": "Synthetic Paracetamol 500 mg tablets"
             }
           ]
         }
@@ -671,6 +685,11 @@
         "resource": {
           "resourceType": "RegulatedAuthorization",
           "id": "synthetic-authorization",
+          "meta": {
+            "profile": [
+              "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/RegulatedAuthorization-uv-epi"
+            ]
+          },
           "identifier": [
             {
               "system": "https://khs.dev/fhir/identifier/authorization",
@@ -699,12 +718,30 @@
         "resource": {
           "resourceType": "PackagedProductDefinition",
           "id": "synthetic-package",
+          "meta": {
+            "profile": [
+              "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/PackagedProductDefinition-uv-epi"
+            ]
+          },
+          "identifier": [
+            {
+              "system": "https://khs.dev/fhir/identifier/package",
+              "value": "SYN-PARA-500-PKG"
+            }
+          ],
+          "name": "Synthetic Paracetamol 500 mg tablets carton",
           "packageFor": [
             {
               "reference": "https://khs.dev/fhir/MedicinalProductDefinition/synthetic-paracetamol"
             }
           ],
           "packaging": {
+            "identifier": [
+              {
+                "system": "https://khs.dev/fhir/identifier/packaging",
+                "value": "SYN-PARA-500-PKG-1"
+              }
+            ],
             "type": {
               "coding": [
                 {
@@ -712,7 +749,16 @@
                 }
               ]
             },
-            "quantity": 1
+            "quantity": 1,
+            "containedItem": [
+              {
+                "item": {
+                  "reference": {
+                    "reference": "https://khs.dev/fhir/ManufacturedItemDefinition/synthetic-tablet"
+                  }
+                }
+              }
+            ]
           }
         }
       },
@@ -721,6 +767,17 @@
         "resource": {
           "resourceType": "ManufacturedItemDefinition",
           "id": "synthetic-tablet",
+          "meta": {
+            "profile": [
+              "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/ManufacturedItemDefinition-uv-epi"
+            ]
+          },
+          "identifier": [
+            {
+              "system": "https://khs.dev/fhir/identifier/manufactured-item",
+              "value": "SYN-PARA-500-ITEM"
+            }
+          ],
           "status": "active",
           "manufacturedDoseForm": {
             "coding": [
@@ -743,6 +800,17 @@
         "resource": {
           "resourceType": "AdministrableProductDefinition",
           "id": "synthetic-administrable",
+          "meta": {
+            "profile": [
+              "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/AdministrableProductDefinition-uv-epi"
+            ]
+          },
+          "identifier": [
+            {
+              "system": "https://khs.dev/fhir/identifier/administrable-product",
+              "value": "SYN-PARA-500-ADM"
+            }
+          ],
           "status": "active",
           "formOf": [
             {
@@ -756,6 +824,11 @@
               }
             ]
           },
+          "producedFrom": [
+            {
+              "reference": "https://khs.dev/fhir/ManufacturedItemDefinition/synthetic-tablet"
+            }
+          ],
           "routeOfAdministration": [
             {
               "code": {
@@ -774,6 +847,11 @@
         "resource": {
           "resourceType": "Ingredient",
           "id": "synthetic-active-ingredient",
+          "meta": {
+            "profile": [
+              "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/Ingredient-uv-epi"
+            ]
+          },
           "status": "active",
           "for": [
             {
@@ -817,6 +895,11 @@
         "resource": {
           "resourceType": "SubstanceDefinition",
           "id": "synthetic-paracetamol-substance",
+          "meta": {
+            "profile": [
+              "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/SubstanceDefinition-uv-epi"
+            ]
+          },
           "identifier": [
             {
               "system": "https://khs.dev/fhir/identifier/substance",
@@ -847,7 +930,7 @@
       }
     ]
   },
-  "bundleSha256": "8891a69b297b5bf2f054684102273866ef91215b743ca2a82d8630a15ef9aa6a",
+  "bundleSha256": "e95421e1d5de87f5e637edb5900487ab0bd5cc6942e0861c629d129f03836490",
   "provenance": {
     "sourceDocument": {
       "sha256": "c226c77c373a69ba2a0e131298356e48916601fabdf85cb58d87a516c14674b4",
@@ -1479,6 +1562,6 @@
     "approvedAt": "2026-09-19T00:00:00Z",
     "method": "api-attestation",
     "meaning": "reviewed-fidelity-and-structure",
-    "approvedContentSha256": "203155ef2032bc13f15f1c33e89c598a2078e410e956bc07d9d232be3a48ecac"
+    "approvedContentSha256": "350d284889933aed5a835a77e0060c82f8b90382f098f6a61c5401759a9a5027"
   }
 }
