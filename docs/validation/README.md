@@ -229,9 +229,30 @@ is no longer resolvable in the store. That is acceptable in a demonstrator being
 deliberately. It would not be acceptable in a regulated environment, where the store is the
 record and deleting it is not a routine act.
 
+### The Workflows `document` branch
+
+Every run above reached the worker by a direct POST from the seeding script or the local runner,
+so until 2026-09-21 the orchestration in `workflows/epi-pipeline.yaml` that builds a `document`
+request had never run. It was exercised deliberately, and deliberately as a negative case:
+execution `8a14b585-2b95-454c-8b77-44571e3ae304` of `ema-flow-dev-pipeline` was started with a
+real submission URI and a `sha256` of sixty-four zeroes.
+
+The workflow took the `document` branch, assigned the reference into the request body, and
+called the worker, which read the object, hashed it, and refused with HTTP 422 and the closed
+body `{"error":"submission-unreadable","part":"submission","reason":"hash-mismatch"}`.
+
+That establishes three things and no more. The orchestration passes `submissionRef` through
+correctly. The ingress gate checks the hash of a by-reference submission and fails closed with a
+reason code rather than an unclassified error. And the refusal costs nothing: the referenced
+label's Bundle was untouched, and no ledger row was written, because a submission refused at the
+gate never becomes a run.
+
+A _successful_ `document` run through Workflows is still unexercised, because the only thing it
+would add over the direct-POST runs above is persistence, and executing it would publish another
+version of a seeded demonstration label. That is a deliberate deferral, not an oversight.
+
 **What these runs do not establish.** The content is synthetic throughout, so nothing here says
-anything about a real label. The Workflows `document` branch is still unexercised: the seeding
-script posts to the worker directly. And the validator's package resolution is not hermetic (see
+anything about a real label. And the validator's package resolution is not hermetic (see
 "Official validation gate"), so these outcomes are reproducible only as far as the FHIR registry
 is stable.
 
