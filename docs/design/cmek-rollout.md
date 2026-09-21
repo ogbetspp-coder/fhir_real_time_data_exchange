@@ -1,6 +1,6 @@
 # Customer-managed keys on the record — rollout plan
 
-Status: **plan, revised after independent review; step 0 in progress.** Foundations review
+Status: **steps 0–3 done and proven.** Revised after independent review. Foundations review
 findings A3 (the record on Google-managed keys), A4 (software signing key), C4 (worker's
 Healthcare role project-wide) and C5 (Terraform state open to project viewers). Owner decision
 2026-09-21: do it in `dev` now, so production copies a setup that has been proven rather than
@@ -114,6 +114,7 @@ reading the plan.
 0. **Nothing that holds a record can be destroyed by an apply.** `deletion_protection` on by
    default; `prevent_destroy` on the FHIR dataset, the ledger dataset and table, the audit log
    bucket, and the evidence and submission buckets. _Verified by plan before merge:_ `0 to add, 5
+_Done 2026-09-21 (PR #55); deploy and smoke run green. Proved live during step 3: a plan that would have replaced the ledger table failed with `Instance cannot be destroyed` instead of applying._
 to change, 0 to destroy` — four resources switching deletion protection on, and one pre-existing
    perpetual difference on the monitoring dashboard (the API reformats its JSON; not introduced
    here, noted so it does not hide a real change in later plans).
@@ -123,9 +124,11 @@ to change, 0 to destroy` — four resources switching deletion protection on, an
    administrator. _Verify:_ every key exists with its protection level and destroy duration; each
    agent holds exactly its grant; the deny policy is in force; disabling a version of a throwaway
    key raises the alert (the throwaway key cannot be deleted afterwards — it is named as such).
+   _Done 2026-09-21 (PR #56), verified live: five record keys at 90-day rotation and a 120-day destroy wait (Cloud KMS accepted 120 days), `manifest-signing-hsm` version 1 enabled at HSM protection, each service agent holding exactly its one grant, the alert enabled. The deny policy awaits the organisation administrator (`scripts/gcp/key-guard.sh`)._
 2. **Signing on the HSM key.** Worker's `KMS_MANIFEST_KEY` points at `manifest-signing-hsm`
    version 1; its grant on the old key is removed. _Verify:_ the deploy's smoke run persists, and
    its manifest signature verifies against the new key's public key.
+   _Done 2026-09-21 (PR #57). Run `987e8ced-99c5-4bf4-9f5d-02568aea6e9d` (the deploy's smoke run): signed by `manifest-signing-hsm/cryptoKeyVersions/1`, protection HSM; its manifest hash recomputed with the repository's canonical JSON matches; the signature verifies with openssl against the version's public key; a hash altered by one bit is rejected. Run `c0648d78…`, signed by the software key before the switch, still verifies._
 3. **BigQuery in place.** Pause deploys (`gh workflow disable`), confirm no run is in flight, and
    wait until `bq show` reports no streaming buffer on any table. Record each table's row count and
    a content hash; snapshot each table; convert each to the `ledger-analytics` key in place;
@@ -134,6 +137,14 @@ to change, 0 to destroy` — four resources switching deletion protection on, an
    and require no replacement — a different string form would plan one, and step 0 would make that
    plan fail rather than apply. Merge, then re-enable deploys. _Verify:_ identical counts and
    hashes; `bq show` reports the key on every table; the plan shows no replacement.
+   _Done 2026-09-21. Deploys paused at 19:37; every streaming buffer drained by 20:26 — the ledger's
+   four buffered rows among them, which is why the wait mattered. All twelve tables converted by
+   `scripts/gcp/bq-cmek-convert.sh`, each with a snapshot first (expiring after 14 days, and on
+   Google-managed encryption until then) and identical row count and content fingerprint before
+   and after (ledger: 31 rows). Planned before conversion, the change failed with `Instance cannot
+be destroyed` on the ledger table — step 0 refusing the replacement the provider wanted;
+   planned after, `0 to add, 3 to change, 0 to destroy`: the two dataset defaults and the known
+   dashboard difference._
 4. **Registry.** A second repository block, `ema-flow-images`, with the `artifacts` key, created
    after the Artifact Registry agent holds its grant. Every hard-coded `ema-flow` repository name
    switches: `deploy.sh` (repository, import, digest lookup), both Cloud Build files'
