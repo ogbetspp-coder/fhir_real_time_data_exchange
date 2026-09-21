@@ -22,6 +22,8 @@ const records: [type: string, name: string][] = [
   ["google_storage_bucket", "submissions"],
   ["google_kms_crypto_key", "evidence_encryption"],
   ["google_kms_crypto_key", "manifest_signing"],
+  ["google_kms_crypto_key", "record"],
+  ["google_kms_crypto_key", "manifest_signing_hsm"],
 ];
 
 describe("resources that hold a record", () => {
