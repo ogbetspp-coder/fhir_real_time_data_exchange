@@ -147,6 +147,7 @@ export function createApp(overrides: AppOverrides = {}): Hono {
         "GOOGLE_CLOUD_PROJECT is required": "project-not-configured",
         "EVIDENCE_BUCKET is required": "evidence-bucket-not-configured",
         "Cloud KMS returned no manifest signature": "kms-no-signature",
+        "KMS_MANIFEST_KEY must name a crypto key version": "kms-key-not-a-version",
         "Healthcare API project and dataset configuration are required":
           "healthcare-not-configured",
         "Application Default Credentials returned no access token": "no-access-token",
