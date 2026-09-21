@@ -138,7 +138,12 @@ The deployment:
 2. GitHub Actions runs `npm run check` as the Quality gate step before deploy; Cloud Build
    (`cloudbuild.images.yaml`) only builds the worker, validator, and query images; `cloudbuild.yaml` is
    a separate, manual/CI-optional configuration that additionally runs the quality gate,
-   standards-integrity check, and Terraform format/validate before building those same images;
+   standards-integrity check, and Terraform format/validate before building those same images.
+   Submit either one with the three flags `phase_images` in `scripts/gcp/deploy.sh` uses —
+   `--region`, `--service-account` naming `ema-flow-build-<env>`, and
+   `--gcs-source-staging-dir` on the `-build-staging` bucket. Without them gcloud falls back to
+   a global build, as the default compute service account, staging the source in a US bucket;
+   that account no longer holds a build role, so such a build is refused;
 3. deploys immutable image digests; Binary Authorization is configurable
    (`enforce_binary_authorization`) and is disabled by default;
 4. reconciles the R5 stores and native BigQuery stream through the Healthcare REST API;

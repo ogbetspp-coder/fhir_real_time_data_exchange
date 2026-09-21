@@ -86,7 +86,11 @@ let an update bot propose moves (C3).
 
 **B3. Image builds run as the default compute service account** with
 `cloudbuild.builds.builder`. A dedicated build service account with only what building needs is
-the standard shape. _Before features_, together with A2's regional builds.
+the standard shape. _Before features_, together with A2's regional builds. Separately, the
+legacy Cloud Build service account (`<number>@cloudbuild.gserviceaccount.com`) also holds
+`cloudbuild.builds.builder`, granted by Google when the API was enabled and outside Terraform.
+Nothing runs as it once builds name their own identity; removing the grant is part of C2's
+trim.
 
 ### C. Hardening — cheap, and overdue
 
