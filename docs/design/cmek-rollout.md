@@ -1,6 +1,6 @@
 # Customer-managed keys on the record — rollout plan
 
-Status: **steps 0–4 done and proven; step 5 in progress.** Revised after independent review. Foundations review
+Status: **steps 0–5 done and proven; step 6 in progress.** Revised after independent review. Foundations review
 findings A3 (the record on Google-managed keys), A4 (software signing key), C4 (worker's
 Healthcare role project-wide) and C5 (Terraform state open to project viewers). Owner decision
 2026-09-21: do it in `dev` now, so production copies a setup that has been proven rather than
@@ -179,6 +179,17 @@ be destroyed` on the ledger table — step 0 refusing the replacement the provid
    changes on them) and the dashboard difference; the three destroyed are IAM bindings (the old
    reader grant being replaced, the worker's project-wide editor role, its unused Document AI
    role); and `epi` "will no longer be managed by Terraform, but will not be destroyed"._
+   _(c) done 2026-09-21 (PR #62), and step 5 complete. The first deploy after the switch applied
+   it and then failed seeding with a 403: the deploy identity's FHIR write access had been a grant
+   made by hand on the old dataset, outside Terraform, and the plan and its review both missed it.
+   Declared in Terraform on the new dataset (PR #64); the next deploy passed end to end. Then:
+   the demonstration re-seeded (four runs, same bundle ids); `find_product` returns the three
+   labels, `truncated: false`; `get_provenance` returns the version 2 record; **five rows streamed
+   from the encrypted dataset into the encrypted `Bundle` table** — the behaviour the
+   documentation does not cover; notifications fired (59 publish operations in the hour). The old
+   dataset — holding only the superseded synthetic copy, referenced by nothing — was deleted. The
+   project's only FHIR dataset is now on the `fhir-record` key. Lesson recorded: before migrating
+   a resource, diff its live IAM against Terraform._
 6. **Audit log bucket in place.** The logging service account's grant, then `cmek_settings` on the
    existing bucket. _Verify:_ `gcloud logging buckets describe` reports the key; new entries
    arrive.

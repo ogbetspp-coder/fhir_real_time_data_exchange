@@ -237,7 +237,22 @@ information only. Evidence artefacts are under
 | `95250c7b-51ef-4e5f-8d76-14e97cc96354` | `document` | 2026-09-21 | `synthetic-paracetamol` v1, re-seeded after the store rebuild                                                                                                                                                                                                                                                                                                           |
 | `f4e6b7e3-97d5-47bf-8dfc-cf02b53f745b` | `document` | 2026-09-21 | `synthetic-demoxetine` v1, re-seeded                                                                                                                                                                                                                                                                                                                                    |
 | `10aeaa11-a548-42f8-ac43-dba26d99d975` | `document` | 2026-09-21 | `synthetic-placebolol` v1, re-seeded                                                                                                                                                                                                                                                                                                                                    |
-| `7494fd1b-ae01-4005-a31d-2c57b790d785` | `document` | 2026-09-21 | `synthetic-paracetamol` v2, re-seeded. These four are the documents the store holds now                                                                                                                                                                                                                                                                                 |
+| `7494fd1b-ae01-4005-a31d-2c57b790d785` | `document` | 2026-09-21 | `synthetic-paracetamol` v2, re-seeded. Held by the store until the CMEK switch below                                                                                                                                                                                                                                                                                    |
+
+**After the move to the FHIR dataset on our key (CMEK step 5, 2026-09-21).** The old
+Google-managed dataset was deleted once the switch was verified, and the demonstration was
+re-seeded into `ema-flow-dev-fhir-record` under the same bundle ids the entitlement map names.
+These four are the documents the store holds now:
+
+| Run id                                 | Source     | Product                    |
+| -------------------------------------- | ---------- | -------------------------- |
+| `592b5a99-1df5-4dfa-83d8-cdc50106e2b3` | `document` | `synthetic-paracetamol` v1 |
+| `dbbb75e6-fdec-4c7d-ad85-5d2e39103a62` | `document` | `synthetic-demoxetine` v1  |
+| `d8602746-590b-4c7e-92bf-803a9de0cc7b` | `document` | `synthetic-placebolol` v1  |
+| `96947888-1ddb-4b1b-b850-b0cf9d14d13b` | `document` | `synthetic-paracetamol` v2 |
+
+The same traceability wrinkle applies a third time, now deliberately: evidence and ledger rows
+for the earlier runs survive, their documents do not.
 
 Each `document` run wrote 11 evidence artefacts — the 7 a fixture run writes plus
 `canonical-submission.json`, `ingestion-provenance.json`, `fidelity-report.json` and
