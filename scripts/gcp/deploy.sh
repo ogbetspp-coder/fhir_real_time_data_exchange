@@ -421,10 +421,12 @@ phase_bootstrap() {
 # key file, an impersonation-configured gcloud, or a GCE service account — so a local run still
 # works without the workflow.
 #
-# For Cloud Run to accept the token, the identity it authenticates as must hold
-# roles/run.invoker on the worker, which infra/run.tf declares
-# (google_cloud_run_v2_service_iam_member.deployer_invoker) from the account phase_apply
-# passes as deployer_account; a 403 here after that apply is IAM propagation, hence the retry.
+# For Cloud Run to accept the token, the identity it authenticates as must be able to invoke
+# the worker. The deployer can today through its project-level roles/run.admin, which contains
+# run.routes.invoke; infra/run.tf additionally declares an explicit run.invoker binding
+# (google_cloud_run_v2_service_iam_member.deployer_invoker) from the account phase_apply passes
+# as deployer_account. A 403 here is therefore only expected if that project role is ever
+# narrowed and the explicit binding is still propagating, which is what the retry below covers.
 #
 # A production environment may set enabled_run_sources without "fixture" (ADR 0002): the worker
 # then answers 422 source-disabled before touching anything, and this step skips with a notice
@@ -449,27 +451,50 @@ phase_smoke() {
     [[ -n "$token" ]]; then
     echo "token source: gcloud print-identity-token as the active account"
   else
-    echo "::error title=Smoke run::Could not obtain an ID token for ${worker_url}. gcloud refuses --audiences for external-account (Workload Identity Federation) and user credentials, so supply one in WORKER_ID_TOKEN instead: gcloud auth print-identity-token --impersonate-service-account=ema-flow-workflow-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com --audiences=${worker_url} --include-email" >&2
+    # The impersonation recipe is not restated here: it needs a one-time
+    # roles/iam.serviceAccountTokenCreator grant that project owner does not carry, and a message
+    # that gave the command without the grant would send an operator into a PERMISSION_DENIED
+    # this repository has already recorded. README.md carries both, together.
+    echo "::error title=Smoke run::Could not obtain an ID token for ${worker_url}. gcloud refuses --audiences for external-account (Workload Identity Federation) and user credentials alike, so supply one in WORKER_ID_TOKEN. The recipe, including the one-time roles/iam.serviceAccountTokenCreator grant it needs first, is in README.md under 'Re-ingesting with scripts/demo/seed.ts'." >&2
     return 1
   fi
 
   body_file="$(mktemp)"
+  # Only 403 is retried, and only because an apply seconds earlier may still be propagating an
+  # IAM binding. The other two codes a first draft retried are wrong to retry:
+  #
+  #   401 means the token was refused, not the caller. Sleeping does not mint a new one, so the
+  #   attempts only delay the failure while blaming an IAM binding that was never involved.
+  #   403 is what a missing or propagating binding actually answers.
+  #
+  #   000 is curl reporting no HTTP answer at all, and it cannot distinguish a connection that
+  #   never opened from a request the worker received and is still executing. A run is not
+  #   idempotent — it persists a document and writes evidence and a ledger row — so re-POSTing
+  #   after a timeout risks a second run of the first one. Failing honestly is the lesser harm.
+  #
+  # --max-time is 480s, comfortably inside the ID token's 10-minute maximum lifetime, so no
+  # attempt can outlive the credential it is carrying. With only 403 retried the answers are
+  # immediate, so the whole loop is bounded by the propagation budget (105s) rather than by
+  # eight timeouts, and cannot approach the job's timeout-minutes.
   local max_attempts=8
   for attempt in $(seq 1 "$max_attempts"); do
-    # 000 is curl's code for no HTTP answer at all (connection failure or timeout).
     http_code="$(curl --silent --show-error --output "$body_file" --write-out '%{http_code}' \
-      --max-time 1500 \
+      --max-time 480 \
       --request POST "${worker_url}/v1/runs" \
       --header "Authorization: Bearer ${token}" \
       --header 'Content-Type: application/json' \
       --data '{"source":"fixture"}' || true)"
+    if [[ "$http_code" == "403" && "$attempt" -lt "$max_attempts" ]]; then
+      echo "worker answered HTTP 403 (attempt ${attempt}/${max_attempts}); retrying in 15s in case the run.invoker binding is still propagating."
+      sleep 15
+      continue
+    fi
     case "$http_code" in
-      401 | 403 | 000)
-        if [[ "$attempt" -lt "$max_attempts" ]]; then
-          echo "worker answered HTTP ${http_code:-000} (attempt ${attempt}/${max_attempts}); retrying in 15s in case the deployer's run.invoker binding is still propagating."
-          sleep 15
-          continue
-        fi
+      401)
+        echo "worker answered HTTP 401: the ID token was refused. Not retried — a retry presents the same token. Check the audience matches ${worker_url} and that the token carries an e-mail claim." >&2
+        ;;
+      000)
+        echo "worker returned no HTTP answer within 480s. Not retried, because a run that may already be executing is not safe to repeat." >&2
         ;;
     esac
     break

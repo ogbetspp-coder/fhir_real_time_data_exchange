@@ -194,6 +194,14 @@ variable "deployer_account" {
 
 # roles/run.invoker on the worker for the deployer, and nothing else: the smoke run POSTs one
 # fixture run and reads the answer.
+#
+# Today this binding authorises nothing new. The deployer holds roles/run.admin at project
+# level, which already contains run.routes.invoke — the permission Cloud Run's edge checks — so
+# the smoke call would succeed without it. It is declared anyway for two reasons: it states at
+# the resource level which service the deploy is entitled to call, and it is what the call falls
+# back on if the deployer's project-level run.admin is ever narrowed, which the roadmap's
+# least-privilege item contemplates. Treat the 403 retry in scripts/gcp/deploy.sh as insurance
+# for that future, not as the propagation window of a binding the call currently depends on.
 resource "google_cloud_run_v2_service_iam_member" "deployer_invoker" {
   count    = var.deployer_account == "" ? 0 : 1
   project  = var.project_id
