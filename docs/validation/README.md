@@ -195,6 +195,11 @@ information only. Evidence artefacts are under
 | `30f08ec0-a23e-4736-8cb1-58d9ea0540bc` | `document` | 2026-09-21 | `synthetic-demoxetine` v1. The document `get_section`, `get_provenance` and `verify_quote` were proved against                                                                                                                                                                                                                                                          |
 | `a6ea3c5d-4a90-4d27-95ac-68d7f10dbb7c` | `document` | 2026-09-21 | `synthetic-placebolol` v1                                                                                                                                                                                                                                                                                                                                               |
 | `24e8aa7d-b588-4fc6-8186-abc7ecc5239c` | `document` | 2026-09-21 | `synthetic-paracetamol` v2, a second version of an existing document rather than a new one                                                                                                                                                                                                                                                                              |
+| `627d1dbb-348f-43c3-9535-1d2a64594286` | `fixture`  | 2026-09-21 | The local runner (`scripts/dev/run-pipeline.ts --persist`) executing the whole pipeline from a laptop against the deployed environment own configuration: both validators executed with 0 errors, signed, `persisted`, in **13.7 seconds**                                                                                                                              |
+| `95250c7b-51ef-4e5f-8d76-14e97cc96354` | `document` | 2026-09-21 | `synthetic-paracetamol` v1, re-seeded after the store rebuild                                                                                                                                                                                                                                                                                                           |
+| `f4e6b7e3-97d5-47bf-8dfc-cf02b53f745b` | `document` | 2026-09-21 | `synthetic-demoxetine` v1, re-seeded                                                                                                                                                                                                                                                                                                                                    |
+| `10aeaa11-a548-42f8-ac43-dba26d99d975` | `document` | 2026-09-21 | `synthetic-placebolol` v1, re-seeded                                                                                                                                                                                                                                                                                                                                    |
+| `7494fd1b-ae01-4005-a31d-2c57b790d785` | `document` | 2026-09-21 | `synthetic-paracetamol` v2, re-seeded. These four are the documents the store holds now                                                                                                                                                                                                                                                                                 |
 
 Each `document` run wrote 11 evidence artefacts — the 7 a fixture run writes plus
 `canonical-submission.json`, `ingestion-provenance.json`, `fidelity-report.json` and
@@ -209,6 +214,20 @@ sentence with the strength changed from 10 mg to 20 mg answered `no-match`; the 
 with the negation removed from "not for clinical use" answered `no-match`. That is the system's
 central claim — that a quote can be checked rather than trusted — exercised against a published
 document rather than a fixture.
+
+Scene 2 of the demonstration was proved the same way on `0c18c50e…` section 4.4 after version 2
+was published: the version 2 sentence answered `match` at offsets 54–109, and the version 1
+sentence it replaced answered `no-match`. A quote from a superseded version of a label does not
+verify against the label as published, which is the point of the scene.
+
+**A traceability wrinkle, stated rather than hidden.** The validated FHIR store was deleted and
+rebuilt twice on 2026-09-21 — once to remove writes made by hand while diagnosing the transaction
+defect, and once after the `fixture` run source was moved onto its own product. Evidence
+artefacts and ledger rows survive a rebuild, because they live in Cloud Storage and BigQuery; the
+documents do not. So for the earlier `document` runs there is now evidence of a run whose output
+is no longer resolvable in the store. That is acceptable in a demonstrator being rebuilt
+deliberately. It would not be acceptable in a regulated environment, where the store is the
+record and deleting it is not a routine act.
 
 **What these runs do not establish.** The content is synthetic throughout, so nothing here says
 anything about a real label. The Workflows `document` branch is still unexercised: the seeding
