@@ -158,3 +158,13 @@ describe("the image registry on the artifacts key", () => {
     expect(grant).toContain("repository = google_artifact_registry_repository.images_cmek.name");
   });
 });
+
+describe("the FHIR dataset on the fhir-record key", () => {
+  it("is encrypted with the fhir-record key, and created only after its agent holds the grant", () => {
+    const dataset = block("google_healthcare_dataset", "record");
+    expect(dataset).toMatch(
+      /encryption_spec\s*\{\s*kms_key_name\s*=\s*google_kms_crypto_key\.record\["fhir-record"\]\.id/,
+    );
+    expect(dataset).toContain("google_kms_crypto_key_iam_member.record_agent");
+  });
+});

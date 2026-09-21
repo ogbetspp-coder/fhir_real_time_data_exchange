@@ -11,7 +11,10 @@ export GOOGLE_CLOUD_PROJECT="$PROJECT_ID"
 export CLOUDSDK_CORE_PROJECT="$PROJECT_ID"
 
 REGION="$(terraform -chdir=infra output -raw region)"
-DATASET="$(terraform -chdir=infra output -raw healthcare_dataset_id)"
+# HEALTHCARE_DATASET_OVERRIDE points this at a dataset the services are not using yet, so a new
+# dataset can be built and checked before anything is switched to it (CMEK step 5b). Unset, the
+# dataset is the one Terraform says the services use.
+DATASET="${HEALTHCARE_DATASET_OVERRIDE:-$(terraform -chdir=infra output -raw healthcare_dataset_id)}"
 SOURCE_STORE="$(terraform -chdir=infra output -raw source_fhir_store_id)"
 TARGET_STORE="$(terraform -chdir=infra output -raw target_fhir_store_id)"
 ANALYTICS_DATASET="$(terraform -chdir=infra output -raw fhir_analytics_dataset)"

@@ -15,6 +15,7 @@ const blocks = terraformBlocks(terraform);
 
 const records: [type: string, name: string][] = [
   ["google_healthcare_dataset", "epi"],
+  ["google_healthcare_dataset", "record"],
   ["google_bigquery_dataset", "ledger"],
   ["google_bigquery_table", "transformation_runs"],
   ["google_logging_project_bucket_config", "regulated_audit"],
