@@ -268,6 +268,18 @@ resource "google_project_iam_member" "worker_lineage_editor" {
   member  = "serviceAccount:${google_service_account.worker.email}"
 }
 
+# The deploy writes FHIR resources itself: scripts/gcp/bootstrap.sh seeds the synthetic Type 2
+# bundle into the source store. Until CMEK step 5c that permission was a grant made by hand on the
+# old dataset, outside Terraform, and nothing recorded it but a note; the switch to the new
+# dataset left the deployer without it and the first deploy's seeding step was refused (403).
+# Declared here so it follows the dataset. Scoped to the one dataset, like the worker's.
+resource "google_healthcare_dataset_iam_member" "deployer_fhir_editor" {
+  count      = var.deployer_account == "" ? 0 : 1
+  dataset_id = google_healthcare_dataset.record.id
+  role       = "roles/healthcare.fhirResourceEditor"
+  member     = "serviceAccount:${var.deployer_account}"
+}
+
 # No Document AI role: nothing the worker runs calls Document AI. The extractor spike does, as a
 # person running scripts/spikes/document-ai by hand, not as this identity. Removed in CMEK step 5c.
 
