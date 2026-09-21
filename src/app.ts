@@ -5,7 +5,7 @@ import { RunRequestSchema, SubmissionRejectedError } from "./contracts/index.js"
 import { loadEmaMapping } from "./fhir/mapping.js";
 import type { FhirBundle } from "./fhir/types.js";
 import { createSyntheticType2Bundle } from "./fixtures/synthetic.js";
-import { HealthcareApiClient } from "./gcp/healthcare.js";
+import { HealthcareApiClient, HealthcareApiError } from "./gcp/healthcare.js";
 import {
   GcsSubmissionReader,
   SubmissionReadError,
@@ -128,6 +128,13 @@ export function createApp(overrides: AppOverrides = {}): Hono {
     // did not write is `unclassified`. "pipeline-failed" alone told an operator only that
     // something threw, which in a system whose product is traceable evidence is not enough.
     function pipelineFailureReason(failure: Error): string {
+      // An upstream refusal carries its own closed operation, so it is classified by type rather
+      // than by message: the message embeds a status and a hash and could never match a literal.
+      // The first run to reach persistence answered `unclassified` for exactly this reason, and
+      // finding out which upstream had refused meant reading Cloud Audit Logs by hand.
+      if (failure instanceof HealthcareApiError) {
+        return `healthcare-${failure.operation}-refused`;
+      }
       const reasons: Record<string, string> = {
         "runId must be a UUID": "bad-run-id",
         "Canonical Type 2 preflight failed": "source-preflight-failed",
