@@ -7,7 +7,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   HERMETIC_PROPERTIES,
   PACKAGE_LOCK,
-  downloadAttempts,
+  networkUse,
+  packageSummary,
   readPackageLock,
   readSidecarPins,
 } from "../../scripts/ci/validator-pins.mjs";
@@ -45,6 +46,12 @@ describe("the validator sidecar as built", () => {
     const flags = pins.flags.join(" ");
     expect(flags).toContain("-jurisdiction uv");
     expect(flags).toContain("-locale en-US");
+  });
+
+  it("refuses every HTTP request inside the application, not only at the proxy", () => {
+    // The validator's own switch. Besides reproducibility it closes a request-forgery path:
+    // submitted content can name URLs for the validator to fetch, internal ones included.
+    expect(pins.flags).toContain("-no-http-access");
   });
 
   it("installs the pinned list, and stops the build on the first bad checksum", () => {
@@ -107,23 +114,56 @@ describe("the readers refuse a Dockerfile that has drifted", () => {
     expect(() => readSidecarPins(variant(text))).toThrow(/does not COPY/);
   });
 
+  it("without the application's own network refusal", () => {
+    const text = dockerfile.replace(`, "-no-http-access"]`, "]");
+    expect(() => readSidecarPins(variant(text))).toThrow(/-no-http-access/);
+  });
+
   it("without a pinned jurisdiction", () => {
     const text = dockerfile.replace(`"-jurisdiction", "uv", `, "");
     expect(() => readSidecarPins(variant(text))).toThrow(/-jurisdiction/);
   });
 });
 
-describe("recognising a download attempt in validator output", () => {
-  it("catches installing, fetching and failed fetches, and nothing else", () => {
+describe("reading how the validator used the network", () => {
+  it("fails on installs and socket-level fetch errors, reports policy refusals", () => {
     const output = [
       "  Loading FHIR v5.0.0 from hl7.fhir.r5.core#5.0.0",
       "Installing hl7.fhir.r5.core#5.0.0 to the package cache",
-      "  Fetching:",
-      "Error fetching https://packages2.fhir.org/packages/hl7.fhir.r5.core: Failed to connect",
+      "Error fetching https://packages2.fhir.org/packages/hl7.terminology: Access to the internet is not allowed by local security policy",
+      "Error fetching https://packages.fhir.org/hl7.terminology: Failed to connect to /127.0.0.1:9",
+      "Failed to determine latest version of package hl7.terminology from server: x",
       "  Load hl7.terminology.r5#6.2.0 - 4288 resources (00:11.450)",
-      "  Package Summary: [hl7.fhir.r5.core#5.0.0]",
     ];
-    expect(downloadAttempts(output)).toEqual(output.slice(1, 4));
+    const { installs, refused, other } = networkUse(output);
+    expect(installs).toEqual([output[1]]);
+    expect(refused).toEqual([output[2]]);
+    expect(other).toEqual([output[3], output[4]]);
+  });
+
+  it("reads the validator's own list of loaded packages, and knows when it is missing", () => {
+    expect(
+      packageSummary(["x", "  Package Summary: [hl7.fhir.r5.core#5.0.0, EUePI#1.0.0]", "y"]),
+    ).toEqual(["hl7.fhir.r5.core#5.0.0", "EUePI#1.0.0"]);
+    expect(packageSummary(["no summary here"])).toBeUndefined();
+  });
+});
+
+describe("the local validator helper", () => {
+  it("runs the way the sidecar runs, not the way it used to", () => {
+    const helper = readFileSync("scripts/dev/validator-server.sh", "utf8");
+    for (const property of HERMETIC_PROPERTIES) {
+      const [key, value] = property.replace(/^-D/, "").split("=");
+      expect(helper).toMatch(
+        new RegExp(
+          `-D${String(key).replace(/\./g, "\\.")}=${String(value).replace(/\./g, "\\.")}\\b`,
+        ),
+      );
+    }
+    expect(helper).toContain('-Duser.home="${CACHE}/home"');
+    for (const flag of ["-jurisdiction uv", "-locale en-US", "-no-http-access", "-tx n/a"]) {
+      expect(helper).toContain(flag);
+    }
   });
 });
 
@@ -132,6 +172,9 @@ describe("the image build", () => {
     const build = readFileSync("cloudbuild.images.yaml", "utf8");
     expect(build).toContain("- id: validator-starts-offline");
     expect(build).toMatch(/docker run --detach --name offline --network none/);
-    expect(build).toMatch(/Installing \[\^ \]\+ to the package cache\|Fetching:\|Error fetching/);
+    expect(build).toMatch(/grep -E "Installing \[\^ \]\+ to the package cache" offline\.log/);
+    expect(build).toMatch(/grep -v "not allowed by local security policy"/);
+    expect(build).toContain('grep -q "Jurisdiction: Global (Whole world)" offline.log');
+    expect(build).toContain('grep -q "Locale: United States/US" offline.log');
   });
 });

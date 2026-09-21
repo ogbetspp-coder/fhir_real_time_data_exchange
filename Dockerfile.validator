@@ -75,4 +75,11 @@ ENTRYPOINT ["java", "-Xms768m", "-Xmx1536m", "-Duser.home=/opt/fhir/home", "-Dja
 # exposed: only the "worker" container publishes a port in infra/run.tf.
 # -jurisdiction uv and -locale en-US: without them the validator takes both from the container's
 # locale, which on 2026-09-21 meant EMA content was validated under United States jurisdiction.
-CMD ["server", "8090", "-allowNetworkAccess", "-version", "5.0.0", "-jurisdiction", "uv", "-locale", "en-US", "-ig", "/opt/fhir/terminology-package.tgz", "-ig", "/opt/fhir/extensions-package.tgz", "-ig", "/opt/fhir/global-epi-package.tgz", "-ig", "/opt/fhir/ema-epi-package.tgz", "-tx", "n/a"]
+# -no-http-access: the validator's own switch that refuses every HTTP(S) request inside the
+# application ("Access to the internet is not allowed by local security policy"). The closed
+# proxy above stays as a second layer for any client that bypasses it. Beyond reproducibility this
+# closes a request-forgery path: the validator's documentation warns that content being
+# validated can direct it to fetch URLs of the content's choosing, including internal addresses
+# such as Cloud Run's metadata server, and this sidecar validates content that arrives in
+# submissions.
+CMD ["server", "8090", "-allowNetworkAccess", "-version", "5.0.0", "-jurisdiction", "uv", "-locale", "en-US", "-ig", "/opt/fhir/terminology-package.tgz", "-ig", "/opt/fhir/extensions-package.tgz", "-ig", "/opt/fhir/global-epi-package.tgz", "-ig", "/opt/fhir/ema-epi-package.tgz", "-tx", "n/a", "-no-http-access"]

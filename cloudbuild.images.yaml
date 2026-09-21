@@ -51,8 +51,16 @@ steps:
         done
         docker logs offline > offline.log 2>&1 || true
         docker rm --force offline >/dev/null
-        if grep -E "Installing [^ ]+ to the package cache|Fetching:|Error fetching" offline.log; then
-          echo "The validator reached for the network while starting offline." >&2
+        # An install means a needed package is not in the image. A fetch error that the
+        # validator's own -no-http-access policy did not refuse means an attempt got as far as a
+        # socket. Refused optional lookups (the hl7.terminology version check) are allowed.
+        if grep -E "Installing [^ ]+ to the package cache" offline.log; then
+          echo "The validator needed a package that is not installed in the image." >&2
+          exit 1
+        fi
+        if grep -E "Error fetching|Failed to determine latest version of package|Failed to connect" offline.log \
+          | grep -v "not allowed by local security policy"; then
+          echo "The validator attempted a network request that its policy did not refuse." >&2
           exit 1
         fi
         if [ -z "$$started" ]; then
@@ -60,6 +68,10 @@ steps:
           echo "The validator did not start with networking disabled." >&2
           exit 1
         fi
+        grep -q "Jurisdiction: Global (Whole world)" offline.log \
+          || { echo "The validator is not validating under universal jurisdiction." >&2; exit 1; }
+        grep -q "Locale: United States/US" offline.log \
+          || { echo "The validator is not running in the pinned locale." >&2; exit 1; }
         grep -E "Jurisdiction:|Locale:|Package Summary|HTTP Service started" offline.log | cut -c1-200
 
   - id: build-query-image

@@ -26,4 +26,6 @@ export type LockedPackage = {
 export function instructions(text: string): string[];
 export function readSidecarPins(dockerfile: string): SidecarPins;
 export function readPackageLock(file: string): LockedPackage[];
-export function downloadAttempts(lines: readonly string[]): string[];
+export type NetworkUse = { installs: string[]; refused: string[]; other: string[] };
+export function networkUse(lines: readonly string[]): NetworkUse;
+export function packageSummary(lines: readonly string[]): string[] | undefined;

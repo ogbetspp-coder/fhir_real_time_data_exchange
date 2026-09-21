@@ -149,14 +149,25 @@ Two gates close that.
     installed from the network and found byte-identical; only the validator's own
     `.index.json` files differ, and it regenerates those.
   - `Dockerfile.validator` installs them into the image's package cache at build time, each
-    verified before it is unpacked, and runs the JVM with `-Duser.home` pointing at that cache
-    and a proxy on a closed local port, so any outbound request fails. The validator runs with
-    `-jurisdiction uv -locale en-US`.
-  - This gate seeds its own cache from the same list, runs with the sidecar's own JVM
-    properties, and fails on any line showing an attempted download.
+    verified before it is unpacked. The validator runs with `-no-http-access` — its own switch,
+    which refuses every HTTP(S) request inside the application — and, as a second layer, a JVM
+    proxy on a closed local port. It validates with `-jurisdiction uv -locale en-US`, which it
+    reports as `Jurisdiction: Global (Whole world)` and `Locale: United States/US`.
+  - This gate seeds its own cache from the same list and runs with the sidecar's own JVM
+    properties and flags. It fails if the validator installs anything (a needed package is not
+    listed), if any fetch gets as far as a socket, or if the validator's own `Package Summary`
+    names any package outside the pinned set — the nine listed plus the four `-ig` files, by the
+    id each declares in its `package.json`. A lookup the policy refused is reported, not failed:
+    the validator checks for a newer `hl7.terminology` on every run, the first CI run with the
+    network closed showed it, and it recovers from the refusal with the pinned version.
   - Every image build starts the validator image with `--network none` in Cloud Build and fails
     unless it comes up without reaching for the network (`cloudbuild.images.yaml`,
     step `validator-starts-offline`).
+
+  `-no-http-access` also closes a request-forgery path. The validator's own documentation warns
+  that content being validated can direct it to fetch URLs of the content's choosing, including
+  internal network addresses — on Cloud Run that includes the metadata server, which serves
+  credentials over plain HTTP — and the sidecar validates content that arrives in submissions.
 
   Blocking the network was tested before it was relied on: with an empty cache and the closed
   proxy, the validator refused to start — `Error fetching … Failed to connect to /127.0.0.1:9`,

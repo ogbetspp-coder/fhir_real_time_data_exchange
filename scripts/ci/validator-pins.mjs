@@ -96,6 +96,8 @@ export function readSidecarPins(dockerfile) {
       if (typeof value !== "string") throw new Error(`${name}: CMD ${token} has no value`);
       flags.push(token, value);
       index += 1;
+    } else if (token === "-no-http-access") {
+      flags.push(token);
     } else if (token === "-ig") {
       const value = tokens[index + 1];
       if (typeof value !== "string") throw new Error(`${name}: CMD -ig has no value`);
@@ -107,7 +109,7 @@ export function readSidecarPins(dockerfile) {
       index += 1;
     }
   }
-  for (const required of ["-version", "-tx", "-jurisdiction", "-locale"]) {
+  for (const required of ["-version", "-tx", "-jurisdiction", "-locale", "-no-http-access"]) {
     if (!flags.includes(required)) throw new Error(`${name}: CMD does not carry ${required}`);
   }
   if (packages.length === 0) throw new Error(`${name}: CMD loads no -ig package`);
@@ -200,11 +202,41 @@ export function readPackageLock(file) {
   return entries;
 }
 
-// Every line of validator output that shows it reaching for the network: installing a package
-// that was not already in its cache, fetching, or failing to fetch. With the cache seeded and the
-// proxy closed there must be none.
-export function downloadAttempts(lines) {
-  return lines.filter((line) =>
-    /Installing \S+ to the package cache|^\s*Fetching:|Error fetching/.test(line),
-  );
+// How the validator's output shows it relating to the network, sorted three ways:
+//
+//   installs — "Installing <id>#<version> to the package cache": a package it needed was not
+//              already installed. With the cache seeded from the list, any install means the
+//              list is incomplete, and it fails the gate.
+//   refused  — a fetch the validator's own `-no-http-access` policy refused ("Access to the
+//              internet is not allowed by local security policy"). These are optional lookups it
+//              recovers from — the version check it makes for hl7.terminology — and they prove no
+//              network was used. Reported, not failed.
+//   other    — any other fetch error: an attempt that got as far as a socket. With the policy
+//              on there should be none, so any fails the gate.
+export function networkUse(lines) {
+  const installs = [];
+  const refused = [];
+  const other = [];
+  for (const line of lines) {
+    if (/Installing \S+ to the package cache/.test(line)) installs.push(line);
+    else if (
+      /Error fetching|Failed to determine latest version of package|Failed to connect/.test(line)
+    ) {
+      if (/not allowed by local security policy/.test(line)) refused.push(line);
+      else other.push(line);
+    }
+  }
+  return { installs, refused, other };
+}
+
+// The validator's own list of what it loaded: "Package Summary: [id#version, ...]". Undefined
+// when the line is absent, which the gate treats as no verdict rather than as an empty set.
+export function packageSummary(lines) {
+  const line = lines.find((candidate) => /Package Summary:\s*\[/.test(candidate));
+  if (line === undefined) return undefined;
+  const inner = /Package Summary:\s*\[(.*)\]/.exec(line)?.[1] ?? "";
+  return inner
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== "");
 }

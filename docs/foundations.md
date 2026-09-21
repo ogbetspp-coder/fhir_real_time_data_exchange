@@ -173,7 +173,8 @@ _Status 2026-09-21: fixed, pending deploy verification._ Worse than first record
 sidecar downloaded all nine packages **on every cold start** — validator ready at 48 seconds,
 worker at 57 — and validated EMA content under United States jurisdiction. The packages are now
 pinned in `fhir/validator-packages.lock`, installed into the image, and the validator runs with
-no route to the network and `-jurisdiction uv -locale en-US`; the CI gate uses the same list and
+`-no-http-access`, no route to the network and `-jurisdiction uv -locale en-US` — which also
+closes a request-forgery path from submitted content to internal addresses; the CI gate uses the same list and
 the same JVM properties and fails on any download attempt; every image build proves the
 validator starts with networking disabled. Details in `docs/validation/README.md`, "Official
 validation gate".

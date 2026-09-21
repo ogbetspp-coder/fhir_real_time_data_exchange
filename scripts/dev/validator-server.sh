@@ -17,7 +17,7 @@ PORT="${1:-8090}"
 
 missing=()
 for artefact in validator_cli.jar terminology-package.tgz extensions-package.tgz \
-  global-epi-package.tgz ema-epi-package.tgz; do
+  global-epi-package.tgz ema-epi-package.tgz home/.fhir/packages/packages.ini; do
   [[ -f "${CACHE}/${artefact}" ]] || missing+=("$artefact")
 done
 
@@ -27,15 +27,26 @@ if ((${#missing[@]} > 0)); then
   exit 1
 fi
 
-# The -ig order and the -tx and -version flags mirror Dockerfile.validator's CMD. Written out
-# rather than held in a variable: an unquoted variable is not word-split by every shell, and a
-# validator that silently runs with no packages reports zero errors and exits 0.
-echo "Validator ${PORT}: loading four pinned packages, this takes about a minute."
-exec java -Xms768m -Xmx1536m -jar "${CACHE}/validator_cli.jar" \
+# The JVM properties, the -ig order and the validation flags mirror Dockerfile.validator's
+# ENTRYPOINT and CMD: the package cache seeded from fhir/validator-packages.lock by
+# `npm run validate:official`, no route to the network, and the same jurisdiction and locale.
+# test/ci/validator-pins.test.ts fails if this drifts. Written out rather than held in a
+# variable: an unquoted variable is not word-split by every shell, and a validator that silently
+# runs with no packages reports zero errors and exits 0.
+echo "Validator ${PORT}: loading the pinned packages offline, this takes about a minute."
+exec java -Xms768m -Xmx1536m \
+  -Duser.home="${CACHE}/home" \
+  -Djava.net.useSystemProxies=false \
+  -Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=9 \
+  -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=9 \
+  -jar "${CACHE}/validator_cli.jar" \
   server "${PORT}" \
   -version 5.0.0 \
+  -jurisdiction uv \
+  -locale en-US \
   -ig "${CACHE}/terminology-package.tgz" \
   -ig "${CACHE}/extensions-package.tgz" \
   -ig "${CACHE}/global-epi-package.tgz" \
   -ig "${CACHE}/ema-epi-package.tgz" \
-  -tx n/a
+  -tx n/a \
+  -no-http-access

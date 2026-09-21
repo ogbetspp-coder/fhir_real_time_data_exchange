@@ -2,13 +2,22 @@
 
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 import {
   PACKAGE_LOCK,
-  downloadAttempts,
+  networkUse,
+  packageSummary,
   readPackageLock,
   readSidecarPins,
 } from "./validator-pins.mjs";
@@ -146,6 +155,23 @@ async function seedPackage(validatorDir, home, entry, offline) {
   console.log(`  ${entry.key}: unpacked into the package cache`);
 }
 
+// The id and version a package declares for itself, read from package/package.json inside the
+// tarball — the form the validator's "Package Summary" uses.
+function igPackageId(tarball) {
+  const read = spawnSync("tar", ["-xzOf", tarball, "package/package.json"], {
+    encoding: "utf8",
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  if (read.error !== undefined || read.status !== 0) {
+    throw new Error(`could not read package.json from ${path.basename(tarball)}`);
+  }
+  const { name, version } = JSON.parse(read.stdout);
+  if (typeof name !== "string" || typeof version !== "string") {
+    throw new Error(`${path.basename(tarball)}: package.json has no name and version`);
+  }
+  return `${name}#${version}`;
+}
+
 function emitValidationSet(setDir) {
   const tsx = path.join(root, "node_modules", ".bin", "tsx");
   const script = path.join(root, "scripts", "ci", "emit-validation-set.ts");
@@ -207,8 +233,8 @@ function validate(java, pins, validatorDir, home, setDir, entry) {
     status: run.status,
     issues,
     unloaded,
-    attempts: downloadAttempts(lines),
-    summary: lines.find((line) => /Package Summary/.test(line))?.trim(),
+    network: networkUse(lines),
+    loaded: packageSummary(lines),
     tail: lines.filter(Boolean).slice(-30),
   };
 }
@@ -235,7 +261,20 @@ async function main() {
   mkdirSync(cache, { recursive: true });
   writeFileSync(path.join(cache, "packages.ini"), "[cache]\nversion = 4\n");
   console.log(`Package cache from ${PACKAGE_LOCK} (${lock.length} packages):`);
+  // A package dropped from the list must not linger in a local cache and keep a run passing.
+  const listed = new Set(lock.map(({ key }) => key));
+  for (const name of readdirSync(cache)) {
+    if (name.includes("#") && !listed.has(name)) {
+      rmSync(path.join(cache, name), { recursive: true, force: true });
+      console.log(`  ${name}: removed from the package cache, no longer listed`);
+    }
+  }
   for (const entry of lock) await seedPackage(options.validatorDir, home, entry, options.offline);
+
+  // Everything the validator may load: the listed packages and the four -ig files, by the id and
+  // version each declares in its own package.json.
+  const pinned = new Set(listed);
+  for (const file of pins.packages) pinned.add(igPackageId(path.join(options.validatorDir, file)));
 
   const setDir =
     options.setDir ??
@@ -262,14 +301,37 @@ async function main() {
     for (const profile of entry.profiles) console.log(`  -profile ${profile}`);
     const result = validate(java, pins, options.validatorDir, home, setDir, entry);
 
-    if (result.attempts.length > 0) {
+    const { installs, refused, other } = result.network;
+    if (installs.length > 0 || other.length > 0) {
       failed = true;
-      console.log("  VALIDATOR FAILURE: the validator reached for the network");
-      for (const line of result.attempts) console.log(`  | ${line.trim()}`);
-      summary.push(`${entry.file}: validator attempted ${result.attempts.length} download(s)`);
+      console.log("  VALIDATOR FAILURE: the validator needed something that is not pinned");
+      for (const line of [...installs, ...other]) console.log(`  | ${line.trim()}`);
+      summary.push(`${entry.file}: ${installs.length} install(s), ${other.length} fetch error(s)`);
       continue;
     }
-    if (result.summary !== undefined) console.log(`  ${result.summary}`);
+    if (result.loaded === undefined) {
+      failed = true;
+      console.log("  VALIDATOR FAILURE: no package summary, so what was loaded is unknown");
+      for (const line of result.tail) console.log(`  | ${line}`);
+      summary.push(`${entry.file}: no package summary`);
+      continue;
+    }
+    const unpinned = result.loaded.filter((key) => !pinned.has(key));
+    if (unpinned.length > 0) {
+      failed = true;
+      console.log(
+        `  VALIDATOR FAILURE: loaded packages that are not pinned: ${unpinned.join(", ")}`,
+      );
+      summary.push(`${entry.file}: loaded unpinned ${unpinned.join(", ")}`);
+      continue;
+    }
+    console.log(`  loaded ${result.loaded.length} packages, every one pinned`);
+    if (refused.length > 0) {
+      console.log(
+        `  ${refused.length} optional lookup(s) refused by -no-http-access; no network used:`,
+      );
+      for (const line of refused) console.log(`  | ${line.trim()}`);
+    }
 
     if (result.unloaded.length > 0) {
       failed = true;
