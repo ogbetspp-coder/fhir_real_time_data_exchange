@@ -45,7 +45,9 @@ const verifier: CredentialVerifier = {
       return Promise.resolve({ principal: access[1], credentialType: "access-token" as const });
     }
     const match = /^aud=([^;]+);sub=([A-Za-z0-9]+)$/.exec(token);
-    if (match?.[1] !== AUDIENCE || match[2] === undefined) return Promise.resolve(undefined);
+    if (match?.[1] !== AUDIENCE || match[2] === undefined) {
+      return Promise.resolve({ rejected: "id-token-rejected" as const });
+    }
     return Promise.resolve({ principal: match[2], credentialType: "id-token" as const });
   },
 };

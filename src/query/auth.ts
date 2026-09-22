@@ -18,11 +18,31 @@ import { sha256Utf8 } from "../lib/hash.js";
 
 export type VerifiedCredential = { principal: string; credentialType: CredentialType };
 
+// Why a credential was refused, as a fixed category — never a message, and never anything
+// derived from the token's bytes. A caller is still told only "unauthenticated"; this is for the
+// operator's log, and only when QUERY_LOG_REJECTION_REASON is set (see app.ts). The categories
+// distinguish the mistakes that actually happen: an ID token minted for the wrong audience, an
+// access token from an OAuth client the service does not accept, and a token Google no longer
+// recognises.
+export type RejectionReason =
+  | "no-bearer"
+  | "id-token-rejected"
+  | "access-tokens-not-accepted"
+  | "access-token-audience"
+  | "access-token-expired"
+  | "access-token-lookup-failed"
+  | "principal-malformed";
+
+export type Rejected = { rejected: RejectionReason };
+
+export function isRejected(result: VerifiedCredential | Rejected): result is Rejected {
+  return "rejected" in result;
+}
+
 export type CredentialVerifier = {
-  // The verified principal and how it was proven, or undefined for any credential that is
-  // missing, malformed, expired, wrongly-audienced, or not Google-issued. The caller learns
-  // nothing more.
-  verify(token: string): Promise<VerifiedCredential | undefined>;
+  // The verified principal and how it was proven, or the category of refusal. The caller is
+  // told only that it was not authenticated; the category never reaches it.
+  verify(token: string): Promise<VerifiedCredential | Rejected>;
 };
 
 const GOOGLE_ISSUERS = new Set(["https://accounts.google.com", "accounts.google.com"]);
@@ -65,26 +85,26 @@ export function googleCredentialVerifier(options: GoogleVerifierOptions): Creden
   // order is eviction order.
   const cache = new Map<string, CacheEntry>();
 
-  async function verifyIdToken(idToken: string): Promise<VerifiedCredential | undefined> {
+  async function verifyIdToken(idToken: string): Promise<VerifiedCredential | Rejected> {
     try {
       const ticket = await client.verifyIdToken({ idToken, audience });
       const payload = ticket.getPayload();
-      if (payload === undefined) return undefined;
-      if (!GOOGLE_ISSUERS.has(payload.iss)) return undefined;
+      if (payload === undefined) return { rejected: "id-token-rejected" };
+      if (!GOOGLE_ISSUERS.has(payload.iss)) return { rejected: "id-token-rejected" };
       // The principal identifies an entitlement holder and is written to the audit record, so
       // it has to satisfy the contract's PrincipalId before it is used as either.
       const principal = PrincipalId.safeParse(payload.sub);
       return principal.success
         ? { principal: principal.data, credentialType: "id-token" }
-        : undefined;
+        : { rejected: "principal-malformed" };
     } catch {
       // Verification failures carry token material in their messages; none of it escapes.
-      return undefined;
+      return { rejected: "id-token-rejected" };
     }
   }
 
-  async function verifyAccessToken(accessToken: string): Promise<VerifiedCredential | undefined> {
-    if (clientIds.size === 0) return undefined;
+  async function verifyAccessToken(accessToken: string): Promise<VerifiedCredential | Rejected> {
+    if (clientIds.size === 0) return { rejected: "access-tokens-not-accepted" };
 
     const key = sha256Utf8(accessToken);
     const cached = cache.get(key);
@@ -100,11 +120,14 @@ export function googleCredentialVerifier(options: GoogleVerifierOptions): Creden
       // getTokenInfo sends the token in the Authorization header of a POST to Google's tokeninfo
       // endpoint; it is never placed in a URL here.
       const info = await client.getTokenInfo(accessToken);
-      if (typeof info.expiry_date !== "number" || !(info.expiry_date > at)) return undefined;
+      if (typeof info.expiry_date !== "number" || !(info.expiry_date > at)) {
+        return { rejected: "access-token-expired" };
+      }
       const presentedTo = [info.aud, info.azp].filter((id): id is string => typeof id === "string");
-      if (!presentedTo.some((id) => clientIds.has(id))) return undefined;
+      if (!presentedTo.some((id) => clientIds.has(id)))
+        return { rejected: "access-token-audience" };
       const principal = PrincipalId.safeParse(info.sub);
-      if (!principal.success) return undefined;
+      if (!principal.success) return { rejected: "principal-malformed" };
 
       const expiresAt = Math.min(info.expiry_date, at + ACCESS_TOKEN_CACHE_MAX_MS);
       if (cache.size >= ACCESS_TOKEN_CACHE_MAX_ENTRIES) {
@@ -115,12 +138,12 @@ export function googleCredentialVerifier(options: GoogleVerifierOptions): Creden
       return { principal: principal.data, credentialType: "access-token" };
     } catch {
       // A failed lookup is never cached and its message (which may quote the token) never escapes.
-      return undefined;
+      return { rejected: "access-token-lookup-failed" };
     }
   }
 
   return {
-    verify(token: string): Promise<VerifiedCredential | undefined> {
+    verify(token: string): Promise<VerifiedCredential | Rejected> {
       return isJwtShaped(token) ? verifyIdToken(token) : verifyAccessToken(token);
     },
   };

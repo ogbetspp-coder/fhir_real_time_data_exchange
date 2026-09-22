@@ -133,6 +133,13 @@ resource "google_cloud_run_v2_service" "query" {
           value = join(",", var.query_oauth_client_ids)
         }
       }
+      # Logs the category of an authentication refusal, never the token and never a reason to the
+      # caller. On in dev, where a credential refused for an unknown reason is undiagnosable; the
+      # variable defaults to false, so production stays silent.
+      env {
+        name  = "QUERY_LOG_REJECTION_REASON"
+        value = var.query_log_rejection_reason ? "true" : "false"
+      }
     }
   }
 

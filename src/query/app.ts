@@ -30,7 +30,7 @@ import {
 import type { EmaMapping } from "../fhir/mapping.js";
 import { sha256 } from "../lib/hash.js";
 import { log } from "../lib/logger.js";
-import { bearerToken, type CredentialVerifier } from "./auth.js";
+import { bearerToken, isRejected, type CredentialVerifier } from "./auth.js";
 import type { EntitlementDirectory, Entitlements } from "./entitlements.js";
 import type { FhirReader } from "./fhir-reader.js";
 import {
@@ -354,6 +354,8 @@ export type QueryAppDeps = {
   // Present when the service runs from a container: `sha256:<64 hex>`, as the config validates.
   imageDigest?: string | undefined;
   verifier: CredentialVerifier;
+  // Dev only: log the category of an authentication refusal. Never returned to the caller.
+  logRejectionReason?: boolean;
   entitlements: EntitlementDirectory;
   audit?: AuditSink;
   // Store reads one HTTP request may make across its whole batch; defaults to
@@ -560,15 +562,21 @@ export function createQueryApp(
     }
 
     // The Bearer check runs before the transport sees the request: an unauthenticated caller
-    // never reaches the protocol, and learns nothing but that it was not authenticated. The log
-    // line carries no principal and no reason: nothing on it is derived from the credential.
+    // never reaches the protocol, and learns nothing but that it was not authenticated. The
+    // caller is never told why. The operator's log carries the category of refusal only when
+    // QUERY_LOG_REJECTION_REASON is set, and even then it is one of a fixed set of words, never
+    // a message and never anything derived from the token's bytes. It exists because a
+    // credential refused for an unknown reason is undiagnosable: a whole Gemini Enterprise turn
+    // failed on 2026-09-22 with nothing in the log but "unauthenticated" seven times.
     const token = bearerToken(request.headers.authorization);
-    const credential = token === undefined ? undefined : await deps.verifier.verify(token);
-    if (credential === undefined) {
+    const credential =
+      token === undefined ? { rejected: "no-bearer" as const } : await deps.verifier.verify(token);
+    if (isRejected(credential)) {
       log("warning", "Query request unauthenticated", {
         service: QUERY_SERVICE_NAME,
         stage: "query-http",
         event: "unauthenticated",
+        ...(deps.logRejectionReason === true ? { reason: credential.rejected } : {}),
       });
       sendJson(response, 401, { error: "unauthenticated" });
       return;

@@ -120,6 +120,8 @@ tf_deploy_vars() {
     -var="query_oauth_client_ids=${query_oauth_client_ids_json}"
     -var="query_entitlements_json=${query_entitlements_json}"
     -var="alert_notification_email=${alert_notification_email}"
+    # Dev logs why a credential was refused (a category, never the token); production does not.
+    -var="query_log_rejection_reason=${QUERY_LOG_REJECTION_REASON:-false}"
   )
 }
 

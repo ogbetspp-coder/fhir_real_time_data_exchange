@@ -12,6 +12,7 @@ import {
   ACCESS_TOKEN_CACHE_MAX_MS,
   googleCredentialVerifier,
   isJwtShaped,
+  isRejected,
   type GoogleVerifierOptions,
 } from "../../src/query/auth.js";
 import {
@@ -129,10 +130,10 @@ describe("credential verification", () => {
     stub.idTokens.set(badSub, idPayload("someone@example.com"));
     const verifier = verifierWith(stub);
 
-    expect(await verifier.verify(otherAudience)).toBeUndefined();
-    expect(await verifier.verify(otherIssuer)).toBeUndefined();
-    expect(await verifier.verify(badSub)).toBeUndefined();
-    expect(await verifier.verify(jwt("unknown"))).toBeUndefined();
+    expect(isRejected(await verifier.verify(otherAudience))).toBe(true);
+    expect(isRejected(await verifier.verify(otherIssuer))).toBe(true);
+    expect(isRejected(await verifier.verify(badSub))).toBe(true);
+    expect(isRejected(await verifier.verify(jwt("unknown")))).toBe(true);
   });
 
   // The demo path. `gcloud auth print-identity-token --audiences=...` is refused for a user
@@ -156,7 +157,7 @@ describe("credential verification", () => {
     });
 
     // Not configured: the operator has not opted into the path, and the token is refused.
-    expect(await verifierWith(stub).verify(userToken)).toBeUndefined();
+    expect(isRejected(await verifierWith(stub).verify(userToken))).toBe(true);
 
     // Configured: the same token resolves to the user's Google subject, which is the principal
     // an operator entitles. Nothing else about the path differs from the ID-token path.
@@ -179,7 +180,7 @@ describe("credential verification", () => {
     );
     const verifier = verifierWith(stub);
 
-    expect(await verifier.verify("ya29.wrong-aud")).toBeUndefined();
+    expect(isRejected(await verifier.verify("ya29.wrong-aud"))).toBe(true);
     // `azp` naming a configured client is accepted, as `aud` is.
     expect(await verifier.verify("ya29.azp-ok")).toEqual({
       principal: PRINCIPAL_A,
@@ -197,10 +198,10 @@ describe("credential verification", () => {
     });
     const verifier = verifierWith(stub);
 
-    expect(await verifier.verify("ya29.expired")).toBeUndefined();
-    expect(await verifier.verify("ya29.no-sub")).toBeUndefined();
+    expect(isRejected(await verifier.verify("ya29.expired"))).toBe(true);
+    expect(isRejected(await verifier.verify("ya29.no-sub"))).toBe(true);
     // Failures are never cached: the next presentation asks Google again.
-    expect(await verifier.verify("ya29.expired")).toBeUndefined();
+    expect(isRejected(await verifier.verify("ya29.expired"))).toBe(true);
     expect(stub.calls.getTokenInfo).toBe(3);
   });
 
@@ -209,7 +210,7 @@ describe("credential verification", () => {
     stub.accessTokens.set("ya29.valid", accessInfo(PRINCIPAL_A));
     const verifier = verifierWith(stub, { oauthClientIds: [] });
 
-    expect(await verifier.verify("ya29.valid")).toBeUndefined();
+    expect(isRejected(await verifier.verify("ya29.valid"))).toBe(true);
     expect(stub.calls.getTokenInfo).toBe(0);
 
     // The ID-token path is unaffected by the access-token posture.
@@ -252,7 +253,7 @@ describe("credential verification", () => {
     clock.now = NOW + 10_000;
     // The cached entry has expired with the token; the lookup goes to Google, which (in this
     // stub) still reports the old expiry, so the token is now rejected rather than served.
-    expect(await verifier.verify("ya29.short")).toBeUndefined();
+    expect(isRejected(await verifier.verify("ya29.short"))).toBe(true);
     expect(stub.calls.getTokenInfo).toBe(2);
   });
 
@@ -357,5 +358,50 @@ describe("credential verification through the HTTP service", () => {
       expect([secret, logged.includes(sha256Utf8(secret))]).toEqual([secret, false]);
     }
     expect(logged.includes("Bearer")).toBe(false);
+  });
+});
+
+// The category of a refusal (docs/design/verifiable-answers.md). The caller is still told only
+// "unauthenticated"; these categories exist so an operator can tell an ID token minted for the
+// wrong audience from an access token issued to an OAuth client the service does not accept —
+// the difference that cost a whole Gemini Enterprise turn on 2026-09-22.
+describe("why a credential was refused", () => {
+  it("names the category, and never the token", async () => {
+    const stub = {
+      verifyIdToken: () => Promise.reject(new Error("audience mismatch: ya29.secret-token-bytes")),
+      getTokenInfo: () =>
+        Promise.resolve({
+          aud: "another-client.apps.googleusercontent.com",
+          sub: PRINCIPAL_A,
+          expiry_date: Date.now() + 60_000,
+        }),
+    } as unknown as GoogleVerifierOptions["client"];
+    const verifier = googleCredentialVerifier({
+      audience: "https://service.example",
+      oauthClientIds: ["configured-client.apps.googleusercontent.com"],
+      client: stub,
+    });
+
+    const idToken = await verifier.verify("aaa.bbb.ccc");
+    expect(idToken).toEqual({ rejected: "id-token-rejected" });
+    const accessToken = await verifier.verify("ya29.secret-token-bytes");
+    expect(accessToken).toEqual({ rejected: "access-token-audience" });
+    for (const result of [idToken, accessToken]) {
+      expect(JSON.stringify(result)).not.toContain("secret-token-bytes");
+    }
+  });
+
+  it("distinguishes a service that accepts no access token at all", async () => {
+    const verifier = googleCredentialVerifier({
+      audience: "https://service.example",
+      oauthClientIds: [],
+      client: {
+        verifyIdToken: () => Promise.reject(new Error("no")),
+        getTokenInfo: () => Promise.reject(new Error("must not be called")),
+      },
+    });
+    expect(await verifier.verify("ya29.opaque")).toEqual({
+      rejected: "access-tokens-not-accepted",
+    });
   });
 });
