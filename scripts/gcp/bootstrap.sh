@@ -75,58 +75,95 @@ node scripts/fhir/select-import-resources.mjs "$TMP/ema/package" "$TMP/import/em
 node scripts/fhir/select-import-resources.mjs "$TMP/terminology/package" "$TMP/import/terminology"
 node scripts/fhir/select-import-resources.mjs "$TMP/extensions/package" "$TMP/import/extensions"
 
-# --delete-unmatched-destination-objects: without it, rsync only adds/updates
-# objects, so a file excluded here after already having been uploaded by an
-# earlier run (e.g. select-import-resources.mjs's exclusion list) would keep
-# being imported from the stale copy left in the bucket.
-#
-# --checksums-only, and one fixed modification time on every generated file: the files are
-# written fresh on every deploy, so by default rsync saw a new mtime on each of the ~5,000 and
-# re-uploaded them all. Once the bucket moved to a customer-managed key (CMEK step 7) each
-# upload also costs a key operation, and the re-upload took the deploy's bootstrap from four
-# minutes to over twenty. Comparing content hashes uploads exactly the files whose content
-# changed; the fixed mtime stops rsync patching every object's timestamp when nothing did.
-# The comparison runs on MD5, which every object here carries, rather than on CRC32C through the
-# `gcloud-crc32c` helper binary, which some gcloud installs lack — without it rsync stops part-way.
-find "$TMP/import" -type f -exec touch -t 198001010000 {} +
-export CLOUDSDK_STORAGE_USE_GCLOUD_CRC32C=false
-gcloud --quiet storage rsync "$TMP/import/global" "gs://${PROFILE_BUCKET}/global" --recursive --checksums-only --delete-unmatched-destination-objects
-gcloud --quiet storage rsync "$TMP/import/ema" "gs://${PROFILE_BUCKET}/ema" --recursive --checksums-only --delete-unmatched-destination-objects
-gcloud --quiet storage rsync "$TMP/import/terminology" "gs://${PROFILE_BUCKET}/terminology" --recursive --checksums-only --delete-unmatched-destination-objects
-gcloud --quiet storage rsync "$TMP/import/extensions" "gs://${PROFILE_BUCKET}/extensions" --recursive --checksums-only --delete-unmatched-destination-objects
+# Skip the sync and the import when nothing would change (foundations E2). The profile bucket is
+# on a customer-managed key, and Cloud Storage omits checksums from listings of such objects, so
+# any sync compares by fetching each of the ~5,000 objects one at a time: measured at 13 minutes
+# a deploy, for a set that changes only when a vendored package does. So the generated set is
+# fingerprinted — every file's path and content, plus the dataset and store it goes into — and
+# the fingerprint is recorded in the bucket after a successful import. The next deploy skips
+# both steps only if the fingerprint matches AND the store itself still holds the expected
+# number of StructureDefinitions (753 on 2026-09-22), so a recreated or emptied store is always
+# re-imported. The Healthcare API refuses `_summary=count`; `_total=accurate` gives the count.
+# FORCE_PROFILE_IMPORT=true imports regardless.
+FINGERPRINT="$(python3 - "$TMP/import" "$DATASET" "$TARGET_STORE" <<'PY'
+import hashlib, os, sys
+root, dataset, store = sys.argv[1], sys.argv[2], sys.argv[3]
+h = hashlib.sha256(f"dataset={dataset}\nstore={store}\n".encode())
+for dirpath, _, files in sorted(os.walk(root)):
+    for name in sorted(files):
+        path = os.path.join(dirpath, name)
+        h.update(os.path.relpath(path, root).encode() + b"\0")
+        h.update(hashlib.sha256(open(path, "rb").read()).digest())
+print(h.hexdigest())
+PY
+)"
+MARKER="gs://${PROFILE_BUCKET}/import-fingerprint/${TARGET_STORE}.sha256"
+EXPECTED_PROFILES="$(find "$TMP/import" -type f -name 'StructureDefinition-*.json' | wc -l | tr -d ' ')"
+recorded="$(gcloud --quiet storage cat "$MARKER" 2>/dev/null || true)"
+in_store="$(curl --fail --silent --show-error \
+  --header "Authorization: Bearer $(ema_flow_access_token)" \
+  "https://healthcare.googleapis.com/v1/projects/${PROJECT_ID}/locations/${REGION}/datasets/${DATASET}/fhirStores/${TARGET_STORE}/fhir/StructureDefinition?_count=1&_total=accurate&_elements=id" |
+  python3 -c "import sys,json;print(json.load(sys.stdin).get('total',''))" 2>/dev/null || true)"
+echo "profile set ${FINGERPRINT:0:16}…: recorded ${recorded:0:16}…, StructureDefinitions in store ${in_store:-unknown}, expected ${EXPECTED_PROFILES}"
 
-for prefix in terminology extensions global ema; do
-  echo "=== importing ${prefix} ==="
-  import_log="$TMP/import-${prefix}.log"
-  if ! gcloud --quiet healthcare fhir-stores import gcs "$TARGET_STORE" \
-    --project="$PROJECT_ID" \
-    --location="$REGION" \
-    --dataset="$DATASET" \
-    --gcs-uri="gs://${PROFILE_BUCKET}/${prefix}/*.json" \
-    --content-structure=resource-pretty 2>&1 | tee "$import_log"; then
-    # The CLI only reports a summary error pointing at metadata.logsUrl for the
-    # per-resource details; describing the operation surfaces the counters and
-    # that URL instead of just the bare invalid_argument. Neither the describe
-    # output nor the log read may carry response text: upstream messages can
-    # quote FHIR content, so only codes, counters and identifiers are printed.
-    operation_id="$(grep -oE 'operations/[0-9]+' "$import_log" | head -1 | cut -d/ -f2)"
-    if [[ -n "$operation_id" ]]; then
-      echo "=== operation details for ${prefix} import (operation ${operation_id}) ===" >&2
-      gcloud --quiet healthcare operations describe "$operation_id" \
-        --project="$PROJECT_ID" --location="$REGION" --dataset="$DATASET" \
-        --format="value(done,error.code,metadata.counter.failure,metadata.counter.success,metadata.logsUrl)" >&2 || true
-      # The operation's own metadata only has success/failure counts, not the
-      # per-resource errors -- those are in Cloud Logging under this operation id.
-      echo "=== per-resource import errors for ${prefix} (operation ${operation_id}) ===" >&2
-      gcloud --quiet logging read \
-        "operation.id=\"projects/${PROJECT_ID}/locations/${REGION}/datasets/${DATASET}/operations/${operation_id}\"" \
-        --project="$PROJECT_ID" \
-        --format="value(timestamp,severity,jsonPayload.resourceId,jsonPayload.error.code)" \
-        --limit=100 >&2 || true
+if [[ "${FORCE_PROFILE_IMPORT:-false}" != "true" && "$recorded" == "$FINGERPRINT" && "$in_store" == "$EXPECTED_PROFILES" ]]; then
+  echo "Profiles unchanged and present in ${TARGET_STORE}; sync and import skipped."
+else
+  # --delete-unmatched-destination-objects: without it, rsync only adds/updates
+  # objects, so a file excluded here after already having been uploaded by an
+  # earlier run (e.g. select-import-resources.mjs's exclusion list) would keep
+  # being imported from the stale copy left in the bucket.
+  #
+  # --checksums-only, and one fixed modification time on every generated file: the files are
+  # written fresh on every deploy, so by default rsync saw a new mtime on each of the ~5,000 and
+  # re-uploaded them all. Once the bucket moved to a customer-managed key (CMEK step 7) each
+  # upload also costs a key operation, and the re-upload took the deploy's bootstrap from four
+  # minutes to over twenty. Comparing content hashes uploads exactly the files whose content
+  # changed; the fixed mtime stops rsync patching every object's timestamp when nothing did.
+  # The comparison runs on MD5, which every object here carries, rather than on CRC32C through the
+  # `gcloud-crc32c` helper binary, which some gcloud installs lack — without it rsync stops part-way.
+  find "$TMP/import" -type f -exec touch -t 198001010000 {} +
+  export CLOUDSDK_STORAGE_USE_GCLOUD_CRC32C=false
+  gcloud --quiet storage rsync "$TMP/import/global" "gs://${PROFILE_BUCKET}/global" --recursive --checksums-only --delete-unmatched-destination-objects
+  gcloud --quiet storage rsync "$TMP/import/ema" "gs://${PROFILE_BUCKET}/ema" --recursive --checksums-only --delete-unmatched-destination-objects
+  gcloud --quiet storage rsync "$TMP/import/terminology" "gs://${PROFILE_BUCKET}/terminology" --recursive --checksums-only --delete-unmatched-destination-objects
+  gcloud --quiet storage rsync "$TMP/import/extensions" "gs://${PROFILE_BUCKET}/extensions" --recursive --checksums-only --delete-unmatched-destination-objects
+
+  for prefix in terminology extensions global ema; do
+    echo "=== importing ${prefix} ==="
+    import_log="$TMP/import-${prefix}.log"
+    if ! gcloud --quiet healthcare fhir-stores import gcs "$TARGET_STORE" \
+      --project="$PROJECT_ID" \
+      --location="$REGION" \
+      --dataset="$DATASET" \
+      --gcs-uri="gs://${PROFILE_BUCKET}/${prefix}/*.json" \
+      --content-structure=resource-pretty 2>&1 | tee "$import_log"; then
+      # The CLI only reports a summary error pointing at metadata.logsUrl for the
+      # per-resource details; describing the operation surfaces the counters and
+      # that URL instead of just the bare invalid_argument. Neither the describe
+      # output nor the log read may carry response text: upstream messages can
+      # quote FHIR content, so only codes, counters and identifiers are printed.
+      operation_id="$(grep -oE 'operations/[0-9]+' "$import_log" | head -1 | cut -d/ -f2)"
+      if [[ -n "$operation_id" ]]; then
+        echo "=== operation details for ${prefix} import (operation ${operation_id}) ===" >&2
+        gcloud --quiet healthcare operations describe "$operation_id" \
+          --project="$PROJECT_ID" --location="$REGION" --dataset="$DATASET" \
+          --format="value(done,error.code,metadata.counter.failure,metadata.counter.success,metadata.logsUrl)" >&2 || true
+        # The operation's own metadata only has success/failure counts, not the
+        # per-resource errors -- those are in Cloud Logging under this operation id.
+        echo "=== per-resource import errors for ${prefix} (operation ${operation_id}) ===" >&2
+        gcloud --quiet logging read \
+          "operation.id=\"projects/${PROJECT_ID}/locations/${REGION}/datasets/${DATASET}/operations/${operation_id}\"" \
+          --project="$PROJECT_ID" \
+          --format="value(timestamp,severity,jsonPayload.resourceId,jsonPayload.error.code)" \
+          --limit=100 >&2 || true
+      fi
+      exit 1
     fi
-    exit 1
-  fi
-done
+  done
+  printf '%s\n' "$FINGERPRINT" | gcloud --quiet storage cp - "$MARKER" >/dev/null
+  echo "Profile set ${FINGERPRINT:0:16}… recorded as imported into ${TARGET_STORE}."
+fi
 
 # This artifact has no version/package in standards.lock.json, so
 # fetch-standards.mjs writes it with no suffix at all: no literal "-" to
