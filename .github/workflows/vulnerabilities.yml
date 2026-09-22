@@ -1,0 +1,53 @@
+name: Vulnerabilities
+
+# Known-vulnerability scan (docs/foundations.md, C1; scripts/ci/vuln-scan.sh). Fails on any known
+# vulnerability in the npm or uv lockfiles; reports, without failing, what the pinned base images
+# carry. Weekly as well as on every change: a new advisory is published without any commit, and
+# the weekly run turns it into an issue.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  scan:
+    name: Vulnerabilities
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash --noprofile --norc -eo pipefail {0}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Scan lockfiles and base images
+        env:
+          VULN_REPORT: ${{ runner.temp }}/vulnerabilities.md
+        run: bash scripts/ci/vuln-scan.sh
+
+      - name: Publish the report
+        if: always()
+        env:
+          REPORT: ${{ runner.temp }}/vulnerabilities.md
+        run: |
+          [[ -f "$REPORT" ]] && cat "$REPORT" >>"$GITHUB_STEP_SUMMARY" || true
+
+      - name: Open an issue when the weekly scan fails
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPORT: ${{ runner.temp }}/vulnerabilities.md
+        run: |
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          { echo "The weekly scan found known vulnerabilities in a lockfile: ${run_url}"; echo; cat "$REPORT" 2>/dev/null || true; } >issue.md
+          gh issue create --title "vulnerabilities $(date -u +%Y-%m-%d)" --body-file issue.md
