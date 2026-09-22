@@ -14,6 +14,10 @@
 # to the API, which stores it encrypted. Run by the owner: it is the same consent screen decision
 # as the connector's client.
 #
+# The OAuth client must list BOTH redirect URIs, or the consent window never closes:
+#   https://vertexaisearch.cloud.google.com/oauth-redirect          (the MCP connector)
+#   https://vertexaisearch.cloud.google.com/static/oauth/oauth.html (an agent authorization)
+#
 #   bash agent/deploy/authorization.sh            # create or update
 #   bash agent/deploy/authorization.sh --check    # report only; exit 1 if missing
 set -euo pipefail
@@ -56,8 +60,17 @@ print(json.dumps({
     "serverSideOauth2": {
         "clientId": client_id,
         "clientSecret": os.environ["CLIENT_SECRET"],
-        "authorizationUri": "https://accounts.google.com/o/oauth2/v2/auth?client_id=" + client_id
-        + "&response_type=code&access_type=offline&prompt=consent&scope=openid%20email%20profile",
+        # Exactly the template Google documents for an agent authorization. The redirect_uri is
+        # fixed and must also be listed on the OAuth client: without it the consent window opens,
+        # the user signs in, and the window never closes, because the result has nowhere to go
+        # (observed 2026-09-22).
+        "authorizationUri": (
+            "https://accounts.google.com/o/oauth2/v2/auth"
+            "?client_id=" + client_id
+            + "&redirect_uri=https%3A%2F%2Fvertexaisearch.cloud.google.com%2Fstatic%2Foauth%2Foauth.html"
+            + "&scope=openid%20email%20profile"
+            + "&include_granted_scopes=true&response_type=code&access_type=offline&prompt=consent"
+        ),
         "tokenUri": "https://oauth2.googleapis.com/token",
     },
 }))' >"$body_file"

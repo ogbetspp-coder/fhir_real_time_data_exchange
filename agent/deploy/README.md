@@ -161,6 +161,15 @@ No new mechanism, no new module: `query_invokers` already exists for this purpos
 
 Source: [Set up a custom MCP server](https://docs.cloud.google.com/gemini/enterprise/docs/connectors/custom-mcp-server/set-up-custom-mcp-server).
 
+## The OAuth client needs both redirect URIs
+
+The consent window opened, accepted the sign-in and never closed (2026-09-22). The authorization's
+`authorizationUri` had no `redirect_uri`, so the result had nowhere to return to. Google's
+template for an agent authorization fixes it at
+`https://vertexaisearch.cloud.google.com/static/oauth/oauth.html`, which is **not** the
+connector's `…/oauth-redirect`. The OAuth client must list both, and `authorization.sh` now
+builds the documented URI.
+
 ## What the first Gemini Enterprise turns showed (2026-09-22)
 
 Two questions asked in the app were answered **without any tool call ever reaching the query
