@@ -103,7 +103,9 @@ async def test_the_answer_shown_is_the_stores_text_with_its_citation(
 
     # The store's own words, and the four fields a reader needs to recompute the hash.
     assert payload["text"].split("\n")[0][:40] in shown
-    assert BUNDLE_ID in shown and VERSION_ID in shown and SECTION_KEY in shown
+    assert BUNDLE_ID in shown
+    assert VERSION_ID in shown
+    assert SECTION_KEY in shown
     assert payload["narrativeDivSha256"] in shown
     # The model's words are still shown, labelled as the model's, never as label content.
     assert "Here is what it says." in shown
@@ -148,4 +150,6 @@ async def test_nothing_is_shown_as_label_content_when_the_check_cannot_run(
 def test_only_this_turns_results_are_answered_from(query_service: FakeQueryService) -> None:
     events = _events(query_service, "another-invocation", "from an earlier turn")
     sections, calls, text = draft_from_events(events, "synthetic-invocation")
-    assert sections == [] and calls == [] and text == ""
+    assert sections == []
+    assert calls == []
+    assert text == ""
