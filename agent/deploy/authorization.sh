@@ -79,6 +79,20 @@ else
 fi
 [[ -n "$CLIENT_SECRET" ]] || { echo "No secret supplied." >&2; exit 1; }
 
+# A Google OAuth client secret is one short token, "GOCSPX-" and about thirty more characters.
+# Anything else is a mangled paste: on 2026-09-22 a paste carried the surrounding instructions
+# with it, so 217 and then 319 characters were sent to Google as the secret, the consent flow
+# could never succeed, and the trailing lines of the paste ran as shell commands — which is how
+# a live secret came to be echoed into a terminal. Refused here rather than sent.
+if [[ "$CLIENT_SECRET" != GOCSPX-* || ${#CLIENT_SECRET} -gt 64 || "$CLIENT_SECRET" == *[[:space:]]* ]]; then
+  echo "That does not look like a Google OAuth client secret (${#CLIENT_SECRET} characters)." >&2
+  echo "It should start GOCSPX- and be about 35 characters, with nothing else pasted with it." >&2
+  echo "If a secret was echoed into your terminal, rotate it in the console before using it." >&2
+  echo "Easier: pass the file Google gave you, which needs no paste at all:" >&2
+  echo "  bash agent/deploy/authorization.sh ~/Downloads/client_secret_<id>.json" >&2
+  exit 1
+fi
+
 # The request body goes to a private temporary file, built by Python reading the secret from its
 # environment: not a command-line argument, which other processes can briefly see, and not a
 # heredoc inside a command substitution, which bash mis-parsed on the first run (2026-09-22).
