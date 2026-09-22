@@ -16,8 +16,11 @@
 #
 # Production-folder policies:
 #   - gcp.resourceLocations = in:eu-locations. New resources outside the EU are refused.
-#   - gcp.restrictNonCmekServices denies storage, bigquery, healthcare and artifactregistry: a new
-#     bucket, dataset, FHIR dataset or repository without a customer-managed key is refused. Logging
+#   - gcp.restrictNonCmekServices denies storage, bigquery and artifactregistry: a new bucket,
+#     dataset or repository without a customer-managed key is refused. The Cloud Healthcare API is
+#     not a value this constraint accepts (the API refused it on the first run, 2026-09-22), so the
+#     FHIR dataset's key is held by Terraform instead: the dataset declares it, carries
+#     prevent_destroy, and test/infra/keys.test.ts fails without it. Logging
 #     is deliberately not listed: every new project's default log buckets are created by Google
 #     without a key, and the regulated audit bucket is keyed explicitly in Terraform.
 #   - gcp.restrictCmekCryptoKeyProjects = under:folders/<production>. A production resource cannot
@@ -107,7 +110,7 @@ policy() { # <constraint> <values json>
     >"$policy_dir/$1.json"
 }
 policy gcp.resourceLocations '{"allowedValues":["in:eu-locations"]}'
-policy gcp.restrictNonCmekServices '{"deniedValues":["artifactregistry.googleapis.com","bigquery.googleapis.com","healthcare.googleapis.com","storage.googleapis.com"]}'
+policy gcp.restrictNonCmekServices '{"deniedValues":["artifactregistry.googleapis.com","bigquery.googleapis.com","storage.googleapis.com"]}'
 policy gcp.restrictCmekCryptoKeyProjects "{\"allowedValues\":[\"under:folders/${prod}\"]}"
 
 canonical() { # policy JSON on stdin -> canonical spec (rules, reset, inheritFromParent) and dry run
