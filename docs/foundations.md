@@ -154,6 +154,34 @@ trim.
 _Status 2026-09-21: closed._ Builds run as `ema-flow-build-dev`, which holds exactly three
 roles; the default compute account holds no project role.
 
+**B4. Infrastructure changes are not planned before merge.** Added 2026-09-22. The deploy applies
+unattended on merge, and every plan against live state this week was run by hand on a laptop. A
+shared foundation cannot rely on that. The plan must run on every pull request, as an identity
+that can read but not change, and must stop a merge that destroys anything until a person has
+acknowledged it.
+
+_Status 2026-09-22: built; waiting on the owner to create the identity._
+`.github/workflows/plan.yml` plans every pull request with the deploy's own inputs (one shared
+function in `scripts/gcp/deploy.sh`) against the deployed images and version, posts a summary
+of resource addresses and actions, never values, and fails on any destroy or replace unless the
+pull request is labelled `allow-replace`. It runs as `ema-flow-planner-dev`
+(`scripts/gcp/plan-identity.sh`), in its own Workload Identity pool: the deployer's grant
+covers every identity in the deployer's pool that names this repository, so a pull-request
+provider there would have admitted pull requests to the deployer. The planner's custom role was
+derived from a trace of every API call a live plan makes — all reads — and holds no permission
+that returns a stored record (`test/infra/plan-identity.test.ts`).
+
+Reviewed adversarially before enabling. No path from a pull request to the deployer or to any
+write was found. Two defects were fixed: the verdict failed open if the summariser crashed, and
+matching the plan's text missed some phrasings of a destroy (a tainted resource, a deposed
+object). The verdict now comes from `terraform show -json` and fails closed. Two limits are
+accepted and stated. A branch pull request can rewrite the plan workflow and use the planner's
+token, so everything the planner can read (IAM policy, service configuration including the
+entitlement map, the state's history) is readable by anyone who can push a branch: today that
+is the owner alone, and the planner reads no record. And while one person both writes and
+approves, the `allow-replace` label is a deliberate acknowledgement, not a second pair of eyes;
+it becomes a control when a second reviewer is required through `CODEOWNERS`.
+
 ### C. Hardening — cheap, and overdue
 
 **C1. Artifact Registry vulnerability scanning is disabled.** An image with a known critical
@@ -318,6 +346,20 @@ identifiers, never credentials — but nothing would stop one.
   document listed it as a candidate. The real candidates are building the validator's package
   indexes into the image at build time, so they are not regenerated on every start, and a
   minimum instance. Nothing waits on the worker interactively today.
+
+**E2. Every deploy did work that nothing had asked for.** Added 2026-09-22. Every merge
+deployed, including documentation: 41 deploys in two days. Each re-imported the full profile
+set. After the profile bucket moved to a customer-managed key, that step went from 4 to 23
+minutes: Cloud Storage omits checksums from listings of CMEK objects, so every sync fetched
+5,074 objects one at a time.
+
+_Status 2026-09-22: closed; first proof on the next two deploys._ Merges touching only docs,
+tests, the agent or Zone A no longer deploy (`test/ci/deploy-trigger.test.ts` pins that no
+deployable path is ignored). The profile sync and import run only when the generated set's
+fingerprint differs from the one recorded after the last successful import, or the target
+store does not hold the expected 753 StructureDefinitions, or `FORCE_PROFILE_IMPORT` is set
+(`test/ci/profile-import.test.ts`). The first deploy after this records the fingerprint; the
+second should skip both steps.
 
 ## Order of work
 
