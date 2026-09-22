@@ -87,21 +87,33 @@ Cloud client stack, none of which the agent runs. Supply it for the one command:
   python deploy/deploy_agent_engine.py
 ```
 
-Two details worth knowing before you read the script:
+What the first real run (2026-09-22) corrected in this runbook, which had been written from
+documentation before the SDK's 2.0 split:
 
-- **The API moved.** `client.agent_engines.create(agent=..., config=...)` via
-  `vertexai.Client(project=..., location=...)` is current; the module-level
-  `vertexai.agent_engines.create(...)` is the legacy form, and `agent_engine=` is deprecated in
-  favour of `agent=`. `config.staging_bucket` is now required and replaces
-  `vertexai.init(staging_bucket=...)`
-  ([AgentEngines reference](https://docs.cloud.google.com/python/docs/reference/vertexai/latest/vertexai._genai.agent_engines.AgentEngines)).
-- **The package moved too.** The 2.0 release (2026-08-28) split the agent surface out of
-  `google-cloud-aiplatform` into `google-cloud-agentplatform`. Do not `pip install vertexai`:
-  that PyPI name is a stale 1.71.1 shim; the `vertexai` namespace ships inside
-  aiplatform/agentplatform.
+- **The module is `agentplatform`, not `vertexai`,** and Agent Engine is `client.runtimes`
+  (`agentplatform.Client(project=..., location=...).runtimes.create(agent=..., config=...)`).
+  The `vertexai` namespace and `client.agent_engines` do not exist in
+  `google-cloud-agentplatform` 2.1.3.
+- **The agent is wrapped in `agentplatform.frameworks.AdkApp`,** which is also how Gemini
+  Enterprise's calls arrive: its `streaming_agent_run_with_events` copies each authorization's
+  end-user access token into session state as `temp:<authorization id>` and never persists it.
+  That is read from the SDK's source, and it is the key the agent reads. So the SDK is a runtime
+  requirement too, added after the `uv.lock` pins.
+- **`extra_packages` is relative and the upload runs from `src/`.** The SDK archives each path as
+  given, so an absolute path would nest the code under the deploying machine's home directory.
 - **Requirements come from `uv.lock`.** `requirements_from_lock()` walks the dependency graph
   from this package's own `dependencies`, so the deployed runtime gets the 61 packages the CI
-  gate ran against and none of the dev-only ones.
+  gate ran against, plus the SDK, and none of the dev-only ones.
+- **The query service URL must be the one it validates against.** The service accepts ID tokens
+  whose audience equals `QUERY_AUDIENCE`:
+  `https://ema-flow-dev-query-<project number>.<region>.run.app`. Cloud Run also answers on its
+  other form, `https://ema-flow-dev-query-<hash>-<code>.a.run.app`, and a token minted for that
+  one is refused with `401 {"error":"unauthenticated"}`. Use the audience form in
+  `QUERY_SERVICE_MCP_URL`.
+- **Live since 2026-09-22:**
+  `projects/398017980210/locations/europe-west4/reasoningEngines/6226059359072288768`.
+- **The model is `gemini-2.5-flash` in `europe-west4`,** so inference stays in the EU. On
+  2026-09-22 no Gemini 3 model was served in that region.
 
 ## Step 3 — register in the Agent Gallery
 
