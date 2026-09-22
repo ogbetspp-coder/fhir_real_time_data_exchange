@@ -104,6 +104,14 @@ documentation before the SDK's 2.0 split:
 - **Requirements come from `uv.lock`.** `requirements_from_lock()` walks the dependency graph
   from this package's own `dependencies`, so the deployed runtime gets the 61 packages the CI
   gate ran against, plus the SDK, and none of the dev-only ones.
+- **The query service URL must be the one it validates against.** The service accepts ID tokens
+  whose audience equals `QUERY_AUDIENCE`:
+  `https://ema-flow-dev-query-<project number>.<region>.run.app`. Cloud Run also answers on its
+  other form, `https://ema-flow-dev-query-<hash>-<code>.a.run.app`, and a token minted for that
+  one is refused with `401 {"error":"unauthenticated"}`. Use the audience form in
+  `QUERY_SERVICE_MCP_URL`.
+- **Live since 2026-09-22:**
+  `projects/398017980210/locations/europe-west4/reasoningEngines/6226059359072288768`.
 - **The model is `gemini-2.5-flash` in `europe-west4`,** so inference stays in the EU. On
   2026-09-22 no Gemini 3 model was served in that region.
 
