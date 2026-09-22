@@ -5,16 +5,26 @@ every claim cited, so that the person who does run it can check each step agains
 before touching a project. Documentation dates are the dates the pages were read, 2026-09-18 to
 2026-09-20.
 
-Five steps. Only step 2 is a script; the rest are console and Terraform work, which is the
-correct division — an OAuth client and an IAM grant are decisions, not build artefacts.
+Six steps. Steps 1 and 4 were done for the MCP connector on 2026-09-21 and are reused; the
+OAuth client is a console decision, the invoker grant a Terraform variable.
 
-| #   | Step                                                          | Where                           |
-| --- | ------------------------------------------------------------- | ------------------------------- |
-| 1   | An internal OAuth 2.0 client for the MCP connector            | Cloud console                   |
-| 2   | Deploy the agent to Vertex AI Agent Engine                    | `deploy_agent_engine.py`        |
-| 3   | Register the agent in the Gemini Enterprise Agent Gallery     | Console or Discovery Engine API |
-| 4   | Grant the Gemini Enterprise service agent `roles/run.invoker` | Terraform (`query_invokers`)    |
-| 5   | (Optional) Expose the same agent as a Google Chat app         | Apps Script quickstart          |
+| #   | Step                                                                   | Where                        | State      |
+| --- | ---------------------------------------------------------------------- | ---------------------------- | ---------- |
+| 1   | An internal OAuth 2.0 client for the MCP connector                     | Cloud console                | done       |
+| 2   | Deploy the agent to Vertex AI Agent Engine                             | `deploy_agent_engine.py`     | 2026-09-22 |
+| 2b  | An authorization so Gemini Enterprise hands the agent the user's token | `authorization.sh` (owner)   | 2026-09-22 |
+| 3   | Register the agent in the Gemini Enterprise Agent Gallery              | `register.sh`                | 2026-09-22 |
+| 4   | Grant the Gemini Enterprise service agent `roles/run.invoker`          | Terraform (`query_invokers`) | done       |
+| 5   | (Optional) Expose the same agent as a Google Chat app                  | Apps Script quickstart       | not now    |
+
+**Step 2b, the token.** Gemini Enterprise runs an OAuth consent flow for each authorization in a
+registered agent's `authorizationConfig.toolAuthorizations`, and hands the access token to the
+agent in session state as `temp:<authorization id>`. The agent reads one key,
+`temp:query_service_bearer_token`, so the authorization id is `query_service_bearer_token`;
+`tests/test_deploy_authorization.py` holds the two together. The authorization reuses the
+connector's OAuth client, so the query service sees the same principal, entitlement and audit
+identity whether Gemini calls it directly or through the agent. The client secret is typed at a
+prompt and stored encrypted by the API; it is never an argument, a file or a repository value.
 
 ## Prerequisites, stated before anything is spent
 
