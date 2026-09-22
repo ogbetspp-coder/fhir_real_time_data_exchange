@@ -1,6 +1,6 @@
 # Customer-managed keys on the record — rollout plan
 
-Status: **steps 0–6 done and proven; step 7 in progress.** Revised after independent review. Foundations review
+Status: **all seven steps done and proven, 2026-09-22.** Revised after independent review. Foundations review
 findings A3 (the record on Google-managed keys), A4 (software signing key), C4 (worker's
 Healthcare role project-wide) and C5 (Terraform state open to project viewers). Owner decision
 2026-09-21: do it in `dev` now, so production copies a setup that has been proven rather than
@@ -213,8 +213,14 @@ be destroyed` on the ledger table — step 0 refusing the replacement the provid
    `storage.admin` for the owner. The script's first run removed the owner's legacy binding before
    granting the explicit one and locked the owner out of the bucket's permissions — the project
    owner's storage access comes from those bindings; recovered with a temporary project grant,
-   since removed, and the script now grants before it revokes. The Terraform-managed profile and
-   build-staging buckets are the remaining part._
+   since removed, and the script now grants before it revokes._
+   _2026-09-22, done. The profile and build-staging buckets gained their `encryption` block in
+   Terraform (PR #68), planned against live state first: two in-place updates, nothing destroyed.
+   After the deploy (run 35671971083, smoke run passed) every existing object was rewritten under
+   the key — 5,074 in profiles, 15 in build-staging — and sampled objects report
+   `platform-storage` version 1. `storage-keys.sh --check` reports no drift, and **no bucket in
+   the project is left on a Google-managed key.** The key-guard deny policy was applied by the
+   owner the same night and `key-guard.sh --check` reports it matches._
 
 After step 7, with the product folder in place (foundations A1), the organisation policies
 `gcp.restrictNonCmekServices` and `gcp.restrictCmekCryptoKeyProjects` on the folder make a
