@@ -236,6 +236,11 @@ sellable component, what a client may do with the code is the first question leg
 The owner decides the terms; the default of no licence means all rights reserved, which is
 defensible but should be stated.
 
+_Status 2026-09-22: closed._ `LICENSE` states the code is proprietary to KHS Advisory LLC, all
+rights reserved, use only under a separate signed agreement. `package.json` had declared
+`Apache-2.0` — an open-source grant contradicting the owner's decision; it now says `UNLICENSED`
+and `private: true`, so the package cannot be published to a registry by accident.
+
 **D2. No `SECURITY.md` and no `CODEOWNERS`.** Cheap, and expected by any vendor assessment.
 
 **D3. Administrators can bypass branch protection** (`enforce_admins` is off). Acceptable for
