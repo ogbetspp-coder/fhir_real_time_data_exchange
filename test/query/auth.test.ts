@@ -375,7 +375,7 @@ describe("why a credential was refused", () => {
           sub: PRINCIPAL_A,
           expiry_date: Date.now() + 60_000,
         }),
-    };
+    } as unknown as GoogleVerifierOptions["client"];
     const verifier = googleCredentialVerifier({
       audience: "https://service.example",
       oauthClientIds: ["configured-client.apps.googleusercontent.com"],
