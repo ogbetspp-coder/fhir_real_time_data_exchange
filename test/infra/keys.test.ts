@@ -184,3 +184,29 @@ describe("the retained audit log on the audit-logs key", () => {
     );
   });
 });
+
+describe("the platform buckets on the platform-storage key", () => {
+  it("default to the platform-storage key", () => {
+    for (const name of ["profiles", "build_staging"]) {
+      expect(block("google_storage_bucket", name)).toContain(
+        'default_kms_key_name = google_kms_crypto_key.record["platform-storage"].id',
+      );
+    }
+  });
+
+  it("and the buckets Terraform does not create are keyed, rewritten and restricted by a script that grants before it revokes", () => {
+    const script = readFileSync("scripts/gcp/storage-keys.sh", "utf8");
+    expect(script).toContain("cryptoKeys/platform-storage");
+    // Rewriting state while a deploy holds the lock could corrupt it.
+    expect(script).toMatch(
+      /Refusing: gs:\/\/\$\{STATE_BUCKET\}\/terraform\/state\/default\.tflock exists/,
+    );
+    // The explicit administrator grant comes before any legacy binding is removed.
+    expect(script.indexOf("granted storage.admin on the bucket")).toBeLessThan(
+      script.indexOf("legacy bindings removed"),
+    );
+    // Old state generations expire.
+    expect(script).toContain('"numNewerVersions": 20');
+    expect(script).toContain('"daysSinceNoncurrentTime": 30');
+  });
+});

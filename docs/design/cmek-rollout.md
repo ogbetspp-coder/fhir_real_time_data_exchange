@@ -1,6 +1,6 @@
 # Customer-managed keys on the record — rollout plan
 
-Status: **steps 0–5 done and proven; step 6 in progress.** Revised after independent review. Foundations review
+Status: **steps 0–6 done and proven; step 7 in progress.** Revised after independent review. Foundations review
 findings A3 (the record on Google-managed keys), A4 (software signing key), C4 (worker's
 Healthcare role project-wide) and C5 (Terraform state open to project viewers). Owner decision
 2026-09-21: do it in `dev` now, so production copies a setup that has been proven rather than
@@ -205,6 +205,16 @@ be destroyed` on the ledger table — step 0 refusing the replacement the provid
    by script: the legacy project viewer, editor and owner bindings removed, leaving the deployer
    (through its project `storage.admin`) and the owner. _Verify:_ every object reports the key; a
    project viewer can no longer read state.
+   _2026-09-21, in progress. The two buckets outside Terraform are done, by
+   `scripts/gcp/storage-keys.sh`: the state and agent-staging buckets default to the
+   `platform-storage` key and every live object is under it; old state generations now expire (20
+   newer, or 30 days — there were 168, kept forever); the state bucket's legacy convenience
+   bindings are gone, leaving the deployer (project `storage.admin`) and an explicit bucket-level
+   `storage.admin` for the owner. The script's first run removed the owner's legacy binding before
+   granting the explicit one and locked the owner out of the bucket's permissions — the project
+   owner's storage access comes from those bindings; recovered with a temporary project grant,
+   since removed, and the script now grants before it revokes. The Terraform-managed profile and
+   build-staging buckets are the remaining part._
 
 After step 7, with the product folder in place (foundations A1), the organisation policies
 `gcp.restrictNonCmekServices` and `gcp.restrictCmekCryptoKeyProjects` on the folder make a

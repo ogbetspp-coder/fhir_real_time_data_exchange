@@ -182,6 +182,14 @@ resource "google_storage_bucket" "profiles" {
       type = "Delete"
     }
   }
+
+  # On the platform-storage key (CMEK step 7). A default key applies to objects written after it
+  # is set; objects already in the bucket were rewritten under it once, by hand.
+  encryption {
+    default_kms_key_name = google_kms_crypto_key.record["platform-storage"].id
+  }
+
+  depends_on = [google_kms_crypto_key_iam_member.record_agent]
 }
 
 resource "google_storage_bucket_iam_member" "healthcare_profile_reader" {

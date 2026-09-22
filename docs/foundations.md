@@ -205,6 +205,14 @@ reason; the workflow should close its own once a later deploy succeeds.
 would do. The bucket's seven-year retention policy already stops it deleting or overwriting
 evidence, so this is least privilege rather than a live exposure.
 
+**C13. Project viewers can read the evidence and the approved submissions.** Every bucket still
+carries Cloud Storage's legacy convenience bindings: `projectViewer` has read, `projectEditor` and
+`projectOwner` have write, on every object. So anyone granted viewer on the project — for any
+reason — can read signed evidence and approved submissions. Removing the bindings is the fix, but
+the project owner's own storage access comes from them (removing them from the state bucket locked
+the owner out of its permissions on 2026-09-21), so each bucket needs its explicit grants in place
+first. Decide who reads the record, grant that explicitly, then remove the bindings.
+
 ### D. The repository
 
 **D1. No licence.** The repository has no `LICENSE`. For a product whose value is a small,

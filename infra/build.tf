@@ -38,7 +38,12 @@ resource "google_storage_bucket" "build_staging" {
     }
   }
 
-  depends_on = [google_project_service.required]
+  # On the platform-storage key (CMEK step 7).
+  encryption {
+    default_kms_key_name = google_kms_crypto_key.record["platform-storage"].id
+  }
+
+  depends_on = [google_project_service.required, google_kms_crypto_key_iam_member.record_agent]
 }
 
 # Reads the source tarball the deployer uploaded. Nothing else in the bucket, no write.
