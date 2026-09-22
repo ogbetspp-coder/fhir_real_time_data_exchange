@@ -46,7 +46,7 @@ what is missing is the landing zone: a folder for the product, `dev` and `prod` 
 it, and the organisation policies below applied at the folder. _Before features:_ create the
 folder and move `dev` into it. The `prod` project can be created empty.
 
-_Status 2026-09-22: scripted, awaiting the owner's run._ `scripts/gcp/landing-zone.sh` creates
+_Status 2026-09-22: closed, run and verified._ `scripts/gcp/landing-zone.sh` creates
 `EMA Flow` with `non-production` and `production` folders beneath it, moves `dev` into
 `non-production`, and creates `khs-ema-flow-prod` empty and without billing in `production`. The
 location and key policies go on the **production** folder, not the product folder: `dev` hosts the
@@ -60,6 +60,14 @@ policies, prod project, and the `dev` move last, polled to its end. Consequences
 first production deploy: with `storage` in the key policy, the buckets Google creates on its own
 (Cloud Build, Cloud Run source uploads) must be created with a key first; every BigQuery dataset
 needs a key; and a production Gemini Enterprise app must be in `eu`, not `global`.
+The first run showed the Cloud Healthcare API is not a value `gcp.restrictNonCmekServices`
+accepts; it was removed, and the FHIR dataset's key is held by Terraform and
+`test/infra/keys.test.ts` instead. The script stopped before creating production or moving `dev`,
+as the reviewed order intends. The second run completed with no drift: `EMA Flow`
+(`folders/784801785369`), `non-production` (`folders/964747511982`) holding `dev`, `production`
+(`folders/678854787982`) holding `khs-ema-flow-prod`, empty and without billing. After the move,
+`dev`'s connector policy override is still effective, the key guard and bucket keys report no
+drift, and both services are ready.
 
 **A2. Data residency is not enforced, and something already lives outside the EU.**
 `constraints/gcp.resourceLocations` allows every location. The project's Cloud Build staging
@@ -69,6 +77,9 @@ residency promise has to be a policy, not a habit. _Before features:_ move image
 regional Cloud Build in `europe-west4` with an EU staging bucket, then set
 `gcp.resourceLocations` to `in:eu-locations` on the product folder. The order matters: the
 policy first would break the build.
+
+_Status 2026-09-22: closed for production._ `in:eu-locations` is set on the production folder
+(A1). `dev` carries no location policy by decision: it hosts the global Gemini Enterprise trial.
 
 _Status 2026-09-21: builds moved, policy pending._ Image builds run in `europe-west4`, staged in
 an EU bucket, since PR #44 — proved on build `07fb41b9…` — and the US staging bucket is deleted;
@@ -257,6 +268,10 @@ rights reserved, use only under a separate signed agreement. `package.json` had 
 and `private: true`, so the package cannot be published to a registry by accident.
 
 **D2. No `SECURITY.md` and no `CODEOWNERS`.** Cheap, and expected by any vendor assessment.
+
+_Status 2026-09-22: closed._ `SECURITY.md` gives a private reporting route, scope, and pointers to
+the recorded controls; its address, `security@khsadvisory.com`, is a placeholder marked as such
+and confirming it is on the production gate. `.github/CODEOWNERS` names the owner on every path.
 
 **D3. Administrators can bypass branch protection** (`enforce_admins` is off). Acceptable for
 one person; stated so that it is a decision and not a default.
