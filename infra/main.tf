@@ -71,6 +71,16 @@ resource "google_project_service" "required" {
     "storage-api.googleapis.com",
     "storage-component.googleapis.com",
     "telemetry.googleapis.com",
+    # Refused when disabling on 2026-09-22 because a declared service holds them: cloudapis holds
+    # bigquerydatatransfer, dataplex and sql-component; binaryauthorization holds container;
+    # binaryauthorization, compute and container hold oslogin. Disabling would take the holder too.
+    "bigquerydatatransfer.googleapis.com",
+    "container.googleapis.com",
+    "dataplex.googleapis.com",
+    "oslogin.googleapis.com",
+    "sql-component.googleapis.com",
+    # Re-enabled by Cloud Build on the next deploy after it was disabled, so a dependency of it.
+    "containerregistry.googleapis.com",
     # Kept, unused today: the entitlement store's candidate home (Firestore in Datastore mode is
     # one option), decided before a second tenant.
     "datastore.googleapis.com",

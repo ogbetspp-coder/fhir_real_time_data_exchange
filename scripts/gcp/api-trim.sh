@@ -5,7 +5,8 @@
 # anything. So an API enabled by hand, by a console wizard or by an experiment stays enabled,
 # unmonitored, until someone turns it off. This script is that someone.
 #
-# UNUSED names the APIs measured on 2026-09-22 as unused: no request in 30 days, no resource
+# UNUSED names the APIs measured on 2026-09-22 as unused (eight; six more looked unused but a
+# declared service holds them or re-enables them, so they are declared as dependencies in infra/main.tf instead): no request in 30 days, no resource
 # under them (no cluster, instance, zone, secret, pipeline, trigger, transfer or lake), and no
 # reference in the repository. Each is disabled WITHOUT --force: if another enabled API depends
 # on it, the API refuses and the script reports that, instead of disabling the dependent too.
@@ -21,20 +22,14 @@ PROJECT_ID="${GCP_PROJECT_ID:-sage-ship-509104-b8}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 UNUSED=(
   autoscaling.googleapis.com
-  bigquerydatatransfer.googleapis.com
   clouddeploy.googleapis.com
-  container.googleapis.com
   containerfilesystem.googleapis.com
-  containerregistry.googleapis.com
-  dataplex.googleapis.com
   dns.googleapis.com
   eventarc.googleapis.com
   file.googleapis.com
   gkebackup.googleapis.com
   networkconnectivity.googleapis.com
-  oslogin.googleapis.com
   secretmanager.googleapis.com
-  sql-component.googleapis.com
 )
 
 enabled="$(gcloud services list --enabled --project="$PROJECT_ID" --format='value(config.name)' | sort)"
