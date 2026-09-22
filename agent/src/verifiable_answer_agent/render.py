@@ -51,7 +51,7 @@ DataPart. A surface that does not advertise it gets ``render_text`` instead."""
 Surface = Literal["a2ui", "text"]
 
 ASSISTANT_LABEL: Final = "The assistant's own words (not label content)"
-VERIFIED_LABEL: Final = "Verified against the store after composition"
+VERIFIED_LABEL: Final = "Verified against the approved label"
 UNVERIFIED_LABEL: Final = "NOT VERIFIED"
 
 _FLAG_TEXT: Final[dict[str, str]] = {
@@ -140,12 +140,19 @@ def render_a2ui(
 
 
 def render_text(answer: CheckedAnswer) -> str:
-    """The same answer where no structured surface exists. Labels, not decoration."""
+    """The same answer where no structured surface exists. Labels, not decoration.
+
+    What a reader needs first is the quotation and whether it was verified; what an auditor
+    needs is the version and the checksum, which follow it on their own lines. The block id is
+    an internal handle and belongs in the audit record, not in a person's reading. The checksum
+    is written in full: this is the surface Gemini Enterprise shows, and a checksum a reader
+    cannot copy is not evidence.
+    """
     lines: list[str] = []
     for block in answer.blocks:
-        lines.append(f"[{block.block_id}] {_status_line(block)}")
+        lines.append(_status_line(block))
         lines.append(block.text)
-        lines.append(_citation_line(block))
+        lines.extend(_reading_lines(block))
         lines.append("")
     lines.append(f"[{ASSISTANT_LABEL}]")
     lines.append(answer.assistant.text)
@@ -160,8 +167,19 @@ def _status_line(block: CheckedBlock) -> str:
 
 
 def _citation_line(block: CheckedBlock) -> str:
+    """Where the quotation came from, in the fields a reader needs to check it."""
     citation = block.citation
     return (
         f"bundleId {citation.bundle_id} · versionId {citation.version_id} · "
         f"sourceKey {citation.source_key} · narrativeDivSha256 {citation.narrative_div_sha256}"
     )
+
+
+def _reading_lines(block: CheckedBlock) -> list[str]:
+    """The citation as a person reads it: the section and version, then the checksum."""
+    citation = block.citation
+    return [
+        f"From section {citation.source_key} of document version {citation.version_id} "
+        f"({citation.bundle_id})",
+        f"Checksum of the approved narrative: {citation.narrative_div_sha256}",
+    ]
