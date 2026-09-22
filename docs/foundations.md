@@ -154,6 +154,23 @@ trim.
 _Status 2026-09-21: closed._ Builds run as `ema-flow-build-dev`, which holds exactly three
 roles; the default compute account holds no project role.
 
+**B4. Infrastructure changes are not planned before merge.** Added 2026-09-22. The deploy applies
+unattended on merge, and every plan against live state this week was run by hand on a laptop. A
+shared foundation cannot rely on that. The plan must run on every pull request, as an identity
+that can read but not change, and must stop a merge that destroys anything until a person has
+acknowledged it.
+
+_Status 2026-09-22: built; waiting on the owner to create the identity._
+`.github/workflows/plan.yml` plans every pull request with the deploy's own inputs (one shared
+function in `scripts/gcp/deploy.sh`) against the deployed images and version, posts a summary
+of resource addresses and actions, never values, and fails on any destroy or replace unless the
+pull request is labelled `allow-replace`. It runs as `ema-flow-planner-dev`
+(`scripts/gcp/plan-identity.sh`), in its own Workload Identity pool: the deployer's grant
+covers every identity in the deployer's pool that names this repository, so a pull-request
+provider there would have admitted pull requests to the deployer. The planner's custom role was
+derived from a trace of every API call a live plan makes — all reads — and holds no permission
+that returns a stored record (`test/infra/plan-identity.test.ts`).
+
 ### C. Hardening — cheap, and overdue
 
 **C1. Artifact Registry vulnerability scanning is disabled.** An image with a known critical

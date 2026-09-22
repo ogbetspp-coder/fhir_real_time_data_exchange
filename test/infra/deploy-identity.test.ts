@@ -57,10 +57,21 @@ describe("the deploy identity", () => {
   it("is only ever requested by the deploy workflow", () => {
     // The condition names deploy.yml. Any other workflow asking for Google credentials would
     // either fail, or mean the condition had been widened to admit it.
+    // Since 2026-09-22 one other workflow authenticates: the pull-request plan, as the read-only
+    // planner through its own pool (test/infra/plan-identity.test.ts). It must never name the
+    // deployer's provider or account.
     const authenticating = workflows
       .filter(({ text }) => text.includes("google-github-actions/auth@"))
       .map(({ name }) => name);
-    expect(authenticating).toEqual(["deploy.yml"]);
+    expect(authenticating).toEqual(["deploy.yml", "plan.yml"]);
+    const namingDeployer = workflows
+      .filter(
+        ({ text }) =>
+          text.includes("vars.GCP_WORKLOAD_IDENTITY_PROVIDER") ||
+          text.includes("service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}"),
+      )
+      .map(({ name }) => name);
+    expect(namingDeployer).toEqual(["deploy.yml"]);
   });
 
   it("runs the deploy workflow only from main", () => {
