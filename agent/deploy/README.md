@@ -161,6 +161,18 @@ No new mechanism, no new module: `query_invokers` already exists for this purpos
 
 Source: [Set up a custom MCP server](https://docs.cloud.google.com/gemini/enterprise/docs/connectors/custom-mcp-server/set-up-custom-mcp-server).
 
+## Supplying the client secret without pasting it
+
+A paste into a hidden prompt carried the surrounding instructions with it on 2026-09-22: 217 then
+319 characters went to Google as the secret, and the trailing lines ran as shell commands, which
+echoed a live secret into a terminal. It was rotated. `authorization.sh` now checks the shape
+before sending, and takes the secret four ways, of which the first needs no typing:
+
+    bash agent/deploy/authorization.sh --clipboard          # copy it in the console, then run
+    bash agent/deploy/authorization.sh client_secret_*.json # Google's download
+    bash agent/deploy/authorization.sh --secret-file PATH   # a file holding it alone
+    bash agent/deploy/authorization.sh                      # a hidden prompt
+
 ## The OAuth client needs both redirect URIs
 
 The consent window opened, accepted the sign-in and never closed (2026-09-22). The authorization's
