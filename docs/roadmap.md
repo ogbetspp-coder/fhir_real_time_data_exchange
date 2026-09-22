@@ -257,6 +257,9 @@ that skips one is not a production deploy.
   rollout: the worker holds `fhirResourceEditor` on the record dataset only.
 - **Real addresses for alerts and security reports.** The alert channel and `SECURITY.md` carry
   placeholders (`you@khsadvisory.com`, `security@khsadvisory.com`); production needs monitored ones.
+- **Registry vulnerability scanning and Binary Authorization in production.** `dev` scans with
+  OSV-Scanner in CI (foundations C1); production turns on Artifact Analysis, where it is charged
+  per image and deploys are rare.
 - **Deploy into `khs-ema-flow-prod`**, which exists empty in the `production` folder under the EU
   and key policies. Before the first deploy there: buckets Google would create itself (Cloud
   Build, Cloud Run source uploads) created with a key first, since the folder refuses unkeyed

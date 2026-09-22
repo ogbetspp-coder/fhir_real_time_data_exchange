@@ -189,11 +189,14 @@ vulnerability would deploy without anyone being told. Turn scanning on. Binary A
 is already wired as the `enforce_binary_authorization` variable, off; turn it on once scanning
 results exist to attest to.
 
-_Status 2026-09-22: open, owner's decision on cost._ Artifact Analysis charges per newly pushed
-image, and every deploy pushes three: at the 41 deploys of 2026-09-21–22 that is about 15 USD a
-day, most of the 200 USD monthly budget. The alternatives: scan in CI with a free open-source
-scanner (cloud-agnostic, gates the merge, no attestations for Binary Authorization), or turn
-registry scanning on in production only, where deploys are rare.
+_Status 2026-09-22: closed for development; production gets registry scanning._ The owner chose
+the free route for `dev`: Google's open-source OSV-Scanner, pinned by version and SHA-256
+(`scripts/ci/vuln-scan.sh`), on every pull request, on main and weekly. Any known vulnerability
+in the npm or uv lockfiles fails the check (512 packages, none today; proved to fail on a lockfile
+pinning a vulnerable lodash). The pinned base images are scanned and reported without failing,
+since most operating-system advisories have no fixed package and fixes arrive as Dependabot
+digest bumps. A weekly failure opens an issue. Artifact Analysis registry scanning, and Binary
+Authorization on its results, move to the production gate, where deploys are rare.
 
 **C2. Fifty-four APIs are enabled; Terraform declares twenty, and not all of those are used.**
 Enabled with no declaration anywhere: GKE, GKE Backup, Filestore, Cloud SQL, Dataform, Cloud DNS,
