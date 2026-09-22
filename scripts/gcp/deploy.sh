@@ -74,6 +74,55 @@ ema_flow_json_array() {
   printf '%s]' "$out"
 }
 
+# The full -var list the deploy applies with, built in one place so the pull-request plan
+# (phase_plan) and the apply cannot drift apart. Sets TF_DEPLOY_VARS.
+#   tf_deploy_vars <deployer account> <worker image> <validator image> <query image> <service version>
+tf_deploy_vars() {
+  # Query service access configuration, supplied by the environment (GitHub Actions repository
+  # variables, see .github/workflows/deploy.yml). Unset means the Terraform defaults: no
+  # invoker, no token creator on the caller service account, no entitlement, no accepted OAuth
+  # client id -- a service that deploys and passes its startup probe while authorising no
+  # caller, rather than a deploy that fails.
+  local query_invokers_json query_token_creators_json query_oauth_client_ids_json query_entitlements_json
+  query_invokers_json="$(ema_flow_json_array "${QUERY_INVOKERS:-}")"
+  query_token_creators_json="$(ema_flow_json_array "${QUERY_TOKEN_CREATORS:-}")"
+  query_oauth_client_ids_json="$(ema_flow_json_array "${QUERY_OAUTH_CLIENT_IDS:-}")"
+  query_entitlements_json="${QUERY_ENTITLEMENTS_JSON:-}"
+  if [[ -z "$query_entitlements_json" ]]; then
+    query_entitlements_json='{}'
+  fi
+  # Sizes, not values: invoker members, token-creator members and entitlement keys are account
+  # identifiers, and this log is attached to a failure issue by .github/workflows/deploy.yml.
+  echo "query access configuration: query_invokers=${#query_invokers_json} bytes, query_token_creators=${#query_token_creators_json} bytes, query_oauth_client_ids=${#query_oauth_client_ids_json} bytes, query_entitlements_json=${#query_entitlements_json} bytes (2 bytes is the empty default)"
+
+  # The entitlement-denial alert's recipient (infra/variables.tf `alert_notification_email`).
+  # Until 2026-09-21 nothing passed it, so the variable existed, the metric was created, and no
+  # alert could ever fire from a deploy. Presence only is logged: an address is personal data
+  # and this log can be attached to a failure issue. Unset, like the query variables above,
+  # means the Terraform default -- which also means a deploy run without it removes a channel
+  # an earlier deploy created, so set it wherever deploys run.
+  local alert_notification_email="${ALERT_NOTIFICATION_EMAIL:-}"
+  if [[ -n "$alert_notification_email" ]]; then
+    echo "alert configuration: alert_notification_email is set; the denial alert and its e-mail channel are declared"
+  else
+    echo "alert configuration: alert_notification_email is not set; the denial metric exists with no alert"
+  fi
+
+  TF_DEPLOY_VARS=(
+    "${tf_common_vars[@]}"
+    -var="deployer_account=${1}"
+    -var="service_version=${5}"
+    -var="worker_image=${2}"
+    -var="validator_image=${3}"
+    -var="query_image=${4}"
+    -var="query_invokers=${query_invokers_json}"
+    -var="query_token_creators=${query_token_creators_json}"
+    -var="query_oauth_client_ids=${query_oauth_client_ids_json}"
+    -var="query_entitlements_json=${query_entitlements_json}"
+    -var="alert_notification_email=${alert_notification_email}"
+  )
+}
+
 phase_preflight() {
   echo "=== preflight ==="
   echo "project=${PROJECT_ID} region=${REGION} environment=${ENVIRONMENT} tag=${TAG}"
@@ -350,36 +399,6 @@ phase_apply() {
   VALIDATOR_DIGEST="$(resolve_image_digest validator "$TAG")"
   QUERY_DIGEST="$(resolve_image_digest query "$TAG")"
 
-  # Query service access configuration, supplied by the environment (GitHub Actions repository
-  # variables, see .github/workflows/deploy.yml). Unset means the Terraform defaults: no
-  # invoker, no token creator on the caller service account, no entitlement, no accepted OAuth
-  # client id -- a service that deploys and passes its startup probe while authorising no
-  # caller, rather than a deploy that fails.
-  local query_invokers_json query_token_creators_json query_oauth_client_ids_json query_entitlements_json
-  query_invokers_json="$(ema_flow_json_array "${QUERY_INVOKERS:-}")"
-  query_token_creators_json="$(ema_flow_json_array "${QUERY_TOKEN_CREATORS:-}")"
-  query_oauth_client_ids_json="$(ema_flow_json_array "${QUERY_OAUTH_CLIENT_IDS:-}")"
-  query_entitlements_json="${QUERY_ENTITLEMENTS_JSON:-}"
-  if [[ -z "$query_entitlements_json" ]]; then
-    query_entitlements_json='{}'
-  fi
-  # Sizes, not values: invoker members, token-creator members and entitlement keys are account
-  # identifiers, and this log is attached to a failure issue by .github/workflows/deploy.yml.
-  echo "query access configuration: query_invokers=${#query_invokers_json} bytes, query_token_creators=${#query_token_creators_json} bytes, query_oauth_client_ids=${#query_oauth_client_ids_json} bytes, query_entitlements_json=${#query_entitlements_json} bytes (2 bytes is the empty default)"
-
-  # The entitlement-denial alert's recipient (infra/variables.tf `alert_notification_email`).
-  # Until 2026-09-21 nothing passed it, so the variable existed, the metric was created, and no
-  # alert could ever fire from a deploy. Presence only is logged: an address is personal data
-  # and this log can be attached to a failure issue. Unset, like the query variables above,
-  # means the Terraform default -- which also means a deploy run without it removes a channel
-  # an earlier deploy created, so set it wherever deploys run.
-  local alert_notification_email="${ALERT_NOTIFICATION_EMAIL:-}"
-  if [[ -n "$alert_notification_email" ]]; then
-    echo "alert configuration: alert_notification_email is set; the denial alert and its e-mail channel are declared"
-  else
-    echo "alert configuration: alert_notification_email is not set; the denial metric exists with no alert"
-  fi
-
   # The account this deploy runs as, granted roles/run.invoker on the worker
   # (google_cloud_run_v2_service_iam_member.deployer_invoker in infra/run.tf) so phase_smoke can
   # call the service this apply just deployed. Only a service account is passed: a human's
@@ -387,29 +406,25 @@ phase_apply() {
   # a standing privilege on the worker that no documented path can exercise. A local operator
   # supplies WORKER_ID_TOKEN instead (phase_smoke says how), which authenticates as the
   # impersonated service account and needs no binding for the human.
-  local deployer_account
-  deployer_account="$(gcloud --quiet auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null | head -n 1 || true)"
-  if [[ -z "$deployer_account" ]]; then
+  local deployer_account_input
+  deployer_account_input="$(gcloud --quiet auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null | head -n 1 || true)"
+  if [[ -z "$deployer_account_input" ]]; then
     echo "::warning::Could not determine the active gcloud account; the deployer's run.invoker binding on the worker is not declared and the smoke run will be refused."
-  elif [[ "$deployer_account" != *.gserviceaccount.com ]]; then
+  elif [[ "$deployer_account_input" != *.gserviceaccount.com ]]; then
     echo "::notice::Deploying as a user account, so no deployer run.invoker binding is declared; phase_smoke needs WORKER_ID_TOKEN."
-    deployer_account=""
+    deployer_account_input=""
   fi
+
+  tf_deploy_vars "$deployer_account_input" \
+    "${REPOSITORY}/worker@${WORKER_DIGEST}" \
+    "${REPOSITORY}/validator@${VALIDATOR_DIGEST}" \
+    "${REPOSITORY}/query@${QUERY_DIGEST}" \
+    "$SERVICE_VERSION"
 
   if ! terraform -chdir=infra apply \
     -input=false \
     -auto-approve \
-    "${tf_common_vars[@]}" \
-    -var="deployer_account=${deployer_account}" \
-    -var="service_version=${SERVICE_VERSION}" \
-    -var="worker_image=${REPOSITORY}/worker@${WORKER_DIGEST}" \
-    -var="validator_image=${REPOSITORY}/validator@${VALIDATOR_DIGEST}" \
-    -var="query_image=${REPOSITORY}/query@${QUERY_DIGEST}" \
-    -var="query_invokers=${query_invokers_json}" \
-    -var="query_token_creators=${query_token_creators_json}" \
-    -var="query_oauth_client_ids=${query_oauth_client_ids_json}" \
-    -var="query_entitlements_json=${query_entitlements_json}" \
-    -var="alert_notification_email=${alert_notification_email}"; then
+    "${TF_DEPLOY_VARS[@]}"; then
     echo "=== terraform apply failed; dumping recent container logs for diagnosis ===" >&2
     # Only the worker's and the query service's structured logs, whose fields are sanitised by
     # src/lib/logger.ts, and only the five fields named in --format; the validator sidecar's
@@ -436,6 +451,54 @@ phase_apply() {
   terraform -chdir=infra output query_caller_service_account || true
 
   export_effective_iam
+}
+
+# A pull request's plan against live state (.github/workflows/plan.yml; foundations B4), run as
+# the read-only planner. Every input is what is deployed now — the running images, the running
+# service version, the deployer the deploy runs as — so the plan shows only what the pull request
+# itself changes, not the image churn every deploy carries. Writes the plan text to PLAN_OUT
+# (default plan.txt) and a redacted summary to PLAN_SUMMARY (default plan-summary.md).
+# Exits 1 on a plan error, and 3 when the plan destroys or replaces anything and ALLOW_REPLACE is
+# not "true": a destroy on merge is applied unattended, so it must be acknowledged on the pull
+# request (label `allow-replace`) before the check passes.
+phase_plan() {
+  echo "=== terraform plan (read-only) ==="
+  local out="${PLAN_OUT:-plan.txt}" summary="${PLAN_SUMMARY:-plan-summary.md}"
+  local worker_service="ema-flow-${ENVIRONMENT}-worker" query_service="ema-flow-${ENVIRONMENT}-query"
+  local images live_version
+  images="$(gcloud --quiet run services describe "$worker_service" --region="$REGION" --format=json |
+    python3 -c "import sys,json;c={x.get('name','x'):x['image'] for x in json.load(sys.stdin)['spec']['template']['spec']['containers']};print(c['worker'],c['validator'])")"
+  live_version="$(gcloud --quiet run services describe "$query_service" --region="$REGION" --format=json |
+    python3 -c "import sys,json;c=json.load(sys.stdin)['spec']['template']['spec']['containers'][0];print(next(e['value'] for e in c.get('env',[]) if e['name']=='QUERY_SERVICE_VERSION'))")"
+  local query_image
+  query_image="$(gcloud --quiet run services describe "$query_service" --region="$REGION" --format='value(spec.template.spec.containers[0].image)')"
+
+  tf_deploy_vars "${DEPLOY_SERVICE_ACCOUNT:?DEPLOY_SERVICE_ACCOUNT names the account the deploy runs as}" \
+    "${images% *}" "${images#* }" "$query_image" "$live_version"
+
+  local code=0 plan_file plan_json="-"
+  plan_file="$(mktemp)"
+  terraform -chdir=infra plan -input=false -lock=false -no-color -detailed-exitcode \
+    -out="$plan_file" "${TF_DEPLOY_VARS[@]}" >"$out" 2>&1 || code=$?
+  if [[ "$code" != "1" ]]; then
+    plan_json="${out%.*}.json"
+    terraform -chdir=infra show -json "$plan_file" >"$plan_json"
+  fi
+  rm -f "$plan_file"
+  # The verdict fails closed: only 0 (no destroy) and 4 (destroy) are verdicts; anything else,
+  # including a crash of the summariser, fails the check.
+  local verdict=0
+  python3 scripts/ci/plan-summary.py "$plan_json" "$out" "$summary" "$code" || verdict=$?
+  [[ "$plan_json" != "-" ]] && rm -f "$plan_json"
+  case "$verdict" in
+    0) return 0 ;;
+    4)
+      if [[ "${ALLOW_REPLACE:-false}" == "true" ]]; then return 0; fi
+      echo "::error::The plan destroys or replaces resources. Label the pull request allow-replace once reviewed." >&2
+      return 3
+      ;;
+    *) return 1 ;;
+  esac
 }
 
 phase_bootstrap() {
@@ -595,6 +658,7 @@ case "$PHASE" in
   apis) phase_apis ;;
   images) phase_images ;;
   apply) phase_apply ;;
+  plan) phase_plan ;;
   bootstrap) phase_bootstrap ;;
   smoke) phase_smoke ;;
   all)

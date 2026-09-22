@@ -1,0 +1,98 @@
+name: Terraform plan
+
+# Every pull request's infrastructure plan, against live state, before merge (docs/foundations.md,
+# B4). The deploy applies unattended on merge, so this is the last point a person sees what an
+# infrastructure change will do to the record.
+#
+# Runs as the read-only planner (scripts/gcp/plan-identity.sh), through its own Workload Identity
+# pool: the provider admits this repository's pull_request runs of this file and nothing else,
+# and the planner can read metadata and IAM policy but no stored record. The plan cannot take the
+# state lock and writes nothing.
+#
+# The check fails when the plan errors, and when it destroys or replaces anything unless the pull
+# request carries the `allow-replace` label: a destroy on merge is applied unattended, so it must
+# be acknowledged here first. Adding or removing the label re-runs the check.
+#
+# A pull request opened by Dependabot cannot request the identity token this needs. For one that
+# touches infra/ (a provider bump), push any commit to its branch as a person and the check
+# re-runs under that person.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+concurrency:
+  group: plan-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash --noprofile --norc -eo pipefail {0}
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      EMA_FLOW_ENVIRONMENT: dev
+      CLOUDSDK_CORE_DISABLE_PROMPTS: "1"
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "0"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Authenticate to Google Cloud as the planner
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_PLAN_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_PLAN_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.16.3
+          terraform_wrapper: false
+
+      - name: Terraform init
+        run: bash scripts/gcp/deploy.sh init
+
+      - name: Plan against live state
+        id: plan
+        env:
+          DEPLOY_SERVICE_ACCOUNT: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          QUERY_INVOKERS: ${{ vars.QUERY_INVOKERS }}
+          QUERY_TOKEN_CREATORS: ${{ vars.QUERY_TOKEN_CREATORS }}
+          QUERY_ENTITLEMENTS_JSON: ${{ vars.QUERY_ENTITLEMENTS_JSON }}
+          QUERY_OAUTH_CLIENT_IDS: ${{ vars.QUERY_OAUTH_CLIENT_IDS }}
+          ALERT_NOTIFICATION_EMAIL: ${{ vars.ALERT_NOTIFICATION_EMAIL }}
+          ALLOW_REPLACE: ${{ contains(github.event.pull_request.labels.*.name, 'allow-replace') }}
+          PLAN_OUT: ${{ runner.temp }}/plan.txt
+          PLAN_SUMMARY: ${{ runner.temp }}/plan-summary.md
+        run: bash scripts/gcp/deploy.sh plan
+
+      # The summary holds resource addresses and actions only (scripts/ci/plan-summary.py). The
+      # full plan text is never published: it carries attribute values, including account ids.
+      - name: Post the summary to the pull request
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          SUMMARY: ${{ runner.temp }}/plan-summary.md
+        run: |
+          [[ -f "$SUMMARY" ]] || { echo "No summary: the plan did not run."; exit 0; }
+          cat "$SUMMARY" >>"$GITHUB_STEP_SUMMARY"
+          gh pr comment "$PR" --edit-last --create-if-none --body-file "$SUMMARY"

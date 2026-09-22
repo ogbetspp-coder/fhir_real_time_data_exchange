@@ -1,0 +1,98 @@
+import { readFileSync } from "node:fs";
+
+import { describe, expect, it } from "vitest";
+
+// The pull-request planner (docs/foundations.md, B4). A pull request's workflow runs with the
+// planner's credentials, so the planner must be unable to reach the deployer and unable to read
+// the record. These tests pin both, from the script that is the source of truth.
+
+const script = readFileSync("scripts/gcp/plan-identity.sh", "utf8");
+const deployScript = readFileSync("scripts/gcp/deploy-identity.sh", "utf8");
+const value = (text: string, name: string): string =>
+  new RegExp(`^${name}="(.+)"$`, "m").exec(text)?.[1] ?? "";
+const permissions = [
+  ...(/^PERMISSIONS=\(\n([\s\S]*?)\n\)$/m.exec(script)?.[1] ?? "").matchAll(/^\s+(\S+)$/gm),
+].map((match) => match[1] ?? "");
+
+describe("the pull-request planner", () => {
+  it("has its own pool, never the deployer's", () => {
+    // The deployer's impersonation grant covers every identity in its pool that names this
+    // repository; a pull-request provider in that pool would admit pull requests to the deployer.
+    expect(value(deployScript, "POOL")).toBe("github-pool");
+    expect(value(script, "POOL")).not.toBe(value(deployScript, "POOL"));
+  });
+
+  it("admits only this repository's pull_request runs of the plan workflow", () => {
+    const condition = value(script, "CONDITION");
+    expect(condition).toContain("assertion.repository_id=='${REPOSITORY_ID}'");
+    expect(condition).toContain("assertion.event_name=='pull_request'");
+    expect(condition).toContain(
+      "assertion.workflow_ref.startsWith('${REPOSITORY}/.github/workflows/plan.yml@refs/pull/')",
+    );
+  });
+
+  it("reads metadata and policy only", () => {
+    expect(permissions.length).toBeGreaterThan(20);
+    for (const permission of permissions) {
+      expect([permission, /\.(get|list|getIamPolicy)$/.test(permission)]).toEqual([
+        permission,
+        true,
+      ]);
+    }
+  });
+
+  it("holds no permission that returns a stored record", () => {
+    const forbidden = [
+      /^storage\.objects\./, // evidence, submissions; state is read through one bucket grant
+      /^bigquery\.tables\.getData$/, // the ledger and the analytical projection
+      /^healthcare\.fhir(Resources|Stores)\./, // the FHIR stores themselves
+      /^logging\.(logEntries|privateLogEntries)\./, // log content, including audit logs
+      /^cloudkms\.cryptoKeyVersions\.use/, // decrypt or sign
+      /^secretmanager\.versions\.access$/,
+    ];
+    for (const permission of permissions) {
+      expect([permission, forbidden.some((rule) => rule.test(permission))]).toEqual([
+        permission,
+        false,
+      ]);
+    }
+  });
+
+  it("reads the state through the state bucket alone", () => {
+    expect(script).toContain('--member="serviceAccount:${SA}" --role=roles/storage.objectViewer');
+    expect(script).toContain("gs://${STATE_BUCKET}");
+  });
+});
+
+describe("the plan workflow", () => {
+  const workflow = readFileSync(".github/workflows/plan.yml", "utf8");
+
+  it("runs on pull requests as the planner, never the deployer", () => {
+    expect(workflow).toMatch(/^on:\n {2}pull_request:/m);
+    expect(workflow).toContain("vars.GCP_PLAN_WORKLOAD_IDENTITY_PROVIDER");
+    expect(workflow).toContain("vars.GCP_PLAN_SERVICE_ACCOUNT");
+    expect(workflow).not.toContain("vars.GCP_WORKLOAD_IDENTITY_PROVIDER");
+  });
+
+  it("fails on a destroy unless the pull request is labelled allow-replace", () => {
+    expect(workflow).toContain(
+      "ALLOW_REPLACE: ${{ contains(github.event.pull_request.labels.*.name, 'allow-replace') }}",
+    );
+    const deploy = readFileSync("scripts/gcp/deploy.sh", "utf8");
+    // The verdict fails closed: only 0 and 4 are verdicts, anything else fails the check.
+    expect(deploy).toMatch(
+      /if \[\[ "\$\{ALLOW_REPLACE:-false\}" == "true" \]\]; then return 0; fi/,
+    );
+    expect(deploy).toMatch(/case "\$verdict" in[\s\S]*?\*\) return 1 ;;/);
+  });
+
+  it("plans with exactly the inputs the deploy applies with", () => {
+    const deploy = readFileSync("scripts/gcp/deploy.sh", "utf8");
+    const applyUses =
+      /terraform -chdir=infra apply \\\n\s+-input=false \\\n\s+-auto-approve \\\n\s+"\$\{TF_DEPLOY_VARS\[@\]\}"/;
+    const planUses =
+      /terraform -chdir=infra plan [^\n]*\\\n\s+-out="\$plan_file" "\$\{TF_DEPLOY_VARS\[@\]\}"/;
+    expect(deploy).toMatch(applyUses);
+    expect(deploy).toMatch(planUses);
+  });
+});
