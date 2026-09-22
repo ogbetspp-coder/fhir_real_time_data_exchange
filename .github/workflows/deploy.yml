@@ -4,6 +4,23 @@ on:
   push:
     branches:
       - main
+    # A merge that touches only these cannot change what is deployed, so it does not deploy:
+    # every deploy rebuilds three images, re-imports the profiles and publishes a smoke run, and
+    # 41 of them ran in two days, most for documentation. Nothing deployed is built from these
+    # paths — the images take src/, fhir/, package files and Dockerfiles; the deploy takes infra/,
+    # scripts/ and workflows/. The quality gate on the pull request still covers test/.
+    # workflow_dispatch below deploys on demand whatever changed.
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+      - "LICENSE"
+      - "test/**"
+      - "agent/**"
+      - "zone-a/**"
+      - ".github/CODEOWNERS"
+      - ".github/dependabot.yml"
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/plan.yml"
   workflow_dispatch:
 
 permissions:
