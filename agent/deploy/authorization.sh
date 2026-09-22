@@ -154,7 +154,10 @@ print(json.dumps({
 unset CLIENT_SECRET
 
 if [[ "$status" == "200" ]]; then
-  verb=PATCH; url="${BASE}/${NAME}"
+  # updateMask is required: without it the API answers 200 and changes nothing, which left this
+  # authorization holding its first, mangled secret through four apparently successful runs
+  # (2026-09-22) while Gemini Enterprise logged "the provided client secret is invalid".
+  verb=PATCH; url="${BASE}/${NAME}?updateMask=serverSideOauth2,displayName"
 else
   verb=POST; url="${BASE}/projects/${PROJECT_NUMBER}/locations/global/authorizations?authorizationId=${AUTHORIZATION_ID}"
 fi
@@ -175,5 +178,18 @@ except Exception:
     print('no JSON in the response'); sys.exit(1)
 if 'error' in d:
     print('error:',d['error'].get('status'),d['error'].get('message')); sys.exit(1)
-print('authorization created:',d['name'])" "$response_file"
-bash "$0" --check
+print('authorization:',d['name'])" "$response_file"
+
+# Read it back: the response echoes what was sent, not what was stored. The redirect_uri proves
+# the update applied; the secret can never be read back at all.
+stored="$(curl --silent --header "Authorization: Bearer ${TOKEN}" \
+  --header "X-Goog-User-Project: ${PROJECT_ID}" "${BASE}/${NAME}")"
+python3 -c "
+import json, sys, urllib.parse
+d = json.loads(sys.argv[1])
+uri = (d.get('serverSideOauth2') or {}).get('authorizationUri', '')
+query = urllib.parse.parse_qs(urllib.parse.urlparse(uri).query)
+redirect = (query.get('redirect_uri') or [''])[0]
+if redirect != 'https://vertexaisearch.cloud.google.com/static/oauth/oauth.html':
+    sys.exit('stored authorizationUri has no usable redirect_uri; the update did not apply')
+print('stored: redirect_uri correct for client', (d.get('serverSideOauth2') or {}).get('clientId','')[:24] + '…')" "$stored"

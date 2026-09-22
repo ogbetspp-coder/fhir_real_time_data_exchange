@@ -173,6 +173,15 @@ before sending, and takes the secret four ways, of which the first needs no typi
     bash agent/deploy/authorization.sh --secret-file PATH   # a file holding it alone
     bash agent/deploy/authorization.sh                      # a hidden prompt
 
+## An update needs `updateMask`, and must be read back
+
+`PATCH` on an authorization without `updateMask` answers **200 and changes nothing**. Four runs
+on 2026-09-22 reported success while the resource kept its first, mangled secret, and Gemini
+Enterprise logged `Authorization failed: The provided client secret is invalid`. The script now
+sends `updateMask=serverSideOauth2,displayName` and reads the resource back, checking the stored
+`redirect_uri`: the response echoes what was sent, so only a read-back proves anything. The
+secret itself can never be read back, which is why the redirect_uri is the field that is checked.
+
 ## The OAuth client needs both redirect URIs
 
 The consent window opened, accepted the sign-in and never closed (2026-09-22). The authorization's
