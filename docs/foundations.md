@@ -338,6 +338,20 @@ identifiers, never credentials — but nothing would stop one.
   indexes into the image at build time, so they are not regenerated on every start, and a
   minimum instance. Nothing waits on the worker interactively today.
 
+**E2. Every deploy did work that nothing had asked for.** Added 2026-09-22. Every merge
+deployed, including documentation: 41 deploys in two days. Each re-imported the full profile
+set. After the profile bucket moved to a customer-managed key, that step went from 4 to 23
+minutes: Cloud Storage omits checksums from listings of CMEK objects, so every sync fetched
+5,074 objects one at a time.
+
+_Status 2026-09-22: closed; first proof on the next two deploys._ Merges touching only docs,
+tests, the agent or Zone A no longer deploy (`test/ci/deploy-trigger.test.ts` pins that no
+deployable path is ignored). The profile sync and import run only when the generated set's
+fingerprint differs from the one recorded after the last successful import, or the target
+store does not hold the expected 753 StructureDefinitions, or `FORCE_PROFILE_IMPORT` is set
+(`test/ci/profile-import.test.ts`). The first deploy after this records the fingerprint; the
+second should skip both steps.
+
 ## Order of work
 
 1. **Decisions the owner makes** (below).
