@@ -14,6 +14,7 @@ from __future__ import annotations
 from google.adk.agents import LlmAgent
 
 from .config import AgentConfig
+from .finish import build_finish_turn
 from .instruction import SYSTEM_INSTRUCTION
 from .tools import begin_turn, build_query_toolset
 
@@ -31,13 +32,18 @@ AGENT_DESCRIPTION = (
 def build_agent(config: AgentConfig | None = None) -> LlmAgent:
     """Construct the agent. Pure: no network call, no model resolution until it is run."""
     settings = config if config is not None else AgentConfig.from_env()
+    toolset = build_query_toolset(settings)
     return LlmAgent(
         name=AGENT_NAME,
         model=settings.model,
         description=AGENT_DESCRIPTION,
         instruction=SYSTEM_INSTRUCTION,
-        tools=[build_query_toolset(settings)],
+        tools=[toolset],
         # Generates the turn id before the model runs, so the first tool call already carries
         # X-Query-Turn-Id and the audit record's turnId is the same value.
         before_agent_callback=begin_turn,
+        # Replaces the model's reply with the checked, rendered answer. Bound to the toolset
+        # above so the post-check's verify_quote calls travel the same MCP session, as the same
+        # user, under the same turn id.
+        after_agent_callback=build_finish_turn(settings, toolset),
     )
