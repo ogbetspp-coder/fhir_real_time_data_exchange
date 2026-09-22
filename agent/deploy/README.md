@@ -210,6 +210,21 @@ right is not evidence.** The transcript was fluent, correctly formatted, and cit
 that exists; only the version id and the audit record showed that nothing had been read. Show
 the version, the hash, and `verify_quote` — never the prose alone.
 
+## Step 4b — let Gemini Enterprise run the agent
+
+The first turn that reached the agent failed with `PERMISSION_DENIED: Reasoning Engine Execution
+Service stream failed`. Gemini Enterprise calls a registered agent as its own service agent, and
+`roles/discoveryengine.serviceAgent` does not include `aiplatform.reasoningEngines.query`.
+
+`grant-invoker.sh` creates a custom role of exactly two permissions, query and get, and binds it
+**on the one reasoning engine**, not on the project. The alternative, `roles/aiplatform.user`,
+carries 451 permissions including create and delete on every Vertex AI resource.
+
+```bash
+AGENT_RESOURCE=projects/<number>/locations/<region>/reasoningEngines/<id> \
+  bash agent/deploy/grant-invoker.sh
+```
+
 ## Step 5 — the Google Chat app (optional)
 
 The same Agent Engine agent can front a Google Chat app, through Google's own quickstart: set
