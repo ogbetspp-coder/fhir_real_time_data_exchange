@@ -25,6 +25,16 @@ describe("the record's readers", () => {
     expect(script).toContain('"ema_flow_ledger_${ENVIRONMENT}" "ema_flow_fhir_${ENVIRONMENT}"');
   });
 
+  it("fail the deploy on any read error other than not-found", () => {
+    expect(script).toContain('echo "${bucket}: cannot read its IAM policy');
+    expect(script).toContain('echo "${dataset}: cannot read it');
+    expect(script.match(/\n\s+exit 1\n/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+  });
+
+  it("replace a dataset's access list only if it is unchanged since read", () => {
+    expect(script).toContain('update --etag "$etag" --source "$wanted"');
+  });
+
   it("are enforced by every deploy, right after the apply", () => {
     const apply = workflow.indexOf("- name: Apply infrastructure");
     const readers = workflow.indexOf("- name: Record readers");

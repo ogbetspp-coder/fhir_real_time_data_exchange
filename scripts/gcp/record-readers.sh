@@ -29,18 +29,32 @@ set -euo pipefail
 PROJECT_ID="${GCP_PROJECT_ID:-sage-ship-509104-b8}"
 ENVIRONMENT="${EMA_FLOW_ENVIRONMENT:-dev}"
 BUCKETS=(evidence submissions profiles build-staging)
+# Created by hand for the agent's deploy, outside Terraform and without the environment in its name.
+EXTRA_BUCKETS=("${PROJECT_ID}-ema-flow-agent-staging")
 DATASETS=("ema_flow_ledger_${ENVIRONMENT}" "ema_flow_fhir_${ENVIRONMENT}")
 CHECK="false"
 [[ "${1:-}" == "--check" ]] && CHECK="true"
 drift=0
 
 # Buckets: every binding held through projectViewer or projectEditor goes; projectOwner stays.
-for suffix in "${BUCKETS[@]}"; do
-  bucket="${PROJECT_ID}-ema-flow-${ENVIRONMENT}-${suffix}"
-  policy="$(gcloud --quiet storage buckets get-iam-policy "gs://${bucket}" --format=json 2>/dev/null)" || {
-    echo "${bucket}: not readable or does not exist; skipped"
-    continue
-  }
+# A read that fails for any reason but "not found" stops the script: a network or permission error
+# must fail the deploy, not pass it with nothing enforced.
+bucket_names=()
+for suffix in "${BUCKETS[@]}"; do bucket_names+=("${PROJECT_ID}-ema-flow-${ENVIRONMENT}-${suffix}"); done
+bucket_names+=("${EXTRA_BUCKETS[@]}")
+for bucket in "${bucket_names[@]}"; do
+  err="$(mktemp)"
+  if ! policy="$(gcloud --quiet storage buckets get-iam-policy "gs://${bucket}" --format=json 2>"$err")"; then
+    if grep -qiE "not found|404" "$err"; then
+      echo "${bucket}: does not exist; skipped"
+      rm -f "$err"
+      continue
+    fi
+    echo "${bucket}: cannot read its IAM policy: $(head -c 300 "$err")" >&2
+    rm -f "$err"
+    exit 1
+  fi
+  rm -f "$err"
   convenience="$(printf '%s' "$policy" | python3 -c "
 import sys,json
 for b in json.load(sys.stdin).get('bindings',[]):
@@ -62,11 +76,18 @@ done
 # Datasets: the projectReaders and projectWriters special groups go; projectOwners stays.
 for dataset in "${DATASETS[@]}"; do
   current="$(mktemp)"
-  if ! bq --quiet --format=json show "${PROJECT_ID}:${dataset}" >"$current" 2>/dev/null; then
-    echo "${dataset}: not readable or does not exist; skipped"
-    rm -f "$current"
-    continue
+  err="$(mktemp)"
+  if ! bq --headless --quiet --format=json show "${PROJECT_ID}:${dataset}" >"$current" 2>"$err"; then
+    if grep -qiE "not found|404" "$err" "$current"; then
+      echo "${dataset}: does not exist; skipped"
+      rm -f "$current" "$err"
+      continue
+    fi
+    echo "${dataset}: cannot read it: $(head -c 300 "$err")" >&2
+    rm -f "$current" "$err"
+    exit 1
   fi
+  rm -f "$err"
   wanted="$(mktemp)"
   removed="$(python3 - "$current" "$wanted" <<'PY'
 import json, sys
@@ -76,11 +97,14 @@ json.dump({"access": keep}, open(sys.argv[2], "w"))
 print(len(d.get("access", [])) - len(keep))
 PY
 )"
+  etag="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['etag'])" "$current")"
   if [[ "$removed" != "0" ]]; then
     drift=1
     echo "${dataset}: ${removed} project reader/writer entr(ies)"
     if [[ "$CHECK" == "false" ]]; then
-      bq --quiet update --source "$wanted" "${PROJECT_ID}:${dataset}" >/dev/null
+      # --etag: the update applies only to the access list read above; an entry added since is
+      # not silently dropped, the update is refused and the next deploy tries again.
+      bq --headless --quiet update --etag "$etag" --source "$wanted" "${PROJECT_ID}:${dataset}" >/dev/null
       echo "${dataset}: removed"
     fi
   fi
