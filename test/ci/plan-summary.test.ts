@@ -44,7 +44,7 @@ function summarise(
     [script, changes === null ? "-" : planJson, planText, output, String(code)],
     { encoding: "utf8" },
   );
-  let summary = "";
+  let summary: string;
   try {
     summary = readFileSync(output, "utf8");
   } catch {
