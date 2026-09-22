@@ -18,8 +18,10 @@
 #   https://vertexaisearch.cloud.google.com/oauth-redirect          (the MCP connector)
 #   https://vertexaisearch.cloud.google.com/static/oauth/oauth.html (an agent authorization)
 #
-#   bash agent/deploy/authorization.sh                       # hidden prompt for the secret
-#   bash agent/deploy/authorization.sh client_secret_*.json  # or read it from Google's download
+#   bash agent/deploy/authorization.sh --clipboard           # copy it in the console, then run
+#   bash agent/deploy/authorization.sh client_secret_*.json  # or read Google's download
+#   bash agent/deploy/authorization.sh --secret-file PATH    # or a file holding it alone
+#   bash agent/deploy/authorization.sh                       # or a hidden prompt
 #   bash agent/deploy/authorization.sh --check               # report only; exit 1 if missing
 set -euo pipefail
 
@@ -49,13 +51,25 @@ echo "project ${PROJECT_ID} (${PROJECT_NUMBER}); authorization ${AUTHORIZATION_I
 # The secret is never an argument, never printed, and never written by this script.
 CLIENT_SECRET=""
 secret_file=""
+from_clipboard="false"
 case "${1:-}" in
+  --clipboard) from_clipboard="true" ;;
   --secret-file) secret_file="${2:?--secret-file needs a path}" ;;
   "") ;;
   *) secret_file="$1" ;;
 esac
 
-if [[ -n "$secret_file" ]]; then
+if [[ "$from_clipboard" == "true" ]]; then
+  command -v pbpaste >/dev/null || { echo "pbpaste is not available; use --secret-file." >&2; exit 1; }
+  # Read once, trim surrounding whitespace, and never print it. Copy the secret from the console
+  # with the copy button next to it, so nothing else comes with it.
+  CLIENT_SECRET="$(pbpaste | tr -d '\r\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+  echo "secret read from the clipboard (${#CLIENT_SECRET} characters)"
+fi
+
+if [[ "$from_clipboard" == "true" ]]; then
+  :
+elif [[ -n "$secret_file" ]]; then
   [[ -f "$secret_file" ]] || { echo "No such file: ${secret_file}" >&2; exit 1; }
   # A Google OAuth client JSON download, or a file holding the secret alone.
   CLIENT_SECRET="$(SECRET_FILE="$secret_file" python3 -c '
