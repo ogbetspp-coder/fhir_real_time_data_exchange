@@ -168,6 +168,21 @@ jobs:
           WORKER_ID_TOKEN: ${{ steps.worker_token.outputs.id_token }}
         run: bash scripts/gcp/deploy.sh smoke 2>&1 | tee -a deploy-run.log
 
+      # A green deploy supersedes every earlier failure: close their issues, each with a pointer to
+      # the run that superseded it, so an open deploy-failure issue always means a live failure
+      # (foundations C11). Only issues this workflow opened, by title and author, are touched.
+      - name: Close superseded failure issues
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          gh issue list --state open --author "app/github-actions" --search "deploy-failure in:title" \
+            --limit 100 --json number,title --jq '.[] | select(.title | startswith("deploy-failure ")) | .number' |
+            while read -r n; do
+              gh issue close "$n" --comment "Superseded: deploy ${run_url} succeeded, smoke run included." || true
+            done
+
       - name: Publish failure log
         if: failure()
         env:

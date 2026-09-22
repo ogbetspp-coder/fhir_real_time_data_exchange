@@ -79,10 +79,21 @@ node scripts/fhir/select-import-resources.mjs "$TMP/extensions/package" "$TMP/im
 # objects, so a file excluded here after already having been uploaded by an
 # earlier run (e.g. select-import-resources.mjs's exclusion list) would keep
 # being imported from the stale copy left in the bucket.
-gcloud --quiet storage rsync "$TMP/import/global" "gs://${PROFILE_BUCKET}/global" --recursive --delete-unmatched-destination-objects
-gcloud --quiet storage rsync "$TMP/import/ema" "gs://${PROFILE_BUCKET}/ema" --recursive --delete-unmatched-destination-objects
-gcloud --quiet storage rsync "$TMP/import/terminology" "gs://${PROFILE_BUCKET}/terminology" --recursive --delete-unmatched-destination-objects
-gcloud --quiet storage rsync "$TMP/import/extensions" "gs://${PROFILE_BUCKET}/extensions" --recursive --delete-unmatched-destination-objects
+#
+# --checksums-only, and one fixed modification time on every generated file: the files are
+# written fresh on every deploy, so by default rsync saw a new mtime on each of the ~5,000 and
+# re-uploaded them all. Once the bucket moved to a customer-managed key (CMEK step 7) each
+# upload also costs a key operation, and the re-upload took the deploy's bootstrap from four
+# minutes to over twenty. Comparing content hashes uploads exactly the files whose content
+# changed; the fixed mtime stops rsync patching every object's timestamp when nothing did.
+# The comparison runs on MD5, which every object here carries, rather than on CRC32C through the
+# `gcloud-crc32c` helper binary, which some gcloud installs lack — without it rsync stops part-way.
+find "$TMP/import" -type f -exec touch -t 198001010000 {} +
+export CLOUDSDK_STORAGE_USE_GCLOUD_CRC32C=false
+gcloud --quiet storage rsync "$TMP/import/global" "gs://${PROFILE_BUCKET}/global" --recursive --checksums-only --delete-unmatched-destination-objects
+gcloud --quiet storage rsync "$TMP/import/ema" "gs://${PROFILE_BUCKET}/ema" --recursive --checksums-only --delete-unmatched-destination-objects
+gcloud --quiet storage rsync "$TMP/import/terminology" "gs://${PROFILE_BUCKET}/terminology" --recursive --checksums-only --delete-unmatched-destination-objects
+gcloud --quiet storage rsync "$TMP/import/extensions" "gs://${PROFILE_BUCKET}/extensions" --recursive --checksums-only --delete-unmatched-destination-objects
 
 for prefix in terminology extensions global ema; do
   echo "=== importing ${prefix} ==="

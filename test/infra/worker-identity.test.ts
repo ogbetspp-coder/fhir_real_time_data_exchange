@@ -14,7 +14,7 @@ describe("the worker identity", () => {
     expect(roles).toEqual(
       expect.arrayContaining([
         { type: "google_kms_crypto_key_iam_member", role: "roles/cloudkms.signerVerifier" },
-        { type: "google_storage_bucket_iam_member", role: "roles/storage.objectAdmin" },
+        { type: "google_storage_bucket_iam_member", role: "roles/storage.objectCreator" },
         { type: "google_storage_bucket_iam_member", role: "roles/storage.objectViewer" },
         {
           type: "google_healthcare_dataset_iam_member",
@@ -32,6 +32,10 @@ describe("the worker identity", () => {
     expect(roles.filter(({ role }) => role.startsWith("roles/healthcare."))).toEqual([
       { type: "google_healthcare_dataset_iam_member", role: "roles/healthcare.fhirResourceEditor" },
     ]);
+  });
+
+  it("can create evidence but never read, overwrite or delete it (foundations C12)", () => {
+    expect(roles.some(({ role }) => role === "roles/storage.objectAdmin")).toBe(false);
   });
 
   it("holds no Document AI role", () => {
