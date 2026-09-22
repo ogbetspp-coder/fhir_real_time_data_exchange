@@ -317,7 +317,7 @@ agent's staging bucket) and the project reader and writer groups on both BigQuer
 keeps the owners' paths, whose removal locked the owner out of the state bucket before. It runs
 in every deploy right after the apply, so a bucket or dataset created later is brought into line
 on its first deploy. Reviewed before it ran: a failed read now fails the deploy instead of being
-skipped, and a dataset's access list is replaced only if unchanged since it was read (`--etag`).
+skipped, and a dataset's access list is replaced only if unchanged since it was read (an `If-Match` precondition on the API call; the `bq` tool was replaced after it printed non-JSON on a fresh CI runner and stopped the first deploy at this step, after the buckets and before anything else).
 Cloud Healthcare has no per-dataset equivalent: project Viewer or Editor reads every FHIR store,
 so the script reports how many principals hold either. Today none do.
 
