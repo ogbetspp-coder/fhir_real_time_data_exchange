@@ -203,7 +203,7 @@ Terraform but referenced by nothing else in the repository: Secret Manager, Clou
 Dataplex, BigQuery Data Transfer and Eventarc. Each is surface nothing monitors. Trim both lists
 to what the product uses, and make Terraform the only list.
 
-_Status 2026-09-22: measured; closes when the unused are disabled._ 30 days of request counts
+_Status 2026-09-22: closed._ Fifty-four enabled became forty-five, every one declared, and `scripts/gcp/api-trim.sh --check` reports no drift. Of the fifteen measured unused, eight are disabled; five turned out to be held by a declared service (Google's umbrella service, Binary Authorization, Compute) and one is re-enabled by Cloud Build on every deploy, so those six are declared as dependencies rather than forced off with their holder. The list the deploy enables before Terraform runs is tested to be a subset of Terraform's. 30 days of request counts
 per API decided it, not a reading of names: an API that served requests, or that Google enables
 as a dependency of one that did, is declared in `infra/main.tf`, which is now the complete list
 (39). Fifteen served no request, hold no resource and are referenced nowhere; they are dropped
