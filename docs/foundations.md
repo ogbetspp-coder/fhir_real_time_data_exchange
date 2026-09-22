@@ -203,6 +203,15 @@ Terraform but referenced by nothing else in the repository: Secret Manager, Clou
 Dataplex, BigQuery Data Transfer and Eventarc. Each is surface nothing monitors. Trim both lists
 to what the product uses, and make Terraform the only list.
 
+_Status 2026-09-22: measured; closes when the unused are disabled._ 30 days of request counts
+per API decided it, not a reading of names: an API that served requests, or that Google enables
+as a dependency of one that did, is declared in `infra/main.tf`, which is now the complete list
+(39). Fifteen served no request, hold no resource and are referenced nowhere; they are dropped
+from Terraform (without disabling — `disable_on_destroy` is false) and disabled by
+`scripts/gcp/api-trim.sh`, which never forces past a dependency and whose `--check` reports any
+API enabled outside the list. Kept although idle: Vertex AI, for the agent, and Datastore, a
+candidate home for the entitlement store.
+
 **C3. No dependency update automation.** No Dependabot or Renovate configuration exists for npm,
 Python, Docker base-image digests, Terraform providers or Actions. Digest pinning without an
 update path means pinned and slowly rotting.

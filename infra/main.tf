@@ -21,28 +21,59 @@ data "google_project" "current" {
   project_id = var.project_id
 }
 
+# The project's APIs, and the only list of them (docs/foundations.md, C2). An API enabled but
+# not listed here is drift, and scripts/gcp/api-trim.sh reports it. Measured 2026-09-22 against
+# 30 days of request counts: each API below either served requests or is a dependency Google
+# enables for one that did. disable_on_destroy is false, so removing a line stops managing an API
+# without disabling it; disabling is a separate, deliberate step in that script.
 resource "google_project_service" "required" {
   for_each = toset([
+    # The product.
     "artifactregistry.googleapis.com",
-    "binaryauthorization.googleapis.com",
     "bigquery.googleapis.com",
-    "bigquerydatatransfer.googleapis.com",
     "cloudbuild.googleapis.com",
-    "clouddeploy.googleapis.com",
     "cloudkms.googleapis.com",
-    "eventarc.googleapis.com",
+    "datalineage.googleapis.com",
+    "documentai.googleapis.com",
     "healthcare.googleapis.com",
     "logging.googleapis.com",
     "monitoring.googleapis.com",
     "pubsub.googleapis.com",
     "run.googleapis.com",
-    "secretmanager.googleapis.com",
     "storage.googleapis.com",
-    "workflows.googleapis.com",
     "workflowexecutions.googleapis.com",
-    "datalineage.googleapis.com",
-    "dataplex.googleapis.com",
-    "documentai.googleapis.com",
+    "workflows.googleapis.com",
+    # Deploy, identity and governance.
+    "binaryauthorization.googleapis.com",
+    "cloudresourcemanager.googleapis.com",
+    "containeranalysis.googleapis.com",
+    "iam.googleapis.com",
+    "iamcredentials.googleapis.com",
+    "orgpolicy.googleapis.com",
+    "serviceusage.googleapis.com",
+    "sts.googleapis.com",
+    # The assistant: Gemini Enterprise's connector, and Vertex AI for the agent (roadmap 1b).
+    "aiplatform.googleapis.com",
+    "discoveryengine.googleapis.com",
+    # Enabled by Google as dependencies of the above; listed so the list is complete. Compute
+    # served 5 requests in 30 days from a Google-managed caller and holds no instance.
+    "analyticshub.googleapis.com",
+    "bigqueryconnection.googleapis.com",
+    "bigquerydatapolicy.googleapis.com",
+    "bigquerymigration.googleapis.com",
+    "bigqueryreservation.googleapis.com",
+    "bigquerystorage.googleapis.com",
+    "cloudapis.googleapis.com",
+    "cloudtrace.googleapis.com",
+    "compute.googleapis.com",
+    "dataform.googleapis.com",
+    "servicemanagement.googleapis.com",
+    "storage-api.googleapis.com",
+    "storage-component.googleapis.com",
+    "telemetry.googleapis.com",
+    # Kept, unused today: the entitlement store's candidate home (Firestore in Datastore mode is
+    # one option), decided before a second tenant.
+    "datastore.googleapis.com",
   ])
 
   project            = var.project_id
