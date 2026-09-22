@@ -18,8 +18,9 @@
 #   https://vertexaisearch.cloud.google.com/oauth-redirect          (the MCP connector)
 #   https://vertexaisearch.cloud.google.com/static/oauth/oauth.html (an agent authorization)
 #
-#   bash agent/deploy/authorization.sh            # create or update
-#   bash agent/deploy/authorization.sh --check    # report only; exit 1 if missing
+#   bash agent/deploy/authorization.sh                       # hidden prompt for the secret
+#   bash agent/deploy/authorization.sh client_secret_*.json  # or read it from Google's download
+#   bash agent/deploy/authorization.sh --check               # report only; exit 1 if missing
 set -euo pipefail
 
 PROJECT_ID="${GCP_PROJECT_ID:-sage-ship-509104-b8}"
@@ -39,11 +40,44 @@ if [[ "${1:-}" == "--check" ]]; then
   exit 1
 fi
 
-echo "project ${PROJECT_ID} (${PROJECT_NUMBER}); authorization ${AUTHORIZATION_ID} is missing, so it will be created."
-read -r -s -p "Paste the OAuth client secret for ${CLIENT_ID} and press Enter (nothing will show): " CLIENT_SECRET
-echo
-echo "secret received (${#CLIENT_SECRET} characters)"
-[[ -n "$CLIENT_SECRET" ]] || { echo "No secret entered." >&2; exit 1; }
+echo "project ${PROJECT_ID} (${PROJECT_NUMBER}); authorization ${AUTHORIZATION_ID} will be created or updated."
+
+# Three ways to supply the secret, because a hidden prompt refuses a paste in some terminals:
+#   bash agent/deploy/authorization.sh path/to/client_secret_....json   # the file Google gave you
+#   bash agent/deploy/authorization.sh --secret-file path/to/secret.txt # a file holding only it
+#   bash agent/deploy/authorization.sh                                  # hidden prompt
+# The secret is never an argument, never printed, and never written by this script.
+CLIENT_SECRET=""
+secret_file=""
+case "${1:-}" in
+  --secret-file) secret_file="${2:?--secret-file needs a path}" ;;
+  "") ;;
+  *) secret_file="$1" ;;
+esac
+
+if [[ -n "$secret_file" ]]; then
+  [[ -f "$secret_file" ]] || { echo "No such file: ${secret_file}" >&2; exit 1; }
+  # A Google OAuth client JSON download, or a file holding the secret alone.
+  CLIENT_SECRET="$(SECRET_FILE="$secret_file" python3 -c '
+import json, os, sys
+text = open(os.environ["SECRET_FILE"], encoding="utf-8").read().strip()
+try:
+    data = json.loads(text)
+except ValueError:
+    print(text)
+else:
+    section = data.get("web") or data.get("installed") or data
+    secret = section.get("client_secret")
+    if not secret:
+        sys.exit("that JSON has no client_secret")
+    print(secret)')"
+  echo "secret read from ${secret_file} (${#CLIENT_SECRET} characters)"
+else
+  read -r -s -p "Paste the OAuth client secret for ${CLIENT_ID} and press Enter (nothing will show): " CLIENT_SECRET
+  echo
+  echo "secret received (${#CLIENT_SECRET} characters)"
+fi
+[[ -n "$CLIENT_SECRET" ]] || { echo "No secret supplied." >&2; exit 1; }
 
 # The request body goes to a private temporary file, built by Python reading the secret from its
 # environment: not a command-line argument, which other processes can briefly see, and not a
