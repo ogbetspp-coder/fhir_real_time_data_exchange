@@ -21,6 +21,8 @@ on:
       - ".github/dependabot.yml"
       - ".github/workflows/ci.yml"
       - ".github/workflows/plan.yml"
+      - ".github/workflows/vulnerabilities.yml"
+      - "osv-scanner.toml"
   workflow_dispatch:
 
 permissions:
