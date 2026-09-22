@@ -161,6 +161,25 @@ No new mechanism, no new module: `query_invokers` already exists for this purpos
 
 Source: [Set up a custom MCP server](https://docs.cloud.google.com/gemini/enterprise/docs/connectors/custom-mcp-server/set-up-custom-mcp-server).
 
+## What the first Gemini Enterprise turns showed (2026-09-22)
+
+Two questions asked in the app were answered **without any tool call ever reaching the query
+service**, the second one inventing a `versionId` and quoting hashes it had seen in an earlier
+session. The audit trail is unambiguous: `StreamAssist` was called on
+`assistants/default_assistant` with no agent named, and the query service logged nothing at all.
+
+Two causes, both fixed in `register.sh`:
+
+- The registration carried no `sharingConfig`, so the agent was not offered in the app.
+- It carried no `adkAgentDefinition.toolSettings.toolDescription`, which is what the assistant's
+  router reads when deciding whether to route a question to an agent. Google's own Deep Research
+  agent sets both.
+
+The lesson for the demonstration, which is the product's whole argument: **an answer that looks
+right is not evidence.** The transcript was fluent, correctly formatted, and cited a document
+that exists; only the version id and the audit record showed that nothing had been read. Show
+the version, the hash, and `verify_quote` — never the prose alone.
+
 ## Step 5 — the Google Chat app (optional)
 
 The same Agent Engine agent can front a Google Chat app, through Google's own quickstart: set

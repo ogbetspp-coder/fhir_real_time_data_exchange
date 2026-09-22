@@ -36,11 +36,15 @@ if [[ "${1:-}" == "--check" ]]; then
 fi
 
 : "${AGENT_RESOURCE:?AGENT_RESOURCE names the reasoning engine deploy_agent_engine.py printed}"
-body="$(python3 - "$NAME" "$AGENT_RESOURCE" "$PROJECT_NUMBER" "$AUTHORIZATION_ID" <<'PY'
-import json, sys
-name, engine, number, auth = sys.argv[1:5]
+# Built by Python into a private file, not inside a command substitution: bash mis-parses a
+# heredoc containing parentheses there, which silently truncated this request on 2026-09-22.
+body_file="$(mktemp)"
+trap 'rm -f "$body_file"' EXIT
+NAME="$NAME" ENGINE="$AGENT_RESOURCE" NUMBER="$PROJECT_NUMBER" AUTH="$AUTHORIZATION_ID" python3 -c '
+import json, os
+number, auth = os.environ["NUMBER"], os.environ["AUTH"]
 print(json.dumps({
-    "name": name,
+    "name": os.environ["NAME"],
     "displayName": "Verifiable answers (EMA Flow)",
     "description": (
         "Answers questions about approved medicinal product information from the verified "
@@ -48,18 +52,33 @@ print(json.dumps({
         "machine-checks every quotation before showing it. Does not search the web, does not "
         "summarise from memory, and refuses questions about products the user is not entitled to."
     ),
-    "adkAgentDefinition": {"provisionedReasoningEngine": {"reasoningEngine": engine}},
+    # toolDescription is what the assistant router reads when deciding whether to send a question
+    # here. Without it the default assistant answered by itself, twice, inventing a version id
+    # and hashes rather than calling a tool (2026-09-22).
+    "adkAgentDefinition": {
+        "provisionedReasoningEngine": {"reasoningEngine": os.environ["ENGINE"]},
+        "toolSettings": {
+            "toolDescription": (
+                "Use for any question about the content of an approved medicinal product label "
+                "or product information: warnings, contraindications, dosage, a numbered section "
+                "of an SmPC or package leaflet, or what a particular version of a label says. "
+                "Answers only from the verified ePI store, quoting verbatim with the document "
+                "version and a content hash."
+            )
+        },
+    },
+    # Offered to every user of the app, as the built-in agents are.
+    "sharingConfig": {"scope": "ALL_USERS"},
     "authorizationConfig": {
         "toolAuthorizations": [f"projects/{number}/locations/global/authorizations/{auth}"]
     },
-}))
-PY
-)"
+}))' >"$body_file"
+
 if [[ "$exists" == "yes" ]]; then
-  response="$(curl --silent --show-error --request PATCH "${hdr[@]}" --data-binary "$body" \
-    "${BASE}/${NAME}?updateMask=displayName,description,adkAgentDefinition,authorizationConfig")"
+  response="$(curl --silent --show-error --request PATCH "${hdr[@]}" --data-binary "@${body_file}" \
+    "${BASE}/${NAME}?updateMask=displayName,description,adkAgentDefinition,authorizationConfig,sharingConfig")"
 else
-  response="$(curl --silent --show-error --request POST "${hdr[@]}" --data-binary "$body" \
+  response="$(curl --silent --show-error --request POST "${hdr[@]}" --data-binary "@${body_file}" \
     "${BASE}/${PARENT}/agents?agentId=${AGENT_ID}")"
 fi
 python3 -c "import sys,json;d=json.loads(sys.argv[1]);print('error:',json.dumps(d['error'])) if 'error' in d else print('registered:',d['name'])" "$response"
