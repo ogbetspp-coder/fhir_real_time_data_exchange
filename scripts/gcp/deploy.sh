@@ -476,17 +476,29 @@ phase_plan() {
   tf_deploy_vars "${DEPLOY_SERVICE_ACCOUNT:?DEPLOY_SERVICE_ACCOUNT names the account the deploy runs as}" \
     "${images% *}" "${images#* }" "$query_image" "$live_version"
 
-  local code=0
+  local code=0 plan_file plan_json="-"
+  plan_file="$(mktemp)"
   terraform -chdir=infra plan -input=false -lock=false -no-color -detailed-exitcode \
-    "${TF_DEPLOY_VARS[@]}" >"$out" 2>&1 || code=$?
-  local verdict=0
-  python3 scripts/ci/plan-summary.py "$out" "$summary" "$code" || verdict=$?
-  [[ "$code" == "1" ]] && return 1
-  if [[ "$verdict" == "4" && "${ALLOW_REPLACE:-false}" != "true" ]]; then
-    echo "::error::The plan destroys or replaces resources. Label the pull request allow-replace once reviewed." >&2
-    return 3
+    -out="$plan_file" "${TF_DEPLOY_VARS[@]}" >"$out" 2>&1 || code=$?
+  if [[ "$code" != "1" ]]; then
+    plan_json="${out%.*}.json"
+    terraform -chdir=infra show -json "$plan_file" >"$plan_json"
   fi
-  return 0
+  rm -f "$plan_file"
+  # The verdict fails closed: only 0 (no destroy) and 4 (destroy) are verdicts; anything else,
+  # including a crash of the summariser, fails the check.
+  local verdict=0
+  python3 scripts/ci/plan-summary.py "$plan_json" "$out" "$summary" "$code" || verdict=$?
+  [[ "$plan_json" != "-" ]] && rm -f "$plan_json"
+  case "$verdict" in
+    0) return 0 ;;
+    4)
+      if [[ "${ALLOW_REPLACE:-false}" == "true" ]]; then return 0; fi
+      echo "::error::The plan destroys or replaces resources. Label the pull request allow-replace once reviewed." >&2
+      return 3
+      ;;
+    *) return 1 ;;
+  esac
 }
 
 phase_bootstrap() {

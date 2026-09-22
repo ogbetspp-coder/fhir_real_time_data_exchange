@@ -84,6 +84,14 @@ PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(project
 want_perms="$(printf '%s\n' "${PERMISSIONS[@]}" | sort | paste -sd, -)"
 have_perms="$(gcloud iam roles describe "$ROLE_ID" --project="$PROJECT_ID" \
   --format='value(includedPermissions)' 2>/dev/null | tr ';' '\n' | tr ',' '\n' | sed '/^$/d' | sort | paste -sd, - || true)"
+role_deleted="$(gcloud iam roles describe "$ROLE_ID" --project="$PROJECT_ID" --format='value(deleted)' 2>/dev/null || true)"
+if [[ "$role_deleted" == "True" ]]; then
+  note "role ${ROLE_ID}: soft-deleted"
+  if apply; then
+    gcloud iam roles undelete "$ROLE_ID" --project="$PROJECT_ID" --quiet >/dev/null
+    echo "role ${ROLE_ID}: undeleted"
+  fi
+fi
 if [[ "$have_perms" != "$want_perms" ]]; then
   note "role ${ROLE_ID}: permissions differ"
   if apply; then
@@ -107,11 +115,15 @@ if ! gcloud iam service-accounts describe "$SA" --project="$PROJECT_ID" >/dev/nu
     gcloud iam service-accounts create "$SA_ID" --project="$PROJECT_ID" --quiet \
       --display-name="EMA Flow planner (${ENVIRONMENT})" \
       --description="Plans pull requests against live state. Read-only; see scripts/gcp/plan-identity.sh." >/dev/null
+    for _ in $(seq 1 30); do # a new account is not grantable until it propagates
+      gcloud iam service-accounts describe "$SA" --project="$PROJECT_ID" >/dev/null 2>&1 && break
+      sleep 2
+    done
     echo "service account ${SA}: created"
   fi
 fi
 project_roles="$(gcloud projects get-iam-policy "$PROJECT_ID" --flatten=bindings \
-  --filter="bindings.members:serviceAccount:${SA}" --format='value(bindings.role)' 2>/dev/null | sort | paste -sd, -)"
+  --filter="bindings.members:serviceAccount:${SA}" --format='value(bindings.role)' 2>/dev/null | sort -u | paste -sd, -)"
 if [[ "$project_roles" != "projects/${PROJECT_ID}/roles/${ROLE_ID}" ]]; then
   note "project roles of ${SA}: '${project_roles}'"
   if apply; then
@@ -120,7 +132,9 @@ if [[ "$project_roles" != "projects/${PROJECT_ID}/roles/${ROLE_ID}" ]]; then
     echo "project role granted"
   fi
 fi
-state_roles="$(gcloud storage buckets get-iam-policy "gs://${STATE_BUCKET}" --format=json |
+state_policy="$(gcloud storage buckets get-iam-policy "gs://${STATE_BUCKET}" --format=json)" ||
+  { echo "Cannot read the state bucket's IAM policy." >&2; exit 1; }
+state_roles="$(printf '%s' "$state_policy" |
   python3 -c "import sys,json;print(','.join(sorted(b['role'] for b in json.load(sys.stdin).get('bindings',[]) if 'serviceAccount:${SA}' in b['members'])))")"
 if [[ "$state_roles" != "roles/storage.objectViewer" ]]; then
   note "state bucket roles of ${SA}: '${state_roles}'"
@@ -140,8 +154,27 @@ if ! gcloud iam workload-identity-pools describe "$POOL" --location=global --pro
     echo "pool ${POOL}: created"
   fi
 fi
-current="$(gcloud iam workload-identity-pools providers describe "$PROVIDER" --workload-identity-pool="$POOL" \
-  --location=global --project="$PROJECT_ID" --format='value(attributeCondition)' 2>/dev/null || true)"
+MAPPING="attribute.repository=assertion.repository,google.subject=assertion.sub"
+provider_json="$(gcloud iam workload-identity-pools providers describe "$PROVIDER" --workload-identity-pool="$POOL" \
+  --location=global --project="$PROJECT_ID" --format=json 2>/dev/null || true)"
+[[ -n "$provider_json" ]] || provider_json='{}'
+current="$(printf '%s' "$provider_json" | python3 -c "import sys,json;print(json.load(sys.stdin).get('attributeCondition',''))")"
+provider_rest="$(printf '%s' "$provider_json" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+m=','.join(f'{k}={v}' for k,v in sorted((d.get('attributeMapping') or {}).items()))
+print(d.get('state',''),(d.get('oidc') or {}).get('issuerUri',''),m)")"
+if [[ -n "$current" && "$provider_rest" != "ACTIVE https://token.actions.githubusercontent.com ${MAPPING}" ]]; then
+  note "provider ${PROVIDER}: state, issuer or mapping is '${provider_rest}'"
+  if apply; then
+    [[ "$provider_rest" == DELETED* ]] && gcloud iam workload-identity-pools providers undelete "$PROVIDER" \
+      --workload-identity-pool="$POOL" --location=global --project="$PROJECT_ID" --quiet >/dev/null
+    gcloud iam workload-identity-pools providers update-oidc "$PROVIDER" --workload-identity-pool="$POOL" \
+      --location=global --project="$PROJECT_ID" --quiet --issuer-uri="https://token.actions.githubusercontent.com" \
+      --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" >/dev/null
+    echo "provider ${PROVIDER}: state, issuer and mapping set"
+  fi
+fi
 if [[ "$current" != "$CONDITION" ]]; then
   note "provider ${PROVIDER}: condition is '${current:-missing}'"
   if apply; then
@@ -158,7 +191,9 @@ fi
 
 # 4. Only identities from the plan pool, for this repository, may become the planner.
 member="principalSet://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${POOL}/attribute.repository/${REPOSITORY}"
-sa_members="$(gcloud iam service-accounts get-iam-policy "$SA" --project="$PROJECT_ID" --format=json 2>/dev/null |
+sa_policy="$(gcloud iam service-accounts get-iam-policy "$SA" --project="$PROJECT_ID" --format=json 2>/dev/null || true)"
+[[ -n "$sa_policy" ]] || sa_policy='{}'
+sa_members="$(printf '%s' "$sa_policy" |
   python3 -c "import sys,json;print(','.join(sorted(b['role']+' '+m for b in json.load(sys.stdin).get('bindings',[]) for m in b['members'])))" || true)"
 if [[ "$sa_members" != "roles/iam.workloadIdentityUser ${member}" ]]; then
   note "who may become ${SA}: '${sa_members}'"

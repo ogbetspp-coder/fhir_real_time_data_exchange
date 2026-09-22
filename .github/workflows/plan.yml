@@ -95,5 +95,4 @@ jobs:
         run: |
           [[ -f "$SUMMARY" ]] || { echo "No summary: the plan did not run."; exit 0; }
           cat "$SUMMARY" >>"$GITHUB_STEP_SUMMARY"
-          gh pr comment "$PR" --edit-last --body-file "$SUMMARY" 2>/dev/null ||
-            gh pr comment "$PR" --body-file "$SUMMARY"
+          gh pr comment "$PR" --edit-last --create-if-none --body-file "$SUMMARY"

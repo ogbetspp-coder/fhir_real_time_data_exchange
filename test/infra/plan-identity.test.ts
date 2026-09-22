@@ -79,14 +79,19 @@ describe("the plan workflow", () => {
       "ALLOW_REPLACE: ${{ contains(github.event.pull_request.labels.*.name, 'allow-replace') }}",
     );
     const deploy = readFileSync("scripts/gcp/deploy.sh", "utf8");
-    expect(deploy).toMatch(/verdict" == "4" && "\$\{ALLOW_REPLACE:-false\}" != "true"/);
+    // The verdict fails closed: only 0 and 4 are verdicts, anything else fails the check.
+    expect(deploy).toMatch(
+      /if \[\[ "\$\{ALLOW_REPLACE:-false\}" == "true" \]\]; then return 0; fi/,
+    );
+    expect(deploy).toMatch(/case "\$verdict" in[\s\S]*?\*\) return 1 ;;/);
   });
 
   it("plans with exactly the inputs the deploy applies with", () => {
     const deploy = readFileSync("scripts/gcp/deploy.sh", "utf8");
     const applyUses =
       /terraform -chdir=infra apply \\\n\s+-input=false \\\n\s+-auto-approve \\\n\s+"\$\{TF_DEPLOY_VARS\[@\]\}"/;
-    const planUses = /terraform -chdir=infra plan [^\n]*\\\n\s+"\$\{TF_DEPLOY_VARS\[@\]\}"/;
+    const planUses =
+      /terraform -chdir=infra plan [^\n]*\\\n\s+-out="\$plan_file" "\$\{TF_DEPLOY_VARS\[@\]\}"/;
     expect(deploy).toMatch(applyUses);
     expect(deploy).toMatch(planUses);
   });

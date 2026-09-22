@@ -7,20 +7,50 @@ import { afterEach, describe, expect, it } from "vitest";
 
 // The pull-request plan's summary (docs/foundations.md, B4). The deploy applies unattended on
 // merge, so this summary is what a reviewer sees before an infrastructure change reaches the
-// record. These tests pin the three things it must do: name every resource that changes, fail
-// on any destroy or replace, and never copy an account or address into the pull request.
+// record. The verdict is read from `terraform show -json`, because the human-readable text has
+// several phrasings for a destroy and a missed one would pass it. These tests pin: every change
+// named, every form of destroy caught, a crash failing closed, and no account ever copied.
 
 const script = path.resolve("scripts/ci/plan-summary.py");
 const dirs: string[] = [];
 
-function summarise(plan: string, code: number): { status: number | null; summary: string } {
+type Change = { address: string; actions: string[]; deposed?: string };
+
+function summarise(
+  changes: Change[] | null,
+  text: string,
+  code: number,
+): { status: number | null; summary: string } {
   const dir = mkdtempSync(path.join(tmpdir(), "plan-summary-"));
   dirs.push(dir);
-  const input = path.join(dir, "plan.txt");
+  const planText = path.join(dir, "plan.txt");
+  const planJson = path.join(dir, "plan.json");
   const output = path.join(dir, "summary.md");
-  writeFileSync(input, plan);
-  const run = spawnSync("python3", [script, input, output, String(code)], { encoding: "utf8" });
-  return { status: run.status, summary: readFileSync(output, "utf8") };
+  writeFileSync(planText, text);
+  if (changes !== null) {
+    writeFileSync(
+      planJson,
+      JSON.stringify({
+        resource_changes: changes.map(({ address, actions, deposed }) => ({
+          address,
+          ...(deposed === undefined ? {} : { deposed }),
+          change: { actions },
+        })),
+      }),
+    );
+  }
+  const run = spawnSync(
+    "python3",
+    [script, changes === null ? "-" : planJson, planText, output, String(code)],
+    { encoding: "utf8" },
+  );
+  let summary = "";
+  try {
+    summary = readFileSync(output, "utf8");
+  } catch {
+    summary = "";
+  }
+  return { status: run.status, summary };
 }
 
 afterEach(() => {
@@ -28,66 +58,110 @@ afterEach(() => {
 });
 
 describe("the pull-request plan summary", () => {
-  it("names each changed resource and passes an in-place change", () => {
+  it("names each changed resource, skips unchanged ones, and passes without a destroy", () => {
     const { status, summary } = summarise(
       [
-        "  # google_monitoring_dashboard.operations will be updated in-place",
-        '  # google_project_iam_audit_config.regulated_data_access["discoveryengine.googleapis.com"] will be created',
-        "Plan: 1 to add, 1 to change, 0 to destroy.",
-      ].join("\n"),
+        { address: "google_monitoring_dashboard.operations", actions: ["update"] },
+        {
+          address: 'google_project_iam_audit_config.x["discoveryengine.googleapis.com"]',
+          actions: ["create"],
+        },
+        { address: "google_storage_bucket.evidence", actions: ["no-op"] },
+        { address: "data.google_project.current", actions: ["read"] },
+      ],
+      "Plan: 1 to add, 1 to change, 0 to destroy.",
       2,
     );
     expect(status).toBe(0);
     expect(summary).toContain("**Plan: 1 to add, 1 to change, 0 to destroy.**");
+    expect(summary).toContain("`google_monitoring_dashboard.operations` — updated in place");
     expect(summary).toContain(
-      "- `google_monitoring_dashboard.operations will be updated in-place`",
+      '`google_project_iam_audit_config.x["discoveryengine.googleapis.com"]` — created',
     );
-    expect(summary).toContain(
-      '- `google_project_iam_audit_config.regulated_data_access["discoveryengine.googleapis.com"] will be created`',
-    );
+    expect(summary).not.toContain("google_storage_bucket.evidence");
+    expect(summary).not.toContain("data.google_project");
   });
 
-  it("fails on a replace, and says so", () => {
+  it.each([
+    ["a destroy", { address: "google_bigquery_dataset.ledger", actions: ["delete"] }],
+    ["a replace", { address: "google_storage_bucket_iam_member.w", actions: ["delete", "create"] }],
+    [
+      "a create-before-destroy replace",
+      { address: "google_storage_bucket_iam_member.w", actions: ["create", "delete"] },
+    ],
+    [
+      "a deposed object",
+      { address: "google_storage_bucket.b", actions: ["delete"], deposed: "abc123" },
+    ],
+  ])("fails on %s", (_name, change) => {
     const { status, summary } = summarise(
-      [
-        "  # google_storage_bucket_iam_member.worker_evidence_writer must be replaced",
-        "Plan: 1 to add, 0 to change, 1 to destroy.",
-      ].join("\n"),
+      [change],
+      "Plan: 0 to add, 0 to change, 1 to destroy.",
       2,
     );
     expect(status).toBe(4);
     expect(summary).toContain("**1 destroy or replace.**");
   });
 
-  it("fails on a destroy", () => {
-    const { status } = summarise(
-      "  # google_bigquery_dataset.ledger will be destroyed\nPlan: 0 to add, 0 to change, 1 to destroy.",
-      2,
-    );
-    expect(status).toBe(4);
-  });
-
-  it("never copies an account into the pull request", () => {
-    const { summary } = summarise(
-      '  # google_cloud_run_v2_service_iam_member.query_invoker["user:someone@example.com"] will be created\nPlan: 1 to add, 0 to change, 0 to destroy.',
-      2,
-    );
-    expect(summary).not.toContain("someone@example.com");
-    expect(summary).toMatch(/query_invoker\["sha256:[0-9a-f]{12}"\]/);
-  });
-
-  it("reports a failed plan with its errors", () => {
+  it("lists a resource removed from Terraform but left in place, without failing", () => {
     const { status, summary } = summarise(
-      "│ Error: Error when reading or editing Project Service: googleapi: Error 403: Permission denied",
-      1,
+      [{ address: "google_healthcare_dataset.epi", actions: ["forget"] }],
+      "Plan: 0 to add, 0 to change, 0 to destroy, 1 to forget.",
+      2,
     );
     expect(status).toBe(0);
+    expect(summary).toContain("removed from Terraform, left in place");
+  });
+
+  it("never copies an account or address into the pull request", () => {
+    const { summary } = summarise(
+      [
+        { address: 'google_x.a["user:someone@example.com"]', actions: ["create"] },
+        { address: 'google_x.b["domain:example.com"]', actions: ["create"] },
+        { address: 'google_x.c["group:admins"]', actions: ["create"] },
+      ],
+      "Plan: 3 to add, 0 to change, 0 to destroy.",
+      2,
+    );
+    expect(summary).not.toMatch(/someone|example\.com|admins/);
+    expect(summary.match(/sha256:[0-9a-f]{12}/g)).toHaveLength(3);
+  });
+
+  it("fails a failed plan, with its errors redacted", () => {
+    const { status, summary } = summarise(
+      null,
+      "│ Error: googleapi: Error 403: Permission denied for user:someone@example.com",
+      1,
+    );
+    expect(status).toBe(1);
     expect(summary).toContain("**The plan failed.**");
     expect(summary).toContain("Error 403");
+    expect(summary).not.toContain("someone@example.com");
+  });
+
+  it("fails closed when the plan cannot be read", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "plan-summary-"));
+    dirs.push(dir);
+    writeFileSync(path.join(dir, "plan.txt"), "Plan: 0 to add, 0 to change, 0 to destroy.");
+    writeFileSync(path.join(dir, "plan.json"), "{ not json");
+    const run = spawnSync(
+      "python3",
+      [
+        script,
+        path.join(dir, "plan.json"),
+        path.join(dir, "plan.txt"),
+        path.join(dir, "s.md"),
+        "2",
+      ],
+      { encoding: "utf8" },
+    );
+    expect(run.status).not.toBe(0);
+    expect(run.status).not.toBe(4);
   });
 
   it("reports no changes", () => {
     const { status, summary } = summarise(
+      [],
       "No changes. Your infrastructure matches the configuration.",
       0,
     );

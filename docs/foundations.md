@@ -171,6 +171,17 @@ provider there would have admitted pull requests to the deployer. The planner's 
 derived from a trace of every API call a live plan makes — all reads — and holds no permission
 that returns a stored record (`test/infra/plan-identity.test.ts`).
 
+Reviewed adversarially before enabling. No path from a pull request to the deployer or to any
+write was found. Two defects were fixed: the verdict failed open if the summariser crashed, and
+matching the plan's text missed some phrasings of a destroy (a tainted resource, a deposed
+object). The verdict now comes from `terraform show -json` and fails closed. Two limits are
+accepted and stated. A branch pull request can rewrite the plan workflow and use the planner's
+token, so everything the planner can read (IAM policy, service configuration including the
+entitlement map, the state's history) is readable by anyone who can push a branch: today that
+is the owner alone, and the planner reads no record. And while one person both writes and
+approves, the `allow-replace` label is a deliberate acknowledgement, not a second pair of eyes;
+it becomes a control when a second reviewer is required through `CODEOWNERS`.
+
 ### C. Hardening — cheap, and overdue
 
 **C1. Artifact Registry vulnerability scanning is disabled.** An image with a known critical
