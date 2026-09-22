@@ -73,21 +73,26 @@ for b in json.load(sys.stdin).get('bindings',[]):
   fi
 done
 
-# Datasets: the projectReaders and projectWriters special groups go; projectOwners stays.
+# Datasets: the projectReaders and projectWriters special groups go; projectOwners stays. Through
+# the REST API rather than the bq tool: on a fresh CI runner bq printed something other than JSON
+# before its output (deploy of 2026-09-22), and the API's answer is always JSON. The PATCH carries
+# If-Match with the etag read, so it applies only to the access list this script saw.
+token="$(gcloud --quiet auth print-access-token)"
 for dataset in "${DATASETS[@]}"; do
+  url="https://bigquery.googleapis.com/bigquery/v2/projects/${PROJECT_ID}/datasets/${dataset}"
   current="$(mktemp)"
-  err="$(mktemp)"
-  if ! bq --headless --quiet --format=json show "${PROJECT_ID}:${dataset}" >"$current" 2>"$err"; then
-    if grep -qiE "not found|404" "$err" "$current"; then
-      echo "${dataset}: does not exist; skipped"
-      rm -f "$current" "$err"
-      continue
-    fi
-    echo "${dataset}: cannot read it: $(head -c 300 "$err")" >&2
-    rm -f "$current" "$err"
+  status="$(curl --silent --show-error --output "$current" --write-out '%{http_code}' \
+    --header "Authorization: Bearer ${token}" "$url")"
+  if [[ "$status" == "404" ]]; then
+    echo "${dataset}: does not exist; skipped"
+    rm -f "$current"
+    continue
+  fi
+  if [[ "$status" != "200" ]]; then
+    echo "${dataset}: cannot read it: HTTP ${status}" >&2
+    rm -f "$current"
     exit 1
   fi
-  rm -f "$err"
   wanted="$(mktemp)"
   removed="$(python3 - "$current" "$wanted" <<'PY'
 import json, sys
@@ -102,9 +107,17 @@ PY
     drift=1
     echo "${dataset}: ${removed} project reader/writer entr(ies)"
     if [[ "$CHECK" == "false" ]]; then
-      # --etag: the update applies only to the access list read above; an entry added since is
-      # not silently dropped, the update is refused and the next deploy tries again.
-      bq --headless --quiet update --etag "$etag" --source "$wanted" "${PROJECT_ID}:${dataset}" >/dev/null
+      # A 412 means the access list changed since it was read: nothing is applied, and the next
+      # deploy tries again from the new list.
+      status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+        --request PATCH --header "Authorization: Bearer ${token}" \
+        --header "Content-Type: application/json" --header "If-Match: ${etag}" \
+        --data-binary "@${wanted}" "$url")"
+      if [[ "$status" != "200" ]]; then
+        echo "${dataset}: update refused: HTTP ${status}" >&2
+        rm -f "$current" "$wanted"
+        exit 1
+      fi
       echo "${dataset}: removed"
     fi
   fi

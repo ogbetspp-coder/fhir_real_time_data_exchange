@@ -32,7 +32,8 @@ describe("the record's readers", () => {
   });
 
   it("replace a dataset's access list only if it is unchanged since read", () => {
-    expect(script).toContain('update --etag "$etag" --source "$wanted"');
+    expect(script).toContain('--header "If-Match: ${etag}"');
+    expect(script).toContain("--request PATCH");
   });
 
   it("are enforced by every deploy, right after the apply", () => {
