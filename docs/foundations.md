@@ -161,6 +161,12 @@ vulnerability would deploy without anyone being told. Turn scanning on. Binary A
 is already wired as the `enforce_binary_authorization` variable, off; turn it on once scanning
 results exist to attest to.
 
+_Status 2026-09-22: open, owner's decision on cost._ Artifact Analysis charges per newly pushed
+image, and every deploy pushes three: at the 41 deploys of 2026-09-21–22 that is about 15 USD a
+day, most of the 200 USD monthly budget. The alternatives: scan in CI with a free open-source
+scanner (cloud-agnostic, gates the merge, no attestations for Binary Authorization), or turn
+registry scanning on in production only, where deploys are rare.
+
 **C2. Fifty-four APIs are enabled; Terraform declares twenty, and not all of those are used.**
 Enabled with no declaration anywhere: GKE, GKE Backup, Filestore, Cloud SQL, Dataform, Cloud DNS,
 Compute, OS Login, Network Connectivity, Datastore, Analytics Hub, BigQuery Migration and
@@ -196,6 +202,9 @@ bucket-level grant for the owner; old state generations expire (`scripts/gcp/sto
 Discovery Engine, and the regulated sink does not include it. The query service's own audit
 records do capture every tool call, so the evidence exists — but the connector's side of each
 call does not. Add Discovery Engine, and Vertex AI once the agent deploys, to both.
+
+_Status 2026-09-22: closed._ Discovery Engine has Data Access logs on and is in the regulated
+sink's filter (`test/infra/audit-trail.test.ts`). Vertex AI joins when the agent deploys.
 
 **C7. No essential contacts and no visible budget.** Google's security and billing
 notifications have no named recipient (the Essential Contacts API is not enabled), and budgets
@@ -243,9 +252,15 @@ failure and nothing closed them: 27 were open on 2026-09-21, the oldest from the
 for a failure long since fixed — noise that would bury a real one. Closed by hand, each with the
 reason; the workflow should close its own once a later deploy succeeds.
 
+_Status 2026-09-22: closed._ A successful deploy closes every open `deploy-failure` issue the
+workflow opened, each with a link to the run that superseded it.
+
 **C12. The worker's evidence-bucket role is object admin.** It creates objects; `objectCreator`
 would do. The bucket's seven-year retention policy already stops it deleting or overwriting
 evidence, so this is least privilege rather than a live exposure.
+
+_Status 2026-09-22: closed._ `objectCreator`, granted before the old binding is removed; the
+worker's only storage call on evidence is a single simple upload per artefact.
 
 **C13. Project viewers can read the evidence and the approved submissions.** Every bucket still
 carries Cloud Storage's legacy convenience bindings: `projectViewer` has read, `projectEditor` and

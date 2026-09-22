@@ -14,6 +14,10 @@ resource "google_project_iam_audit_config" "regulated_data_access" {
     "storage.googleapis.com",
     "bigquery.googleapis.com",
     "cloudkms.googleapis.com",
+    # The Gemini Enterprise connector's side of every tool call (foundations C6). The query
+    # service's own audit record captures the call; this captures who asked Gemini, and what
+    # Gemini sent to the connector.
+    "discoveryengine.googleapis.com",
   ])
 
   project = var.project_id
@@ -253,7 +257,7 @@ resource "google_logging_project_sink" "regulated_audit" {
   unique_writer_identity = true
   filter                 = <<-EOT
     resource.type=("cloud_run_revision" OR "workflows.googleapis.com/Workflow" OR "healthcare_fhir_store")
-    OR protoPayload.serviceName=("healthcare.googleapis.com" OR "run.googleapis.com" OR "workflows.googleapis.com" OR "storage.googleapis.com" OR "bigquery.googleapis.com" OR "cloudkms.googleapis.com")
+    OR protoPayload.serviceName=("healthcare.googleapis.com" OR "run.googleapis.com" OR "workflows.googleapis.com" OR "storage.googleapis.com" OR "bigquery.googleapis.com" OR "cloudkms.googleapis.com" OR "discoveryengine.googleapis.com")
   EOT
 }
 
@@ -264,10 +268,19 @@ resource "google_logging_project_sink" "regulated_audit" {
 # Terraform" pattern already used for the R5 FHIR stores (see
 # scripts/gcp/reconcile-fhir-stores.sh).
 
+# Create only (foundations C12). The worker writes each artefact once, with a simple upload, and
+# never reads, lists, overwrites or deletes evidence; the retention policy would refuse the last
+# two anyway.
 resource "google_storage_bucket_iam_member" "worker_evidence_writer" {
   bucket = google_storage_bucket.evidence.name
-  role   = "roles/storage.objectAdmin"
+  role   = "roles/storage.objectCreator"
   member = "serviceAccount:${google_service_account.worker.email}"
+
+  # A role change replaces the binding; the new one is granted before the old is removed, so the
+  # worker is never without evidence write access mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # Read-only, and only this bucket: the worker consumes submissions, it never produces or
