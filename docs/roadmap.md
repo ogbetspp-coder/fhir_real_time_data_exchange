@@ -252,6 +252,9 @@ that skips one is not a production deploy.
   is a new app, a new connector, and a new internal OAuth client — not a setting. The Agent
   Engine region follows the app (an EU app takes `europe-*`).
 - **Lock the retained audit log bucket** (below).
+- **Lock the evidence bucket's retention policy.** It is set but unlocked, so an owner or the
+  deployer (storage.admin) could remove it and then delete evidence. Locking is irreversible,
+  like the audit log's, and is the same decision.
 - **Narrow run sources to `["document"]`** (`enabled_run_sources`, under Standing items).
 - ~~**The worker's Healthcare role scoped to the dataset**~~ done 2026-09-21 with the CMEK
   rollout: the worker holds `fhirResourceEditor` on the record dataset only.

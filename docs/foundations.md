@@ -310,6 +310,17 @@ the project owner's own storage access comes from them (removing them from the s
 the owner out of its permissions on 2026-09-21), so each bucket needs its explicit grants in place
 first. Decide who reads the record, grant that explicitly, then remove the bindings.
 
+_Status 2026-09-22: closed; enforced by every deploy._ The owner's decision: the record is read by
+the services Terraform names and by the project's owners, nobody else. `scripts/gcp/record-readers.sh`
+removes the project viewer and editor paths on every bucket (the four Terraform owns and the
+agent's staging bucket) and the project reader and writer groups on both BigQuery datasets, and
+keeps the owners' paths, whose removal locked the owner out of the state bucket before. It runs
+in every deploy right after the apply, so a bucket or dataset created later is brought into line
+on its first deploy. Reviewed before it ran: a failed read now fails the deploy instead of being
+skipped, and a dataset's access list is replaced only if unchanged since it was read (`--etag`).
+Cloud Healthcare has no per-dataset equivalent: project Viewer or Editor reads every FHIR store,
+so the script reports how many principals hold either. Today none do.
+
 ### D. The repository
 
 **D1. No licence.** The repository has no `LICENSE`. For a product whose value is a small,
