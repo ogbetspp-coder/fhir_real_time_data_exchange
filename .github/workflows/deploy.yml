@@ -145,6 +145,12 @@ jobs:
           ALERT_NOTIFICATION_EMAIL: ${{ vars.ALERT_NOTIFICATION_EMAIL }}
         run: bash scripts/gcp/deploy.sh apply 2>&1 | tee -a deploy-run.log
 
+      # Who may read the record (foundations C13): project viewers and editors lose the access
+      # Cloud Storage and BigQuery give them by default, on every bucket and dataset this deploy
+      # manages, including any created by the apply above.
+      - name: Record readers
+        run: bash scripts/gcp/deploy.sh record-readers 2>&1 | tee -a deploy-run.log
+
       - name: Reconcile FHIR stores
         run: bash scripts/gcp/deploy.sh bootstrap 2>&1 | tee -a deploy-run.log
 

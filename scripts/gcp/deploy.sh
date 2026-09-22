@@ -659,6 +659,7 @@ case "$PHASE" in
   images) phase_images ;;
   apply) phase_apply ;;
   plan) phase_plan ;;
+  record-readers) bash scripts/gcp/record-readers.sh ;;
   bootstrap) phase_bootstrap ;;
   smoke) phase_smoke ;;
   all)
@@ -668,6 +669,7 @@ case "$PHASE" in
     phase_apis
     phase_images
     phase_apply
+    bash scripts/gcp/record-readers.sh
     phase_bootstrap
     phase_smoke
     ;;
