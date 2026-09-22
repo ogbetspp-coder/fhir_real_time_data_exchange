@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import functools
+
 import pytest
 from google.adk.agents import LlmAgent
 from google.adk.tools.mcp_tool import McpToolset
@@ -34,7 +36,12 @@ def test_the_toolset_is_filtered_to_the_four_tools_and_signs_as_the_user() -> No
     tool_filter = toolset.tool_filter
     assert isinstance(tool_filter, list)
     assert sorted(tool_filter) == sorted(QUERY_TOOL_NAMES)
-    assert toolset._header_provider is bearer_header_provider
+    # The provider is bound to the service's own audience so it can also satisfy Cloud Run's edge
+    # check; what the service itself sees is still the user's token.
+    provider = toolset._header_provider
+    assert isinstance(provider, functools.partial)
+    assert provider.func is bearer_header_provider
+    assert provider.keywords == {"audience": "https://example.invalid"}
 
 
 def test_the_turn_id_is_generated_before_the_agent_runs() -> None:
