@@ -47,6 +47,8 @@ jobs:
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
       GCP_REGION: ${{ vars.GCP_REGION }}
       EMA_FLOW_ENVIRONMENT: dev
+      # dev only: the query service logs the category of an authentication refusal
+      QUERY_LOG_REJECTION_REASON: "true"
       CLOUDSDK_CORE_DISABLE_PROMPTS: "1"
       TF_IN_AUTOMATION: "true"
       TF_INPUT: "0"

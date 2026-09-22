@@ -24,6 +24,13 @@ export const QueryConfigSchema = z.object({
   // Comma-separated OAuth 2.0 client ids whose access tokens are accepted on `Authorization`
   // (the Gemini Enterprise path: the end user's Google access token). Absent or empty: access
   // tokens are rejected and only ID tokens for QUERY_AUDIENCE authenticate.
+  // Log the category of an authentication refusal (never the token, never the reason to the
+  // caller). Off unless set: in production a refusal reason in a log is a hint about a
+  // credential. On in dev, where a credential refused for an unknown reason is undiagnosable.
+  QUERY_LOG_REJECTION_REASON: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
   QUERY_OAUTH_CLIENT_IDS: z
     .string()
     .max(8_192)

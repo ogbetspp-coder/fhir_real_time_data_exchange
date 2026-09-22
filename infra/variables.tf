@@ -274,3 +274,9 @@ variable "lock_regulated_audit_log_bucket" {
   type        = bool
   default     = false
 }
+
+variable "query_log_rejection_reason" {
+  description = "Log why the query service refused a credential, as a category. Dev only; never returned to the caller."
+  type        = bool
+  default     = false
+}
