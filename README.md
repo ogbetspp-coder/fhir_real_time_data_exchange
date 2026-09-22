@@ -12,6 +12,8 @@ It deliberately has no bespoke operations dashboard. Cloud Workflows, Cloud Logg
 Cloud Monitoring, Cloud Trace, Cloud Audit Logs, Dataplex Data Lineage, and BigQuery Studio
 are the operator interface.
 
+**North star:** `docs/vision.md`. **Plan of record:** `docs/roadmap.md`, `docs/foundations.md`.
+
 ## What the demonstration proves
 
 - Complete Type 2 graph preflight, including structured product, authorization, package,

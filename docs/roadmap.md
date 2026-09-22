@@ -1,5 +1,7 @@
 # Technical roadmap
 
+_The north star this roadmap serves is `docs/vision.md`. Every item below is judged against it._
+
 This is the engineering plan for the hub, in the order the pieces should be built. It names
 the Google Cloud component intended for each item, because the standing decision is to use
 fit-for-purpose managed services rather than build what Google already operates.
