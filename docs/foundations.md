@@ -68,7 +68,12 @@ encryption is fixed when it is created, so in `dev` this means recreating the da
 re-seeding — which the project has done twice already and has a script for. _Before features:_
 decide it; if yes, do it in `dev` now so production is built the proven way.
 
-_Status 2026-09-21: planned and reviewed; step 0 in progress._ The rollout is
+_Status 2026-09-22: closed._ All seven steps of the rollout are done and proven live: the FHIR
+dataset, both BigQuery datasets (12 of 12 tables, fingerprints identical before and after), the
+audit log, the image registry and every bucket in the project are on keys in
+`ema-flow-dev-record`; the keys carry `prevent_destroy`, a 120-day destruction wait, an alert on
+any version disabled or grant changed, and a deny policy that refuses key destruction and update
+to every identity. The old dataset and the US build bucket are gone. The rollout is
 `docs/design/cmek-rollout.md`. Its first draft was reviewed adversarially before anything ran,
 and four findings would each have destroyed data — an ordinary deploy deleting the ledger after
 an in-place key change, rows lost from BigQuery's streaming buffer, a renamed dataset destroying
@@ -80,6 +85,10 @@ nothing that holds a record can now be destroyed by an apply.
 best-in-class answer is an HSM-protected key. Manifests already signed stay verifiable against
 the existing key version; new signing moves to a new HSM key. _Production gate_, and cheap
 enough to do in `dev` at the same time as A3.
+
+_Status 2026-09-21: closed._ `manifest-signing-hsm` (HSM, same algorithm) signs every run since
+step 2; a signature was verified with openssl against the key's public key and a tampered hash
+was rejected. The software key stays enabled so earlier manifests stay verifiable.
 
 ### B. The deploy path — who can change production
 
@@ -146,9 +155,16 @@ request through the required checks.
 project level) while the query service's reader is dataset-scoped. Already on the roadmap's
 production gate; do it with A3, since the dataset is being recreated anyway.
 
+_Status 2026-09-21: closed._ The worker holds `fhirResourceEditor` on the record dataset only;
+the project-level grant and the Document AI grant are gone (`test/infra/worker-identity.test.ts`).
+
 **C5. The Terraform state bucket is readable by every project viewer and writable by every
 editor**, through legacy project roles. State holds the entitlement map and every resource's
 configuration. Restrict it to the deployer and the owner; CMEK it with A3.
+
+_Status 2026-09-22: closed._ The state bucket is on the `platform-storage` key with every object
+rewritten, its legacy project bindings are removed, and access is the deployer plus an explicit
+bucket-level grant for the owner; old state generations expire (`scripts/gcp/storage-keys.sh`).
 
 **C6. The Gemini Enterprise connector is outside the audit trail.** Data Access logs are off for
 Discovery Engine, and the regulated sink does not include it. The query service's own audit
