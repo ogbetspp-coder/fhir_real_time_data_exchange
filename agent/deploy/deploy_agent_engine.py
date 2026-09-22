@@ -1,6 +1,6 @@
-"""Create or update this agent on Vertex AI Agent Engine. Documented, scripted, not executed.
+"""Create or update this agent on Vertex AI Agent Engine (Agent Runtime).
 
-Nothing here has been run against a real project. It refuses to run without an explicit
+First run against a real project 2026-09-22. It refuses to run without an explicit
 environment — no project inferred from Application Default Credentials, no region defaulted, no
 bucket guessed — because an agent deployed into the wrong project is a data-residency incident,
 not a typo.
@@ -18,14 +18,12 @@ from __future__ import annotations
 
 import argparse
 import os
+import subprocess
 import sys
-import tomllib
 from pathlib import Path
 from typing import Any
 
 AGENT_ROOT = Path(__file__).resolve().parents[1]
-LOCKFILE = AGENT_ROOT / "uv.lock"
-PACKAGE_NAME = "verifiable-answer-agent"
 
 # Pinned in pyproject.toml; Agent Engine defaults to 3.10, which is four minors behind the lock.
 PYTHON_VERSION = "3.14"
@@ -43,40 +41,83 @@ REQUIRED_ENV = (
 
 RUNTIME_ENV = ("QUERY_SERVICE_MCP_URL", "AGENT_MODEL", "AGENT_SERVICE_VERSION")
 
+# The deploy-time SDK, and also a runtime requirement: the runtime loads the AdkApp wrapper this
+# script builds, and AdkApp is how Gemini Enterprise's calls arrive (its
+# ``streaming_agent_run_with_events`` puts each authorization's end-user token into session state
+# as ``temp:<authorization id>``, the key ``tools.USER_TOKEN_STATE_KEY`` reads). Kept out of
+# uv.lock because the agent's own code never imports it.
+AGENT_PLATFORM_SDK = "google-cloud-agentplatform[agent-engines,adk]==2.1.3"
+# The SDK checks that the runtime's requirements name cloudpickle, which serialises the AdkApp;
+# pinned at the version the SDK above resolves to.
+CLOUDPICKLE = "cloudpickle==3.1.2"
+# Still required at runtime after the 2.0 split: the AdkApp's set_up and Agent Engine's own serving
+# code import google.cloud.aiplatform, and the second deploy (2026-09-22) failed to start without
+# it. Same release as the SDK.
+AIPLATFORM = "google-cloud-aiplatform[agent-engines,adk]==2.1.3"
+# Google's build machines: Linux on x86_64, the runtime's Python.
+BUILD_PLATFORM = "x86_64-manylinux_2_28"
 
-def requirements_from_lock(lockfile: Path = LOCKFILE) -> list[str]:
-    """Every runtime dependency at the exact version ``uv.lock`` resolved, and no other.
 
-    The lock is the only place a version is decided in this project, so the deployed runtime is
-    reconstructed from it rather than from a hand-written list that can drift. Dev-only
-    packages are excluded by walking the dependency graph from this package's own
-    ``dependencies``, not by listing everything the lock mentions.
+def check_resolves(requirements: list[str]) -> None:
+    """Resolve the runtime's requirements for Google's build platform before uploading anything.
+
+    A conflict otherwise surfaces ten minutes later as "Build failed" in Agent Engine's build log.
+    Resolution only: nothing is downloaded beyond package metadata, nothing is installed.
     """
-    lock: dict[str, Any] = tomllib.loads(lockfile.read_text(encoding="utf-8"))
-    packages = {package["name"]: package for package in lock["package"]}
-    root = packages[PACKAGE_NAME]
-
-    wanted: set[str] = set()
-    frontier = [dependency["name"] for dependency in root.get("dependencies", [])] + [
-        dependency["name"]
-        for group in root.get("optional-dependencies", {}).values()
-        for dependency in group
-    ]
-    while frontier:
-        name = frontier.pop()
-        if name in wanted or name == PACKAGE_NAME:
-            continue
-        wanted.add(name)
-        package = packages.get(name)
-        if package is None:
-            continue
-        frontier.extend(dependency["name"] for dependency in package.get("dependencies", []))
-        frontier.extend(
-            dependency["name"]
-            for group in package.get("optional-dependencies", {}).values()
-            for dependency in group
+    uv = os.environ.get("UV") or str(AGENT_ROOT / ".uv-bootstrap" / "bin" / "uv")
+    result = subprocess.run(
+        [
+            uv,
+            "pip",
+            "compile",
+            "-",
+            "--python-version",
+            PYTHON_VERSION,
+            "--python-platform",
+            BUILD_PLATFORM,
+            "--no-header",
+            "--quiet",
+        ],
+        input="\n".join(requirements) + "\n",
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise SystemExit(
+            f"the runtime requirements do not resolve for {BUILD_PLATFORM} / Python "
+            f"{PYTHON_VERSION}:\n{result.stderr.strip()}"
         )
-    return sorted(f"{name}=={packages[name]['version']}" for name in wanted if name in packages)
+
+
+def requirements_from_lock() -> list[str]:
+    """Every runtime dependency at the exact version ``uv.lock`` resolved, with its platform marker.
+
+    Exported by uv itself (``uv export --frozen --no-dev``), the tool that wrote the lock, rather
+    than read from the lock by hand. The first real deploy (2026-09-22) failed on a hand reading
+    that dropped environment markers: ``pywin32`` is locked for ``sys_platform == 'win32'``
+    only, and without its marker the Linux build tried to install it and stopped.
+    """
+    uv = os.environ.get("UV") or str(AGENT_ROOT / ".uv-bootstrap" / "bin" / "uv")
+    exported = subprocess.run(
+        [
+            uv,
+            "export",
+            "--frozen",
+            "--no-dev",
+            "--no-emit-project",
+            "--no-hashes",
+            "--all-extras",
+            "--format",
+            "requirements-txt",
+        ],
+        cwd=AGENT_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    lines = [line.strip() for line in exported.splitlines()]
+    return sorted(line for line in lines if line and not line.startswith(("#", "-")))
 
 
 def read_environment() -> dict[str, str]:
@@ -95,7 +136,7 @@ def read_environment() -> dict[str, str]:
 
 
 def build_config(settings: dict[str, str], resource_name: str | None) -> dict[str, Any]:
-    """The ``config`` argument for ``client.agent_engines.create`` / ``.update``."""
+    """The ``config`` argument for ``client.runtimes.create`` / ``.update``."""
     config: dict[str, Any] = {
         "display_name": "Verifiable-answer agent",
         "description": (
@@ -103,13 +144,15 @@ def build_config(settings: dict[str, str], resource_name: str | None) -> dict[st
             "re-checks every quotation through verify_quote before showing it."
         ),
         "staging_bucket": settings["AGENT_ENGINE_STAGING_BUCKET"],
-        "requirements": requirements_from_lock(),
-        "extra_packages": [str(AGENT_ROOT / "src" / "verifiable_answer_agent")],
+        "requirements": [*requirements_from_lock(), AGENT_PLATFORM_SDK, AIPLATFORM, CLOUDPICKLE],
+        # Relative, and main() runs the upload from src/: the SDK archives each extra package by
+        # the path as given (``tar.add(path)``), so an absolute path would nest the code under the
+        # deploying machine's home directory and the runtime could not import it.
+        "extra_packages": ["verifiable_answer_agent"],
         "python_version": PYTHON_VERSION,
         "env_vars": {name: settings[name] for name in RUNTIME_ENV},
     }
-    if resource_name:
-        config["name"] = resource_name
+    del resource_name  # update takes the name as its own argument, not in the config
     return config
 
 
@@ -135,36 +178,41 @@ def main(argv: list[str]) -> int:
     print(f"location          {settings['AGENT_ENGINE_LOCATION']}")
     print(f"staging bucket    {settings['AGENT_ENGINE_STAGING_BUCKET']}")
     print(f"python            {PYTHON_VERSION}")
-    print(f"requirements      {len(config['requirements'])} pinned from uv.lock")
+    print(f"requirements      {len(config['requirements']) - 3} pinned from uv.lock, plus the SDKs")
+    check_resolves(config["requirements"])
+    print(f"resolves          yes, for {BUILD_PLATFORM} / Python {PYTHON_VERSION}")
     print(f"operation         {'update ' + arguments.update if arguments.update else 'create'}")
 
     if arguments.dry_run:
         print("\n--dry-run: nothing was sent.")
         return 0
 
-    # Imported here, not at module scope: the Vertex AI SDK is a deploy-time dependency and is
-    # deliberately absent from this project's runtime lock. See deploy/README.md.
+    # Imported here, not at module scope: the Agent Platform SDK is a deploy-time dependency and
+    # is deliberately absent from this project's runtime lock. See deploy/README.md. Since the
+    # 2.0 split (2026-08-28) it is the ``agentplatform`` module, not ``vertexai``, and Agent
+    # Engine's create/update live on ``client.runtimes``.
     try:
-        import vertexai
+        import agentplatform
+        from agentplatform.frameworks import AdkApp
     except ModuleNotFoundError:
         raise SystemExit(
-            "the Vertex AI SDK is not installed. It is a deploy-time dependency, kept out of "
-            "uv.lock on purpose:\n"
-            "  uv run --with 'google-cloud-agentplatform[agent-engines,adk]==2.1.3' "
+            "the Agent Platform SDK is not installed. It is a deploy-time dependency, kept out "
+            f"of uv.lock on purpose:\n  uv run --with '{AGENT_PLATFORM_SDK}' "
             "python deploy/deploy_agent_engine.py"
         ) from None
 
     from verifiable_answer_agent.agent import build_agent
     from verifiable_answer_agent.config import AgentConfig
 
-    agent = build_agent(AgentConfig.from_env())
-    client = vertexai.Client(
+    app = AdkApp(agent=build_agent(AgentConfig.from_env()))
+    os.chdir(AGENT_ROOT / "src")  # see extra_packages in build_config
+    client = agentplatform.Client(
         project=settings["AGENT_ENGINE_PROJECT"], location=settings["AGENT_ENGINE_LOCATION"]
     )
     if arguments.update:
-        engine = client.agent_engines.update(name=arguments.update, agent=agent, config=config)
+        engine = client.runtimes.update(name=arguments.update, agent=app, config=config)
     else:
-        engine = client.agent_engines.create(agent=agent, config=config)
+        engine = client.runtimes.create(agent=app, config=config)
     print(f"\nresource name     {engine.api_resource.name}")
     print("Register this resource name in the Agent Gallery — see deploy/README.md step 3.")
     return 0

@@ -86,7 +86,7 @@ enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
 # pulls the whole Google Cloud client stack, none of which the agent runs, and nothing in CI
 # executes deploy/. The import is lazy and guarded, so the module is declared missing rather
 # than installed to satisfy the type checker. Everything the agent actually runs is checked.
-module = ["vertexai.*"]
+module = ["agentplatform", "agentplatform.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
