@@ -253,7 +253,14 @@ that skips one is not a production deploy.
   Engine region follows the app (an EU app takes `europe-*`).
 - **Lock the retained audit log bucket** (below).
 - **Narrow run sources to `["document"]`** (`enabled_run_sources`, under Standing items).
-- **The worker's Healthcare role scoped to the dataset** (below).
+- ~~**The worker's Healthcare role scoped to the dataset**~~ done 2026-09-21 with the CMEK
+  rollout: the worker holds `fhirResourceEditor` on the record dataset only.
+- **Real addresses for alerts and security reports.** The alert channel and `SECURITY.md` carry
+  placeholders (`you@khsadvisory.com`, `security@khsadvisory.com`); production needs monitored ones.
+- **Deploy into `khs-ema-flow-prod`**, which exists empty in the `production` folder under the EU
+  and key policies. Before the first deploy there: buckets Google would create itself (Cloud
+  Build, Cloud Run source uploads) created with a key first, since the folder refuses unkeyed
+  buckets.
 - **Web grounding off** on the production assistant, as in `dev` since 2026-09-21.
 - **Only the connector's OAuth client** in `query_oauth_client_ids`, as in `dev` since 2026-09-21.
 

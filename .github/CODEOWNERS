@@ -1,0 +1,12 @@
+# Every change needs the owner's review. The paths below are listed separately so that, when a
+# second maintainer exists, the controls that protect the record keep a named owner.
+*                   @ogbetspp-coder
+
+# Who can change production, what the record is encrypted with, and what CI enforces.
+/infra/             @ogbetspp-coder
+/scripts/gcp/       @ogbetspp-coder
+/.github/           @ogbetspp-coder
+/contracts/         @ogbetspp-coder
+/fhir/              @ogbetspp-coder
+/LICENSE            @ogbetspp-coder
+/SECURITY.md        @ogbetspp-coder
