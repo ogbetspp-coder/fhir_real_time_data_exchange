@@ -63,8 +63,20 @@ if [[ "$from_clipboard" == "true" ]]; then
   command -v pbpaste >/dev/null || { echo "pbpaste is not available; use --secret-file." >&2; exit 1; }
   # Read once, trim surrounding whitespace, and never print it. Copy the secret from the console
   # with the copy button next to it, so nothing else comes with it.
-  CLIENT_SECRET="$(pbpaste | tr -d '\r\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
-  echo "secret read from the clipboard (${#CLIENT_SECRET} characters)"
+  # The console's copy button often takes surrounding page text with the value, so the secret is
+  # picked out of whatever was copied rather than assumed to be all of it: exactly one
+  # GOCSPX-... token must be present. Nothing read here is ever printed.
+  CLIENT_SECRET="$(pbpaste | python3 -c '
+import re, sys
+found = sorted(set(re.findall(r"GOCSPX-[A-Za-z0-9_-]{20,}", sys.stdin.read())))
+if len(found) == 1:
+    print(found[0])
+elif not found:
+    sys.exit("no GOCSPX- secret found in the clipboard")
+else:
+    sys.exit(f"{len(found)} different secrets found in the clipboard; copy only one")
+')" || { echo "Copy just the secret value with the console's copy button, then run this again." >&2; exit 1; }
+  echo "secret found in the clipboard (${#CLIENT_SECRET} characters)"
 fi
 
 if [[ "$from_clipboard" == "true" ]]; then
@@ -73,12 +85,15 @@ elif [[ -n "$secret_file" ]]; then
   [[ -f "$secret_file" ]] || { echo "No such file: ${secret_file}" >&2; exit 1; }
   # A Google OAuth client JSON download, or a file holding the secret alone.
   CLIENT_SECRET="$(SECRET_FILE="$secret_file" python3 -c '
-import json, os, sys
+import json, os, re, sys
 text = open(os.environ["SECRET_FILE"], encoding="utf-8").read().strip()
 try:
     data = json.loads(text)
 except ValueError:
-    print(text)
+    found = sorted(set(re.findall(r"GOCSPX-[A-Za-z0-9_-]{20,}", text)))
+    if len(found) != 1:
+        sys.exit("that file does not hold exactly one GOCSPX- secret")
+    print(found[0])
 else:
     section = data.get("web") or data.get("installed") or data
     secret = section.get("client_secret")
