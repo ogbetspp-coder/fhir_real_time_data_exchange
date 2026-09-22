@@ -46,6 +46,21 @@ what is missing is the landing zone: a folder for the product, `dev` and `prod` 
 it, and the organisation policies below applied at the folder. _Before features:_ create the
 folder and move `dev` into it. The `prod` project can be created empty.
 
+_Status 2026-09-22: scripted, awaiting the owner's run._ `scripts/gcp/landing-zone.sh` creates
+`EMA Flow` with `non-production` and `production` folders beneath it, moves `dev` into
+`non-production`, and creates `khs-ema-flow-prod` empty and without billing in `production`. The
+location and key policies go on the **production** folder, not the product folder: `dev` hosts the
+Gemini Enterprise trial, whose app and data store are `global`, and a location policy would refuse
+the next global resource it needs. EU residency of the assistant is already a production gate
+item, so the policy goes where production lives, and any future production project inherits it.
+Reviewed adversarially before any run: the first draft moved `dev` before creating production
+and setting its policies, so a taken project id would have left `dev` moved with production
+unguarded, and it reported a failed move as a success. Both fixed; the order is now folders,
+policies, prod project, and the `dev` move last, polled to its end. Consequences recorded for the
+first production deploy: with `storage` in the key policy, the buckets Google creates on its own
+(Cloud Build, Cloud Run source uploads) must be created with a key first; every BigQuery dataset
+needs a key; and a production Gemini Enterprise app must be in `eu`, not `global`.
+
 **A2. Data residency is not enforced, and something already lives outside the EU.**
 `constraints/gcp.resourceLocations` allows every location. The project's Cloud Build staging
 bucket, `sage-ship-509104-b8_cloudbuild`, is in `US`: every image build uploads the repository's
