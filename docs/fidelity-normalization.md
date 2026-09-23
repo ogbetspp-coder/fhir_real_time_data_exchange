@@ -97,20 +97,38 @@ pair rejects even if the next reference completes it.
    applied in the first pass.
 4. Replace a bullet glyph that starts a list item with U+0020 — closed list: U+2022, U+2023,
    U+25A0, U+25A1, U+25AA, U+25AB, U+25CB, U+25CF, U+25E6. A bullet glyph starts a list item
-   only at the start of a line — after the text start or U+000A, plus optional step 5
-   whitespace — and only when step 5 whitespace follows it; a bullet glyph replaced by this step
-   counts as whitespace for a bullet glyph after it (so `• • x` is `x`, and the procedure stays
-   idempotent). Anywhere else a bullet glyph is content: `2 • 10` in a line is not `2 10`.
-   U+2219 BULLET OPERATOR and U+2043 HYPHEN BULLET are not in the list, because one is a
-   multiplication sign and the other a dash: `2∙10` against a table row reading `2` and `10`
-   is a mismatch. (Positions are those of the text after step 3.)
+   only when all three hold: it is at the start of a line — after U+000A, plus optional step 5
+   whitespace; step 5 whitespace follows it; and its line (the text between the U+000A before
+   it and the next U+000A or the end) contains no U+0009. A bullet glyph replaced by this step
+   counts as whitespace for a bullet glyph after it (so U+000A `• • x` is `x`). Anywhere else a
+   bullet glyph is content: `2 • 10` in a line is not `2 10`. U+2219 BULLET OPERATOR and U+2043
+   HYPHEN BULLET are not in the list, because one is a multiplication sign and the other a
+   dash: `2∙10` against a table row reading `2` and `10` is a mismatch. (Positions are those of
+   the text after step 3.)
+
+   A line that contains U+0009 is a table row: the extractor writes a row as cells separated by
+   U+0009 (section 7), and the scanner writes a table cell, and everything inside one, on a line
+   of U+0009-separated text (section 5). A bullet glyph in a table cell is therefore content on
+   both sides, wherever it stands in the cell: `<td>2</td><td>• 10</td>` does not verify
+   against the row `2` U+0009 `10`, and a page row `• 10` U+0009 `2` needs a narrative cell that
+   shows `• 10`. The rule reads nothing but the text it normalises, so it applies identically
+   to both sides.
+
+   The start of the text is not the start of a line. Normalised text contains no U+000A, so
+   normalising it again replaces no bullet glyph; with the start of the text counted as a line
+   start, a bullet kept because its line contains U+0009 would be replaced the second time, once
+   that U+0009 had become U+0020. The narrative's text always begins with U+000A (the root
+   `div`, section 5), and the verifier reads a page slice from its line terminator (section 6),
+   so a list item at the start of a section is still a list item on both sides.
+
 5. Replace every whitespace-class code point with U+0020 — closed list: U+0009, U+000A,
    U+000D, U+0020, U+00A0, U+1680, U+2000–U+200A, U+2028, U+2029, U+202F, U+205F, U+3000.
    Then collapse runs of U+0020 to a single U+0020 and remove leading and trailing U+0020.
    U+000B, U+000C and U+0085 are not in the list: section 2 rejects them.
 
 The procedure is idempotent: applying it twice yields the first result (the golden vectors
-include the blocking cases that make step order matter).
+include the blocking cases that make step order matter, and step 4's rule that the start of the
+text is not a line start is what keeps it idempotent with the U+0009 rule).
 
 ## 4. Deliberately not normalised
 
@@ -139,10 +157,20 @@ markup is folded into the text or rejected.
 
 - Exactly one root element `div` carrying `xmlns="http://www.w3.org/1999/xhtml"`; only
   whitespace may appear outside it.
-- Element names are lower-case. Block elements emit U+000A before their start tag and after
-  their end tag: `div p h1 h2 h3 h4 h5 h6 ul li table thead tbody tfoot tr td th caption
-blockquote dl dt dd hr`. `br` emits U+000A. Inline elements contribute only their text:
+- Element names are lower-case. Block elements emit a line break before their start tag and
+  after their end tag: `div p h1 h2 h3 h4 h5 h6 ul li table thead tbody tfoot tr td th caption
+blockquote dl dt dd hr`. `br` emits a line break. Inline elements contribute only their text:
   `span b i u em strong sup sub small a abbr cite code` (`sup` and `sub` fold theirs, below).
+- The line break a block element or `br` emits is U+000A, except that the start and end tags
+  of `td` and `th`, and every block element and `br` inside an open `td` or `th`, emit
+  U+0009: a table cell and everything in it is on one line of U+0009-separated text, as the
+  extractor writes a table row (section 7). So a bullet glyph in a cell is never a list item
+  (section 3 step 4), and a soft hyphen before a break inside a cell joins nothing.
+- A line feed or carriage return in text — raw U+000A or U+000D, or a reference to either — is
+  emitted as U+0020. A renderer draws it as a space: only a block boundary or `br` is a line
+  break. So `<p>Take 2` U+000A `• 10 mg</p>`, which renders "Take 2 • 10 mg", reads "Take 2 •
+  10 mg" to the check (the bullet is mid-line and so content), and does not verify against a
+  page whose "• 10 mg" starts a new line.
 - Only `br` and `hr` may be self-closing, and they must be: `<x/>` for any other element, and a
   `br` or `hr` written as a start tag without `/` (`<br>`, `<hr></hr>`), reject
   (`void-element`). An HTML parser ignores the `/` on every other element, so `<sup/>6`,
@@ -163,13 +191,17 @@ blockquote dl dt dd hr`. `br` emits U+000A. Inline elements contribute only thei
   Inside sup, the subscript digits U+2080–U+2089 and the subscript signs U+208A–U+208E reject
   (`unmappable-script`); inside sub, the superscript digits U+2070, U+00B9, U+00B2, U+00B3,
   U+2074–U+2079 and the superscript signs U+207A–U+207E reject: a subscript digit raised is not
-  a superscript one, and the check would otherwise see a character the reader does not. Inside
-  sup or sub, any other code point of general category N that is not a target of the element's
-  own table, and U+00B1 and U+2213, reject (`unmappable-script`). The element's own script
-  digits and signs (U+2070, U+00B9, U+00B2, U+00B3, U+2074–U+207E inside `sup`; U+2080–U+208E
-  inside `sub`) are kept. Other code points (letters, footnote marks, ®) are kept unchanged:
-  raising a letter or a mark does not change what it says, so `C<sub>max</sub>`,
-  `<sup>a</sup>` and `<sup>®</sup>` are accepted, and `t<sub>1/2</sub>` is `t₁/₂`.
+  a superscript one, and the check would otherwise see a character the reader does not. In the
+  same way, inside sub the superscript letters U+2071 and U+207F, and inside sup the subscript
+  letters U+2090–U+209C, reject. Inside sup or sub, any other code point of general category N
+  that is not a target of the element's own table, any code point of general category Sm, Ps,
+  Pe or Pd that is neither a source nor a target of the fold tables (`＝` U+FF1D, `﹙` U+FE59,
+  `⸺` U+2E3A, `︱` U+FE31, `~`, `<`, `[`), and U+00B1 and U+2213, reject (`unmappable-script`).
+  The element's own script digits and signs (U+2070, U+00B9, U+00B2, U+00B3, U+2074–U+207E
+  inside `sup`; U+2080–U+208E inside `sub`) are kept. Other code points (letters, footnote
+  marks, ®, `/`) are kept unchanged: raising a letter or a mark does not change what it says,
+  so `C<sub>max</sub>`, `<sup>a</sup>` and `<sup>®</sup>` are accepted, and `t<sub>1/2</sub>`
+  is `t₁/₂`.
 - Tables contain only table parts. The only children of `table` are `caption`, `thead`,
   `tbody`, `tfoot` and `tr`; `thead`, `tbody` and `tfoot` contain only `tr`; `tr` contains only
   `td` and `th`. Any other element directly inside `table`, `thead`, `tbody`, `tfoot` or `tr`
@@ -191,11 +223,14 @@ blockquote dl dt dd hr`. `br` emits U+000A. Inline elements contribute only thei
   number), `tfoot` (at most one), never both forms in one table. `caption`, `thead`, `tbody`,
   `tfoot` must be direct children of `table`; `tr` of `table` or a section; `td` and `th` of
   `tr`. Violations reject (`table-structure`, `table-section-order`, or `misnested-tag`).
-- In the text the scanner emits, U+00AD followed by U+000A, or by U+000D and then U+000A,
-  rejects (`soft-hyphen-at-boundary`), whatever produced the break: raw text, a reference, a
-  block boundary or `br`. In page text U+00AD before a line break is the extractor's mark for a
-  word broken across lines (section 7) and step 1 joins it; in XHTML a line break inside text is
-  a space and a block boundary or `br` is a visible new line, and neither is a hyphenated word.
+- In the text the scanner emits, U+00AD followed by U+000A rejects
+  (`soft-hyphen-at-boundary`). That text has U+000A only from a block boundary or `br` outside a
+  table cell, and no U+000D at all: a line break in text is emitted as U+0020 (above), so U+00AD
+  before it is followed by a space, which step 1 does not join (`un` U+00AD U+000A `safe` in a
+  paragraph reads "un safe" and does not verify against a page's "unsafe"). In page text U+00AD
+  before a line break is the extractor's mark for a word broken across lines (section 7) and
+  step 1 joins it; in XHTML a block boundary or `br` is a visible new line, not a hyphenated
+  word.
 - Allowed attributes: `xmlns` (root), `xml:lang` and `lang` (root `div` only), `href` (`a`
   only, `https://` form only), `scope` (`th` only). Values must be double- or single-quoted.
   Any other attribute — in particular `style`, `hidden`, `title`, `class`, `id`, `colspan` and
@@ -218,8 +253,8 @@ blockquote dl dt dd hr`. `br` emits U+000A. Inline elements contribute only thei
   result is decided: a narrative whose normalised text is empty is `malformed-narrative` with
   reason `empty-narrative`. The scanner itself never produces that reason.
 
-Because block boundaries become U+000A and the whitespace step collapses them, paragraph and
-table-cell boundaries are structure, not content. Cell text is content.
+Because block boundaries become U+000A or U+0009 and the whitespace step collapses them,
+paragraph and table-cell boundaries are structure, not content. Cell text is content.
 
 ### Tokeniser
 
@@ -255,8 +290,10 @@ general category of the pinned Unicode version.
   U+000D, U+0020 only. A root `div` without `xmlns="http://www.w3.org/1999/xhtml"` is
   `root-not-div`, checked after its attributes; `xmlns` anywhere else, or with any other
   value, is `forbidden-attribute`.
-- A block element's start tag emits U+000A; its end tag emits U+000A; a self-closing `hr`
-  therefore emits two. `br` emits one.
+- A block element's start tag emits a line break; its end tag emits one; a self-closing `hr`
+  therefore emits two. `br` emits one. Each is U+000A, or U+0009 for `td` and `th` and inside
+  an open `td` or `th` (section 5). The scanner's text therefore always begins with U+000A, the
+  root `div`'s.
 - Input ending with no root is `root-not-div`; input ending with elements still open is
   `unbalanced-tag`.
 
@@ -297,6 +334,16 @@ The scanner's reason codes are, in the order of this section: `forbidden-charact
   between consecutive spans (which must normalise to nothing). The source's own characters
   therefore decide where words begin and end; the verifier never inserts whitespace between
   spans on the same page, so adjacent spans cannot split a word.
+- A slice of page text that the verifier normalises — the first slice of a section, and every
+  gap it tests for blankness (between spans, the tail and head around a page break, and the
+  coverage gaps) — is read from the U+000A that ends the previous line when only §3 step 5
+  whitespace other than U+000A lies between that U+000A and the slice's start. Before
+  `bodyStart` that is the code point section 1 makes U+000A; nothing else outside the body is
+  read. At the very start of a page with no header there is no such U+000A, and the slice is
+  read from its start. This gives a bullet glyph at the start of a line the line start that
+  section 3 step 4 requires (normalisation does not count the start of a text as one), and
+  adds nothing but whitespace to what is compared. A page-2 slice of a section that continues
+  across a page break is not extended: the page-1 slice ends with its own line terminator.
 - When a section continues onto the next page, the page-1 slice is extended to `bodyEnd` and
   the page-2 slice starts at `bodyStart` (the blank tail and head must normalise to nothing),
   and the slices are concatenated verbatim with no separator: the body's own final line
@@ -307,27 +354,38 @@ The scanner's reason codes are, in the order of this section: `forbidden-charact
   is `invalid-provenance` with reason `word-cut`. The rule is about whitespace, not about
   letters: punctuation is not a boundary, because inside a number it is part of the number
   (`1.5`, `−20`, `0.5`, `1,000`) and inside a word it is part of the word (`non-steroidal`).
+  - Edge whitespace is the §3 step 5 whitespace list without U+00A0, U+2007 and U+202F. Those
+    three join the groups of a number (`10 000`), so for the edge rules they are not a
+    boundary between tokens.
   - Start. Read backwards from the code point before the first span's start offset through
     page n's body. On passing its bodyStart, continue from the last code point of page n−1's
     body, and so on through earlier pages. Only body text is read, and earlier pages are read
-    as declared even if they fail §1 or §2. Skip code points in the §3 step 5 whitespace list
-    and stop at the first other code point c. The result is word-cut if no code point was
-    skipped before c, whatever c's category, or if c is U+00AD. If reading passes the start of
-    page 1's body, there is no cut.
-  - End. The result is word-cut if the last span, with trailing §3 step 5 whitespace removed,
-    ends in U+00AD. Otherwise it is word-cut unless the code point at the end offset is §3
-    step 5 whitespace, or the end offset is at or past `bodyEnd` (section 1 makes the code
-    point before `bodyEnd` a line feed).
+    as declared even if they fail §1 or §2. Skip edge whitespace and stop at the first other
+    code point c. The result is word-cut if no code point was skipped before c, whatever c's
+    category, or if c is U+00AD. If reading passes the start of page 1's body, there is no cut.
+  - End. The result is word-cut if the last span, with trailing edge whitespace removed, ends
+    in U+00AD. Otherwise it is word-cut unless the code point at the end offset is edge
+    whitespace, or the end offset is at or past `bodyEnd` (section 1 makes the code point
+    before `bodyEnd` a line feed).
+  - Numbers grouped with a space. On either edge it is also a cut when the code point on the
+    inner side of the edge (the span's first code point at the start, its last at the end) is
+    a digit (general category Nd), and the first code point beyond the edge that is not §3
+    step 5 whitespace, read inside the body without crossing a U+000A, is also Nd. So "…is 10"
+    cannot be taken from "…is 10 000 IU", with a space, U+2009, U+00A0, U+202F or U+2007
+    between the groups, nor "000 IU" after it; a number at the end of one line and a number at
+    the start of the next are separate.
+  - These rules apply together; any one of them makes a cut.
 
   So "Maximum dose is 1" cannot be taken from "Maximum dose is 1.5 mg", nor "20 °C." from
-  "−20 °C.", nor "5 mg." from "0.5 mg."; a section cannot begin at "safe for pregnant women"
+  "−20 °C.", nor "5 mg." from "0.5 mg.", nor "is 10" from "is 10 000 IU"; a section cannot begin at "safe for pregnant women"
   when the page before ends "un" and U+00AD, whether a line break, a blank line, or a page
   break with a blank head lies between; and it cannot end after "intra", U+00AD and a space.
   What the rule does not claim: it proves that a section's edges touch whitespace in the page
   text, not that the whitespace ends a sentence or a clause ("Take 5" can still be taken from
   "Take 5 mg twice"), and a span that itself begins or ends with whitespace is judged by the
   code points outside it, so it can be refused although its words are whole (a false
-  failure).
+  failure). Two separate numbers on one line separated only by whitespace ("Take 2 10 mg
+  tablets") cannot be split by a section edge either (a false failure the digit rule accepts).
 
 - The joined text is normalised (section 3) and must equal the normalised narrative exactly.
 - A report with zero narrative sections is `failed` (issue `No narrative sections to verify`);
@@ -417,8 +475,10 @@ extractor is a controlled component: its name and version are recorded in
 - emit table cells row-major separated by U+0009 and rows by U+000A, with the same number of
   cells in every row: a spanned cell's text is emitted once, in its first slot, and each other
   slot it covers as an empty cell; a line break inside a cell is emitted as U+0020, except a
-  discretionary hyphen, which is U+00AD U+000A. Cell boundaries are not checked (section 5), so
-  these rules fix the page text's shape, not which cell a narrative puts a value in;
+  discretionary hyphen, which is U+00AD U+000A. A row is one line with U+0009 in it, so a
+  bullet glyph in a cell is content (section 3 step 4). Cell boundaries are not checked
+  (section 5), so these rules fix the page text's shape, not which cell a narrative puts a
+  value in;
 - in a raised or lowered glyph run, emit every digit and sign of section 5's folding tables as
   its script code point — raised: U+0030–U+0039 as U+2070, U+00B9, U+00B2, U+00B3,
   U+2074–U+2079, `+`, U+FE62, U+FF0B and U+2795 as U+207A, `-`, U+2212, U+2010–U+2015,
@@ -496,6 +556,19 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   U+02D7, U+FE58 and U+2796 fold to minus and U+2795 to plus (section 5). **L2** — a span
   field that is not an integer, and a page number that is a boolean, are structural errors
   (section 6). The residual of cell association is stated in section 5.
+
+  Round 2 of that review, also folded into 2.0.0: a line feed or carriage return in narrative
+  text, raw or referenced, is emitted as U+0020, because a renderer draws it as a space and
+  `<p>Take 2` U+000A `• 10 mg</p>` otherwise verified against "Take 2" and a new line "• 10 mg";
+  `soft-hyphen-at-boundary` therefore applies to U+00AD before a block boundary or `br` only
+  (section 5). A number grouped with a space, U+2009, U+00A0, U+202F or U+2007 cannot be cut at
+  a section edge, and U+00A0, U+2007 and U+202F are not edge whitespace (section 6). A bullet
+  glyph on a line that contains U+0009 is content, the scanner writes a table cell on a
+  U+0009-separated line, and so a bullet in a table cell is never a list item; the start of a
+  text is no longer a line start for step 4, which keeps the procedure idempotent, and the
+  verifier reads a page slice from its line terminator instead (sections 3, 5 and 6). Inside
+  `sup` and `sub` the other kind's script letters, and any mathematical symbol, bracket or dash
+  outside the fold tables, reject (section 5).
 
 - `fidelity-norm/1.1.1` (patch) — documents behaviour the vectors already pinned but the text
   left to the reference implementation, found when the check was re-implemented in a second

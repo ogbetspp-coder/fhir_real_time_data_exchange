@@ -315,3 +315,26 @@ states each rule; `docs/validation/changes/2026-09-23-fidelity-norm-2-0-0.md` re
   U+2796 fold to minus and U+2795 to plus.
 - **L2.** A span field that is not an integer, or a page number that is a boolean, is a
   structural error in both implementations (Python tests for `bool` before `int`).
+
+### Round 2 of the second review (2026-09-23)
+
+- **Text line breaks.** A raw or referenced U+000A or U+000D in narrative text is emitted as
+  U+0020, because a renderer draws it as a space: `<p>Take 2` U+000A `• 10 mg</p>` verified
+  against a page whose "• 10 mg" starts a new line. Only a block boundary or `br` emits U+000A,
+  so `soft-hyphen-at-boundary` now concerns only those; U+00AD before a text line break is
+  followed by a space and joins nothing.
+- **Grouped numbers at section edges.** A section edge with a digit on its inner side and a
+  digit as the first non-whitespace code point beyond it, on the same line, is a cut; U+00A0,
+  U+2007 and U+202F are not edge whitespace. "…is 10" of "…is 10 000 IU" verified.
+- **Bullets in table cells.** A bullet glyph on a line that contains U+0009 is content, and the
+  scanner writes a table cell and everything inside it on a U+0009-separated line, so a bullet
+  in a cell is never a list item on either side (`<td>2</td><td>• 10</td>` verified against the
+  row 2 U+0009 10). To keep normalisation idempotent, the start of a text is no longer a line
+  start for step 4; the narrative's text begins with U+000A, and the verifier reads a page
+  slice from its line terminator. This departs from C3's wording "after text start or LF",
+  deliberately: with the start of the text counted, a bullet kept for its U+0009 would be
+  replaced when the result was normalised again.
+- **Script letters and symbols.** Inside `sub`, U+2071 and U+207F reject; inside `sup`,
+  U+2090–U+209C reject; inside either, any code point of general category Sm, Ps, Pe or Pd that
+  is neither a source nor a target of the fold tables rejects (`unmappable-script`), which
+  covers U+FF1D, U+FE59, U+2E3A, U+FE31, `~`, `<` and `[`.
