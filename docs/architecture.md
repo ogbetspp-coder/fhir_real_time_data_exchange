@@ -39,6 +39,12 @@ transform, validation, persistence, and evidence pipeline. `src/fhir/transform.t
 mapping manifest, and the generated artifacts are not touched by this boundary; their
 determinism and hashes stay frozen.
 
+The engine that will produce submissions from real labels (roadmap item 8) has its first
+component in `zone-a/`: a Word reader that refuses what it cannot read exactly, and the QRD
+template registry (`qrd/registry/`), the EMA's SmPC template 10.4 and Appendices I–III as data
+derived from the EMA's own files, pinned by hash in `qrd/sources.lock.json`
+(`docs/design/qrd-registry.md`). Nothing in Zone B reads the registry yet.
+
 Narrative fidelity is checked mechanically, not by prompt: a pure verifier
 (`src/fidelity/`) recomputes provenance-span hashes, applies the versioned normalisation in
 `docs/fidelity-normalization.md`, and requires an exact match before Zone B will transform a

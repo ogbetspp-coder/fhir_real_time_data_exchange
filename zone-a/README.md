@@ -29,6 +29,8 @@ that run them. None of that changes a byte of what the pipeline computes.
 | The two implementations agree off the vectors as well        | `tests/test_differential.py`                  |
 | The runtime's Unicode Character Database is the pinned one   | `tests/test_environment.py`                   |
 | No test prints narrative and no file here quotes a vector    | `tests/test_no_narrative_leak.py`             |
+| A Word body is read exactly, or refused with a reason        | `tests/test_docx_reader.py`                   |
+| The QRD registry is what the pinned EMA files build          | `tests/test_qrd_registry.py`                  |
 
 The second and sixth rows are new, and they exist because the first version of this port was
 wrong in five places that 130 passing vectors could not see. See "What the vectors could not
