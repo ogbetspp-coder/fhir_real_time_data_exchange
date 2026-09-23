@@ -10,9 +10,8 @@ variable "region" {
 }
 
 variable "environment" {
-  description = "Environment name used in labels and resource names."
+  description = "Environment name used in labels and resource names. No default: every plan, apply and import in scripts/gcp/deploy.sh passes it, so an apply that forgets it fails instead of silently targeting dev's resource names."
   type        = string
-  default     = "dev"
 
   validation {
     condition     = contains(["dev", "validation", "prod"], var.environment)
@@ -50,13 +49,6 @@ variable "submission_retention_days" {
     condition     = var.submission_retention_days == 0 || var.submission_retention_days >= 30
     error_message = "Submission retention must be 0 (disabled) or at least 30 days."
   }
-}
-
-variable "bigquery_partition_expiration_days" {
-  description = "FHIR history partition retention. Set null to retain indefinitely."
-  type        = number
-  default     = 2555
-  nullable    = true
 }
 
 variable "alert_notification_channels" {
@@ -238,7 +230,8 @@ variable "query_audience" {
 variable "service_version" {
   description = <<-EOT
     Identifier of the code being deployed, recorded as QUERY_SERVICE_VERSION in every query
-    audit record. scripts/gcp/deploy.sh passes the git commit SHA; the default marks an apply
+    audit record and as GIT_COMMIT (runtime.sourceCommit) in every signed run manifest the
+    worker writes. scripts/gcp/deploy.sh passes the git commit SHA; the default marks an apply
     made outside that script.
   EOT
   type        = string
@@ -279,4 +272,49 @@ variable "query_log_rejection_reason" {
   description = "Log why the query service refused a credential, as a category. Dev only; never returned to the caller."
   type        = bool
   default     = false
+}
+
+# The deployer service account, which the post-apply smoke run authenticates as. It is
+# bootstrapped outside this configuration (README.md), so it is named by the deploy rather than
+# declared here: scripts/gcp/deploy.sh phase_apply passes the active gcloud account, and passes
+# it only when that account is a service account. It is granted run.invoker on the worker
+# (infra/run.tf), actAs on the build identity (infra/build.tf) and FHIR editor on the record
+# dataset (infra/security.tf). Empty (the default) declares none of these bindings.
+#
+# A human's account is deliberately not accepted. gcloud refuses `print-identity-token
+# --audiences=` for user credentials, so a person cannot present a token this binding would
+# authorise, and granting one would leave a standing privilege on the worker that no documented
+# path can exercise. A local operator supplies WORKER_ID_TOKEN instead, minted by impersonating
+# a service account that already holds run.invoker.
+variable "deployer_account" {
+  description = "E-mail of the service account running the deploy, granted roles/run.invoker on the worker so the post-apply smoke run (scripts/gcp/deploy.sh phase_smoke) can call it. Empty declares no binding."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.deployer_account == "" || endswith(var.deployer_account, ".gserviceaccount.com")
+    error_message = "deployer_account must be a service account e-mail or empty: a user account cannot mint an ID token for the worker's audience, so a binding for one would never be usable."
+  }
+}
+
+# Cloud KMS signs with a crypto key VERSION, not a crypto key: AsymmetricSign's `name` must end
+# in /cryptoKeyVersions/<n>. `google_kms_crypto_key.manifest_signing.id` stops at the key, so
+# passing it to the worker meant every signing call was refused and no run ever produced a signed
+# manifest.
+#
+# The version is named here rather than read with a `google_kms_crypto_key_version` data source,
+# because that data source fetches the version's PUBLIC KEY and so requires
+# `cloudkms.cryptoKeyVersions.viewPublicKey`. The deploy identity does not hold it, and granting
+# it would widen the deployer's reach into key material to obtain a string that is already known.
+# Cloud KMS does not rotate asymmetric signing keys automatically, so this only changes when a
+# person deliberately creates a version — a configuration change, which is what this is.
+variable "kms_manifest_key_version" {
+  description = "Version of manifest-signing-hsm (keys.tf) the worker signs with. Cloud KMS does not rotate asymmetric signing keys automatically, so this changes only when a new version is created by hand."
+  type        = string
+  default     = "1"
+
+  validation {
+    condition     = can(regex("^[1-9][0-9]*$", var.kms_manifest_key_version))
+    error_message = "kms_manifest_key_version must be a positive integer, as Cloud KMS numbers crypto key versions from 1."
+  }
 }

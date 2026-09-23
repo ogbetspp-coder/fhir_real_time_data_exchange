@@ -4,6 +4,10 @@ name: Vulnerabilities
 # vulnerability in the npm or uv lockfiles; reports, without failing, what the pinned base images
 # carry. Weekly as well as on every change: a new advisory is published without any commit, and
 # the weekly run turns it into an issue.
+#
+# Secret scan (docs/foundations.md, D4; scripts/ci/secret-scan.sh), in the same required check:
+# fails on any possible credential in the working tree or in the commits a pull request or a push
+# adds; the weekly and manual runs scan the whole history.
 
 on:
   pull_request:
@@ -29,25 +33,56 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          # The secret scan reads the commits being added, not only the tip.
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Scan lockfiles and base images
         env:
           VULN_REPORT: ${{ runner.temp }}/vulnerabilities.md
         run: bash scripts/ci/vuln-scan.sh
 
+      # Runs even when the vulnerability scan failed, so one finding never hides the other.
+      - name: Scan for secrets
+        if: success() || failure()
+        env:
+          SECRET_REPORT: ${{ runner.temp }}/secrets.md
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_AFTER: ${{ github.sha }}
+        run: |
+          case "$EVENT" in
+            pull_request) range="${PR_BASE}..${PR_HEAD}" ;;
+            push)
+              if [[ "$PUSH_BEFORE" =~ ^0+$ ]] || ! git cat-file -e "${PUSH_BEFORE}^{commit}" 2>/dev/null; then
+                range="${PUSH_AFTER}~1..${PUSH_AFTER}"
+              else
+                range="${PUSH_BEFORE}..${PUSH_AFTER}"
+              fi
+              ;;
+            *) range="--all" ;;
+          esac
+          SECRET_SCAN_RANGE="$range" bash scripts/ci/secret-scan.sh
+
       - name: Publish the report
         if: always()
         env:
           REPORT: ${{ runner.temp }}/vulnerabilities.md
+          SECRETS: ${{ runner.temp }}/secrets.md
         run: |
           [[ -f "$REPORT" ]] && cat "$REPORT" >>"$GITHUB_STEP_SUMMARY" || true
+          [[ -f "$SECRETS" ]] && cat "$SECRETS" >>"$GITHUB_STEP_SUMMARY" || true
 
       - name: Open an issue when the weekly scan fails
         if: failure() && github.event_name == 'schedule'
         env:
           GH_TOKEN: ${{ github.token }}
           REPORT: ${{ runner.temp }}/vulnerabilities.md
+          SECRETS: ${{ runner.temp }}/secrets.md
         run: |
           run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          { echo "The weekly scan found known vulnerabilities in a lockfile: ${run_url}"; echo; cat "$REPORT" 2>/dev/null || true; } >issue.md
+          { echo "The weekly scan found known vulnerabilities in a lockfile or a possible secret: ${run_url}"; echo; cat "$REPORT" "$SECRETS" 2>/dev/null || true; } >issue.md
           gh issue create --title "vulnerabilities $(date -u +%Y-%m-%d)" --body-file issue.md

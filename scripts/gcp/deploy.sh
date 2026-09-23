@@ -143,12 +143,9 @@ phase_preflight() {
 
 phase_deps() {
   echo "=== install node dependencies ==="
-  if [[ -f package-lock.json ]]; then
-    npm ci --no-audit --no-fund
-  else
-    echo "package-lock.json is missing; falling back to npm install." >&2
-    npm install --no-audit --no-fund
-  fi
+  # The lockfile or nothing: npm ci fails on a missing or out-of-date package-lock.json, and
+  # there is no npm install fallback that would resolve fresh versions at deploy time.
+  npm ci --no-audit --no-fund
 }
 
 phase_init() {

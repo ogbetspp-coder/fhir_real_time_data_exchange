@@ -44,13 +44,14 @@ Google Cloud Healthcare API and observe their native near-real-time BigQuery str
 5. Run the full local gate before commit. `.github/workflows/ci.yml` is the merge gate on every
    pull request. On `main`, `npm run check` runs again as its own `gate` job in
    `.github/workflows/deploy.yml`, which holds no cloud token; the `deploy` job needs it. A merge
-   that touches only documentation, `test/`, `agent/` or `zone-a/` does not deploy. Cloud Build
+   that touches only documentation, `test/`, `agent/`, `zone-a/`, `.claude/` or `.cursor/` does
+   not deploy. Cloud Build
    only builds images.
 6. Use a separate git worktree for every parallel writing agent.
 
 ## Toolchain
 
-Node 22.14 (`.nvmrc`, the version CI uses), Python 3.14 with uv for `zone-a/` and `agent/`
+Node 22.22.0 (`.nvmrc`, the version CI uses and ADR 0003 pins), Python 3.14 with uv for `zone-a/` and `agent/`
 (`.python-version`), Java 21 for the official HL7 validator, and Terraform 1.16+.
 Read-only development and unit tests need no cloud credentials. Real-cloud smoke tests use
 Application Default Credentials and an explicitly configured non-production GCP project.

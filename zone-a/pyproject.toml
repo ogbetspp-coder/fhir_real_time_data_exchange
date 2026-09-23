@@ -5,7 +5,7 @@ description = "Zone A skeleton: contract models, cross-language canonical-hash p
 readme = "README.md"
 # ADR 0003 pins the Unicode Character Database, not just the language version: NFC output
 # depends on it. 3.14.x ships Unicode 16.0.0, the same version as the Zone B runtime image
-# (node:22.14.0, ICU 76.1). A different minor Python is a different UCD, so the range is closed.
+# (node:22.22.0, ICU 77.1). A different minor Python is a different UCD, so the range is closed.
 requires-python = ">=3.14,<3.15"
 dependencies = ["pydantic==2.13.5"]
 

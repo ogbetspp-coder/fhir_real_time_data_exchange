@@ -28,7 +28,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
-          node-version: 22.14.0
+          node-version: 22.22.0
           cache: npm
 
       - name: Install Node dependencies
@@ -62,7 +62,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
-          node-version: 22.14.0
+          node-version: 22.22.0
           cache: npm
 
       - name: Install Node dependencies
@@ -107,7 +107,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
-          node-version: 22.14.0
+          node-version: 22.22.0
           cache: npm
           cache-dependency-path: package-lock.json
 

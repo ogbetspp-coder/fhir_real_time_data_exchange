@@ -18,7 +18,11 @@
 #   bash scripts/gcp/api-trim.sh --check
 set -euo pipefail
 
-PROJECT_ID="${GCP_PROJECT_ID:-sage-ship-509104-b8}"
+# shellcheck source=scripts/gcp/common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+# GCP_PROJECT_ID first, as before; otherwise GOOGLE_CLOUD_PROJECT or the gcloud configuration,
+# and no project at all fails rather than falling back to a hard-coded one.
+PROJECT_ID="${GCP_PROJECT_ID:-$(ema_flow_resolve_project)}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 UNUSED=(
   autoscaling.googleapis.com

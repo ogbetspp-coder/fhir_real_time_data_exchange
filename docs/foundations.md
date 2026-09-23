@@ -351,6 +351,17 @@ one person; stated so that it is a decision and not a default.
 GitHub's paid secret protection. Nothing secret is committed today — the repository holds
 identifiers, never credentials — but nothing would stop one.
 
+_Status 2026-09-23: closed for development; push protection stays unavailable._ The free route,
+as for C1: gitleaks, pinned by version and SHA-256 (`scripts/ci/secret-scan.sh`,
+`test/ci/scanner-pins.test.ts`), runs in the required `Vulnerabilities` check on every pull request
+(its commits and the tree), on every push to main (the pushed commits) and weekly (the whole
+history), and fails on any finding. The whole history and the tree scanned clean on 2026-09-23 but
+for one false positive, a `curl --user` line in `deploy.sh` whose password is a command
+substitution; `.gitleaks.toml` exempts exactly that rule, file and captured text. The fake tokens in
+the tests and the `GOCSPX-` patterns in `agent/deploy/authorization.sh` match no default rule and
+need no exception. Proved to fail on a planted fake GitHub token, AWS key and OAuth client secret.
+It does not stop a push, so a secret that reaches a branch must still be rotated.
+
 ### E. Performance
 
 **E1. Both services scale to zero.** Measured 2026-09-21.

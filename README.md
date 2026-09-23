@@ -140,11 +140,11 @@ The deployment:
 2. GitHub Actions runs `npm run check` in its own `gate` job of `.github/workflows/deploy.yml`,
    which holds no cloud token (no `id-token` permission); the `deploy` job needs it and does not
    start unless it passes. The merge gate is `.github/workflows/ci.yml` on the pull request, and a
-   merge that touches only documentation, `test/`, `agent/` or `zone-a/` does not deploy at all.
-   Cloud Build (`cloudbuild.images.yaml`) only builds the worker, validator, and query images;
-   `cloudbuild.yaml` is a separate, manual/CI-optional configuration that additionally runs the
-   quality gate, standards-integrity check, and Terraform format/validate before building those same
-   images. Submit either one with the three flags `phase_images` in `scripts/gcp/deploy.sh` uses —
+   merge that touches only documentation, `test/`, `agent/`, `zone-a/`, `.claude/` or `.cursor/`
+   does not deploy at all.
+   Cloud Build (`cloudbuild.images.yaml`, the only build configuration) only builds the worker,
+   validator, and query images; the quality gate runs in GitHub Actions before it. Submit it by
+   hand only with the three flags `phase_images` in `scripts/gcp/deploy.sh` uses —
    `--region`, `--service-account` naming `ema-flow-build-<env>`, and `--gcs-source-staging-dir` on
    the `-build-staging` bucket. Without them gcloud falls back to a global build, as the default
    compute service account, staging the source in a US bucket; that account no longer holds a build

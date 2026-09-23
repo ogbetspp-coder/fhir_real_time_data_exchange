@@ -204,6 +204,56 @@ describe("Dockerfile image pinning gate", () => {
     expect(result.stderr).toContain("pin different digests");
   });
 
+  it("passes Cloud Build steps whose builders are pinned by digest", () => {
+    const result = check({
+      Dockerfile: `FROM ${PINNED_NODE} AS build\n`,
+      "cloudbuild.images.yaml": [
+        "steps:",
+        "  - id: build",
+        `    name: gcr.io/cloud-builders/docker@${OTHER_DIGEST}`,
+        `  - name: "gcr.io/cloud-builders/docker@${OTHER_DIGEST}" # quoted`,
+      ].join("\n"),
+    });
+
+    expect([result.status, result.stderr]).toEqual([0, ""]);
+    expect(result.stdout).toContain("2 Cloud Build steps in 1 configurations pinned by digest");
+  });
+
+  it("fails a Cloud Build step whose builder is a tag", () => {
+    const result = check({
+      Dockerfile: `FROM ${PINNED_NODE} AS build\n`,
+      "cloudbuild.yaml": ["steps:", "  - id: build", "    name: gcr.io/cloud-builders/docker"].join(
+        "\n",
+      ),
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "cloudbuild.yaml:3: step name gcr.io/cloud-builders/docker is not pinned by @sha256 digest",
+    );
+  });
+
+  it("fails a Cloud Build step named by a substitution, and one written as a list item", () => {
+    const result = check({
+      Dockerfile: `FROM ${PINNED_NODE} AS build\n`,
+      "cloudbuild.extra.yaml": ["steps:", "  - name: ${_BUILDER}", "  - name: node:22"].join("\n"),
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("cloudbuild.extra.yaml:2: step name ${_BUILDER} is not pinned");
+    expect(result.stderr).toContain("cloudbuild.extra.yaml:3: step name node:22 is not pinned");
+  });
+
+  it("holds a node builder in Cloud Build to the Dockerfiles' node digest", () => {
+    const result = check({
+      Dockerfile: `FROM ${PINNED_NODE} AS build\n`,
+      "cloudbuild.yaml": `steps:\n  - name: node:22.14.0-bookworm-slim@${OTHER_DIGEST}\n`,
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("pin different digests");
+  });
+
   it("fails when the directory holds no Dockerfile at all", () => {
     const result = check({ "not-a-dockerfile.txt": "FROM node:latest\n" });
 

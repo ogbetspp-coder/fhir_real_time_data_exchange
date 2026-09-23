@@ -21,7 +21,11 @@
 #   bash scripts/gcp/bq-cmek-convert.sh             # converts
 set -euo pipefail
 
-PROJECT_ID="${GCP_PROJECT_ID:-sage-ship-509104-b8}"
+# shellcheck source=scripts/gcp/common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+# GCP_PROJECT_ID first, as before; otherwise GOOGLE_CLOUD_PROJECT or the gcloud configuration,
+# and no project at all fails rather than falling back to a hard-coded one.
+PROJECT_ID="${GCP_PROJECT_ID:-$(ema_flow_resolve_project)}"
 REGION="${GCP_REGION:-europe-west4}"
 ENVIRONMENT="${EMA_FLOW_ENVIRONMENT:-dev}"
 KEY="projects/${PROJECT_ID}/locations/${REGION}/keyRings/ema-flow-${ENVIRONMENT}-record/cryptoKeys/ledger-analytics"
