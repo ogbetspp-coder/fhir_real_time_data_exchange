@@ -113,7 +113,7 @@
     {
       "kind": "deviation",
       "id": "document#1",
-      "similarity": 0.929,
+      "similarity": 0.931,
       "in": "10. DATE OF REVISION OF THE TEXT",
       "paragraph": 0,
       "differences": [
@@ -123,9 +123,9 @@
           "label": "http"
         },
         {
-          "change": "replace",
-          "template": ".",
-          "label": "/."
+          "change": "insert",
+          "template": "",
+          "label": "/"
         }
       ]
     },

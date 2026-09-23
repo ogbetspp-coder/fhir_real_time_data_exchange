@@ -49,14 +49,15 @@ and a deviation needs at least ``SIMILARITY`` and either ``MIN_MATCHED`` matched
 word outside the optional segments. The differences are the alignment's runs of changes, the
 label's side as its text reads; where the statement's last tokens are missing, the label's words
 to the end of that sentence stand in their place. The same tokens with other spaces or paragraph
-breaks are a ``layout`` difference. Struck or faint text is one token, ``HIDDEN_WORD``, that
-nothing matches and no fill-in takes. Characters that an exact match of another statement of the
-same section or appendix explains are not compared again, and where two resemblances of one
-section or appendix overlap, only the closer is reported. A resemblance in the readable part of
-a section is reported even when another part was refused. A statement with no required literal
-text of at least ``MIN_LITERAL`` characters is ``not-checkable`` (too little to tell). A
-non-optional statement or subheading that is absent is a ``missing-statement`` or
-``missing-subheading`` finding.
+breaks are a ``layout`` difference; the search takes in up to two paragraphs more than the
+statement spans, so a statement set out over more paragraphs is found. Struck or faint text is
+one token, ``HIDDEN_WORD``, that nothing matches and no fill-in takes. Characters that an exact
+match of another statement of the same section or appendix explains are not compared again, and
+where two resemblances of one section or appendix overlap, only the closer is reported. A
+resemblance in the readable part of a section is reported even when another part was refused. A
+statement with no required literal text of at least ``MIN_LITERAL`` characters is
+``not-checkable`` (too little to tell). A non-optional statement or subheading that is absent is
+a ``missing-statement`` or ``missing-subheading`` finding.
 
 Sections the reader refused are ``refused-section`` findings. A statement not found in a section
 with a refused part is ``not-checked``, not ``absent``: it may be in the part that could not be
@@ -72,6 +73,7 @@ import hashlib
 import itertools
 import json
 import re
+from collections import Counter
 from dataclasses import dataclass
 from typing import Any
 
@@ -540,12 +542,16 @@ _TOKEN = re.compile(r"[^\W_]+\([sS]\)|[^\W_]+|[^\w\s]|_")
 @dataclass(frozen=True)
 class _Node:
     """One step of a statement: a token, a fill-in, or the opening or closing of an optional
-    segment (``end`` is the index of an opening's closing)."""
+    segment (``end`` is the index of an opening's closing in the whole list)."""
 
     kind: str
     text: str = ""
     space: bool = False
     end: int = 0
+    # A token the template sets at the start of a paragraph.
+    brk: bool = False
+    # How many optional segments the node is inside.
+    depth: int = 0
 
 
 def _nodes(pieces: list[_Piece]) -> list[_Node]:
@@ -553,16 +559,21 @@ def _nodes(pieces: list[_Piece]) -> list[_Node]:
     for piece in pieces:
         if piece.kind == "text":
             for number, token in enumerate(_TOKEN.findall(piece.text)):
-                out.append(_Node("token", token, space=number == 0 and bool(piece.joint)))
+                joint = piece.joint if number == 0 else ""
+                out.append(_Node("token", token, space=bool(joint), brk=joint == "\n"))
         elif piece.kind == "fill":
-            out.append(_Node("fill", "\u2026", space=bool(piece.joint)))
+            out.append(_Node("fill", "\u2026", space=bool(piece.joint), brk=piece.joint == "\n"))
         else:
             start = len(out)
             out.append(_Node("open"))
-            inner = _nodes(list(piece.pieces))
+            # The inner list's openings point at their closings within it; shift them to this one.
+            inner = [
+                _Node(n.kind, n.text, n.space, n.end + start + 1 if n.kind == "open" else n.end)
+                for n in _nodes(list(piece.pieces))
+            ]
             if inner and piece.joint:
                 first = inner[0]
-                inner[0] = _Node(first.kind, first.text, True, first.end)
+                inner[0] = _Node(first.kind, first.text, True, first.end, piece.joint == "\n")
             out += inner
             out.append(_Node("close"))
             out[start] = _Node("open", end=len(out) - 1)
@@ -627,66 +638,114 @@ def _align(nodes: list[_Node], tokens: list[_Token]) -> _Alignment | None:
 
     Edit distance over tokens, with the statement's structure: a token matches an equal token
     (cost 0) or is substituted, deleted or has a token inserted before it (cost 1 each); a
-    fill-in takes one or more tokens of one paragraph (cost 0, never struck or faint text) or
-    is missing (cost 1); an optional segment is taken or skipped (cost 0). The stretch may
-    start and end anywhere."""
+    fill-in takes one or more tokens of one paragraph, at most ``FILL_LIMIT`` characters, never
+    struck or faint text, and ends a paragraph only where the template has a break next (cost
+    0), or is missing (cost 1); an optional segment, nested or not, is taken or skipped (cost
+    0). Of two alignments that cost the same, the one with more matched tokens is kept. The
+    stretch may start and end anywhere, but not on a substitution: a first or last token the
+    label does not match is missing, not replaced by the word beside the stretch."""
     rows, columns = len(nodes) + 1, len(tokens) + 1
     # The first token of the statement, whose capital a label may drop mid-sentence.
     opening = next((n for n, node in enumerate(nodes) if node.kind == "token"), -1)
     cost = [[_INFINITE] * columns for _ in range(rows)]
+    hits = [[0] * columns for _ in range(rows)]
     back: list[list[tuple[str, int, int] | None]] = [[None] * columns for _ in range(rows)]
     cost[0] = [0] * columns
+    # Whether a paragraph break may follow each fill-in: only where the template has one next,
+    # or where nothing follows; otherwise a fill-in would take a whole inserted paragraph.
+    breaks = {}
+    for position, node in enumerate(nodes):
+        if node.kind == "fill":
+            after = next((n for n in nodes[position + 1 :] if n.kind in ("token", "fill")), None)
+            breaks[position] = after is None or after.brk
 
-    def relax(row: int, column: int, value: int, step: tuple[str, int, int]) -> None:
-        if value < cost[row][column]:
+    def relax(row: int, column: int, value: int, found: int, step: tuple[str, int, int]) -> None:
+        # Of two alignments that cost the same, the one with more matched tokens is kept.
+        if (value, -found) < (cost[row][column], -hits[row][column]):
             cost[row][column] = value
+            hits[row][column] = found
             back[row][column] = step
 
     for row in range(rows):
         if row:
             for column in range(columns - 1):
-                relax(row, column + 1, cost[row][column] + 1, ("insert", row, column))
+                relax(
+                    row,
+                    column + 1,
+                    cost[row][column] + 1,
+                    hits[row][column],
+                    ("insert", row, column),
+                )
         if row == rows - 1:
             break
         node = nodes[row]
-        current = cost[row]
+        current, found = cost[row], hits[row]
         if node.kind == "token":
             for column in range(columns):
                 if current[column] >= _INFINITE:
                     continue
-                relax(row + 1, column, current[column] + 1, ("delete", row, column))
+                relax(row + 1, column, current[column] + 1, found[column], ("delete", row, column))
                 if column < columns - 1:
                     equal = _same(node.text, tokens[column].text, first=row == opening)
                     step = ("match" if equal else "replace", row, column)
-                    relax(row + 1, column + 1, current[column] + (0 if equal else 1), step)
+                    relax(
+                        row + 1,
+                        column + 1,
+                        current[column] + (0 if equal else 1),
+                        found[column] + equal,
+                        step,
+                    )
         elif node.kind == "fill":
-            best, origin = _INFINITE, -1
             for column in range(columns):
                 if current[column] < _INFINITE:
-                    relax(row + 1, column, current[column] + 1, ("delete", row, column))
-                if column == columns - 1:
-                    break
-                token = tokens[column]
-                if not token.fillable:
-                    # Struck or faint text where the fill-in stands is one change.
-                    if current[column] < _INFINITE:
-                        relax(row + 1, column + 1, current[column] + 1, ("replace", row, column))
-                    best, origin = _INFINITE, -1
+                    relax(
+                        row + 1, column, current[column] + 1, found[column], ("delete", row, column)
+                    )
+                    token = tokens[column] if column < columns - 1 else None
+                    if token is not None and not token.fillable:
+                        # Struck or faint text where the fill-in stands is one change.
+                        relax(
+                            row + 1,
+                            column + 1,
+                            current[column] + 1,
+                            found[column],
+                            ("replace", row, column),
+                        )
+            for column in range(1, columns):
+                # A fill-in ending with token column - 1: the best start within one paragraph,
+                # over fillable tokens and at most FILL_LIMIT characters.
+                last_token = tokens[column - 1]
+                if not last_token.fillable:
                     continue
-                if column and tokens[column - 1].line != token.line:
-                    best, origin = _INFINITE, -1
-                if current[column] < best:
-                    best, origin = current[column], column
-                if best < _INFINITE:
-                    relax(row + 1, column + 1, best, ("fill", row, origin))
+                closes_line = column == columns - 1 or tokens[column].line != last_token.line
+                if closes_line and not breaks[row] and column < columns - 1:
+                    continue
+                for origin in range(column - 1, -1, -1):
+                    token = tokens[origin]
+                    if (
+                        not token.fillable
+                        or token.line != last_token.line
+                        or last_token.end - token.start > FILL_LIMIT
+                    ):
+                        break
+                    if current[origin] < _INFINITE:
+                        relax(
+                            row + 1, column, current[origin], found[origin], ("fill", row, origin)
+                        )
         else:
             for column in range(columns):
                 if current[column] < _INFINITE:
-                    relax(row + 1, column, current[column], ("pass", row, column))
+                    relax(row + 1, column, current[column], found[column], ("pass", row, column))
                     if node.kind == "open":
-                        relax(node.end + 1, column, current[column], ("skip", row, column))
+                        relax(
+                            node.end + 1,
+                            column,
+                            current[column],
+                            found[column],
+                            ("skip", row, column),
+                        )
     last = cost[rows - 1]
-    end = min(range(columns), key=lambda column: (last[column], column))
+    end = min(range(columns), key=lambda column: (last[column], -hits[rows - 1][column], column))
     if last[end] >= _INFINITE:
         return None
     steps: list[tuple[str, int, int]] = []
@@ -707,6 +766,15 @@ def _align(nodes: list[_Node], tokens: list[_Token]) -> _Alignment | None:
             steps.append(("delete", from_row, -1))
         row, column = from_row, from_column
     steps.reverse()
+    # A stretch starts and ends on the label's own words: a first or last substitution is a
+    # missing token, not a claim on the word beside the stretch.
+    for order in (range(len(steps)), range(len(steps) - 1, -1, -1)):
+        for position in order:
+            operation, at, _ = steps[position]
+            if operation == "replace":
+                steps[position] = ("delete", at, -1)
+            elif operation in ("match", "fill", "insert"):
+                break
     matched = sum(1 for operation, _, _ in steps if operation == "match")
     return _Alignment(last[end], matched, tuple(steps))
 
@@ -724,13 +792,39 @@ class _Near:
         return list(range(min(indices), max(indices) + 1)) if indices else []
 
 
+def _depths(nodes: list[_Node]) -> list[_Node]:
+    out: list[_Node] = []
+    depth = 0
+    for node in nodes:
+        if node.kind == "close":
+            depth -= 1
+        out.append(_Node(node.kind, node.text, node.space, node.end, node.brk, depth))
+        if node.kind == "open":
+            depth += 1
+    return out
+
+
 def _closest(nodes: list[_Node], lines: list[_Line], size: int) -> _Near | None:
     """The best alignment over windows whose tokens hold enough of the statement's words."""
-    literal = {node.text for node in nodes if node.kind == "token"}
+    nodes = _depths(nodes)
+    every = Counter(_PLURAL.sub("", node.text).lower() for node in nodes if node.kind == "token")
+    required = Counter(
+        _PLURAL.sub("", node.text).lower()
+        for node in nodes
+        if node.kind == "token" and not node.depth
+    )
     best: _Near | None = None
     for window in _windows(lines, size):
         tokens = _tokens(window)
-        if len(literal & {token.text for token in tokens}) < min(4, len(literal)):
+        # The best score this window could reach: every statement token it holds matched, and
+        # every required token it lacks costing one. Below the threshold, it is not aligned.
+        # Counted generously (either case, with or without a final "s"), so a window is
+        # never passed over that could reach the threshold.
+        held = Counter(token.text.lower() for token in tokens)
+        held.update(token.text.lower()[:-1] for token in tokens if token.text.lower().endswith("s"))
+        present = sum(min(n, held[text]) for text, n in every.items())
+        lacking = sum(max(0, n - held[text]) for text, n in required.items())
+        if not present or present / (present + lacking) < SIMILARITY:
             continue
         alignment = _align(nodes, tokens)
         if alignment is None:
@@ -772,12 +866,15 @@ def _differences(near: _Near) -> list[dict[str, str]]:
         last = max(covered)
         line = near.tokens[last].line
         limit = min(len(near.tokens), last + 1 + len(near.nodes))
-        for index in range(last + 1, limit):
-            token = near.tokens[index]
+        extension: list[tuple[str, int, int]] = []
+        for at in range(last + 1, limit):
+            token = near.tokens[at]
             if token.line != line or not token.fillable:
                 break
-            steps.append(("insert", -1, index))
+            extension.append(("insert", -1, at))
             if token.text in TERMINAL:
+                # Only words that finish the sentence stand in for the missing end.
+                steps += extension
                 break
     for step in steps:
         if step[0] in ("replace", "delete", "insert"):
@@ -867,7 +964,14 @@ def _candidate(job: _Job, taken: _Taken) -> _Near | None:
     """The closest resemblance of a statement not matched exactly, if close enough."""
     pieces = _statement(job.item["pattern"])
     nodes = _nodes(pieces)
-    near = _closest(nodes, _mask(job.lines, taken.get(job.group, {})), _span(pieces))
+    lines = _mask(job.lines, taken.get(job.group, {}))
+    near = _closest(nodes, lines, _span(pieces))
+    if near is None or near.alignment.score < SIMILARITY:
+        # Then over two paragraphs more, for a statement set out over more paragraphs than the
+        # template gives it.
+        wider = _closest(nodes, lines, _span(pieces) + 2)
+        if wider is not None and (near is None or wider.alignment.score > near.alignment.score):
+            near = wider
     if near is None:
         return None
     words = sum(

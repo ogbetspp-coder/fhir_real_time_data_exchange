@@ -18,6 +18,7 @@ import pytest
 from zone_a.docx.reader import Mark, Paragraph
 from zone_a.epi.reader import Document, Section, SectionRefusal
 from zone_a.qrd.check import check
+from zone_a.qrd.pattern import parse
 
 ROOT = Path(__file__).resolve().parents[2]
 LABELS = ROOT / "labels" / "ema-epi"
@@ -257,7 +258,7 @@ def test_brukinsa() -> None:
         {"change": "replace", "template": "on", "label": "in"}
     ]
     waiver = _deviation(result, "smpc.5.1#6")["differences"]
-    assert waiver == [{"change": "delete", "template": "in", "label": ""}]
+    assert waiver == [{"change": "replace", "template": "in", "label": "for"}]
 
 
 def test_jentadueto() -> None:
@@ -674,3 +675,90 @@ def test_a_resemblance_starts_at_the_first_matching_word() -> None:
     assert _deviation(result, identifier)["differences"] == [
         {"change": "replace", "template": "local", "label": "national"}
     ]
+
+
+# --- review round 6 -----------------------------------------------------------------------
+
+
+def test_nested_optional_segments_can_be_skipped() -> None:
+    from zone_a.qrd import check as module
+
+    nodes = module._nodes(module._statement(parse("a <b <c> d> e f g h")))
+    for position, node in enumerate(nodes):
+        if node.kind == "open":
+            assert nodes[node.end].kind == "close"
+            assert node.end > position
+
+
+def test_of_two_equal_alignments_the_one_with_more_matches_is_kept() -> None:
+    text = "Zeta has no or negligible influence on the ability to drive and use machines."
+    start = text.index("negligible")
+    paragraph = Paragraph(text, None, None, None, marks=(Mark(start, start + 10, "strike"),))
+    result = check(document(smpc_4_7=(paragraph,)), REGISTRY, MAPPING)
+    assert _deviation(result, "smpc.4.7#0")["differences"] == [
+        {"change": "replace", "template": "negligible", "label": "[struck or faint text]"}
+    ]
+
+
+def test_a_resemblance_does_not_start_on_an_unrelated_paragraph() -> None:
+    paragraphs = _paragraphs(
+        "Anaphylaxis has been reported with Zeta vaccine",
+        "In order to improve the traceability of biological medicinal products, the name and the "
+        "batch number of the administered product should be clearly recorded.",
+    )
+    result = check(document(smpc_4_4=paragraphs), REGISTRY, MAPPING)
+    identifier = f"smpc.4.4#{_item_index('smpc.4.4', '<Traceability')}"
+    deviation = _deviation(result, identifier)
+    assert deviation["paragraph"] == 1
+    assert deviation["differences"] == [
+        {"change": "delete", "template": "Traceability", "label": ""}
+    ]
+
+
+def test_a_fill_in_does_not_take_an_inserted_paragraph() -> None:
+    paragraphs = _paragraphs(
+        "There are no or limited amount of data from the use of Zeta in pregnant women.",
+        "Studies in animals have shown reproductive toxicity (see section 5.3).",
+        "Pregnant women should be told of the risk.",
+        "Zeta is not recommended during pregnancy and in women of childbearing potential not "
+        "using contraception.",
+    )
+    result = check(document(smpc_4_6=paragraphs), REGISTRY, MAPPING)
+    for finding in findings(result, "deviation"):
+        if finding["id"] == "appendix-I#pregnancy.4":
+            assert finding["differences"] != [{"change": "insert", "template": "", "label": "Zeta"}]
+
+
+def test_a_statement_set_out_over_more_paragraphs_is_a_layout_deviation() -> None:
+    parts = REPORTING.split(". ")
+    paragraphs = _paragraphs(parts[0] + ".", parts[1] + ".", parts[2])
+    result = check(document(smpc_4_8_reporting=paragraphs), REGISTRY, MAPPING)
+    identifier = f"smpc.4.8#{_item_index('smpc.4.8', 'Reporting suspected')}"
+    assert _deviation(result, identifier)["differences"] == [
+        {"change": "layout", "template": "", "label": ""}
+    ]
+
+
+def test_a_fill_in_longer_than_the_limit_is_not_a_perfect_resemblance() -> None:
+    condition = "treatment of " + "a very long condition name " * 14
+    text = (
+        "The European Medicines Agency has waived the obligation to submit the results of "
+        f"studies with Zeta in all subsets of the paediatric population in {condition}"
+        "(see section 4.2 for information on paediatric use)."
+    )
+    result = check(document(smpc_5_1=_paragraphs(text)), REGISTRY, MAPPING)
+    identifier = f"smpc.5.1#{_item_index('smpc.5.1', '<The European Medicines Agency has waived')}"
+    for finding in findings(result, "deviation"):
+        if finding["id"] == identifier:
+            assert finding["similarity"] < 1.0
+
+
+def test_words_past_a_missing_end_show_only_when_they_finish_a_sentence() -> None:
+    text = (
+        "Hypersensitivity to the active substance or to any of the excipients listed in "
+        "section 6.1 or to egg proteins"
+    )
+    result = check(document(smpc_4_3=_paragraphs(text)), REGISTRY, MAPPING)
+    for finding in findings(result, "deviation"):
+        for difference in finding["differences"]:
+            assert "egg" not in difference["label"]

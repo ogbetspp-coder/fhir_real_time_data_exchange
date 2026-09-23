@@ -20,14 +20,14 @@
   },
   "summary": {
     "findings": {
-      "deviation": 8,
+      "deviation": 9,
       "document-quirk": 1,
       "formatting": 1,
       "refused-section": 1
     },
     "statements": {
-      "absent": 75,
-      "deviation": 8,
+      "absent": 74,
+      "deviation": 9,
       "not-checkable": 8,
       "not-checked": 1,
       "used": 31
@@ -169,6 +169,20 @@
         {
           "change": "delete",
           "template": "frequency",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "kind": "deviation",
+      "id": "appendix-II#017",
+      "similarity": 1.0,
+      "in": "4.8 Undesirable effects",
+      "paragraph": 74,
+      "differences": [
+        {
+          "change": "layout",
+          "template": "",
           "label": ""
         }
       ]
@@ -680,7 +694,7 @@
     },
     {
       "id": "appendix-II#017",
-      "status": "absent"
+      "status": "deviation"
     },
     {
       "id": "appendix-II#018",

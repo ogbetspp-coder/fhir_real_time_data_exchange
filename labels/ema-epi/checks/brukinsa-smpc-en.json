@@ -83,14 +83,14 @@
     {
       "kind": "deviation",
       "id": "smpc.4.2#2",
-      "similarity": 0.917,
+      "similarity": 0.923,
       "in": "4.2 Posology and method of administration > Posology",
       "paragraph": 79,
       "differences": [
         {
-          "change": "delete",
+          "change": "replace",
           "template": "aged",
-          "label": ""
+          "label": "and"
         }
       ]
     },
@@ -116,9 +116,9 @@
       "paragraph": 365,
       "differences": [
         {
-          "change": "delete",
+          "change": "replace",
           "template": "in",
-          "label": ""
+          "label": "for"
         }
       ]
     },

@@ -73,8 +73,8 @@ EMA writes "GFR < 60 mL/min" that way in Jentadueto.
   substituted, missing or inserted token costs one. A deviation needs at least 85% of matched
   tokens against matched tokens plus changes, and either six matched words or every word the
   statement requires. The differences are exact ("https" against "http", "," against ";"); the
-  same tokens with other spaces or paragraph breaks are a `layout` difference ("2°C" against
-  "2 °C"). Text an exact match of a sibling statement explains is not compared again, and where
+  same tokens with other spaces or paragraph breaks, fewer or more, are a `layout` difference
+  ("2°C" against "2 °C"; "Cardiac" and "disorders" in two paragraphs of a table). Text an exact match of a sibling statement explains is not compared again, and where
   two resemblances overlap only the closer is reported. 85% and six words are proposal
   thresholds, set on these three labels.
 - **Refused parts.** A statement not found in a section with a part the reader refused is
@@ -135,6 +135,8 @@ The mapping lacks three EMA codes the labels use (Pregnancy, Breast-feeding and 
 
 ## Known limits
 
+- A statement matched exactly is `used` even when an optional sentence beside it, which the
+  label also carries, has a typo: the optional sentence is simply taken as absent.
 - A resemblance is a proposal. A short statement (fewer than six words) resembles text only
   when every word it requires is there, so a changed word in "No data are available." is not
   found; a heavily reworded statement is not found either.
