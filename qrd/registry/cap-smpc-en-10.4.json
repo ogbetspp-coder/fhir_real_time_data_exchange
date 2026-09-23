@@ -1,0 +1,4580 @@
+{
+  "registryVersion": "1.0.0",
+  "readerVersion": "docx-reader/1.0.0",
+  "template": {
+    "family": "EMA QRD product-information template, centralised procedure",
+    "version": "10.4",
+    "status": "adopted",
+    "annex": "I",
+    "document": "Summary of product characteristics",
+    "language": "en"
+  },
+  "sources": [
+    {
+      "file": "qrd-product-information-template-version-104_en.docx",
+      "sha256": "6c9da03b2c72f055c81dc14f12c82da61a1609e7beffcc71f95e8046d7104fd1",
+      "emaReference": null,
+      "lastUpdated": "2024-02-29"
+    },
+    {
+      "file": "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics_en.docx",
+      "sha256": "13031dfae722bfe2479cb9323be96adfe18941da1c489731ea805082e5f886b3",
+      "emaReference": "EMA/215345/2023",
+      "lastUpdated": "2023-06-23"
+    },
+    {
+      "file": "qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48-undesirable-effects-summary-product-characteristics_en.docx",
+      "sha256": "68a8026e6d99f22f9a380edf04df34bb5f29f35574f9e507fb4b5d5f16e996ae",
+      "emaReference": "EMA/295934/2018 v.7",
+      "lastUpdated": "2026-03-25"
+    },
+    {
+      "file": "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products_en.docx",
+      "sha256": "10aed02c52b69740041841d09a3fca2239bc9839eb3317bc1c1dd732532a9215",
+      "emaReference": "EMEA/29277/2003 v.6",
+      "lastUpdated": "2026-03-25"
+    }
+  ],
+  "sections": [
+    {
+      "key": "smpc.1",
+      "number": "1",
+      "level": 1,
+      "optional": false,
+      "source": "1.\tNAME OF THE MEDICINAL PRODUCT",
+      "title": [
+        {
+          "kind": "text",
+          "value": "NAME OF THE MEDICINAL PRODUCT"
+        }
+      ],
+      "guidance": null,
+      "dotted": true,
+      "gap": "\t",
+      "items": [
+        {
+          "kind": "fill",
+          "optional": false,
+          "source": "{(Invented) name strength pharmaceutical form}",
+          "pattern": [
+            {
+              "kind": "fill",
+              "value": "(Invented) name strength pharmaceutical form"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "smpc.2",
+      "number": "2",
+      "level": 1,
+      "optional": false,
+      "source": "2.\tQUALITATIVE AND QUANTITATIVE COMPOSITION",
+      "title": [
+        {
+          "kind": "text",
+          "value": "QUALITATIVE AND QUANTITATIVE COMPOSITION"
+        }
+      ],
+      "guidance": null,
+      "dotted": true,
+      "gap": "\t",
+      "items": []
+    },
+    {
+      "key": "smpc.2.1",
+      "number": "2.1",
+      "level": 2,
+      "optional": true,
+      "source": "<2.1\tGeneral description> [For advanced therapy products only]",
+      "title": [
+        {
+          "kind": "text",
+          "value": "General description"
+        }
+      ],
+      "guidance": "For advanced therapy products only",
+      "dotted": false,
+      "gap": "\t",
+      "items": []
+    },
+    {
+      "key": "smpc.2.2",
+      "number": "2.2",
+      "level": 2,
+      "optional": true,
+      "source": "<2.2\tQualitative and quantitative composition> [For advanced therapy products only]",
+      "title": [
+        {
+          "kind": "text",
+          "value": "Qualitative and quantitative composition"
+        }
+      ],
+      "guidance": "For advanced therapy products only",
+      "dotted": false,
+      "gap": "\t",
+      "items": [
+        {
+          "kind": "subheading",
+          "optional": true,
+          "source": "<Excipient(s) with known effect>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Excipient(s) with known effect"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<For the full list of excipients, see section 6.1.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "For the full list of excipients, see section 6.1."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "smpc.3",
+      "number": "3",
+      "level": 1,
+      "optional": false,
+      "source": "3.\tPHARMACEUTICAL FORM",
+      "title": [
+        {
+          "kind": "text",
+          "value": "PHARMACEUTICAL FORM"
+        }
+      ],
+      "guidance": null,
+      "dotted": true,
+      "gap": "\t",
+      "items": [
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<The score line is only to facilitate breaking for ease of swallowing and not to divide into equal doses.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "The score line is only to facilitate breaking for ease of swallowing and not to divide into equal doses."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<The score line is not intended for breaking the tablet.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "The score line is not intended for breaking the tablet."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<The tablet can be divided into equal doses.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "The tablet can be divided into equal doses."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "smpc.4",
+      "number": "4",
+      "level": 1,
+      "optional": false,
+      "source": "4.\tCLINICAL PARTICULARS",
+      "title": [
+        {
+          "kind": "text",
+          "value": "CLINICAL PARTICULARS"
+        }
+      ],
+      "guidance": null,
+      "dotted": true,
+      "gap": "\t",
+      "items": []
+    },
+    {
+      "key": "smpc.4.1",
+      "number": "4.1",
+      "level": 2,
+      "optional": false,
+      "source": "4.1\tTherapeutic indications",
+      "title": [
+        {
+          "kind": "text",
+          "value": "Therapeutic indications"
+        }
+      ],
+      "guidance": null,
+      "dotted": false,
+      "gap": "\t",
+      "items": [
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<This medicinal product is for diagnostic use only.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "This medicinal product is for diagnostic use only."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<{X} is indicated in <adults> <neonates> <infants> <children> <adolescents> <aged {x to y}> <years> <months>.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "fill",
+                  "value": "X"
+                },
+                {
+                  "kind": "text",
+                  "value": " is indicated in "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "adults"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "neonates"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "infants"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "children"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "adolescents"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "aged "
+                    },
+                    {
+                      "kind": "fill",
+                      "value": "x to y"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "years"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "months"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": "."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "smpc.4.2",
+      "number": "4.2",
+      "level": 2,
+      "optional": false,
+      "source": "4.2\tPosology and method of administration",
+      "title": [
+        {
+          "kind": "text",
+          "value": "Posology and method of administration"
+        }
+      ],
+      "guidance": null,
+      "dotted": false,
+      "gap": "\t",
+      "items": [
+        {
+          "kind": "subheading",
+          "optional": false,
+          "source": "Posology",
+          "pattern": [
+            {
+              "kind": "text",
+              "value": "Posology"
+            }
+          ]
+        },
+        {
+          "kind": "subheading",
+          "optional": false,
+          "source": "Paediatric population",
+          "pattern": [
+            {
+              "kind": "text",
+              "value": "Paediatric population"
+            }
+          ]
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<The <safety> <and> <efficacy> of {X} in children aged {x to y} <months> <years> [or any other relevant subsets, e.g. weight, pubertal age, gender] <has> <have> not <yet> been established.> ",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "The "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "safety"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "and"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "efficacy"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " of "
+                },
+                {
+                  "kind": "fill",
+                  "value": "X"
+                },
+                {
+                  "kind": "text",
+                  "value": " in children aged "
+                },
+                {
+                  "kind": "fill",
+                  "value": "x to y"
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "months"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "years"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "guidance",
+                  "value": "or any other relevant subsets, e.g. weight, pubertal age, gender"
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "has"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "have"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " not "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "yet"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " been established."
+                }
+              ]
+            }
+          ],
+          "trailer": " "
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<No data are available.> ",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "No data are available."
+                }
+              ]
+            }
+          ],
+          "trailer": " "
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<Currently available data are described in section <4.8> <5.1> <5.2> but no recommendation on a posology can be made.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Currently available data are described in section "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "4.8"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "5.1"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "5.2"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " but no recommendation on a posology can be made."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<{X} should not be used in children aged {x to y} <years> <months> [or any other relevant subsets, e.g. weight, pubertal age, gender] because of <safety> <efficacy> concern(s).> ",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "fill",
+                  "value": "X"
+                },
+                {
+                  "kind": "text",
+                  "value": " should not be used in children aged "
+                },
+                {
+                  "kind": "fill",
+                  "value": "x to y"
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "years"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "months"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "guidance",
+                  "value": "or any other relevant subsets, e.g. weight, pubertal age, gender"
+                },
+                {
+                  "kind": "text",
+                  "value": " because of "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "safety"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "efficacy"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " concern(s)."
+                }
+              ]
+            }
+          ],
+          "trailer": " "
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<There is no relevant use of {X} <in the paediatric population> <in children aged {x to y} <years> <months> [or any other relevant subsets, e.g. weight, pubertal age, gender] <for the indication of...>.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "There is no relevant use of "
+                },
+                {
+                  "kind": "fill",
+                  "value": "X"
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "in the paediatric population"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "in children aged "
+                    },
+                    {
+                      "kind": "fill",
+                      "value": "x to y"
+                    },
+                    {
+                      "kind": "text",
+                      "value": " "
+                    },
+                    {
+                      "kind": "optional",
+                      "value": [
+                        {
+                          "kind": "text",
+                          "value": "years"
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "text",
+                      "value": " "
+                    },
+                    {
+                      "kind": "optional",
+                      "value": [
+                        {
+                          "kind": "text",
+                          "value": "months"
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "text",
+                      "value": " "
+                    },
+                    {
+                      "kind": "guidance",
+                      "value": "or any other relevant subsets, e.g. weight, pubertal age, gender"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "for the indication of..."
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": "."
+                }
+              ]
+            }
+          ],
+          "erratum": "The template opens '<in children aged' and never closes it (one '<' more than '>'; the v11 draft repeats it). The registry closes it after the guidance, as in the sibling statement '<{X} should not be used in children aged ... [or any other relevant subsets, ...] because of ...>', so that the two ways of naming the population are alternatives."
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<{X} is contraindicated in children aged {x to y} <years> <months> [or any other relevant subsets, e.g. weight, pubertal age, gender] <for the indication of...> (see section 4.3).>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "fill",
+                  "value": "X"
+                },
+                {
+                  "kind": "text",
+                  "value": " is contraindicated in children aged "
+                },
+                {
+                  "kind": "fill",
+                  "value": "x to y"
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "years"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "months"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "guidance",
+                  "value": "or any other relevant subsets, e.g. weight, pubertal age, gender"
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "for the indication of..."
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " (see section 4.3)."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "subheading",
+          "optional": false,
+          "source": "Method of administration ",
+          "pattern": [
+            {
+              "kind": "text",
+              "value": "Method of administration"
+            }
+          ],
+          "trailer": " "
+        },
+        {
+          "kind": "subheading",
+          "optional": true,
+          "source": "<Precautions to be taken before handling or administering the medicinal product>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Precautions to be taken before handling or administering the medicinal product"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<For instructions on <reconstitution> <dilution> of the medicinal product before administration, see section <6.6> <and> <12>.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "For instructions on "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "reconstitution"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "dilution"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " of the medicinal product before administration, see section "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "6.6"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "and"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "12"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": "."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "smpc.4.3",
+      "number": "4.3",
+      "level": 2,
+      "optional": false,
+      "source": "4.3\tContraindications",
+      "title": [
+        {
+          "kind": "text",
+          "value": "Contraindications"
+        }
+      ],
+      "guidance": null,
+      "dotted": false,
+      "gap": "\t",
+      "items": [
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<Hypersensitivity to the active substance(s) or to any of the excipients listed in section 6.1 <or {name of the residue(s)}>.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Hypersensitivity to the active substance(s) or to any of the excipients listed in section 6.1 "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "or "
+                    },
+                    {
+                      "kind": "fill",
+                      "value": "name of the residue(s)"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": "."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "smpc.4.4",
+      "number": "4.4",
+      "level": 2,
+      "optional": false,
+      "source": "4.4\tSpecial warnings and precautions for use",
+      "title": [
+        {
+          "kind": "text",
+          "value": "Special warnings and precautions for use"
+        }
+      ],
+      "guidance": null,
+      "dotted": false,
+      "gap": "\t",
+      "items": [
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<Traceability\nIn order to improve the traceability of biological medicinal products, the name and the batch number of the administered product should be clearly recorded.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Traceability\nIn order to improve the traceability of biological medicinal products, the name and the batch number of the administered product should be clearly recorded."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "subheading",
+          "optional": true,
+          "source": "<Paediatric population>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Paediatric population"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "smpc.4.5",
+      "number": "4.5",
+      "level": 2,
+      "optional": false,
+      "source": "4.5\tInteraction with other medicinal products and other forms of interaction",
+      "title": [
+        {
+          "kind": "text",
+          "value": "Interaction with other medicinal products and other forms of interaction"
+        }
+      ],
+      "guidance": null,
+      "dotted": false,
+      "gap": "\t",
+      "items": [
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<No interaction studies have been performed.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "No interaction studies have been performed."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "subheading",
+          "optional": true,
+          "source": "<Paediatric population>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Paediatric population"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<Interaction studies have only been performed in adults.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Interaction studies have only been performed in adults."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "smpc.4.6",
+      "number": "4.6",
+      "level": 2,
+      "optional": false,
+      "source": "4.6\tFertility, pregnancy and lactation",
+      "title": [
+        {
+          "kind": "text",
+          "value": "Fertility, pregnancy and lactation"
+        }
+      ],
+      "guidance": null,
+      "dotted": false,
+      "gap": "\t",
+      "items": [
+        {
+          "kind": "subheading",
+          "optional": true,
+          "source": "<Pregnancy>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Pregnancy"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "subheading",
+          "optional": true,
+          "source": "<Breast-feeding>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Breast-feeding"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "subheading",
+          "optional": true,
+          "source": "<Fertility>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Fertility"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "smpc.4.7",
+      "number": "4.7",
+      "level": 2,
+      "optional": false,
+      "source": "4.7\tEffects on ability to drive and use machines",
+      "title": [
+        {
+          "kind": "text",
+          "value": "Effects on ability to drive and use machines"
+        }
+      ],
+      "guidance": null,
+      "dotted": false,
+      "gap": "\t",
+      "items": [
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<{(Invented) name} has <no or negligible influence> <minor influence> <moderate influence> <major influence> on the ability to drive and use machines.> ",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "fill",
+                  "value": "(Invented) name"
+                },
+                {
+                  "kind": "text",
+                  "value": " has "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "no or negligible influence"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "minor influence"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "moderate influence"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "major influence"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " on the ability to drive and use machines."
+                }
+              ]
+            }
+          ],
+          "trailer": " "
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<Not relevant.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Not relevant."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "smpc.4.8",
+      "number": "4.8",
+      "level": 2,
+      "optional": false,
+      "source": "4.8\tUndesirable effects",
+      "title": [
+        {
+          "kind": "text",
+          "value": "Undesirable effects"
+        }
+      ],
+      "guidance": null,
+      "dotted": false,
+      "gap": "\t",
+      "items": [
+        {
+          "kind": "subheading",
+          "optional": true,
+          "source": "<Paediatric population>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Paediatric population"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "subheading",
+          "optional": false,
+          "source": "Reporting of suspected adverse reactions",
+          "pattern": [
+            {
+              "kind": "text",
+              "value": "Reporting of suspected adverse reactions"
+            }
+          ]
+        },
+        {
+          "kind": "statement",
+          "optional": false,
+          "source": "Reporting suspected adverse reactions after authorisation of the medicinal product is important. It allows continued monitoring of the benefit/risk balance of the medicinal product. Healthcare professionals are asked to report any suspected adverse reactions via the national reporting system listed in Appendix V.*",
+          "pattern": [
+            {
+              "kind": "text",
+              "value": "Reporting suspected adverse reactions after authorisation of the medicinal product is important. It allows continued monitoring of the benefit/risk balance of the medicinal product. Healthcare professionals are asked to report any suspected adverse reactions via the national reporting system listed in Appendix V."
+            }
+          ],
+          "trailer": "*",
+          "note": "*",
+          "marks": [
+            {
+              "start": 263,
+              "end": 313,
+              "kind": "highlight-lightGray"
+            }
+          ]
+        },
+        {
+          "kind": "guidance",
+          "optional": false,
+          "source": "[*For the printed material, please refer to the guidance of the annotated QRD template.]",
+          "pattern": [
+            {
+              "kind": "guidance",
+              "value": "*For the printed material, please refer to the guidance of the annotated QRD template."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "smpc.4.9",
+      "number": "4.9",
+      "level": 2,
+      "optional": false,
+      "source": "4.9\tOverdose",
+      "title": [
+        {
+          "kind": "text",
+          "value": "Overdose"
+        }
+      ],
+      "guidance": null,
+      "dotted": false,
+      "gap": "\t",
+      "items": [
+        {
+          "kind": "subheading",
+          "optional": true,
+          "source": "<Paediatric population>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Paediatric population"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "smpc.5",
+      "number": "5",
+      "level": 1,
+      "optional": false,
+      "source": "5.\tPHARMACOLOGICAL PROPERTIES",
+      "title": [
+        {
+          "kind": "text",
+          "value": "PHARMACOLOGICAL PROPERTIES"
+        }
+      ],
+      "guidance": null,
+      "dotted": true,
+      "gap": "\t",
+      "items": []
+    },
+    {
+      "key": "smpc.5.1",
+      "number": "5.1",
+      "level": 2,
+      "optional": false,
+      "source": "5.1 \tPharmacodynamic properties",
+      "title": [
+        {
+          "kind": "text",
+          "value": "Pharmacodynamic properties"
+        }
+      ],
+      "guidance": null,
+      "dotted": false,
+      "gap": " \t",
+      "items": [
+        {
+          "kind": "statement",
+          "optional": false,
+          "source": "Pharmacotherapeutic group: {group}, ATC code: <{code}> <not yet assigned>",
+          "pattern": [
+            {
+              "kind": "text",
+              "value": "Pharmacotherapeutic group: "
+            },
+            {
+              "kind": "fill",
+              "value": "group"
+            },
+            {
+              "kind": "text",
+              "value": ", ATC code: "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "fill",
+                  "value": "code"
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "not yet assigned"
+                }
+              ]
+            }
+          ],
+          "marks": [
+            {
+              "start": 56,
+              "end": 72,
+              "kind": "highlight-lightGray"
+            }
+          ]
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<{(Invented) name} is a biosimilar medicinal product. Detailed information is available on the website of the European Medicines Agency https://www.ema.europa.eu.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "fill",
+                  "value": "(Invented) name"
+                },
+                {
+                  "kind": "text",
+                  "value": " is a biosimilar medicinal product. Detailed information is available on the website of the European Medicines Agency https://www.ema.europa.eu."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "subheading",
+          "optional": true,
+          "source": "<Mechanism of action>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Mechanism of action"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "subheading",
+          "optional": true,
+          "source": "<Pharmacodynamic effects>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Pharmacodynamic effects"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "subheading",
+          "optional": true,
+          "source": "<Clinical efficacy and safety>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Clinical efficacy and safety"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "subheading",
+          "optional": true,
+          "source": "<Paediatric population>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Paediatric population"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<The European Medicines Agency has waived the obligation to submit the results of studies with <{(Invented) name}> [or for generics: <the reference medicinal product containing {name of the active substance(s)}>] in all subsets of the paediatric population in {condition as per paediatric investigation plan (PIP) decision, for the granted indication} (see section 4.2 for information on paediatric use).>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "The European Medicines Agency has waived the obligation to submit the results of studies with "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "fill",
+                      "value": "(Invented) name"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "guidance",
+                  "value": "or for generics: <the reference medicinal product containing {name of the active substance(s)}>"
+                },
+                {
+                  "kind": "text",
+                  "value": " in all subsets of the paediatric population in "
+                },
+                {
+                  "kind": "fill",
+                  "value": "condition as per paediatric investigation plan (PIP) decision, for the granted indication"
+                },
+                {
+                  "kind": "text",
+                  "value": " (see section 4.2 for information on paediatric use)."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<The European Medicines Agency has deferred the obligation to submit the results of studies with <{(Invented) name}> [or for generics: <the reference medicinal product containing {name of the active substance(s)}>] in one or more subsets of the paediatric population in {condition, as per paediatric investigation plan (PIP) decision, for the granted indication} (see section 4.2 for information on paediatric use).>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "The European Medicines Agency has deferred the obligation to submit the results of studies with "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "fill",
+                      "value": "(Invented) name"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "guidance",
+                  "value": "or for generics: <the reference medicinal product containing {name of the active substance(s)}>"
+                },
+                {
+                  "kind": "text",
+                  "value": " in one or more subsets of the paediatric population in "
+                },
+                {
+                  "kind": "fill",
+                  "value": "condition, as per paediatric investigation plan (PIP) decision, for the granted indication"
+                },
+                {
+                  "kind": "text",
+                  "value": " (see section 4.2 for information on paediatric use)."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<This medicinal product has been authorised under a so-called ‘conditional approval’ scheme. This means that further evidence on this medicinal product is awaited.\nThe European Medicines Agency will review new information on this medicinal product at least every year and this SmPC will be updated as necessary.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "This medicinal product has been authorised under a so-called ‘conditional approval’ scheme. This means that further evidence on this medicinal product is awaited.\nThe European Medicines Agency will review new information on this medicinal product at least every year and this SmPC will be updated as necessary."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<This medicinal product has been authorised under ‘exceptional circumstances’. This means that <due to the rarity of the disease> <for scientific reasons> <for ethical reasons> it has not been possible to obtain complete information on this medicinal product.\nThe European Medicines Agency will review any new information which may become available every year and this SmPC will be updated as necessary.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "This medicinal product has been authorised under ‘exceptional circumstances’. This means that "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "due to the rarity of the disease"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "for scientific reasons"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "for ethical reasons"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " it has not been possible to obtain complete information on this medicinal product.\nThe European Medicines Agency will review any new information which may become available every year and this SmPC will be updated as necessary."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<The reference medicinal product containing {active substance} has been authorised under ‘exceptional circumstances’. This means that <due to the rarity of the disease><for scientific reasons><for ethical reasons> it has not been possible to obtain complete information on the reference medicinal product. The European Medicines Agency will review any new information which may become available every year and this SmPC will be updated as necessary accordingly to the reference medicinal product SmPC.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "The reference medicinal product containing "
+                },
+                {
+                  "kind": "fill",
+                  "value": "active substance"
+                },
+                {
+                  "kind": "text",
+                  "value": " has been authorised under ‘exceptional circumstances’. This means that "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "due to the rarity of the disease"
+                    }
+                  ]
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "for scientific reasons"
+                    }
+                  ]
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "for ethical reasons"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " it has not been possible to obtain complete information on the reference medicinal product. The European Medicines Agency will review any new information which may become available every year and this SmPC will be updated as necessary accordingly to the reference medicinal product SmPC."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "smpc.5.2",
+      "number": "5.2",
+      "level": 2,
+      "optional": false,
+      "source": "5.2\tPharmacokinetic properties",
+      "title": [
+        {
+          "kind": "text",
+          "value": "Pharmacokinetic properties"
+        }
+      ],
+      "guidance": null,
+      "dotted": false,
+      "gap": "\t",
+      "items": [
+        {
+          "kind": "subheading",
+          "optional": true,
+          "source": "<Absorption>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Absorption"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "subheading",
+          "optional": true,
+          "source": "<Distribution>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Distribution"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "subheading",
+          "optional": true,
+          "source": "<Biotransformation>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Biotransformation"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "subheading",
+          "optional": true,
+          "source": "<Elimination>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Elimination"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "subheading",
+          "optional": true,
+          "source": "<Linearity/non-linearity>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Linearity/non-linearity"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "subheading",
+          "optional": true,
+          "source": "<Pharmacokinetic/pharmacodynamic relationship(s)>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Pharmacokinetic/pharmacodynamic relationship(s)"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "smpc.5.3",
+      "number": "5.3",
+      "level": 2,
+      "optional": false,
+      "source": "5.3\tPreclinical safety data",
+      "title": [
+        {
+          "kind": "text",
+          "value": "Preclinical safety data"
+        }
+      ],
+      "guidance": null,
+      "dotted": false,
+      "gap": "\t",
+      "items": [
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<Non-clinical data reveal no special hazard for humans based on conventional studies of safety pharmacology, repeated dose toxicity, genotoxicity, carcinogenic potential, toxicity to reproduction and development.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Non-clinical data reveal no special hazard for humans based on conventional studies of safety pharmacology, repeated dose toxicity, genotoxicity, carcinogenic potential, toxicity to reproduction and development."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<Effects in non-clinical studies were observed only at exposures considered sufficiently in excess of the maximum human exposure indicating little relevance to clinical use.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Effects in non-clinical studies were observed only at exposures considered sufficiently in excess of the maximum human exposure indicating little relevance to clinical use."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<Adverse reactions not observed in clinical studies, but seen in animals at exposure levels similar to clinical exposure levels and with possible relevance to clinical use were as follows:>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Adverse reactions not observed in clinical studies, but seen in animals at exposure levels similar to clinical exposure levels and with possible relevance to clinical use were as follows:"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "subheading",
+          "optional": true,
+          "source": "<Environmental risk assessment (ERA)>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Environmental risk assessment (ERA)"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "smpc.6",
+      "number": "6",
+      "level": 1,
+      "optional": false,
+      "source": "6.\tPHARMACEUTICAL PARTICULARS",
+      "title": [
+        {
+          "kind": "text",
+          "value": "PHARMACEUTICAL PARTICULARS"
+        }
+      ],
+      "guidance": null,
+      "dotted": true,
+      "gap": "\t",
+      "items": []
+    },
+    {
+      "key": "smpc.6.1",
+      "number": "6.1",
+      "level": 2,
+      "optional": false,
+      "source": "6.1\tList of excipients",
+      "title": [
+        {
+          "kind": "text",
+          "value": "List of excipients"
+        }
+      ],
+      "guidance": null,
+      "dotted": false,
+      "gap": "\t",
+      "items": [
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<None.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "None."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "smpc.6.2",
+      "number": "6.2",
+      "level": 2,
+      "optional": false,
+      "source": "6.2\tIncompatibilities",
+      "title": [
+        {
+          "kind": "text",
+          "value": "Incompatibilities"
+        }
+      ],
+      "guidance": null,
+      "dotted": false,
+      "gap": "\t",
+      "items": [
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<Not applicable.> ",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Not applicable."
+                }
+              ]
+            }
+          ],
+          "trailer": " "
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<In the absence of compatibility studies, this medicinal product must not be mixed with other medicinal products.> ",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "In the absence of compatibility studies, this medicinal product must not be mixed with other medicinal products."
+                }
+              ]
+            }
+          ],
+          "trailer": " "
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<This medicinal product must not be mixed with other medicinal products except those mentioned in section <6.6> <and> <12>.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "This medicinal product must not be mixed with other medicinal products except those mentioned in section "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "6.6"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "and"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "12"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": "."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "smpc.6.3",
+      "number": "6.3",
+      "level": 2,
+      "optional": false,
+      "source": "6.3\tShelf life",
+      "title": [
+        {
+          "kind": "text",
+          "value": "Shelf life"
+        }
+      ],
+      "guidance": null,
+      "dotted": false,
+      "gap": "\t",
+      "items": [
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<...> <6 months> <...> <1 year> <18 months> <2 years> <30 months> <3 years> <...>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "..."
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "6 months"
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "..."
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "1 year"
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "18 months"
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "2 years"
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "30 months"
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "3 years"
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "..."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "smpc.6.4",
+      "number": "6.4",
+      "level": 2,
+      "optional": false,
+      "source": "6.4\tSpecial precautions for storage",
+      "title": [
+        {
+          "kind": "text",
+          "value": "Special precautions for storage"
+        }
+      ],
+      "guidance": null,
+      "dotted": false,
+      "gap": "\t",
+      "items": [
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<For storage conditions after <reconstitution> <dilution> <first opening> of the medicinal product, see section 6.3.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "For storage conditions after "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "reconstitution"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "dilution"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "first opening"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " of the medicinal product, see section 6.3."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "smpc.6.5",
+      "number": "6.5",
+      "level": 2,
+      "optional": false,
+      "source": "6.5\tNature and contents of container <and special equipment for use, administration or implantation>",
+      "title": [
+        {
+          "kind": "text",
+          "value": "Nature and contents of container "
+        },
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "text",
+              "value": "and special equipment for use, administration or implantation"
+            }
+          ]
+        }
+      ],
+      "guidance": null,
+      "dotted": false,
+      "gap": "\t",
+      "items": [
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<Not all pack sizes may be marketed.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Not all pack sizes may be marketed."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "smpc.6.6",
+      "number": "6.6",
+      "level": 2,
+      "optional": false,
+      "source": "6.6\tSpecial precautions for disposal <and other handling>",
+      "title": [
+        {
+          "kind": "text",
+          "value": "Special precautions for disposal "
+        },
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "text",
+              "value": "and other handling"
+            }
+          ]
+        }
+      ],
+      "guidance": null,
+      "dotted": false,
+      "gap": "\t",
+      "items": [
+        {
+          "kind": "subheading",
+          "optional": true,
+          "source": "<Use in the paediatric population>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Use in the paediatric population"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<No special requirements <for disposal>.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "No special requirements "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "for disposal"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": "."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<Any unused medicinal product or waste material should be disposed of in accordance with local requirements.> ",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Any unused medicinal product or waste material should be disposed of in accordance with local requirements."
+                }
+              ]
+            }
+          ],
+          "trailer": " "
+        }
+      ]
+    },
+    {
+      "key": "smpc.7",
+      "number": "7",
+      "level": 1,
+      "optional": false,
+      "source": "7.\tMARKETING AUTHORISATION HOLDER",
+      "title": [
+        {
+          "kind": "text",
+          "value": "MARKETING AUTHORISATION HOLDER"
+        }
+      ],
+      "guidance": null,
+      "dotted": true,
+      "gap": "\t",
+      "items": [
+        {
+          "kind": "fill",
+          "optional": false,
+          "source": "{Name and address}",
+          "pattern": [
+            {
+              "kind": "fill",
+              "value": "Name and address"
+            }
+          ]
+        },
+        {
+          "kind": "fill",
+          "optional": true,
+          "source": "<{tel}>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "fill",
+                  "value": "tel"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "fill",
+          "optional": true,
+          "source": "<{fax}>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "fill",
+                  "value": "fax"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "fill",
+          "optional": true,
+          "source": "<{e-mail}>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "fill",
+                  "value": "e-mail"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "smpc.8",
+      "number": "8",
+      "level": 1,
+      "optional": false,
+      "source": "8.\tMARKETING AUTHORISATION NUMBER(S) ",
+      "title": [
+        {
+          "kind": "text",
+          "value": "MARKETING AUTHORISATION NUMBER(S)"
+        }
+      ],
+      "guidance": null,
+      "dotted": true,
+      "gap": "\t",
+      "items": []
+    },
+    {
+      "key": "smpc.9",
+      "number": "9",
+      "level": 1,
+      "optional": false,
+      "source": "9.\tDATE OF FIRST AUTHORISATION/RENEWAL OF THE AUTHORISATION",
+      "title": [
+        {
+          "kind": "text",
+          "value": "DATE OF FIRST AUTHORISATION/RENEWAL OF THE AUTHORISATION"
+        }
+      ],
+      "guidance": null,
+      "dotted": true,
+      "gap": "\t",
+      "items": [
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<Date of first authorisation: {DD month YYYY}>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Date of first authorisation: "
+                },
+                {
+                  "kind": "fill",
+                  "value": "DD month YYYY"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<Date of latest renewal: {DD month YYYY}>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Date of latest renewal: "
+                },
+                {
+                  "kind": "fill",
+                  "value": "DD month YYYY"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "smpc.10",
+      "number": "10",
+      "level": 1,
+      "optional": false,
+      "source": "10.\tDATE OF REVISION OF THE TEXT",
+      "title": [
+        {
+          "kind": "text",
+          "value": "DATE OF REVISION OF THE TEXT"
+        }
+      ],
+      "guidance": null,
+      "dotted": true,
+      "gap": "\t",
+      "items": [
+        {
+          "kind": "fill",
+          "optional": true,
+          "source": "<{MM/YYYY}>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "fill",
+                  "value": "MM/YYYY"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "fill",
+          "optional": true,
+          "source": "<{DD/MM/YYYY}>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "fill",
+                  "value": "DD/MM/YYYY"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "fill",
+          "optional": true,
+          "source": "<{DD month YYYY}>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "fill",
+                  "value": "DD month YYYY"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "smpc.11",
+      "number": "11",
+      "level": 1,
+      "optional": true,
+      "source": "<11.\tDOSIMETRY>",
+      "title": [
+        {
+          "kind": "text",
+          "value": "DOSIMETRY"
+        }
+      ],
+      "guidance": null,
+      "dotted": true,
+      "gap": "\t",
+      "items": []
+    },
+    {
+      "key": "smpc.12",
+      "number": "12",
+      "level": 1,
+      "optional": true,
+      "source": "<12.\tINSTRUCTIONS FOR PREPARATION OF RADIOPHARMACEUTICALS>",
+      "title": [
+        {
+          "kind": "text",
+          "value": "INSTRUCTIONS FOR PREPARATION OF RADIOPHARMACEUTICALS"
+        }
+      ],
+      "guidance": null,
+      "dotted": true,
+      "gap": "\t",
+      "items": [
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<Any unused medicinal product or waste material should be disposed of in accordance with local requirements.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Any unused medicinal product or waste material should be disposed of in accordance with local requirements."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "documentStatements": [
+    {
+      "placement": "before-section-1",
+      "kind": "statement",
+      "optional": true,
+      "source": "<￼This medicinal product is subject to additional monitoring. This will allow quick identification of new safety information. Healthcare professionals are asked to report any suspected adverse reactions. See section 4.8 for how to report adverse reactions.> [For medicinal products subject to additional monitoring ONLY]",
+      "pattern": [
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "text",
+              "value": "￼This medicinal product is subject to additional monitoring. This will allow quick identification of new safety information. Healthcare professionals are asked to report any suspected adverse reactions. See section 4.8 for how to report adverse reactions."
+            }
+          ]
+        },
+        {
+          "kind": "text",
+          "value": " "
+        },
+        {
+          "kind": "guidance",
+          "value": "For medicinal products subject to additional monitoring ONLY"
+        }
+      ]
+    },
+    {
+      "placement": "end-of-document",
+      "kind": "statement",
+      "optional": false,
+      "source": "Detailed information on this medicinal product is available on the website of the European Medicines Agency https://www.ema.europa.eu<, and on the website of {name of MS Agency (link)}>.",
+      "pattern": [
+        {
+          "kind": "text",
+          "value": "Detailed information on this medicinal product is available on the website of the European Medicines Agency https://www.ema.europa.eu"
+        },
+        {
+          "kind": "optional",
+          "value": [
+            {
+              "kind": "text",
+              "value": ", and on the website of "
+            },
+            {
+              "kind": "fill",
+              "value": "name of MS Agency (link)"
+            }
+          ]
+        },
+        {
+          "kind": "text",
+          "value": "."
+        }
+      ]
+    }
+  ],
+  "appendices": {
+    "I": {
+      "attachesTo": "smpc.4.6",
+      "entries": [
+        {
+          "id": "pregnancy.1",
+          "paragraphs": [
+            "[1]<Based on human experience [specify] {Active substance} causes <congenital malformations [specify] when administered during pregnancy.> [or] <harmful pharmacological effects during pregnancy and/or on the fetus/newborn child.> ",
+            "{Invented name} is contraindicated <during pregnancy><during {trimester} of pregnancy> [this case is a strict contraindication] (see section 4.3). ",
+            "<Women of childbearing potential have to use effective contraception <during <and up to {number} weeks after> treatment.>>"
+          ],
+          "bracketsBalanced": false,
+          "pattern": null
+        },
+        {
+          "id": "pregnancy.2",
+          "paragraphs": [
+            "[2] <Based on human experience [specify] {Active substance} is suggested / suspected to cause congenital malformations [specify] when administered during pregnancy. ",
+            "A <Studies in animals have shown reproductive toxicity (see section 5.3).> ",
+            "[or] ",
+            "B <Animal studies are insufficient with respect to reproductive toxicity (see section 5.3).> ",
+            "{Invented name} should not be used <during pregnancy><during {trimester} of pregnancy> unless the clinical condition of the woman requires treatment with {Active substance}.",
+            "<Women of childbearing potential have to use effective contraception <during <and up to {number} weeks after> treatment.>>"
+          ],
+          "bracketsBalanced": false,
+          "pattern": null
+        },
+        {
+          "id": "pregnancy.3",
+          "paragraphs": [
+            "[3] <Based on human experience [specify] {Active substance} is suggested / suspected to cause congenital malformations [specify] when administered during pregnancy. ",
+            "Animal studies do not indicate direct or indirect harmful effects with respect to reproductive toxicity (see section 5.3). ",
+            "{Invented name} should not be used<during pregnancy><during {trimester} of pregnancy> unless the clinical condition of the woman requires treatment with {Active substance}.",
+            "<Women of childbearing potential have to use effective contraception <during <and up to {number} weeks after)> treatment.>> "
+          ],
+          "bracketsBalanced": false,
+          "pattern": null
+        },
+        {
+          "id": "pregnancy.4",
+          "paragraphs": [
+            "[4] <There are no or limited amount of data from the use of {Active substance} in pregnant women. ",
+            "A <Studies in animals have shown reproductive toxicity (see section 5.3).> ",
+            "[or] ",
+            "B <Animal studies are insufficient with respect to reproductive toxicity (see section 5.3).> ",
+            "{Invented name} is not recommended <during pregnancy><during {trimester} of pregnancy> and in women of childbearing potential not using contraception.> "
+          ],
+          "bracketsBalanced": true,
+          "pattern": [
+            {
+              "kind": "guidance",
+              "value": "4"
+            },
+            {
+              "kind": "text",
+              "value": " "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "There are no or limited amount of data from the use of "
+                },
+                {
+                  "kind": "fill",
+                  "value": "Active substance"
+                },
+                {
+                  "kind": "text",
+                  "value": " in pregnant women. \nA "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "Studies in animals have shown reproductive toxicity (see section 5.3)."
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " \n"
+                },
+                {
+                  "kind": "guidance",
+                  "value": "or"
+                },
+                {
+                  "kind": "text",
+                  "value": " \nB "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "Animal studies are insufficient with respect to reproductive toxicity (see section 5.3)."
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " \n"
+                },
+                {
+                  "kind": "fill",
+                  "value": "Invented name"
+                },
+                {
+                  "kind": "text",
+                  "value": " is not recommended "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "during pregnancy"
+                    }
+                  ]
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "during "
+                    },
+                    {
+                      "kind": "fill",
+                      "value": "trimester"
+                    },
+                    {
+                      "kind": "text",
+                      "value": " of pregnancy"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " and in women of childbearing potential not using contraception."
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " "
+            }
+          ]
+        },
+        {
+          "id": "pregnancy.5",
+          "paragraphs": [
+            "[5] <There are no or limited amount of data (less than 300 pregnancy outcomes) from the use of {Active substance} in pregnant women.",
+            "Animal studies do not indicate direct or indirect harmful effects with respect to reproductive toxicity (see section 5.3). ",
+            "As a precautionary measure, it is preferable to avoid the use of {Invented name} <during pregnancy> <during {trimester} of pregnancy>. >"
+          ],
+          "bracketsBalanced": true,
+          "pattern": [
+            {
+              "kind": "guidance",
+              "value": "5"
+            },
+            {
+              "kind": "text",
+              "value": " "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "There are no or limited amount of data (less than 300 pregnancy outcomes) from the use of "
+                },
+                {
+                  "kind": "fill",
+                  "value": "Active substance"
+                },
+                {
+                  "kind": "text",
+                  "value": " in pregnant women.\nAnimal studies do not indicate direct or indirect harmful effects with respect to reproductive toxicity (see section 5.3). \nAs a precautionary measure, it is preferable to avoid the use of "
+                },
+                {
+                  "kind": "fill",
+                  "value": "Invented name"
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "during pregnancy"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "during "
+                    },
+                    {
+                      "kind": "fill",
+                      "value": "trimester"
+                    },
+                    {
+                      "kind": "text",
+                      "value": " of pregnancy"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": ". "
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "pregnancy.6",
+          "paragraphs": [
+            "[6] <A moderate amount of data on pregnant women (between 300-1000 pregnancy outcomes) indicate no malformative or feto/ neonatal toxicity of {Active substance}. ",
+            "A <Animal studies have shown reproductive toxicity (see section 5.3).>",
+            " [or] ",
+            "B <Animal studies are insufficient with respect to reproductive toxicity (see section 5.3).>",
+            "As a precautionary measure, it is preferable to avoid the use of {invented name} <during pregnancy > <during {trimester} of pregnancy.> "
+          ],
+          "bracketsBalanced": false,
+          "pattern": null
+        },
+        {
+          "id": "pregnancy.7",
+          "paragraphs": [
+            "[7] <A moderate amount of data on pregnant women (between 300-1000 pregnancy outcomes) indicate no malformative or feto/ neonatal toxicity of {Active substance}.>",
+            "Animal studies do not indicate reproductive toxicity (see section 5.3). ",
+            "The use of {invented name} may be considered <during pregnancy><during {trimester} of pregnancy>, if necessary. "
+          ],
+          "bracketsBalanced": true,
+          "pattern": [
+            {
+              "kind": "guidance",
+              "value": "7"
+            },
+            {
+              "kind": "text",
+              "value": " "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "A moderate amount of data on pregnant women (between 300-1000 pregnancy outcomes) indicate no malformative or feto/ neonatal toxicity of "
+                },
+                {
+                  "kind": "fill",
+                  "value": "Active substance"
+                },
+                {
+                  "kind": "text",
+                  "value": "."
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": "\nAnimal studies do not indicate reproductive toxicity (see section 5.3). \nThe use of "
+            },
+            {
+              "kind": "fill",
+              "value": "invented name"
+            },
+            {
+              "kind": "text",
+              "value": " may be considered "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "during pregnancy"
+                }
+              ]
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "during "
+                },
+                {
+                  "kind": "fill",
+                  "value": "trimester"
+                },
+                {
+                  "kind": "text",
+                  "value": " of pregnancy"
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": ", if necessary. "
+            }
+          ]
+        },
+        {
+          "id": "pregnancy.8",
+          "paragraphs": [
+            "[8] <A large amount of data on pregnant women (more than 1000 pregnancy outcomes) indicate no malformative nor feto/ neonatal toxicity of {Active substance}.>",
+            "{Invented name} can be used <during pregnancy><during {trimester} of pregnancy> if clinically needed. "
+          ],
+          "bracketsBalanced": true,
+          "pattern": [
+            {
+              "kind": "guidance",
+              "value": "8"
+            },
+            {
+              "kind": "text",
+              "value": " "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "A large amount of data on pregnant women (more than 1000 pregnancy outcomes) indicate no malformative nor feto/ neonatal toxicity of "
+                },
+                {
+                  "kind": "fill",
+                  "value": "Active substance"
+                },
+                {
+                  "kind": "text",
+                  "value": "."
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": "\n"
+            },
+            {
+              "kind": "fill",
+              "value": "Invented name"
+            },
+            {
+              "kind": "text",
+              "value": " can be used "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "during pregnancy"
+                }
+              ]
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "during "
+                },
+                {
+                  "kind": "fill",
+                  "value": "trimester"
+                },
+                {
+                  "kind": "text",
+                  "value": " of pregnancy"
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " if clinically needed. "
+            }
+          ]
+        },
+        {
+          "id": "pregnancy.9",
+          "paragraphs": [
+            "[9] <No effects during pregnancy are anticipated, since systemic exposure to {Active substance} is negligible.>",
+            "{Invented name} can be used during pregnancy. [E.g. medicinal products for which negligible systemic exposure/negligible pharmacodynamic systemic activity has been demonstrated in clinical situation]"
+          ],
+          "bracketsBalanced": true,
+          "pattern": [
+            {
+              "kind": "guidance",
+              "value": "9"
+            },
+            {
+              "kind": "text",
+              "value": " "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "No effects during pregnancy are anticipated, since systemic exposure to "
+                },
+                {
+                  "kind": "fill",
+                  "value": "Active substance"
+                },
+                {
+                  "kind": "text",
+                  "value": " is negligible."
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": "\n"
+            },
+            {
+              "kind": "fill",
+              "value": "Invented name"
+            },
+            {
+              "kind": "text",
+              "value": " can be used during pregnancy. "
+            },
+            {
+              "kind": "guidance",
+              "value": "E.g. medicinal products for which negligible systemic exposure/negligible pharmacodynamic systemic activity has been demonstrated in clinical situation"
+            }
+          ]
+        },
+        {
+          "id": "lactation.1",
+          "paragraphs": [
+            "[1] <{Active substance}/metabolites are excreted in human milk and effects have been shown in breastfed newborns/infants of treated women.> ",
+            "[or] ",
+            "<{Active substance}/metabolites have been identified in breastfed newborns/infants of treated women. <The effect of {Active substance} on newborns/infants is unknown.> [or] <There is insufficient information on the effects of {Active substance} in newborns/infants.>>",
+            "[or] ",
+            "<{Active substance}/metabolites are excreted in human milk to such an extent that effects on the breastfed newborns/infants are likely.>",
+            "<{Invented name}<is contraindicated during breast-feeding (see section 4.3)> [or] <should not be used during breast-feeding>.>",
+            " [or]",
+            " <Breast-feeding should be discontinued during treatment with {Invented name}.> ",
+            "[or]",
+            " <A decision must be made whether to discontinue breast-feeding or to discontinue/abstain from {Invented name} therapy taking into account the benefit of breast feeding for the child and the benefit of therapy for the woman.> "
+          ],
+          "bracketsBalanced": true,
+          "pattern": [
+            {
+              "kind": "guidance",
+              "value": "1"
+            },
+            {
+              "kind": "text",
+              "value": " "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "fill",
+                  "value": "Active substance"
+                },
+                {
+                  "kind": "text",
+                  "value": "/metabolites are excreted in human milk and effects have been shown in breastfed newborns/infants of treated women."
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " \n"
+            },
+            {
+              "kind": "guidance",
+              "value": "or"
+            },
+            {
+              "kind": "text",
+              "value": " \n"
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "fill",
+                  "value": "Active substance"
+                },
+                {
+                  "kind": "text",
+                  "value": "/metabolites have been identified in breastfed newborns/infants of treated women. "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "The effect of "
+                    },
+                    {
+                      "kind": "fill",
+                      "value": "Active substance"
+                    },
+                    {
+                      "kind": "text",
+                      "value": " on newborns/infants is unknown."
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "guidance",
+                  "value": "or"
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "There is insufficient information on the effects of "
+                    },
+                    {
+                      "kind": "fill",
+                      "value": "Active substance"
+                    },
+                    {
+                      "kind": "text",
+                      "value": " in newborns/infants."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": "\n"
+            },
+            {
+              "kind": "guidance",
+              "value": "or"
+            },
+            {
+              "kind": "text",
+              "value": " \n"
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "fill",
+                  "value": "Active substance"
+                },
+                {
+                  "kind": "text",
+                  "value": "/metabolites are excreted in human milk to such an extent that effects on the breastfed newborns/infants are likely."
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": "\n"
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "fill",
+                  "value": "Invented name"
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "is contraindicated during breast-feeding (see section 4.3)"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "guidance",
+                  "value": "or"
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "should not be used during breast-feeding"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": "."
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": "\n "
+            },
+            {
+              "kind": "guidance",
+              "value": "or"
+            },
+            {
+              "kind": "text",
+              "value": "\n "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Breast-feeding should be discontinued during treatment with "
+                },
+                {
+                  "kind": "fill",
+                  "value": "Invented name"
+                },
+                {
+                  "kind": "text",
+                  "value": "."
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " \n"
+            },
+            {
+              "kind": "guidance",
+              "value": "or"
+            },
+            {
+              "kind": "text",
+              "value": "\n "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "A decision must be made whether to discontinue breast-feeding or to discontinue/abstain from "
+                },
+                {
+                  "kind": "fill",
+                  "value": "Invented name"
+                },
+                {
+                  "kind": "text",
+                  "value": " therapy taking into account the benefit of breast feeding for the child and the benefit of therapy for the woman."
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " "
+            }
+          ]
+        },
+        {
+          "id": "lactation.2",
+          "paragraphs": [
+            "[2] <It is unknown whether {Active substance}/metabolites are excreted in human milk.> ",
+            "[or] ",
+            "<There is insufficient information on the excretion of {Active substance}/metabolites in human milk.> ",
+            "[or] ",
+            "<There is insufficient information on the excretion of {Active substance}/metabolites in animal milk.> ",
+            "[or] ",
+            "<Available pharmacodynamic/toxicological data in animals have shown excretion of {Active substance}/metabolites in milk (for details see 5.3).> ",
+            "[or] ",
+            "<Physico-chemical data suggest excretion of {Active substance}/metabolites in human milk.> ",
+            "A risk to the newborns/infants cannot be excluded. ",
+            "<{Invented name} <is contraindicated during breast-feeding (see section 4.3)> [or] <should not be used during breast-feeding>.> ",
+            "[or]",
+            " <Breast-feeding should be discontinued during treatment with {Invented name}.>",
+            " [or]",
+            " <A decision must be made whether to discontinue breast-feeding or to discontinue/abstain from {Invented name} therapy taking into account the benefit of breast feeding for the child and the benefit of therapy for the woman.>"
+          ],
+          "bracketsBalanced": true,
+          "pattern": [
+            {
+              "kind": "guidance",
+              "value": "2"
+            },
+            {
+              "kind": "text",
+              "value": " "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "It is unknown whether "
+                },
+                {
+                  "kind": "fill",
+                  "value": "Active substance"
+                },
+                {
+                  "kind": "text",
+                  "value": "/metabolites are excreted in human milk."
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " \n"
+            },
+            {
+              "kind": "guidance",
+              "value": "or"
+            },
+            {
+              "kind": "text",
+              "value": " \n"
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "There is insufficient information on the excretion of "
+                },
+                {
+                  "kind": "fill",
+                  "value": "Active substance"
+                },
+                {
+                  "kind": "text",
+                  "value": "/metabolites in human milk."
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " \n"
+            },
+            {
+              "kind": "guidance",
+              "value": "or"
+            },
+            {
+              "kind": "text",
+              "value": " \n"
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "There is insufficient information on the excretion of "
+                },
+                {
+                  "kind": "fill",
+                  "value": "Active substance"
+                },
+                {
+                  "kind": "text",
+                  "value": "/metabolites in animal milk."
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " \n"
+            },
+            {
+              "kind": "guidance",
+              "value": "or"
+            },
+            {
+              "kind": "text",
+              "value": " \n"
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Available pharmacodynamic/toxicological data in animals have shown excretion of "
+                },
+                {
+                  "kind": "fill",
+                  "value": "Active substance"
+                },
+                {
+                  "kind": "text",
+                  "value": "/metabolites in milk (for details see 5.3)."
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " \n"
+            },
+            {
+              "kind": "guidance",
+              "value": "or"
+            },
+            {
+              "kind": "text",
+              "value": " \n"
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Physico-chemical data suggest excretion of "
+                },
+                {
+                  "kind": "fill",
+                  "value": "Active substance"
+                },
+                {
+                  "kind": "text",
+                  "value": "/metabolites in human milk."
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " \nA risk to the newborns/infants cannot be excluded. \n"
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "fill",
+                  "value": "Invented name"
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "is contraindicated during breast-feeding (see section 4.3)"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "guidance",
+                  "value": "or"
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "should not be used during breast-feeding"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": "."
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " \n"
+            },
+            {
+              "kind": "guidance",
+              "value": "or"
+            },
+            {
+              "kind": "text",
+              "value": "\n "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Breast-feeding should be discontinued during treatment with "
+                },
+                {
+                  "kind": "fill",
+                  "value": "Invented name"
+                },
+                {
+                  "kind": "text",
+                  "value": "."
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": "\n "
+            },
+            {
+              "kind": "guidance",
+              "value": "or"
+            },
+            {
+              "kind": "text",
+              "value": "\n "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "A decision must be made whether to discontinue breast-feeding or to discontinue/abstain from "
+                },
+                {
+                  "kind": "fill",
+                  "value": "Invented name"
+                },
+                {
+                  "kind": "text",
+                  "value": " therapy taking into account the benefit of breast feeding for the child and the benefit of therapy for the woman."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "lactation.3",
+          "paragraphs": [
+            "[3] <No effects of {Active substance} have been shown in breastfed newborns/infants of treated mothers.> ",
+            "[or] ",
+            "<No effects on the breastfed newborn/infant are anticipated since the systemic exposure of the breast-feeding woman to {Active substance} is negligible.> ",
+            "[or] ",
+            "<{Active substance}/metabolites have not been identified in plasma of breastfed newborns/infants of treated mothers.> ",
+            "[or] ",
+            "<{Active substance}/metabolites are not excreted in human milk.> ",
+            "[or] ",
+            "<{Active substance}/metabolites are excreted in human milk, but at therapeutic doses of {Invented name} no effects on the breastfed newborns/infants are anticipated.> ",
+            "{Invented name} can be used during breast-feeding. "
+          ],
+          "bracketsBalanced": true,
+          "pattern": [
+            {
+              "kind": "guidance",
+              "value": "3"
+            },
+            {
+              "kind": "text",
+              "value": " "
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "No effects of "
+                },
+                {
+                  "kind": "fill",
+                  "value": "Active substance"
+                },
+                {
+                  "kind": "text",
+                  "value": " have been shown in breastfed newborns/infants of treated mothers."
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " \n"
+            },
+            {
+              "kind": "guidance",
+              "value": "or"
+            },
+            {
+              "kind": "text",
+              "value": " \n"
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "No effects on the breastfed newborn/infant are anticipated since the systemic exposure of the breast-feeding woman to "
+                },
+                {
+                  "kind": "fill",
+                  "value": "Active substance"
+                },
+                {
+                  "kind": "text",
+                  "value": " is negligible."
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " \n"
+            },
+            {
+              "kind": "guidance",
+              "value": "or"
+            },
+            {
+              "kind": "text",
+              "value": " \n"
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "fill",
+                  "value": "Active substance"
+                },
+                {
+                  "kind": "text",
+                  "value": "/metabolites have not been identified in plasma of breastfed newborns/infants of treated mothers."
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " \n"
+            },
+            {
+              "kind": "guidance",
+              "value": "or"
+            },
+            {
+              "kind": "text",
+              "value": " \n"
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "fill",
+                  "value": "Active substance"
+                },
+                {
+                  "kind": "text",
+                  "value": "/metabolites are not excreted in human milk."
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " \n"
+            },
+            {
+              "kind": "guidance",
+              "value": "or"
+            },
+            {
+              "kind": "text",
+              "value": " \n"
+            },
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "fill",
+                  "value": "Active substance"
+                },
+                {
+                  "kind": "text",
+                  "value": "/metabolites are excreted in human milk, but at therapeutic doses of "
+                },
+                {
+                  "kind": "fill",
+                  "value": "Invented name"
+                },
+                {
+                  "kind": "text",
+                  "value": " no effects on the breastfed newborns/infants are anticipated."
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "value": " \n"
+            },
+            {
+              "kind": "fill",
+              "value": "Invented name"
+            },
+            {
+              "kind": "text",
+              "value": " can be used during breast-feeding. "
+            }
+          ]
+        }
+      ]
+    },
+    "II": {
+      "attachesTo": "smpc.4.8",
+      "groups": {
+        "MedDRA frequency convention": [
+          {
+            "code": "001",
+            "text": "<Very common (≥ 1/10)>"
+          },
+          {
+            "code": "002",
+            "text": "<Common (≥ 1/100 to < 1/10)>"
+          },
+          {
+            "code": "003",
+            "text": "<Uncommon (≥ 1/1 000 to < 1/100)>"
+          },
+          {
+            "code": "004",
+            "text": "<Rare (≥ 1/10 000 to < 1/1 000)>"
+          },
+          {
+            "code": "005",
+            "text": "<Very rare (< 1/10 000)>"
+          },
+          {
+            "code": "006",
+            "text": "<not known (frequency cannot be estimated from the available data)>"
+          }
+        ],
+        "MedDRA- system organ class database": [
+          {
+            "code": "007",
+            "text": "Infections and infestations"
+          },
+          {
+            "code": "008",
+            "text": "Neoplasms benign, malignant and unspecified (incl cysts and polyps)"
+          },
+          {
+            "code": "009",
+            "text": "Blood and lymphatic system disorders "
+          },
+          {
+            "code": "010",
+            "text": "Immune system disorders "
+          },
+          {
+            "code": "011",
+            "text": "Endocrine disorders "
+          },
+          {
+            "code": "012",
+            "text": "Metabolism and nutrition disorders "
+          },
+          {
+            "code": "013",
+            "text": "Psychiatric disorders "
+          },
+          {
+            "code": "014",
+            "text": "Nervous system disorders "
+          },
+          {
+            "code": "015",
+            "text": "Eye disorders "
+          },
+          {
+            "code": "016",
+            "text": "Ear and labyrinth disorders "
+          },
+          {
+            "code": "017",
+            "text": "Cardiac disorders "
+          },
+          {
+            "code": "018",
+            "text": "Vascular disorders "
+          },
+          {
+            "code": "019",
+            "text": "Respiratory, thoracic and mediastinal disorders "
+          },
+          {
+            "code": "020",
+            "text": "Gastrointestinal disorders "
+          },
+          {
+            "code": "021",
+            "text": "Hepatobiliary disorders "
+          },
+          {
+            "code": "022",
+            "text": "Skin and subcutaneous tissue disorders "
+          },
+          {
+            "code": "023",
+            "text": "Musculoskeletal and connective tissue disorders "
+          },
+          {
+            "code": "024",
+            "text": "Renal and urinary disorders "
+          },
+          {
+            "code": "025",
+            "text": "Pregnancy, puerperium and perinatal conditions "
+          },
+          {
+            "code": "026",
+            "text": "Reproductive system and breast disorders "
+          },
+          {
+            "code": "027",
+            "text": "Congenital, familial and genetic disorders "
+          },
+          {
+            "code": "028",
+            "text": "General disorders and administration site conditions "
+          },
+          {
+            "code": "029",
+            "text": "Investigations "
+          },
+          {
+            "code": "030",
+            "text": "Injury, poisoning and procedural complications "
+          },
+          {
+            "code": "031",
+            "text": "Surgical and medical procedures "
+          },
+          {
+            "code": "032",
+            "text": "Social circumstances"
+          },
+          {
+            "code": "033",
+            "text": "Product issues"
+          }
+        ]
+      }
+    },
+    "III": {
+      "attachesTo": "smpc.6.4",
+      "items": [
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<Do not store above <25 °C> <30 °C>.> or",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Do not store above "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "25 °C"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "30 °C"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": "."
+                }
+              ]
+            }
+          ],
+          "trailer": " or",
+          "connector": "or"
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<Store below <25 °C> <30 °C>.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Store below "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "25 °C"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "30 °C"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": "."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<Store in a refrigerator (2 °C – 8 °C).>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Store in a refrigerator (2 °C – 8 °C)."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<Store and transport refrigerated (2 °C – 8 °C).>*",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Store and transport refrigerated (2 °C – 8 °C)."
+                }
+              ]
+            }
+          ],
+          "trailer": "*",
+          "note": "*"
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<Store in a freezer {temperature range}.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Store in a freezer "
+                },
+                {
+                  "kind": "fill",
+                  "value": "temperature range"
+                },
+                {
+                  "kind": "text",
+                  "value": "."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<Store and transport frozen {temperature range}.>**",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Store and transport frozen "
+                },
+                {
+                  "kind": "fill",
+                  "value": "temperature range"
+                },
+                {
+                  "kind": "text",
+                  "value": "."
+                }
+              ]
+            }
+          ],
+          "trailer": "**",
+          "note": "**"
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<Do not <refrigerate> <or> <freeze>.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Do not "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "refrigerate"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "or"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "freeze"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": "."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<Store in the original package in order to protect from <light> <moisture>.>****",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Store in the original package in order to protect from "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "light"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "moisture"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": "."
+                }
+              ]
+            }
+          ],
+          "trailer": "****",
+          "note": "****"
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<Keep the {container}*** tightly closed in order to protect from <light> <moisture>.>****",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Keep the "
+                },
+                {
+                  "kind": "fill",
+                  "value": "container"
+                },
+                {
+                  "kind": "text",
+                  "value": "*** tightly closed in order to protect from "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "light"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "moisture"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": "."
+                }
+              ]
+            }
+          ],
+          "trailer": "****",
+          "note": "****"
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<Keep the {container}*** in the outer carton in order to protect from <light> <moisture>.>****",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "Keep the "
+                },
+                {
+                  "kind": "fill",
+                  "value": "container"
+                },
+                {
+                  "kind": "text",
+                  "value": "*** in the outer carton in order to protect from "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "light"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": " "
+                },
+                {
+                  "kind": "optional",
+                  "value": [
+                    {
+                      "kind": "text",
+                      "value": "moisture"
+                    }
+                  ]
+                },
+                {
+                  "kind": "text",
+                  "value": "."
+                }
+              ]
+            }
+          ],
+          "trailer": "****",
+          "note": "****"
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<This medicinal product does not require any special storage conditions.>",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "This medicinal product does not require any special storage conditions."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "statement",
+          "optional": true,
+          "source": "<This medicinal product does not require any special temperature storage conditions.>*****",
+          "pattern": [
+            {
+              "kind": "optional",
+              "value": [
+                {
+                  "kind": "text",
+                  "value": "This medicinal product does not require any special temperature storage conditions."
+                }
+              ]
+            }
+          ],
+          "trailer": "*****",
+          "note": "*****"
+        }
+      ],
+      "notes": [
+        "* The stability data generated at 25 °C/60%RH (acc) should be taken into account when deciding whether or not transport under refrigeration is necessary. The statement should only be used in exceptional cases.",
+        "** The statement should be used only when critical.",
+        "*** The actual name of the container should be used (e.g. bottle, blister, etc.).",
+        "**** It should be specified if the product is sensitive to light and/or moisture.",
+        "***** Depending on the pharmaceutical form and the properties of the product, there may be a risk of deterioration due to physical changes if subjected to low temperatures. Low temperatures may also have an effect on the packaging in certain cases. An additional statement may be necessary to take account of this possibility."
+      ]
+    }
+  }
+}

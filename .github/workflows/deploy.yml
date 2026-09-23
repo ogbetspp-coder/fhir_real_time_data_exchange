@@ -8,7 +8,8 @@ on:
     # every deploy rebuilds three images, re-imports the profiles and publishes a smoke run, and
     # 41 of them ran in two days, most for documentation. Nothing deployed is built from these
     # paths — the images take src/, fhir/, package files and Dockerfiles; the deploy takes infra/,
-    # scripts/ and workflows/. The quality gate on the pull request still covers test/.
+    # scripts/ and workflows/. The quality gate on the pull request still covers test/. qrd/
+    # holds the pinned EMA templates and the registry built from them, read only by zone-a/.
     # .claude/ and .cursor/ hold coding-assistant settings and hooks, read by editors on a
     # developer's machine and never by a build or the deploy.
     # workflow_dispatch below deploys on demand whatever changed.
@@ -19,6 +20,7 @@ on:
       - "test/**"
       - "agent/**"
       - "zone-a/**"
+      - "qrd/**"
       - ".github/CODEOWNERS"
       - ".github/dependabot.yml"
       - ".github/workflows/ci.yml"

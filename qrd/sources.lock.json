@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "1.0.0",
+  "page": "https://www.ema.europa.eu/en/human-regulatory-overview/marketing-authorisation/product-information-requirements/product-information-qrd-templates-human",
+  "retrieved": "2026-09-23",
+  "note": "EMA documents, reproduced with acknowledgement of the source as the EMA permits. The reference numbers and dates are copied from the page on the retrieval date; the files are byte copies. zone-a/tests/test_qrd_registry.py checks the hashes offline; zone-a/scripts/check_qrd_sources.py compares them with the live page on demand.",
+  "sources": [
+    {
+      "name": "QRD product-information template version 10.4",
+      "file": "qrd-product-information-template-version-104_en.docx",
+      "url": "https://www.ema.europa.eu/en/documents/template-form/qrd-product-information-template-version-104_en.docx",
+      "sha256": "6c9da03b2c72f055c81dc14f12c82da61a1609e7beffcc71f95e8046d7104fd1",
+      "bytes": 65538,
+      "emaReference": null,
+      "firstPublished": "1997-12-03",
+      "lastUpdated": "2024-02-29",
+      "status": "adopted",
+      "usedFor": "SmPC section tree, headings and standard statements"
+    },
+    {
+      "name": "QRD Appendix I - Statements for use in section 4.6 'pregnancy and lactation' of the SmPC",
+      "file": "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics_en.docx",
+      "url": "https://www.ema.europa.eu/en/documents/template-form/qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics_en.docx",
+      "sha256": "13031dfae722bfe2479cb9323be96adfe18941da1c489731ea805082e5f886b3",
+      "bytes": 19519,
+      "emaReference": "EMA/215345/2023",
+      "firstPublished": "2008-07-01",
+      "lastUpdated": "2023-06-23",
+      "status": "adopted",
+      "usedFor": "SmPC 4.6 statement menu"
+    },
+    {
+      "name": "QRD Appendix II - MedDRA terminology to be used in section 4.8 'undesirable effects' of the SmPC",
+      "file": "qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48-undesirable-effects-summary-product-characteristics_en.docx",
+      "url": "https://www.ema.europa.eu/en/documents/template-form/qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48-undesirable-effects-summary-product-characteristics_en.docx",
+      "sha256": "68a8026e6d99f22f9a380edf04df34bb5f29f35574f9e507fb4b5d5f16e996ae",
+      "bytes": 23078,
+      "emaReference": "EMA/295934/2018 v.7",
+      "firstPublished": "2009-07-01",
+      "lastUpdated": "2026-03-25",
+      "status": "adopted",
+      "usedFor": "SmPC 4.8 frequency convention and system organ classes"
+    },
+    {
+      "name": "QRD Appendix III to the Quality Review of Documents templates for human medicinal products",
+      "file": "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products_en.docx",
+      "url": "https://www.ema.europa.eu/en/documents/template-form/qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products_en.docx",
+      "sha256": "10aed02c52b69740041841d09a3fca2239bc9839eb3317bc1c1dd732532a9215",
+      "bytes": 27156,
+      "emaReference": "EMEA/29277/2003 v.6",
+      "firstPublished": "2016-02-09",
+      "lastUpdated": "2026-03-25",
+      "status": "adopted",
+      "usedFor": "SmPC 6.4 storage statement menu"
+    }
+  ]
+}

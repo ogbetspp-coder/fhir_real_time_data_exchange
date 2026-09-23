@@ -48,13 +48,15 @@ function matches(pattern: string, file: string): boolean {
 }
 
 describe("the deploy trigger", () => {
-  it("skips merges that touch only documentation, tests, the agent, Zone A or assistant settings", () => {
+  it("skips merges that touch only documentation, tests, the agent, Zone A, the QRD registry or assistant settings", () => {
     expect(ignored.length).toBeGreaterThan(5);
     for (const file of [
       "docs/foundations.md",
       "README.md",
       "test/ci/x.test.ts",
       "agent/src/a.py",
+      "qrd/registry/cap-smpc-en-10.4.json",
+      "qrd/sources.lock.json",
       ".claude/settings.json",
       ".claude/hooks/shell_guard.py",
       ".cursor/hooks.json",

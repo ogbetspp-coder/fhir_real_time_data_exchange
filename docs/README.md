@@ -16,6 +16,7 @@ working rules.
 | [Design: CMEK rollout](design/cmek-rollout.md)               | Customer-managed keys on the record, and how the rollout was proven.                          |
 | [Design: ePI query service](design/epi-mcp-query-service.md) | The Model Context Protocol query service over the record.                                     |
 | [Design: extractor spike](design/extractor-spike.md)         | Document AI as an extractor: the spike and its verdict.                                       |
+| [Design: QRD template registry](design/qrd-registry.md)      | The EMA QRD template as pinned, hash-checked data: the engine's first component.              |
 | [Design: verifiable answers](design/verifiable-answers.md)   | Verifiable answers on Google-native surfaces (proposed).                                      |
 | [Demo: the verifiable label](demo/verifiable-label.md)       | The demonstration script.                                                                     |
 
