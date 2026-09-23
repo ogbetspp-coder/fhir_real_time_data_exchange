@@ -12,7 +12,7 @@
 # 26 in every image, all at once and all but TypeScript green.
 #
 # The Node base image moves by digest only, never by version. ADR 0003 pins the runtime to
-# node:22.14.0 because NFC — step 3 of the fidelity normalisation — depends on the runtime's
+# node:22.22.0 because NFC — step 3 of the fidelity normalisation — depends on the runtime's
 # Unicode tables, and a different Node can change every NFC-dependent hash. CI would not have
 # noticed: it tests on its own Node install, not the one inside the image. Moving it is a change
 # under ADR 0003's change control; test/ci/runtime-pin.test.ts fails if any image or workflow

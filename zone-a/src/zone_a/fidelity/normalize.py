@@ -19,7 +19,7 @@ from typing import Final
 NORMALIZATION_VERSION: Final = "fidelity-norm/1.1.1"
 
 # ADR 0003: NFC output depends on the Unicode Character Database of the runtime, so the UCD is
-# pinned as tightly as the code. Zone B runs node:22.14.0 (ICU 76.1, Unicode 16.0).
+# pinned as tightly as the code. Zone B runs node:22.22.0 (ICU 77.1, Unicode 16.0).
 REQUIRED_UNICODE_VERSION: Final = "16.0.0"
 
 INVISIBLE_FORMATTING: Final = frozenset({0x00AD, 0x200B, 0xFEFF, 0x2060})

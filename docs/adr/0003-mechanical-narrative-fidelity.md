@@ -89,8 +89,9 @@ unit order, never locale-aware ordering, so a re-implementation can reproduce th
   differential run over generated inputs (spec section 8), and the specification was amended
   (`fidelity-norm/1.1.1`) to state every rule the port had to read from the code.
 - NFC (step 3) depends on the Unicode Character Database of the runtime. Zone B pins its
-  runtime image (`node:22.14.0`, ICU 76.1, Unicode 16.0) and any re-implementation must pin an
-  equivalent; a runtime with a different Unicode version is a change to the normalisation
-  version even though no code changes.
+  runtime image (`node:22.22.0`, ICU 77.1, Unicode 16.0; `node:22.14.0`, ICU 76.1, until
+  2026-09-22 — the recorded change in `docs/validation/README.md`) and any re-implementation
+  must pin an equivalent; a runtime with a different Unicode version is a change to the
+  normalisation version even though no code changes.
 - The verifier is a second, independent narrative gate alongside the existing
   byte-preservation assertion in `src/fhir/transform.ts` (UR-01); the new control is UR-09.

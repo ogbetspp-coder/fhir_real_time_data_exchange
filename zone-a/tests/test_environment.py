@@ -1,7 +1,7 @@
 """The runtime pins ADR 0003 requires.
 
 NFC (normalisation step 3) is a function of the runtime's Unicode Character Database, not of the
-code. Zone B pins node:22.14.0 / ICU 76.1 / Unicode 16.0; a Zone A runtime on a different UCD
+code. Zone B pins node:22.22.0 / ICU 77.1 / Unicode 16.0; a Zone A runtime on a different UCD
 would produce different normalised text from identical input and would be a change to
 NORMALIZATION_VERSION even though no line of either implementation changed. So it is asserted,
 not assumed.

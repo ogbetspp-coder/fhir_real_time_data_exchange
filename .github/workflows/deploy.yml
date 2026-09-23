@@ -55,7 +55,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
-          node-version: 22.14.0
+          node-version: 22.22.0
           package-manager-cache: false
       # npm ci directly, not deploy.sh deps: the script resolves a project id before any phase,
       # and this job has neither the project variables nor a gcloud configuration.
@@ -149,7 +149,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
-          node-version: 22.14.0
+          node-version: 22.22.0
           package-manager-cache: false
 
       # The deploy still runs Node: bootstrap.sh fetches the pinned standards and exports the

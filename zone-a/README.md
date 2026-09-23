@@ -38,7 +38,7 @@ see" below.
 
 Python 3.14 is required and the range is closed (`>=3.14,<3.15`): the Unicode Character
 Database ships with the interpreter, NFC output depends on it, and ADR 0003 pins Unicode 16.0
-because the Zone B runtime image (`node:22.14.0`, ICU 76.1) is on that version. A different
+because the Zone B runtime image (`node:22.22.0`, ICU 77.1) is on that version. A different
 minor Python is a different UCD and therefore a change to `NORMALIZATION_VERSION` even though no
 line of code changed. `tests/test_environment.py` asserts it rather than trusting it.
 

@@ -1,8 +1,9 @@
 # Pinned by digest, not tag: the normalisation version (docs/fidelity-normalization.md section
 # 8, ADR 0003) depends on the runtime's Unicode database, and a rebuilt tag can move it while
-# every version literal stays put. This is node:22.14.0-bookworm-slim's multi-arch index as
-# resolved on 2026-09-20; test/runtime.test.ts fails the build if the Unicode version drifts.
-FROM node:22.14.0-bookworm-slim@sha256:1c18d9ab3af4585870b92e4dbc5cac5a0dc77dd13df1a5905cea89fc720eb05b AS build
+# every version literal stays put. This is node:22.22.0-bookworm-slim's multi-arch index as
+# resolved on 2026-09-22 (ICU 77.1, Unicode 16.0); test/runtime.test.ts fails the build if the
+# Unicode or ICU version drifts.
+FROM node:22.22.0-bookworm-slim@sha256:dd9d21971ec4395903fa6143c2b9267d048ae01ca6d3ea96f16cb30df6187d94 AS build
 
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -12,7 +13,7 @@ COPY src ./src
 RUN npm run build
 RUN npm prune --omit=dev
 
-FROM node:22.14.0-bookworm-slim@sha256:1c18d9ab3af4585870b92e4dbc5cac5a0dc77dd13df1a5905cea89fc720eb05b AS runtime
+FROM node:22.22.0-bookworm-slim@sha256:dd9d21971ec4395903fa6143c2b9267d048ae01ca6d3ea96f16cb30df6187d94 AS runtime
 
 ENV NODE_ENV=production
 WORKDIR /app
