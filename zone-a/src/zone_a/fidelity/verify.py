@@ -22,6 +22,7 @@ normalisation to ``int`` that Python's slicing and arithmetic need afterwards.
 
 from __future__ import annotations
 
+import unicodedata
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -32,7 +33,7 @@ from .normalize import (
     NormalizationError,
     count_words,
     find_forbidden_character,
-    is_word_character,
+    is_whitespace,
     normalize_text,
 )
 from .xhtml import SOFT_HYPHEN, XhtmlError, xhtml_to_text
@@ -103,7 +104,15 @@ def _normalized_span(span: Json) -> dict[str, Json]:
 
 
 def _number_text(value: Json) -> str:
-    """A number as JavaScript writes it into an issue string: ``1.0`` is ``1``, not ``1.0``."""
+    """A value as a JavaScript template literal writes it into an issue string.
+
+    ``1.0`` is ``1``, not ``1.0``; a boolean is ``true``/``false``, not ``True``/``False`` (tested
+    before the integer case, because ``bool`` is a subclass of ``int``); ``None`` is ``null``.
+    """
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if value is None:
+        return "null"
     integral = _as_integer(value)
     return str(value) if integral is None else str(integral)
 
@@ -131,7 +140,9 @@ def _body_issue_for(text: str, body_start: int, body_end: int) -> str | None:
         _at(text, body_start - 1) != "\n" or _soft_hyphen_break_before(text, body_start)
     ):
         return "body-boundary"
-    if body_end != len(text) and _at(text, body_end - 1) != "\n":
+    # A non-empty body always ends with its own line terminator, even at the end of the page:
+    # otherwise the last word of one page and the first word of the next would read as one.
+    if body_end != body_start and _at(text, body_end - 1) != "\n":
         return "body-boundary"
     if len(text) - (body_end - body_start) > MAX_EXCLUDED_CODE_POINTS_PER_PAGE:
         return "excluded-text"
@@ -142,7 +153,7 @@ def index_pages(source: Json) -> tuple[dict[int, PageIndex], list[str]]:
     pages: dict[int, PageIndex] = {}
     structural: list[str] = []
     issues: list[str] = []
-    for page in source["pages"]:
+    for position, page in enumerate(source["pages"], start=1):
         text = page["text"]
         # `Number.isInteger`, not `isinstance(..., int)`: a JSON `1.0` is the same number as `1`
         # on the Zone B side, and the issue strings are inside `reportHash`, so the number is
@@ -152,6 +163,10 @@ def index_pages(source: Json) -> tuple[dict[int, PageIndex], list[str]]:
         body_end = _as_integer(page["bodyEnd"])
         if number is not None and number in pages:
             structural.append(f"Duplicate page number {_number_text(page['page'])}")
+        # Pages are numbered 1..N in array order, so no page can be left out of the document and
+        # the text before a section's first span is always the text the document puts there.
+        if number != position:
+            structural.append(f"Page {_number_text(page['page'])} at position {position}")
         if (
             number is None
             or number < 1
@@ -179,16 +194,164 @@ def index_pages(source: Json) -> tuple[dict[int, PageIndex], list[str]]:
     return pages, issues
 
 
+def _from_line_start(index: PageIndex, start: int) -> int:
+    """Where a slice of page text starting at ``start`` is read from.
+
+    The U+000A that ends the previous line when only whitespace other than U+000A lies between
+    it and ``start`` (before ``bodyStart``, section 1 makes that code point U+000A), otherwise
+    ``start``. Normalisation does not treat the start of a text as the start of a line (section
+    3 step 4), so a slice that begins at a line start carries its line terminator with it.
+    """
+    position = start
+    while position > index.body_start:
+        character = index.text[position - 1]
+        if character == "\n":
+            return position - 1
+        if not is_whitespace(ord(character)):
+            return start
+        position -= 1
+    return position - 1 if _at(index.text, position - 1) == "\n" else start
+
+
+def _last_line_has_tab(index: PageIndex, end: int) -> bool:
+    """Whether the whole page line a slice ending at ``end`` ends on contains U+0009.
+
+    The line is read in the body from the U+000A before it to the next U+000A, not only its part
+    inside the slice. A slice that ends with U+000A ends on no partial line.
+    """
+    if end <= index.body_start or index.text[end - 1] == "\n":
+        return False
+    line_start = end - 1
+    while line_start > index.body_start and index.text[line_start - 1] != "\n":
+        line_start -= 1
+    line_end = end
+    while line_end < index.body_end and index.text[line_end] != "\n":
+        line_end += 1
+    return "\t" in index.text[line_start:line_end]
+
+
+@dataclass(slots=True)
+class _Resolved:
+    raw: list[str]
+    last_line_has_tab: bool
+
+
 def _is_blank_slice(index: PageIndex, start: int, end: int) -> bool:
     if end <= start:
         return True
     try:
-        return normalize_text(index.text[start:end]) == ""
+        text = index.text[_from_line_start(index, start) : end]
+        return normalize_text(text, last_line_has_tab=_last_line_has_tab(index, end)) == ""
     except NormalizationError:
         return False
 
 
-def _resolve_spans(spans: list[Json], pages: dict[int, PageIndex]) -> list[str] | tuple[str, str]:
+# Whitespace for the edge rules: section 3 step 5's list without U+00A0, U+2007 and U+202F, which
+# join the groups of a number (`10 000`) and so are not a boundary between tokens.
+NUMBER_JOINERS: Final = frozenset({0x00A0, 0x2007, 0x202F})
+
+
+def _is_edge_whitespace(character: str | None) -> bool:
+    if character is None:
+        return False
+    code_point = ord(character)
+    return is_whitespace(code_point) and code_point not in NUMBER_JOINERS
+
+
+def _is_decimal_digit(character: str | None) -> bool:
+    """General category Nd, which is what JavaScript's ``\\p{Nd}`` tests."""
+    return character is not None and unicodedata.category(character) == "Nd"
+
+
+def _next_token(index: PageIndex, start: int, step: int) -> str | None:
+    """The first non-whitespace code point from ``start`` in direction ``step``, in the body.
+
+    Reading stops at U+000A (``None``): a number is never read across a line break.
+    """
+    position = start
+    while index.body_start <= position < index.body_end:
+        character = index.text[position]
+        if character == "\n":
+            return None
+        if not is_whitespace(ord(character)):
+            return character
+        position += step
+    return None
+
+
+def _cuts_digit_group(index: PageIndex, inner: int, beyond: int, step: int) -> bool:
+    """A digit at the edge with a digit beyond it, on the same line, is one grouped number."""
+    return _is_decimal_digit(_at(index.text, inner)) and _is_decimal_digit(
+        _next_token(index, beyond, step)
+    )
+
+
+def _start_cuts_word(pages: dict[int, PageIndex], span: Json) -> bool:
+    """Section 6 start rule: does the section begin inside a token?
+
+    Reads backwards from the code point before the first span, through its page's body and then
+    the bodies of the pages before it (as declared, whether or not they pass section 1 or 2),
+    skipping edge whitespace. The first other code point cuts a token if nothing was skipped
+    before it, whatever it is (a letter, a digit, the ``.`` of ``0.5``, the minus of ``-20``,
+    U+00A0 of ``10 000``), or if it is U+00AD. Reading past page 1 is no cut. It also cuts a
+    number when the span's first code point that is not edge whitespace is a digit and the first
+    non-whitespace code point before that on the same line is a digit too.
+    """
+    first = pages.get(span["page"])
+    start = span["startOffset"]
+    if first is not None:
+        # The span's first code point that is not section 3 whitespace (joiners included).
+        inner = start
+        while inner < span["endOffset"] and is_whitespace(ord(first.text[inner])):
+            inner += 1
+        if inner < span["endOffset"] and _cuts_digit_group(first, inner, inner - 1, -1):
+            return True
+    skipped = False
+    page_number = span["page"]
+    position = start - 1
+    index = first
+    while index is not None:
+        while position >= index.body_start:
+            character = index.text[position]
+            if _is_edge_whitespace(character):
+                skipped = True
+                position -= 1
+                continue
+            return character == SOFT_HYPHEN or not skipped
+        page_number -= 1
+        index = pages.get(page_number)
+        if index is not None:
+            position = index.body_end - 1
+    return False
+
+
+def _end_cuts_word(index: PageIndex, span: Json) -> bool:
+    """Section 6 end rule: does the section end inside a token?
+
+    It does if the last span, without trailing edge whitespace, ends in U+00AD; otherwise it does
+    unless the code point at its end offset is edge whitespace or the end offset is at or past
+    ``bodyEnd``. The ``1`` of ``1.5`` is a cut. It also cuts a number when the span's last code
+    point that is not edge whitespace is a digit and the first non-whitespace code point after
+    that on the same line is a digit too.
+    """
+    start, end = span["startOffset"], span["endOffset"]
+    trimmed = end
+    while trimmed > start and _is_edge_whitespace(index.text[trimmed - 1]):
+        trimmed -= 1
+    if trimmed > start and index.text[trimmed - 1] == SOFT_HYPHEN:
+        return True
+    if end >= index.body_end:
+        return False
+    if not _is_edge_whitespace(_at(index.text, end)):
+        return True
+    # The span's last code point that is not section 3 whitespace (joiners included).
+    inner = trimmed
+    while inner > start and is_whitespace(ord(index.text[inner - 1])):
+        inner -= 1
+    return inner > start and _cuts_digit_group(index, inner - 1, inner, 1)
+
+
+def _resolve_spans(spans: list[Json], pages: dict[int, PageIndex]) -> _Resolved | tuple[str, str]:
     """Locate and hash-check a section's spans.
 
     Returns one contiguous raw slice per page — so the source's own characters, never
@@ -237,32 +400,25 @@ def _resolve_spans(spans: list[Json], pages: dict[int, PageIndex]) -> list[str] 
             else:
                 return ("invalid-provenance", "non-contiguous")
         else:
-            pieces.append(_Piece(index=index, start=start_offset, end=end_offset))
+            pieces.append(
+                _Piece(index=index, start=_from_line_start(index, start_offset), end=end_offset)
+            )
         previous = span
 
     # The outer edges of a section must fall on word boundaries: a section may omit words, but
     # it may not begin or end inside one (spec section 6).
-    if pieces:
-        first, last = pieces[0], pieces[-1]
-        head = first.index.text
-        before = _at(head, first.start - 1)
-        if (
-            first.start > first.index.body_start
-            and before is not None
-            and (is_word_character(before) or _soft_hyphen_break_before(head, first.start))
-        ):
-            return ("invalid-provenance", "word-cut")
-        tail = last.index.text
-        after = _at(tail, last.end)
-        cuts_after = _at(tail, last.end - 1) == SOFT_HYPHEN or (
-            (after is not None and is_word_character(after))
-            if last.end < last.index.body_end
-            else _soft_hyphen_break_before(tail, last.end)
-        )
-        if cuts_after:
-            return ("invalid-provenance", "word-cut")
+    if (
+        pieces
+        and spans
+        and (_start_cuts_word(pages, spans[0]) or _end_cuts_word(pieces[-1].index, spans[-1]))
+    ):
+        return ("invalid-provenance", "word-cut")
 
-    return [piece.index.text[piece.start : piece.end] for piece in pieces]
+    last = pieces[-1] if pieces else None
+    return _Resolved(
+        raw=[piece.index.text[piece.start : piece.end] for piece in pieces],
+        last_line_has_tab=last is not None and _last_line_has_tab(last.index, last.end),
+    )
 
 
 def _diff_hint(expected: str, actual: str) -> dict[str, Json]:
@@ -345,6 +501,22 @@ def _coverage(pages: dict[int, PageIndex], verified_spans: list[Json]) -> dict[s
     }
 
 
+def _assert_integer_spans(provenance: list[Json]) -> None:
+    """Every span's page and offsets are integers (``Number.isInteger``; ``1.0`` is one).
+
+    A boolean is refused explicitly: ``True`` is an ``int`` to Python and would be read as page 1,
+    where JavaScript reads it as no page at all. A structural error, never a status.
+    """
+    invalid = [
+        f"Invalid span in provenance {entry['sourceKey']}"
+        for entry in provenance
+        for span in entry["spans"]
+        if any(_as_integer(span.get(key)) is None for key in ("page", "startOffset", "endOffset"))
+    ]
+    if invalid:
+        raise FidelityError("Provenance span is invalid", invalid)
+
+
 def _assert_unique_keys(keys: list[str], what: str) -> None:
     seen: set[str] = set()
     duplicates: list[str] = []
@@ -365,6 +537,7 @@ def verify_narrative_fidelity(payload: Json) -> dict[str, Json]:
         )
     _assert_unique_keys([s["sourceKey"] for s in payload["sections"]], "source section")
     _assert_unique_keys([e["sourceKey"] for e in payload["provenance"]], "provenance entry")
+    _assert_integer_spans(payload["provenance"])
     pages, issues = index_pages(payload["source"])
     provenance = {entry["sourceKey"]: entry for entry in payload["provenance"]}
     section_keys = {section["sourceKey"] for section in payload["sections"]}
@@ -419,7 +592,9 @@ def verify_narrative_fidelity(payload: Json) -> dict[str, Json]:
             continue
         # Pieces from consecutive pages are concatenated verbatim: a page body ends with its own
         # line terminator (or a soft hyphen when a word continues), so nothing is inserted here.
-        expected = normalize_text("".join(resolved))
+        expected = normalize_text(
+            "".join(resolved.raw), last_line_has_tab=resolved.last_line_has_tab
+        )
         if expected != normalized["text"]:
             results.append(
                 {

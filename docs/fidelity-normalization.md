@@ -1,6 +1,6 @@
 # Narrative fidelity normalisation specification
 
-Version: `fidelity-norm/1.1.1` (`NORMALIZATION_VERSION` in `src/fidelity/normalize.ts`; history
+Version: `fidelity-norm/2.0.0` (`NORMALIZATION_VERSION` in `src/fidelity/normalize.ts`; history
 in section 9)
 
 This document is the language-neutral specification of the text normalisation and XHTML
@@ -15,18 +15,28 @@ text and to the narrative text; nothing is applied to one side only.
   bytes). In TypeScript iterate with `Array.from(text)`; in Python index `str` directly.
 - A span's `textSha256` is the SHA-256 hex digest of the UTF-8 encoding of the raw
   (un-normalised) slice `text[startOffset:endOffset]`.
+- The `page` values of `pages`, in array order, are 1, 2, …, N; anything else is a structural
+  error. A document therefore cannot leave out the page a section's first word is read against
+  (section 6).
 - A page's body is the half-open range `[bodyStart, bodyEnd)` in code points. Spans must lie
   inside the body. Text outside the body (running headers, footers, page numbers) is ignored
   by contiguity checks, but the report records the whole page length (`pageCodePoints`) next
   to the body length so excluded text is visible.
 - The body range is declared by the extractor and is bounded rather than trusted: `bodyStart`
-  must be 0 or immediately follow U+000A, and that U+000A must not itself follow U+00AD (step 1
-  would delete it, so it lies inside a word); `bodyEnd` must be the page length or the code
-  point before it must be U+000A (a body ends with its own line terminator; U+00AD U+000A is
-  allowed there because a word may continue on the next page — section 6 decides whether the
-  section may end there); and a page may exclude at most 240 code points in total. A page that
-  violates any of these makes every span on it `span-not-found` (reason `body-boundary` or
-  `excluded-text`) and the report `failed`.
+  must be 0 or immediately follow U+000A, and that U+000A must not itself follow U+00AD,
+  directly or through U+000D (step 1 would delete it, so it lies inside a word); `bodyEnd` must
+  equal `bodyStart`, or the code point before it must be U+000A: a non-empty body always ends
+  with its own line terminator. This holds at the end of the page too. Section 6 lets a section
+  end at `bodyEnd` without reading further, and that is sound only because the code point
+  before `bodyEnd` is then a line feed, which is whitespace; without this rule a page ending
+  "… is 1" with no line feed, followed by a page beginning "0 mg", let a section end at "1".
+  The rule makes every page break a line break in the text the check reads; it does not prove
+  that the line break separates words in the document — that is the extractor's contract
+  (section 7: a word broken across lines ends in U+00AD). U+00AD followed by U+000A is allowed
+  at the end of a body because a word may continue on the next page; section 6 decides whether
+  a section may end there. A page may
+  exclude at most 240 code points in total. A page that violates any of these makes every span
+  on it `span-not-found` (reason `body-boundary` or `excluded-text`) and the report `failed`.
 - Every hash of a JSON value (`reportHash`, `extractedTextSha256`, `narrativeBindingSha256`,
   the contract hashes) is the SHA-256 of canonical JSON: object keys sorted by UTF-16 code
   unit order (RFC 8785), no insignificant whitespace, `JSON.stringify` number and string
@@ -46,16 +56,32 @@ text and to the narrative text; nothing is applied to one side only.
 
 ## 2. Rejection (before any normalisation)
 
-The input is malformed, and the section fails with `malformed-narrative`, if it contains:
+The input is malformed, and the section fails with `malformed-narrative` (reason
+`forbidden-character`), if it contains:
 
 - U+FFFD REPLACEMENT CHARACTER;
-- any C0 control other than U+0009 TAB, U+000A LF, U+000B VT, U+000C FF, U+000D CR;
-- U+007F DELETE;
+- any C0 control other than U+0009 TAB, U+000A LF and U+000D CR;
+- U+007F DELETE, and the C1 controls U+0080–U+009F;
 - U+FFFE or U+FFFF;
+- the bidirectional controls U+061C, U+200E, U+200F, U+202A–U+202E and U+2066–U+2069;
 - an unpaired UTF-16 surrogate (a code point in U+D800–U+DFFF).
+
+U+000B and U+000C reject on both sides (`forbidden-character`): they are not XML characters,
+and a renderer draws them as nothing or as a box. The C1 controls reject because a renderer
+remaps them through windows-1252 (U+0085 is drawn as "…"), so a narrative carrying one shows
+a character the check does not see. The bidirectional controls reject because their reach
+differs between a narrative block and a line of page text, and no EU product-information
+language needs them.
 
 Rejection applies to page text as well; a page containing these characters makes every span on
 it `span-not-found`.
+
+For narrative, section 2 applies to the div string as decoded from JSON (RFC 8259, where an
+escaped surrogate pair is one code point). It covers every code point, including markup,
+attribute values and text outside the root. A surrogate code point that remains rejects. The
+code is `forbidden-character`, and this check precedes the scan. Each character reference is
+also checked on its own as the scan decodes it (section 5): a reference to half a surrogate
+pair rejects even if the next reference completes it.
 
 ## 3. Normalisation steps (ordered)
 
@@ -69,15 +95,43 @@ it `span-not-found`.
 3. Unicode Normalization Form C (NFC). It runs after steps 1 and 2 so that a composition an
    invisible character or a ligature would otherwise block (`e` + ZWSP + combining acute) is
    applied in the first pass.
-4. Replace bullet glyphs with U+0020 — closed list: U+2022, U+2023, U+2043, U+2219, U+25A0,
-   U+25A1, U+25AA, U+25AB, U+25CB, U+25CF, U+25E6.
+4. Replace a bullet glyph that starts a list item with U+0020 — closed list: U+2022, U+2023,
+   U+25A0, U+25A1, U+25AA, U+25AB, U+25CB, U+25CF, U+25E6. A bullet glyph starts a list item
+   only when all three hold: it is at the start of a line — after U+000A, plus optional step 5
+   whitespace; step 5 whitespace follows it; and its line (the text between the U+000A before
+   it and the next U+000A or the end) contains no U+0009. A bullet glyph replaced by this step
+   counts as whitespace for a bullet glyph after it (so U+000A `• • x` is `x`). Anywhere else a
+   bullet glyph is content: `2 • 10` in a line is not `2 10`. U+2219 BULLET OPERATOR and U+2043
+   HYPHEN BULLET are not in the list, because one is a multiplication sign and the other a
+   dash: `2∙10` against a table row reading `2` and `10` is a mismatch. (Positions are those of
+   the text after step 3.)
+
+   A line that contains U+0009 is a table row: the extractor writes a row as cells separated by
+   U+0009 (section 7), and the scanner writes a table cell, and everything inside one, on a line
+   of U+0009-separated text (section 5). A bullet glyph in a table cell is therefore content on
+   both sides, wherever it stands in the cell: `<td>2</td><td>• 10</td>` does not verify
+   against the row `2` U+0009 `10`, and a page row `• 10` U+0009 `2` needs a narrative cell that
+   shows `• 10`. The rule applies identically to both sides, with one addition for page text:
+   when the verifier normalises a slice of page text whose last line continues past the slice
+   on the page, that line's U+0009 status is the status of the whole page line in the body, not
+   of its part inside the slice (section 6). A span that stops before a row's U+0009 (`• Adults`
+   of `• Adults` U+0009 `10 mg`) therefore still reads the bullet as content.
+
+   The start of the text is not the start of a line. Normalised text contains no U+000A, so
+   normalising it again replaces no bullet glyph; with the start of the text counted as a line
+   start, a bullet kept because its line contains U+0009 would be replaced the second time, once
+   that U+0009 had become U+0020. The narrative's text always begins with U+000A (the root
+   `div`, section 5), and the verifier reads a page slice from its line terminator (section 6),
+   so a list item at the start of a section is still a list item on both sides.
+
 5. Replace every whitespace-class code point with U+0020 — closed list: U+0009, U+000A,
-   U+000B, U+000C, U+000D, U+0020, U+0085, U+00A0, U+1680, U+2000–U+200A, U+2028, U+2029,
-   U+202F, U+205F, U+3000. Then collapse runs of U+0020 to a single U+0020 and remove leading
-   and trailing U+0020.
+   U+000D, U+0020, U+00A0, U+1680, U+2000–U+200A, U+2028, U+2029, U+202F, U+205F, U+3000.
+   Then collapse runs of U+0020 to a single U+0020 and remove leading and trailing U+0020.
+   U+000B, U+000C and U+0085 are not in the list: section 2 rejects them.
 
 The procedure is idempotent: applying it twice yields the first result (the golden vectors
-include the blocking cases that make step order matter).
+include the blocking cases that make step order matter, and step 4's rule that the start of the
+text is not a line start is what keeps it idempotent with the U+0009 rule).
 
 ## 4. Deliberately not normalised
 
@@ -89,7 +143,9 @@ These are treated as content; a difference is a mismatch:
 - hyphen and dash variants (U+002D, U+2010–U+2015, U+2212) and line-break de-hyphenation
   (`intra-` at a line end followed by `venous` stays `intra- venous`; the extractor must emit
   discretionary hyphens as U+00AD so that step 1 removes them together with the line break);
-- superscript and subscript code points (`m²`, `H₂O`) versus plain digits;
+- superscript and subscript code points (`m²`, `H₂O`) versus plain digits. Markup cannot turn
+  one into the other: the digits and signs inside `sup` and `sub` are folded to these code
+  points (section 5), so `m<sup>2</sup>` is `m²` and never equals a source's `m2`;
 - footnote and reference markers, numbered-list markers (`1.`, `a)`), and other punctuation;
 - U+200C ZERO WIDTH NON-JOINER and U+200D ZERO WIDTH JOINER;
 - any character not named in section 3.
@@ -97,92 +153,182 @@ These are treated as content; a difference is a mismatch:
 ## 5. XHTML to text
 
 The narrative `text.div` is scanned without a DOM. Any violation makes the section
-`malformed-narrative`.
+`malformed-narrative`. The rule behind every bullet is the same: markup may not change what a
+reader sees without the check seeing it. Where a renderer — usually an HTML parser given the
+narrative as `innerHTML` — would draw markup differently from the text the scanner emits, the
+markup is folded into the text or rejected.
 
 - Exactly one root element `div` carrying `xmlns="http://www.w3.org/1999/xhtml"`; only
   whitespace may appear outside it.
-- Element names are lower-case. Block elements emit U+000A before their start tag and after
-  their end tag: `div p h1 h2 h3 h4 h5 h6 ul li table thead tbody tfoot tr td th caption pre
-blockquote dl dt dd hr`. `br` emits U+000A. Inline elements contribute only their text:
-  `span b i u em strong sup sub small a abbr cite code`. Self-closing syntax (`<br/>`,
-  `<td/>`) is accepted for any allowed element.
+- Element names are lower-case. Block elements emit a line break before their start tag and
+  after their end tag: `div p h1 h2 h3 h4 h5 h6 ul li table thead tbody tfoot tr td th caption
+blockquote dl dt dd hr`. `br` emits a line break. Inline elements contribute only their text:
+  `span b i u em strong sup sub small a abbr cite code` (`sup` and `sub` fold theirs, below).
+- The line break a block element or `br` emits is U+000A, except that the start and end tags
+  of `td` and `th`, and every block element and `br` inside an open `td` or `th`, emit
+  U+0009: a table cell and everything in it is on one line of U+0009-separated text, as the
+  extractor writes a table row (section 7). So a bullet glyph in a cell is never a list item
+  (section 3 step 4), and a soft hyphen before a break inside a cell joins nothing.
+- A line feed or carriage return in text — raw U+000A or U+000D, or a reference to either — is
+  emitted as U+0020. A renderer draws it as a space: only a block boundary or `br` is a line
+  break. So `<p>Take 2` U+000A `• 10 mg</p>`, which renders "Take 2 • 10 mg", reads "Take 2 •
+  10 mg" to the check (the bullet is mid-line and so content), and does not verify against a
+  page whose "• 10 mg" starts a new line.
+- Only `br` and `hr` may be self-closing, and they must be: `<x/>` for any other element, and a
+  `br` or `hr` written as a start tag without `/` (`<br>`, `<hr></hr>`), reject
+  (`void-element`). An HTML parser ignores the `/` on every other element, so `<sup/>6`,
+  `<a href="…"/>text` and `<li/>` open an element around the text that follows; and an XML
+  renderer draws no children of a `br` written `<br>…</br>`.
 - Any other element (including `script`, `style`, `img`, `svg`, `object`, `iframe`, `del`,
-  `s`, `strike`, `math`, form controls, and `ol` and `q`, whose renderers generate list
-  numbers and quotation marks the source may not contain) rejects (`unknown-element`).
+  `s`, `strike`, `math`, form controls, `ol` and `q`, whose renderers generate list numbers and
+  quotation marks the source may not contain, and `pre`, which keeps whitespace a renderer
+  draws as columns the check cannot see) rejects (`unknown-element`).
+- The content of `sup` and `sub` is text and character references only; a child element
+  rejects (`script-content`). Folding happens after references are decoded. Inside `sup`:
+  `0`–`9` → U+2070, U+00B9, U+00B2, U+00B3, U+2074–U+2079; `+` → U+207A; `-` and U+2212 →
+  U+207B; `=` → U+207C; `(` → U+207D; `)` → U+207E. Inside `sub`: `0`–`9` → U+2080–U+2089;
+  `+` → U+208A; `-` and U+2212 → U+208B; `=` → U+208C; `(` → U+208D; `)` → U+208E. Folding
+  applies to U+0030–U+0039. Inside sup, U+2010–U+2015, U+02D7, U+FE58, U+FE63, U+FF0D and
+  U+2796 fold to U+207B, and U+FE62, U+FF0B and U+2795 fold to U+207A (as well as '-', U+2212
+  → U+207B and '+' → U+207A). Inside sub, the same characters fold to U+208B and U+208A.
+  Inside sup, the subscript digits U+2080–U+2089 and the subscript signs U+208A–U+208E reject
+  (`unmappable-script`); inside sub, the superscript digits U+2070, U+00B9, U+00B2, U+00B3,
+  U+2074–U+2079 and the superscript signs U+207A–U+207E reject: a subscript digit raised is not
+  a superscript one, and the check would otherwise see a character the reader does not. In the
+  same way, inside sub the superscript letters U+2071 and U+207F, and inside sup the subscript
+  letters U+2090–U+209C, reject. Inside sup or sub, any other code point of general category N
+  that is not a target of the element's own table, any code point of general category Sm, Ps,
+  Pe or Pd that is neither a source nor a target of the fold tables (`＝` U+FF1D, `﹙` U+FE59,
+  `⸺` U+2E3A, `︱` U+FE31, `~`, `<`, `[`), and U+00B1 and U+2213, reject (`unmappable-script`).
+  The element's own script digits and signs (U+2070, U+00B9, U+00B2, U+00B3, U+2074–U+207E
+  inside `sup`; U+2080–U+208E inside `sub`) are kept. Other code points (letters, footnote
+  marks, ®, `/`) are kept unchanged: raising a letter or a mark does not change what it says,
+  so `C<sub>max</sub>`, `<sup>a</sup>` and `<sup>®</sup>` are accepted, and `t<sub>1/2</sub>`
+  is `t₁/₂`.
+- Tables contain only table parts. The only children of `table` are `caption`, `thead`,
+  `tbody`, `tfoot` and `tr`; `thead`, `tbody` and `tfoot` contain only `tr`; `tr` contains only
+  `td` and `th`. Any other element directly inside `table`, `thead`, `tbody`, `tfoot` or `tr`
+  rejects (`table-content`), and so does any character reference, and any raw code point other
+  than U+0009, U+000A, U+000D and U+0020, directly inside them: a renderer moves such content
+  out of the table. Every `tr` of a table, in whichever section, has the same number of `td`
+  and `th` children; cells of a nested table do not count. Otherwise the table rejects
+  (`table-shape`), decided at its end tag. A table with no rows is accepted. `colspan` and
+  `rowspan` are not allowed (below), so no cell is drawn across a column or row by a span
+  attribute. That is all it closes: cell boundaries are not content (they flatten to
+  whitespace, below), so a narrative table of the same text and the same row width can still
+  put a value in a different cell from the source — a dose can move from the Adults column to
+  the Children column and verify. The empty slots section 7 requires for a spanned source cell
+  make that easier, because an empty narrative cell costs nothing. Cell association is not
+  checked; it needs a table extractor contract.
 - Table parts must appear in the one document order that renders as written, because
   renderers place them by role: `caption` (at most one) first; then either rows (`tr`)
   directly under `table`, or sections in the order `thead` (at most one), `tbody` (any
   number), `tfoot` (at most one), never both forms in one table. `caption`, `thead`, `tbody`,
   `tfoot` must be direct children of `table`; `tr` of `table` or a section; `td` and `th` of
   `tr`. Violations reject (`table-structure`, `table-section-order`, or `misnested-tag`).
-- U+00AD directly before a structural U+000A (a block boundary or `br`) rejects
-  (`soft-hyphen-at-boundary`): step 1 would join the word across markup that renders as a
-  hyphenated line break.
-- Allowed attributes: `xmlns` (root only), `xml:lang`, `lang`, `id`, `class`, `href` (on `a`
-  only), `colspan`, `rowspan`, `scope`. Values must be double- or single-quoted. Any other
-  attribute — in particular `style`, `hidden`, and `title` — rejects, and so does a repeated
-  attribute name on one element.
+- In the text the scanner emits, U+00AD followed by U+000A rejects
+  (`soft-hyphen-at-boundary`). That text has U+000A only from a block boundary or `br` outside a
+  table cell, and no U+000D at all: a line break in text is emitted as U+0020 (above), so U+00AD
+  before it is followed by a space, which step 1 does not join (`un` U+00AD U+000A `safe` in a
+  paragraph reads "un safe" and does not verify against a page's "unsafe"). In page text U+00AD
+  before a line break is the extractor's mark for a word broken across lines (section 7) and
+  step 1 joins it; in XHTML a block boundary or `br` is a visible new line, not a hyphenated
+  word.
+- Allowed attributes: `xmlns` (root), `xml:lang` and `lang` (root `div` only), `href` (`a`
+  only, `https://` form only), `scope` (`th` only). Values must be double- or single-quoted.
+  Any other attribute — in particular `style`, `hidden`, `title`, `class`, `id`, `colspan` and
+  `rowspan` — rejects, and so does an allowed attribute on any other element and a repeated
+  attribute name on one element. A viewer's stylesheet or script can key on a class, an id, a
+  language tag or an in-page link to hide content, and a narrative needs none of them below the
+  root.
 - Attribute values are never compared against the source, so they must not be able to carry
   text. Each value must match its token form or the element rejects: `xml:lang`, `lang`,
-  `id`, `scope` — `[A-Za-z0-9_.:-]{1,32}`; `class` — up to three such tokens separated by
-  single spaces; `colspan`, `rowspan` — an integer 1–999; `href` — `https://` host and up to
-  eight path segments of at most 32 unreserved characters (no query or fragment), or `#`
-  followed by a token. Anything else (`javascript:` links, spaces, `<`, `&`, query strings)
-  rejects. These bounds limit, but do not eliminate, what attribute values can carry; narrative
-  markup should not need links.
+  `scope` — `[A-Za-z0-9_.:-]{1,32}`; `href` — `https://` host and up to eight path segments of
+  at most 32 unreserved characters (no query or fragment). Anything else (`javascript:` links,
+  `#` fragments, spaces, `<`, `&`, query strings) rejects. These bounds limit, but do not
+  eliminate, what attribute values can carry; narrative markup should not need links.
 - Comments, processing instructions, CDATA sections, DOCTYPE declarations, a stray `<`, a
   stray `&`, unbalanced or misnested tags reject.
 - Entities: `&amp; &lt; &gt; &quot; &apos;`, decimal `&#N;`, and hexadecimal `&#xH;` only.
-  Decoded code points are subject to section 2. Named HTML entities such as `&nbsp;` reject.
+  Each decoded code point is subject to section 2 on its own. Named HTML entities such as
+  `&nbsp;` reject.
 - The extracted text is then normalised (section 3) by the verifier, which is where an empty
   result is decided: a narrative whose normalised text is empty is `malformed-narrative` with
   reason `empty-narrative`. The scanner itself never produces that reason.
 
-Because block boundaries become U+000A and the whitespace step collapses them, paragraph and
-table-cell boundaries are structure, not content. Cell text is content.
+Because block boundaries become U+000A or U+0009 and the whitespace step collapses them,
+paragraph and table-cell boundaries are structure, not content. Cell text is content.
 
 ### Tokeniser
 
 The scanner is a single left-to-right pass over the `div` string, matching at the current
-offset only (sticky matching). The grammar is given as regular expressions in a dialect where
-every class is spelled out: `[0-9]` never means a non-ASCII digit, `$` never matches before a
-trailing line break, and `WS` stands for the JavaScript `\s` class exactly — U+0009, U+000A,
-U+000B, U+000C, U+000D, U+0020, U+00A0, U+1680, U+2000–U+200A, U+2028, U+2029, U+202F, U+205F,
-U+3000, U+FEFF. An implementation whose regex dialect differs in any of these must spell the
-class out; a port that copies the reference's regex text verbatim is wrong.
+offset only (sticky matching), after the section 2 check of the whole string. The grammar is
+given as regular expressions in a dialect where every class is spelled out: `[0-9]` never
+means a non-ASCII digit, `$` never matches before a trailing line break, and `WS` stands for
+exactly U+0009, U+000A, U+000D and U+0020 — `[\t\n\r ]`, never a dialect's `\s`. An HTML
+parser treats only those as whitespace inside a tag and reads any other code point as part of
+the tag name, so `<sup` followed by U+00A0 and `>` is an unknown element to a renderer (`10`
+then `6` renders as `106`), and `<br` U+00A0 `/>`, `<table` U+3000 `>` or `<td` U+FEFF `>` is
+not a `br`, `table` or `td`. Any other code point where the grammar allows `WS` makes the tag
+fail its grammar, which is `malformed-tag` (below). An implementation whose regex dialect
+differs in any of these must spell the class out; a port that copies the reference's regex
+text verbatim is wrong. General category N (section 5, `sup` and `sub`) is the Unicode
+general category of the pinned Unicode version.
 
 - Start tag: `<(NAME)(ATTRS)WS*(/?)>` where `NAME` is `[A-Za-z][A-Za-z0-9]*` and `ATTRS` is
   zero or more of `WS+ ANAME WS* = WS* ( "[^"<]*" | '[^'<]*' )`, with `ANAME` =
   `[A-Za-z_:][-A-Za-z0-9_:.]*`. Attribute values may not contain `<` or their own quote
-  character; the value grammars of the previous bullet are then applied to the unquoted value
-  as whole-string matches.
+  character; the value grammars of section 5 are then applied to the unquoted value as
+  whole-string matches.
 - End tag: `</(NAME)WS*>`.
 - Entity: `&( [A-Za-z]+ | #[0-9]{1,7} | #x[0-9A-Fa-f]{1,6} );`. Named entities are only the
-  five listed; a decoded code point above U+10FFFF rejects.
+  five listed; a decoded code point above U+10FFFF is `unknown-entity`.
 - At `<`: a comment (`<!--`), CDATA section (`<![CDATA[`), any other `<!`, and `<?` reject with
   `comment`, `cdata`, `doctype`, `processing-instruction` respectively. A `</` that does not
   match the end-tag grammar is `malformed-tag`. A `<` that matches neither grammar is
-  `malformed-tag` when the next character is an ASCII letter and `stray-lt` otherwise. An
-  element name containing an upper-case letter is `uppercase-element`, checked before the name
-  is looked up; a name outside the allowed lists is `unknown-element`.
+  `malformed-tag` when the next character is an ASCII letter and `stray-lt` otherwise.
 - Root: the first element must be `div`, else `root-not-div`; a second element at depth zero,
   or any element after the root has closed, is `multiple-roots`; non-whitespace text (or an
   entity) outside the root is `text-outside-root`, where whitespace means U+0009, U+000A,
   U+000D, U+0020 only. A root `div` without `xmlns="http://www.w3.org/1999/xhtml"` is
   `root-not-div`, checked after its attributes; `xmlns` anywhere else, or with any other
   value, is `forbidden-attribute`.
-- Attributes are checked in document order: a repeated name, an unlisted name, `href` on an
-  element other than `a`, or a value failing its grammar is `forbidden-attribute`.
-- A block element's start tag emits U+000A; its end tag emits U+000A; a self-closing block
-  (`<hr/>`, `<td/>`) therefore emits two. `br` emits one. Before any of these emissions, an
-  immediately preceding U+00AD in the output is `soft-hyphen-at-boundary`.
-- An end tag with nothing open is `unbalanced-tag`; one not matching the innermost open
-  element is `misnested-tag`; input ending with elements still open is `unbalanced-tag`.
-- Table structure is checked at each start tag as in the earlier bullet, in this order:
-  parent checks (`misnested-tag`), then `table-structure`, then `table-section-order`.
-- At `&`: a run not matching the entity grammar is `stray-amp`.
+- A block element's start tag emits a line break; its end tag emits one; a self-closing `hr`
+  therefore emits two. `br` emits one. Each is U+000A, or U+0009 for `td` and `th` and inside
+  an open `td` or `th` (section 5). The scanner's text therefore always begins with U+000A, the
+  root `div`'s.
+- Input ending with no root is `root-not-div`; input ending with elements still open is
+  `unbalanced-tag`.
 
-The first violation encountered in this pass decides the code; scanning does not continue.
+The first violation encountered in this pass decides the code; scanning does not continue. The
+reason code is inside `reportHash`, so the order in which violations are decided is normative:
+
+- At a start tag: `malformed-tag`/`stray-lt`, then `uppercase-element`, then
+  `unknown-element`, then `multiple-roots`/`root-not-div`, then attributes in document order
+  (`forbidden-attribute`; root without xmlns = `root-not-div`), then `void-element`, then the
+  parent check, then `table-structure`, then `table-section-order`. The parent check:
+  `script-content` if the parent is `sup` or `sub`; else `misnested-tag` for a table part
+  (`caption`, `thead`, `tbody`, `tfoot`, `tr`, `td`, `th`) in the wrong parent; else
+  `table-content` for any other element whose parent is `table`, `thead`, `tbody`, `tfoot` or
+  `tr`.
+- At an end tag: `malformed-tag`, then `uppercase-element`, then `unbalanced-tag`, then
+  `misnested-tag`, then `table-shape` (for `</table>`).
+- At `&`: `stray-amp`, then `text-outside-root`, then `unknown-entity`, then
+  `forbidden-character`, then `table-content`, then `unmappable-script`.
+- At a raw code point: `text-outside-root` or `table-content`, then `unmappable-script`.
+- After a clean scan: `soft-hyphen-at-boundary`, then `empty-narrative`.
+
+(So `<table><td>a</td></table>` is `misnested-tag` and `<img/>` is `unknown-element`.) The
+section 2 check of the whole `div`, which precedes the scan, decides `forbidden-character`
+before any of these.
+
+The scanner's reason codes are, in the order of this section: `forbidden-character`,
+`root-not-div`, `multiple-roots`, `text-outside-root`, `uppercase-element`,
+`unknown-element`, `void-element`, `script-content`, `unmappable-script`, `table-content`,
+`table-shape`, `table-structure`, `table-section-order`, `misnested-tag`,
+`soft-hyphen-at-boundary`, `forbidden-attribute`, `comment`, `processing-instruction`,
+`cdata`, `doctype`, `malformed-tag`, `stray-lt`, `stray-amp`, `unknown-entity`,
+`unbalanced-tag`.
 
 ## 6. Verification and report rules
 
@@ -191,20 +337,75 @@ The first violation encountered in this pass decides the code; scanning does not
   between consecutive spans (which must normalise to nothing). The source's own characters
   therefore decide where words begin and end; the verifier never inserts whitespace between
   spans on the same page, so adjacent spans cannot split a word.
+- A slice of page text that the verifier normalises — the first slice of a section, and every
+  gap it tests for blankness (between spans, the tail and head around a page break, and the
+  coverage gaps) — is read from the U+000A that ends the previous line when only §3 step 5
+  whitespace other than U+000A lies between that U+000A and the slice's start. Before
+  `bodyStart` that is the code point section 1 makes U+000A; nothing else outside the body is
+  read. At the very start of a page with no header there is no such U+000A, and the slice is
+  read from its start. This gives a bullet glyph at the start of a line the line start that
+  section 3 step 4 requires (normalisation does not count the start of a text as one), and
+  adds nothing but whitespace to what is compared. A page-2 slice of a section that continues
+  across a page break is not extended: the page-1 slice ends with its own line terminator.
+- When the verifier normalises a slice of page text (a section's joined slices, or a gap), and
+  the slice's last line does not end with U+000A inside the slice, that line's U+0009 status
+  for section 3 step 4 is decided on the whole page line: from the U+000A before it to the next
+  U+000A, within the body. A slice cut before a row's U+0009 is still on a table row.
 - When a section continues onto the next page, the page-1 slice is extended to `bodyEnd` and
   the page-2 slice starts at `bodyStart` (the blank tail and head must normalise to nothing),
   and the slices are concatenated verbatim with no separator: the body's own final line
   terminator, or a soft hyphen when a word continues, decides how the pages join. The verifier
   never inserts a character of its own.
-- A section may omit words but never begin or end inside one. Its first span must start at a
-  word boundary and its last span must end at one: unless the first span starts at `bodyStart`,
-  the code point before it must not be a word character and must not be a U+000A that follows
-  U+00AD; the last span must not end in U+00AD; unless it ends at `bodyEnd`, the code point at
-  its end must not be a word character; and if it ends at `bodyEnd`, that end must not be a
-  U+00AD U+000A pair (the word continues on the next page, so the section must continue too).
-  Word characters are Unicode letters, digits, and combining marks (`\p{L}`, `\p{N}`, `\p{M}`),
-  the step 1 invisible characters, U+200C, and U+200D; whitespace and punctuation are
-  boundaries. Violations are `invalid-provenance` with reason `word-cut`.
+- A section may omit whole whitespace-delimited tokens but never begin or end inside one.
+  After all spans resolve, the first span's start and the last span's end are checked; a cut
+  is `invalid-provenance` with reason `word-cut`. The rule is about whitespace, not about
+  letters: punctuation is not a boundary, because inside a number it is part of the number
+  (`1.5`, `−20`, `0.5`, `1,000`) and inside a word it is part of the word (`non-steroidal`).
+  - Edge whitespace is the §3 step 5 whitespace list without U+00A0, U+2007 and U+202F. Those
+    three join the groups of a number (`10 000`), so for the edge rules they are not a
+    boundary between tokens.
+  - Start. Read backwards from the code point before the first span's start offset through
+    page n's body. On passing its bodyStart, continue from the last code point of page n−1's
+    body, and so on through earlier pages. Only body text is read, and earlier pages are read
+    as declared even if they fail §1 or §2. Skip edge whitespace and stop at the first other
+    code point c. The result is word-cut if no code point was skipped before c, whatever c's
+    category, or if c is U+00AD. If reading passes the start of page 1's body, there is no cut.
+  - End. The result is word-cut if the last span, with trailing edge whitespace removed, ends
+    in U+00AD. Otherwise it is word-cut unless the code point at the end offset is edge
+    whitespace, or the end offset is at or past `bodyEnd` (section 1 makes the code point
+    before `bodyEnd` a line feed).
+  - Numbers grouped with a space. On either edge it is also a cut when the code point on the
+    inner side of the edge is a digit (general category Nd), and the first code point beyond
+    it that is not §3 step 5 whitespace, read inside the body without crossing a U+000A, is
+    also Nd. The inner code point is the span's first code point that is not §3 step 5
+    whitespace (at the start) or its last (at the end): a span that begins or ends with
+    whitespace is judged by the digit inside it. So "…is 10" cannot be taken from "…is 10 000
+    IU", with a space, U+2009, U+00A0, U+202F or U+2007 between the groups or two of them ("10
+    ␠␠000", "10 U+2009␠000", "10 U+202F␠000"), even by a span that ends with the first space,
+    nor "000 IU" after it by a span that starts with the second; a number at the end of one
+    line and a number at the start of the next are separate. (The inner code point skips the
+    joiners U+00A0, U+2007 and U+202F as well, although they are not edge whitespace: a span
+    ending "10" U+202F before a space still ends inside the number.)
+  - These rules apply together; any one of them makes a cut.
+
+  So "Maximum dose is 1" cannot be taken from "Maximum dose is 1.5 mg", nor "20 °C." from
+  "−20 °C.", nor "5 mg." from "0.5 mg.", nor "is 10" from "is 10 000 IU"; a section cannot begin at "safe for pregnant women"
+  when the page before ends "un" and U+00AD, whether a line break, a blank line, or a page
+  break with a blank head lies between; and it cannot end after "intra", U+00AD and a space.
+  What the rule does not claim: it proves that a section's edges touch whitespace in the page
+  text, not that the whitespace ends a sentence or a clause ("Take 5" can still be taken from
+  "Take 5 mg twice"), and a span that itself begins or ends with whitespace is judged by the
+  code points outside it, so it can be refused although its words are whole (a false
+  failure). Two separate numbers on one line separated only by whitespace ("Take 2 10 mg
+  tablets") cannot be split by a section edge either (a false failure the digit rule accepts).
+
+  Other false failures these rules accept, stated: a list item at the very top of a page whose
+  body starts at 0 (no header, so no line terminator to read the slice from: its bullet is
+  content, and a `<ul><li>` narrative mismatches); a table row whose first cell starts with a
+  bullet, cut before its U+0009 (the bullet is content on the page and a list item in a
+  paragraph narrative); and a list written by the extractor with U+0009 after the bullet,
+  which section 7 forbids.
+
 - The joined text is normalised (section 3) and must equal the normalised narrative exactly.
 - A report with zero narrative sections is `failed` (issue `No narrative sections to verify`);
   "nothing to check" is never a pass.
@@ -227,9 +428,10 @@ side is a structural error (below), not a result.
   never `null`; this decides `reportHash`.
 - The status is decided in this order, stopping at the first that applies: no provenance entry →
   `missing-provenance`; narrative does not normalise → `malformed-narrative` with the scanner's
-  code, `forbidden-character` (section 2), or `empty-narrative`; span resolution fails → the
-  status and reason below; normalised source and narrative differ → `mismatch`; else
-  `verified`.
+  code (section 5, including `forbidden-character` for the `div` or a decoded reference),
+  `forbidden-character` (section 2 on the extracted text), or `empty-narrative`; span
+  resolution fails → the status and reason below; normalised source and narrative differ →
+  `mismatch`; else `verified`.
 - Span resolution examines the spans in order and stops at the first failure. Per span:
   `span-not-found` with reason `page-not-found`, `page-malformed` (the page contains a section
   2 character), `body-boundary` or `excluded-text` (section 1), `outside-body` (the span lies
@@ -260,9 +462,14 @@ provenance <sourceKey>` for each provenance entry with no section, in provenance
   The wording is normative because `issues` is inside `reportHash`.
 - `summary` is `{ "total": <sections>, "verified": <verified sections> }`.
 - Structural errors do not produce a report at all: a normalisation version other than the
-  implementation's own, a duplicate page number, a page whose body range is not a valid
-  range, a duplicate `sourceKey` among sections or among provenance entries. Their wording is
-  not normative.
+  implementation's own, page numbers that are not 1, 2, …, N in array order (section 1, which
+  includes a duplicate page number and a missing page), a page number or body offset that is
+  not an integer, a page whose body range is not a valid range, a span whose `page`,
+  `startOffset` or `endOffset` is not an integer, a duplicate `sourceKey` among sections or
+  among provenance entries. An integer is a JSON number with no fractional part (`1.0` is 1);
+  a boolean is not an integer, although some languages treat `true` as 1 — an implementation
+  in one of them must test for a boolean before it tests for an integer. Their wording is not
+  normative.
 
 ## 7. Extractor contract
 
@@ -281,11 +488,35 @@ extractor is a controlled component: its name and version are recorded in
 - record in `extractorVersion` the pinned versions of every component whose output reaches the
   text or the body ranges, read from each component's own version endpoint rather than from
   its response when the response does not carry one;
-- emit table cells row-major separated by U+0009 and rows by U+000A;
+- decode the text layer as Unicode, never through Latin-1 or windows-1252: page text contains
+  no section 2 character. Page text contains no U+000B or U+000C; a page break is the page
+  record, not a character;
+- emit table cells row-major separated by U+0009 and rows by U+000A, with the same number of
+  cells in every row: a spanned cell's text is emitted once, in its first slot, and each other
+  slot it covers as an empty cell; a line break inside a cell is emitted as U+0020, except a
+  discretionary hyphen, which is U+00AD U+000A. A row is one line with U+0009 in it, so a
+  bullet glyph in a cell is content (section 3 step 4). Cell boundaries are not checked
+  (section 5), so these rules fix the page text's shape, not which cell a narrative puts a
+  value in;
+- emit a list marker (a bullet glyph, section 3 step 4) followed by U+0020, never U+0009: the
+  tab after a list marker is layout, not a cell boundary. A word processor's list (`•` U+0009
+  `Adults: 10 mg`) extracted with its tab reads as a table row, its bullet as content, and a
+  `<ul><li>` narrative fails against it — safe, but a false failure that the extractor must
+  avoid;
+- in a raised or lowered glyph run, emit every digit and sign of section 5's folding tables as
+  its script code point — raised: U+0030–U+0039 as U+2070, U+00B9, U+00B2, U+00B3,
+  U+2074–U+2079, `+`, U+FE62, U+FF0B and U+2795 as U+207A, `-`, U+2212, U+2010–U+2015,
+  U+02D7, U+FE58, U+FE63, U+FF0D and U+2796 as U+207B, `=` as U+207C, `(` and `)` as U+207D
+  and U+207E; lowered: the same characters as U+2080–U+2089 and U+208A–U+208E — and every
+  other character as it is. An
+  extractor that cannot tell a glyph's baseline shift is unverifiable and must refuse the
+  document (emit no SourceDocumentText) rather than emit plain digits: the narrative is
+  derived from the page text, so if the text layer flattens `10⁹` to `109`, both sides say
+  `109` and the check passes against a document that shows `10⁹`;
 - emit discretionary (line-break) hyphens as U+00AD and hard hyphens verbatim;
-- declare `bodyStart`/`bodyEnd` per page so repeated headers and footers are excluded, with the
-  body ending in its final line terminator (section 1), and never exclude more than a running
-  header and footer;
+- declare `bodyStart`/`bodyEnd` per page so repeated headers and footers are excluded, with
+  every non-empty body ending in its final line terminator, including at the end of the page
+  (section 1), and never exclude more than a running header and footer;
 - not apply any normalisation of its own beyond faithful text extraction.
 
 ## 8. Change control
@@ -309,6 +540,67 @@ alone: vectors authored from the reference only establish agreement where its au
 looked. The vectors remain the fixed, reviewed floor; the differential run is the proof.
 
 ## 9. Version history
+
+- `fidelity-norm/2.0.0` (major) — markup may not change what a reader sees without the check
+  seeing it (`docs/design/fidelity-norm-2-0-0.md`, as amended by its independent re-review).
+  Only `br` and `hr` may be self-closing, and must be (`void-element`); digits and signs inside
+  `sup` and `sub` fold to script code points, other numbers and U+00B1, U+2213 there reject
+  (`unmappable-script`), and `sup`/`sub` hold no element (`script-content`) (section 5); U+00AD
+  before a line break anywhere in the emitted narrative text rejects, decided after the scan
+  (section 5); the section-edge rules read back through whitespace and across pages, pages are
+  numbered 1..N, and a non-empty body ends with its own line terminator even at the end of a
+  page (sections 1 and 6); section 2 adds U+000B, U+000C, the C1 controls and the bidirectional
+  controls on both sides, applies to the whole `div` as decoded from JSON before the scan and to
+  each decoded reference on its own, and U+000B, U+000C and U+0085 leave the section 3
+  whitespace list; `class` and `id` are removed, `lang` and `xml:lang` are allowed on the root
+  only, `href` has only its `https://` form and `scope` is allowed on `th` only (section 5);
+  tables contain only table parts and rows of one width (`table-content`, `table-shape`), and
+  `colspan`, `rowspan` and `pre` are removed (section 5); the order in which violations are
+  decided is stated in full (section 5); and the extractor contract gains the script,
+  unverifiable-document, table-slot and page-break rules (section 7). Major under section 8:
+  extractor output that conformed to 1.1.1 (plain digits in a raised run, uneven table rows, a
+  final line without its line feed) no longer does, and spans that were valid (a section
+  beginning after a blank line that follows a hyphenated word) become `word-cut`. The changed
+  vectors are listed with their reasons in
+  `docs/validation/changes/2026-09-23-fidelity-norm-2-0-0.md`.
+
+  Folded into 2.0.0 before its release, from a second independent review that found false
+  passes in the first 2.0.0 implementation (no version was released in between): **C1** —
+  whitespace inside a tag is U+0009, U+000A, U+000D and U+0020 only, because an HTML parser
+  reads U+00A0, U+2000–U+200A, U+3000 or U+FEFF there as part of the tag name (`10<sup` U+00A0
+  `>6` rendered "106" and verified against "10⁶"); any other code point there is
+  `malformed-tag` (section 5, Tokeniser). **C2** — a span edge must touch whitespace or a body
+  edge, whatever the code point beyond it; punctuation is no longer a boundary, because
+  "Maximum dose is 1" verified against "Maximum dose is 1.5 mg" and "20 °C." after "−"
+  (section 6). **C3** — a bullet glyph is replaced only at the start of a line and before
+  whitespace, and U+2219 and U+2043 are no longer bullets, because `2∙10` verified against a
+  table row reading 2 and 10 (section 3 step 4). **L1** — inside `sup` the subscript digits and
+  signs, and inside `sub` the superscript ones, reject, which reverses the first reading of
+  "not a target of these tables" (a script digit of either table was kept in both); U+2015,
+  U+02D7, U+FE58 and U+2796 fold to minus and U+2795 to plus (section 5). **L2** — a span
+  field that is not an integer, and a page number that is a boolean, are structural errors
+  (section 6). The residual of cell association is stated in section 5.
+
+  Round 2 of that review, also folded into 2.0.0: a line feed or carriage return in narrative
+  text, raw or referenced, is emitted as U+0020, because a renderer draws it as a space and
+  `<p>Take 2` U+000A `• 10 mg</p>` otherwise verified against "Take 2" and a new line "• 10 mg";
+  `soft-hyphen-at-boundary` therefore applies to U+00AD before a block boundary or `br` only
+  (section 5). A number grouped with a space, U+2009, U+00A0, U+202F or U+2007 cannot be cut at
+  a section edge, and U+00A0, U+2007 and U+202F are not edge whitespace (section 6). A bullet
+  glyph on a line that contains U+0009 is content, the scanner writes a table cell on a
+  U+0009-separated line, and so a bullet in a table cell is never a list item; the start of a
+  text is no longer a line start for step 4, which keeps the procedure idempotent, and the
+  verifier reads a page slice from its line terminator instead (sections 3, 5 and 6). Inside
+  `sup` and `sub` the other kind's script letters, and any mathematical symbol, bracket or dash
+  outside the fold tables, reject (section 5). A bracketed footnote marker in `sup`
+  (`<sup>[1]</sup>`) is therefore `unmappable-script`: a false failure, accepted.
+
+  Round 3, also folded into 2.0.0: the digit-group edge rule reads the span's first and last
+  code points that are not whitespace, so a span ending or starting in the whitespace between
+  two groups ("…is 10␠" of "…is 10␠␠000") still cuts the number (section 6); the U+0009 status
+  of a page slice's last line is that of the whole page line, so a span stopping before a row's
+  U+0009 cannot turn the bullet in its first cell into a list item (sections 3 and 6); and the
+  extractor contract says a list marker is followed by U+0020, not U+0009 (section 7).
 
 - `fidelity-norm/1.1.1` (patch) — documents behaviour the vectors already pinned but the text
   left to the reference implementation, found when the check was re-implemented in a second

@@ -181,16 +181,18 @@ defaults are wrong:
 
 ## Vector results
 
-All 137 golden vectors pass, byte for byte, including every error case:
+All 411 golden vectors of `fidelity-norm/2.0.0` pass, byte for byte, including every error case:
 
 | Module                         | Result          |
 | ------------------------------ | --------------- |
-| `zone_a/fidelity/normalize.py` | normalize 25/25 |
-| `zone_a/fidelity/xhtml.py`     | xhtml 60/60     |
-| `zone_a/fidelity/verify.py`    | verify 52/52    |
+| `zone_a/fidelity/normalize.py` | normalize 62/62 |
+| `zone_a/fidelity/xhtml.py`     | xhtml 214/214   |
+| `zone_a/fidelity/verify.py`    | verify 135/135  |
 
-Seven of those are new and were added by this round: six XHTML cases and one verify case, each
-of them pinning a divergence the existing 130 could not see. They are defined in
+Under `fidelity-norm/1.1.1` there were 137 (25, 60 and 52). Seven of those were added by the
+first round of this port: six XHTML cases and one verify case, each of them pinning a divergence
+the existing 130 could not see. The 274 added by `fidelity-norm/2.0.0` pin its rules and both
+sides of every boundary (`docs/validation/changes/2026-09-23-fidelity-norm-2-0-0.md`). They are defined in
 `test/fixtures/fidelity/cases.ts` on the Zone B side, where the TypeScript defines the expected
 behaviour, and regenerated with `npm run vectors:generate`.
 
@@ -212,9 +214,11 @@ vectors passed and started asking what the vectors did not cover.
   U+001C–U+001F, which section 2 forbids outright — so none of them is used for the whitespace
   step. Membership of the explicit list is tested instead.
 - **`\s` differs between the two regex dialects.** JavaScript's `\s` includes U+FEFF and excludes
-  U+001C–U+001F and U+0085; Python's is the reverse. Every `\s` in the ported scanner regexes is
-  spelled out as an explicit class built from code points, so `xhtml.py` accepts and rejects
-  exactly what `xhtml.ts` does.
+  U+001C–U+001F and U+0085; Python's is the reverse. Every `\s` in the ported scanner regexes
+  was spelled out as an explicit class built from code points, so `xhtml.py` accepted and
+  rejected exactly what `xhtml.ts` did. Since `fidelity-norm/2.0.0` neither side uses `\s` in a
+  tag at all: tag whitespace is `[\t\n\r ]`, because an HTML parser reads any other code point
+  there as part of the tag name (the second review's C1).
 - **`\d` differs too, and in the direction that opens a channel.** JavaScript's `\d` is ASCII;
   Python's matches every Unicode decimal digit, so a numeric character reference written with
   U+FF10–U+FF19 FULLWIDTH DIGIT (or Arabic-Indic digits, or the mathematical digits) decoded here
@@ -233,6 +237,21 @@ vectors passed and started asking what the vectors did not cover.
   fractional part, so a source page written `"page": 1.0` satisfies the contract, verified in
   Zone B, and was refused here. Offsets now go through `_as_integer()` in `verify.py`, and
   `canonical_json` writes an integral float as the integer `JSON.stringify` writes.
+
+`fidelity-norm/2.0.0` added three more, all about strings rather than regexes:
+
+- **A lone surrogate is an ordinary code point to Python.** `json.loads` turns an escaped
+  unpaired surrogate into a one-code-point `str`, and `chr(0xD835)` does the same for a
+  character reference. Section 2 now applies to the whole `div` before the scan and to each
+  decoded reference on its own, so both are checked explicitly (`find_forbidden_character`,
+  `is_forbidden`); an escaped valid pair is one code point on both sides, which
+  `tests/test_golden_vectors.py` pins because `JSON.stringify` never writes one.
+- **`\p{N}` has no `re` equivalent.** The `unmappable-script` rule rejects any general category N
+  code point without a script form inside `sup` or `sub`; it is read from
+  `unicodedata.category`, whose Unicode version is pinned with the interpreter.
+- **The TypeScript scanner walks UTF-16 units; this one walks code points.** A supplementary
+  digit inside `sup` must be one code point on both sides, so `xhtml.ts` steps over a pair with
+  `codePointAt`; here it is native.
 
 ## What the vectors could not see
 
@@ -282,21 +301,33 @@ Three families, a third of the corpus each:
 
 - **normalize** — strings assembled from a weighted alphabet that covers every code point in the
   specification's closed lists (the four invisibles, the six ligatures, the eleven bullet glyphs,
-  the whitespace class including U+0085, U+00A0, U+1680, U+2000–U+200A, U+2028, U+2029, U+202F,
-  U+205F and U+3000), plus the near misses that a wrong implementation would treat as members
-  (U+FB05, U+180E, U+2024), combining marks after invisibles, NFC singletons, Hangul jamo,
-  U+00AD before LF and before CRLF, the section 2 forbidden characters including unpaired
-  surrogates, and ordinary ASCII words.
+  the whitespace class U+0009, U+000A, U+000D, U+0020, U+00A0, U+1680, U+2000–U+200A, U+2028,
+  U+2029, U+202F, U+205F and U+3000), plus the near misses that a wrong implementation would
+  treat as members (U+FB05, U+180E, U+2024, and the accepted neighbours of every range
+  `fidelity-norm/2.0.0` rejects), combining marks after invisibles, NFC singletons, Hangul jamo,
+  U+00AD before LF, before CRLF and before a space, the section 2 forbidden characters including
+  unpaired surrogates and, since 2.0.0, U+000B, U+000C, the C1 controls and the bidirectional
+  controls, and ordinary ASCII words.
 - **xhtml** — documents assembled from the allowed grammar (every block and inline element,
-  nested tables and lists, self-closing blocks, table sections in rendering order, entities in
-  named, decimal and hexadecimal form, every allowed attribute), with a single deliberate
-  violation injected into one case in three. The 26 violation classes reach every error code the
-  scanner can raise.
+  nested tables and lists, self-closing `br` and `hr`, table sections in rendering order with
+  whitespace between parts, tables of one row width including empty ones, `sup` and `sub` holding
+  ASCII digits and signs, dashes, letters, script digits, references and the numbers that have
+  no script form, entities in named, decimal and hexadecimal form, supplementary characters, every
+  allowed attribute), with a single deliberate violation injected into two cases in five. The
+  violation classes reach every error code the scanner can raise, including self-closing tags
+  and `<br>` start tags, a start tag that is both a void and a parent violation, content and
+  references directly inside table parts, uneven rows, surrogates split by markup and by
+  reference, section 2 characters raw, referenced, in a tag, in an attribute and outside the
+  root, and U+00AD before a line break in each form (raw, reference, CR LF, `br`, block).
 - **verify** — documents of one to three pages with running headers and footers and one to four
   sections, with span layouts drawn from the arrangements the specification distinguishes: exact,
   shifted by one in each direction, cut mid-word, two spans on one page, crossing a page
-  boundary, overlapping another section, hash-mismatched, outside the declared body, out of
-  order, and pointing at a page that does not exist. The comparison key is the full `reportHash`,
+  boundary, starting at the first sentence of a later page, ending at the end of a page, ending
+  just after U+00AD and whitespace, overlapping another section, hash-mismatched, outside the
+  declared body, out of order, and pointing at a page that does not exist. Pages may begin with a
+  blank line, end with a word continued on the next page (U+00AD before the final LF), or lack
+  their final LF before the footer or at the very end of the page; a document may leave a page
+  out, number its pages out of order, or start at 2. The comparison key is the full `reportHash`,
   plus each section's status and reason and the report's issue list.
 
 Every case records the **classes** it was assembled from rather than its text, which is what makes
@@ -317,6 +348,58 @@ A harness that has never failed proves nothing, so each of the five fixes was re
 the seed-20260920 corpus re-run: the ASCII digit class → 6 failures, `fullmatch` → 1, the
 surrogate escape → 9, integral floats in `verify.py` → 48, and the JavaScript rendering of a
 number inside an issue string → 5. Each revert was undone and the run went back to 2002 passed.
+
+**`fidelity-norm/2.0.0`.** Rerun on the extended generator, 2000 cases at each of seeds
+20260920, 1 and 2: **zero divergences**, and the class-coverage test passes on each. The
+generator was extended twice: for the rules of the design note and its amendments, and again
+for the second review's findings folded into 2.0.0 (C1 tag whitespace, C2 punctuation at span
+edges, C3 bullets, L1 script digits of the other script and the added fold forms, L2
+non-integer span fields). The reviewer's own probes (121 cases) and XHTML fuzz (60,000
+narratives) agree too, 0 divergent.
+
+Twenty-five rules were then broken in the Python port one at a time and the three corpora
+re-run (divergences at seeds 20260920 / 1 / 2). The second review's: tag whitespace back to
+`\s` → 34 / 30 / 35; end edge back to word characters → 25 / 39 / 29; start edge back to word
+characters → 15 / 17 / 22; bullets replaced away from a line start → 215 / 191 / 213; bullets
+replaced without following whitespace → 54 / 60 / 56; U+2219 back in the bullet list →
+13 / 12 / 10; the other script's digits kept → 7 / 11 / 10; U+2796 not folded → 3 / 4 / 4;
+non-integer span fields not refused → 11 / 12 / 28; a boolean written as Python's `True` in an
+issue → 19 / 14 / 12. The first round's: a body at the end of a page without its line feed
+accepted → 44 / 45 / 52; U+000B and U+000C allowed → 10 / 6 / 5; U+2066–U+2069 allowed →
+10 / 12 / 11; the start rule stopping at the page start → 22 / 10 / 14; the 1..N page check
+dropped → 76 / 59 / 60; U+2013 not folded inside `sup` → 0 / 3 / 2; numbers without a script
+form kept → 12 / 8 / 9; the section 2 check of the whole `div` skipped → 14 / 13 / 15; any
+element allowed to self-close → 10 / 12 / 10; `void-element` decided after the parent check →
+2 / 4 / 7; U+00AD before CR LF accepted → 15 / 16 / 11; `table-shape` skipped → 24 / 12 / 12; a
+whitespace reference allowed in a table part → 5 / 0 / 5; `lang` allowed below the root →
+0 / 1 / 1; the end rule not reading through trailing whitespace → 17 / 14 / 14. Every review
+break diverged on all three seeds and every break on at least two; each was restored and the
+runs went back to 2002 passed. Two breaks (the order of `void-element` and the end rule's
+trailing whitespace) were at first invisible to the generator; the `void-element-and-parent`
+violation class and the `span-ends-after-soft-hyphen-space` and `span-page-end` layouts were
+added so that they are not.
+
+Round 2 of the second review (text line breaks as spaces, grouped numbers at section edges,
+bullets in table cells and the line-start rule that keeps normalisation idempotent, the other
+kind's script letters and symbols in `sup`/`sub`) extended the generator again; zero
+divergences at the same three seeds. Breaking each of its rules in this port diverged on all
+three seeds (20260920 / 1 / 2): text line breaks kept → 183 / 192 / 187; only raw ones turned
+into spaces → 48 / 43 / 40; end digit-group rule dropped → 1 / 1 / 1; start digit-group rule
+dropped → 3 / 2 / 4; joiners counted as edge whitespace → 5 / 4 / 8; the U+0009-line bullet
+rule dropped → 111 / 129 / 122; cells emitted with U+000A → 25 / 29 / 30; the start of a text
+counted as a line start → 11 / 2 / 6; page slices read from the span start → 9 / 13 / 12;
+symbols kept in `sup`/`sub` → 11 / 7 / 12; the other kind's letters kept → 1 / 3 / 2. The
+reviewer's probes (44 and 121 cases) and fuzz (two sets of 60,000 narratives) agree, 0
+divergent.
+
+Round 3 (the digit-group rule reading past whitespace at a span edge, and a page line's tab
+status decided on the whole line) extended the generator with numbers grouped by two
+whitespace code points, edges inside them, and rows cut before their tab. Zero divergences at
+the same seeds. Breaks (20260920 / 1 / 2): end inner code point read raw → 3 / 5 / 4; start
+inner code point read raw → 1 / 6 / 4; whole-line tab status dropped → 17 / 11 / 9; the round 2
+end and start digit-group rules dropped → 6 / 6 / 5 and 1 / 7 / 4 (they were 1 / 1 / 1 and
+3 / 2 / 4 before these shapes were generated). The round's probes (37 cases) agree, 0
+divergent.
 
 The corpus is generated in CI rather than committed, because a committed corpus proves agreement
 with a past revision of the TypeScript rather than with the current one. A tiny 18-case smoke
@@ -460,9 +543,11 @@ all of item 16 — it now states the `\udXXX` escape and that a hashed number su
 integer 1. The entries are kept as the record of what a port had to discover for itself, and
 because one part of item 15 is still open: `sha256Utf8` is not `JSON.stringify`, and the
 replacement Node's UTF-8 encoder performs on an unpaired surrogate is not written down anywhere.
-This port is on `fidelity-norm/1.1.1`, in step with `NORMALIZATION_VERSION` in
+This port is on `fidelity-norm/2.0.0`, in step with `NORMALIZATION_VERSION` in
 `src/fidelity/normalize.ts`; whenever that constant moves, the Python constant, the vectors, and
-every recorded hash move with it.
+every recorded hash move with it. (It moved from `fidelity-norm/1.1.1` on 2026-09-23, in the
+same change as the TypeScript and by the same author; that is why the seeded differential run,
+not the vectors, is the evidence that the two agree.)
 
 **15. "`JSON.stringify` string formatting" is a normative reference to a JavaScript function,
 and it decides two things the specification does not mention.** Section 1 fixes canonical JSON as

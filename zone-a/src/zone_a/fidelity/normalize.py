@@ -16,7 +16,7 @@ from __future__ import annotations
 import unicodedata
 from typing import Final
 
-NORMALIZATION_VERSION: Final = "fidelity-norm/1.1.1"
+NORMALIZATION_VERSION: Final = "fidelity-norm/2.0.0"
 
 # ADR 0003: NFC output depends on the Unicode Character Database of the runtime, so the UCD is
 # pinned as tightly as the code. Zone B runs node:22.22.0 (ICU 77.1, Unicode 16.0).
@@ -33,28 +33,16 @@ LIGATURES: Final[dict[int, str]] = {
     0xFB06: "st",
 }
 
+# U+2219 BULLET OPERATOR and U+2043 HYPHEN BULLET are not here: one is a multiplication sign and
+# the other a dash, so they are always content.
 BULLET_GLYPHS: Final = frozenset(
-    {0x2022, 0x2023, 0x2043, 0x2219, 0x25A0, 0x25A1, 0x25AA, 0x25AB, 0x25CB, 0x25CF, 0x25E6}
+    {0x2022, 0x2023, 0x25A0, 0x25A1, 0x25AA, 0x25AB, 0x25CB, 0x25CF, 0x25E6}
 )
 
-# Closed list, section 3 step 5. U+2000-U+200A is a range, handled in is_whitespace().
+# Closed list, section 3 step 5. U+2000-U+200A is a range, handled in is_whitespace(). U+000B,
+# U+000C and U+0085 are not here: since fidelity-norm/2.0.0 section 2 rejects them.
 WHITESPACE: Final = frozenset(
-    {
-        0x0009,
-        0x000A,
-        0x000B,
-        0x000C,
-        0x000D,
-        0x0020,
-        0x0085,
-        0x00A0,
-        0x1680,
-        0x2028,
-        0x2029,
-        0x202F,
-        0x205F,
-        0x3000,
-    }
+    {0x0009, 0x000A, 0x000D, 0x0020, 0x00A0, 0x1680, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000}
 )
 
 SOFT_HYPHEN: Final = chr(0x00AD)
@@ -92,13 +80,24 @@ def is_word_character(character: str) -> bool:
 
 
 def is_forbidden(code_point: int) -> bool:
-    """Section 2's closed rejection list."""
-    if code_point in (0xFFFD, 0xFFFE, 0xFFFF, 0x007F):
+    """Section 2's closed rejection list.
+
+    C1 controls (U+0080-U+009F) because a renderer remaps them through windows-1252; U+000B and
+    U+000C because they are not XML characters; the bidirectional controls because their reach
+    differs between a narrative block and page text.
+    """
+    if code_point in (0xFFFD, 0xFFFE, 0xFFFF):
+        return True
+    if 0x007F <= code_point <= 0x009F:
         return True
     if 0xD800 <= code_point <= 0xDFFF:
         return True
+    if code_point in (0x061C, 0x200E, 0x200F):
+        return True
+    if 0x202A <= code_point <= 0x202E or 0x2066 <= code_point <= 0x2069:
+        return True
     if code_point < 0x0020:
-        return code_point not in (0x0009, 0x000A, 0x000B, 0x000C, 0x000D)
+        return code_point not in (0x0009, 0x000A, 0x000D)
     return False
 
 
@@ -110,7 +109,17 @@ def find_forbidden_character(text: str) -> int | None:
     return None
 
 
-def normalize_text(text: str) -> str:
+def _lines_with_tab(text: str) -> list[bool]:
+    """For each code point, whether the line it is on (delimited by U+000A) contains U+0009."""
+    result: list[bool] = []
+    for line in text.split("\n"):
+        has_tab = "\t" in line
+        result.extend([has_tab] * len(line))
+        result.append(False)  # the U+000A itself, or one past the end
+    return result
+
+
+def normalize_text(text: str, *, last_line_has_tab: bool = False) -> str:
     """Apply section 3's five ordered steps. Raises NormalizationError on a section 2 character."""
     forbidden = find_forbidden_character(text)
     if forbidden is not None:
@@ -139,13 +148,36 @@ def normalize_text(text: str) -> str:
 
     # Steps 4 and 5, with the space collapse folded into the same pass: a space is emitted only
     # when the previous emitted character was not one, which drops runs and the leading space.
+    # Step 4: a bullet glyph is list structure only at the start of a line (after U+000A, then
+    # optional whitespace), followed by whitespace, on a line that contains no U+0009 (a line with
+    # U+0009 is a table row); anywhere else it is content. The start of the text is not a line
+    # start, so normalising the result again (it has no U+000A) replaces nothing: idempotence. A
+    # bullet replaced here counts as whitespace for the bullet after it.
     output: list[str] = []
-    for character in unicodedata.normalize("NFC", "".join(expanded)):
+    composed = unicodedata.normalize("NFC", "".join(expanded))
+    on_tab_line = _lines_with_tab(composed)
+    if last_line_has_tab:
+        # A page slice whose last line continues past it on a page line with U+0009 (section 6).
+        last_break = composed.rfind("\n")
+        for position in range(last_break + 1, len(composed)):
+            on_tab_line[position] = True
+    at_line_start = False
+    for position, character in enumerate(composed):
         code_point = ord(character)
-        if code_point in BULLET_GLYPHS or is_whitespace(code_point):
+        replaced_bullet = (
+            code_point in BULLET_GLYPHS
+            and at_line_start
+            and not on_tab_line[position]
+            and position + 1 < len(composed)
+            and is_whitespace(ord(composed[position + 1]))
+        )
+        if is_whitespace(code_point) or replaced_bullet:
+            if code_point == 0x000A:
+                at_line_start = True
             if output and output[-1] != " ":
                 output.append(" ")
             continue
+        at_line_start = False
         output.append(character)
     if output and output[-1] == " ":
         output.pop()

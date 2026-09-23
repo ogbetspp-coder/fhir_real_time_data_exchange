@@ -5,7 +5,7 @@ import {
   NormalizationError,
   countWords,
   findForbiddenCharacter,
-  isWordCharacter,
+  isWhitespace,
   normalizeText,
 } from "./normalize.js";
 import { XhtmlError, xhtmlToText } from "./xhtml.js";
@@ -115,6 +115,8 @@ export class FidelityError extends Error {
 // extractor, so it is bounded and must sit on line boundaries rather than trusted outright.
 const MAX_EXCLUDED_CODE_POINTS_PER_PAGE = 240;
 
+const SOFT_HYPHEN = "\u00ad";
+
 type PageIndex = {
   page: SourcePage;
   codePoints: string[];
@@ -127,7 +129,7 @@ type PageIndex = {
 function softHyphenBreakBefore(codePoints: string[], offset: number): boolean {
   if (codePoints[offset - 1] !== "\n") return false;
   const before = codePoints[offset - 2] === "\r" ? offset - 3 : offset - 2;
-  return codePoints[before] === "­";
+  return codePoints[before] === SOFT_HYPHEN;
 }
 
 function bodyIssueFor(page: SourcePage, codePoints: string[]): string | undefined {
@@ -138,7 +140,9 @@ function bodyIssueFor(page: SourcePage, codePoints: string[]): string | undefine
   ) {
     return "body-boundary";
   }
-  if (bodyEnd !== codePoints.length && codePoints[bodyEnd - 1] !== "\n") return "body-boundary";
+  // A non-empty body always ends with its own line terminator, even at the end of the page:
+  // otherwise the last word of one page and the first word of the next would read as one.
+  if (bodyEnd !== bodyStart && codePoints[bodyEnd - 1] !== "\n") return "body-boundary";
   if (codePoints.length - (bodyEnd - bodyStart) > MAX_EXCLUDED_CODE_POINTS_PER_PAGE) {
     return "excluded-text";
   }
@@ -152,8 +156,12 @@ function indexPages(source: SourceDocumentText): {
   const pages = new Map<number, PageIndex>();
   const structural: string[] = [];
   const issues: string[] = [];
-  for (const page of source.pages) {
+  for (const [position, page] of source.pages.entries()) {
     if (pages.has(page.page)) structural.push(`Duplicate page number ${page.page}`);
+    // Pages are numbered 1..N in array order, so no page can be left out of the document and the
+    // text before a section's first span is always the text the document puts there.
+    if (page.page !== position + 1)
+      structural.push(`Page ${page.page} at position ${position + 1}`);
     const codePoints = Array.from(page.text);
     if (
       !Number.isInteger(page.page) ||
@@ -184,10 +192,40 @@ function slice(index: PageIndex, start: number, end: number): string {
   return index.codePoints.slice(start, end).join("");
 }
 
+// Where a slice of page text that starts at `start` is read from: the U+000A that ends the
+// previous line when only whitespace other than U+000A lies between it and `start` (before
+// `bodyStart`, section 1 makes that code point U+000A), otherwise `start` itself. Normalisation
+// does not treat the start of a text as the start of a line (section 3 step 4), so a slice that
+// begins at a line start carries its line terminator with it.
+function fromLineStart(index: PageIndex, start: number): number {
+  let position = start;
+  while (position > index.page.bodyStart) {
+    const character = index.codePoints[position - 1] ?? "";
+    if (character === "\n") return position - 1;
+    if (!isWhitespace(character.codePointAt(0) ?? 0)) return start;
+    position -= 1;
+  }
+  return index.codePoints[position - 1] === "\n" ? position - 1 : start;
+}
+
+// Whether the page line that a slice ending at `end` ends on — the whole line in the body, from
+// the U+000A before it to the next U+000A, not only its part inside the slice — contains U+0009.
+// A slice that ends with U+000A ends on no partial line.
+function lastLineHasTab(index: PageIndex, end: number): boolean {
+  const { bodyStart, bodyEnd } = index.page;
+  if (end <= bodyStart || index.codePoints[end - 1] === "\n") return false;
+  let lineStart = end - 1;
+  while (lineStart > bodyStart && index.codePoints[lineStart - 1] !== "\n") lineStart -= 1;
+  let lineEnd = end;
+  while (lineEnd < bodyEnd && index.codePoints[lineEnd] !== "\n") lineEnd += 1;
+  return index.codePoints.slice(lineStart, lineEnd).includes("\t");
+}
+
 function isBlankSlice(index: PageIndex, start: number, end: number): boolean {
   if (end <= start) return true;
   try {
-    return normalizeText(slice(index, start, end)) === "";
+    const text = slice(index, fromLineStart(index, start), end);
+    return normalizeText(text, { lastLineHasTab: lastLineHasTab(index, end) }) === "";
   } catch {
     return false;
   }
@@ -201,7 +239,7 @@ type SpanPiece = { index: PageIndex; start: number; end: number };
 function resolveSpans(
   spans: SourceSpan[],
   pages: Map<number, PageIndex>,
-): { raw: string[] } | { status: SectionStatus; reason: string } {
+): { raw: string[]; lastLineHasTab: boolean } | { status: SectionStatus; reason: string } {
   const pieces: SpanPiece[] = [];
   let previous: SourceSpan | undefined;
 
@@ -250,36 +288,119 @@ function resolveSpans(
         return { status: "invalid-provenance", reason: "non-contiguous" };
       }
     } else {
-      pieces.push({ index, start: span.startOffset, end: span.endOffset });
+      pieces.push({ index, start: fromLineStart(index, span.startOffset), end: span.endOffset });
     }
     previous = span;
   }
 
   // The outer edges of a section must fall on word boundaries: a section may omit words, but
   // it may not begin or end inside one (spec section 6).
-  const first = pieces[0];
+  const firstSpan = spans[0];
+  const lastSpan = spans[spans.length - 1];
   const last = pieces[pieces.length - 1];
-  if (first !== undefined && last !== undefined) {
-    const head = first.index.codePoints;
-    const before = head[first.start - 1];
-    if (
-      first.start > first.index.page.bodyStart &&
-      before !== undefined &&
-      (isWordCharacter(before) || softHyphenBreakBefore(head, first.start))
-    ) {
+  if (firstSpan !== undefined && lastSpan !== undefined && last !== undefined) {
+    if (startCutsWord(pages, firstSpan) || endCutsWord(last.index, lastSpan)) {
       return { status: "invalid-provenance", reason: "word-cut" };
     }
-    const tail = last.index.codePoints;
-    const after = tail[last.end];
-    const cutsAfter =
-      tail[last.end - 1] === "­" ||
-      (last.end < last.index.page.bodyEnd
-        ? after !== undefined && isWordCharacter(after)
-        : softHyphenBreakBefore(tail, last.end));
-    if (cutsAfter) return { status: "invalid-provenance", reason: "word-cut" };
   }
 
-  return { raw: pieces.map((piece) => slice(piece.index, piece.start, piece.end)) };
+  return {
+    raw: pieces.map((piece) => slice(piece.index, piece.start, piece.end)),
+    lastLineHasTab: last === undefined ? false : lastLineHasTab(last.index, last.end),
+  };
+}
+
+// Whitespace for the edge rules: section 3 step 5's list without U+00A0, U+2007 and U+202F,
+// which join the groups of a number (`10 000`) and so are not a boundary between tokens.
+const NUMBER_JOINERS = new Set([0x00a0, 0x2007, 0x202f]);
+
+function isEdgeWhitespace(character: string | undefined): boolean {
+  const codePoint = character?.codePointAt(0);
+  return codePoint !== undefined && isWhitespace(codePoint) && !NUMBER_JOINERS.has(codePoint);
+}
+
+function isSpace(character: string | undefined): boolean {
+  const codePoint = character?.codePointAt(0);
+  return codePoint !== undefined && isWhitespace(codePoint);
+}
+
+const DECIMAL_DIGIT = /^\p{Nd}$/u;
+
+function isDecimalDigit(character: string | undefined): boolean {
+  return character !== undefined && DECIMAL_DIGIT.test(character);
+}
+
+// The first code point from `from` in direction `step` (+1 or -1) that is not section 3
+// whitespace, read inside the body and without crossing U+000A; undefined if there is none.
+function nextToken(index: PageIndex, from: number, step: 1 | -1): string | undefined {
+  const { bodyStart, bodyEnd } = index.page;
+  for (let position = from; position >= bodyStart && position < bodyEnd; position += step) {
+    const character = index.codePoints[position] ?? "";
+    if (character === "\n") return undefined;
+    if (!isWhitespace(character.codePointAt(0) ?? 0)) return character;
+  }
+  return undefined;
+}
+
+// A digit at the edge with a digit beyond it, across nothing but whitespace on the same line,
+// is one number grouped with spaces (`10 000`): the edge cuts it.
+function cutsDigitGroup(index: PageIndex, inner: number, beyond: number, step: 1 | -1): boolean {
+  return isDecimalDigit(index.codePoints[inner]) && isDecimalDigit(nextToken(index, beyond, step));
+}
+
+// Reads backwards from the code point before the first span, through its page's body and then
+// the bodies of the pages before it (as declared, whether or not they pass section 1 or 2),
+// skipping edge whitespace. The section starts inside a token if nothing was skipped before the
+// first other code point, whatever that code point is (a letter, a digit, `.` of `0.5`, `−` of
+// `−20`, U+00A0 of `10 000`), or if that code point is U+00AD. Reading past page 1 is no cut. It
+// also starts inside a number when its first code point that is not edge whitespace is a digit
+// and the first non-whitespace code point before that on the same line is a digit too.
+function startCutsWord(pages: Map<number, PageIndex>, span: SourceSpan): boolean {
+  const first = pages.get(span.page);
+  if (first !== undefined) {
+    // The inner code point is the span's first that is not section 3 whitespace (a joiner
+    // such as U+202F is skipped here too: `\u202f 000` is inside the number).
+    let inner = span.startOffset;
+    while (inner < span.endOffset && isSpace(first.codePoints[inner])) inner += 1;
+    if (inner < span.endOffset && cutsDigitGroup(first, inner, inner - 1, -1)) return true;
+  }
+  let skipped = false;
+  let pageNumber = span.page;
+  let position = span.startOffset - 1;
+  let index = first;
+  while (index !== undefined) {
+    for (; position >= index.page.bodyStart; position -= 1) {
+      const character = index.codePoints[position] ?? "";
+      if (isEdgeWhitespace(character)) {
+        skipped = true;
+        continue;
+      }
+      return character === SOFT_HYPHEN || !skipped;
+    }
+    pageNumber -= 1;
+    index = pages.get(pageNumber);
+    if (index !== undefined) position = index.page.bodyEnd - 1;
+  }
+  return false;
+}
+
+// The section ends inside a token if its last span, without trailing edge whitespace, ends in
+// U+00AD; or unless the code point at its end offset is edge whitespace or the end offset is at
+// or past `bodyEnd` (whose code point before is U+000A, section 1). `1` of `1.5` is a cut: the
+// `.` after it is not a boundary. It also ends inside a number when its last code point that is
+// not edge whitespace is a digit and the first non-whitespace code point after that on the same
+// line is a digit too (a span ending "10 " of "10  000" still cuts the number).
+function endCutsWord(index: PageIndex, span: SourceSpan): boolean {
+  let end = span.endOffset;
+  while (end > span.startOffset && isEdgeWhitespace(index.codePoints[end - 1])) end -= 1;
+  if (end > span.startOffset && index.codePoints[end - 1] === SOFT_HYPHEN) return true;
+  if (span.endOffset >= index.page.bodyEnd) return false;
+  if (!isEdgeWhitespace(index.codePoints[span.endOffset])) return true;
+  // The inner code point is the span's last that is not section 3 whitespace (`10\u202f`
+  // before ` 000` ends inside the number).
+  let inner = end;
+  while (inner > span.startOffset && isSpace(index.codePoints[inner - 1])) inner -= 1;
+  return inner > span.startOffset && cutsDigitGroup(index, inner - 1, inner, 1);
 }
 
 // Pieces from consecutive pages are concatenated verbatim: a page body ends with its own line
@@ -400,6 +521,22 @@ function coverage(
   return { pageCodePoints, bodyCodePoints, coveredCodePoints, uncoveredGaps };
 }
 
+// Every span's page and offsets are integers (a JSON `1.0` is the integer 1). A boolean or a
+// fractional number is not an offset, and a language that treats `true` as 1 would otherwise
+// read it as page 1: it is a structural error, never a status.
+function assertIntegerSpans(provenance: SectionProvenance[]): void {
+  const invalid: string[] = [];
+  for (const entry of provenance) {
+    for (const span of entry.spans) {
+      const fields: unknown[] = [span.page, span.startOffset, span.endOffset];
+      if (!fields.every((value) => Number.isInteger(value))) {
+        invalid.push(`Invalid span in provenance ${entry.sourceKey}`);
+      }
+    }
+  }
+  if (invalid.length > 0) throw new FidelityError("Provenance span is invalid", invalid);
+}
+
 function assertUniqueKeys(keys: string[], what: string): void {
   const seen = new Set<string>();
   const duplicates: string[] = [];
@@ -424,6 +561,7 @@ export function verifyNarrativeFidelity(input: FidelityInput): FidelityReport {
     input.provenance.map(({ sourceKey }) => sourceKey),
     "provenance entry",
   );
+  assertIntegerSpans(input.provenance);
   const { pages, issues } = indexPages(input.source);
   const provenance = new Map(input.provenance.map((entry) => [entry.sourceKey, entry]));
   const sectionKeys = new Set(input.sections.map(({ sourceKey }) => sourceKey));
@@ -467,7 +605,9 @@ export function verifyNarrativeFidelity(input: FidelityInput): FidelityReport {
       });
       continue;
     }
-    const expected = normalizeText(joinPieces(resolved.raw));
+    const expected = normalizeText(joinPieces(resolved.raw), {
+      lastLineHasTab: resolved.lastLineHasTab,
+    });
     if (expected !== normalized.text) {
       results.push({
         ...base,

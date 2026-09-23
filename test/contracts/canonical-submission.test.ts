@@ -223,7 +223,7 @@ describe("canonical submission contract", () => {
     const submission = clone();
     submission.provenance.fidelity.normalizationVersion = "fidelity-norm/0.9.0";
 
-    rejectedByParse(seal(submission), "fidelity.normalizationVersion must be fidelity-norm/1.1.1");
+    rejectedByParse(seal(submission), "fidelity.normalizationVersion must be fidelity-norm/2.0.0");
   });
 
   it("rejects source text that does not match sourceDocument.extractedText.sha256", () => {

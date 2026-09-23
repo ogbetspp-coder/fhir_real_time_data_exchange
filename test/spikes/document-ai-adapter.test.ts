@@ -282,7 +282,7 @@ describe("assertTextFree", () => {
       assertTextFree({
         rule: "body-boundary",
         sourceKey: "smpc.4.1",
-        version: "fidelity-norm/1.1.1",
+        version: "fidelity-norm/2.0.0",
         path: "Composition.section[3].section[1]",
         hash: "a".repeat(64),
         at: "2026-09-20T08:00:00Z",

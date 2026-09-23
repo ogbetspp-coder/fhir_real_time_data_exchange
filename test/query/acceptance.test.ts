@@ -231,6 +231,20 @@ describe("ePI query service, phase 1", () => {
       expect(forbidden.isError).toBe(true);
       expect(forbidden.structured).toEqual({ tool: "verify_quote", error: "invalid-request" });
       expect(forbidden.text).toBe("invalid-request");
+
+      // fidelity-norm/2.0.0 added C1 controls, U+000B, U+000C and the bidirectional controls to
+      // section 2; a quote carrying one is a bad request too (under 1.1.1 U+000B, U+000C and
+      // U+0085 were whitespace, and the rest were compared as content).
+      for (const codePoint of [0x000b, 0x000c, 0x0085, 0x0092, 0x200e, 0x202e, 0x2066]) {
+        const refused = await callTool(harness, "verify_quote", {
+          bundleId: typography,
+          quote: `dose${String.fromCodePoint(codePoint)} is`,
+        });
+        expect(refused.structured, codePoint.toString(16)).toEqual({
+          tool: "verify_quote",
+          error: "invalid-request",
+        });
+      }
     });
   });
 

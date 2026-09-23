@@ -65,7 +65,7 @@ const PROSE_PATTERN = /\S+(?:\s+\S+){3,}/u;
 
 // The closed list of shapes a report string may take. Nothing here can hold a space, so nothing
 // here can hold a phrase.
-//   - a token: rule names, statuses, source keys (`smpc.4.1`), versions (`fidelity-norm/1.1.1`),
+//   - a token: rule names, statuses, source keys (`smpc.4.1`), versions (`fidelity-norm/2.0.0`),
 //     paths (`Composition.section[3].section[1]`), block-type keys, Unicode category names;
 //   - a 64-hex SHA-256 digest;
 //   - an ISO 8601 UTC timestamp.
@@ -153,13 +153,15 @@ const LIGATURES = new Map<number, string>([
   [0xfb06, "st"],
 ]);
 
+// The spec's step 4 list. The spec also replaces a bullet only at a line start and before
+// whitespace; this locator replaces it everywhere, which can lose a candidate, never fabricate
+// one (every candidate is re-checked with `normalizeText`, above).
 const BULLET_GLYPHS = new Set([
-  0x2022, 0x2023, 0x2043, 0x2219, 0x25a0, 0x25a1, 0x25aa, 0x25ab, 0x25cb, 0x25cf, 0x25e6,
+  0x2022, 0x2023, 0x25a0, 0x25a1, 0x25aa, 0x25ab, 0x25cb, 0x25cf, 0x25e6,
 ]);
 
 const WHITESPACE = new Set([
-  0x0009, 0x000a, 0x000b, 0x000c, 0x000d, 0x0020, 0x0085, 0x00a0, 0x1680, 0x2028, 0x2029, 0x202f,
-  0x205f, 0x3000,
+  0x0009, 0x000a, 0x000d, 0x0020, 0x00a0, 0x1680, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000,
 ]);
 
 function isWhitespace(codePoint: number): boolean {
@@ -468,8 +470,7 @@ function countCodePoints(characters: readonly string[]): Map<string, number> {
 // the spike must not reach into src/fidelity's private tables and must not apply the rest of
 // the normaliser (ligature expansion and NFC would hide exactly the differences it measures).
 const WHITESPACE_CLASS = new Set([
-  0x0009, 0x000a, 0x000b, 0x000c, 0x000d, 0x0020, 0x0085, 0x00a0, 0x1680, 0x2028, 0x2029, 0x202f,
-  0x205f, 0x3000,
+  0x0009, 0x000a, 0x000d, 0x0020, 0x00a0, 0x1680, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000,
 ]);
 
 function isWhitespaceClass(character: string): boolean {
