@@ -22,7 +22,11 @@
 #   bash scripts/gcp/key-guard.sh --check    # report only; exit 1 if missing or different
 set -euo pipefail
 
-PROJECT_ID="${GCP_PROJECT_ID:-sage-ship-509104-b8}"
+# shellcheck source=scripts/gcp/common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+# GCP_PROJECT_ID first, as before; otherwise GOOGLE_CLOUD_PROJECT or the gcloud configuration,
+# and no project at all fails rather than falling back to a hard-coded one.
+PROJECT_ID="${GCP_PROJECT_ID:-$(ema_flow_resolve_project)}"
 DEPLOYER="ema-flow-deployer@${PROJECT_ID}.iam.gserviceaccount.com"
 POLICY_ID="key-guard"
 ATTACHMENT="cloudresourcemanager.googleapis.com%2Fprojects%2F${PROJECT_ID}"

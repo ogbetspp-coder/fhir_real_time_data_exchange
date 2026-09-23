@@ -25,7 +25,11 @@
 #   bash agent/deploy/authorization.sh --check               # report only; exit 1 if missing
 set -euo pipefail
 
-PROJECT_ID="${GCP_PROJECT_ID:-sage-ship-509104-b8}"
+# shellcheck source=scripts/gcp/common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../scripts/gcp" && pwd)/common.sh"
+# GCP_PROJECT_ID first, as before; otherwise GOOGLE_CLOUD_PROJECT or the gcloud configuration,
+# and no project at all fails rather than falling back to a hard-coded one.
+PROJECT_ID="${GCP_PROJECT_ID:-$(ema_flow_resolve_project)}"
 AUTHORIZATION_ID="query_service_bearer_token"
 CLIENT_ID="${GEMINI_OAUTH_CLIENT_ID:-398017980210-mgn6flks5a9nmlbkgkhh1pple9tv2075.apps.googleusercontent.com}"
 BASE="https://discoveryengine.googleapis.com/v1alpha"

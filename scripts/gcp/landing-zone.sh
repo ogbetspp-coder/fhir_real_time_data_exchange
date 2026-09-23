@@ -43,7 +43,11 @@
 set -euo pipefail
 
 ORG_ID="${GCP_ORG_ID:-1048405016186}"
-DEV_PROJECT="${GCP_PROJECT_ID:-sage-ship-509104-b8}"
+# shellcheck source=scripts/gcp/common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+# GCP_PROJECT_ID first, as before; otherwise GOOGLE_CLOUD_PROJECT or the gcloud configuration,
+# and no project at all fails rather than falling back to a hard-coded one.
+DEV_PROJECT="${GCP_PROJECT_ID:-$(ema_flow_resolve_project)}"
 PROD_PROJECT="${PROD_PROJECT_ID:-khs-ema-flow-prod}"
 CHECK="false"
 [[ "${1:-}" == "--check" ]] && CHECK="true"
