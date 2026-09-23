@@ -86,16 +86,31 @@ The transformer accepts two authoritative source categories:
 
 It does not infer clinical narrative from ingredients or product properties. Every output
 field is classified as copied, code-mapped, structurally moved, deterministically defaulted,
-or rejected. Missing and duplicate required sections are errors. So is anything the mapping
-manifest would otherwise drop or quietly repair: a section coded in the manifest's source code
-system that no rule maps, at any depth; a section without such a code that carries narrative; a
-mapped section that is not directly under the section its parent rule maps (the manifest's top
-rule at the top level); a mandatory leaf section without narrative (a section with child rules
-may be a bare heading); and a source Composition or Bundle that declares a language other than
-English, since the manifest is the English template and the output is always `en`. The manifest
-loader rejects a manifest in which two rules share a `sourceKey` or a `targetCode`, and lineage
-names the mapping by the version the loaded manifest declares, the same `mappingVersion` the run
-manifest records.
+or rejected. Missing and duplicate required sections are errors. The crosswalk
+(`transformType2ToEma`) also refuses, with one issue each, a source it would otherwise have to
+drop from or rearrange:
+
+- a section coded in the manifest's source code system that no rule maps, at any depth; a
+  section carrying two such codes; a section with no `code` element;
+- a section without such a code whose `text.div` shows any text, or that the fidelity XHTML
+  scanner (`src/fidelity/xhtml.ts`) cannot read;
+- a mapped section that is not directly under the section its parent rule maps (the root rule
+  at the top level), or that comes before a sibling the manifest orders first;
+- a section carrying any element besides `id`, `title`, `code`, `text` and `section` (for
+  example `entry`, `extension`, `emptyReason`, `author`, `focus`, `orderedBy` or `mode`);
+- a mandatory leaf section, or a section whose rule is marked `"narrative": "required"`
+  (4.8, whose own text sits above its reporting subsection), without narrative that the
+  scanner can read and that shows some text;
+- a source Composition or Bundle whose `language` is missing or is not an English BCP 47 tag
+  (`en`, optionally `-Latn`, optionally a region).
+
+Some things it still does without asking, by design: every mapped section takes its rule's
+title as its heading and a new id (the source title is not compared); only the target coding
+is kept; Composition.language and Bundle.language are written as `en`; and a section without a
+source code and without narrative — an empty container — is dropped, title included. The
+`xml:lang` of a narrative `div` is not checked yet. The manifest loader rejects a manifest in
+which two rules share a `sourceKey` or a `targetCode`, and lineage names the mapping by the
+version the loaded manifest declares, the same `mappingVersion` the run manifest records.
 
 ## Validation model
 
@@ -105,8 +120,8 @@ Validation is deliberately redundant:
    fidelity check that gates ingress before any transformation (ADR 0003);
 1. application checks verify graph completeness, uniqueness, and expected profiles
    (`src/fhir/preflight.ts`), and the crosswalk (`transformType2ToEma`) refuses a source whose
-   section tree is not exactly the manifest's hierarchy, as described above; the EMA preflight
-   then checks every target section's code and title at its position;
+   coded sections are not in the manifest's hierarchy and order, as listed above; the EMA
+   preflight then checks every target section's code and title at its position;
 2. the official HL7 Java validator evaluates the pinned packages, FHIRPath, slicing, and
    profile chain;
 3. Cloud Healthcare API `$validate?profile=` verifies each profile as deployed in the target

@@ -68,7 +68,11 @@ function transformIssues(source: FhirBundle, withMapping: EmaMapping = mapping):
   throw new Error("Expected the transformation to fail closed");
 }
 
-const NARRATIVE = '<div xmlns="http://www.w3.org/1999/xhtml"><p>Synthetic narrative.</p></div>';
+function div(content: string): string {
+  return `<div xmlns="http://www.w3.org/1999/xhtml">${content}</div>`;
+}
+
+const NARRATIVE = div("<p>Synthetic narrative.</p>");
 
 describe("deterministic Type 2 to EMA conversion", () => {
   it("maps the complete synthetic Type 2 graph and passes structural gates", () => {
@@ -141,9 +145,9 @@ describe("deterministic Type 2 to EMA conversion", () => {
       },
     ];
 
-    expect(transformIssues(source)).toContain(
+    expect(transformIssues(source)).toEqual([
       "Unmapped source section smpc.4.1.1 at Composition.section[0].section[3].section[0].section[0]",
-    );
+    ]);
   });
 
   it("fails closed when a section without a source code carries narrative", () => {
@@ -154,9 +158,96 @@ describe("deterministic Type 2 to EMA conversion", () => {
       text: { status: "generated", div: NARRATIVE },
     });
 
-    expect(transformIssues(source)).toContain(
+    expect(transformIssues(source)).toEqual([
       "Uncoded source section with narrative at Composition.section[0].section[5].section[6]",
+    ]);
+  });
+
+  it.each([
+    ["CDATA", "<p><![CDATA[Do not use in children]]></p>"],
+    ["a comment", "<!-- Do not use in children -->"],
+    ["an image", '<img src="https://khs.dev/pictogram.png"/>'],
+    ["an unknown entity", "<p>&nbsp;</p>"],
+  ])("fails closed when a section without a source code carries %s", (_name, content) => {
+    const source = createSyntheticType2Bundle(mapping);
+    findSection(composition(source).section, "smpc.6").section?.push({
+      title: "6.7 Additional information",
+      code: { coding: [] },
+      text: { status: "generated", div: div(content) },
+    });
+
+    expect(transformIssues(source)).toEqual([
+      "Uncoded source section with unreadable narrative at Composition.section[0].section[5].section[6]",
+    ]);
+  });
+
+  it("accepts a section without a source code that is an empty container", () => {
+    const source = createSyntheticType2Bundle(mapping);
+    const pharmaceutical = findSection(composition(source).section, "smpc.6");
+    pharmaceutical.section?.push(
+      { title: "Container", code: { coding: [] } },
+      { title: "Blank", code: { text: "blank" }, text: { status: "empty", div: div("<p> </p>") } },
     );
+
+    const result = transformType2ToEma(source, mapping);
+    expect(result.outputHash).toBe(
+      transformType2ToEma(createSyntheticType2Bundle(mapping), mapping).outputHash,
+    );
+  });
+
+  it("fails closed when a source section carries two codes in the source code system", () => {
+    const source = createSyntheticType2Bundle(mapping);
+    findSection(composition(source).section, "smpc.4.3").code.coding?.push({
+      system: mapping.sourceCodeSystem,
+      code: "smpc.4.4",
+    });
+
+    expect(transformIssues(source)).toEqual([
+      "Missing mandatory source section smpc.4.3",
+      "Ambiguous source section at Composition.section[0].section[3].section[2]: 2 codes in the source code system",
+    ]);
+  });
+
+  it("fails closed with an issue, not a TypeError, when a source section has no code", () => {
+    const source = createSyntheticType2Bundle(mapping);
+    const incompatibilities: Partial<CompositionSection> = findSection(
+      composition(source).section,
+      "smpc.6.2",
+    );
+    delete incompatibilities.code;
+
+    expect(transformIssues(source)).toEqual([
+      "Missing mandatory source section smpc.6.2",
+      "Source section at Composition.section[0].section[5].section[1] has no code",
+      "Uncoded source section with narrative at Composition.section[0].section[5].section[1]",
+    ]);
+  });
+
+  it("fails closed when a source section carries an element the mapping would drop", () => {
+    const source = createSyntheticType2Bundle(mapping);
+    Object.assign(findSection(composition(source).section, "smpc.4.3"), {
+      entry: [{ reference: "https://khs.dev/fhir/Ingredient/synthetic" }],
+      emptyReason: { coding: [{ code: "unavailable" }] },
+    });
+
+    expect(transformIssues(source)).toEqual([
+      "Source section at Composition.section[0].section[3].section[2] carries entry, which the mapping would drop",
+      "Source section at Composition.section[0].section[3].section[2] carries emptyReason, which the mapping would drop",
+    ]);
+  });
+
+  it("fails closed when source subsections are out of manifest order", () => {
+    const source = createSyntheticType2Bundle(mapping);
+    const clinical = findSection(composition(source).section, "smpc.4");
+    const [indications, posology, ...rest] = clinical.section ?? [];
+    if (indications === undefined || posology === undefined) {
+      throw new Error("Synthetic fixture requires sections 4.1 and 4.2");
+    }
+    clinical.section = [posology, indications, ...rest];
+
+    expect(transformIssues(source)).toEqual([
+      "Source section smpc.4.2 comes before smpc.4.1 under smpc.4; the manifest orders smpc.4.1 first",
+    ]);
   });
 
   it("fails closed when a source section sits under the wrong parent", () => {
@@ -167,9 +258,9 @@ describe("deterministic Type 2 to EMA conversion", () => {
     findSection(moved, "smpc.6").section?.push(indications);
     composition(source).section = moved;
 
-    expect(transformIssues(source)).toContain(
+    expect(transformIssues(source)).toEqual([
       "Source section smpc.4.1 is under smpc.6, expected under smpc.4",
-    );
+    ]);
   });
 
   it("fails closed when the root source section is not at the top level", () => {
@@ -178,9 +269,9 @@ describe("deterministic Type 2 to EMA conversion", () => {
     if (root === undefined) throw new Error("Synthetic fixture requires a root section");
     composition(source).section = [{ title: "Wrapper", code: { coding: [] }, section: [root] }];
 
-    expect(transformIssues(source)).toContain(
+    expect(transformIssues(source)).toEqual([
       "Source section smpc is under uncoded section at Composition.section[0], expected under top level",
-    );
+    ]);
   });
 
   it("fails closed when a mandatory leaf section has no narrative", () => {
@@ -188,17 +279,55 @@ describe("deterministic Type 2 to EMA conversion", () => {
     delete findSection(composition(source).section, "smpc.4.3").text;
     findSection(composition(source).section, "smpc.6.2").text = {
       status: "empty",
-      div: '<div xmlns="http://www.w3.org/1999/xhtml"><p> </p></div>',
+      div: div("<p> </p>"),
     };
 
-    const issues = transformIssues(source);
-    expect(issues).toContain("Mandatory source section smpc.4.3 has no narrative");
-    expect(issues).toContain("Mandatory source section smpc.6.2 has no narrative");
+    expect(transformIssues(source)).toEqual([
+      "Mandatory source section smpc.4.3 has no narrative",
+      "Mandatory source section smpc.6.2 has no narrative",
+    ]);
   });
 
-  it("does not require narrative on a section that has child rules", () => {
+  it.each([
+    ["a non-breaking space by number", "<p>&#160;</p>", "has no narrative"],
+    ["a zero-width space by number", "<p>&#x200B;</p>", "has no narrative"],
+    [
+      "a zero-width space as a character",
+      `<p>${String.fromCodePoint(0x200b)}</p>`,
+      "has no narrative",
+    ],
+    [
+      "a byte-order mark, a word joiner and a soft hyphen",
+      "<p>&#xFEFF;&#x2060;&#xAD; </p>",
+      "has no narrative",
+    ],
+    ["a named entity the scanner does not know", "<p>&nbsp;</p>", "has unreadable narrative"],
+    ["a comment holding a >", "<!-- a > b -->", "has unreadable narrative"],
+    ["an attribute holding a >", '<p title="x>y"></p>', "has unreadable narrative"],
+    ["a comment holding an img", "<!-- <img> -->", "has unreadable narrative"],
+    ["an image only", '<img src="https://khs.dev/pictogram.png"/>', "has unreadable narrative"],
+  ])("fails closed when a mandatory leaf section holds only %s", (_name, content, outcome) => {
+    const source = createSyntheticType2Bundle(mapping);
+    findSection(composition(source).section, "smpc.4.3").text = {
+      status: "generated",
+      div: div(content),
+    };
+
+    expect(transformIssues(source)).toEqual([`Mandatory source section smpc.4.3 ${outcome}`]);
+  });
+
+  it("fails closed when 4.8 has no narrative above its reporting subsection", () => {
+    // 4.8 has a child rule, so only the manifest's narrative flag makes its own text mandatory.
+    const source = createSyntheticType2Bundle(mapping);
+    delete findSection(composition(source).section, "smpc.4.8").text;
+
+    expect(transformIssues(source)).toEqual(["Mandatory source section smpc.4.8 has no narrative"]);
+  });
+
+  it("does not require narrative on a section whose rule has children and no narrative flag", () => {
     const source = createSyntheticType2Bundle(mapping);
     delete findSection(composition(source).section, "smpc.4").text;
+    delete findSection(composition(source).section, "smpc.4.2").text;
 
     expect(() => transformType2ToEma(source, mapping)).not.toThrow();
   });
@@ -208,14 +337,47 @@ describe("deterministic Type 2 to EMA conversion", () => {
     composition(source).language = "fr";
     source.language = "de-AT";
 
-    const issues = transformIssues(source);
-    expect(issues).toContain(
+    expect(transformIssues(source)).toEqual([
       "Source Composition.language fr is not English; the mapping is English-only",
-    );
-    expect(issues).toContain(
       "Source Bundle.language de-AT is not English; the mapping is English-only",
-    );
+    ]);
   });
+
+  it.each(["eng", "en-", "en-x-fr", "en-GB-x-fr", "en-Cyrl", "en-GB-oxendict", "fr-CA"])(
+    "fails closed on the language tag %j",
+    (language) => {
+      const source = createSyntheticType2Bundle(mapping);
+      composition(source).language = language;
+
+      expect(transformIssues(source)).toEqual([
+        `Source Composition.language ${language} is not English; the mapping is English-only`,
+      ]);
+    },
+  );
+
+  it("fails closed when the source Composition or Bundle declares no language", () => {
+    const source = createSyntheticType2Bundle(mapping);
+    delete composition(source).language;
+    delete source.language;
+
+    expect(transformIssues(source)).toEqual([
+      "Source Composition.language is missing; the mapping is English-only",
+      "Source Bundle.language is missing; the mapping is English-only",
+    ]);
+  });
+
+  it.each(["en", "EN", "en-GB", "en-us", "en-001", "en-Latn", "en-Latn-GB"])(
+    "accepts the English language tag %j and publishes en on the Composition and the Bundle",
+    (language) => {
+      const source = createSyntheticType2Bundle(mapping);
+      composition(source).language = language;
+      source.language = language;
+
+      const result = transformType2ToEma(source, mapping);
+      expect(composition(result.documentBundle).language).toBe("en");
+      expect(result.documentBundle.language).toBe("en");
+    },
+  );
 
   it("fails closed on a mapping whose rules share a sourceKey or a targetCode", () => {
     // The loader refuses such a manifest; the transform refuses one built in memory too.
@@ -227,16 +389,10 @@ describe("deterministic Type 2 to EMA conversion", () => {
     warnings.sourceKey = "smpc.4.3";
     warnings.targetCode = "200000029805";
 
-    const issues = transformIssues(source, altered);
-    expect(issues).toContain("Duplicate sourceKey smpc.4.3 in mapping manifest");
-    expect(issues).toContain("Duplicate targetCode 200000029805 in mapping manifest");
-  });
-
-  it("accepts a regional English source and still publishes en", () => {
-    const source = createSyntheticType2Bundle(mapping);
-    composition(source).language = "en-GB";
-
-    const result = transformType2ToEma(source, mapping);
-    expect(composition(result.documentBundle).language).toBe("en");
+    expect(transformIssues(source, altered)).toEqual([
+      "Duplicate sourceKey smpc.4.3 in mapping manifest",
+      "Duplicate targetCode 200000029805 in mapping manifest",
+      "Unmapped source section smpc.4.4 at Composition.section[0].section[3].section[3]",
+    ]);
   });
 });

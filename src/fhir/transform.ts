@@ -1,4 +1,5 @@
 import { sha256, stableUuid } from "../lib/hash.js";
+import { xhtmlToText } from "../fidelity/xhtml.js";
 import { duplicateRuleIssues, type EmaMapping, type SectionRule } from "./mapping.js";
 import {
   isComposition,
@@ -50,32 +51,58 @@ export class TransformationError extends Error {
   }
 }
 
-type IndexedSection = {
+type SourceSection = {
   section: CompositionSection;
   path: string;
-  // The source code of the section this one sits directly under, and that section's path. Both
-  // are undefined at the top level of Composition.section.
-  parentCode: string | undefined;
-  parentPath: string | undefined;
+  // Where the section sits among its siblings, so manifest order can be checked.
+  position: number;
+  // Every code the section carries in the source code system, and the one code when there is
+  // exactly one. Two codes make a section ambiguous; it is then indexed under neither.
+  codes: string[];
+  code: string | undefined;
+  // The section this one sits directly under; undefined at the top level of Composition.section.
+  parent: SourceSection | undefined;
 };
 
-type SourceSection = IndexedSection & { code: string | undefined };
+// An English language tag in BCP 47: "en", optionally the Latin script subtag, optionally a
+// region (two letters or three digits), compared case-insensitively. Anything else — a variant,
+// an extension, a private-use subtag such as "en-x-fr", a dangling "en-", or "eng" — is refused:
+// the manifest is the English CAP SmPC template and nothing else.
+const ENGLISH_LANGUAGE = /^en(?:-latn)?(?:-(?:[a-z]{2}|\d{3}))?$/i;
 
-// An English language tag: "en" itself or any "en-" subtag, compared case-insensitively as
-// BCP 47 requires. The manifest is the English CAP SmPC template and nothing else.
-const ENGLISH_LANGUAGE = /^en(-|$)/i;
+// The elements of a source section the crosswalk carries or deliberately replaces: id and title
+// (the output takes the rule's own id and heading), code (mapped), text (copied byte for byte)
+// and section (walked). Any other element — entry, extension, emptyReason, author, focus,
+// orderedBy, mode — would be dropped, so a section carrying one is refused instead.
+const CARRIED_SECTION_ELEMENTS = new Set(["id", "title", "code", "text", "section"]);
 
-function sectionCode(section: CompositionSection, system: string): string | undefined {
-  return section.code.coding?.find((coding) => coding.system === system)?.code;
+// Characters that show nothing on the page besides whitespace (which already covers U+00A0 and
+// U+FEFF): the zero-width space, the zero-width non-joiner and joiner, the word joiner and the
+// soft hyphen.
+const INVISIBLE_CODE_POINTS = new Set([0x200b, 0x200c, 0x200d, 0x2060, 0x00ad]);
+
+function isVisible(character: string): boolean {
+  return !/\s/u.test(character) && !INVISIBLE_CODE_POINTS.has(character.codePointAt(0) ?? 0);
 }
 
-// A section carries narrative when its text.div holds something a reader would see: text once
-// the markup is removed, or an image. An absent text, an empty root div, or a div holding only
-// empty elements is no narrative.
-function hasNarrative(section: CompositionSection): boolean {
-  const div = section.text?.div;
-  if (div === undefined) return false;
-  return div.replace(/<[^>]*>/g, "").trim() !== "" || /<img\b/i.test(div);
+type Narrative = "absent" | "present" | "unreadable";
+
+// Whether a section's text.div holds anything a reader would see, read with the same fail-closed
+// scanner the fidelity check uses (src/fidelity/xhtml.ts): entities decoded, markup removed,
+// invisible characters ignored. A div that scanner rejects — a comment, CDATA, an unknown
+// element such as img, an unknown entity such as &nbsp;, a forbidden attribute — is
+// "unreadable", and both checks that use this refuse it: an uncoded section might be hiding text
+// in it, and a mandatory section cannot be shown to carry any.
+function readNarrative(section: CompositionSection): Narrative {
+  const div: unknown = section.text?.div;
+  if (div === undefined) return "absent";
+  if (typeof div !== "string") return "unreadable";
+  try {
+    return Array.from(xhtmlToText(div)).some(isVisible) ? "present" : "absent";
+  } catch {
+    // An XhtmlError, or anything else the scanner throws: either way nothing can be shown.
+    return "unreadable";
+  }
 }
 
 // Every section of the source tree, in document order, coded or not. Nothing is skipped here:
@@ -84,24 +111,40 @@ function collectSections(
   sections: CompositionSection[],
   system: string,
   basePath = "Composition.section",
-  parent?: { code: string | undefined; path: string },
+  parent?: SourceSection,
   collected: SourceSection[] = [],
 ): SourceSection[] {
   sections.forEach((section, position) => {
     const path = `${basePath}[${position}]`;
-    const code = sectionCode(section, system);
-    collected.push({ section, path, code, parentCode: parent?.code, parentPath: parent?.path });
+    // Typed as required, but a source read from a store is not checked against the type; a
+    // section without a code is reported below rather than failing here with a TypeError.
+    const codings = (section as { code?: CompositionSection["code"] }).code?.coding ?? [];
+    const codes = codings
+      .filter((coding) => coding.system === system)
+      .map((coding) => coding.code ?? "");
+    const single = codes.length === 1 ? codes[0] : undefined;
+    const entry: SourceSection = {
+      section,
+      path,
+      position,
+      codes,
+      code: single === "" ? undefined : single,
+      parent,
+    };
+    collected.push(entry);
     if (section.section !== undefined) {
-      collectSections(section.section, system, `${path}.section`, { code, path }, collected);
+      collectSections(section.section, system, `${path}.section`, entry, collected);
     }
   });
   return collected;
 }
 
-function indexSections(sections: SourceSection[]): Map<string, IndexedSection[]> {
-  const index = new Map<string, IndexedSection[]>();
-  for (const { code, ...indexed } of sections) {
-    if (code !== undefined) index.set(code, [...(index.get(code) ?? []), indexed]);
+function indexSections(sections: SourceSection[]): Map<string, SourceSection[]> {
+  const index = new Map<string, SourceSection[]>();
+  for (const section of sections) {
+    if (section.code !== undefined) {
+      index.set(section.code, [...(index.get(section.code) ?? []), section]);
+    }
   }
   return index;
 }
@@ -112,15 +155,41 @@ function ruleKeys(rule: SectionRule, keys = new Set<string>()): Set<string> {
   return keys;
 }
 
-// A source section the manifest does not consume would otherwise be dropped with its narrative
-// while the run succeeds. A section coded in the source code system must match a rule; a section
+function describeParent(parent: SourceSection | undefined): string {
+  if (parent === undefined) return "top level";
+  if (parent.code !== undefined) return parent.code;
+  return parent.codes.length > 1
+    ? `ambiguously coded section at ${parent.path}`
+    : `uncoded section at ${parent.path}`;
+}
+
+// Checks every section of the source tree on its own, whether or not a rule consumes it. A
+// section the manifest does not consume would otherwise be dropped with its narrative while the
+// run succeeds: a section coded in the source code system must match a rule, and a section
 // without such a code may exist only as an empty container, never with narrative of its own.
-function unconsumedSectionIssues(sections: SourceSection[], mapping: EmaMapping): string[] {
+function sourceSectionIssues(sections: SourceSection[], mapping: EmaMapping): string[] {
   const keys = ruleKeys(mapping.root);
   const issues: string[] = [];
-  for (const { section, path, code } of sections) {
-    if (code === undefined) {
-      if (hasNarrative(section)) issues.push(`Uncoded source section with narrative at ${path}`);
+  for (const { section, path, codes, code } of sections) {
+    if ((section as { code?: unknown }).code === undefined) {
+      issues.push(`Source section at ${path} has no code`);
+    }
+    for (const element of Object.keys(section)) {
+      if (!CARRIED_SECTION_ELEMENTS.has(element)) {
+        issues.push(`Source section at ${path} carries ${element}, which the mapping would drop`);
+      }
+    }
+    if (codes.length > 1) {
+      issues.push(
+        `Ambiguous source section at ${path}: ${codes.length} codes in the source code system`,
+      );
+    } else if (code === undefined) {
+      const narrative = readNarrative(section);
+      if (narrative === "present") {
+        issues.push(`Uncoded source section with narrative at ${path}`);
+      } else if (narrative === "unreadable") {
+        issues.push(`Uncoded source section with unreadable narrative at ${path}`);
+      }
     } else if (!keys.has(code)) {
       issues.push(`Unmapped source section ${code} at ${path}`);
     }
@@ -128,23 +197,23 @@ function unconsumedSectionIssues(sections: SourceSection[], mapping: EmaMapping)
   return issues;
 }
 
-// The manifest is English-only, so a source that says it is written in another language is
-// refused rather than published under an English language tag.
+// The manifest is English-only, so a source must say it is English: a source that declares
+// another language, or none, is refused rather than published under an English language tag.
+// Bundle-uv-epi makes Bundle.language mandatory, and every fixture and the published HL7 example
+// declare both.
 function sourceLanguageIssues(bundle: FhirBundle, composition: FhirComposition): string[] {
   const declared: [string, unknown][] = [
     ["Composition.language", composition.language],
     ["Bundle.language", bundle.language],
   ];
-  return declared
-    .filter(
-      ([, language]) =>
-        language !== undefined &&
-        (typeof language !== "string" || !ENGLISH_LANGUAGE.test(language)),
-    )
-    .map(
-      ([element, language]) =>
-        `Source ${element} ${typeof language === "string" ? language : JSON.stringify(language)} is not English; the mapping is English-only`,
-    );
+  return declared.flatMap(([element, language]) => {
+    if (language === undefined) {
+      return [`Source ${element} is missing; the mapping is English-only`];
+    }
+    if (typeof language === "string" && ENGLISH_LANGUAGE.test(language)) return [];
+    const shown = typeof language === "string" ? language : JSON.stringify(language);
+    return [`Source ${element} ${shown} is not English; the mapping is English-only`];
+  });
 }
 
 function mapSection(
@@ -152,7 +221,7 @@ function mapSection(
   // The sourceKey of the parent rule; undefined for a top-level rule.
   parentKey: string | undefined,
   mapping: EmaMapping,
-  index: Map<string, IndexedSection[]>,
+  index: Map<string, SourceSection[]>,
   targetPath: string,
   decisions: MappingDecision[],
   issues: string[],
@@ -174,24 +243,41 @@ function mapSection(
   // section its parent rule maps, and a top-level rule's section at the top level. The index is
   // flat, so without this a misplaced section would be quietly moved back into place.
   const placed =
-    match.parentPath === undefined
+    match.parent === undefined
       ? parentKey === undefined
-      : match.parentCode !== undefined && match.parentCode === parentKey;
+      : match.parent.code !== undefined && match.parent.code === parentKey;
   if (!placed) {
-    const actual =
-      match.parentPath === undefined
-        ? "top level"
-        : (match.parentCode ?? `uncoded section at ${match.parentPath}`);
     issues.push(
-      `Source section ${rule.sourceKey} is under ${actual}, expected under ${parentKey ?? "top level"}`,
+      `Source section ${rule.sourceKey} is under ${describeParent(match.parent)}, expected under ${parentKey ?? "top level"}`,
     );
   }
 
-  // Only a leaf must carry narrative; a section with child rules may be a bare heading over its
-  // subsections.
+  // A leaf must carry narrative. A section with child rules may be a bare heading over its
+  // subsections, unless its rule says the section carries text of its own above them.
   const childRules = rule.children ?? [];
-  if (rule.required && childRules.length === 0 && !hasNarrative(match.section)) {
-    issues.push(`Mandatory source section ${rule.sourceKey} has no narrative`);
+  if (rule.narrative === "required" || (rule.required && childRules.length === 0)) {
+    const narrative = readNarrative(match.section);
+    if (narrative === "absent") {
+      issues.push(`Mandatory source section ${rule.sourceKey} has no narrative`);
+    } else if (narrative === "unreadable") {
+      issues.push(`Mandatory source section ${rule.sourceKey} has unreadable narrative`);
+    }
+  }
+
+  // Subsections must already be in manifest order. Only those placed directly under this section
+  // are compared; one found elsewhere has been reported above.
+  let previous: { sourceKey: string; position: number } | undefined;
+  for (const child of childRules) {
+    const [only, ...others] = index.get(child.sourceKey) ?? [];
+    if (only === undefined || others.length > 0 || only.parent !== match) continue;
+    if (previous !== undefined && only.position < previous.position) {
+      issues.push(
+        `Source section ${child.sourceKey} comes before ${previous.sourceKey} under ${rule.sourceKey}; the manifest orders ${previous.sourceKey} first`,
+      );
+    }
+    if (previous === undefined || only.position > previous.position) {
+      previous = { sourceKey: child.sourceKey, position: only.position };
+    }
   }
 
   const children = childRules
@@ -315,7 +401,7 @@ export function transformType2ToEma(
     decisions,
     issues,
   );
-  issues.push(...unconsumedSectionIssues(sections, mapping));
+  issues.push(...sourceSectionIssues(sections, mapping));
 
   if (issues.length > 0 || root === undefined) {
     throw new TransformationError("EMA QRD transformation failed closed", issues);
@@ -338,7 +424,7 @@ export function transformType2ToEma(
     ...structuredClone(sourceComposition),
     id: compositionId,
     meta: { ...sourceComposition.meta, profile: mapping.profiles.composition },
-    // Always English: a source declaring any other language has already failed above.
+    // Always English: a source declaring any other language, or none, has already failed above.
     language: "en",
     extension: [
       ...((sourceComposition.extension as unknown[] | undefined) ?? []).filter(
@@ -371,6 +457,9 @@ export function transformType2ToEma(
     ...structuredClone(sourceBundle),
     id: bundleId,
     meta: { ...sourceBundle.meta, profile: [mapping.profiles.bundle] },
+    // The source declared an English tag in some spelling ("EN", "en-GB"); the output says "en",
+    // as the Composition does.
+    language: "en",
     identifier: {
       system: "https://khs.dev/fhir/identifier/ema-document",
       value: bundleId,

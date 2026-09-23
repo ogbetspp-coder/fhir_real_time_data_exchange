@@ -2,7 +2,7 @@
   "resourceType": "StructureMap",
   "id": "type2-to-ema-cap-smpc-en",
   "url": "https://khs.dev/fhir/StructureMap/type2-to-ema-cap-smpc-en",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "name": "Type2ToEmaCapSmpcEnglish",
   "title": "HL7 Global ePI Type 2 to EMA CAP SmPC English",
   "status": "active",

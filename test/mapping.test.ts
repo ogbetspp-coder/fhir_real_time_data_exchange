@@ -42,6 +42,23 @@ describe("mapping manifest loader", () => {
     await expect(loadEmaMapping()).resolves.toMatchObject({ root: { sourceKey: "smpc" } });
   });
 
+  it("requires narrative above the subsections of 4.8 and of no other section with children", async () => {
+    const mapping = await loadEmaMapping();
+    const flagged = rules(mapping.root)
+      .filter(({ narrative }) => narrative === "required")
+      .map(({ sourceKey }) => sourceKey);
+
+    expect(flagged).toEqual(["smpc.4.8"]);
+  });
+
+  it("rejects a narrative flag other than required", async () => {
+    const file = writeManifest((manifest) => {
+      Object.assign(rule(manifest.root, "smpc.4.8"), { narrative: "optional" });
+    });
+
+    await expect(loadEmaMapping(file)).rejects.toThrow(/narrative/);
+  });
+
   it("rejects a sourceKey that two rules share", async () => {
     // The 4.4 rule keyed smpc.4.3 would publish the contraindications under the special-warnings
     // heading as well as under their own.

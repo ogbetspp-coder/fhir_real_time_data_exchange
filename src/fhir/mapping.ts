@@ -3,8 +3,10 @@ import path from "node:path";
 
 import { z } from "zod";
 
-// The manifest's name. It is the basename of the default manifest file and the id lineage and
-// the generated ConceptMap and StructureMap carry; the manifest itself names only its version.
+// The manifest's name: the basename of the default manifest file and, with the manifest's
+// version, the mapping lineage records. The manifest itself names only its version. The
+// generated ConceptMap and StructureMap spell the same name in their own literals
+// (scripts/fhir/generate-artifacts.ts).
 export const EMA_MAPPING_ID = "cap-smpc-en";
 
 const SectionRuleSchema: z.ZodType<SectionRule> = z.lazy(() =>
@@ -14,6 +16,7 @@ const SectionRuleSchema: z.ZodType<SectionRule> = z.lazy(() =>
     title: z.string().min(1),
     display: z.string().min(1).optional(),
     required: z.boolean(),
+    narrative: z.literal("required").optional(),
     children: z.array(SectionRuleSchema).optional(),
   }),
 );
@@ -39,6 +42,11 @@ export type SectionRule = {
   // heading. The validator rejects any other display on the coding; the heading is not bound.
   display?: string | undefined;
   required: boolean;
+  // A leaf rule's section must always carry narrative. A rule with children must too when this
+  // is "required": its QRD section has text of its own above its subsections (4.8 Undesirable
+  // effects above "Reporting of suspected adverse reactions"). Absent, such a section may be a
+  // bare heading.
+  narrative?: "required" | undefined;
   children?: SectionRule[] | undefined;
 };
 
