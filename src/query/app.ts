@@ -91,6 +91,9 @@ export type McpServerDeps = {
   readBudget: ReadBudget;
   // When present, what the HTTP layer needs to write exactly one record per tools/call request.
   journal?: RequestJournal | undefined;
+  // The clock audit records are dated and timed by, in epoch milliseconds. Defaults to
+  // Date.now; a test injects one to assert which reading a record carries.
+  now?: (() => number) | undefined;
 };
 
 // Which JSON-RPC ids of one request have entered a tool handler and which have had their audit
@@ -158,7 +161,7 @@ function auditRecord(
     ...(outcome.status === "ok" && outcome.truncated !== undefined
       ? { truncated: outcome.truncated }
       : {}),
-    durationMs: Date.now() - startedAt,
+    durationMs: (deps.now ?? Date.now)() - startedAt,
     ...(outcome.bundleId === undefined ? {} : { bundleId: outcome.bundleId }),
     ...(outcome.versionId === undefined ? {} : { versionId: outcome.versionId }),
     ...(identity.turnId === undefined ? {} : { turnId: identity.turnId }),
@@ -200,7 +203,7 @@ async function runTool<Input, Output extends Record<string, unknown>>(
   requestId: RequestId | undefined,
   run: (context: ToolContext, input: Input) => Promise<ToolOutcome<Output>>,
 ): Promise<CallToolResult> {
-  const startedAt = Date.now();
+  const startedAt = (deps.now ?? Date.now)();
   // Recorded before the tool runs, so the HTTP layer can tell a request that reached a handler
   // from one the transport refused even while the tool is still running.
   if (requestId !== undefined) deps.journal?.dispatched.add(requestId);
@@ -363,6 +366,9 @@ export type QueryAppDeps = {
   readBudget?: number | undefined;
   // Defaults to REQUEST_DEADLINE_MS. A test sets it small to exercise the deadline path.
   requestDeadlineMs?: number | undefined;
+  // The clock audit records are dated and timed by; defaults to Date.now. The deadline itself
+  // is a timer and does not read it.
+  now?: (() => number) | undefined;
 };
 
 const TOOL_NAMES = new Set<string>([
@@ -529,12 +535,13 @@ export function createQueryApp(
   const audit = deps.audit ?? logAuditRecord;
   const readBudget = deps.readBudget ?? REQUEST_READ_BUDGET;
   const deadlineMs = deps.requestDeadlineMs ?? REQUEST_DEADLINE_MS;
+  const now = deps.now ?? Date.now;
 
   return async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
     // Taken before anything else this request does, including reading the body, so a record
     // written for a call that never finished dates from when the request arrived rather than
     // from when the service gave up waiting or finished uploading.
-    const requestStartedAt = Date.now();
+    const requestStartedAt = now();
     const path = new URL(request.url ?? "/", "http://ema-flow-query.invalid").pathname;
 
     // Two paths, one answer. `/healthz` is what Cloud Run's startup probe calls inside the
@@ -664,6 +671,7 @@ export function createQueryApp(
       // One budget for the whole request: every tool call of the batch draws on it.
       readBudget: createReadBudget(readBudget),
       journal,
+      now,
     });
     // Stateless mode is `sessionIdGenerator` absent (the SDK reads it as undefined), which is
     // what lets Cloud Run scale the service to zero and across instances: no session lives
@@ -701,6 +709,7 @@ export function createQueryApp(
             audit,
             // Nothing is read on this path; the budget is here because the type requires one.
             readBudget: createReadBudget(0),
+            now,
           },
           unanswered.tool,
           unanswered.args,
