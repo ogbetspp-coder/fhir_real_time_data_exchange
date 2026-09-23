@@ -322,6 +322,22 @@ const C1_PAGE_SOURCE = customSource(["Take one tablet daily.\u0096 Swallow it wh
 const FORM_FEED_PAGE_SOURCE = customSource(["Take one tablet daily.\u000cSwallow it whole."]);
 const BIDI_PAGE_SOURCE = customSource(["Take one tablet daily. \u202eSwallow it whole."]);
 
+// Sources for the review findings folded into fidelity-norm/2.0.0 (C1-C3).
+const DECIMAL = "Maximum dose is 1.5 mg daily.";
+const DECIMAL_SOURCE = customSource([DECIMAL]);
+const MINUS_TEMPERATURE = "Store at \u221220 \u00b0C.";
+const MINUS_SOURCE = customSource([MINUS_TEMPERATURE]);
+const HALF_DOSE = "Dose 0.5 mg.";
+const HALF_DOSE_SOURCE = customSource([HALF_DOSE]);
+const THOUSANDS = "Give 1,000 units.";
+const THOUSANDS_SOURCE = customSource([THOUSANDS]);
+const COMPOUND = "Use non-steroidal drugs.";
+const COMPOUND_SOURCE = customSource([COMPOUND]);
+const TABLE_ROW = "Dose (mg)\t2\t10";
+const TABLE_ROW_SOURCE = customSource([TABLE_ROW]);
+const RAISED = "Count 10\u2076/L";
+const RAISED_SOURCE = customSource([RAISED]);
+
 export const verifyCases: VerifyCase[] = [
   // A body boundary inside a line, or a body that excludes more than a header/footer could hold,
   // invalidates the page: the extractor-declared range is bounded, not trusted.
@@ -415,6 +431,8 @@ export const verifyCases: VerifyCase[] = [
     },
   },
   {
+    // 2.0.0 (review): a span edge must touch whitespace; a full stop is not a boundary, because
+    // the same rule must refuse `1` of `1.5`. The name is kept for review against 1.1.1.
     name: "span-ends-before-punctuation-passes",
     input: toInput(
       S,
@@ -424,7 +442,11 @@ export const verifyCases: VerifyCase[] = [
         [spanFor(S, 1, "Synthetic demonstration content for section 4.1; not for clinical use")],
       ),
     ),
-    expect: { status: "passed", sections: { "smpc.4.1": "verified" } },
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.1": "invalid-provenance" },
+      reasons: { "smpc.4.1": "word-cut" },
+    },
   },
   {
     name: "section-ends-at-hyphenated-page-end",
@@ -1426,6 +1448,152 @@ export const verifyCases: VerifyCase[] = [
       reasons: { "smpc.4.2.posology": "page-malformed" },
     },
   },
+  // Review C2: a span edge must touch whitespace or a body edge. Punctuation inside a number
+  // (`.` of `1.5`, `−` of `−20`, `,` of `1,000`) and a hyphen inside a word are not boundaries.
+  {
+    name: "span-ends-inside-decimal",
+    input: toInput(
+      DECIMAL_SOURCE,
+      single("smpc.4.2.posology", paragraphs("Maximum dose is 1"), [
+        spanFor(DECIMAL_SOURCE, 1, "Maximum dose is 1"),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
+    },
+  },
+  {
+    name: "span-ends-after-decimal-before-space",
+    input: toInput(
+      DECIMAL_SOURCE,
+      single("smpc.4.2.posology", paragraphs("Maximum dose is 1.5"), [
+        spanFor(DECIMAL_SOURCE, 1, "Maximum dose is 1.5"),
+      ]),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "span-ends-before-thousands-separator",
+    input: toInput(
+      THOUSANDS_SOURCE,
+      single("smpc.4.2.posology", paragraphs("Give 1"), [spanFor(THOUSANDS_SOURCE, 1, "Give 1")]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
+    },
+  },
+  {
+    name: "span-starts-after-minus-sign",
+    input: toInput(
+      MINUS_SOURCE,
+      single("smpc.6.4", paragraphs("20 \u00b0C."), [spanFor(MINUS_SOURCE, 1, "20 \u00b0C.")]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.6.4": "invalid-provenance" },
+      reasons: { "smpc.6.4": "word-cut" },
+    },
+  },
+  {
+    name: "span-starts-at-minus-sign-after-space",
+    input: toInput(
+      MINUS_SOURCE,
+      single("smpc.6.4", paragraphs("\u221220 \u00b0C."), [
+        spanFor(MINUS_SOURCE, 1, "\u221220 \u00b0C."),
+      ]),
+    ),
+    expect: { status: "passed", sections: { "smpc.6.4": "verified" } },
+  },
+  {
+    name: "span-starts-after-decimal-point",
+    input: toInput(
+      HALF_DOSE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("5 mg."), [spanFor(HALF_DOSE_SOURCE, 1, "5 mg.")]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
+    },
+  },
+  {
+    name: "span-starts-after-hyphen-in-word",
+    input: toInput(
+      COMPOUND_SOURCE,
+      single("smpc.4.4", paragraphs("steroidal drugs."), [
+        spanFor(COMPOUND_SOURCE, 1, "steroidal drugs."),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.4": "invalid-provenance" },
+      reasons: { "smpc.4.4": "word-cut" },
+    },
+  },
+  {
+    // A false failure the rule accepts: a span that begins with a space still has to be preceded
+    // by whitespace, because only the code points before it are read.
+    name: "span-starting-with-space-after-word",
+    input: toInput(
+      COMPOUND_SOURCE,
+      single("smpc.4.4", paragraphs("drugs."), [spanFor(COMPOUND_SOURCE, 1, " drugs.")]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.4": "invalid-provenance" },
+      reasons: { "smpc.4.4": "word-cut" },
+    },
+  },
+  // Review C3: a bullet glyph mid-line is content, and U+2219 and U+2043 are never bullets.
+  {
+    name: "bullet-operator-between-numbers",
+    input: toInput(
+      TABLE_ROW_SOURCE,
+      single("smpc.4.2.posology", paragraphs("Dose (mg) 2\u221910"), [
+        spanFor(TABLE_ROW_SOURCE, 1, TABLE_ROW),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "bullet-between-numbers-mid-line",
+    input: toInput(
+      TABLE_ROW_SOURCE,
+      single("smpc.4.2.posology", paragraphs("Dose (mg) 2 \u2022 10"), [
+        spanFor(TABLE_ROW_SOURCE, 1, TABLE_ROW),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  // Review C1: whitespace other than TAB, LF, CR and SPACE inside a tag makes it malformed.
+  {
+    name: "no-break-space-in-sup-tag",
+    input: toInput(
+      RAISED_SOURCE,
+      single("smpc.4.2.posology", paragraphs("Count 10<sup\u00a0>6</sup\u00a0>/L"), [
+        spanFor(RAISED_SOURCE, 1, RAISED),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "malformed-narrative" },
+      reasons: { "smpc.4.2.posology": "malformed-tag" },
+    },
+  },
+  {
+    name: "ascii-space-in-sup-tag-verifies",
+    input: toInput(
+      RAISED_SOURCE,
+      single("smpc.4.2.posology", paragraphs("Count 10<sup >6</sup\t>/L"), [
+        spanFor(RAISED_SOURCE, 1, RAISED),
+      ]),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
 ];
 
 export const throwCases: ThrowCase[] = [
@@ -1490,11 +1658,70 @@ export const throwCases: ThrowCase[] = [
       return { ...input, source: { ...input.source, pages } };
     })(),
   },
+  // Review L2: a span's page and offsets are integers, and a page number is not a boolean.
+  {
+    name: "span-page-boolean",
+    input: (() => {
+      const input = toInput(S, baseSpecs().slice(0, 1));
+      const [entry] = input.provenance;
+      const [span] = entry?.spans ?? [];
+      if (entry === undefined || span === undefined) throw new Error("fixture");
+      const spans = [{ ...span, page: true as unknown as number }];
+      return { ...input, provenance: [{ ...entry, spans }] };
+    })(),
+  },
+  {
+    name: "span-offset-boolean",
+    input: (() => {
+      const input = toInput(S, baseSpecs().slice(0, 1));
+      const [entry] = input.provenance;
+      const [span] = entry?.spans ?? [];
+      if (entry === undefined || span === undefined) throw new Error("fixture");
+      const spans = [{ ...span, startOffset: false as unknown as number }];
+      return { ...input, provenance: [{ ...entry, spans }] };
+    })(),
+  },
+  {
+    name: "span-offset-fractional",
+    input: (() => {
+      const input = toInput(S, baseSpecs().slice(0, 1));
+      const [entry] = input.provenance;
+      const [span] = entry?.spans ?? [];
+      if (entry === undefined || span === undefined) throw new Error("fixture");
+      const spans = [{ ...span, endOffset: span.endOffset + 0.5 }];
+      return { ...input, provenance: [{ ...entry, spans }] };
+    })(),
+  },
+  {
+    name: "page-number-boolean",
+    input: (() => {
+      const input = toInput(S, baseSpecs().slice(0, 1));
+      const [first, ...rest] = input.source.pages;
+      if (first === undefined) throw new Error("fixture");
+      const pages = [{ ...first, page: true as unknown as number }, ...rest];
+      return { ...input, source: { ...input.source, pages } };
+    })(),
+  },
 ];
 
 // fidelity-norm/2.0.0, section 2 and section 3 step 5: C1 controls, U+000B, U+000C and the
 // bidirectional controls reject on both sides; the accepting neighbours of each range are kept.
 const NORMALIZATION_CASES_2_0_0: NormalizationCase[] = [
+  // Step 4 (review C3): a bullet glyph is list structure only at the start of a line, followed
+  // by whitespace; U+2219 and U+2043 are never bullets.
+  { name: "bullet-line-start-replaced", input: "x\n• y", expected: "x y" },
+  { name: "bullet-after-indent-replaced", input: "x\n  ◦ y", expected: "x y" },
+  { name: "bullet-at-text-start-replaced", input: "▪\ty", expected: "y" },
+  { name: "bullet-after-invisible-at-start-replaced", input: "\u200b• x", expected: "x" },
+  { name: "bullets-in-a-row-replaced", input: "• • x", expected: "x" },
+  { name: "bullet-mid-line-kept", input: "2 • 10", expected: "2 • 10" },
+  { name: "bullet-without-following-space-kept", input: "•x", expected: "•x" },
+  { name: "bullet-at-end-kept", input: "x\n•", expected: "x •" },
+  { name: "bullet-after-cr-only-kept", input: "x\r• y", expected: "x • y" },
+  { name: "bullet-before-bullet-kept", input: "•• x", expected: "•• x" },
+  { name: "bullet-operator-is-content", input: "2∙10", expected: "2∙10" },
+  { name: "bullet-operator-at-line-start-is-content", input: "∙ x", expected: "∙ x" },
+  { name: "hyphen-bullet-is-content", input: "⁃ x", expected: "⁃ x" },
   { name: "allows-tab-lf-cr", input: "a\tb\nc\rd", expected: "a b c d" },
   { name: "rejects-vertical-tab", input: "a\u000bb", expected: { error: "forbidden-character" } },
   { name: "rejects-form-feed", input: "a\u000cb", expected: { error: "forbidden-character" } },
@@ -1567,7 +1794,9 @@ export const normalizationCases: NormalizationCase[] = [
   { name: "soft-hyphen", input: "intra­venous", expected: "intravenous" },
   { name: "zero-width", input: "a​b﻿c⁠d", expected: "abcd" },
   { name: "ligatures", input: "ﬀ ﬁ ﬂ ﬃ ﬄ ﬆ", expected: "ff fi fl ffi ffl st" },
-  { name: "bullets", input: "• one\n● two ▪ three", expected: "one two three" },
+  // 2.0.0 (review): a bullet glyph is list structure only at the start of a line and followed by
+  // whitespace; the mid-line one is content. The name is kept for review against 1.1.1.
+  { name: "bullets", input: "• one\n● two ▪ three", expected: "one two ▪ three" },
   { name: "keeps-case", input: "Take ONE", expected: "Take ONE" },
   { name: "keeps-typographic-quotes", input: "‘a’ “b”", expected: "‘a’ “b”" },
   {
@@ -1943,23 +2172,23 @@ export const xhtmlCases: XhtmlCase[] = [
   },
   {
     name: "sup-dashes-fold-to-minus",
-    input: div("<p><sup>‐‑‒–—−﹣－</sup></p>"),
-    expected: `\n\n${"⁻".repeat(8)}\n\n`,
+    input: div("<p><sup>‐‑‒–—―−\u02d7﹘﹣－➖</sup></p>"),
+    expected: `\n\n${"⁻".repeat(12)}\n\n`,
   },
   {
     name: "sup-plus-variants-fold",
-    input: div("<p><sup>﹢＋</sup></p>"),
-    expected: "\n\n⁺⁺\n\n",
+    input: div("<p><sup>﹢＋➕</sup></p>"),
+    expected: "\n\n⁺⁺⁺\n\n",
   },
   {
     name: "sub-dashes-fold-to-minus",
-    input: div("<p><sub>‐–—−﹣－</sub></p>"),
-    expected: `\n\n${"₋".repeat(6)}\n\n`,
+    input: div("<p><sub>‐–—―−\u02d7﹘﹣－➖</sub></p>"),
+    expected: `\n\n${"₋".repeat(10)}\n\n`,
   },
   {
     name: "sub-plus-variants-fold",
-    input: div("<p><sub>﹢＋</sub></p>"),
-    expected: "\n\n₊₊\n\n",
+    input: div("<p><sub>﹢＋➕</sub></p>"),
+    expected: "\n\n₊₊₊\n\n",
   },
   {
     name: "sup-en-dash-exponent",
@@ -1971,10 +2200,12 @@ export const xhtmlCases: XhtmlCase[] = [
     input: div("<p><sup>&#x2212;&#54;</sup></p>"),
     expected: "\n\n⁻⁶\n\n",
   },
+  // A dash-like character outside the fold tables is kept as it is.
+  { name: "sup-tilde-kept", input: div("<p><sup>~</sup></p>"), expected: "\n\n~\n\n" },
   {
-    name: "sup-horizontal-bar-kept",
+    name: "sup-horizontal-bar-folds",
     input: div("<p><sup>―</sup></p>"),
-    expected: "\n\n―\n\n",
+    expected: "\n\n⁻\n\n",
   },
   { name: "sup-letter-kept", input: div("<p><sup>a</sup></p>"), expected: "\n\na\n\n" },
   { name: "sub-letters-kept", input: div("<p>C<sub>max</sub></p>"), expected: "\n\nCmax\n\n" },
@@ -1996,9 +2227,44 @@ export const xhtmlCases: XhtmlCase[] = [
     expected: "\n\n₂\n\n",
   },
   {
-    name: "sub-superscript-digit-kept",
+    name: "sup-own-signs-kept",
+    input: div("<p><sup>⁺⁻⁼⁽⁾</sup></p>"),
+    expected: "\n\n⁺⁻⁼⁽⁾\n\n",
+  },
+  {
+    name: "sub-own-signs-kept",
+    input: div("<p><sub>₊₋₌₍₎</sub></p>"),
+    expected: "\n\n₊₋₌₍₎\n\n",
+  },
+  {
+    name: "rejects-sub-superscript-digit",
     input: div("<p><sub>²</sub></p>"),
-    expected: "\n\n²\n\n",
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-superscript-digit-zero",
+    input: div("<p><sub>⁰</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-superscript-sign",
+    input: div("<p><sub>⁻</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sup-subscript-digit",
+    input: div("<p>10<sup>₆</sup></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sup-subscript-sign",
+    input: div("<p><sup>₎</sup></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sup-subscript-digit-reference",
+    input: div("<p><sup>&#x2089;</sup></p>"),
+    expected: { error: "unmappable-script" },
   },
   { name: "sup-whitespace-kept", input: div("<p><sup> 2 </sup></p>"), expected: "\n\n ² \n\n" },
   {
@@ -2425,5 +2691,48 @@ export const xhtmlCases: XhtmlCase[] = [
     name: "rejects-multiple-roots-before-attributes",
     input: `${div("<p>a</p>")}<div class="c"></div>`,
     expected: { error: "multiple-roots" },
+  },
+  // Review C1: inside a tag, whitespace is U+0009, U+000A, U+000D and U+0020 only. An HTML parser
+  // reads any other code point as part of the tag name, so the element would not be what the
+  // scanner saw.
+  {
+    name: "rejects-no-break-space-in-start-tag",
+    input: div("<p>10<sup\u00a0>6</sup></p>"),
+    expected: { error: "malformed-tag" },
+  },
+  {
+    name: "rejects-no-break-space-in-end-tag",
+    input: div("<p>10<sup>6</sup\u00a0></p>"),
+    expected: { error: "malformed-tag" },
+  },
+  {
+    name: "rejects-no-break-space-in-self-closing-br",
+    input: div("<p>a<br\u00a0/>b</p>"),
+    expected: { error: "malformed-tag" },
+  },
+  {
+    name: "rejects-ideographic-space-in-table-tag",
+    input: div("<table\u3000><tr><td>a</td></tr></table>"),
+    expected: { error: "malformed-tag" },
+  },
+  {
+    name: "rejects-zero-width-no-break-space-in-td-tag",
+    input: div("<table><tr><td\ufeff>a</td></tr></table>"),
+    expected: { error: "malformed-tag" },
+  },
+  {
+    name: "rejects-em-space-before-attribute",
+    input: `<div\u2003${XHTML}><p>a</p></div>`,
+    expected: { error: "malformed-tag" },
+  },
+  {
+    name: "rejects-no-break-space-around-equals",
+    input: div('<p><a href\u00a0="https://example.org/">a</a></p>'),
+    expected: { error: "malformed-tag" },
+  },
+  {
+    name: "accepts-ascii-whitespace-in-tags",
+    input: `<div\n${XHTML}\r\n><p\t>a<br\t/>b</p ><table\n><tr ><td\r>c</td\n></tr></table></div\t>`,
+    expected: "\n\na\nb\n\n\n\nc\n\n\n\n",
   },
 ];

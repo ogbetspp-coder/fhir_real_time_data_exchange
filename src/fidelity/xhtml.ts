@@ -136,42 +136,64 @@ const SUPERSCRIPT_DIGITS = [
 const SUBSCRIPT_DIGITS = [
   0x2080, 0x2081, 0x2082, 0x2083, 0x2084, 0x2085, 0x2086, 0x2087, 0x2088, 0x2089,
 ];
-const PLUS_SIGNS = [0x002b, 0xfe62, 0xff0b];
-const MINUS_SIGNS = [0x002d, 0x2212, 0x2010, 0x2011, 0x2012, 0x2013, 0x2014, 0xfe63, 0xff0d];
+// Plus, minus, equals, open and close, in that order.
+type ScriptSigns = readonly [number, number, number, number, number];
+const SUPERSCRIPT_SIGNS: ScriptSigns = [0x207a, 0x207b, 0x207c, 0x207d, 0x207e];
+const SUBSCRIPT_SIGNS: ScriptSigns = [0x208a, 0x208b, 0x208c, 0x208d, 0x208e];
+const PLUS_SIGNS = [0x002b, 0xfe62, 0xff0b, 0x2795];
+const MINUS_SIGNS = [
+  0x002d, 0x2212, 0x2010, 0x2011, 0x2012, 0x2013, 0x2014, 0x2015, 0x02d7, 0xfe58, 0xfe63, 0xff0d,
+  0x2796,
+];
 
-function scriptTable(
+type ScriptRule = {
+  folding: ReadonlyMap<number, number>;
+  // The element's own script digits, kept as they are.
+  own: ReadonlySet<number>;
+  // The other script's digits and signs: a subscript digit raised is not a superscript one.
+  foreign: ReadonlySet<number>;
+};
+
+function scriptRule(
   digits: readonly number[],
-  plus: number,
-  minus: number,
-  equals: number,
-  open: number,
-  close: number,
-): ReadonlyMap<number, number> {
-  const table = new Map<number, number>();
-  digits.forEach((target, digit) => table.set(0x0030 + digit, target));
-  for (const sign of PLUS_SIGNS) table.set(sign, plus);
-  for (const sign of MINUS_SIGNS) table.set(sign, minus);
-  table.set(0x003d, equals);
-  table.set(0x0028, open);
-  table.set(0x0029, close);
-  return table;
+  signs: ScriptSigns,
+  foreign: readonly number[],
+): ScriptRule {
+  const [plus, minus, equals, open, close] = signs;
+  const folding = new Map<number, number>();
+  digits.forEach((target, digit) => folding.set(0x0030 + digit, target));
+  for (const sign of PLUS_SIGNS) folding.set(sign, plus);
+  for (const sign of MINUS_SIGNS) folding.set(sign, minus);
+  folding.set(0x003d, equals);
+  folding.set(0x0028, open);
+  folding.set(0x0029, close);
+  return { folding, own: new Set(digits), foreign: new Set(foreign) };
 }
 
-const SCRIPT_FOLDING = new Map<string, ReadonlyMap<number, number>>([
-  ["sup", scriptTable(SUPERSCRIPT_DIGITS, 0x207a, 0x207b, 0x207c, 0x207d, 0x207e)],
-  ["sub", scriptTable(SUBSCRIPT_DIGITS, 0x208a, 0x208b, 0x208c, 0x208d, 0x208e)],
+const SCRIPT_RULES = new Map<string, ScriptRule>([
+  [
+    "sup",
+    scriptRule(SUPERSCRIPT_DIGITS, SUPERSCRIPT_SIGNS, [...SUBSCRIPT_DIGITS, ...SUBSCRIPT_SIGNS]),
+  ],
+  [
+    "sub",
+    scriptRule(SUBSCRIPT_DIGITS, SUBSCRIPT_SIGNS, [...SUPERSCRIPT_DIGITS, ...SUPERSCRIPT_SIGNS]),
+  ],
 ]);
 
-// Numbers already written as script digits are kept; every other number (a non-ASCII digit, a
-// fraction, a numeral) and a plus-minus sign has no script form here and rejects.
-const SCRIPT_DIGIT_TARGETS = new Set([...SUPERSCRIPT_DIGITS, ...SUBSCRIPT_DIGITS]);
+// The element's own script digits are kept; the other script's digits and signs, every other
+// number (a non-ASCII digit, a fraction, a numeral) and a plus-minus sign have no script form
+// here and reject.
 const UNMAPPABLE_SIGNS = new Set([0x00b1, 0x2213]);
 const NUMBER = /^\p{N}$/u;
 
-const END_TAG = /<\/([A-Za-z][A-Za-z0-9]*)\s*>/y;
+// Whitespace inside a tag is U+0009, U+000A, U+000D and U+0020 only, never `\s`: an HTML
+// parser reads any other code point (U+00A0, U+3000, U+FEFF) as part of the tag name, so
+// `<sup\u00a0>` is an unknown element to a renderer and must not be `sup` here.
+const END_TAG = /<\/([A-Za-z][A-Za-z0-9]*)[\t\n\r ]*>/y;
 const START_TAG =
-  /<([A-Za-z][A-Za-z0-9]*)((?:\s+[A-Za-z_:][-A-Za-z0-9_:.]*\s*=\s*(?:"[^"<]*"|'[^'<]*'))*)\s*(\/?)>/y;
-const ATTRIBUTE = /([A-Za-z_:][-A-Za-z0-9_:.]*)\s*=\s*(?:"([^"<]*)"|'([^'<]*)')/g;
+  /<([A-Za-z][A-Za-z0-9]*)((?:[\t\n\r ]+[A-Za-z_:][-A-Za-z0-9_:.]*[\t\n\r ]*=[\t\n\r ]*(?:"[^"<]*"|'[^'<]*'))*)[\t\n\r ]*(\/?)>/y;
+const ATTRIBUTE = /([A-Za-z_:][-A-Za-z0-9_:.]*)[\t\n\r ]*=[\t\n\r ]*(?:"([^"<]*)"|'([^'<]*)')/g;
 const ENTITY = /&(?:([A-Za-z]+)|#(\d{1,7})|#x([0-9A-Fa-f]{1,6}));/y;
 
 function isAsciiWhitespace(character: string): boolean {
@@ -315,16 +337,17 @@ function emitText(
     output.push(character);
     return;
   }
-  const folding = parent === undefined ? undefined : SCRIPT_FOLDING.get(parent);
-  if (folding !== undefined) {
-    const folded = folding.get(codePoint);
+  const rule = parent === undefined ? undefined : SCRIPT_RULES.get(parent);
+  if (rule !== undefined) {
+    const folded = rule.folding.get(codePoint);
     if (folded !== undefined) {
       output.push(String.fromCodePoint(folded));
       return;
     }
     if (
       UNMAPPABLE_SIGNS.has(codePoint) ||
-      (NUMBER.test(character) && !SCRIPT_DIGIT_TARGETS.has(codePoint))
+      rule.foreign.has(codePoint) ||
+      (NUMBER.test(character) && !rule.own.has(codePoint))
     ) {
       throw new XhtmlError("unmappable-script", offset);
     }

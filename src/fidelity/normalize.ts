@@ -25,8 +25,10 @@ const LIGATURES = new Map<number, string>([
   [0xfb06, "st"],
 ]);
 
+// U+2219 BULLET OPERATOR and U+2043 HYPHEN BULLET are not here: one is a multiplication sign
+// and the other a dash, so they are always content.
 const BULLET_GLYPHS = new Set([
-  0x2022, 0x2023, 0x2043, 0x2219, 0x25a0, 0x25a1, 0x25aa, 0x25ab, 0x25cb, 0x25cf, 0x25e6,
+  0x2022, 0x2023, 0x25a0, 0x25a1, 0x25aa, 0x25ab, 0x25cb, 0x25cf, 0x25e6,
 ]);
 
 // Section 3 step 5. U+000B, U+000C and U+0085 are not here: section 2 rejects them.
@@ -40,9 +42,11 @@ export function isWhitespace(codePoint: number): boolean {
 
 const WORD_CHARACTER = /^[\p{L}\p{N}\p{M}]$/u;
 
-// A character that belongs to a word (spec section 6): letters, digits, combining marks, the
-// invisible formatting characters of step 1, and the zero-width (non-)joiners. A span edge that
-// touches one of these cuts a word.
+// A character that belongs to a word: letters, digits, combining marks, the invisible formatting
+// characters of step 1, and the zero-width (non-)joiners. The query service's quote-edge rule
+// uses it. The verifier's span-edge rule (spec section 6) no longer does: since
+// fidelity-norm/2.0.0 a span edge must touch whitespace, because punctuation inside a number
+// (`1.5`, `−20`, `1,000`) is not a boundary either.
 export function isWordCharacter(character: string): boolean {
   const codePoint = character.codePointAt(0) ?? 0;
   return (
@@ -102,13 +106,27 @@ export function normalizeText(text: string): string {
     expanded.push(LIGATURES.get(codePoint) ?? character);
   }
 
+  // Step 4: a bullet glyph is list structure only where a list item starts — at the start of a
+  // line (the text start or U+000A, then optional whitespace) and followed by whitespace.
+  // Anywhere else it is content (`2 • 10` in a sentence is not `2 10`). A bullet this step
+  // replaced counts as whitespace for the bullet after it, which keeps the procedure idempotent.
   const output: string[] = [];
-  for (const character of expanded.join("").normalize("NFC")) {
+  const composed = Array.from(expanded.join("").normalize("NFC"));
+  let atLineStart = true;
+  for (let position = 0; position < composed.length; position += 1) {
+    const character = composed[position] ?? "";
     const codePoint = character.codePointAt(0) ?? 0;
-    if (BULLET_GLYPHS.has(codePoint) || isWhitespace(codePoint)) {
+    if (isWhitespace(codePoint)) {
+      if (codePoint === 0x000a) atLineStart = true;
       output.push(" ");
       continue;
     }
+    const next = composed[position + 1]?.codePointAt(0);
+    if (BULLET_GLYPHS.has(codePoint) && atLineStart && next !== undefined && isWhitespace(next)) {
+      output.push(" ");
+      continue;
+    }
+    atLineStart = false;
     output.push(character);
   }
 

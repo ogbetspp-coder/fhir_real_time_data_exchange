@@ -6,7 +6,6 @@ import {
   countWords,
   findForbiddenCharacter,
   isWhitespace,
-  isWordCharacter,
   normalizeText,
 } from "./normalize.js";
 import { XhtmlError, xhtmlToText } from "./xhtml.js";
@@ -280,8 +279,9 @@ function resolveSpans(
 
 // Reads backwards from the code point before the first span, through its page's body and then
 // the bodies of the pages before it (as declared, whether or not they pass section 1 or 2),
-// skipping section 3 whitespace. The section starts inside a word if the first other code point
-// is U+00AD, or is a word character with nothing skipped. Reading past page 1 is no cut.
+// skipping section 3 whitespace. The section starts inside a word if nothing was skipped before
+// the first other code point, whatever that code point is (a letter, a digit, `.` of `0.5`, `−`
+// of `−20`), or if that code point is U+00AD. Reading past page 1 is no cut.
 function startCutsWord(pages: Map<number, PageIndex>, span: SourceSpan): boolean {
   let skipped = false;
   let pageNumber = span.page;
@@ -294,7 +294,7 @@ function startCutsWord(pages: Map<number, PageIndex>, span: SourceSpan): boolean
         skipped = true;
         continue;
       }
-      return character === SOFT_HYPHEN || (!skipped && isWordCharacter(character));
+      return character === SOFT_HYPHEN || !skipped;
     }
     pageNumber -= 1;
     index = pages.get(pageNumber);
@@ -304,15 +304,17 @@ function startCutsWord(pages: Map<number, PageIndex>, span: SourceSpan): boolean
 }
 
 // The section ends inside a word if its last span, without trailing section 3 whitespace, ends
-// in U+00AD, or if the code point at its end offset is a word character inside the body.
+// in U+00AD, or unless the code point at its end offset is section 3 whitespace or the end
+// offset is at or past `bodyEnd` (whose code point before is U+000A, section 1). `1` of `1.5`
+// is a cut: the `.` after it is not a boundary.
 function endCutsWord(index: PageIndex, span: SourceSpan): boolean {
   let end = span.endOffset;
   while (end > span.startOffset && isWhitespace(index.codePoints[end - 1]?.codePointAt(0) ?? 0)) {
     end -= 1;
   }
   if (end > span.startOffset && index.codePoints[end - 1] === SOFT_HYPHEN) return true;
-  const after = index.codePoints[span.endOffset];
-  return span.endOffset < index.page.bodyEnd && after !== undefined && isWordCharacter(after);
+  if (span.endOffset >= index.page.bodyEnd) return false;
+  return !isWhitespace(index.codePoints[span.endOffset]?.codePointAt(0) ?? 0);
 }
 
 // Pieces from consecutive pages are concatenated verbatim: a page body ends with its own line
@@ -433,6 +435,22 @@ function coverage(
   return { pageCodePoints, bodyCodePoints, coveredCodePoints, uncoveredGaps };
 }
 
+// Every span's page and offsets are integers (a JSON `1.0` is the integer 1). A boolean or a
+// fractional number is not an offset, and a language that treats `true` as 1 would otherwise
+// read it as page 1: it is a structural error, never a status.
+function assertIntegerSpans(provenance: SectionProvenance[]): void {
+  const invalid: string[] = [];
+  for (const entry of provenance) {
+    for (const span of entry.spans) {
+      const fields: unknown[] = [span.page, span.startOffset, span.endOffset];
+      if (!fields.every((value) => Number.isInteger(value))) {
+        invalid.push(`Invalid span in provenance ${entry.sourceKey}`);
+      }
+    }
+  }
+  if (invalid.length > 0) throw new FidelityError("Provenance span is invalid", invalid);
+}
+
 function assertUniqueKeys(keys: string[], what: string): void {
   const seen = new Set<string>();
   const duplicates: string[] = [];
@@ -457,6 +475,7 @@ export function verifyNarrativeFidelity(input: FidelityInput): FidelityReport {
     input.provenance.map(({ sourceKey }) => sourceKey),
     "provenance entry",
   );
+  assertIntegerSpans(input.provenance);
   const { pages, issues } = indexPages(input.source);
   const provenance = new Map(input.provenance.map((entry) => [entry.sourceKey, entry]));
   const sectionKeys = new Set(input.sections.map(({ sourceKey }) => sourceKey));

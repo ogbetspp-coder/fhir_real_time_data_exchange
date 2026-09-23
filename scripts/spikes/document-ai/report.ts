@@ -153,8 +153,11 @@ const LIGATURES = new Map<number, string>([
   [0xfb06, "st"],
 ]);
 
+// The spec's step 4 list. The spec also replaces a bullet only at a line start and before
+// whitespace; this locator replaces it everywhere, which can lose a candidate, never fabricate
+// one (every candidate is re-checked with `normalizeText`, above).
 const BULLET_GLYPHS = new Set([
-  0x2022, 0x2023, 0x2043, 0x2219, 0x25a0, 0x25a1, 0x25aa, 0x25ab, 0x25cb, 0x25cf, 0x25e6,
+  0x2022, 0x2023, 0x25a0, 0x25a1, 0x25aa, 0x25ab, 0x25cb, 0x25cf, 0x25e6,
 ]);
 
 const WHITESPACE = new Set([
