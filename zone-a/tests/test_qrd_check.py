@@ -762,3 +762,53 @@ def test_words_past_a_missing_end_show_only_when_they_finish_a_sentence() -> Non
     for finding in findings(result, "deviation"):
         for difference in finding["differences"]:
             assert "egg" not in difference["label"]
+
+
+# --- review round 7 -----------------------------------------------------------------------
+
+
+def test_a_label_keeping_the_plural_marker_is_still_compared() -> None:
+    text = (
+        "Hypersensitivity to the active substance(s) or any of the excipients listed under "
+        "section 6.1."
+    )
+    result = check(document(smpc_4_3=_paragraphs(text)), REGISTRY, MAPPING)
+    assert status(result, "smpc.4.3#0") == "deviation"
+
+
+@pytest.mark.parametrize(
+    ("key", "paragraphs", "identifier"),
+    [
+        (
+            "smpc_5_1",
+            ("Pharmacotherapeutic group: antineoplastic agents", "ATC code: L01EL03"),
+            "smpc.5.1#0",
+        )
+    ],
+)
+def test_a_paragraph_break_after_a_fill_in_is_not_absurd(
+    key: str, paragraphs: tuple[str, ...], identifier: str
+) -> None:
+    result = check(document(**{key: _paragraphs(*paragraphs)}), REGISTRY, MAPPING)
+    for finding in findings(result, "deviation"):
+        if finding["id"] == identifier:
+            # The label drops the comma and breaks the paragraph there instead.
+            assert finding["differences"] == [{"change": "delete", "template": ",", "label": ""}]
+
+
+def test_text_in_the_next_paragraph_is_not_reported_missing() -> None:
+    parts = REPORTING.rsplit(" in Appendix V.", 1)
+    paragraphs = _paragraphs(parts[0], "in Appendix V.")
+    result = check(document(smpc_4_8_reporting=paragraphs), REGISTRY, MAPPING)
+    identifier = f"smpc.4.8#{_item_index('smpc.4.8', 'Reporting suspected')}"
+    assert _deviation(result, identifier)["differences"] == [
+        {"change": "layout", "template": "", "label": ""}
+    ]
+
+
+def test_a_break_inside_an_optional_segment_is_kept() -> None:
+    from zone_a.qrd import check as module
+
+    nodes = module._nodes(module._statement(parse("a b c <{x}\nKeep it> d e f")))
+    keep = next(node for node in nodes if node.text == "Keep")
+    assert keep.brk
