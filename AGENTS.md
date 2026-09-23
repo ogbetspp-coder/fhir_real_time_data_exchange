@@ -40,7 +40,8 @@ Google Cloud Healthcare API and observe their native near-real-time BigQuery str
 5. Run the full local gate before commit. `.github/workflows/ci.yml` is the merge gate on every
    pull request. On `main`, `npm run check` runs again as its own `gate` job in
    `.github/workflows/deploy.yml`, which holds no cloud token; the `deploy` job needs it. A merge
-   that touches only documentation, `test/`, `agent/` or `zone-a/` does not deploy. Cloud Build
+   that touches only documentation, `test/`, `agent/`, `zone-a/`, `.claude/` or `.cursor/` does
+   not deploy. Cloud Build
    only builds images.
 6. Use a separate git worktree for every parallel writing agent.
 

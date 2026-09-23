@@ -140,7 +140,8 @@ The deployment:
 2. GitHub Actions runs `npm run check` in its own `gate` job of `.github/workflows/deploy.yml`,
    which holds no cloud token (no `id-token` permission); the `deploy` job needs it and does not
    start unless it passes. The merge gate is `.github/workflows/ci.yml` on the pull request, and a
-   merge that touches only documentation, `test/`, `agent/` or `zone-a/` does not deploy at all.
+   merge that touches only documentation, `test/`, `agent/`, `zone-a/`, `.claude/` or `.cursor/`
+   does not deploy at all.
    Cloud Build (`cloudbuild.images.yaml`, the only build configuration) only builds the worker,
    validator, and query images; the quality gate runs in GitHub Actions before it. Submit it by
    hand only with the three flags `phase_images` in `scripts/gcp/deploy.sh` uses —

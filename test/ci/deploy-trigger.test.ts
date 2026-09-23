@@ -48,13 +48,17 @@ function matches(pattern: string, file: string): boolean {
 }
 
 describe("the deploy trigger", () => {
-  it("skips merges that touch only documentation, tests, the agent or Zone A", () => {
+  it("skips merges that touch only documentation, tests, the agent, Zone A or assistant settings", () => {
     expect(ignored.length).toBeGreaterThan(5);
     for (const file of [
       "docs/foundations.md",
       "README.md",
       "test/ci/x.test.ts",
       "agent/src/a.py",
+      ".claude/settings.json",
+      ".claude/hooks/shell_guard.py",
+      ".cursor/hooks.json",
+      ".cursor/rules/fhir-safety.mdc",
     ]) {
       expect([file, ignored.some((pattern) => matches(pattern, file))]).toEqual([file, true]);
     }
