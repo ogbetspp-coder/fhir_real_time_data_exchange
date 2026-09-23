@@ -7,7 +7,6 @@ node_modules/
 dist/
 coverage/
 fhir/vendor/
-artifacts/
 .terraform/
 package-lock.json
 

@@ -23,6 +23,9 @@ Google Cloud Healthcare API and observe their native near-real-time BigQuery str
 - Bootstrap: `npm ci`
 - Format: `npm run format`
 - Full local gate: `npm run check`
+- Every CI gate (Node, Zone A, Agent; not the official HL7 validator): `scripts/check-all.sh`.
+  Needs Python 3.14 and uv 0.12.17 (`agent/.uv-bootstrap`, `zone-a/.uv-bootstrap`, `$UV` or
+  `PATH`); `test/ci/check-all.test.ts` keeps it in step with `.github/workflows/ci.yml`.
 - Build: `npm run build`
 - Local deterministic demo: `npm run demo`
 - Service: `npm run dev`
@@ -44,8 +47,9 @@ Google Cloud Healthcare API and observe their native near-real-time BigQuery str
    only builds images.
 6. Use a separate git worktree for every parallel writing agent.
 
-## Cursor Cloud specific instructions
+## Toolchain
 
-The project requires Node 22+, Java 21 for the official HL7 validator, and Terraform 1.16+.
+Node 22.14 (`.nvmrc`, the version CI uses), Python 3.14 with uv for `zone-a/` and `agent/`
+(`.python-version`), Java 21 for the official HL7 validator, and Terraform 1.16+.
 Read-only development and unit tests need no cloud credentials. Real-cloud smoke tests use
 Application Default Credentials and an explicitly configured non-production GCP project.

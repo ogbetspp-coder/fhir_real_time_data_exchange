@@ -22,12 +22,12 @@ import {
 import { createSyntheticType2Bundle } from "../src/fixtures/synthetic.js";
 
 // The official HL7 validator, run with the pinned Global ePI and EMA ePI packages, rejected the
-// synthetic Type 2 Bundle and its EMA transform on 2026-09-20 (docs/validation/README.md,
-// "Recorded change: fhir/mappings/cap-smpc-en.json"). Each block below pins one class of that
-// rejection in-process so `npm run check` catches it before a deploy does. The validator itself
-// is not run here: the packages are not vendored (AGENTS.md), so what can be pinned is what the
-// packages say — copied into test/fixtures/terminology/ema-displays.json — and the structural
-// rules the validator applied.
+// synthetic Type 2 Bundle and its EMA transform on 2026-09-20
+// (docs/validation/changes/2026-09-20-mapping-qrd-displays-and-ema-list-code.md). Each block
+// below pins one class of that rejection in-process so `npm run check` catches it before a
+// deploy does. The validator itself is not run here: the packages are not vendored (AGENTS.md),
+// so what can be pinned is what the packages say — copied into
+// test/fixtures/terminology/ema-displays.json — and the structural rules the validator applied.
 
 // Every QRD narrative div of every product and version, captured from the tree as it was
 // before the conformance change. The fixture is the "before"; the assertions are the "after".

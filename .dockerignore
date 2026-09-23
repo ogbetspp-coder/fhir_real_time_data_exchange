@@ -5,9 +5,11 @@ dist
 coverage
 .terraform
 *.tfstate*
-agent-tools
-artifacts
 fhir/vendor
 infra
 docs
 test
+.cache
+.claude
+agent
+zone-a

@@ -446,7 +446,8 @@ called `fixtures:export`; `package.json` already binds that name to
 `scripts/fhir/export-validation-set.ts`, a hand-run exporter that takes two command-line
 arguments. Rather than silently repoint an existing entry point, the new exporter is
 `npm run contracts:fixtures`, and it is wired into the guarded paths of `contracts:check` so
-drift in `test/fixtures/contracts/` fails the gate.
+drift in `test/fixtures/contracts/` fails the gate. (Since removed: `scripts/ci/emit-validation-set.ts`
+superseded that hand-run exporter, and `fixtures:export` no longer exists.)
 
 The three below were found by this round. Each was resolved by making the Python match the
 TypeScript, which is the rule here; each is recorded because the resolution came from reading an

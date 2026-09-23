@@ -1,7 +1,7 @@
-import { loadConfig } from "../src/config.js";
-import { loadEmaMapping } from "../src/fhir/mapping.js";
-import { createSyntheticType2Bundle } from "../src/fixtures/synthetic.js";
-import { runPipeline } from "../src/pipeline.js";
+import { loadConfig } from "../../src/config.js";
+import { loadEmaMapping } from "../../src/fhir/mapping.js";
+import { createSyntheticType2Bundle } from "../../src/fixtures/synthetic.js";
+import { runPipeline } from "../../src/pipeline.js";
 
 const mapping = await loadEmaMapping();
 const config = loadConfig({ ...process.env, DRY_RUN: "true", NODE_ENV: "development" });
