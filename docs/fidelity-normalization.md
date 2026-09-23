@@ -111,8 +111,11 @@ pair rejects even if the next reference completes it.
    of U+0009-separated text (section 5). A bullet glyph in a table cell is therefore content on
    both sides, wherever it stands in the cell: `<td>2</td><td>• 10</td>` does not verify
    against the row `2` U+0009 `10`, and a page row `• 10` U+0009 `2` needs a narrative cell that
-   shows `• 10`. The rule reads nothing but the text it normalises, so it applies identically
-   to both sides.
+   shows `• 10`. The rule applies identically to both sides, with one addition for page text:
+   when the verifier normalises a slice of page text whose last line continues past the slice
+   on the page, that line's U+0009 status is the status of the whole page line in the body, not
+   of its part inside the slice (section 6). A span that stops before a row's U+0009 (`• Adults`
+   of `• Adults` U+0009 `10 mg`) therefore still reads the bullet as content.
 
    The start of the text is not the start of a line. Normalised text contains no U+000A, so
    normalising it again replaces no bullet glyph; with the start of the text counted as a line
@@ -344,6 +347,10 @@ The scanner's reason codes are, in the order of this section: `forbidden-charact
   section 3 step 4 requires (normalisation does not count the start of a text as one), and
   adds nothing but whitespace to what is compared. A page-2 slice of a section that continues
   across a page break is not extended: the page-1 slice ends with its own line terminator.
+- When the verifier normalises a slice of page text (a section's joined slices, or a gap), and
+  the slice's last line does not end with U+000A inside the slice, that line's U+0009 status
+  for section 3 step 4 is decided on the whole page line: from the U+000A before it to the next
+  U+000A, within the body. A slice cut before a row's U+0009 is still on a table row.
 - When a section continues onto the next page, the page-1 slice is extended to `bodyEnd` and
   the page-2 slice starts at `bodyStart` (the blank tail and head must normalise to nothing),
   and the slices are concatenated verbatim with no separator: the body's own final line
@@ -368,12 +375,17 @@ The scanner's reason codes are, in the order of this section: `forbidden-charact
     whitespace, or the end offset is at or past `bodyEnd` (section 1 makes the code point
     before `bodyEnd` a line feed).
   - Numbers grouped with a space. On either edge it is also a cut when the code point on the
-    inner side of the edge (the span's first code point at the start, its last at the end) is
-    a digit (general category Nd), and the first code point beyond the edge that is not §3
-    step 5 whitespace, read inside the body without crossing a U+000A, is also Nd. So "…is 10"
-    cannot be taken from "…is 10 000 IU", with a space, U+2009, U+00A0, U+202F or U+2007
-    between the groups, nor "000 IU" after it; a number at the end of one line and a number at
-    the start of the next are separate.
+    inner side of the edge is a digit (general category Nd), and the first code point beyond
+    it that is not §3 step 5 whitespace, read inside the body without crossing a U+000A, is
+    also Nd. The inner code point is the span's first code point that is not §3 step 5
+    whitespace (at the start) or its last (at the end): a span that begins or ends with
+    whitespace is judged by the digit inside it. So "…is 10" cannot be taken from "…is 10 000
+    IU", with a space, U+2009, U+00A0, U+202F or U+2007 between the groups or two of them ("10
+    ␠␠000", "10 U+2009␠000", "10 U+202F␠000"), even by a span that ends with the first space,
+    nor "000 IU" after it by a span that starts with the second; a number at the end of one
+    line and a number at the start of the next are separate. (The inner code point skips the
+    joiners U+00A0, U+2007 and U+202F as well, although they are not edge whitespace: a span
+    ending "10" U+202F before a space still ends inside the number.)
   - These rules apply together; any one of them makes a cut.
 
   So "Maximum dose is 1" cannot be taken from "Maximum dose is 1.5 mg", nor "20 °C." from
@@ -386,6 +398,13 @@ The scanner's reason codes are, in the order of this section: `forbidden-charact
   code points outside it, so it can be refused although its words are whole (a false
   failure). Two separate numbers on one line separated only by whitespace ("Take 2 10 mg
   tablets") cannot be split by a section edge either (a false failure the digit rule accepts).
+
+  Other false failures these rules accept, stated: a list item at the very top of a page whose
+  body starts at 0 (no header, so no line terminator to read the slice from: its bullet is
+  content, and a `<ul><li>` narrative mismatches); a table row whose first cell starts with a
+  bullet, cut before its U+0009 (the bullet is content on the page and a list item in a
+  paragraph narrative); and a list written by the extractor with U+0009 after the bullet,
+  which section 7 forbids.
 
 - The joined text is normalised (section 3) and must equal the normalised narrative exactly.
 - A report with zero narrative sections is `failed` (issue `No narrative sections to verify`);
@@ -479,6 +498,11 @@ extractor is a controlled component: its name and version are recorded in
   bullet glyph in a cell is content (section 3 step 4). Cell boundaries are not checked
   (section 5), so these rules fix the page text's shape, not which cell a narrative puts a
   value in;
+- emit a list marker (a bullet glyph, section 3 step 4) followed by U+0020, never U+0009: the
+  tab after a list marker is layout, not a cell boundary. A word processor's list (`•` U+0009
+  `Adults: 10 mg`) extracted with its tab reads as a table row, its bullet as content, and a
+  `<ul><li>` narrative fails against it — safe, but a false failure that the extractor must
+  avoid;
 - in a raised or lowered glyph run, emit every digit and sign of section 5's folding tables as
   its script code point — raised: U+0030–U+0039 as U+2070, U+00B9, U+00B2, U+00B3,
   U+2074–U+2079, `+`, U+FE62, U+FF0B and U+2795 as U+207A, `-`, U+2212, U+2010–U+2015,
@@ -568,7 +592,15 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   text is no longer a line start for step 4, which keeps the procedure idempotent, and the
   verifier reads a page slice from its line terminator instead (sections 3, 5 and 6). Inside
   `sup` and `sub` the other kind's script letters, and any mathematical symbol, bracket or dash
-  outside the fold tables, reject (section 5).
+  outside the fold tables, reject (section 5). A bracketed footnote marker in `sup`
+  (`<sup>[1]</sup>`) is therefore `unmappable-script`: a false failure, accepted.
+
+  Round 3, also folded into 2.0.0: the digit-group edge rule reads the span's first and last
+  code points that are not whitespace, so a span ending or starting in the whitespace between
+  two groups ("…is 10␠" of "…is 10␠␠000") still cuts the number (section 6); the U+0009 status
+  of a page slice's last line is that of the whole page line, so a span stopping before a row's
+  U+0009 cannot turn the bullet in its first cell into a list item (sections 3 and 6); and the
+  extractor contract says a list marker is followed by U+0020, not U+0009 (section 7).
 
 - `fidelity-norm/1.1.1` (patch) — documents behaviour the vectors already pinned but the text
   left to the reference implementation, found when the check was re-implemented in a second

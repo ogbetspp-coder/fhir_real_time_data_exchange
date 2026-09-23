@@ -338,3 +338,18 @@ states each rule; `docs/validation/changes/2026-09-23-fidelity-norm-2-0-0.md` re
   U+2090–U+209C reject; inside either, any code point of general category Sm, Ps, Pe or Pd that
   is neither a source nor a target of the fold tables rejects (`unmappable-script`), which
   covers U+FF1D, U+FE59, U+2E3A, U+FE31, `~`, `<` and `[`.
+
+### Round 3 of the second review (2026-09-23)
+
+- **Digit groups at a whitespace edge.** The digit-group rule read the span's raw first or last
+  code point, so a span ending in the whitespace between two groups ("…is 10␠" of "…is
+  10␠␠000") never reached it. The inner code point is now the span's first or last code point
+  that is not whitespace (the number joiners included).
+- **A row cut before its tab.** The tab status of a page slice's last line is decided on the
+  whole page line, so a span "• Adults" of the row "• Adults" U+0009 "10 mg" keeps the bullet
+  as content.
+- **Extractor lists.** Section 7 requires a list marker to be followed by U+0020, not U+0009;
+  a word processor's list extracted with its tab reads as a table row. The normaliser is not
+  changed for it.
+- **False failures, stated:** a list item at the very top of a page whose body starts at 0,
+  and a bracketed footnote marker in `sup` (`<sup>[1]</sup>` is `unmappable-script`).
