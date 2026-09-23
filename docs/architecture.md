@@ -191,12 +191,15 @@ policy actually in force (ADR 0004, decision 5). Every step of it is warning-onl
 permission needed and never fails the deploy, so an absent export is visible rather than
 silent. The caller account's two exports are expected to come back empty — its only declared
 binding is `run.invoker` on one Cloud Run service, which neither policy covers — and that
-emptiness is the evidence that it holds nothing else. It has not yet run against a project.
+emptiness is the evidence that it holds nothing else. It runs on every deploy of `dev`; the
+exports are under `gs://…-dev-evidence/deploy-evidence/`, the latest for commit `caa5d9a`.
 
 ## Security boundaries
 
 - Cloud Run requires IAM authentication on both services; no `allUsers` invoker is granted
-  anywhere. On the worker, the Workflow service account is the only invoker. On the query
+  anywhere. On the worker, `run.invoker` is held by two service accounts: the Workflows
+  account (`workflow_invoker`) and the deployer, for the post-deploy smoke run
+  (`deployer_invoker`, `infra/run.tf`). On the query
   service, `run.invoker` is granted to the members listed in the `query_invokers` variable,
   which is empty by default, plus one service account the configuration creates for the
   purpose: `ema-flow-caller-<env>` (`google_service_account.caller`, `infra/query.tf`). That
@@ -207,11 +210,10 @@ emptiness is the evidence that it holds nothing else. It has not yet run against
   that sets neither variable authorises no caller: the account exists and nobody can use it.
 - The worker uses a dedicated service account with the narrow
   `roles/healthcare.fhirResourceEditor` role plus evidence-object, ledger-writer,
-  lineage-editor, logger, and signing permissions. That editor role is bound at project level
-  (`google_project_iam_member.worker_healthcare`, `infra/security.tf`), so it reaches every
-  Healthcare dataset in the project; the query service's reader role is bound on the dataset.
-  Moving the worker's binding to the dataset is a project-level role removal listed under
-  "Needs a person" in `docs/roadmap.md`.
+  lineage-editor, logger, and signing permissions. That editor role is bound on the record
+  dataset only (`google_healthcare_dataset_iam_member.worker_fhir_editor`, `infra/security.tf`),
+  as the query service's reader role is; the project-level binding was removed on 2026-09-21
+  (`docs/foundations.md`, C4; `test/infra/worker-identity.test.ts`).
 - The external deployment identity uses `roles/healthcare.datasetAdmin` and
   `roles/healthcare.fhirStoreAdmin` for Healthcare provisioning; it is not used at runtime.
 - Workflows can invoke the worker and query only the FHIR analytics dataset.
@@ -228,9 +230,9 @@ emptiness is the evidence that it holds nothing else. It has not yet run against
 
 `ema-flow-<env>-query` (ADR 0004, `docs/design/epi-mcp-query-service.md`, whose "Phase 1 as
 built" section is the authoritative description) is a second, discrete Cloud Run deployable,
-not a mode of the worker. It is built and tested under `test/query/`; it has not been deployed
-to a project, so every infrastructure statement below has been checked by `terraform validate`
-only.
+not a mode of the worker. It is tested under `test/query/` and deployed in `dev` as
+`ema-flow-dev-query` (europe-west4): first on 2026-09-20, all four tools answered live on
+2026-09-21, and redeployed from `main` by every deploy since.
 
 - **Intended use.** A read-only Model Context Protocol endpoint (four tools: `find_product`,
   `get_section`, `get_provenance`, `verify_quote`; contract `query-tools` 2.0.1) that lets an

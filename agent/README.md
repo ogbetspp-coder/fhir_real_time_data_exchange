@@ -1,10 +1,10 @@
 # The verifiable-answer agent
 
-Roadmap item 1b. A small Agent Development Kit agent, its own deployable under ADR 0004 — own
-`pyproject.toml`, own lock, own identity, own CI job — that shares nothing with the worker or
-with Zone A except two published artefacts: `contracts/generated/query-tools.schema.json`
-(2.0.1, the query service's surface) and `contracts/generated/agent-turn.schema.json` (1.0.0,
-the shape of this agent's own audit record).
+Delivered (was roadmap item 1b); its post-check seen in a live turn is roadmap item 1. A small Agent
+Development Kit agent, its own deployable under ADR 0004 — own `pyproject.toml`, own lock, own
+identity, own CI job — that shares nothing with the worker or with Zone A except two published
+artefacts: `contracts/generated/query-tools.schema.json` (2.0.1, the query service's surface) and
+`contracts/generated/agent-turn.schema.json` (1.0.0, the shape of this agent's own audit record).
 
 It does four things and refuses to do a fifth.
 
@@ -124,8 +124,9 @@ Engine both support, which happens to be the same as Zone A's, though for a diff
 One caveat, stated rather than hidden: the version list above comes from the generated API
 reference rather than from the prose "set up" page, because `docs.cloud.google.com` renders its
 body client-side and could not be read as text. Both sources are proto-derived. Older
-`v1beta1` `PackageSpec` references still list 3.8–3.11 and are stale. Confirm in the console
-before the first real deploy.
+`v1beta1` `PackageSpec` references still list 3.8–3.11 and are stale. Confirmed by use: the
+agent has run on Agent Engine in `europe-west4` on Python 3.14 since its first deploy on
+2026-09-22, and again after the redeploys of 2026-09-23.
 
 The whole stack installs and runs on 3.14 here: 75 packages resolved, the ADK toolset
 negotiating MCP protocol version 2025-11-25 against a real server.

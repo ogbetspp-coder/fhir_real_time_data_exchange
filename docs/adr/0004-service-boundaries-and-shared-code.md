@@ -46,7 +46,8 @@ Services are discrete in **identity and state**, never in code.
    and copies it to
    `gs://<evidence bucket>/deploy-evidence/<YYYY>/<MM>/<DD>/<UTC stamp>-<environment>-<commit>/`.
    Every step is warning-only and never fails the deploy, so a missing permission leaves a
-   `::warning::` naming it rather than a silent gap; it has not yet run against a project.
+   `::warning::` naming it rather than a silent gap. (It had not run against a project when this
+   was written; it has run on every deploy of `dev` since, and the exports are in the bucket.)
    Role grants that cannot be Terraform-managed — today the
    deployer's bootstrap roles, `roles/documentai.editor` on the deployer, and the audit log
    sink's writer identity — are listed in `docs/architecture.md` with the reason, and

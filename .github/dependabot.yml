@@ -1,7 +1,7 @@
 # Every dependency in this repository is pinned — actions by commit, images by digest, npm and
 # Python by lock file, Terraform providers by lock file. A pin without an update path rots
 # (docs/foundations.md, finding C3). Dependabot proposes each move as a pull request, where it
-# must pass the same four required checks as any other change; nothing updates on its own.
+# must pass the same six required checks as any other change; nothing updates on its own.
 #
 # Weekly and grouped, so the proposals arrive as one reviewable pull request per ecosystem
 # rather than one per package.

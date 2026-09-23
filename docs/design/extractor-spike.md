@@ -4,7 +4,8 @@
   structure classifier; the parser is a hybrid)
 - Date: 2026-09-20
 - Related: `docs/fidelity-normalization.md` (section 7, the extractor contract),
-  `docs/adr/0003-mechanical-narrative-fidelity.md`, `docs/roadmap.md` item 0
+  `docs/adr/0003-mechanical-narrative-fidelity.md`, `docs/roadmap.md` (was item 0; the spike is
+  complete, and the parser it informs is now item 8, the engine)
 
 ## The question
 
@@ -12,8 +13,9 @@ The Zone A design assumes an extractor can turn a label PDF into `SourceDocument
 with body ranges that exclude running headers and footers, discretionary hyphens emitted as
 U+00AD, tables as row-major TAB/LF — such that the fidelity check (`fidelity-norm/1.1.1`)
 passes for narrative that a human would accept as the same text. That contract was written
-from first principles. No extractor has met it. Everything in roadmap items 2–6 is built on
-it, so it is tested first, cheaply, with a written verdict at the end.
+from first principles. No extractor has met it. Everything Zone A was then planned to build —
+the skeleton (delivered, was item 2), the parser (now item 8, the engine), approval and AI
+structuring — is built on it, so it is tested first, cheaply, with a written verdict at the end.
 
 The spike is not a feature. Its code is disposable once the verdict exists; what survives is
 the verdict, any amendment to the extractor contract or normalisation specification, and the
@@ -101,9 +103,9 @@ likely source of a _conditional_ verdict.
   available, Document AI's text agrees with the embedded text layer (differences explained by
   a closed list of classes), and line-end hyphen ambiguity is low enough for a conservative
   rule plus human review.
-- **Conditional.** Part A verifies, but Part B shows a systematic gap — an unclassified header,
-  a ligature class, a hyphenation rate — that needs an amendment to spec section 3, 4, or 7.
-  The verdict names the amendment; it becomes `fidelity-norm/1.2.0` before item 3 starts.
+- **Conditional.** Part A verifies, but Part B shows a systematic gap — an unclassified header, a
+  ligature class, a hyphenation rate — that needs an amendment to spec section 3, 4, or 7. The
+  verdict names the amendment; it becomes `fidelity-norm/1.2.0` before item 8 (was item 3) starts.
 - **No-go for Document AI as extractor.** Its text is not character-faithful, or it cannot
   classify headers and footers on real documents. The verdict then names the alternative: a
   pinned deterministic text-layer extractor for characters, with Document AI (or nothing) for
@@ -205,7 +207,7 @@ measurement that can see this, which is why it is the one the design was built a
   nothing was excluded, so this needs a probe with known footers before it counts either way.)
 - **Heading hierarchy is exposed** (`heading-1` through `heading-4`) and body blocks nest under
   headings — 553 of 593 guideline blocks were nested, which is the structure a deterministic
-  QRD segmenter (roadmap item 3) wants.
+  QRD segmenter (roadmap item 8, was item 3) wants.
 - **Table structure is exposed** as rows and cells (template slice: 2 tables, 7 rows, 17 cells,
   no spans, no internal line breaks).
 - **Reading order is right on body pages** (ordered agreement tracks multiset agreement to within
@@ -219,7 +221,7 @@ regulatory documents produced from Word are not hyphenated in practice. The ambi
 specification deliberately left to the extractor is, on this corpus, nearly absent; a
 conservative rule — treat a line-end hyphen as a real hyphen, emit no U+00AD, surface each
 occurrence for the reviewer — costs nothing here. Two documents is not a corpus; the count is
-now cheap to take on any further document and should be, before item 3 relies on it.
+now cheap to take on any further document and should be, before item 8 relies on it.
 
 ### Two constraints for the real parser
 
@@ -257,7 +259,7 @@ presumes there is a text layer. They need OCR, and OCR needs a different fidelit
 The recorded Document AI response for the synthetic PDF is committed as a regression fixture,
 and a test asserts the verdict's evidence — 32/32 verified, and the exact page-1 category
 diff that shows the straightening — so the finding is executable, not just written down. The
-rest of the spike code is disposable once item 3 exists.
+rest of the spike code is disposable once item 8 exists.
 
 One more fact, learned from that test's first run in CI: the generated PDF's _text_ is
 reproducible across platforms, its _bytes_ are not (pdfkit on Linux under Node 22 produced a
