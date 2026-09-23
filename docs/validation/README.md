@@ -698,11 +698,14 @@ differs from the pinned one" is a new `NORMALIZATION_VERSION`, and defers to
 `docs/fidelity-normalization.md` section 8 as the single normative statement; section 8 names
 changes to sections 2–6 and says nothing of the runtime, and this README's procedure names a
 Unicode drift. ICU moved and Unicode did not. `NORMALIZATION_VERSION` stays
-`fidelity-norm/1.1.1` on the evidence above: no normalised text, report or vector changed. The
-three statements of the trigger disagree, and this record does not settle that by editing them;
-it is for the approver. If the ADR's wording governs, the consequence is a patch increment
-(`fidelity-norm/1.1.2`, section 8: only version-embedded hashes move) and re-approval of
-approved submissions, of which none exist outside synthetic fixtures.
+`fidelity-norm/1.1.1` on the evidence above: no normalised text, report or vector changed. Decided 2026-09-23: section 8 governs, as ADR 0003 itself says, and nothing in sections 2–6
+changed, so there is no new version. ADR 0003's sentence was amended the same day to match: a
+runtime change is a controlled change that must be re-measured, and becomes a new version only
+if an output in that scope changes. The word-limit change is outside the fidelity scope (it is
+the gate's bound on unverified structured text) and is recorded here. Follow-up: the word
+counter in `src/contracts/canonical-submission.ts` builds `Intl.Segmenter` with the runtime's
+default locale; pinning an explicit locale would remove the last environment-dependent input to
+the gate.
 
 **Steps 1–6.** 1–3: no version literal, schema or vector changed. 4: `test/runtime.test.ts`
 "runs on ICU 77.1" and "segments words as the pinned ICU does, colon between letters included",
