@@ -120,6 +120,11 @@ def _is_uuid(value: str) -> bool:
 # request and minting is a network call. Held in module scope, never logged, never in state.
 _edge_tokens: dict[str, tuple[str, float]] = {}
 _EDGE_TOKEN_REFRESH_BEFORE_SECONDS: Final = 300.0
+# A failed mint is remembered too, briefly: where no credential can mint one, finding that out
+# waits on the metadata server (about 3.4 s off Google Cloud), and every MCP request of a turn
+# would wait again. Short, so a runtime whose credential appears is not refused for long.
+_edge_failures: dict[str, float] = {}
+_EDGE_FAILURE_RETRY_AFTER_SECONDS: Final = 60.0
 
 
 def service_audience(mcp_url: str) -> str:
@@ -133,11 +138,28 @@ def edge_auth_token(audience: str, now: Callable[[], float] = time.time) -> str 
 
     None is not a fallback to some other identity: it means this process holds no credential that
     can mint one, as on a laptop signed in as a person. The request then carries only the user's
-    token and Cloud Run decides on that.
+    token and Cloud Run decides on that. A token is reused until five minutes before the hour it
+    is held for; a failure is remembered for a minute, so a turn's requests do not each wait for
+    the same answer.
     """
     cached = _edge_tokens.get(audience)
     if cached is not None and cached[1] - _EDGE_TOKEN_REFRESH_BEFORE_SECONDS > now():
         return cached[0]
+    failed_until = _edge_failures.get(audience)
+    if failed_until is not None and failed_until > now():
+        return None
+    token = _mint_edge_token(audience)
+    if token is None:
+        _edge_failures[audience] = now() + _EDGE_FAILURE_RETRY_AFTER_SECONDS
+        return None
+    _edge_failures.pop(audience, None)
+    # An ID token's own expiry is a minute-level fact; a fixed hour is well inside it.
+    _edge_tokens[audience] = (token, now() + 3600.0)
+    return token
+
+
+def _mint_edge_token(audience: str) -> str | None:
+    """One attempt to mint an ID token for ``audience``, uncached; ``None`` if none can be."""
     try:
         import google.auth.transport.requests
         from google.auth import default as default_credentials
@@ -148,24 +170,23 @@ def edge_auth_token(audience: str, now: Callable[[], float] = time.time) -> str 
     request = google.auth.transport.requests.Request()
     try:
         fetch = cast(Callable[[Any, str], str], google_id_token.fetch_id_token)
-        token = fetch(request, audience)
+        return fetch(request, audience)
     except auth_exceptions.GoogleAuthError, OSError:
-        try:
-            credentials, _ = default_credentials()
-        except auth_exceptions.GoogleAuthError:
-            return None
-        signer = getattr(credentials, "with_target_audience", None)
-        if signer is None:
-            return None
-        try:
-            scoped = signer(audience)
-            scoped.refresh(request)
-        except auth_exceptions.GoogleAuthError, OSError:
-            return None
-        token = cast(str, scoped.token)
-    # An ID token's own expiry is a minute-level fact; a fixed hour is well inside it.
-    _edge_tokens[audience] = (token, now() + 3600.0)
-    return token
+        pass
+    # No ID token from the environment: a service-account credential can still sign one.
+    try:
+        credentials, _ = default_credentials()
+    except auth_exceptions.GoogleAuthError:
+        return None
+    signer = getattr(credentials, "with_target_audience", None)
+    if signer is None:
+        return None
+    try:
+        scoped = signer(audience)
+        scoped.refresh(request)
+    except auth_exceptions.GoogleAuthError, OSError:
+        return None
+    return cast(str, scoped.token)
 
 
 def bearer_header_provider(context: ReadonlyContext, audience: str | None = None) -> dict[str, str]:

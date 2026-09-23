@@ -15,10 +15,12 @@ from verifiable_answer_agent.contract import (
     load_agent_turn_schema,
     load_schema,
     split_for_verification,
+    utf16_length,
     validate_tool_output,
 )
+from verifiable_answer_agent.quote_edge import edge_after, edge_before, locate_quote
 
-from .fake_query_service import REPOSITORY_ROOT, load_sections
+from .fake_query_service import REPOSITORY_ROOT, load_sections, long_section, quote_edge_cases
 
 VENDORED = Path(str(REPOSITORY_ROOT / "agent" / "src" / "verifiable_answer_agent" / "contracts"))
 
@@ -109,17 +111,63 @@ def test_the_splitter_is_deterministic_and_never_emits_an_empty_chunk() -> None:
     assert not any(chunk.startswith(" ") or chunk.endswith(" ") for chunk in first)
 
 
-def test_a_token_longer_than_the_window_is_cut_at_the_bound() -> None:
-    chunks = split_for_verification("x" * 25, limit=10)
-    assert chunks == ("x" * 10, "x" * 10, "x" * 5)
+def test_a_token_longer_than_the_window_is_one_longer_chunk_not_a_cut_inside_it() -> None:
+    # Any cut inside a word is a cut under the quote-edge rule, so a certain no-match. The bound:
+    # the chunk runs to the first acceptable cut after the window, and no further.
+    assert split_for_verification("x" * 25, limit=10) == ("x" * 25,)
+    assert split_for_verification("a " + "x" * 25 + " b", limit=10) == ("a", "x" * 25, "b")
 
 
 def test_an_astral_character_is_measured_as_two_units_and_never_split() -> None:
-    # U+1F600 costs two UTF-16 code units; a window of three fits one, not two.
-    text = "\U0001f600\U0001f600\U0001f600"
+    # U+1F600 costs two UTF-16 code units; a window of three fits one and the space after it,
+    # not two.
+    text = "\U0001f600 \U0001f600 \U0001f600"
     chunks = split_for_verification(text, limit=3)
-    assert all(len(chunk.encode("utf-16-le")) // 2 <= 3 for chunk in chunks)
-    assert "".join(chunks) == text
+    assert chunks == ("\U0001f600", "\U0001f600", "\U0001f600")
+    assert all(utf16_length(chunk) <= 3 for chunk in chunks)
+
+
+def test_a_cut_never_falls_inside_a_space_grouped_number() -> None:
+    # The last space in a window of 19 is inside "1 000 000": "Give up to 1 000" | "000 IU
+    # daily." is what the splitter cut before 2026-09-22, and the service refuses both halves.
+    text = "Give up to 1 000 000 IU daily."
+    chunks = split_for_verification(text, limit=19)
+    assert chunks == ("Give up to", "1 000 000 IU daily.")
+    assert all(locate_quote(text, chunk) is not None for chunk in chunks)
+
+
+def test_a_cut_never_parts_a_spaced_comparator_from_its_number() -> None:
+    # "…CrCl ≥" | "30 ml/min." was the other: the last space in a window of 29 is after "≥",
+    # and the second half has lost its comparator.
+    text = "Reduce the dose when CrCl ≥ 30 ml/min."
+    chunks = split_for_verification(text, limit=29)
+    assert chunks == ("Reduce the dose when CrCl", "≥ 30 ml/min.")
+    assert all(locate_quote(text, chunk) is not None for chunk in chunks)
+
+
+def test_every_chunk_of_every_worked_example_is_one_the_service_confirms() -> None:
+    # Every text the query service's own rule was exported over, split at every window width:
+    # each chunk within the bound is a match under that rule, and a chunk over the bound exists
+    # only where the window held no acceptable cut.
+    texts = [section["text"] for section in quote_edge_cases()["sections"]]
+    texts.append(long_section().text)
+    for text in texts:
+        for limit in [*range(4, min(len(text), 120)), VERIFY_QUOTE_MAX_UTF16]:
+            position = 0
+            for chunk in split_for_verification(text, limit=limit):
+                start = text.index(chunk, position)
+                position = start + len(chunk)
+                if utf16_length(chunk) <= limit:
+                    assert locate_quote(text, chunk) is not None, (limit, chunk)
+                    continue
+                # Over the bound: no space inside the window was a cut both sides accept.
+                for offset in range(1, min(limit + 1, len(chunk) - 1)):
+                    at = start + offset
+                    if text[at] == " ":
+                        assert not (
+                            edge_after(text, at, text[at - 1])
+                            and edge_before(text, at + 1, text[at + 1])
+                        ), (limit, chunk, offset)
 
 
 def test_the_fixture_the_fake_service_is_built_from_is_the_repositorys_own() -> None:

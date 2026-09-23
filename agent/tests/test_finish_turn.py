@@ -11,7 +11,8 @@ from __future__ import annotations
 
 import contextlib
 import json
-from dataclasses import dataclass
+import socket
+from dataclasses import dataclass, replace
 from typing import Any
 
 from google.adk.agents.callback_context import CallbackContext
@@ -20,6 +21,7 @@ from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from google.genai import types
 
+from verifiable_answer_agent.contract import VERIFY_QUOTE_MAX_UTF16, utf16_length
 from verifiable_answer_agent.finish import (
     TOOLS_UNAVAILABLE_NOTICE,
     UNVERIFIABLE_NOTICE,
@@ -27,10 +29,18 @@ from verifiable_answer_agent.finish import (
     draft_from_events,
 )
 from verifiable_answer_agent.hold import DraftHold
+from verifiable_answer_agent.render import VERIFIED_LABEL
 from verifiable_answer_agent.tools import build_query_toolset
 
 from .conftest import TEST_PRINCIPAL, config_for, invocation_context
-from .fake_query_service import BUNDLE_ID, VERSION_ID, FakeQueryService
+from .fake_query_service import (
+    BUNDLE_ID,
+    LONG_SECTION_KEY,
+    LONG_SECTION_OLD_CUTS,
+    VERSION_ID,
+    FakeQueryService,
+    long_section,
+)
 
 SECTION_KEY = "smpc.4.4"
 TURN_ID = "0f6d1a2e-3b4c-4d5e-8f60-718293a4b5c6"
@@ -69,17 +79,16 @@ def _as_event_response(payload: dict[str, Any]) -> dict[str, Any]:
     return {"content": [], "structuredContent": payload, "isError": False}
 
 
-def _events(service: FakeQueryService, invocation_id: str) -> list[_Event]:
+def _events(
+    service: FakeQueryService, invocation_id: str, payload: dict[str, Any] | None = None
+) -> list[_Event]:
+    section = payload if payload is not None else _section_payload(service)
     return [
         _Event(
             invocation_id=invocation_id,
             content=_Content(
                 parts=[
-                    _Part(
-                        function_response=_Response(
-                            "get_section", _as_event_response(_section_payload(service))
-                        )
-                    )
+                    _Part(function_response=_Response("get_section", _as_event_response(section)))
                 ]
             ),
         )
@@ -150,19 +159,63 @@ async def test_a_quotation_the_store_does_not_confirm_is_flagged_where_it_is_rea
 async def test_nothing_is_shown_as_label_content_when_the_check_cannot_run(
     query_service: FakeQueryService,
 ) -> None:
-    # The service is gone before the post-check can ask it anything.
-    service_url = query_service.url
-    toolset = build_query_toolset(config_for(service_url.replace("http://", "http://127.0.0.2:1/")))
+    # The service is gone before the post-check can ask it anything: nothing listens on the port,
+    # so the connection is refused at once. (An unrouted address such as 127.0.0.2 is not
+    # refused on macOS; it waits for the timeout.)
+    unreachable = replace(config_for(_closed_port_url()), timeout_seconds=2.0)
+    toolset = build_query_toolset(unreachable)
     context = invocation_context(turn_id=TURN_ID)
-    finish = build_finish_turn(
-        config_for(service_url), toolset, _held(context, "Here is what it says.")
-    )
+    finish = build_finish_turn(unreachable, toolset, _held(context, "Here is what it says."))
     context.session.events = _events(  # type: ignore[assignment]
         query_service, "synthetic-invocation"
     )
-    content = await finish(CallbackContext(context))
+    try:
+        content = await finish(CallbackContext(context))
+    finally:
+        with contextlib.suppress(Exception):
+            await toolset.close()
     assert isinstance(content, types.Content)
     assert ((content.parts or [])[0].text or "") == UNVERIFIABLE_NOTICE
+
+
+def _closed_port_url() -> str:
+    """A loopback URL on a port that was free a moment ago and has nothing listening on it."""
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = int(probe.getsockname()[1])
+    return f"http://127.0.0.1:{port}/mcp"
+
+
+async def test_a_verbatim_block_over_the_quote_bound_is_verified_end_to_end(
+    query_service: FakeQueryService,
+) -> None:
+    # The section is longer than two verify_quote windows, and a cut at the last space of each
+    # window would fall inside "1 000 000" and just after "≥": before 2026-09-22 the splitter
+    # made exactly those cuts, the service refused both pieces, and the label's own text was
+    # shown as not verified.
+    section = long_section()
+    text = section.text
+    assert utf16_length(text) > 2 * VERIFY_QUOTE_MAX_UTF16
+    first_cut = text.rfind(" ", 0, VERIFY_QUOTE_MAX_UTF16)
+    second_cut = first_cut + 1 + text[first_cut + 1 :].rfind(" ", 0, VERIFY_QUOTE_MAX_UTF16)
+    assert (first_cut, second_cut) == LONG_SECTION_OLD_CUTS
+    query_service.sections[LONG_SECTION_KEY] = section
+
+    shown = await _run(
+        query_service,
+        _events(query_service, "synthetic-invocation", section.payload),
+        "Here is what it says.",
+    )
+
+    quotes = [quote for quote, _ in query_service.seen_quotes]
+    assert len(quotes) >= 3
+    assert [result for _, result in query_service.seen_quotes] == ["match"] * len(quotes)
+    # Every chunk was within the bound, and together they are the whole block.
+    assert all(utf16_length(quote) <= VERIFY_QUOTE_MAX_UTF16 for quote in quotes)
+    assert " ".join(quotes) == text
+    assert shown.startswith(VERIFIED_LABEL + "\n" + text[:40])
+    assert "not verified" not in shown.lower()
+    assert "no-match" not in shown
 
 
 async def test_a_turn_id_that_is_not_a_uuid_shows_no_draft(query_service: FakeQueryService) -> None:

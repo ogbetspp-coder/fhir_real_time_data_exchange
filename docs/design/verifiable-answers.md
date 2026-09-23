@@ -1,11 +1,17 @@
 # Design note: verifiable answers on Google-native surfaces
 
-- Status: Proposed 2026-09-20; the query service (item 1) and the agent (item 1b) are built
-  and tested as of the same date, neither is deployed. Google product capabilities below were
-  read from Google's public documentation (dated per source, inline); none has been exercised
-  in this project's tenant, and each must be re-confirmed in the console before it is relied on
+- Status: Proposed 2026-09-20. The query service is deployed (`ema-flow-dev-query`, first
+  2026-09-20; all four tools answered live 2026-09-21). The agent is deployed to Agent Engine
+  (`reasoningEngines/6226059359072288768`, europe-west4, Python 3.14), registered in Gemini
+  Enterprise, and redeployed on 2026-09-23 with the draft-hold fix (PR #98); its post-check has
+  not yet run in a live Gemini turn. Both are delivered (were roadmap items 1 and 1b). Google
+  product capabilities below were read from Google's public documentation (dated per source,
+  inline); the MCP connector, Agent Engine and agent registration have since been exercised in
+  this project's tenant, the rest has not and must be re-confirmed in the console before it is
+  relied on
 - Related: `docs/design/epi-mcp-query-service.md`, `docs/adr/0004-service-boundaries-and-shared-code.md`,
-  `docs/roadmap.md` items 1, 1b, 1c
+  `docs/roadmap.md` (the query service, the agent and the demonstration enablers: delivered, were
+  items 1, 1b and 1c; the live post-check is current item 1)
 
 ## The promise, stated narrowly enough to be true
 
@@ -31,7 +37,7 @@ reading.
 
 ## Three layers of enforcement, from hard to soft
 
-1. **Hard: the tool surface.** The query service (item 1) returns narrative verbatim with
+1. **Hard: the tool surface.** The query service returns narrative verbatim with
    `narrativeDivSha256` and `normalizedTextSha256`, names the document version, and marks
    content fields with `ContentNotice`. It has no tool that summarises, drafts, or writes. A
    client cannot obtain paraphrased label text from it because none exists.
@@ -65,7 +71,7 @@ project's tenant.
 | The agent's logic (layer 2) | **Agent Development Kit** (Python, `google-adk`) agent with an MCP toolset over streamable HTTP (confirmed)                                                              | **Yes — small, and the moat** |
 | Agent runtime               | **Vertex AI Agent Engine**; `europe-west4` reported available since 2025-11 (partially confirmed — confirm in console before committing to it)                           | No                            |
 | The model                   | Gemini, pinned by version                                                                                                                                                | No                            |
-| The tools                   | The read-only query service (item 1)                                                                                                                                     | **Yes**                       |
+| The tools                   | The read-only query service                                                                                                                                              | **Yes**                       |
 | Structured display          | **A2UI**: an agent emits a structured UI message that Gemini Enterprise renders as a card — the mechanism for showing hashes and citations as widgets (confirmed)        | Card definitions only         |
 | The record                  | Cloud Healthcare API FHIR store, Provenance, evidence bucket, ledger                                                                                                     | Yes — already built           |
 | Analytics beside the chat   | Looker / Looker Studio over the BigQuery stream                                                                                                                          | No                            |
@@ -127,7 +133,7 @@ Same principal namespace, same entitlements, same audit record. Not tested: sign
 ID-token expiry rejection, which are the library's behaviour behind a stub in every test, and
 the live tokeninfo endpoint, which has not been called from this project.
 
-For the ADK agent path (item 1b), the `header_provider` route was built: `tools.begin_turn`
+For the ADK agent path, the `header_provider` route was built: `tools.begin_turn`
 (the agent's `before_agent_callback`) generates a UUID and puts it in session state; the
 per-request `bearer_header_provider` reads the user's token and that id from session state and
 sends `Authorization` and `X-Query-Turn-Id` on every request of the turn. Agent Engine's
@@ -148,7 +154,7 @@ thing the tool surface now says that an integrator must relay: `find_product` an
 searched — the scan horizon of 200, the `limit` argument, or the request's store-read budget can
 each cut it short — so an empty `products` with `truncated: true` is not "no such product".
 
-**Step 2 — the ADK agent adds layer 2 (item 1b).** A Python `google-adk` agent, its own
+**Step 2 — the ADK agent adds layer 2.** A Python `google-adk` agent, its own
 deployable under ADR 0004 (`agent/`, own identity, shares only the published contracts),
 deployed to Agent Engine and registered in the Agent Gallery, doing four things and nothing
 else:
@@ -170,7 +176,7 @@ else:
    — a `verify_quote` argument _is_ narrative, and a digest of a quote is a way of asking
    whether a document contains a sentence. Which spans failed is on the card; how many, and
    why, is in the record. Without it, the demonstration's first two scenes would produce no
-   assessable evidence, so it is part of item 1b, not an afterthought.
+   assessable evidence, so it is part of the agent, not an afterthought.
 
 The two audit trails join on one value. The agent generates `turnId` before the model runs and
 sends it as `X-Query-Turn-Id` on every request of the turn; the query service copies it into
@@ -192,7 +198,8 @@ surface is wanted.
 ## Human and organisational prerequisites
 
 - Gemini Enterprise is a licensed product. Confirm the organisation (or the demonstration
-  tenant) has it before step 1 is scheduled; the MCP service and item 1c do not depend on it.
+  tenant) has it before step 1 is scheduled; the MCP service and the demonstration set do not
+  depend on it. (Confirmed 2026-09-21: a trial, active until 2026-10-20.)
 - An OAuth 2.0 client (internal consent screen) for the MCP connector — created in the Cloud
   console, not by Terraform; its client id goes into `query_oauth_client_ids`, the list the
   service checks a token's `aud` or `azp` against. Until it is set, access tokens are rejected.
@@ -239,18 +246,18 @@ with.
   it does not prove the assistant named the right product, version, or language. The card
   displays product, `bundleId`, `versionId`, and language for the user to confirm, and the
   demonstration shows this being checked.
-- **Data handling outside the boundary.** Regulated narrative leaves the validated boundary at
-  the tool-result hop and is processed by Gemini and Agent Engine. Before anything but
-  synthetic data crosses that hop, three things must be written down here: the contractual
-  basis on which prompts and tool results are processed (no-training, no human review,
-  prompt-log retention), the confirmed region of each component and whether it matches the
-  query service's `europe-west4` (Gemini Enterprise offers the `eu` multi-region and London;
-  some features fall back to global), and the data-processing agreement relied on. Until that
-  paragraph exists, the assistant path handles synthetic data only. This is the item a
-  security assessor will hold the assistant path on, and it is independent of the query
-  service, which stays within the project's own region.
+- **Data handling outside the boundary.** Regulated narrative leaves the validated boundary at the
+  tool-result hop and is processed by Gemini and Agent Engine. Before anything but synthetic data
+  crosses that hop, three things must be written down here: the contractual basis on which prompts
+  and tool results are processed (no-training, no human review, prompt-log retention), the confirmed
+  region of each component and whether it matches the query service's `europe-west4` (Gemini
+  Enterprise offers the `eu` multi-region and London; some features fall back to global), and the
+  data-processing agreement relied on. Until that paragraph exists, the assistant path handles
+  synthetic data and, for roadmap item 3a, an authority's published ePI (public, approved text) only
+  — no client or confidential content. This is the item a security assessor will hold the assistant
+  path on, and it is independent of the query service, which stays within the project's own region.
 
-## The demonstration (item 1c)
+## The demonstration (delivered, was item 1c)
 
 The line for the client: **FHIR gives every sentence in a label a stable address — product,
 version, section — and everything here hangs off that address. PDFs do not have addresses.**
@@ -258,7 +265,7 @@ version, section — and everything here hangs off that address. PDFs do not hav
 1. **One truth, three windows.** Section 4.4 of a synthetic label as the validated EMA ePI, as
    the BigQuery row that appeared seconds after the write, and as an assistant answer with its
    hash and approver. Same resource, same hash, no copies. The approver shown is synthetic —
-   `api-attestation` by a placeholder principal, because the approval service (roadmap item 4)
+   `api-attestation` by a placeholder principal, because the approval service (roadmap item 2)
    is not built — and the presenter says so _before_ the card appears: "no human approved this
    content; what is real is that the store refuses content without an approval." Showing a
    synthetic approver as "who signed off" without that sentence is the most damaging thing

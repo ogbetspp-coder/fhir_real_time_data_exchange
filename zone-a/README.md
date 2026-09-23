@@ -1,8 +1,8 @@
 # Zone A skeleton
 
-Roadmap item 2. A Python project that consumes the published Zone B contracts, proves that the
-canonical hashes reproduce in a second language, and re-implements the narrative fidelity check
-with the golden vectors as its only oracle.
+Delivered (was roadmap item 2). A Python project that consumes the published Zone B contracts,
+proves that the canonical hashes reproduce in a second language, and re-implements the narrative
+fidelity check with the golden vectors as its only oracle.
 
 This is the first real test of the claim in ADR 0002 that the contract and the fidelity
 specification are language-neutral: "A Zone A implementation in another language must generate

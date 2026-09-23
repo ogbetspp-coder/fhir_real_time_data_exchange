@@ -1,10 +1,10 @@
 # The verifiable-answer agent
 
-Roadmap item 1b. A small Agent Development Kit agent, its own deployable under ADR 0004 — own
-`pyproject.toml`, own lock, own identity, own CI job — that shares nothing with the worker or
-with Zone A except two published artefacts: `contracts/generated/query-tools.schema.json`
-(2.0.1, the query service's surface) and `contracts/generated/agent-turn.schema.json` (1.0.0,
-the shape of this agent's own audit record).
+Delivered (was roadmap item 1b); its post-check seen in a live turn is roadmap item 1. A small Agent
+Development Kit agent, its own deployable under ADR 0004 — own `pyproject.toml`, own lock, own
+identity, own CI job — that shares nothing with the worker or with Zone A except two published
+artefacts: `contracts/generated/query-tools.schema.json` (2.0.1, the query service's surface) and
+`contracts/generated/agent-turn.schema.json` (1.0.0, the shape of this agent's own audit record).
 
 It does four things and refuses to do a fifth.
 
@@ -124,8 +124,9 @@ Engine both support, which happens to be the same as Zone A's, though for a diff
 One caveat, stated rather than hidden: the version list above comes from the generated API
 reference rather than from the prose "set up" page, because `docs.cloud.google.com` renders its
 body client-side and could not be read as text. Both sources are proto-derived. Older
-`v1beta1` `PackageSpec` references still list 3.8–3.11 and are stale. Confirm in the console
-before the first real deploy.
+`v1beta1` `PackageSpec` references still list 3.8–3.11 and are stale. Confirmed by use: the
+agent has run on Agent Engine in `europe-west4` on Python 3.14 since its first deploy on
+2026-09-22, and again after the redeploys of 2026-09-23.
 
 The whole stack installs and runs on 3.14 here: 75 packages resolved, the ADK toolset
 negotiating MCP protocol version 2025-11-25 against a real server.
@@ -154,10 +155,12 @@ Then the five commands CI runs:
 .uv-bootstrap/bin/uv run --frozen ruff format --check .
 .uv-bootstrap/bin/uv run --frozen mypy --strict
 .uv-bootstrap/bin/uv run --frozen python scripts/sync_contract.py --check
-.uv-bootstrap/bin/uv run --frozen pytest
+.uv-bootstrap/bin/uv run --frozen pytest --cov
 ```
 
-Every line above was run as written.
+Every line above was run as written. `--cov` measures line coverage of the package and fails
+below the floor in `pyproject.toml` (`[tool.coverage.report] fail_under`, 98 as of 2026-09-22);
+it is a flag rather than an `addopts` entry so that running one test file does not fail on it.
 
 ## The contracts are vendored, and gate-checked
 
@@ -193,6 +196,21 @@ real service cannot produce.
 Two faults can be injected: `corrupt_section` makes one section stop matching anything, which
 is what "the store moved on since composition" looks like; `break_schema_for` returns a section
 whose hash is not a SHA-256, which is what a malformed result looks like.
+
+The fake's `verify_quote` decides with the service's quote-edge rule, not a substring search
+(until 2026-09-22 it matched any substring, so a chunk the real service refuses passed here).
+The rule is ported in `src/verifiable_answer_agent/quote_edge.py` and held to the service's own
+answers: `scripts/contracts/export-quote-edge-cases.ts` runs the service's `locateQuote` over the
+design's worked examples (`test/query/quote-edge-cases.ts`, which the service's acceptance test
+also drives) and writes `test/fixtures/contracts/quote-edge-cases.json`; `npm run
+contracts:check` regenerates it and fails on drift; `tests/test_quote_edge.py` asserts the port
+and the fake, over the wire, reproduce every answer and offset, and that the port's three
+character sets are the ones in `src/query/tools.ts`.
+
+No test mints Cloud Run's edge token: `tests/conftest.py` stubs `tools.edge_auth_token` for
+every test, because on a machine with no runtime identity each attempt waited about 3.4 s on
+the metadata server and the suite took three minutes. `tests/test_tools_edge_auth.py` tests the
+minting, its fallback and its caches with Google's own calls patched.
 
 `tests/fake_query_service.py` contains a 15-line XHTML-to-text step, and it is worth being
 explicit that this is **not** a third implementation of `docs/fidelity-normalization.md`. The
@@ -257,10 +275,12 @@ Descriptions only; no shape changed, so the agent's validation of tool results i
 Two meanings changed. `verify_quote`'s `match` now requires both edges of the quote to hold
 under the service's quote-edge rule — not inside a word, not at punctuation joined to a number
 or word — so a block the model quoted starting or ending mid-token is now `no-match`, and the
-post-check marks it. The post-check splits a block only at U+0020, so its chunks already end on
-spaces; a chunk boundary that falls between the groups of a space-grouped number ("1 000 000")
-or just after a spaced comparator ("≥ 30") is refused, as is a single token longer than the
-2,000-unit window. All fail closed. And an approval is given for a document's current version
+post-check marks it. The post-check splits a block longer than 2,000 units into chunks, and
+until 2026-09-22 it cut at the last space of each window, so a boundary could fall between the
+groups of a space-grouped number ("1 000" | "000 IU daily.") or just after a spaced comparator
+("CrCl ≥" | "30 ml/min."): the service refused those chunks and the label's own text was
+flagged `no-match`. The splitter now cuts only where the quote-edge rule holds on both sides
+(next section but one). And an approval is given for a document's current version
 only: `get_provenance` for an earlier version is `unavailable`, which this agent reads as it
 reads any other `unavailable`.
 
@@ -293,11 +313,19 @@ pair. Worth one clause in the contract, the way `docs/fidelity-normalization.md`
 same class of question for offsets.
 
 The splitter matters because a section can be a hundred times longer than one `verify_quote`
-argument. It cuts on a U+0020 inside the window, dropping the separator rather than carrying a
-leading or trailing space into either chunk — normalisation would remove one anyway — and at
-the hard limit when a single token is longer than the window. Every chunk is a contiguous
-substring of the block, which is what makes each one findable in the stored section, and a
-block is verified only if **every** chunk came back `match`.
+argument. It cuts on the last U+0020 inside the window where the service's quote-edge rule
+(`quote_edge.py`) holds on both sides — not between two digits, not just after a comparator or
+sign set off by a space — dropping the separator rather than carrying a leading or trailing
+space into either chunk, since normalisation would remove one anyway. Every chunk is a
+contiguous substring of the block, which is what makes each one findable in the stored section,
+and a block is verified only if **every** chunk came back `match`.
+
+The bound: a chunk is longer than the window only when the window holds no acceptable cut at
+all (a single token longer than 2,000 units, or an unbroken run of space-grouped digits), and
+it then ends at the first acceptable cut after the window, or at the end of the block. A cut
+inside such a run would be a certain `no-match`, reported as if the text were not the label's;
+the longer chunk is not sent (the contract refuses it) and the block is flagged
+`verification-unavailable`. Neither verifies the block; only the second says why truthfully.
 
 ## Audit
 

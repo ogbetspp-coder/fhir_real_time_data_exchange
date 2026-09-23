@@ -8,12 +8,15 @@ let the agent be tested against a shape the real service cannot produce.
 
 The transport is the real one: ``mcp``'s ``FastMCP`` over streamable HTTP, on an ephemeral
 loopback port, with the real ADK toolset on the other end. What is faked is the store, not the
-protocol.
+protocol. ``verify_quote`` decides as the service does, under its quote-edge rule
+(``verifiable_answer_agent.quote_edge``, held to the service's exported answers by
+``tests/test_quote_edge.py``), not by substring.
 """
 
 from __future__ import annotations
 
 import hashlib
+import html
 import json
 import socket
 import threading
@@ -28,6 +31,7 @@ import uvicorn
 from mcp.server.fastmcp import FastMCP
 
 from verifiable_answer_agent.contract import validate_tool_output
+from verifiable_answer_agent.quote_edge import locate_quote
 
 REPOSITORY_ROOT: Final = Path(__file__).resolve().parents[2]
 FIXTURES: Final = REPOSITORY_ROOT / "test" / "fixtures" / "contracts"
@@ -136,6 +140,88 @@ def load_sections() -> dict[str, Section]:
     return sections
 
 
+LONG_SECTION_KEY: Final = "smpc.4.2.long"
+# Where the splitter used before 2026-09-22 cut the long section: at the last space inside each
+# 2,000-unit window. The first falls inside "1 000 000", the second just after "≥".
+LONG_SECTION_OLD_CUTS: Final = (1996, 3995)
+
+
+def _filler(length: int) -> str:
+    """Synthetic sentences, exactly ``length`` characters, ending in a full stop."""
+    sentence = "Synthetic demonstration content, not for clinical use."
+    parts: list[str] = []
+    used = 0
+    while length - used > 2 * len(sentence) + 1:
+        parts.append(sentence)
+        used += len(sentence) + 1
+    tail = length - used - len("See also .")
+    parts.append(f"See also {'x' * max(tail, 1)}.")
+    text = " ".join(parts)
+    assert len(text) == length, "the filler arithmetic is wrong"
+    return text
+
+
+def _long_section_text() -> str:
+    """Over 4,000 code points, with a space-grouped number and a spaced comparator placed where
+    a cut at the last space of each 2,000-unit window lands inside each of them."""
+    dose = "Give up to 1 000 000 IU daily."  # the space after "1 000" is its 16th character
+    renal = "Reduce the dose when CrCl ≥ 30 ml/min."  # the space after "≥" is its 27th
+    first = LONG_SECTION_OLD_CUTS[0] - 16
+    second = LONG_SECTION_OLD_CUTS[1] - 27
+    text = (
+        _filler(first - 1)
+        + " "
+        + dose
+        + " "
+        + _filler(second - first - len(dose) - 2)
+        + " "
+        + renal
+        + " End of the synthetic long section."
+    )
+    assert text[LONG_SECTION_OLD_CUTS[0] - 5 : LONG_SECTION_OLD_CUTS[0] + 4] == "1 000 000"
+    assert text[LONG_SECTION_OLD_CUTS[1] - 1 : LONG_SECTION_OLD_CUTS[1] + 3] == "≥ 30"
+    return text
+
+
+def synthetic_section(source_key: str, text: str, title: str = "Synthetic section") -> Section:
+    """A contract-valid section whose normalised text is ``text``, outside the canned
+    submission: a test adds it to ``FakeQueryService.sections`` when it needs one."""
+    div = f'<div xmlns="http://www.w3.org/1999/xhtml"><p>{html.escape(text, quote=False)}</p></div>'
+    payload = {
+        "document": {"bundleId": BUNDLE_ID, "versionId": VERSION_ID, "lastUpdated": LAST_UPDATED},
+        "sourceKey": source_key,
+        "path": "Composition.section[3].section[1].section[9]",
+        "title": title,
+        "div": div,
+        "text": text,
+        "narrativeDivSha256": _sha256_hex(div),
+        "normalizedTextSha256": _sha256_hex(text),
+        "normalizationVersion": NORMALIZATION_VERSION,
+        "contentNotice": CONTENT_NOTICE,
+    }
+    if not validate_tool_output("get_section", payload).available:
+        raise AssertionError(f"the synthetic section {source_key} fails the contract")
+    return Section(source_key=source_key, payload=payload)
+
+
+def long_section() -> Section:
+    """A section longer than two ``verify_quote`` windows (``_long_section_text``)."""
+    return synthetic_section(LONG_SECTION_KEY, _long_section_text(), "Synthetic long section")
+
+
+def quote_edge_cases() -> Mapping[str, Any]:
+    """The query service's own quote-edge answers, as ``test/fixtures/contracts`` holds them.
+
+    ``scripts/contracts/export-quote-edge-cases.ts`` writes them from ``src/query/tools.ts``,
+    ``npm run contracts:check`` regenerates them and fails on drift, and
+    ``tests/test_quote_edge.py`` holds this fake's ``verify_quote`` to every answer.
+    """
+    data: Mapping[str, Any] = json.loads(
+        (FIXTURES / "quote-edge-cases.json").read_text(encoding="utf-8")
+    )
+    return data
+
+
 @final
 @dataclass(slots=True)
 class FakeQueryService:
@@ -145,6 +231,9 @@ class FakeQueryService:
     sections: dict[str, Section]
     seen_authorization: list[str | None] = field(default_factory=list)
     seen_turn_id: list[str | None] = field(default_factory=list)
+    # Each verify_quote answer, in call order, as (quote, result). Test-side only: the real
+    # service keeps no quote text.
+    seen_quotes: list[tuple[str, str]] = field(default_factory=list)
     corrupt_section: str | None = None
     break_schema_for: str | None = None
     truncate_find_product: bool = False
@@ -241,17 +330,20 @@ def _build_server(state: FakeQueryService) -> Any:
             if key == state.corrupt_section:
                 # This section is "changed in the store since composition": nothing matches it.
                 continue
-            start = section.text.find(quote)
-            if start < 0:
+            # The service's quote-edge rule, not a substring search: a quote that cuts a word, a
+            # space-grouped number or a spaced comparator is no-match here as it is there.
+            located = locate_quote(section.text, quote)
+            if located is None:
                 continue
             result["result"] = "match"
             result["match"] = {
                 "sourceKey": key if sourceKey is None else sourceKey,
-                "startOffset": start,
-                "endOffset": start + len(quote),
+                "startOffset": located[0],
+                "endOffset": located[1],
                 "normalizedTextSha256": section.payload["normalizedTextSha256"],
             }
             break
+        state.seen_quotes.append((quote, str(result["result"])))
         return result
 
     app = mcp.streamable_http_app()

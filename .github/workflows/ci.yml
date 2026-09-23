@@ -204,5 +204,6 @@ jobs:
 
       # Hermetic: the tests stand up the four tools on a real MCP streamable-HTTP server on an
       # ephemeral loopback port and connect the real ADK toolset to it. No model is called.
+      # Under line coverage, with the floor in agent/pyproject.toml [tool.coverage.report].
       - name: Test
-        run: uv run --frozen pytest
+        run: uv run --frozen pytest --cov

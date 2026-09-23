@@ -21,6 +21,7 @@ dev = [
   "mypy==2.3.1",
   "pytest==9.1.1",
   "pytest-asyncio==1.4.0",
+  "pytest-cov==7.1.0",
   "ruff==0.16.8",
   "types-jsonschema==4.26.0.20260518",
   "uvicorn==0.53.0",
@@ -96,3 +97,16 @@ addopts = "-ra --strict-markers --strict-config"
 xfail_strict = true
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+
+# Line coverage of the deployable, enforced in CI by `uv run --frozen pytest --cov` (the agent
+# job in .github/workflows/ci.yml). Not in addopts, so running one test file locally does not
+# fail on the floor. The floor is the coverage measured on 2026-09-22 (98.61%), rounded down:
+# raise it when coverage rises, never lower it to let a change through.
+[tool.coverage.run]
+source = ["verifiable_answer_agent"]
+
+[tool.coverage.report]
+fail_under = 98
+precision = 2
+show_missing = true
+skip_covered = true

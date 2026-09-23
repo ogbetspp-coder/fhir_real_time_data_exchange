@@ -137,15 +137,18 @@ bash scripts/gcp/deploy.sh
 The deployment:
 
 1. creates Artifact Registry and required APIs;
-2. GitHub Actions runs `npm run check` as the Quality gate step before deploy; Cloud Build
-   (`cloudbuild.images.yaml`) only builds the worker, validator, and query images; `cloudbuild.yaml` is
-   a separate, manual/CI-optional configuration that additionally runs the quality gate,
-   standards-integrity check, and Terraform format/validate before building those same images.
-   Submit either one with the three flags `phase_images` in `scripts/gcp/deploy.sh` uses —
-   `--region`, `--service-account` naming `ema-flow-build-<env>`, and
-   `--gcs-source-staging-dir` on the `-build-staging` bucket. Without them gcloud falls back to
-   a global build, as the default compute service account, staging the source in a US bucket;
-   that account no longer holds a build role, so such a build is refused;
+2. GitHub Actions runs `npm run check` in its own `gate` job of `.github/workflows/deploy.yml`,
+   which holds no cloud token (no `id-token` permission); the `deploy` job needs it and does not
+   start unless it passes. The merge gate is `.github/workflows/ci.yml` on the pull request, and a
+   merge that touches only documentation, `test/`, `agent/` or `zone-a/` does not deploy at all.
+   Cloud Build (`cloudbuild.images.yaml`) only builds the worker, validator, and query images;
+   `cloudbuild.yaml` is a separate, manual/CI-optional configuration that additionally runs the
+   quality gate, standards-integrity check, and Terraform format/validate before building those same
+   images. Submit either one with the three flags `phase_images` in `scripts/gcp/deploy.sh` uses —
+   `--region`, `--service-account` naming `ema-flow-build-<env>`, and `--gcs-source-staging-dir` on
+   the `-build-staging` bucket. Without them gcloud falls back to a global build, as the default
+   compute service account, staging the source in a US bucket; that account no longer holds a build
+   role, so such a build is refused;
 3. deploys immutable image digests; Binary Authorization is configurable
    (`enforce_binary_authorization`) and is disabled by default;
 4. reconciles the R5 stores and native BigQuery stream through the Healthcare REST API;
@@ -175,10 +178,15 @@ service-account key is stored in GitHub. In that repository, set these Actions v
 | `GCP_DEPLOY_SERVICE_ACCOUNT`     | `ema-flow-deployer@PROJECT_ID.iam.gserviceaccount.com`                                   |
 | `GCP_WORKLOAD_IDENTITY_PROVIDER` | `projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL/providers/PROVIDER` |
 
-Four further Actions variables configure who may call the query service. They are variables,
-not secrets: an IAM member string, an opaque subject id, a FHIR bundle id, and an OAuth client
-id are identifiers, and holding one grants nothing. Each is optional; an unset variable leaves
-the Terraform default, and a deploy with all of them unset succeeds and authorises no caller.
+The pull-request plan (`.github/workflows/plan.yml`) takes two more, `GCP_PLAN_SERVICE_ACCOUNT`
+and `GCP_PLAN_WORKLOAD_IDENTITY_PROVIDER`, for its own read-only identity
+(`docs/foundations.md`, B4).
+
+Five further Actions variables configure who may call the query service and where its alert
+goes. They are variables, not secrets: an IAM member string, an opaque subject id, a FHIR bundle
+id, an OAuth client id and an e-mail address are identifiers, and holding one grants nothing.
+Each is optional; an unset variable leaves the Terraform default, and a deploy with all of them
+unset succeeds and authorises no caller.
 
 | Variable                   | Example                                                           | Default when unset |
 | -------------------------- | ----------------------------------------------------------------- | ------------------ |
@@ -199,16 +207,16 @@ the deploy log is attached to a GitHub issue on failure.
 
 The WIF attribute condition must allow
 `repo:ogbetspp-coder/fhir_real_time_data_exchange:ref:refs/heads/main` (or the whole
-repository). After the four variables are set, start the workflow from the Actions tab.
+repository). After the four deploy variables are set, start the workflow from the Actions tab.
 
 The bootstrapped deployer service account needs
 `roles/healthcare.datasetAdmin` for the Healthcare dataset and
 `roles/healthcare.fhirStoreAdmin` for the R5 REST reconciler. Its other provisioning roles
 depend on the resources in this Terraform configuration. The runtime worker remains separate
-and has the narrower `roles/healthcare.fhirResourceEditor` role — bound at project level
-today (`google_project_iam_member.worker_healthcare` in `infra/security.tf`), whereas the
-query service's reader role is bound on the dataset; tightening the worker's binding to the
-dataset is listed in `docs/roadmap.md` under "Needs a person".
+and has the narrower `roles/healthcare.fhirResourceEditor` role, bound on the record dataset
+only (`google_healthcare_dataset_iam_member.worker_fhir_editor` in `infra/security.tf`), as the
+query service's reader role is; the project-level binding was removed on 2026-09-21 with the
+CMEK rollout (`docs/foundations.md`, C4).
 
 Run the real demonstration:
 
@@ -248,8 +256,9 @@ Do not run that command for a disposable prototype project.
 
 `ema-flow-<env>-query` (`docs/architecture.md`, `docs/design/epi-mcp-query-service.md`) is a
 separate Cloud Run deployable from the worker: read-only, its own service account, its own
-Terraform variables. It is built and its tests pass (`test/query/`); it has not yet been
-deployed to a project.
+Terraform variables. Its tests are under `test/query/`. It is deployed in `dev` as
+`ema-flow-dev-query` (europe-west4): first on 2026-09-20, all four tools answered live on
+2026-09-21, and every deploy since has redeployed it from `main`.
 
 Two things must be granted before it answers anything — invocation, then entitlement — and
 **which principal receives them depends on the credential you intend to call with**. Cloud Run
@@ -356,9 +365,10 @@ AUDIENCE="$(terraform -chdir=infra output -raw query_audience)" || {
 }
 ```
 
-That 401 was reproduced in review against the service's verification code. It has not been
-observed against a deployed service, because no `terraform apply` has created one; the two
-URL shapes above were confirmed on the already-deployed worker in the same project and region.
+That 401 was first reproduced in review against the service's verification code, and the two
+URL shapes above were first confirmed on the worker in the same project and region. The agent's
+first deploy met it against the live service on 2026-09-22: a token minted for the legacy
+hostname was refused with `401 {"error":"unauthenticated"}` (`agent/deploy/README.md`).
 
 <a id="terraform-output-needs-the-backend"></a>
 **`terraform output` needs the real backend first**, here and everywhere else in this file. A
@@ -402,9 +412,8 @@ TOKEN="$(gcloud auth print-identity-token \
 `--include-email` is what puts the `email` and `email_verified` claims into the token:
 `gcloud auth print-identity-token --help` describes the flag as adding exactly those two
 claims and reserves it for impersonated service accounts. Without it the token carries
-neither. Whether Cloud Run's invoker check needs them has not been observed here — there is no
-deployed query service to call — so include the flag rather than find out during a
-demonstration.
+neither. Whether Cloud Run's invoker check needs them has not been tested by leaving the flag
+off against the deployed service, so include it rather than find out during a demonstration.
 
 The subject to entitle is that token's `sub`. Decode the payload locally — never print the
 token, and never pass it as a command argument:
@@ -423,8 +432,7 @@ It prints two lines: the `sub` to key `query_entitlements_json` by, then the `em
 empty second line means `--include-email` was left off. That decode was run on 2026-09-20
 against real Google-signed ID tokens with payload segments of 407 and 498 characters (the two
 residues at which the unpadded form fails) and against synthetic payloads at every residue. The
-`gcloud … --impersonate-service-account` command above it has not been run to completion,
-because the caller service account does not exist until a `terraform apply` creates it.
+impersonated mint above is the credential the live calls of 2026-09-21 were made with.
 
 **Your own Google account** cannot mint an ID token for this service at all. For a user
 account, `gcloud auth print-identity-token --audiences=...` answers, verbatim on 2026-09-20:
@@ -435,28 +443,16 @@ ERROR: (gcloud.auth.print-identity-token) Invalid account type for `--audiences`
 
 and a user's plain identity token carries a Google OAuth client id as its audience rather than
 `QUERY_AUDIENCE`. The path that works for a human at a terminal is impersonating the caller
-account, above; the access token below is for the Gemini Enterprise path, which pairs it with a
-service agent's ID token that satisfies Cloud Run's edge. Read the client id and the subject
-gcloud presents:
+account, above. A human's own access token reaches the service only through Gemini Enterprise,
+which pairs it with a service agent's ID token that satisfies Cloud Run's edge, and only when
+its client is listed in `query_oauth_client_ids` — in `dev`, the connector's internal OAuth
+client and nothing else.
 
-```bash
-curl -s -X POST -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-  https://oauth2.googleapis.com/tokeninfo
-```
-
-Run from a logged-in user account on 2026-09-20, that returned `aud` and `azp` both
-`32555940559.apps.googleusercontent.com`, plus the `sub` to entitle. An operator then sets
-three things: that client id in `query_oauth_client_ids`, `user:<your e-mail>` in
-`query_invokers`, and that `sub` in `query_entitlements_json`. The token is then
-`$(gcloud auth print-access-token)` and needs no audience.
-
-That client id is built into every gcloud installation worldwide, so naming it proves only that
-a token came from gcloud and never who presented it. What still stands between such a caller
-and a document is Cloud Run's `run.invoker` on the service and the per-subject entitlement —
-nothing else. It is `[]` by default; adding it is a deliberate act. **Decided for `dev` on
-2026-09-21: not set.** It was set while no connector client existed, and removed once the
-Gemini Enterprise connector's own internal client was in place; a human at a terminal uses the
-impersonation recipe above instead.
+_History, not a recipe._ Before the connector's client existed, `dev` also accepted gcloud's own
+client id, `32555940559.apps.googleusercontent.com`, read from `tokeninfo` on 2026-09-20. That
+id is built into every gcloud installation worldwide, so it identifies the tool and never the
+caller, leaving `run.invoker` and the per-subject entitlement as the only walls. It was removed
+from `dev` on 2026-09-21 (`docs/roadmap.md`, "Needs a person", item 6).
 
 #### Calling it
 
@@ -535,13 +531,13 @@ joined to the service's records.
 `QUERY_AUDIENCE` defaults to Cloud Run's deterministic URL
 (`https://ema-flow-<env>-query-<project number>.<region>.run.app`), which is known before the
 service exists, so no bootstrap apply is needed; a Terraform postcondition fails the apply if
-that URL is not one Cloud Run reports for the service. This has been checked by `terraform
-validate` only, not by an apply against a project.
+that URL is not one Cloud Run reports for the service. Every deploy since 2026-09-20 has applied
+it.
 
 Query-service Terraform variables beyond `query_invokers`, `query_token_creators`,
-`query_entitlements_json`, and `query_oauth_client_ids` — those four `scripts/gcp/deploy.sh`
-passes from the Actions variables above; supply the rest through `TF_VAR_<name>` or an
-`infra/*.auto.tfvars` file:
+`query_entitlements_json`, `query_oauth_client_ids` and `alert_notification_email` — those five
+`scripts/gcp/deploy.sh` passes from the Actions variables above; supply the rest through
+`TF_VAR_<name>` or an `infra/*.auto.tfvars` file:
 
 | Variable                          | Default   | Effect                                                                                                                      |
 | --------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------- |
@@ -552,46 +548,32 @@ passes from the Actions variables above; supply the rest through `TF_VAR_<name>`
 | `alert_notification_email`        | `""`      | The entitlement-denial log metric always exists; the e-mail channel and alert policy (> 5 denials in an hour) only when set |
 | `lock_regulated_audit_log_bucket` | `false`   | Locks the retained audit log bucket. Irreversible: retention cannot then change and Terraform will not unlock it            |
 
-The metric filter and the alert threshold have been checked by `terraform validate` only; no
-plan or apply has run against a project.
+The metric, channel and policy have been applied by every deploy since 2026-09-21, when
+`ALERT_NOTIFICATION_EMAIL` was first passed through. Its address is still a placeholder
+(production gate, `docs/roadmap.md`).
 
-### Deploy order before the first demonstration
+### The demonstration set, and re-seeding
 
-The ordering constraint is real but it is not a choice of deploy targets. One change in this
-branch causes it: the worker's Provenance projection now writes the approver's role on the
-attester agent (`src/fhir/provenance.ts`, `APPROVER_ROLE_SYSTEM`), and `get_provenance` reads
-only that coding and never infers it. Every document already in the demonstrator's validated
-store was written by a worker built before that change, so its persisted `Provenance` carries
-no role — and `get_provenance` answers `unavailable` for all of them, with nothing to indicate
-the cause but this paragraph. **Re-ingestion has to happen after the new worker is serving and
-before anyone asks `get_provenance` anything.**
+The demonstration set was seeded once, on 2026-09-21, through the ordinary document path into a
+store rebuilt first, so the store's version history holds only what the pipeline published
+(`docs/roadmap.md`, "Needs a person"). The one-time deploy order that preceded it — a
+`Provenance` written before the worker recorded the approver's role answers `unavailable` from
+`get_provenance`, so documents had to be re-ingested after the new worker was serving — is
+spent: every document in the store today was written by a worker that records the role.
 
-There is no worker-only or query-only deploy to sequence. `scripts/gcp/deploy.sh` has one
-untargeted `terraform apply` (its `apply` phase) that reconciles both Cloud Run services
-together, and the phases it does offer are `preflight`, `deps`, `init`, `apis`, `images`,
-`apply`, `bootstrap`. So:
+**Which approval answers.** A document with more than one approved version has more than one
+`Provenance`, and nothing in the store links a version to its own. The query service answers
+with the most recently _written_ approval, and states it only for the document's current
+version; a request naming an earlier version gets no approval. Why it is write order and not
+the approval date, and what that does not prove, is in `docs/design/epi-mcp-query-service.md`
+("An approval is stated only for the current version").
 
-1. **Deploy this branch** — the `Deploy to Google Cloud` workflow, or `bash scripts/gcp/deploy.sh`
-   locally. The worker and the query service both come up from this commit. Between this step
-   and the next, the query service is deployed and answering `unavailable` from
-   `get_provenance` for every existing document; that is the expected state, not a fault.
-2. **Re-ingest the documents** through the ordinary document path with `scripts/demo/seed.ts`.
-   It needs two environment variables and a credential it cannot get from a human's
-   Application Default Credentials — see
-   [Re-ingesting with `scripts/demo/seed.ts`](#re-ingesting-with-scriptsdemoseedts) below, which
-   is the only complete copy of that command. The re-ingest writes a second `Provenance`
-   resource for the document — its id is derived from the submission id
-   (`stableUuid("ingestion-provenance", submissionId)`), so it adds one rather than replacing
-   the old one.
-3. **Call `get_provenance`** for the document you intend to show and confirm it answers an
-   approver role, before anyone is in the room. Confirming it is not optional: `get_provenance`
-   resolves the resource with `Provenance?target=Bundle/<id>&_count=1` and no `_sort`
-   (`src/query/fhir-reader.ts`), so which of two Provenance resources for the same document it
-   returns is not fixed by this code. A fresh store, or a fresh document id, avoids the
-   ambiguity entirely.
-
-Nothing here is a data migration: a `Provenance` already written is never rewritten, and this
-repository has no tool that would rewrite one.
+**Do not re-seed without rebuilding the store.** Re-running `scripts/demo/seed.ts` publishes
+the same content again as further versions, and adds a second `Provenance` per document rather
+than replacing the first, because its id derives from the submission id
+(`stableUuid("ingestion-provenance", submissionId)`). Nothing here is a data migration: a
+`Provenance` already written is never rewritten, and this repository has no tool that would
+rewrite one. The recipe below is for a rebuilt store or a new environment.
 
 #### Re-ingesting with `scripts/demo/seed.ts`
 
@@ -615,8 +597,10 @@ URL through `GoogleAuth().getIdTokenClient(...)` and decoding it: the `aud` clai
 refuses such a token.
 
 Mint the token as a service account that holds `run.invoker` on the worker and pass it in
-`WORKER_ID_TOKEN`, which `scripts/demo/seed.ts` uses in preference to ADC. In this repository
-the worker's only declared invoker is the Workflows service account (`infra/run.tf`):
+`WORKER_ID_TOKEN`, which `scripts/demo/seed.ts` uses in preference to ADC. The worker has two
+declared invokers (`infra/run.tf`): the Workflows service account
+(`google_cloud_run_v2_service_iam_member.workflow_invoker`) and the deployer, for the
+post-deploy smoke run (`deployer_invoker`). Impersonate the Workflows account:
 
 ```bash
 # One-time, and a deliberate grant: roles/owner does not carry this permission. Impersonating
@@ -665,11 +649,13 @@ The HL7 and EMA examples are regression references, not mapping specifications.
 
 The evidence model makes each run attributable (one run id propagated through logs, evidence
 objects, the ledger, and the FHIR transaction), timestamped in UTC, and hash-bound (SHA-256 of
-inputs and outputs, a KMS-signed manifest, retained evidence objects, Cloud Audit Logs,
-deterministic replay, and digest-pinned images). It does not claim ALCOA+ or any other
-data-integrity standard; whether the evidence meets one is an assessment the owning
-organisation makes. Development, validation, and production are separate Terraform
-environments with distinct service identities.
+inputs and outputs, a KMS-signed manifest, retained evidence objects, Cloud Audit Logs, and
+digest-pinned images). It does not claim ALCOA+ or any other data-integrity standard; whether
+the evidence meets one is an assessment the owning organisation makes. The Terraform is
+parameterised by environment, with distinct service identities per environment, but only `dev`
+is deployed. Production is planned as a separate project, `khs-ema-flow-prod`, which exists
+empty in its own folder under the EU location and key policies (`docs/foundations.md`, A1);
+nothing has been deployed there.
 
 Google Cloud operates under shared responsibility. Intended use, risk assessment, procedural
 controls, personnel qualification, electronic signatures, application validation, and final

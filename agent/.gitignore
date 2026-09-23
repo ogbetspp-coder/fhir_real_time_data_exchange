@@ -9,3 +9,6 @@
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
+# pytest --cov's data file (CI runs the suite under coverage; see [tool.coverage] in pyproject).
+.coverage
+.coverage.*
