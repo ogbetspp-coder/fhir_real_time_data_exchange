@@ -11,10 +11,12 @@ import {
   QuoteVerificationSchema,
   SectionContentSchema,
   type QueryAuditRecord,
+  type QuoteVerification,
 } from "../../src/contracts/query-tools.js";
 import { NORMALIZATION_VERSION, normalizeText, xhtmlToText } from "../../src/fidelity/index.js";
 import { loadEmaMapping } from "../../src/fhir/mapping.js";
-import { APPROVER_ROLE_SYSTEM } from "../../src/fhir/provenance.js";
+import { isComposition } from "../../src/fhir/types.js";
+import { APPROVAL_CONTENT_EXTENSION_URL, APPROVER_ROLE_SYSTEM } from "../../src/fhir/provenance.js";
 import { sha256, sha256Utf8, stableUuid } from "../../src/lib/hash.js";
 import type { EntitlementDirectory } from "../../src/query/entitlements.js";
 import { FIND_PRODUCT_CONCURRENCY, FIND_PRODUCT_SCAN_HORIZON } from "../../src/query/tools.js";
@@ -26,6 +28,7 @@ import {
   PRINCIPAL_B,
   SECTION_KEY,
   SERVICE_VERSION,
+  TYPOGRAPHY_DIV,
   TYPOGRAPHY_SECTION_KEY,
   VERSION_ID,
   allNarratives,
@@ -34,6 +37,7 @@ import {
   connectHarness,
   entitlementDirectory,
   narrativeDivOf,
+  withNarratives,
   type Harness,
   type QueryStore,
   type SeededDocument,
@@ -138,10 +142,13 @@ describe("ePI query service, phase 1", () => {
         return QuoteVerificationSchema.parse(answer.structured);
       };
 
-      // A fragment of a section of the document the pipeline published.
+      // A fragment of a section of the document the pipeline published: whole words from the
+      // middle of it, because a quote that begins or ends inside a word is not a match.
       const text = normalizeText(xhtmlToText(narrativeDivOf(store, store.bundleIdA, SECTION_KEY)));
-      const fragment = text.slice(10, 40).trim();
-      const offset = text.indexOf(fragment);
+      const words = text.split(" ");
+      const fragment = words.slice(1, 6).join(" ");
+      const offset = (words[0] ?? "").length + 1;
+      expect(text.indexOf(fragment)).toBe(offset);
       expect(offset).toBeGreaterThan(0);
       const match = await verify(fragment, SECTION_KEY, store.bundleIdA);
       expect(match.result).toBe("match");
@@ -208,7 +215,7 @@ describe("ePI query service, phase 1", () => {
       for (const text of [first, last]) {
         const answer = await callTool(harness, "verify_quote", {
           bundleId: store.bundleIdA,
-          quote: text.slice(0, 30),
+          quote: text.split(" ").slice(0, 4).join(" "),
         });
         const parsed = QuoteVerificationSchema.parse(answer.structured);
         expect(parsed.result).toBe("match");
@@ -291,6 +298,246 @@ describe("ePI query service, phase 1", () => {
       expect(record.versionId).toBe(VERSION_ID);
     } finally {
       await harness.close();
+    }
+  });
+
+  // The publishing gate lets a span omit words but never begin or end inside one
+  // (docs/fidelity-normalization.md section 6), and verify_quote claims the gate's rules. A
+  // quote cut inside a word is therefore no-match, even though its characters are a slice of
+  // the section: a truncated number or unit is exactly the near miss a reviewer must see.
+  it("a quote matches as whole words only", async () => {
+    const verifyIn = async (
+      harness: Harness,
+      quote: string,
+      sourceKey: string | undefined,
+    ): Promise<QuoteVerification> => {
+      const answer = await callTool(harness, "verify_quote", {
+        bundleId: store.bundleIdTypography,
+        ...(sourceKey === undefined ? {} : { sourceKey }),
+        quote,
+      });
+      expect(answer.isError).toBe(false);
+      return QuoteVerificationSchema.parse(answer.structured);
+    };
+
+    // The label says "The sponsor\u2019s first dose is 5 mg/m\u00b2 daily."
+    const label = await harnessFor(PRINCIPAL_A);
+    try {
+      const text = normalizeText(xhtmlToText(TYPOGRAPHY_DIV));
+
+      // Each of these is a slice of it that begins or ends inside a word — a unit cut before
+      // its superscript, a lone letter, a fragment straddling two words, and a unit cut at the
+      // slash — and none is confirmed.
+      for (const cut of ["first dose is 5 mg/m", "e", "s first d", "5 mg/"]) {
+        expect(text.includes(cut)).toBe(true);
+        const answer = await verifyIn(label, cut, TYPOGRAPHY_SECTION_KEY);
+        expect([cut, answer.result]).toEqual([cut, "no-match"]);
+        expect(answer.match).toBeUndefined();
+      }
+
+      // Whole words match: in the middle of the section, at its very start, at its very end,
+      // and ending just before punctuation — whether it closes a word or a sentence.
+      for (const whole of [
+        "first dose is 5 mg/m\u00b2",
+        "The sponsor",
+        "daily.",
+        "5 mg/m\u00b2 daily",
+        "sponsor",
+      ]) {
+        const answer = await verifyIn(label, whole, TYPOGRAPHY_SECTION_KEY);
+        expect([whole, answer.result]).toEqual([whole, "match"]);
+        expect([whole, answer.match?.startOffset]).toEqual([whole, text.indexOf(whole)]);
+      }
+      const start = await verifyIn(label, "The sponsor", TYPOGRAPHY_SECTION_KEY);
+      expect(start.match?.startOffset).toBe(0);
+      const end = await verifyIn(label, "daily.", TYPOGRAPHY_SECTION_KEY);
+      expect(end.match?.endOffset).toBe(Array.from(text).length);
+
+      // One audit record per call, as always.
+      expect(label.audits).toHaveLength(11);
+    } finally {
+      await label.close();
+    }
+
+    // Wording the synthetic submission does not carry: a dose limit in one section, and in a
+    // later section a quote whose first occurrence is inside a longer number and whose second
+    // is whole. The mathematical bold capital A is a letter outside the Basic Multilingual
+    // Plane, so a word boundary has to be judged on a code point, not on half of a surrogate
+    // pair.
+    const seeded = store.documents.get(store.bundleIdTypography);
+    if (seeded === undefined) throw new Error("expected a seeded document");
+    const limits = "Adults: max 100 mg daily. Children: max 10 mg daily. Code \u{1D400}5 mg.";
+    const bundle = withNarratives(seeded.bundle, {
+      [TYPOGRAPHY_SECTION_KEY]:
+        '<div xmlns="http://www.w3.org/1999/xhtml"><p>Do not exceed max 100 mg daily.</p></div>',
+      [SECTION_KEY]: `<div xmlns="http://www.w3.org/1999/xhtml"><p>${limits}</p></div>`,
+    });
+    const composition = bundle.entry[0]?.resource;
+    if (composition === undefined || !isComposition(composition)) {
+      throw new Error("expected a Composition");
+    }
+    // The section holding only the cut occurrence comes first in the document, so a search
+    // across sections meets it before the whole one.
+    const order = JSON.stringify(composition.section);
+    expect(order.indexOf(stableUuid("ema-qrd-section", TYPOGRAPHY_SECTION_KEY))).toBeLessThan(
+      order.indexOf(stableUuid("ema-qrd-section", SECTION_KEY)),
+    );
+
+    const harness = await harnessFor(
+      PRINCIPAL_A,
+      new Map([[store.bundleIdTypography, { ...seeded, bundle }]]),
+    );
+    try {
+      // A truncated number: "max 10" is a slice of "max 100 mg" and is not what it says.
+      const truncated = await verifyIn(harness, "max 10", TYPOGRAPHY_SECTION_KEY);
+      expect(truncated.result).toBe("no-match");
+      expect(truncated.match).toBeUndefined();
+
+      // Within one section: the first occurrence is inside "max 100", the later one is whole,
+      // and the later one is the match, at its own code-point offset.
+      const whole = limits.lastIndexOf("max 10");
+      expect(limits.indexOf("max 10")).toBeLessThan(whole);
+      const later = await verifyIn(harness, "max 10", SECTION_KEY);
+      expect(later.result).toBe("match");
+      expect(later.match?.startOffset).toBe(whole);
+      expect(later.match?.endOffset).toBe(whole + "max 10".length);
+
+      // Across sections: with no section named, the cut occurrence in the earlier section does
+      // not end the search, and the whole one in the later section answers.
+      const anywhere = await verifyIn(harness, "max 10", undefined);
+      expect(anywhere.result).toBe("match");
+      expect(anywhere.match?.sourceKey).toBe(SECTION_KEY);
+      expect(anywhere.match?.startOffset).toBe(whole);
+
+      // A letter outside the Basic Multilingual Plane is still a letter: "5 mg" after it begins
+      // inside a word.
+      expect((await verifyIn(harness, "5 mg", SECTION_KEY)).result).toBe("no-match");
+
+      expect(harness.audits).toHaveLength(4);
+    } finally {
+      await harness.close();
+    }
+  });
+
+  // Nothing yet binds a stored version to its own approval: the Provenance names the Bundle
+  // without a version, so the newest approval is the only one the store can find. A caller who
+  // names an earlier version must not be handed that approval as if it were the version's own.
+  it("an earlier version is never given a later version's approval", async () => {
+    const seeded = store.documents.get(store.bundleIdA);
+    if (seeded?.provenance === undefined) throw new Error("expected a seeded, approved document");
+    const version1 = seeded.bundle;
+    expect(version1.meta?.versionId).toBe(VERSION_ID);
+    const version2 = {
+      ...structuredClone(version1),
+      meta: { ...version1.meta, versionId: "2", lastUpdated: "2026-09-21T09:00:00.000Z" },
+    };
+    // Version 2's approval: its own id and its own approved-content hash.
+    const approval2 = {
+      ...structuredClone(seeded.provenance),
+      id: stableUuid("ingestion-provenance", "version-2"),
+      recorded: "2026-09-21T08:59:00.000Z",
+      extension: [
+        {
+          url: APPROVAL_CONTENT_EXTENSION_URL,
+          valueString: sha256Utf8("version 2 approved content"),
+        },
+      ],
+    };
+    const documents = new Map<string, SeededDocument>([
+      [store.bundleIdA, { bundle: version2, provenance: approval2, history: [version1] }],
+    ]);
+
+    // Version 1, named: get_provenance cannot say which approval is version 1's, so it answers
+    // `unavailable` — with or without a section — and does not search for one.
+    const earlier = await harnessFor(PRINCIPAL_A, documents);
+    try {
+      for (const args of [
+        { bundleId: store.bundleIdA, versionId: VERSION_ID },
+        { bundleId: store.bundleIdA, versionId: VERSION_ID, sourceKey: SECTION_KEY },
+      ]) {
+        const answer = await callTool(earlier, "get_provenance", args);
+        expect(answer.isError).toBe(true);
+        expect(answer.structured).toEqual({ tool: "get_provenance", error: "unavailable" });
+      }
+      // get_section still answers version 1 verbatim, but without a Provenance reference.
+      const section = await callTool(earlier, "get_section", {
+        bundleId: store.bundleIdA,
+        versionId: VERSION_ID,
+        sourceKey: SECTION_KEY,
+      });
+      expect(section.isError).toBe(false);
+      const content = SectionContentSchema.parse(section.structured);
+      expect(content.document.versionId).toBe(VERSION_ID);
+      expect("provenanceResourceId" in section.structured).toBe(false);
+      expect(JSON.stringify(section.structured).includes(approval2.id)).toBe(false);
+
+      // No approval was even looked for; the current version was read to find out.
+      expect(earlier.log.provenance).toEqual([]);
+      expect(earlier.log.bundles).toEqual(
+        Array.from({ length: 3 }, () => [
+          `${store.bundleIdA}/_history/${VERSION_ID}`,
+          store.bundleIdA,
+        ]).flat(),
+      );
+      // One record per call, each naming the version actually read.
+      expect(earlier.audits.map(({ outcome, versionId }) => [outcome, versionId])).toEqual([
+        ["unavailable", VERSION_ID],
+        ["unavailable", VERSION_ID],
+        ["ok", VERSION_ID],
+      ]);
+    } finally {
+      await earlier.close();
+    }
+
+    // The current version — named, or not named — is answered as before, with its approval.
+    const current = await harnessFor(PRINCIPAL_A, documents);
+    try {
+      for (const selector of [{ versionId: "2" }, {}]) {
+        const provenance = await callTool(current, "get_provenance", {
+          bundleId: store.bundleIdA,
+          ...selector,
+        });
+        expect(provenance.isError).toBe(false);
+        const detail = ProvenanceDetailSchema.parse(provenance.structured);
+        expect(detail.document.versionId).toBe("2");
+        expect(detail.provenanceResourceId).toBe(approval2.id);
+        expect(detail.approvedContentSha256).toBe(sha256Utf8("version 2 approved content"));
+
+        const section = await callTool(current, "get_section", {
+          bundleId: store.bundleIdA,
+          sourceKey: SECTION_KEY,
+          ...selector,
+        });
+        const content = SectionContentSchema.parse(section.structured);
+        expect(content.document.versionId).toBe("2");
+        expect(content.provenanceResourceId).toBe(approval2.id);
+      }
+      expect(current.audits.map(({ outcome }) => outcome)).toEqual(["ok", "ok", "ok", "ok"]);
+    } finally {
+      await current.close();
+    }
+
+    // Naming a version costs one more read, so it is budgeted like the others: two reads are
+    // not enough for a get_section of a named version, and the call is `unavailable` rather
+    // than an answer missing its Provenance reference for a reason the caller cannot see.
+    const budgeted = await connectHarness({
+      store,
+      principal: PRINCIPAL_A,
+      entitlements: directory.entitlementsFor(PRINCIPAL_A),
+      documents,
+      readBudget: 2,
+    });
+    try {
+      const answer = await callTool(budgeted, "get_section", {
+        bundleId: store.bundleIdA,
+        versionId: "2",
+        sourceKey: SECTION_KEY,
+      });
+      expect(answer.structured).toEqual({ tool: "get_section", error: "unavailable" });
+      expect(budgeted.log.provenance).toEqual([]);
+      expect(onlyAudit(budgeted.audits).outcome).toBe("unavailable");
+    } finally {
+      await budgeted.close();
     }
   });
 

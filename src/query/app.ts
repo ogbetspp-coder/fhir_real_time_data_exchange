@@ -295,7 +295,7 @@ export function createMcpServer(deps: McpServerDeps): McpServer {
     "get_section",
     {
       title: "Get one section, verbatim",
-      description: `Return one QRD section of a document exactly as it rests in the store: the XHTML narrative, its normalised plain text, both SHA-256 hashes, and the document version they came from. Nothing is summarised or rewritten. ${CONTENT_WARNING}`,
+      description: `Return one QRD section of a document exactly as it rests in the store: the XHTML narrative, its normalised plain text, both SHA-256 hashes, the document version they came from, and — for the document's current version only — its Provenance reference. Nothing is summarised or rewritten. ${CONTENT_WARNING}`,
       inputSchema: GetSectionInputSchema.shape,
       outputSchema: SectionContentSchema.shape,
       annotations: READ_ONLY,
@@ -307,7 +307,7 @@ export function createMcpServer(deps: McpServerDeps): McpServer {
     "get_provenance",
     {
       title: "Prove where a document came from",
-      description: `Return the persisted provenance of a document: source document hash, extractor and model identities, fidelity report hash, approver and approval content hash, and — when a section is named — that section's hashes recomputed live from the stored narrative. ${CONTENT_WARNING}`,
+      description: `Return the persisted provenance of a document: source document hash, extractor and model identities, fidelity report hash, approver and approval content hash, and — when a section is named — that section's hashes recomputed live from the stored narrative. Answered for the document's current version only; a named earlier version is unavailable, because its own approval cannot yet be told apart from a later one. ${CONTENT_WARNING}`,
       inputSchema: GetProvenanceInputSchema.shape,
       outputSchema: ProvenanceDetailSchema.shape,
       annotations: READ_ONLY,
@@ -319,7 +319,7 @@ export function createMcpServer(deps: McpServerDeps): McpServer {
     "verify_quote",
     {
       title: "Is this quote what the label says?",
-      description: `Compare a quote with the stored narrative under the same normalisation the publishing gate uses, and answer match — with the section and code-point offsets — or no-match. Never a paraphrase, never a suggested correction. ${CONTENT_WARNING}`,
+      description: `Compare a quote with the stored narrative under the same normalisation the publishing gate uses, and answer match — with the section and code-point offsets — or no-match. A quote matches only as whole words: one that begins or ends inside a word of the section ("5 mg/m" against "5 mg/m²") is no-match. Never a paraphrase, never a suggested correction. ${CONTENT_WARNING}`,
       inputSchema: VerifyQuoteInputSchema.shape,
       outputSchema: QuoteVerificationSchema.shape,
       annotations: READ_ONLY,

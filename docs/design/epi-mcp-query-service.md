@@ -326,7 +326,10 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
   its whole JSON-RPC batch (`REQUEST_READ_BUDGET`), shared by every tool call in it. Without it
   the batch cap (8) times the `find_product` horizon (200) would allow 1,600 Bundle reads in one
   request. `find_product` stops scanning when the budget is spent and reports `truncated: true`;
-  every other tool answers `unavailable` rather than reading. The budget is checked after the
+  every other tool answers `unavailable` rather than reading. A `get_section` costs two reads
+  (the Bundle and the Provenance search), three when it names a version (the current version is
+  read too, and a version that is not current skips the Provenance search); a `get_provenance`
+  the same. The budget is checked after the
   entitlement decision, so an exhausted budget never turns a `not-entitled` record into an
   `unavailable` one. It is not a per-principal limit: a caller may send many requests.
 - **Reads** go to the validated FHIR store only, by REST, as the worker's own client does.
@@ -350,7 +353,20 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
   character the normalisation forbids — is `document-not-found` to the caller and
   `not-entitled` in the record. It then counts `sectionsSearched` as the number of candidate
   sections that carry a narrative, normalises each candidate's text in turn, stops at the first
-  match, and hashes only the matched section's text.
+  match, and hashes only the matched section's text. A match is whole words only: an occurrence
+  counts when it neither begins nor ends inside a word — the code point before it and the code
+  point after it are each absent or not a word character, under `isWordCharacter`, the fidelity
+  library's own definition — which is the publishing gate's rule for a section's span edges
+  (`docs/fidelity-normalization.md` section 6: a span "may omit words but never begin or end
+  inside one"). So "first dose is 5 mg/m" against "first dose is 5 mg/m² daily", "max 10"
+  against "max 100 mg", and "5 mg/" against "5 mg/m²" are all `no-match`; a quote that ends
+  before punctuation, or at a section's start or end, still matches. An occurrence that cuts a
+  word does not end the search: a later whole-word occurrence, in the same section or a later
+  one, is the match, at its own code-point offsets. Until 2026-09-22 the search was a plain
+  substring test and confirmed all three examples above; the repository review of that date
+  found it. The agent's post-check splits a block only at U+0020, so its chunks already end on
+  word boundaries; a single token longer than the whole 2,000-unit window, which it cuts at the
+  hard limit, is now `no-match` — fail closed.
 - **Provenance is document-level.** The persisted `Provenance` resource carries the source
   document hash, the fidelity report hash, the approved-content hash, extractor and model
   identities, the approver's identity, and — on the attester agent's `role`, under
@@ -363,6 +379,27 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
   verify an answer against the store; the comparison against the _approved_ record (the
   per-section hashes in the ingestion-provenance evidence object) needs an evidence-bucket
   read and is phase 2.
+- **An approval is stated only for the current version (interim).** Nothing in the store binds
+  a stored version to its own approval: the Provenance `target` is `Bundle/<id>` with no
+  version, and the stored Bundle does not name its Provenance. The search sorted by
+  `-recorded` therefore finds the document's newest approval, which is the current version's
+  because the worker writes an approved version and its Provenance in one transaction — and is
+  some other version's for every earlier one. Until 2026-09-22 a request naming version 1 of a
+  document that has a version 2 was answered with version 2's Provenance id,
+  `approvedContentSha256` and approver: a superseded label cited with the wrong approval. The
+  repository review of that date found it. Now, when a caller names a `versionId`, the service
+  reads the document's current version as well (one more store read, from the same budget) and
+  compares; if the named version is not the current one, `get_provenance` answers
+  `unavailable` — the closed code it already gives for an approval it cannot state in full —
+  without searching for a Provenance, and `get_section` answers the section verbatim with no
+  `provenanceResourceId`. A document that no longer answers a plain read counts as not current.
+  With no `versionId`, or the current one, the behaviour is unchanged. This is fail-closed, not
+  a binding: the binding of a version to its approval belongs to the approval design
+  (`docs/vision.md`, "The order", item 2), and two gaps stay open until it lands. A current
+  version written without an approval — by the `fixture` or `healthcare-api` run source, which
+  bypass the gate — is still answered with the previous version's newest approval, because
+  nothing distinguishes it; and a version published between the service's reads can be
+  answered with the newer approval.
 - **Transport** is the Model Context Protocol streamable-HTTP transport from the official SDK,
   pinned, in stateless mode so Cloud Run can scale it. Tool descriptions state that content
   fields are document text, never instructions. Tool failures are returned as `isError: true`
@@ -416,8 +453,8 @@ stage: "query-http", event: "deadline" | "client-closed", principal: <sub>` with
 Each of these is an acceptance criterion for phase 1 — it exists as a named test under
 `test/query/`, except 18 and 28, which hold the repository's own scripts to what this note says
 about them and live in `test/ci/` — and each is also a demonstration. The first seven are the
-original criteria; the rest were added with the three adversarial reviews of 2026-09-20 and pin
-the behaviour described above.
+original criteria; the rest were added with the three adversarial reviews of 2026-09-20 — and
+29 and 30 with the repository review of 2026-09-22 — and pin the behaviour described above.
 
 1. **Verbatim with citations.** `get_section` returns the stored narrative byte for byte, with
    `narrativeDivSha256` and `normalizedTextSha256` that the test recomputes independently
@@ -576,6 +613,22 @@ alpine` with a `RUN --mount ... from=alpine`, and a `FROM node:...@<digest> AS n
     is not the worker URL — and with one that carries no decodable audience at all — the seed
     script exits 1 naming `WORKER_ID_TOKEN` and the impersonation command, before any request;
     a token whose audience is the worker URL is not stopped. (`test/ci/demo-seed-token.test.ts`)
+29. **A quote matches as whole words only.** Against "The sponsor’s first dose is 5 mg/m²
+    daily.", "first dose is 5 mg/m", "e", "s first d" and "5 mg/" are `no-match`, and so is
+    "max 10" against "max 100 mg"; whole words match at the section's start, in its middle, at
+    its end and before punctuation; where the first occurrence of "max 10" is inside "max 100"
+    and a later one is whole, the later one is the match at its own offset, in the same section
+    and — with no section named — in a later section; a letter outside the Basic Multilingual
+    Plane is judged as one code point. (`acceptance.test.ts`, "a quote matches as whole words
+    only")
+30. **An earlier version is never given a later version's approval.** Over a store holding
+    version 1 in history and version 2 current with its own approval, `get_provenance` for
+    version 1 answers `unavailable` with and without a section, `get_section` for version 1
+    answers verbatim with no `provenanceResourceId`, and no Provenance search is made; version 2,
+    named or not, is answered with its own approval by both tools; each call writes one record
+    naming the version it read; and two reads are not enough for a `get_section` of a named
+    version. (`acceptance.test.ts`, "an earlier version is never given a later version's
+    approval")
 
 ## Security properties stated honestly
 
@@ -723,6 +776,17 @@ precisely so entitlements can be granted by a role separate from the developer.
   audit promise holds for every argument shape. Decided 2026-09-20.
 - The image-pinning gate covers `COPY --from`, `ADD --from` and `RUN --mount ... from=` as well
   as `FROM`, and has its own negative fixture test. Decided 2026-09-20.
+- `verify_quote` matches whole words only, by the publishing gate's span-edge rule and the
+  fidelity library's own `isWordCharacter` (re-exported from `src/fidelity/index.ts`, not
+  copied), and keeps searching past an occurrence that cuts a word. `QUERY_TOOLS_VERSION`
+  stays `2.0.0`: the published schema is byte-identical — only the tool description and a
+  source comment changed — and a `match` now promises strictly more than before, as the
+  `truncated` widening of 2026-09-20 did without a bump. Decided 2026-09-22.
+- An approval is attached only to the version the store currently serves as the document; a
+  named earlier version gets `unavailable` from `get_provenance` and no `provenanceResourceId`
+  from `get_section`. Interim, fail-closed, until the approval design binds a version to its
+  approval. `unavailable` was chosen over `version-not-found` because the version exists and
+  is served; what cannot be given is its approval. Decided 2026-09-22.
 - A pre-transport refusal is a 400 with no detail, and the warning it writes carries no field
   derived from the body's content — only how many JSON-RPC messages the body held, and that
   only when the body was parsed. A refusal must not become a way to have the service echo

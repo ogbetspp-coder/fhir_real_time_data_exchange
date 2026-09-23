@@ -22,7 +22,12 @@ import {
   type SectionContent,
   type VerifyQuoteInput,
 } from "../contracts/query-tools.js";
-import { NORMALIZATION_VERSION, normalizeText, xhtmlToText } from "../fidelity/index.js";
+import {
+  NORMALIZATION_VERSION,
+  isWordCharacter,
+  normalizeText,
+  xhtmlToText,
+} from "../fidelity/index.js";
 import type { EmaMapping, SectionRule } from "../fhir/mapping.js";
 import {
   APPROVAL_CONTENT_EXTENSION_URL,
@@ -192,6 +197,43 @@ function codePointLength(text: string): number {
   return Array.from(text).length;
 }
 
+// The code point that ends just before UTF-16 index `index`, or undefined at the start of the
+// text. Normalised text never holds a lone surrogate (spec section 2), so a low surrogate here
+// is always the second half of a pair.
+function codePointBefore(text: string, index: number): string | undefined {
+  if (index <= 0) return undefined;
+  const unit = text.charCodeAt(index - 1);
+  const start = unit >= 0xdc00 && unit <= 0xdfff && index >= 2 ? index - 2 : index - 1;
+  return text.slice(start, index);
+}
+
+// The code point that starts at UTF-16 index `index`, or undefined at the end of the text.
+function codePointAtIndex(text: string, index: number): string | undefined {
+  const codePoint = text.codePointAt(index);
+  return codePoint === undefined ? undefined : String.fromCodePoint(codePoint);
+}
+
+// Where `quote` occurs in `text` without beginning or ending inside a word, as a UTF-16 index,
+// or -1. This is the publishing gate's rule for a section's span edges (docs/fidelity-
+// normalization.md section 6: a span "may omit words but never begin or end inside one"),
+// under the gate's own definition of a word character: the code point before the occurrence
+// and the code point after it must each be absent or not a word character. So "5 mg/m"
+// against "5 mg/m² daily", "max 10" against "max 100 mg", and "5 mg/" against "5 mg/m²" are
+// all refused — a truncated number or unit is exactly the near miss this tool exists to catch.
+// An occurrence that cuts a word does not end the search: a later whole-word occurrence of the
+// same text still matches. The soft-hyphen clauses of the gate's rule have nothing to act on
+// here, because normalisation has already removed every U+00AD.
+function findWholeWordOccurrence(text: string, quote: string): number {
+  for (let found = text.indexOf(quote); found >= 0; found = text.indexOf(quote, found + 1)) {
+    const before = codePointBefore(text, found);
+    const after = codePointAtIndex(text, found + quote.length);
+    const cutsBefore = before !== undefined && isWordCharacter(before);
+    const cutsAfter = after !== undefined && isWordCharacter(after);
+    if (!cutsBefore && !cutsAfter) return found;
+  }
+  return -1;
+}
+
 // --- document loading --------------------------------------------------------------------------
 
 type LoadedDocument = {
@@ -268,6 +310,38 @@ function resolved(loaded: LoadedDocument): Resolved {
   return { bundleId: loaded.document.bundleId, versionId: loaded.document.versionId };
 }
 
+// --- which version an approval belongs to -------------------------------------------------------
+
+// Nothing in the store yet binds a stored version to its own approval: the Provenance target
+// is `Bundle/<id>`, unversioned, and the stored Bundle does not point at its Provenance. The
+// newest approval of a document is the current version's only because the worker writes an
+// approved version and its approval in one transaction. For any earlier version it is another
+// version's approval — a request for version 1 of a document that has a version 2 would be
+// answered with version 2's approver and approved-content hash. Until the approval design binds
+// a version to its approval (docs/vision.md, "The order", item 2), an approval is attached only
+// to the version the store currently serves as the document; for any other the service says
+// nothing about approval rather than the wrong thing. (The converse — a current version
+// written without an approval, by a run source that bypasses the gate, under an older
+// version's approval — is not closed by this; see the design note.)
+//
+// `current`: no version was named (loadDocument read the current one), or the named version is
+// the current one. `superseded`: the store's current version is a different one, or the
+// document no longer answers a plain read. `out-of-budget`: finding out would have taken a
+// read the request no longer has.
+type VersionStanding = "current" | "superseded" | "out-of-budget";
+
+async function versionStanding(
+  context: ToolContext,
+  selector: DocumentSelector,
+  loaded: LoadedDocument,
+): Promise<VersionStanding> {
+  if (selector.versionId === undefined) return "current";
+  // The current version is one more store read, so it takes from the budget like any other.
+  if (!context.readBudget.take()) return "out-of-budget";
+  const current = await context.reader.readBundle(selector.bundleId);
+  return current?.meta?.versionId === loaded.document.versionId ? "current" : "superseded";
+}
+
 // --- get_section --------------------------------------------------------------------------------
 
 export async function getSection(
@@ -291,12 +365,21 @@ export async function getSection(
   const narrative = narrativeOf(located.section);
   if (narrative === undefined) return fail("get_section", "section-not-found", at);
 
-  // The provenance lookup is a second store read, so it takes from the budget too. When the
-  // budget is out the whole call is `unavailable` rather than an answer whose optional
-  // `provenanceResourceId` is missing for a reason the caller cannot see.
-  if (!context.readBudget.take()) return fail("get_section", "unavailable", at);
-  const provenance = await context.reader.findProvenanceForBundle(input.bundleId);
-  const provenanceId = Uuid.safeParse(provenance?.id);
+  // The provenance lookup is a second store read (a third, when a version was named and its
+  // standing has to be read), so it takes from the budget too. When the budget is out the whole
+  // call is `unavailable` rather than an answer whose optional `provenanceResourceId` is missing
+  // for a reason the caller cannot see. A version that is not the current one gets no
+  // `provenanceResourceId` at all: the only approval the store can name is the newest, and it
+  // is not that version's.
+  const standing = await versionStanding(context, input, loaded);
+  if (standing === "out-of-budget") return fail("get_section", "unavailable", at);
+  let provenanceResourceId: string | undefined;
+  if (standing === "current") {
+    if (!context.readBudget.take()) return fail("get_section", "unavailable", at);
+    const provenance = await context.reader.findProvenanceForBundle(input.bundleId);
+    const provenanceId = Uuid.safeParse(provenance?.id);
+    if (provenanceId.success) provenanceResourceId = provenanceId.data;
+  }
 
   const content = SectionContentSchema.safeParse({
     document: loaded.document,
@@ -305,7 +388,7 @@ export async function getSection(
     title: located.section.title,
     ...narrative,
     normalizationVersion: NORMALIZATION_VERSION,
-    ...(provenanceId.success ? { provenanceResourceId: provenanceId.data } : {}),
+    ...(provenanceResourceId === undefined ? {} : { provenanceResourceId }),
     contentNotice: "document-content-not-instructions",
   });
   if (!content.success) return fail("get_section", "unavailable", at);
@@ -391,7 +474,13 @@ export async function getProvenance(
   if (isOutcome(loaded)) return loaded;
   const at = resolved(loaded);
 
-  // The provenance lookup is a second store read and takes from the request's budget.
+  // A version that is not the current one cannot be tied to its own approval yet, and the
+  // newest approval is not it: the answer is `unavailable` — the closed code this tool already
+  // gives for an approval it cannot state in full — and the Provenance search is not made.
+  const standing = await versionStanding(context, input, loaded);
+  if (standing !== "current") return fail("get_provenance", "unavailable", at);
+
+  // The provenance lookup is one more store read and takes from the request's budget.
   if (!context.readBudget.take()) return fail("get_provenance", "unavailable", at);
   const resource = await context.reader.findProvenanceForBundle(input.bundleId);
   if (resource === undefined) return fail("get_provenance", "unavailable", at);
@@ -508,12 +597,12 @@ export async function verifyQuote(
   // not the search stopped early: it describes the scope of the answer, not the work done.
   const sectionsSearched = candidates.length;
 
-  // The search normalises each section's text and stops at the first match; only the matched
-  // section's text is hashed.
+  // The search normalises each section's text and stops at the first whole-word match; only
+  // the matched section's text is hashed.
   let match: QuoteVerification["match"];
   for (const candidate of candidates) {
     const text = normalizeText(xhtmlToText(candidate.div));
-    const found = text.indexOf(normalizedQuote);
+    const found = findWholeWordOccurrence(text, normalizedQuote);
     if (found < 0) continue;
     // Offsets are code points in the section's normalised text, as every offset in this
     // repository is (ADR 0002), not UTF-16 indices.

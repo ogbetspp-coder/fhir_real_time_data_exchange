@@ -149,6 +149,8 @@ export const SectionContentSchema = z
     narrativeDivSha256: Sha256Hex,
     normalizedTextSha256: Sha256Hex,
     normalizationVersion: NormalizationVersion,
+    // Given for the document's current version only: nothing yet binds an earlier version to
+    // its own approval, and the newest approval is not it.
     provenanceResourceId: Uuid.optional(),
     contentNotice: ContentNotice,
   })
@@ -210,8 +212,10 @@ export const QuoteVerificationSchema = z
     document: DocumentRefSchema,
     // `match`: the normalised quote is a contiguous slice of a section's normalised text under
     // the same normalisation the publishing gate uses — so case, quotation marks, dashes, and
-    // superscripts all still have to agree. Anything else is `no-match`; the service does not
-    // guess at near misses, because a near miss is exactly what a reviewer must see for
+    // superscripts all still have to agree — and the slice neither begins nor ends inside a
+    // word, by the gate's own rule for span edges (docs/fidelity-normalization.md section 6), so
+    // "max 10" is not confirmed by "max 100 mg". Anything else is `no-match`; the service does
+    // not guess at near misses, because a near miss is exactly what a reviewer must see for
     // themselves.
     result: z.enum(["match", "no-match"]),
     normalizationVersion: NormalizationVersion,

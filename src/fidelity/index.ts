@@ -3,6 +3,7 @@ export {
   NormalizationError,
   countWords,
   findForbiddenCharacter,
+  isWordCharacter,
   normalizeText,
 } from "./normalize.js";
 export { XhtmlError, xhtmlToText, type XhtmlErrorCode } from "./xhtml.js";
