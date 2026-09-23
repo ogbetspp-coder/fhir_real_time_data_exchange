@@ -20,15 +20,15 @@
   },
   "summary": {
     "findings": {
-      "deviation": 2,
+      "deviation": 4,
       "document-quirk": 1,
       "formatting": 3,
       "heading-text": 2,
       "refused-section": 1
     },
     "statements": {
-      "absent": 56,
-      "deviation": 2,
+      "absent": 54,
+      "deviation": 4,
       "not-checkable": 8,
       "not-checked": 34,
       "used": 23
@@ -82,8 +82,32 @@
     },
     {
       "kind": "deviation",
+      "id": "smpc.4.2#2",
+      "similarity": 0.917,
+      "in": "4.2 Posology and method of administration > Posology",
+      "paragraph": 79,
+      "differences": [
+        {
+          "change": "insert",
+          "template": "",
+          "label": "and"
+        },
+        {
+          "change": "replace",
+          "template": "aged …",
+          "label": "and adolescents below 18"
+        },
+        {
+          "change": "insert",
+          "template": "",
+          "label": "of age"
+        }
+      ]
+    },
+    {
+      "kind": "deviation",
       "id": "smpc.4.7#0",
-      "similarity": 0.857,
+      "similarity": 0.923,
       "in": "4.7 Effects on ability to drive and use machines",
       "paragraph": 0,
       "differences": [
@@ -91,6 +115,20 @@
           "change": "replace",
           "template": "on",
           "label": "in"
+        }
+      ]
+    },
+    {
+      "kind": "deviation",
+      "id": "smpc.5.1#6",
+      "similarity": 0.968,
+      "in": "5.1 Pharmacodynamic properties",
+      "paragraph": 365,
+      "differences": [
+        {
+          "change": "replace",
+          "template": "in …",
+          "label": "for the treatment of lymphoplasmacytic lymphoma and for the treatment of mature B-cell neoplasms"
         }
       ]
     },
@@ -142,7 +180,7 @@
     },
     {
       "id": "smpc.4.2#2",
-      "status": "absent"
+      "status": "deviation"
     },
     {
       "id": "smpc.4.2#3",
@@ -259,7 +297,7 @@
       "in": "5.1 Pharmacodynamic properties",
       "paragraph": 0,
       "start": 0,
-      "end": 105
+      "end": 96
     },
     {
       "id": "smpc.5.1#1",
@@ -287,7 +325,7 @@
     },
     {
       "id": "smpc.5.1#6",
-      "status": "absent"
+      "status": "deviation"
     },
     {
       "id": "smpc.5.1#7",

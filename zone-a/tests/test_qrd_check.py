@@ -256,6 +256,9 @@ def test_brukinsa() -> None:
     assert _deviation(result, "smpc.4.7#0")["differences"] == [
         {"change": "replace", "template": "on", "label": "in"}
     ]
+    waiver = _deviation(result, "smpc.5.1#6")["differences"]
+    assert waiver[0]["template"] == "in \u2026"
+    assert waiver[0]["label"].startswith("for the treatment of")
 
 
 def test_jentadueto() -> None:
@@ -383,7 +386,9 @@ def test_differences_do_not_run_into_the_next_sentence_when_words_are_missing() 
 def test_a_statement_over_paragraphs_keeps_its_paragraph_breaks() -> None:
     entry = next(e for e in REGISTRY["appendices"]["I"]["entries"] if e["id"] == "pregnancy.4")
     paragraphs = [p.replace("{", "").replace("}", "") for p in entry["paragraphs"]]
-    rendered = _paragraphs(*(re.sub(r"[<>]|\[[^\]]*\]", "", p) for p in paragraphs))
+    # As a label writes it: no brackets, no guidance, no option letters.
+    written = (re.sub(r"^[AB] |[<>]|\[[^\]]*\]", "", p) for p in paragraphs)
+    rendered = _paragraphs(*(p for p in written if p.strip()))
     filler = _paragraphs(*(f"Unrelated paragraph {n}." for n in range(20)))
     result = check(document(smpc_4_6=filler + rendered), REGISTRY, MAPPING)
     assert status(result, "appendix-I#pregnancy.4") != "deviation"
@@ -480,16 +485,17 @@ def test_a_statement_opening_with_an_optional_paragraph_does_not_break_the_check
 
 
 def test_optional_segments_written_together_are_separated_by_a_space() -> None:
-    identifier = (
-        f"smpc.5.1#{_item_index('smpc.5.1', '<This medicinal product has been authorised under')}"
-    )
-    text = (
-        "This medicinal product has been authorised under \u2018exceptional circumstances\u2019. "
-        "This means that for scientific reasons it has not been possible to obtain complete "
-        "information on this medicinal product."
-    )
-    result = check(document(smpc_5_1=_paragraphs(text)), REGISTRY, MAPPING)
-    assert status(result, identifier) != "deviation"
+    prefix = "<This medicinal product has been authorised under \u2018exceptional"
+    identifier = f"smpc.5.1#{_item_index('smpc.5.1', prefix)}"
+    items = next(s for s in REGISTRY["sections"] if s["key"] == "smpc.5.1")["items"]
+    source = items[int(identifier.split("#")[1])]["source"]
+    # The statement as a label writes it, choosing only "for scientific reasons".
+    text = re.sub(r"\[[^\]]*\]", "", source).replace("<", "").replace(">", "")
+    text = text.replace("due to the rarity of the disease", "").replace("for ethical reasons", "")
+    text = re.sub(" +", " ", text)
+    paragraphs = _paragraphs(*(line.strip() for line in text.split("\n") if line.strip()))
+    result = check(document(smpc_5_1=paragraphs), REGISTRY, MAPPING)
+    assert status(result, identifier) == "used"
 
 
 def test_a_fill_in_followed_only_by_optional_text_takes_the_rest_of_the_line() -> None:
@@ -506,3 +512,105 @@ def test_struck_text_in_the_place_of_a_fill_in_is_a_difference() -> None:
     assert "deviation" in {
         s["status"] for s in result["statements"] if s["id"].startswith("appendix-III")
     }
+
+
+# --- review round 4 -----------------------------------------------------------------------
+
+
+def test_a_label_that_keeps_the_templates_plural_marker_is_used() -> None:
+    text = (
+        "Hypersensitivity to the active substance(s) or to any of the excipients listed in "
+        "section 6.1."
+    )
+    result = check(document(smpc_4_3=_paragraphs(text)), REGISTRY, MAPPING)
+    assert status(result, "smpc.4.3#0") == "used"
+
+
+@pytest.mark.parametrize(
+    ("key", "text", "difference"),
+    [
+        (
+            "smpc_6_4",
+            "Keep the bottle tightly closed in ordr to protect from light.",
+            {"change": "replace", "template": "order", "label": "ordr"},
+        ),
+        (
+            "smpc_4_3",
+            "Hypersensitivity to the active substance or to any of the excipient listed in "
+            "section 6.1 or lactose.",
+            {"change": "replace", "template": "excipients", "label": "excipient"},
+        ),
+    ],
+)
+def test_one_changed_word_beside_a_fill_in_is_a_deviation(
+    key: str, text: str, difference: dict[str, str]
+) -> None:
+    result = check(document(**{key: _paragraphs(text)}), REGISTRY, MAPPING)
+    differences = [d for f in findings(result, "deviation") for d in f["differences"]]
+    assert difference in differences
+
+
+def test_a_trailing_segment_with_no_words_of_its_own_does_not_take_the_next_paragraph() -> None:
+    paragraphs = _paragraphs(
+        "It is unknown whether Foo/metabolites are excreted in human milk.",
+        "A risk to the newborns/infants cannot be excluded.",
+        "Women should use contraception.",
+    )
+    result = check(document(smpc_4_6=paragraphs), REGISTRY, MAPPING)
+    used = next(s for s in result["statements"] if s["id"] == "appendix-I#lactation.2")
+    assert used["status"] == "used"
+    assert used.get("lastParagraph", used["paragraph"]) == 1
+
+
+def test_the_same_words_with_other_paragraph_breaks_are_a_layout_deviation() -> None:
+    text = (
+        "Traceability In order to improve the traceability of biological medicinal products, the "
+        "name and the batch number of the administered product should be clearly recorded."
+    )
+    result = check(document(smpc_4_4=_paragraphs(text)), REGISTRY, MAPPING)
+    identifier = f"smpc.4.4#{_item_index('smpc.4.4', '<Traceability')}"
+    assert _deviation(result, identifier)["differences"] == [
+        {"change": "layout", "template": "", "label": ""}
+    ]
+
+
+def test_appendix_i_option_letters_are_not_label_text() -> None:
+    paragraphs = _paragraphs(
+        "There are no or limited amount of data from the use of Zeta in pregnant women.",
+        "Studies in animals have shown reproductive toxicity (see section 5.3).",
+        "Zeta is not recommended during pregnancy and in women of childbearing potential not "
+        "using contraception.",
+    )
+    result = check(document(smpc_4_6=paragraphs), REGISTRY, MAPPING)
+    assert status(result, "appendix-I#pregnancy.4") == "used"
+
+
+def test_a_deviation_starts_where_the_resemblance_starts() -> None:
+    text = "Take care. " + DISPOSAL.replace("disposed of", "disposed")
+    result = check(document(smpc_6_6=_paragraphs(text)), REGISTRY, MAPPING)
+    identifier = f"smpc.6.6#{_item_index('smpc.6.6', '<Any unused')}"
+    assert _deviation(result, identifier)["differences"] == [
+        {"change": "delete", "template": "of", "label": ""}
+    ]
+
+
+def test_a_fill_in_next_to_punctuation_is_not_a_difference() -> None:
+    closing = (
+        "Detailed information on this medicinal product is available on the website of the "
+        "European Medicines Agency http://www.ema.europa.eu, and on the website of HPRA."
+    )
+    result = check(document(smpc_10=_paragraphs(closing)), REGISTRY, MAPPING)
+    assert _deviation(result, "document#1")["differences"] == [
+        {
+            "change": "replace",
+            "template": "https://www.ema.europa.eu,",
+            "label": "http://www.ema.europa.eu,",
+        }
+    ]
+
+
+def test_a_present_opening_segment_needs_its_break() -> None:
+    text = "It is unknown whether Foo/metabolites are excreted in human milk.A risk to the "
+    text += "newborns/infants cannot be excluded."
+    result = check(document(smpc_4_6=_paragraphs(text)), REGISTRY, MAPPING)
+    assert status(result, "appendix-I#lactation.2") != "used"

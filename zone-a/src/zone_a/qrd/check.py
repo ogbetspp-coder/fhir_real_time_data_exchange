@@ -9,25 +9,25 @@ the person can check it.
 Headings. Each section's code is looked up in the mapping. A section whose code the mapping
 knows must carry that section's heading: for a numbered section, one of the forms the registry
 allows (``zone_a.qrd.headings``); for a named subsection (Posology, Method of administration,
-Reporting of suspected adverse reactions), the mapping's title. Findings: ``missing-heading``
-(a required mapped section is not in the document), ``heading-text`` (the code is there with
-other wording), ``order`` (mapped sections out of the template's order), ``duplicate-section``
-and ``unmapped-code`` (an EMA code our mapping does not list, reported for information).
+Reporting of suspected adverse reactions), the mapping's title. Findings: ``missing-heading`` (a
+required mapped section is not in the document), ``heading-text`` (the code is there with other
+wording), ``order`` (mapped sections out of the template's order), ``duplicate-section`` and
+``unmapped-code`` (an EMA code our mapping does not list, reported for information).
 
-Statements. The registry's items are matched against the text of the section they belong to:
-its own paragraphs and the titles and paragraphs of its subsections, except subsections that
-are registry sections themselves (4.1 under 4), which are checked on their own. A named
-subsection such as Posology belongs to its section's text. Label text and template text are both
-compared after runs of space, tab and no-break space are collapsed to one space. Characters the
-reader marked struck through or faint are masked: no statement matches them. In a pattern:
+Statements. The registry's items are matched against the text of the section they belong to: its
+own paragraphs and the titles and paragraphs of its subsections, except subsections that are
+registry sections themselves (4.1 under 4), which are checked on their own. A named subsection
+such as Posology belongs to its section's text. Label text and template text are both compared
+after runs of space, tab and no-break space are collapsed to one space. Characters the reader
+marked struck through or faint are masked: no statement matches them. In a pattern:
 
 - literal text must appear exactly, word for word, with a space wherever the template has one
-  and a paragraph break wherever it has one (blank paragraphs fold into one break); the space
-  or break before an optional segment belongs to the segment ("above <25 C>" is "above 25 C" or
+  and a paragraph break wherever it has one (blank paragraphs fold into one break); the space or
+  break before an optional segment belongs to the segment ("above <25 C>" is "above 25 C" or
   "above", never "above25 C"); two segments the template writes together between letters are
   separated by a space, as a person writes them; nothing is required before the first word;
-- a fill-in (``{...}``) is any non-empty text of at most 300 characters within one paragraph
-  (as little as possible, except at the very end of the pattern, where it takes the rest of the
+- a fill-in (``{...}``) is any non-empty text of at most 300 characters within one paragraph (as
+  little as possible, except at the very end of the pattern, where it takes the rest of the
   line);
 - an optional segment (``<...>``) may be present or absent; a whole statement in ``<...>`` is
   matched on its content, since "absent" is the answer when it does not match;
@@ -36,31 +36,32 @@ reader marked struck through or faint are masked: no statement matches them. In 
 - "(s)" after a word is the template's choice of singular or plural: "substance(s)" matches
   "substance" and "substances".
 
-A statement spanning paragraphs (``<Traceability`` and the sentence under it) is matched
-against as many consecutive paragraphs. A statement that matches is ``used``, with where it
-matched: the section's path, the paragraph's index and the character offsets in the
-paragraph's text as the reader returned it (``lastParagraph`` when it runs over several). One
-that does not match but resembles a paragraph of its section (a word-level
-similarity of at least ``SIMILARITY``, difflib's ratio over a window of the paragraph as long as
-the statement, taking the statement as the closest choice of its optional segments writes it)
-is a ``deviation`` finding with the word-level differences; a person decides
-whether the wording was changed on purpose. The differences run from where the resemblance
-starts to the end of the sentence in which the statement's last matching word falls; text in
-the place of a fill-in is not a difference, and a run of struck or faint characters is shown
-as one word, ``HIDDEN_WORD``. A resemblance in the readable part of a section is reported even
-when another part was refused. Characters that an exact match of another statement of the same
-section or appendix explains are not compared again, so one statement matching exactly does not make
-its sibling a deviation, and the rest of the paragraph is still compared. A statement with no
-required literal text of at least ``MIN_LITERAL`` characters is ``not-checkable`` (too little
-to tell). A non-optional statement or subheading that is absent is a ``missing-statement`` or
-``missing-subheading`` finding.
+A statement spanning paragraphs (``<Traceability`` and the sentence under it) is matched against
+as many consecutive paragraphs. A statement that matches is ``used``, with where it matched: the
+section's path, the paragraph's index and the character offsets in the paragraph's text as the
+reader returned it (``lastParagraph`` when it runs over several). One that does not match but
+resembles a stretch of its section (at least ``SIMILARITY`` of its literal words, fill-ins left
+out, appear there in order, for the closest choice of its optional segments) is a ``deviation``
+finding with the word-level differences; the same words with other paragraph breaks are a
+``layout`` difference; a person decides whether the wording was changed on purpose. A paragraph
+that resembles several statements of one section or appendix is a deviation of the one it
+resembles most. The differences run from where the resemblance starts to the end of the sentence
+in which the statement's last matching word falls; text in the place of a fill-in is not a
+difference, and a run of struck or faint characters is shown as one word, ``HIDDEN_WORD``. A
+resemblance in the readable part of a section is reported even when another part was refused.
+Characters that an exact match of another statement of the same section or appendix explains are
+not compared again, so one statement matching exactly does not make its sibling a deviation, and
+the rest of the paragraph is still compared. A statement with no required literal text of at
+least ``MIN_LITERAL`` characters is ``not-checkable`` (too little to tell). A non-optional
+statement or subheading that is absent is a ``missing-statement`` or ``missing-subheading``
+finding.
 
-Sections the reader refused are ``refused-section`` findings. A statement not found in a
-section with a refused part is ``not-checked``, not ``absent``: it may be in the part that
-could not be read, and the checker never guesses around it. Defects the reader read through
-by a stated rule are ``xhtml-defect`` findings. Colour, shading, strike-through and faint marks
-over text are ``formatting`` findings: coloured, highlighted or struck text in a published SmPC
-is usually a left-over from review.
+Sections the reader refused are ``refused-section`` findings. A statement not found in a section
+with a refused part is ``not-checked``, not ``absent``: it may be in the part that could not be
+read, and the checker never guesses around it. Defects the reader read through by a stated rule
+are ``xhtml-defect`` findings. Colour, shading, strike-through and faint marks over text are
+``formatting`` findings: coloured, highlighted or struck text in a published SmPC is usually a
+left-over from review.
 """
 
 from __future__ import annotations
@@ -240,6 +241,30 @@ def _pieces(tokens: list[Token]) -> tuple[list[_Piece], str, str]:
     return out, leading or "", pending
 
 
+def _statement(pattern: list[Token]) -> list[_Piece]:
+    """The pieces of a registry statement, without Appendix I's option letters: a capital
+    letter alone at the start of a paragraph, before an optional segment ("A <Studies in
+    animals have shown ...>"), names an option; the label does not carry it."""
+    pieces = _pieces(_content(pattern))[0]
+    kept: list[_Piece] = []
+    for position, piece in enumerate(pieces):
+        letter = piece.kind == "text" and re.fullmatch("[A-Z]", piece.text) is not None
+        at_start = position == 0 or piece.joint == "\n"
+        before = position + 1 < len(pieces) and pieces[position + 1].kind == "optional"
+        if letter and at_start and before:
+            if position + 1 < len(pieces):
+                following = pieces[position + 1]
+                pieces[position + 1] = _Piece(
+                    _stronger(piece.joint, following.joint) if kept else "",
+                    following.kind,
+                    following.text,
+                    following.pieces,
+                )
+            continue
+        kept.append(piece)
+    return kept
+
+
 def _regex(pieces: list[_Piece], at_end: bool = True, opening: bool = True) -> str:
     """The pieces as a regular expression over collapsed text. An optional segment's joint is
     inside it, so an absent segment leaves no extra space or break. While every piece so far
@@ -252,12 +277,24 @@ def _regex(pieces: list[_Piece], at_end: bool = True, opening: bool = True) -> s
         rest_optional = all(later.kind == "optional" for later in pieces[position + 1 :])
         joint = {"": "", " ": " ", "\n": "\\n"}[piece.joint]
         if joint and opening and position:
-            joint += "?"
+            # The segments before may all be absent: then nothing is needed here but the start
+            # of the text or a space or break before it; if one is present, the joint is.
+            joint = f"(?:{joint}|(?<![^ \\n]))"
+        if (
+            piece.kind == "optional"
+            and at_end
+            and rest_optional
+            and not any(char.isalnum() for run in _required(list(piece.pieces)) for char in run)
+        ):
+            # A trailing segment with no word of its own ("<{name} <...> <...>.>") would take
+            # whatever text follows; it cannot be told from the next paragraph, so it is not
+            # matched.
+            continue
         if piece.kind == "text":
             # "(s)" is the template's choice of singular or plural ("substance(s)").
-            out.append(
-                joint + re.escape(piece.text).replace(r"\(s\)", "s?").replace(r"\(S\)", "S?")
-            )
+            text = re.escape(piece.text)
+            text = text.replace(r"\(s\)", r"(?:s|\(s\))?").replace(r"\(S\)", r"(?:S|\(S\))?")
+            out.append(joint + text)
         elif piece.kind == "fill":
             lazy = "" if at_end and rest_optional else "?"
             out.append(f"{joint}[^\\n{HIDDEN}{TAKEN}]{{1,{FILL_LIMIT}}}{lazy}")
@@ -299,7 +336,8 @@ def _plural(template: str, word: str) -> bool:
     """The word is the template's word with its "(s)" chosen one way or the other."""
     if not _PLURAL.search(template):
         return False
-    pattern = re.escape(template).replace(r"\(s\)", "s?").replace(r"\(S\)", "S?")
+    pattern = re.escape(template).replace(r"\(s\)", r"(?:s|\(s\))?")
+    pattern = pattern.replace(r"\(S\)", r"(?:S|\(S\))?")
     return re.fullmatch(pattern, word) is not None
 
 
@@ -544,26 +582,56 @@ def _words(text: str) -> list[str]:
     return out
 
 
-def _closest(
-    reference: list[str], lines: list[_Line], size: int
-) -> tuple[float, _Window, list[str], int] | None:
-    best: tuple[float, _Window, list[str], int] | None = None
-    length = len(reference)
+def _is_fill(word: str) -> bool:
+    return "\u2026" in word
+
+
+@dataclass(frozen=True)
+class _Near:
+    score: float
+    window: _Window
+    # The window's words, each with the index of the line it is on.
+    words: list[tuple[str, int]]
+    start: int
+    reference: list[str]
+
+
+def _closest(reference: list[str], lines: list[_Line], size: int) -> _Near | None:
+    """The stretch of text that holds most of the statement's literal words, in order.
+
+    The score is the share of the statement's literal words (fill-ins left out, since any text
+    may stand in their place) that the stretch holds in the statement's order. A stretch starts
+    at one of those words, in the first line of a window, and is as long as the statement and
+    half again."""
+    literal = [word for word in reference if not _is_fill(word)]
+    if len(literal) < 4:
+        return None
+    wanted = set(literal)
+    length = len(reference) + len(reference) // 2
+    best: _Near | None = None
     for window in _windows(lines, size):
-        words = _words(window.text)
-        if not words:
-            continue
-        for start in range(max(1, len(words) - length + 1)):
-            stretch = words[start : start + length]
-            ratio = difflib.SequenceMatcher(None, reference, stretch, autojunk=False).ratio()
-            if best is None or ratio > best[0]:
-                best = (ratio, window, words, start)
+        words = [(word, n) for n, line in enumerate(window.lines) for word in _words(line.text)]
+        plain = [word for word, _ in words]
+        for start, (word, line) in enumerate(words):
+            if line or word not in wanted:
+                continue
+            matcher = difflib.SequenceMatcher(
+                None, literal, plain[start : start + length], autojunk=False
+            )
+            score = sum(block.size for block in matcher.get_matching_blocks()) / len(literal)
+            if best is None or score > best.score:
+                best = _Near(score, window, words, start, reference)
     return best
 
 
-def _differences(reference: list[str], words: list[str], start: int) -> list[dict[str, str]]:
-    """Word-level differences from the statement to the stretch of the paragraph it resembles,
-    carried on to the end of that sentence (at most half the statement's length again)."""
+def _differences(near: _Near) -> list[dict[str, str]]:
+    """Word-level differences from the statement to the stretch it resembles, which runs to the
+    end of the sentence where the statement's last matching word falls. Text in the place of a
+    fill-in is what was filled in, and a word written with or without the template's "(s)" is
+    the same word; neither is a difference."""
+    reference = near.reference
+    words = [word for word, _ in near.words]
+    start = near.start
     limit = min(len(words), start + len(reference) + len(reference) // 2)
     blocks = [
         block
@@ -572,8 +640,6 @@ def _differences(reference: list[str], words: list[str], start: int) -> list[dic
         ).get_matching_blocks()
         if block.size
     ]
-    # The label's word where the statement's last matching word falls; the stretch runs from
-    # there to the end of that sentence, not into the next one.
     end = start + (blocks[-1].b + blocks[-1].size if blocks else len(reference))
     while end < limit and not words[end - 1].endswith(TERMINAL):
         end += 1
@@ -581,25 +647,20 @@ def _differences(reference: list[str], words: list[str], start: int) -> list[dic
     out: list[dict[str, str]] = []
     matcher = difflib.SequenceMatcher(None, reference, stretch, autojunk=False)
     for operation, a1, a2, b1, b2 in matcher.get_opcodes():
+        template, label = reference[a1:a2], stretch[b1:b2]
+        if operation == "equal":
+            continue
+        if operation == "replace" and all(map(_is_fill, template)) and HIDDEN_WORD not in label:
+            continue
         if (
             operation == "replace"
-            and set(reference[a1:a2]) == {"\u2026"}
-            and HIDDEN_WORD not in stretch[b1:b2]
-        ) or (
-            operation == "replace"
-            and a2 - a1 == b2 - b1
-            and all(_plural(t, w) for t, w in zip(reference[a1:a2], stretch[b1:b2], strict=True))
+            and len(template) == len(label)
+            and all(_plural(t, w) for t, w in zip(template, label, strict=True))
         ):
-            # Text in the place of a fill-in is what was filled in, not a difference.
             continue
-        if operation != "equal":
-            out.append(
-                {
-                    "change": operation,
-                    "template": " ".join(reference[a1:a2]),
-                    "label": " ".join(stretch[b1:b2]),
-                }
-            )
+        if operation == "delete" and all(map(_is_fill, template)):
+            continue
+        out.append({"change": operation, "template": " ".join(template), "label": " ".join(label)})
     return out
 
 
@@ -649,7 +710,7 @@ def _exact(report: _Report, job: _Job, taken: _Taken) -> bool:
             if not item["optional"]:
                 report.finding("missing-subheading", id=job.identifier, text=wanted)
         return True
-    pieces = _pieces(tokens)[0]
+    pieces = _statement(pattern)
     if sum(len(run) for run in _required(pieces)) < MIN_LITERAL:
         report.statements.append({"id": job.identifier, "status": "not-checkable"})
         return True
@@ -663,26 +724,40 @@ def _exact(report: _Report, job: _Job, taken: _Taken) -> bool:
     return True
 
 
-def _near(report: _Report, job: _Job, taken: _Taken) -> None:
-    item = job.item
-    pieces = _pieces(_content(item["pattern"]))[0]
+def _candidate(job: _Job, taken: _Taken) -> _Near | None:
+    """The closest resemblance of a statement not matched exactly, if close enough."""
+    pieces = _statement(job.item["pattern"])
     lines = _mask(job.lines, taken.get(job.group, {}))
     # The statement as each choice of its optional segments writes it; the closest one counts.
-    best: tuple[float, _Window, list[str], int, list[str]] | None = None
+    best: _Near | None = None
     for reference in _references(pieces):
-        closest = _closest(reference, lines, _span(pieces)) if len(reference) >= 4 else None
-        if closest is not None and (best is None or closest[0] > best[0]):
-            best = (*closest, reference)
-    differences = _differences(best[4], best[2], best[3]) if best is not None else []
-    if best is not None and best[0] >= SIMILARITY and differences:
-        ratio, window = best[0], best[1]
+        near = _closest(reference, lines, _span(pieces))
+        if near is not None and (best is None or near.score > best.score):
+            best = near
+    return best if best is not None and best.score >= SIMILARITY else None
+
+
+def _claims(near: _Near) -> set[tuple[int, int]]:
+    """The lines a resemblance covers."""
+    first = near.words[near.start][1]
+    last = near.words[min(len(near.words), near.start + len(near.reference)) - 1][1]
+    return {line.key for line in near.window.lines[first : last + 1]}
+
+
+def _near(report: _Report, job: _Job, near: _Near | None) -> None:
+    if near is not None:
+        differences = _differences(near) or [
+            # The same words, with paragraph breaks or spaces placed otherwise.
+            {"change": "layout", "template": "", "label": ""}
+        ]
+        line = near.window.lines[near.words[near.start][1]]
         # A resemblance in the readable part is reported even when another part of the section
         # was refused: the differing wording is there to see.
         report.finding(
             "deviation",
             id=job.identifier,
-            similarity=round(ratio, 3),
-            **{"in": window.lines[0].path, "paragraph": window.lines[0].paragraph},
+            similarity=round(near.score, 3),
+            **{"in": line.path, "paragraph": line.paragraph},
             differences=differences,
         )
         report.statements.append({"id": job.identifier, "status": "deviation"})
@@ -692,7 +767,7 @@ def _near(report: _Report, job: _Job, taken: _Taken) -> None:
         report.statements.append({"id": job.identifier, "status": "not-checked"})
         return
     report.statements.append({"id": job.identifier, "status": "absent"})
-    if not item["optional"] and item["kind"] == "statement":
+    if not job.item["optional"] and job.item["kind"] == "statement":
         report.finding("missing-statement", id=job.identifier)
 
 
@@ -807,8 +882,24 @@ def check(document: Document, registry: dict[str, Any], mapping: dict[str, Any])
 
     taken: _Taken = {}
     pending = [job for job in jobs if not _exact(report, job, taken)]
+    # A paragraph that resembles several statements of one section or appendix (alternatives
+    # such as "waived" and "deferred") is a deviation of the one it resembles most.
+    candidates = {job.identifier: _candidate(job, taken) for job in pending}
+    claimed: dict[str, set[tuple[int, int]]] = {}
+    ranked = sorted(
+        (job for job in pending if candidates[job.identifier] is not None),
+        key=lambda job: -candidates[job.identifier].score,  # type: ignore[union-attr]
+    )
+    for job in ranked:
+        near = candidates[job.identifier]
+        assert near is not None
+        covered = _claims(near)
+        if covered & claimed.setdefault(job.group, set()):
+            candidates[job.identifier] = None
+        else:
+            claimed[job.group] |= covered
     for job in pending:
-        _near(report, job, taken)
+        _near(report, job, candidates[job.identifier])
     report.statements.sort(
         key=lambda statement: [job.identifier for job in jobs].index(statement["id"])
     )

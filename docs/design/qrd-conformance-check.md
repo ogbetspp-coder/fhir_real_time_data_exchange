@@ -66,9 +66,12 @@ EMA writes "GFR < 60 mL/min" that way in Jentadueto.
   person would (optional segments all in, none, every other one) and checks each is found. A
   statement over two paragraphs ("Traceability" and the sentence under it) is matched against
   consecutive paragraphs. Struck-through and faint text never counts as a match.
-- **Deviations.** A statement that does not match but resembles a paragraph of its section
-  (difflib's word-level ratio of at least 0.85, against the closest choice of its optional
-  segments) is reported with the word-level differences,
+- **Deviations.** A statement that does not match but resembles a stretch of its section is
+  reported with the word-level differences: at least 85% of its literal words (fill-ins left
+  out, since any text may stand in their place) must appear there in order, for the closest
+  choice of its optional segments. A stretch that resembles several alternatives ("waived",
+  "deferred") is a deviation of the closest one only. The same words set out with other
+  paragraph breaks are a `layout` difference. The differences are shown
   up to the end of the sentence; text in the place of a fill-in is not a difference, and
   struck or faint words show as "[struck or faint text]". Text that an exact match of a sibling
   statement explains is not compared again; the rest of the paragraph is. 0.85 is a proposal
@@ -111,11 +114,15 @@ Every finding below was confirmed by reading the source div.
     has brackets.
   - Brukinsa writes "no or negligible influence in the ability to drive and use machines"; the
     template has "on".
-- **Formatting.** Blue text (an email address and the EMA link) and grey table shading in
-  Brukinsa, besides the template's intended grey shading of "the national reporting system
-  listed in Appendix V" in all three. Red, yellow and other colours in the source fall only on
-  pictures or spaces, which show no text differently, and nearly black text (`#0d0d0d`) reads
-  as black; neither is reported.
+  - Brukinsa's paediatric waiver in 5.1 names the conditions with "for the treatment of …"
+    where the template has "in {condition}", and its 4.2 paediatric statement reads "in
+    children and adolescents below 18 years of age" where the template has "in children aged {x
+    to y}". Both are common, and a person should confirm them.
+- **Formatting.** Blue text (an email address and the EMA link) in Brukinsa, besides the
+  template's intended grey shading of "the national reporting system listed in Appendix V" in
+  all three. Red, yellow and other colours in the source fall only on pictures or spaces, which
+  show no text differently; nearly black text (`#0d0d0d`) reads as black and nearly white
+  shading (`#e6e6e6` behind a table heading) as none; none of these is reported.
 
 The mapping lacks three EMA codes the labels use (Pregnancy, Breast-feeding and Fertility under
 4.6); the check reports them as `unmapped-code`, for information.
