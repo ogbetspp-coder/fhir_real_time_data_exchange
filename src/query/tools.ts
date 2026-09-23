@@ -335,6 +335,21 @@ function findQuoteOccurrence(text: string, quote: string): number {
   return -1;
 }
 
+// The decision `verify_quote` makes for one section: where the normalised `quote` first occurs
+// in the section's normalised `text` under the quote-edge rule, in code points (ADR 0002), or
+// undefined. Exported so that scripts/contracts/export-quote-edge-cases.ts can publish this
+// rule's answers for the agent's test double to be held to (test/fixtures/contracts/
+// quote-edge-cases.json); `verifyQuote` below calls nothing else to decide.
+export function locateQuote(
+  text: string,
+  quote: string,
+): { startOffset: number; endOffset: number } | undefined {
+  const found = findQuoteOccurrence(text, quote);
+  if (found < 0) return undefined;
+  const startOffset = codePointLength(text.slice(0, found));
+  return { startOffset, endOffset: startOffset + codePointLength(quote) };
+}
+
 // --- document loading --------------------------------------------------------------------------
 
 type LoadedDocument = {
@@ -706,15 +721,13 @@ export async function verifyQuote(
   let match: QuoteVerification["match"];
   for (const candidate of candidates) {
     const text = normalizeText(xhtmlToText(candidate.div));
-    const found = findQuoteOccurrence(text, normalizedQuote);
-    if (found < 0) continue;
     // Offsets are code points in the section's normalised text, as every offset in this
     // repository is (ADR 0002), not UTF-16 indices.
-    const startOffset = codePointLength(text.slice(0, found));
+    const located = locateQuote(text, normalizedQuote);
+    if (located === undefined) continue;
     match = {
       sourceKey: candidate.sourceKey,
-      startOffset,
-      endOffset: startOffset + codePointLength(normalizedQuote),
+      ...located,
       normalizedTextSha256: sha256Utf8(text),
     };
     break;

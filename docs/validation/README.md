@@ -651,3 +651,17 @@ toolchain is not installed on the machine that made it); the contract sync check
 **Approval (step 8).** Not obtained: author and releaser are the same identity. Branch protection
 on `main` does exist and requires status checks, but it requires no reviewer, so nothing forces a
 second pair of eyes (see "Release criteria").
+
+**Follow-up in the agent, 2026-09-22.** Not a change to a controlled module (no contract, version,
+vector or hash moves; `src/query/tools.ts` only extracts the per-section decision `verifyQuote`
+already made into an exported `locateQuote`, which `verifyQuote` calls). The two agent residuals in the blast radius above are closed.
+The post-check's splitter (`agent/src/verifiable_answer_agent/contract.py`) now cuts a block
+only where the quote-edge rule holds on both sides, so a verbatim block over 2,000 units no
+longer produces a chunk the service refuses; a run with no acceptable cut inside the window
+becomes one longer chunk, which is not sent and is flagged `verification-unavailable`. The test
+double applies the quote-edge rule, held to the service's own answers:
+`scripts/contracts/export-quote-edge-cases.ts` writes
+`test/fixtures/contracts/quote-edge-cases.json` from the acceptance test's worked examples
+(now `test/query/quote-edge-cases.ts`, shared by both), `npm run contracts:check` fails on
+drift, and `agent/tests/test_quote_edge.py` asserts every answer and offset. The agent's suite
+was run in full (`agent/README.md`).
