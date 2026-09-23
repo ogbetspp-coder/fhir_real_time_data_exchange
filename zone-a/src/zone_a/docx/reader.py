@@ -54,9 +54,11 @@ Fields keep their stored result and drop their instruction, however deeply neste
 ``DOCPROPERTY ... MERGEFORMAT`` never reaches the text. Only fields whose stored result is what
 Word shows are read: HYPERLINK, REF, NOTEREF and DOCPROPERTY. Any other field whose result
 would be shown (PAGE, DATE, SEQ, IF, a formula...) is refused, because Word recomputes it on
-display or print. So are a field with no stored result (no ``separate``, such as a form
-checkbox or a SYMBOL field, or an empty ``fldSimple``), a form field and a field marked for
-update.
+display or print. The code is the first word of the instruction; a field nested in the
+instruction ahead of or inside that word makes the code unknown, and the field is refused. So
+are a field with no stored result (no ``separate``, such as a form checkbox or a SYMBOL field,
+or an empty ``fldSimple``), a form field, a field marked for update, any field in a document
+whose settings ask Word to update fields on open, and field code outside an instruction.
 
 What it refuses (``DocxRefusedError.code``):
 
@@ -75,7 +77,8 @@ What it refuses (``DocxRefusedError.code``):
   (Word writes those as elements).
 - ``unbalanced-field``: a paragraph that ends inside a field instruction.
 - ``field-without-result``: a field with no stored result.
-- ``computed-field``: a shown field whose value Word computes rather than stores.
+- ``computed-field``: a shown field whose value Word computes rather than stores, or any field
+  in a document set to update fields on open.
 - ``stale-field``: a field marked for update.
 - ``unsupported-element``: anything that can carry text and is not read above, and any element
   the reader does not know: text boxes, footnote and endnote references, embedded objects,
@@ -85,7 +88,8 @@ What it refuses (``DocxRefusedError.code``):
 - ``invalid-package``: not a readable .docx, no main document relationship, a part name that
   occurs twice (ignoring case), a related part that is missing or duplicated, a part that
   cannot be read (bad checksum, truncated, encrypted), a part that is not UTF-8 or declares
-  another encoding, a DTD, a part over the size cap, or a list number that is not a number.
+  another encoding, a DTD, a part over the size cap, a style id defined twice, or a list number
+  that is not a number.
 
 Headers, footers, footnotes, comments and the glossary are separate parts and are not read.
 """
@@ -97,7 +101,6 @@ import posixpath
 import re
 import xml.etree.ElementTree as ET
 import zipfile
-import zlib
 from dataclasses import dataclass, field
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -245,7 +248,8 @@ class Mark:
     One of superscript, subscript, position, caps, smallCaps, strike, dstrike,
     ``highlight-<colour>`` (Word's colour name, e.g. ``highlight-lightGray``),
     ``shading-<FILL>`` (e.g. ``shading-D9D9D9``) or ``shading-<pattern>-<COLOUR>-<FILL>``, rtl
-    (right-to-left) and faint (white, under two points, or scaled under a fifth). Marks of one
+    (right-to-left) and faint (white or a light theme colour, under two points, or scaled
+    under a fifth). Marks of one
     kind that touch are merged; marks of different kinds may overlap.
     """
 
@@ -295,8 +299,8 @@ class _Package:
     def __init__(self, data: bytes) -> None:
         try:
             self.zip = zipfile.ZipFile(io.BytesIO(data))
-        except zipfile.BadZipFile as error:
-            raise DocxRefusedError("invalid-package", "not a zip archive") from error
+        except Exception as error:  # zipfile raises many types for a damaged archive
+            raise DocxRefusedError("invalid-package", "not a readable zip archive") from error
         names = self.zip.namelist()
         # Part names in a package are compared without regard to case (ECMA-376 Part 2).
         if len({name.lower() for name in names}) != len(names):
@@ -311,14 +315,9 @@ class _Package:
             raise DocxRefusedError("invalid-package", f"{name} is over {MAX_PART_BYTES} bytes")
         try:
             data = self.zip.read(name)
-        except (
-            zipfile.BadZipFile,
-            zlib.error,
-            EOFError,
-            RuntimeError,
-            NotImplementedError,
-        ) as error:
-            # A bad checksum, a truncated or encrypted entry, or an unsupported compression.
+        except Exception as error:
+            # A bad checksum, a truncated or encrypted entry, an unsupported compression, or a
+            # damaged directory: zipfile raises many types, and every one is a refusal.
             raise DocxRefusedError("invalid-package", f"{name} cannot be read") from error
         try:
             return ET.fromstring(_decode(name, data))
@@ -359,6 +358,8 @@ class _Styles:
     styles: dict[str, _Style] = field(default_factory=dict)
     default_rpr: ET.Element | None = None
     default_ppr: ET.Element | None = None
+    # settings.xml asks Word to update every field when the document opens.
+    update_fields: bool = False
     defaults: dict[str, str] = field(default_factory=dict)
     theme_fonts: dict[str, str] = field(default_factory=dict)
     has_theme: bool = False
@@ -416,6 +417,8 @@ def _styles(root: ET.Element | None, theme: ET.Element | None, fonts: ET.Element
         style_id = style.get(_w("styleId"))
         if style_id is None:
             continue
+        if style_id in styles.styles:
+            raise DocxRefusedError("invalid-package", f"style {style_id!r} is defined twice")
         based = style.find(_w("basedOn"))
         kind = style.get(_w("type"), "paragraph")
         styles.styles[style_id] = _Style(
@@ -592,6 +595,8 @@ class _ParagraphReader:
             if tag == _w("r"):
                 self.run(child)
             elif tag == _w("fldSimple"):
+                if self.styles.update_fields:
+                    raise DocxRefusedError("computed-field", "the document updates fields on open")
                 if child.get(_w("dirty")) in ("1", "true", "on"):
                     raise DocxRefusedError("stale-field", "a field marked for update")
                 if not self.in_instruction():
@@ -643,8 +648,9 @@ class _ParagraphReader:
                 self._field(child)
                 continue
             if tag == _w("instrText"):
-                if self.fields and self.fields[-1]:
-                    self.instructions[-1].append(child.text or "")
+                if not (self.fields and self.fields[-1]):
+                    raise DocxRefusedError("unbalanced-field", "field code outside an instruction")
+                self.instructions[-1].append(child.text or "")
                 continue
             if tag in _RUN_SILENT:
                 continue
@@ -677,6 +683,12 @@ class _ParagraphReader:
             raise DocxRefusedError("stale-field", "a field marked for update")
         kind = child.get(_w("fldCharType"))
         if kind == "begin":
+            if self.styles.update_fields:
+                raise DocxRefusedError("computed-field", "the document updates fields on open")
+            if self.fields and self.fields[-1]:
+                # Word puts this field's result into the enclosing instruction, so the reader
+                # no longer knows that instruction's code; a NUL keeps it from matching one.
+                self.instructions[-1].append("\x00")
             self.fields.append(True)
             self.instructions.append([])
         elif kind == "separate" and self.fields:
@@ -785,8 +797,11 @@ def _faint(properties: _Properties) -> bool:
             return True
         if (color.get(_w("val")) or "").lower() in ("ffffff", "white"):
             return True
-    size = properties.value("sz")
-    if size is not None:
+    # szCs sizes complex-script text; the reader does not know which script a character is
+    # drawn as, so either size being tiny counts.
+    for size in (properties.value("sz"), properties.value("szCs")):
+        if size is None:
+            continue
         match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)(pt|pc|pi|in|cm|mm)?", size)
         if match is None:
             return True
@@ -838,10 +853,10 @@ def _int(value: str, where: str) -> int:
     return int(value)
 
 
-def _numbering(ppr: ET.Element | None, style_chain: list[_Style]) -> Numbering | None:
-    """numId and ilvl, each from the nearest level that sets it."""
+def _numbering(levels: list[ET.Element | None]) -> Numbering | None:
+    """numId and ilvl, each from the nearest paragraph-properties level that sets it."""
     found: dict[str, int] = {}
-    for source in [ppr, *(style.ppr for style in style_chain)]:
+    for source in levels:
         numpr = source.find(_w("numPr")) if source is not None else None
         if numpr is None:
             continue
@@ -874,7 +889,14 @@ def _paragraph(
     return Paragraph(
         text="".join(reader.parts),
         style=style,
-        numbering=_numbering(ppr, styles.resolve(style, "paragraph")),
+        numbering=_numbering(
+            [
+                ppr,
+                *(s.ppr for s in styles.resolve(style, "paragraph")),
+                *(s.ppr for s in styles.chain(table_style)),
+                styles.default_ppr,
+            ]
+        ),
         table=table,
         marks=_paragraph_marks(
             reader,
@@ -997,7 +1019,7 @@ def read_docx(data: bytes) -> list[Paragraph]:
         if document is None:
             raise DocxRefusedError("invalid-package", f"no {mains[0]}")
         parts: list[ET.Element | None] = []
-        for kind in ("styles", "theme", "fontTable"):
+        for kind in ("styles", "theme", "fontTable", "settings"):
             targets = package.related(mains[0], kind)
             if len(targets) > 1:
                 raise DocxRefusedError("invalid-package", f"more than one {kind} part")
@@ -1005,7 +1027,9 @@ def read_docx(data: bytes) -> list[Paragraph]:
             if targets and part is None:
                 raise DocxRefusedError("invalid-package", f"no {targets[0]}")
             parts.append(part)
-        styles = _styles(*parts)
+        styles = _styles(*parts[:3])
+        if parts[3] is not None:
+            styles.update_fields = bool(_on(parts[3].find(_w("updateFields"))))
     for element in document.iter():
         if element.tag in _TRACKED:
             raise DocxRefusedError("tracked-change", _local(element.tag))

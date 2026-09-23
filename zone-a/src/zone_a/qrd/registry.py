@@ -442,6 +442,8 @@ def build_appendix_iii(source: Source) -> dict[str, Any]:
     texts = [p.text for p in source.paragraphs]
     start = _exactly_one(texts, APPENDIX_III_START, APPENDIX_III_FILE)
     end = _exactly_one(texts, APPENDIX_III_END, APPENDIX_III_FILE)
+    for paragraph in source.paragraphs[start + 1 : end]:
+        _check(paragraph, "Appendix III SmPC", keeps_marks=True)
     statements = [p for p in source.paragraphs[start + 1 : end] if p.text.strip()]
     notes = [p for p in source.paragraphs[end:] if re.match(r"^\*+ ", p.text)]
     if not statements or not notes:

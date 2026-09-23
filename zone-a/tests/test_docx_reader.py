@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from zone_a.docx.reader import DocxRefusedError, read_docx
+from zone_a.docx.reader import DocxRefusedError, Numbering, read_docx
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 SOURCES = Path(__file__).resolve().parents[2] / "qrd" / "sources"
@@ -863,6 +863,94 @@ def test_a_part_that_declares_another_encoding_is_refused() -> None:
     with pytest.raises(DocxRefusedError) as caught:
         read_docx(buffer.getvalue())
     assert caught.value.code == "invalid-package"
+
+
+# --- fourth review ------------------------------------------------------------------------
+
+
+def test_a_damaged_zip_directory_is_refused_not_raised() -> None:
+    good = docx(p(r("<w:t>hello</w:t>")))
+    directory = good.rindex(b"PK\x01\x02")
+    version = bytearray(good)
+    version[directory + 6] = 0xFF
+    offset = bytearray(good)
+    end = good.rindex(b"PK\x05\x06")
+    offset[end + 16 : end + 20] = (directory + 0x100000).to_bytes(4, "little")
+    for data in (bytes(version), bytes(offset)):
+        with pytest.raises(DocxRefusedError) as caught:
+            read_docx(data)
+        assert caught.value.code == "invalid-package"
+
+
+def test_a_field_nested_before_the_code_hides_the_code_and_is_refused() -> None:
+    begin = r('<w:fldChar w:fldCharType="begin"/>')
+    separate = r('<w:fldChar w:fldCharType="separate"/>')
+    end = r('<w:fldChar w:fldCharType="end"/>')
+    body = p(
+        begin
+        + begin
+        + r('<w:instrText xml:space="preserve"> DOCPROPERTY Kind </w:instrText>')
+        + separate
+        + r("<w:t>DATE</w:t>")
+        + end
+        + r('<w:instrText xml:space="preserve"> REF bm </w:instrText>')
+        + separate
+        + r("<w:t>stale</w:t>")
+        + end
+    )
+    assert refusal(body) == "computed-field"
+
+
+def test_field_code_outside_an_instruction_is_refused() -> None:
+    assert refusal(p(r("<w:instrText>PAGE</w:instrText><w:t>1</w:t>"))) == "unbalanced-field"
+
+
+def test_a_style_defined_twice_is_refused() -> None:
+    styles = (
+        '<w:style w:type="paragraph" w:styleId="S"><w:rPr><w:vanish/></w:rPr></w:style>'
+        '<w:style w:type="paragraph" w:styleId="S"/>'
+    )
+    assert refusal(p(r("<w:t>x</w:t>"), '<w:pStyle w:val="S"/>'), styles) == "invalid-package"
+
+
+def test_numbering_from_the_paragraph_defaults_or_a_table_style_is_reported() -> None:
+    numbered = '<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="4"/></w:numPr></w:pPr>'
+    defaults = f"<w:docDefaults><w:pPrDefault>{numbered}</w:pPrDefault></w:docDefaults>"
+    paragraph = read_docx(docx(p(r("<w:t>x</w:t>")), defaults))[0]
+    assert paragraph.numbering == Numbering(4, 0)
+    table_style = f'<w:style w:type="table" w:styleId="T">{numbered}</w:style>'
+    table = (
+        '<w:tbl><w:tblPr><w:tblStyle w:val="T"/></w:tblPr><w:tr><w:tc>'
+        + p(r("<w:t>x</w:t>"))
+        + "</w:tc></w:tr></w:tbl>"
+    )
+    assert read_docx(docx(table, table_style))[0].numbering == Numbering(4, 0)
+
+
+def test_fields_in_a_document_that_updates_them_on_open_are_refused() -> None:
+    field = p('<w:fldSimple w:instr=" REF x ">' + r("<w:t>1</w:t>") + "</w:fldSimple>")
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as package:
+        package.writestr("_rels/.rels", ROOT_RELS.format(target="word/document.xml"))
+        package.writestr(
+            "word/_rels/document.xml.rels",
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            + RELATIONSHIP.format(kind="settings", target="settings.xml")
+            + "</Relationships>",
+        )
+        package.writestr("word/document.xml", document_xml(field))
+        package.writestr(
+            "word/settings.xml", f'<w:settings xmlns:w="{W}"><w:updateFields/></w:settings>'
+        )
+    with pytest.raises(DocxRefusedError) as caught:
+        read_docx(buffer.getvalue())
+    assert caught.value.code == "computed-field"
+
+
+def test_tiny_complex_script_text_is_faint() -> None:
+    assert _kinds(p(r("<w:t>ab</w:t>", '<w:sz w:val="22"/><w:szCs w:val="2"/>'))) == [
+        (0, 2, "faint")
+    ]
 
 
 # --- the pinned EMA files -----------------------------------------------------------------

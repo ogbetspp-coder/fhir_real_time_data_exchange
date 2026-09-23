@@ -423,3 +423,8 @@ def test_an_erratum_must_apply_exactly_once() -> None:
         _check_errata([])
     with pytest.raises(RegistryError):
         _check_errata([item, item])
+
+
+def test_a_blank_numbered_paragraph_among_the_storage_statements_is_refused() -> None:
+    with pytest.raises(RegistryError):
+        _check(Paragraph("", None, Numbering(2, 0), None), "Appendix III SmPC", keeps_marks=True)

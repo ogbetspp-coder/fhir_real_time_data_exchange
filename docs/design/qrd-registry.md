@@ -79,7 +79,8 @@ module docstring lists every rule and every refusal. What the EMA files and the 
    NOTEREF and DOCPROPERTY results are read, because Word shows those as stored; PAGE, DATE,
    SEQ, IF and every other field Word recomputes on display or print are refused, and so is a
    field with no stored result (a form checkbox, a SYMBOL field without a result, an empty
-   simple field) or one marked for update.
+   simple field), one marked for update, one whose code is hidden behind a nested field, and
+   any field in a document set to update fields on open.
 4. **Styles and hidden text.** Run properties are looked up on the run, its character style,
    its paragraph style and, inside a table, its table style (each through its `basedOn` chain,
    falling back to the document's last default style of that kind when the id is absent or
