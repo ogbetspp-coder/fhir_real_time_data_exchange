@@ -37,3 +37,7 @@ agent/src/verifiable_answer_agent/contracts/agent-turn.schema.json
 # Agent worktrees that Claude Code creates under the repository; each is its own checkout and
 # is never part of this tree's gate or its commits.
 .claude/worktrees/
+
+# Byte copies of the EMA's published ePI, pinned by hash in labels/ema-epi/sources.lock.json;
+# reformatting them would change the bytes the lock records.
+labels/ema-epi/sources/

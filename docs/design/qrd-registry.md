@@ -188,12 +188,17 @@ The registry records these rather than hiding them.
 
 Every numbered heading in `fhir/mappings/cap-smpc-en.json` (28) is a registry heading, and every
 named subsection (Posology, Method of administration, Reporting of suspected adverse reactions)
-is a registry subheading; a test keeps it so. One question it raises, not answered here: the
-mapping's 6.5 title includes the segment "and special equipment for use, administration or
+is a registry subheading; a test keeps it so.
+
+The mapping's 6.5 title includes the segment "and special equipment for use, administration or
 implantation", which the annotated template marks as "for advanced therapy medicinal products
-only", and the crosswalk writes the rule's title as the heading of every document it
-publishes. Whether that matches the EMA ePI code system's display for 6.5 has to be checked
-against the pinned EMA package before anything changes.
+only", and the crosswalk writes it as the heading of every document it publishes. Checked on
+2026-09-23 against the pinned EMA ePI package (`EUePI` 1.0.0, hash verified): the template
+profile `EUQRD-CAP-template-new-SmPC-en` documents exactly the mapping's title for code
+200000029841, the CodeSystem's display puts the segment in square brackets, nothing in the
+package mentions advanced therapy, and the profile does not constrain the title (only the
+code). The mapping matches the package; the package and the Word template disagree about the
+segment, and the registry records the template's reading. Nothing changes.
 
 ## Known limits
 

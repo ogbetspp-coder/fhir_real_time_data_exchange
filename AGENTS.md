@@ -15,7 +15,8 @@ Google Cloud Healthcare API and observe their native near-real-time BigQuery str
 - Never log FHIR payloads, credentials, tokens, or clinical text.
 - Never commit `.env`, Application Default Credentials, Terraform state, or vendored packages.
 - Use synthetic product information only, with one scoped exception: an authority's published
-  ePI (public, approved text) for roadmap item 3a. No client or confidential content until the
+  ePI (public, approved text) for roadmap item 3a and the QRD conformance check
+  (`docs/design/qrd-conformance-check.md`). No client or confidential content until the
   data-handling paragraph in `docs/design/verifiable-answers.md` is written.
 
 ## Commands

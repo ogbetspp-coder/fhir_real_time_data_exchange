@@ -6,7 +6,7 @@ For every file in qrd/sources.lock.json it downloads the URL and compares the SH
 lock. It writes nothing. Exit status 1 means at least one file differs or could not be fetched:
 the EMA has published a new version, and pinning it is a reviewed change (new bytes, new lock
 entry, regenerated registry, and a change record). CI does not run this, so a slow or changed
-EMA website never breaks a build; the offline check in tests/test_qrd_sources.py does run.
+EMA website never breaks a build; the offline check in tests/test_qrd_registry.py does run.
 """
 
 from __future__ import annotations
