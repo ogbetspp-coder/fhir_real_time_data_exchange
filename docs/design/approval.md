@@ -189,7 +189,11 @@ approval.
    then writes the versioned Provenance (D5).
 7. The query service verifies on every answer (D9).
 
-## Open decision: which Google component asserts the approver
+## Which Google component asserts the approver
+
+**Decided 2026-09-22 by the owner: B, a Google Chat app built as a Workspace add-on.** The
+re-authentication gap is recorded, not closed; C stays the answer if a client's validation lead
+requires re-authentication at each signing.
 
 | Option                                             | Who asserts the person                                                                                                                                                                               | Custom code                 | Re-authentication at signing        | Strength                                                                          |
 | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | ----------------------------------- | --------------------------------------------------------------------------------- |
@@ -200,13 +204,11 @@ approval.
 A classic Chat app is not option B: its body names the user, but only Chat's own token is signed,
 and that identifies Chat, not the person.
 
-**Recommendation: a one-day spike, then decide. Lean to B for the everyday review and record the
-re-authentication gap, or C if the client's validation lead requires re-authentication at each
-signing (21 CFR 11.200 expects an identifying component at each signing).** The spike records,
-against the real products: an add-on click reaching a receiver whose endpoint admits only the
-add-ons service agent, both tokens verified by a separate signer, their audience and issue time;
-and whether IAP's re-authentication setting behaves as documented. C is a custom interface, and
-the only case that needs an exception to principle 7.
+The spike (build step 1) records, against the real products: an add-on click reaching a receiver
+whose endpoint admits only the add-ons service agent, and both tokens verified by the signer
+itself, with their audience and issue time. 21 CFR 11.200 expects an identifying component at
+each signing; B does not re-authenticate, which is the recorded gap. C is a custom interface, and
+the only case that would need an exception to principle 7.
 
 ## Contract changes
 
@@ -239,15 +241,53 @@ the only case that needs an exception to principle 7.
   unsigned route publishes. In `dev`, the `fixture` smoke product stays unsigned and is the
   standing proof that the query service refuses unapproved content.
 
-## Build order, each step with its evidence
+## Two phases: what is built while the product is being tested, and what waits
 
-1. **Spike** (open decision). Evidence: a recorded, verified identity from the chosen surface, or
-   a written finding that it cannot be had.
+The owner's direction (2026-09-22): the product is still being built and tested, so build the
+simplest thing that makes the claim true, and hold the hardening a client's validation would
+require for the production gate.
+
+**Phase 1, built now: everything the claim depends on.** Without any one of these, an answer
+could name an approval that does not cover its text, which is the failure the product exists to
+prevent.
+
+- The statement (D3) with document identity, mapping version, section hashes, the review hash,
+  the approver's verified subject and manifestation, environment, sequence and previous head.
+  `approve` only; `reject` and `withdraw` wait.
+- The approver asserted by the Chat add-on's Google-signed token, verified by the signer (D2).
+- One signer on Cloud Run with its own identity and its own HSM key. The review file is rendered
+  by the signer itself, not a separate review service; it is still built by a pure function, stored
+  once under `reviews/`, and its hash still travels in the click and the statement (D6).
+- The head with compare-and-swap (D8), so a replay or a race cannot make old text current.
+- The versioned Provenance written after commit (D5), and the query service's verification and
+  re-hash on every answer (D9).
+- The pipeline started by hand, or by the signer calling the existing workflow, in `dev`; no
+  Eventarc trigger yet.
+- The migration of the four seeded demo documents and the connector, before 2026-10-20.
+
+**Phase 2, the production gate: hardening, not the claim.** Each is a line on the production
+gate, so production cannot go live without it.
+
+- Segregation of duties (D7). In `dev` one person prepares and approves; the evidence says so.
+- `reject` and `withdraw` statements.
+- The image-digest allowlist, Binary Authorization on the signer, and paging on IAM changes to
+  the key (Infrastructure).
+- The worker's write condition excluding `approvals/` and `reviews/`, and a separate review
+  service with its own identity.
+- Eventarc in place of a direct call; re-authentication at signing if a client requires it
+  (option C).
+- The validation work: intended use, architecture section, traceability rows, effective-IAM
+  export for the new accounts.
+
+## Build order for phase 1, each step with its evidence
+
+1. **Spike** on option B. Evidence: a recorded add-on click reaching a Cloud Run receiver with
+   both Google-signed tokens verified, and their audience and issue time.
 2. **Statement, review and verifier libraries** (pure) with negative tests: another key, other
-   content, another document, a replayed old head, a stale review hash, the submitter as
-   approver, an unmapped subject, a wrong environment. Evidence: the tests.
-3. **Signer and review services**, head compare-and-swap. Evidence: a signed statement and its
-   review file in the evidence bucket; a racing second approval refused.
+   content, another document, a replayed old head, a stale review hash, an unmapped subject, a
+   wrong environment. Evidence: the tests.
+3. **Signer**, with the head compare-and-swap. Evidence: a signed statement and its review file
+   in the evidence bucket; a racing second approval refused.
 4. **Pipeline verifies and links** (D5). Evidence: an unsigned submission refused; the same
    content signed, published, with its versioned Provenance.
 5. **Query service verifies** (D9). Evidence: `not-approved` for the smoke product; an approved
@@ -257,8 +297,6 @@ the only case that needs an exception to principle 7.
    step 5, and the query-tools major changes what the live Gemini connector calls. Re-seed through
    the signer and roll the connector forward in the same change, before 2026-10-20, when the
    Gemini Enterprise trial ends.
-7. **Validation work.** Intended use, an architecture section, traceability rows in
-   `docs/validation/README.md` for each negative test, effective-IAM export for the new accounts.
 
 ## What this does not claim
 
