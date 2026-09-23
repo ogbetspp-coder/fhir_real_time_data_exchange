@@ -181,17 +181,17 @@ defaults are wrong:
 
 ## Vector results
 
-All 307 golden vectors of `fidelity-norm/2.0.0` pass, byte for byte, including every error case:
+All 348 golden vectors of `fidelity-norm/2.0.0` pass, byte for byte, including every error case:
 
 | Module                         | Result          |
 | ------------------------------ | --------------- |
-| `zone_a/fidelity/normalize.py` | normalize 44/44 |
-| `zone_a/fidelity/xhtml.py`     | xhtml 176/176   |
-| `zone_a/fidelity/verify.py`    | verify 87/87    |
+| `zone_a/fidelity/normalize.py` | normalize 57/57 |
+| `zone_a/fidelity/xhtml.py`     | xhtml 192/192   |
+| `zone_a/fidelity/verify.py`    | verify 99/99    |
 
 Under `fidelity-norm/1.1.1` there were 137 (25, 60 and 52). Seven of those were added by the
 first round of this port: six XHTML cases and one verify case, each of them pinning a divergence
-the existing 130 could not see. The 170 added by `fidelity-norm/2.0.0` pin its rules and both
+the existing 130 could not see. The 211 added by `fidelity-norm/2.0.0` pin its rules and both
 sides of every boundary (`docs/validation/changes/2026-09-23-fidelity-norm-2-0-0.md`). They are defined in
 `test/fixtures/fidelity/cases.ts` on the Zone B side, where the TypeScript defines the expected
 behaviour, and regenerated with `npm run vectors:generate`.
@@ -214,9 +214,11 @@ vectors passed and started asking what the vectors did not cover.
   U+001C–U+001F, which section 2 forbids outright — so none of them is used for the whitespace
   step. Membership of the explicit list is tested instead.
 - **`\s` differs between the two regex dialects.** JavaScript's `\s` includes U+FEFF and excludes
-  U+001C–U+001F and U+0085; Python's is the reverse. Every `\s` in the ported scanner regexes is
-  spelled out as an explicit class built from code points, so `xhtml.py` accepts and rejects
-  exactly what `xhtml.ts` does.
+  U+001C–U+001F and U+0085; Python's is the reverse. Every `\s` in the ported scanner regexes
+  was spelled out as an explicit class built from code points, so `xhtml.py` accepted and
+  rejected exactly what `xhtml.ts` did. Since `fidelity-norm/2.0.0` neither side uses `\s` in a
+  tag at all: tag whitespace is `[\t\n\r ]`, because an HTML parser reads any other code point
+  there as part of the tag name (the second review's C1).
 - **`\d` differs too, and in the direction that opens a channel.** JavaScript's `\d` is ASCII;
   Python's matches every Unicode decimal digit, so a numeric character reference written with
   U+FF10–U+FF19 FULLWIDTH DIGIT (or Arabic-Indic digits, or the mathematical digits) decoded here
@@ -311,7 +313,7 @@ Three families, a third of the corpus each:
   whitespace between parts, tables of one row width including empty ones, `sup` and `sub` holding
   ASCII digits and signs, dashes, letters, script digits, references and the numbers that have
   no script form, entities in named, decimal and hexadecimal form, supplementary characters, every
-  allowed attribute), with a single deliberate violation injected into one case in three. The
+  allowed attribute), with a single deliberate violation injected into two cases in five. The
   violation classes reach every error code the scanner can raise, including self-closing tags
   and `<br>` start tags, a start tag that is both a void and a parent violation, content and
   references directly inside table parts, uneven rows, surrogates split by markup and by
@@ -348,19 +350,31 @@ surrogate escape → 9, integral floats in `verify.py` → 48, and the JavaScrip
 number inside an issue string → 5. Each revert was undone and the run went back to 2002 passed.
 
 **`fidelity-norm/2.0.0`.** Rerun on the extended generator, 2000 cases at each of seeds
-20260920, 1 and 2: **zero divergences**, and the class-coverage test passes on each. Sixteen of
-the new rules were then broken in the Python port one at a time and the three corpora re-run;
-every break diverged on every seed (seeds 20260920 / 1 / 2): a body at the end of a page without
-its line feed accepted → 44 / 35 / 47; U+000B and U+000C allowed → 5 / 9 / 2; U+2066–U+2069
-allowed → 9 / 10 / 14; the start rule stopping at the page start → 18 / 13 / 23; the start rule
-cutting after skipped whitespace → 201 / 135 / 166; the 1..N page check dropped → 49 / 47 / 43;
-U+2013 not folded inside `sup` → 3 / 2 / 2; numbers without a script form kept → 17 / 14 / 18;
-the section 2 check of the whole `div` skipped → 13 / 11 / 13; any element allowed to
-self-close → 12 / 14 / 12; `void-element` decided after the parent check → 6 / 7 / 6; U+00AD
-before CR LF accepted → 17 / 26 / 11; `table-shape` skipped → 29 / 18 / 25; a whitespace
-reference allowed in a table part → 5 / 5 / 4; `lang` allowed below the root → 2 / 1 / 2; and
-the end rule not reading through trailing whitespace → 14 / 22 / 17. Each break was restored and
-the runs went back to 2002 passed. Two of these (the order of `void-element` and the end rule's
+20260920, 1 and 2: **zero divergences**, and the class-coverage test passes on each. The
+generator was extended twice: for the rules of the design note and its amendments, and again
+for the second review's findings folded into 2.0.0 (C1 tag whitespace, C2 punctuation at span
+edges, C3 bullets, L1 script digits of the other script and the added fold forms, L2
+non-integer span fields). The reviewer's own probes (121 cases) and XHTML fuzz (60,000
+narratives) agree too, 0 divergent.
+
+Twenty-five rules were then broken in the Python port one at a time and the three corpora
+re-run (divergences at seeds 20260920 / 1 / 2). The second review's: tag whitespace back to
+`\s` → 34 / 30 / 35; end edge back to word characters → 25 / 39 / 29; start edge back to word
+characters → 15 / 17 / 22; bullets replaced away from a line start → 215 / 191 / 213; bullets
+replaced without following whitespace → 54 / 60 / 56; U+2219 back in the bullet list →
+13 / 12 / 10; the other script's digits kept → 7 / 11 / 10; U+2796 not folded → 3 / 4 / 4;
+non-integer span fields not refused → 11 / 12 / 28; a boolean written as Python's `True` in an
+issue → 19 / 14 / 12. The first round's: a body at the end of a page without its line feed
+accepted → 44 / 45 / 52; U+000B and U+000C allowed → 10 / 6 / 5; U+2066–U+2069 allowed →
+10 / 12 / 11; the start rule stopping at the page start → 22 / 10 / 14; the 1..N page check
+dropped → 76 / 59 / 60; U+2013 not folded inside `sup` → 0 / 3 / 2; numbers without a script
+form kept → 12 / 8 / 9; the section 2 check of the whole `div` skipped → 14 / 13 / 15; any
+element allowed to self-close → 10 / 12 / 10; `void-element` decided after the parent check →
+2 / 4 / 7; U+00AD before CR LF accepted → 15 / 16 / 11; `table-shape` skipped → 24 / 12 / 12; a
+whitespace reference allowed in a table part → 5 / 0 / 5; `lang` allowed below the root →
+0 / 1 / 1; the end rule not reading through trailing whitespace → 17 / 14 / 14. Every review
+break diverged on all three seeds and every break on at least two; each was restored and the
+runs went back to 2002 passed. Two breaks (the order of `void-element` and the end rule's
 trailing whitespace) were at first invisible to the generator; the `void-element-and-parent`
 violation class and the `span-ends-after-soft-hyphen-space` and `span-page-end` layouts were
 added so that they are not.

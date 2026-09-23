@@ -37,7 +37,8 @@ word counts, and hashes; never characters.
 
 The normalisation is deliberately conservative. It removes only artefacts of extraction and
 markup (Unicode NFC, a closed list of invisible formatting characters, a closed list of
-ligatures, a closed list of bullet glyphs, whitespace classes). It does not fold case, quotes,
+ligatures, a closed list of bullet glyphs where they start a list item, whitespace
+classes). It does not fold case, quotes,
 dashes, super- or subscripts, list markers, or line-break hyphenation. A joined or split word is
 therefore a reported failure that the extractor must avoid, not a difference the checker
 forgives. False failures are acceptable; false passes are not.
@@ -69,7 +70,9 @@ _Amended 2026-09-23 for `fidelity-norm/2.0.0`
 (`docs/validation/changes/2026-09-23-fidelity-norm-2-0-0.md`): markup may not change what a
 reader sees without the check seeing it._
 
-- Structure is free (paragraph and cell boundaries flatten to spaces); words are checked.
+- Structure is free (paragraph and cell boundaries flatten to spaces); words are checked. A
+  bullet glyph is structure only where it starts a list item (a line start, before whitespace);
+  mid-line it is content, and U+2219 and U+2043 are never bullets.
   Raised and lowered digits and signs are words: the digits and signs inside `sup` and `sub`
   fold to their script code points, so `10<sup>6</sup>` is `10⁶` and never equals a source's
   `106`; a number there with no script form, and U+00B1 or U+2213, rejects.
@@ -98,28 +101,37 @@ reader sees without the check seeing it._
   in-page link. `ol` and `q` are not allowed because renderers generate visible characters for
   them, and table sections must appear in rendering order.
 - Only `br` and `hr` may be self-closing, and must be, because an HTML parser ignores the `/`
-  of any other element. Tables contain only table parts and whitespace, every row has the same
-  number of cells, and `colspan`, `rowspan` and `pre` are not allowed, because a renderer moves
-  other content out of a table and draws spanned cells and preformatted columns the check
-  cannot see.
-- A section may omit words but never begin or end inside one: the outer span edges must fall
-  on word boundaries, read back through whitespace and across pages
-  (`docs/fidelity-normalization.md` section 6, reason `word-cut`), and a soft hyphen directly
-  before any line break in the narrative's text — raw, referenced, a block boundary or `br` —
-  rejects, so a word can be neither truncated at a section edge nor joined across markup.
+  of any other element. Inside a tag only TAB, LF, CR and SPACE are whitespace, because an HTML
+  parser reads any other code point there as part of the tag name. Tables contain only table
+  parts and whitespace, every row has the same number of cells, and `colspan`, `rowspan` and
+  `pre` are not allowed, because a renderer moves other content out of a table and draws
+  spanned cells and preformatted columns the check cannot see. This does not check which cell
+  a value is in (below).
+- A section may omit whole whitespace-delimited tokens but never begin or end inside one: the
+  outer span edges must touch whitespace (or a body edge), read back through whitespace and
+  across pages (`docs/fidelity-normalization.md` section 6, reason `word-cut`). Punctuation is
+  not a boundary, because inside a number it is part of the number (`1` of `1.5`, `20` of
+  `−20`). A soft hyphen directly before any line break in the narrative's text — raw,
+  referenced, a block boundary or `br` — rejects, so a token can be neither truncated at a
+  section edge nor joined across markup. The rule proves that edges touch whitespace, not that
+  they end a sentence or a clause: "Take 5" can still be taken from "Take 5 mg twice".
 - Section 2 rejects on both sides the characters a renderer draws differently from the check:
   C1 controls (remapped through windows-1252), U+000B and U+000C, and the bidirectional
   controls. It applies to the whole narrative `div` as decoded from JSON, markup included,
   before the scan, and to each decoded character reference on its own, so an unpaired
   surrogate cannot be completed across markup or by a second reference. A text layer decoded
   as Latin-1 therefore fails the page; that is intended.
-- Not closed by `fidelity-norm/2.0.0`, stated: two tables with the same text and the same row
-  width can still split that text into cells differently (cell association needs a table
-  extractor contract and is the next major version); a text layer that flattens a superscript
-  is outside the check, because the narrative is derived from it (only the extractor can close
-  that); a letter exponent (`2<sup>n</sup>` against `2n`) still verifies; strong right-to-left
-  letters can reorder adjacent numbers, and no EU product-information language uses them; a
-  viewer's own stylesheet or script can still act on the element names that remain.
+- Not closed by `fidelity-norm/2.0.0`, stated: cell association. Cell boundaries flatten to
+  whitespace, so a narrative table with the same text and the same row width can put a value
+  in a different cell from the source — a dose can move from the Adults column to the Children
+  column and verify. The empty slots the extractor contract requires for a spanned source cell
+  make that easier, because an empty narrative cell costs nothing. Closing it needs a table
+  extractor contract and is the next major version. Also not closed: a text layer that
+  flattens a superscript is outside the check, because the narrative is derived from it (only
+  the extractor can close that); a letter exponent (`2<sup>n</sup>` against `2n`) still
+  verifies; strong right-to-left letters can reorder adjacent numbers, and no EU
+  product-information language uses them; a viewer's own stylesheet or script can still act on
+  the element names that remain.
 - Golden vectors are the fixed, reviewed floor of a re-implementation, not its proof. The first
   second-language port (Python, 2026-09-20) passed all 130 vectors and then diverged from the
   reference on inputs nobody had written a vector for — regex dialect (`\d`, `$`), unpaired
