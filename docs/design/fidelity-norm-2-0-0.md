@@ -201,8 +201,11 @@ section beginning after a blank line that follows a hyphenated word) become `wor
 
 ## What this does not close
 
-- **Cell association** in tables of equal row width (above). Next major version, with the table
-  extractor contract.
+- **Cell association** in tables of equal row width (above). Cell boundaries flatten to
+  whitespace, so a narrative table with the same text and row width can move a value between
+  populations — a dose from the Adults column to the Children column — and verify. The empty
+  slots R7 requires for a spanned source cell make that easier, because an empty narrative cell
+  costs nothing. Next major version, with the table extractor contract.
 - **A flattened text layer** (change I). Outside the check until the extractor proves it.
 - **Letter exponents** (change B).
 - **A viewer's own stylesheet or script** acting on the element names that remain. After this
@@ -253,9 +256,10 @@ Adopted exactly as worded; each supersedes the text of the change it names.
   → U+207A). Inside sub, the same characters fold to U+208B and U+208A. Inside sup or sub, any
   other code point of general category N that is not a target of these tables, and U+00B1 and
   U+2213, reject (unmappable-script)." Other code points (letters, footnote marks, ®) are kept
-  unchanged. §7's extractor rule mirrors these tables. "Target of these tables" is read as the
-  script digits of either table (U+2070, U+00B9, U+00B2, U+00B3, U+2074–U+2079, U+2080–U+2089),
-  which are kept in both `sup` and `sub`.
+  unchanged. §7's extractor rule mirrors these tables. The first implementation read "target
+  of these tables" as the script digits of either table, kept in both `sup` and `sub`; the
+  second review reversed that (L1, below): only the element's own script digits and signs are
+  kept, and the other script's reject.
 - **R6 (E).** "§2 applies to the div string as decoded from JSON (RFC 8259, where an escaped
   surrogate pair is one code point). It covers every code point, including markup, attribute
   values and text outside the root. A surrogate code point that remains rejects. The code is
@@ -287,3 +291,27 @@ Adopted exactly as worded; each supersedes the text of the change it names.
   returns `invalid-request` for a quote containing a C1, bidi, VT or FF character. Impact: real
   PDFs whose text layer was decoded as Latin-1 (U+0092, U+0095, U+0096) now fail the page —
   intended.
+
+## Second review, folded into 2.0.0 (2026-09-23)
+
+A second independent review of the implementation found false passes before 2.0.0 was released.
+They were fixed in 2.0.0 itself, not in a new version, and `docs/fidelity-normalization.md`
+states each rule; `docs/validation/changes/2026-09-23-fidelity-norm-2-0-0.md` records them.
+
+- **C1.** Whitespace inside a tag was JavaScript's `\s`, which includes U+00A0, U+2000–U+200A,
+  U+3000 and U+FEFF; an HTML parser reads those as part of the tag name, so `10<sup` U+00A0
+  `>6` rendered "106" and verified against "10⁶", and `br`, `table` and `td` written that way
+  vanished. Now `[\t\n\r ]` only; anything else is `malformed-tag`.
+- **C2.** Word characters were letters, digits and marks, so punctuation was a boundary:
+  "Maximum dose is 1" verified against "Maximum dose is 1.5 mg", and a section could start at
+  "20 °C." after "−" or "5 mg." after "0.". Now a span edge must touch whitespace (or a body
+  edge) whatever the code point beyond it; R4's look-back stays. This replaces R4's "word
+  character" tests.
+- **C3.** Step 4 replaced bullet glyphs anywhere, so `2∙10` verified against a table row reading
+  2 and 10. Now a bullet is replaced only at a line start and before whitespace, and U+2219 and
+  U+2043 are not bullets.
+- **L1.** Inside `sup`, subscript digits and signs reject; inside `sub`, superscript ones do
+  (this reverses the reading of "not a target" recorded under R5). U+2015, U+02D7, U+FE58 and
+  U+2796 fold to minus and U+2795 to plus.
+- **L2.** A span field that is not an integer, or a page number that is a boolean, is a
+  structural error in both implementations (Python tests for `bool` before `int`).
