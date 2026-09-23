@@ -3,7 +3,7 @@
 Roadmap item 1b. A small Agent Development Kit agent, its own deployable under ADR 0004 — own
 `pyproject.toml`, own lock, own identity, own CI job — that shares nothing with the worker or
 with Zone A except two published artefacts: `contracts/generated/query-tools.schema.json`
-(2.0.0, the query service's surface) and `contracts/generated/agent-turn.schema.json` (1.0.0,
+(2.0.1, the query service's surface) and `contracts/generated/agent-turn.schema.json` (1.0.0,
 the shape of this agent's own audit record).
 
 It does four things and refuses to do a fifth.
@@ -250,6 +250,19 @@ Two changes reach this agent.
 The `QueryAuditRecord` changes in 2.0.0 (`credentialType`, `imageDigest`, `versionId`,
 `turnId`, `truncated`) describe the service's own record and do not concern this agent, except
 that `turnId` is the value this agent sends — see the next section.
+
+## query-tools 2.0.1
+
+Descriptions only; no shape changed, so the agent's validation of tool results is unchanged.
+Two meanings changed. `verify_quote`'s `match` now requires both edges of the quote to hold
+under the service's quote-edge rule — not inside a word, not at punctuation joined to a number
+or word — so a block the model quoted starting or ending mid-token is now `no-match`, and the
+post-check marks it. The post-check splits a block only at U+0020, so its chunks already end on
+spaces; a chunk boundary that falls between the groups of a space-grouped number ("1 000 000")
+or just after a spaced comparator ("≥ 30") is refused, as is a single token longer than the
+2,000-unit window. All fail closed. And an approval is given for a document's current version
+only: `get_provenance` for an earlier version is `unavailable`, which this agent reads as it
+reads any other `unavailable`.
 
 ## The turn id
 

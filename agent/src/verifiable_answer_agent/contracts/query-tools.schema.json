@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://khs.dev/contracts/query-tools/2.0.0/schema.json",
+  "$id": "https://khs.dev/contracts/query-tools/2.0.1/schema.json",
   "$ref": "#/$defs/QueryTools",
   "$defs": {
     "QueryTools": {
@@ -8,7 +8,7 @@
       "properties": {
         "version": {
           "type": "string",
-          "const": "2.0.0"
+          "const": "2.0.1"
         },
         "tools": {
           "type": "object",
@@ -280,7 +280,7 @@
         "contentNotice"
       ],
       "additionalProperties": false,
-      "description": "One QRD section, verbatim. `div` is the stored XHTML; `text` is its normalised plain text; the hashes are recomputable from `div` by anyone."
+      "description": "One QRD section, verbatim. `div` is the stored XHTML; `text` is its normalised plain text; the hashes are recomputable from `div` by anyone. `provenanceResourceId` is given for the document's current version only."
     },
     "TargetPath": {
       "type": "string",
@@ -408,7 +408,7 @@
         "approver"
       ],
       "additionalProperties": false,
-      "description": "Who and what put this document in the store: source document hash, extractor and model identities, fidelity report hash, approver and approval content hash, all from the persisted Provenance resource; per-section hashes recomputed live."
+      "description": "Who and what put this document in the store: source document hash, extractor and model identities, fidelity report hash, approver and approval content hash, all from the persisted Provenance resource; per-section hashes recomputed live. Answered for the document's current version only; a named earlier version is `unavailable`."
     },
     "PrincipalId": {
       "type": "string",
@@ -486,7 +486,7 @@
       },
       "required": ["document", "result", "normalizationVersion", "quoteSha256", "sectionsSearched"],
       "additionalProperties": false,
-      "description": "Mechanical answer to 'is this quote what the label says?': match with the section and code-point offsets, or no-match. Never a paraphrase, never a suggestion."
+      "description": "Mechanical answer to 'is this quote what the label says?': match with the section and code-point offsets, or no-match. A match is a contiguous slice of the normalised section text whose edges fall on boundaries: never inside a word, never at punctuation joined to a number or word (a decimal point, a slash, a sign, an apostrophe). It proves the words the quote contains, not that nothing follows them. Never a paraphrase, never a suggestion."
     },
     "QueryError": {
       "type": "object",

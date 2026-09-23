@@ -11,12 +11,15 @@ import {
   QuoteVerificationSchema,
   SectionContentSchema,
   type QueryAuditRecord,
+  type QuoteVerification,
 } from "../../src/contracts/query-tools.js";
 import { NORMALIZATION_VERSION, normalizeText, xhtmlToText } from "../../src/fidelity/index.js";
 import { loadEmaMapping } from "../../src/fhir/mapping.js";
-import { APPROVER_ROLE_SYSTEM } from "../../src/fhir/provenance.js";
+import { isComposition } from "../../src/fhir/types.js";
+import { APPROVAL_CONTENT_EXTENSION_URL, APPROVER_ROLE_SYSTEM } from "../../src/fhir/provenance.js";
 import { sha256, sha256Utf8, stableUuid } from "../../src/lib/hash.js";
 import type { EntitlementDirectory } from "../../src/query/entitlements.js";
+import type { FhirReader } from "../../src/query/fhir-reader.js";
 import { FIND_PRODUCT_CONCURRENCY, FIND_PRODUCT_SCAN_HORIZON } from "../../src/query/tools.js";
 import {
   INJECTED_SECTION_KEY,
@@ -34,6 +37,7 @@ import {
   connectHarness,
   entitlementDirectory,
   narrativeDivOf,
+  withNarratives,
   type Harness,
   type QueryStore,
   type SeededDocument,
@@ -138,10 +142,13 @@ describe("ePI query service, phase 1", () => {
         return QuoteVerificationSchema.parse(answer.structured);
       };
 
-      // A fragment of a section of the document the pipeline published.
+      // A fragment of a section of the document the pipeline published: whole words from the
+      // middle of it, because a quote that begins or ends inside a word is not a match.
       const text = normalizeText(xhtmlToText(narrativeDivOf(store, store.bundleIdA, SECTION_KEY)));
-      const fragment = text.slice(10, 40).trim();
-      const offset = text.indexOf(fragment);
+      const words = text.split(" ");
+      const fragment = words.slice(1, 6).join(" ");
+      const offset = (words[0] ?? "").length + 1;
+      expect(text.indexOf(fragment)).toBe(offset);
       expect(offset).toBeGreaterThan(0);
       const match = await verify(fragment, SECTION_KEY, store.bundleIdA);
       expect(match.result).toBe("match");
@@ -208,7 +215,7 @@ describe("ePI query service, phase 1", () => {
       for (const text of [first, last]) {
         const answer = await callTool(harness, "verify_quote", {
           bundleId: store.bundleIdA,
-          quote: text.slice(0, 30),
+          quote: text.split(" ").slice(0, 4).join(" "),
         });
         const parsed = QuoteVerificationSchema.parse(answer.structured);
         expect(parsed.result).toBe("match");
@@ -291,6 +298,353 @@ describe("ePI query service, phase 1", () => {
       expect(record.versionId).toBe(VERSION_ID);
     } finally {
       await harness.close();
+    }
+  });
+
+  // A quote is checked against the stored text and nothing checks it afterwards, so its edges
+  // follow the quote-edge rule (src/query/tools.ts), stricter than the publishing gate's
+  // span-edge rule: a quote cut inside a word, or cut at punctuation that still binds what
+  // follows or precedes it, is no-match even though its characters are a slice of the section.
+  it("a quote matches only between the quote-edge boundaries", async () => {
+    const seeded = store.documents.get(store.bundleIdTypography);
+    if (seeded === undefined) throw new Error("expected a seeded document");
+
+    // Each text becomes the whole narrative of one section; `cut` must answer no-match and
+    // `whole` must answer match at the offsets the text itself gives.
+    const cases: { text: string; cut: string[]; whole: string[] }[] = [
+      {
+        // The typography fixture's own sentence.
+        text: "The sponsor’s first dose is 5 mg/m² daily.",
+        // A unit cut before its superscript, a lone letter, a fragment straddling two words, a
+        // unit cut at the slash, a word with its possessive cut off.
+        cut: ["first dose is 5 mg/m", "e", "s first d", "5 mg/", "The sponsor"],
+        whole: [
+          "sponsor’s first dose is 5 mg/m²",
+          "The sponsor’s",
+          "5 mg/m² daily",
+          "daily.",
+          "The sponsor’s first dose is 5 mg/m² daily.",
+        ],
+      },
+      {
+        text: "The dose is 5 mg/m². The dose is 5 mg/kg body weight.",
+        cut: ["The dose is 5 mg", "The dose is 5 mg/m", "The dose is 5 mg/"],
+        whole: ["The dose is 5 mg/m²", "The dose is 5 mg/m².", "5 mg/kg body weight"],
+      },
+      {
+        text: "Take 2.5 mg daily, with water. Take 10,5 mg at night.",
+        cut: ["Take 2", "Take 10", "Take 2.", "5 mg daily"],
+        whole: ["Take 2.5 mg daily", "with water", "Take 10,5 mg at night"],
+      },
+      {
+        text: "Adjust the dose (see section 4.4) when needed; stop (see section 4.8).",
+        cut: ["see section 4", "(see section 4", "4) when needed"],
+        whole: ["see section 4.4", "(see section 4.4)", "see section 4.8", "Adjust the dose"],
+      },
+      {
+        // A hyphen-minus and a minus sign (U+2212) before the number.
+        text: "Store at -20 °C. Ship at −20 °C.",
+        cut: ["20 °C", "20 °C. Ship"],
+        whole: ["-20 °C", "−20 °C", "Store at -20 °C."],
+      },
+      {
+        // An unsigned temperature in its own document is quoted as it stands.
+        text: "Keep at 20 °C.",
+        cut: [],
+        whole: ["Keep at 20 °C", "20 °C", "20 °C."],
+      },
+      {
+        text: "Give <10 mg per day or ≥10 mg per day. Creatinine clearance ≥ 30 ml/min.",
+        cut: ["10 mg per day", "30 ml/min"],
+        whole: ["<10 mg per day", "≥10 mg per day", "≥ 30 ml/min"],
+      },
+      {
+        text: "Treat non-diabetic patients first. Don't take with food. Don’t crush.",
+        cut: ["diabetic patients", "t take with food", "t crush", "Don"],
+        whole: ["non-diabetic patients", "Don't take with food", "Don’t crush"],
+      },
+      {
+        text: 'Warning: take "one tablet" daily. Up to 1 000 000 IU daily.',
+        cut: ["Up to 1 000", "000 IU daily", "Up to 1"],
+        whole: ["Warning", "one tablet", '"one tablet"', "Up to 1 000 000 IU daily"],
+      },
+      {
+        // Letters outside the Basic Multilingual Plane, before and after a quote, and before a
+        // match, so that offsets are counted in code points, not in UTF-16 units.
+        text: "Code \u{1D400}5 mg. Take 5 mg\u{1D400} now. Code \u{1D400} then \u{1D401} dose.",
+        cut: ["5 mg"],
+        whole: ["\u{1D401} dose", "then \u{1D401} dose."],
+      },
+    ];
+
+    for (const { text, cut, whole } of cases) {
+      const bundle = withNarratives(seeded.bundle, {
+        [TYPOGRAPHY_SECTION_KEY]: `<div xmlns="http://www.w3.org/1999/xhtml"><p>${text
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")}</p></div>`,
+      });
+      const harness = await harnessFor(
+        PRINCIPAL_A,
+        new Map([[store.bundleIdTypography, { ...seeded, bundle }]]),
+      );
+      try {
+        const normalized = normalizeText(text);
+        const points = Array.from(normalized);
+        for (const quote of [...cut, ...whole]) {
+          // Every quote is a slice of the text: what decides the answer is where it stops.
+          expect([quote, normalized.includes(quote)]).toEqual([quote, true]);
+          const answer = await callTool(harness, "verify_quote", {
+            bundleId: store.bundleIdTypography,
+            sourceKey: TYPOGRAPHY_SECTION_KEY,
+            quote,
+          });
+          expect(answer.isError).toBe(false);
+          const verification = QuoteVerificationSchema.parse(answer.structured);
+          if (cut.includes(quote)) {
+            expect.soft([quote, verification.result]).toEqual([quote, "no-match"]);
+            expect.soft(verification.match).toBeUndefined();
+            continue;
+          }
+          expect.soft([quote, verification.result]).toEqual([quote, "match"]);
+          // The offsets are code points, recomputed here from the text itself.
+          const unit = normalized.indexOf(quote);
+          const start = Array.from(normalized.slice(0, unit)).length;
+          const end = start + Array.from(quote).length;
+          expect
+            .soft([quote, verification.match?.startOffset, verification.match?.endOffset])
+            .toEqual([quote, start, end]);
+          expect(points.slice(start, end).join("")).toBe(quote);
+        }
+        // One audit record per call, as always.
+        expect(harness.audits).toHaveLength(cut.length + whole.length);
+      } finally {
+        await harness.close();
+      }
+    }
+
+    // The offsets case really is the one it claims to be: UTF-16 and code-point offsets differ.
+    const astral = normalizeText(
+      "Code \u{1D400}5 mg. Take 5 mg\u{1D400} now. Code \u{1D400} then \u{1D401} dose.",
+    );
+    expect(astral.indexOf("\u{1D401} dose")).not.toBe(
+      Array.from(astral.slice(0, astral.indexOf("\u{1D401} dose"))).length,
+    );
+
+    // A cut occurrence does not end the search. In one section, the first "max 10" is inside
+    // "max 100" and the later one is whole; with no section named, the earlier section holds
+    // only a cut occurrence and the later one the whole one.
+    const limits = "Adults: max 100 mg daily. Children: max 10 mg daily.";
+    const bundle = withNarratives(seeded.bundle, {
+      [TYPOGRAPHY_SECTION_KEY]:
+        '<div xmlns="http://www.w3.org/1999/xhtml"><p>Do not exceed max 100 mg daily.</p></div>',
+      [SECTION_KEY]: `<div xmlns="http://www.w3.org/1999/xhtml"><p>${limits}</p></div>`,
+    });
+    const composition = bundle.entry[0]?.resource;
+    if (composition === undefined || !isComposition(composition)) {
+      throw new Error("expected a Composition");
+    }
+    // The section holding only the cut occurrence comes first in the document, so a search
+    // across sections meets it before the whole one.
+    const order = JSON.stringify(composition.section);
+    expect(order.indexOf(stableUuid("ema-qrd-section", TYPOGRAPHY_SECTION_KEY))).toBeLessThan(
+      order.indexOf(stableUuid("ema-qrd-section", SECTION_KEY)),
+    );
+
+    const harness = await harnessFor(
+      PRINCIPAL_A,
+      new Map([[store.bundleIdTypography, { ...seeded, bundle }]]),
+    );
+    const verify = async (quote: string, sourceKey?: string): Promise<QuoteVerification> =>
+      QuoteVerificationSchema.parse(
+        (
+          await callTool(harness, "verify_quote", {
+            bundleId: store.bundleIdTypography,
+            ...(sourceKey === undefined ? {} : { sourceKey }),
+            quote,
+          })
+        ).structured,
+      );
+    try {
+      expect((await verify("max 10", TYPOGRAPHY_SECTION_KEY)).result).toBe("no-match");
+
+      const whole = limits.lastIndexOf("max 10");
+      expect(limits.indexOf("max 10")).toBeLessThan(whole);
+      const later = await verify("max 10", SECTION_KEY);
+      expect(later.result).toBe("match");
+      expect(later.match?.startOffset).toBe(whole);
+      expect(later.match?.endOffset).toBe(whole + "max 10".length);
+
+      const anywhere = await verify("max 10");
+      expect(anywhere.result).toBe("match");
+      expect(anywhere.match?.sourceKey).toBe(SECTION_KEY);
+      expect(anywhere.match?.startOffset).toBe(whole);
+    } finally {
+      await harness.close();
+    }
+  });
+
+  // Nothing yet binds a stored version to its own approval: the Provenance names the Bundle
+  // without a version, so the newest approval is the only one the store can find. A caller who
+  // names an earlier version must not be handed that approval as if it were the version's own.
+  it("an earlier version is never given a later version's approval", async () => {
+    const seeded = store.documents.get(store.bundleIdA);
+    if (seeded?.provenance === undefined) throw new Error("expected a seeded, approved document");
+    const version1 = seeded.bundle;
+    expect(version1.meta?.versionId).toBe(VERSION_ID);
+    const version2 = {
+      ...structuredClone(version1),
+      meta: { ...version1.meta, versionId: "2", lastUpdated: "2026-09-21T09:00:00.000Z" },
+    };
+    // Version 2's approval: its own id and its own approved-content hash.
+    const approval2 = {
+      ...structuredClone(seeded.provenance),
+      id: stableUuid("ingestion-provenance", "version-2"),
+      recorded: "2026-09-21T08:59:00.000Z",
+      extension: [
+        {
+          url: APPROVAL_CONTENT_EXTENSION_URL,
+          valueString: sha256Utf8("version 2 approved content"),
+        },
+      ],
+    };
+    const documents = new Map<string, SeededDocument>([
+      [store.bundleIdA, { bundle: version2, provenance: approval2, history: [version1] }],
+    ]);
+
+    // Version 1, named: get_provenance cannot say which approval is version 1's, so it answers
+    // `unavailable` — with or without a section — and does not search for one.
+    const earlier = await harnessFor(PRINCIPAL_A, documents);
+    try {
+      for (const args of [
+        { bundleId: store.bundleIdA, versionId: VERSION_ID },
+        { bundleId: store.bundleIdA, versionId: VERSION_ID, sourceKey: SECTION_KEY },
+      ]) {
+        const answer = await callTool(earlier, "get_provenance", args);
+        expect(answer.isError).toBe(true);
+        expect(answer.structured).toEqual({ tool: "get_provenance", error: "unavailable" });
+      }
+      // get_section still answers version 1 verbatim, but without a Provenance reference.
+      const section = await callTool(earlier, "get_section", {
+        bundleId: store.bundleIdA,
+        versionId: VERSION_ID,
+        sourceKey: SECTION_KEY,
+      });
+      expect(section.isError).toBe(false);
+      const content = SectionContentSchema.parse(section.structured);
+      expect(content.document.versionId).toBe(VERSION_ID);
+      expect("provenanceResourceId" in section.structured).toBe(false);
+      expect(JSON.stringify(section.structured).includes(approval2.id)).toBe(false);
+
+      // No approval was even looked for; the current version was read to find out.
+      expect(earlier.log.provenance).toEqual([]);
+      expect(earlier.log.bundles).toEqual(
+        Array.from({ length: 3 }, () => [
+          `${store.bundleIdA}/_history/${VERSION_ID}`,
+          store.bundleIdA,
+        ]).flat(),
+      );
+      // One record per call, each naming the version actually read.
+      expect(earlier.audits.map(({ outcome, versionId }) => [outcome, versionId])).toEqual([
+        ["unavailable", VERSION_ID],
+        ["unavailable", VERSION_ID],
+        ["ok", VERSION_ID],
+      ]);
+    } finally {
+      await earlier.close();
+    }
+
+    // The current version — named, or not named — is answered as before, with its approval.
+    const current = await harnessFor(PRINCIPAL_A, documents);
+    try {
+      for (const selector of [{ versionId: "2" }, {}]) {
+        const provenance = await callTool(current, "get_provenance", {
+          bundleId: store.bundleIdA,
+          ...selector,
+        });
+        expect(provenance.isError).toBe(false);
+        const detail = ProvenanceDetailSchema.parse(provenance.structured);
+        expect(detail.document.versionId).toBe("2");
+        expect(detail.provenanceResourceId).toBe(approval2.id);
+        expect(detail.approvedContentSha256).toBe(sha256Utf8("version 2 approved content"));
+
+        const section = await callTool(current, "get_section", {
+          bundleId: store.bundleIdA,
+          sourceKey: SECTION_KEY,
+          ...selector,
+        });
+        const content = SectionContentSchema.parse(section.structured);
+        expect(content.document.versionId).toBe("2");
+        expect(content.provenanceResourceId).toBe(approval2.id);
+      }
+      expect(current.audits.map(({ outcome }) => outcome)).toEqual(["ok", "ok", "ok", "ok"]);
+    } finally {
+      await current.close();
+    }
+
+    // Naming a version costs one more read, so it is budgeted like the others: two reads are
+    // not enough for a get_section of a named version, and the call is `unavailable` rather
+    // than an answer missing its Provenance reference for a reason the caller cannot see.
+    const budgeted = await connectHarness({
+      store,
+      principal: PRINCIPAL_A,
+      entitlements: directory.entitlementsFor(PRINCIPAL_A),
+      documents,
+      readBudget: 2,
+    });
+    try {
+      const answer = await callTool(budgeted, "get_section", {
+        bundleId: store.bundleIdA,
+        versionId: "2",
+        sourceKey: SECTION_KEY,
+      });
+      expect(answer.structured).toEqual({ tool: "get_section", error: "unavailable" });
+      expect(budgeted.log.provenance).toEqual([]);
+      expect(onlyAudit(budgeted.audits).outcome).toBe("unavailable");
+    } finally {
+      await budgeted.close();
+    }
+
+    // A current version the store cannot state is not the named one. When the plain read of the
+    // document answers nothing, or a Bundle that carries no version, version 2 — although its
+    // history read answers — is not shown to be current, and gets no approval.
+    const unstated: ((reader: FhirReader) => FhirReader)[] = [
+      (reader) => ({ ...reader, readBundle: () => Promise.resolve(undefined) }),
+      (reader) => ({
+        ...reader,
+        readBundle: async (bundleId) => {
+          const bundle = await reader.readBundle(bundleId);
+          if (bundle?.meta !== undefined) delete bundle.meta.versionId;
+          return bundle;
+        },
+      }),
+    ];
+    for (const wrapReader of unstated) {
+      const harness = await connectHarness({
+        store,
+        principal: PRINCIPAL_A,
+        entitlements: directory.entitlementsFor(PRINCIPAL_A),
+        documents,
+        wrapReader,
+      });
+      try {
+        const provenance = await callTool(harness, "get_provenance", {
+          bundleId: store.bundleIdA,
+          versionId: "2",
+        });
+        expect(provenance.structured).toEqual({ tool: "get_provenance", error: "unavailable" });
+        const section = await callTool(harness, "get_section", {
+          bundleId: store.bundleIdA,
+          versionId: "2",
+          sourceKey: SECTION_KEY,
+        });
+        expect(section.isError).toBe(false);
+        expect("provenanceResourceId" in section.structured).toBe(false);
+        expect(harness.log.provenance).toEqual([]);
+        expect(harness.audits.map(({ outcome }) => outcome)).toEqual(["unavailable", "ok"]);
+      } finally {
+        await harness.close();
+      }
     }
   });
 

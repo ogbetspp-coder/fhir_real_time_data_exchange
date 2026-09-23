@@ -326,7 +326,10 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
   its whole JSON-RPC batch (`REQUEST_READ_BUDGET`), shared by every tool call in it. Without it
   the batch cap (8) times the `find_product` horizon (200) would allow 1,600 Bundle reads in one
   request. `find_product` stops scanning when the budget is spent and reports `truncated: true`;
-  every other tool answers `unavailable` rather than reading. The budget is checked after the
+  every other tool answers `unavailable` rather than reading. A `get_section` costs two reads
+  (the Bundle and the Provenance search), three when it names a version (the current version is
+  read too, and a version that is not current skips the Provenance search); a `get_provenance`
+  the same. The budget is checked after the
   entitlement decision, so an exhausted budget never turns a `not-entitled` record into an
   `unavailable` one. It is not a per-principal limit: a caller may send many requests.
 - **Reads** go to the validated FHIR store only, by REST, as the worker's own client does.
@@ -351,6 +354,51 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
   `not-entitled` in the record. It then counts `sectionsSearched` as the number of candidate
   sections that carry a narrative, normalises each candidate's text in turn, stops at the first
   match, and hashes only the matched section's text.
+- **The quote-edge rule.** A `verify_quote` match is a contiguous slice of a section's
+  normalised text whose two edges fall on boundaries, and the rule for where a quote may begin
+  and end is its own — stricter than the publishing gate's span-edge rule
+  (`docs/fidelity-normalization.md` section 6), which is left unchanged. The gate only has to
+  stop a span cutting a word, because it then requires the whole section to equal the approved
+  narrative; a quote has no second check after it, and a quote that stops at punctuation can
+  still say something the label does not. So, in `src/query/tools.ts`:
+  - **left edge**: the code point before the quote is absent or a space, or it is a run of
+    opening punctuation — `(`, `[`, `{`, straight and curly opening quotation marks, `«`, `‹`,
+    `¿`, `¡` — that is itself preceded by a space or the start of the text;
+  - **right edge**: the code point after the quote is absent or a space, or it is a run of
+    closing punctuation — `.`, `,`, `;`, `:`, `!`, `?`, `)`, `]`, `}`, straight and curly
+    closing quotation marks and apostrophes, `»`, `›`, `…` — that is itself followed by a space
+    or the end of the text;
+  - **across a space**: a quote that begins with a digit after a space preceded by a digit, or
+    ends with a digit before a space followed by a digit, has cut a space-grouped number; a quote
+    preceded by a comparator or sign and a space (`<`, `>`, `≤`, `≥`, `±`, `∓`, `−`, `~`, `≈`
+    and their variants) has lost it. Both are cuts;
+  - and a word character on either side (the fidelity library's own `isWordCharacter`) is a cut
+    before any of this is consulted, so the rule is never looser than the gate's.
+
+  So "The dose is 5 mg" against "The dose is 5 mg/m²." or "…5 mg/kg body weight.", "Take 2"
+  against "Take 2.5 mg", "Take 10" against "Take 10,5 mg", "see section 4" against "(see section
+  4.4)", "20 °C" against "-20 °C" or "−20 °C", "10 mg per day" against "<10 mg per day" or
+  "≥10 mg per day", "diabetic patients" against "non-diabetic patients", "t take with food"
+  against "Don't take with food", "Up to 1 000" against "Up to 1 000 000 IU", "first dose is 5
+  mg/m" against "5 mg/m²" and "max 10" against "max 100 mg" are all `no-match`; a quote that ends
+  before a sentence's full stop, a comma, a colon or a closing parenthesis followed by a space,
+  or that begins after an opening parenthesis or quotation mark set off by a space, or at a
+  section's start or end, still matches. An occurrence that is cut does not end the search: a
+  later occurrence whose edges hold, in the same section or a later one, is the match, at its
+  own code-point offsets.
+
+  What the rule does not do, stated: it does not make a quote complete — a quote may stop
+  before any following word, so "Take 5" matches "Take 5 mg daily" and a match proves the words
+  a quote contains, not that nothing follows them; a sign set off by a hyphen or dash and a space
+  ("at - 20 °C") is not treated as a sign, because a spaced hyphen or dash is far more often a
+  separator; two numbers genuinely separated only by a space cannot be quoted up to the space
+  between them (fail-safe `no-match`); and text written without spaces between words — Chinese,
+  Japanese, Thai — has almost no boundaries, so most quotes from it are `no-match` (fail-safe).
+  History: until 2026-09-22 the search was a plain substring test; the repository review of that
+  date found it confirming quotes cut inside a word, and the first fix (the gate's word-cut rule
+  alone) was found by independent review the same day still to confirm every example above that
+  stops at punctuation, which is why the rule is now its own.
+
 - **Provenance is document-level.** The persisted `Provenance` resource carries the source
   document hash, the fidelity report hash, the approved-content hash, extractor and model
   identities, the approver's identity, and — on the attester agent's `role`, under
@@ -363,6 +411,42 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
   verify an answer against the store; the comparison against the _approved_ record (the
   per-section hashes in the ingestion-provenance evidence object) needs an evidence-bucket
   read and is phase 2.
+- **An approval is stated only for the current version (interim).** Nothing in the store binds
+  a stored version to its own approval: the Provenance `target` is `Bundle/<id>` with no
+  version, and the stored Bundle does not name its Provenance. The reader therefore answers with
+  one approval for the document — the most recently _written_ one, chosen in code by the store's
+  own `meta.lastUpdated` and then by id (`latestProvenance`). Written, not `recorded`:
+  `recorded` is the approval date the submission carried, so version 1 republished after version
+  2 would otherwise have been answered with version 2's approval, although version 1 is current
+  again; the independent review of 2026-09-22 found that. The worker writes an approved version
+  and its Provenance in one transaction, so the most recently written approval is the current
+  version's whenever the current version came through the gate — an inference from write order,
+  not a recorded link — and is some other version's for every earlier one. The store is still
+  asked for a page ordered by `-recorded`, the sort verified against the Healthcare API on
+  2026-09-21; `-_lastUpdated` would put the newest-written first on the page as well, but has
+  not been checked the same way, and a sort the store refused would fail every lookup. Until it
+  is, write order is exact for a document with at most 20 approvals (`PROVENANCE_PAGE_SIZE`).
+
+  Until 2026-09-22 a request naming version 1 of a document that has a version 2 was answered
+  with version 2's Provenance id, `approvedContentSha256` and approver: a superseded label cited
+  with the wrong approval. The repository review of that date found it. Now, when a caller names
+  a `versionId`, the service reads the document's current version as well (one more store read,
+  from the same budget) and compares; if the named version is not the current one — or the
+  plain read answers nothing, or a Bundle that does not say its version — `get_provenance`
+  answers `unavailable` without searching for a Provenance, and `get_section` answers the
+  section verbatim with no `provenanceResourceId`. With no `versionId`, or the current one, the
+  behaviour is unchanged. `unavailable` is the closed code the tool already gives for an
+  approval it cannot state in full; it is also what a store outage answers, so a caller cannot
+  tell "superseded version" from "try again" by the code alone — adding a code would be a major
+  contract change, and is left to the approval design.
+
+  This is fail-closed, not a binding: the binding of a version to its approval belongs to the
+  approval design (`docs/vision.md`, "The order", item 2), and these stay open until it lands.
+  A current version written without an approval — by the `fixture` or `healthcare-api` run
+  source, which bypass the gate — is answered with the last approval written, because nothing
+  distinguishes it. A version written between the service's read of the current version and
+  its Provenance search can be answered with that newer approval. And the page bound above.
+
 - **Transport** is the Model Context Protocol streamable-HTTP transport from the official SDK,
   pinned, in stateless mode so Cloud Run can scale it. Tool descriptions state that content
   fields are document text, never instructions. Tool failures are returned as `isError: true`
@@ -416,8 +500,8 @@ stage: "query-http", event: "deadline" | "client-closed", principal: <sub>` with
 Each of these is an acceptance criterion for phase 1 — it exists as a named test under
 `test/query/`, except 18 and 28, which hold the repository's own scripts to what this note says
 about them and live in `test/ci/` — and each is also a demonstration. The first seven are the
-original criteria; the rest were added with the three adversarial reviews of 2026-09-20 and pin
-the behaviour described above.
+original criteria; the rest were added with the three adversarial reviews of 2026-09-20 — and
+29 and 30 with the repository review of 2026-09-22 — and pin the behaviour described above.
 
 1. **Verbatim with citations.** `get_section` returns the stored narrative byte for byte, with
    `narrativeDivSha256` and `normalizedTextSha256` that the test recomputes independently
@@ -576,6 +660,27 @@ alpine` with a `RUN --mount ... from=alpine`, and a `FROM node:...@<digest> AS n
     is not the worker URL — and with one that carries no decodable audience at all — the seed
     script exits 1 naming `WORKER_ID_TOKEN` and the impersonation command, before any request;
     a token whose audience is the worker URL is not stopped. (`test/ci/demo-seed-token.test.ts`)
+29. **A quote matches only between the quote-edge boundaries.** Every example in "The
+    quote-edge rule" above that must be `no-match` is `no-match`, each against its own section
+    text; whole sentences and clauses match — ending before a full stop, a comma followed by a
+    space, a colon, a closing parenthesis followed by a space, beginning after an opening
+    parenthesis or quotation mark — at the code-point offsets recomputed from the text, including
+    after a letter outside the Basic Multilingual Plane, where UTF-16 and code-point offsets
+    differ; "5 mg" is `no-match` with such a letter immediately before it and immediately after
+    it; where the first occurrence of "max 10" is inside "max 100" and a later one is whole, the
+    later one is the match, in the same section and — with no section named — in a later
+    section. (`acceptance.test.ts`, "a quote matches only between the quote-edge boundaries")
+30. **An earlier version is never given a later version's approval.** Over a store holding
+    version 1 in history and version 2 current with its own approval, `get_provenance` for
+    version 1 answers `unavailable` with and without a section, `get_section` for version 1
+    answers verbatim with no `provenanceResourceId`, and no Provenance search is made; version 2,
+    named or not, is answered with its own approval by both tools; each call writes one record
+    naming the version it read; two reads are not enough for a `get_section` of a named version;
+    and a store whose plain read answers nothing, or a Bundle with no version, does not make the
+    named version current. (`acceptance.test.ts`, "an earlier version is never given a later
+    version's approval") The approval chosen is the most recently written, whatever the approval
+    dates say, in both directions. (`fhir-reader.test.ts`, "goes by when the store wrote an
+    approval, not by the approval date it carries")
 
 ## Security properties stated honestly
 
@@ -723,6 +828,19 @@ precisely so entitlements can be granted by a role separate from the developer.
   audit promise holds for every argument shape. Decided 2026-09-20.
 - The image-pinning gate covers `COPY --from`, `ADD --from` and `RUN --mount ... from=` as well
   as `FROM`, and has its own negative fixture test. Decided 2026-09-20.
+- `verify_quote` accepts a match only when both edges hold under the quote-edge rule, a rule
+  of its own and stricter than the gate's span-edge rule, which is unchanged; it keeps searching
+  past an occurrence that is cut. Space-grouped numbers are handled (fail-safe) rather than left
+  as a residual. `QUERY_TOOLS_VERSION` moved to `2.0.1`: no shape changed, but the published
+  descriptions of `QuoteVerification`, `SectionContent` and `ProvenanceDetail` and three tool
+  descriptions served through `tools/list` did, and `match` means something stricter (ADR 0002:
+  a description-level change is a patch). Decided 2026-09-22.
+- An approval is attached only to the version the store currently serves as the document, and
+  the approval chosen is the most recently written, not the most recently dated; a named
+  earlier version gets `unavailable` from `get_provenance` and no `provenanceResourceId` from
+  `get_section`. Interim, fail-closed, until the approval design binds a version to its
+  approval. `unavailable` was chosen over `version-not-found` because the version exists and
+  is served; what cannot be given is its approval. Decided 2026-09-22.
 - A pre-transport refusal is a 400 with no detail, and the warning it writes carries no field
   derived from the body's content — only how many JSON-RPC messages the body held, and that
   only when the body was parsed. A refusal must not become a way to have the service echo

@@ -59,7 +59,14 @@ export const TYPOGRAPHY_DIV =
   "<p>The sponsor\u2019s first dose is 5 mg/m\u00b2 daily.</p>" +
   "</div>";
 
-export type SeededDocument = { bundle: FhirBundle; provenance?: FhirResource | undefined };
+export type SeededDocument = {
+  // The current version: what a plain read answers.
+  bundle: FhirBundle;
+  // The newest approval, which is what a Provenance search for the document answers.
+  provenance?: FhirResource | undefined;
+  // Earlier stored versions, which only a `_history` read reaches.
+  history?: FhirBundle[] | undefined;
+};
 
 export type QueryStore = {
   mapping: EmaMapping;
@@ -110,6 +117,14 @@ function replaceNarrative(bundle: FhirBundle, sourceKey: string, div: string): v
     replaced.push(id);
   });
   if (replaced.length !== 1) throw new Error(`No narrative section for ${sourceKey}`);
+}
+
+// A copy of a stored document with some sections' narrative replaced, for a test that needs
+// wording the synthetic submission does not carry.
+export function withNarratives(bundle: FhirBundle, divs: Record<string, string>): FhirBundle {
+  const copy = structuredClone(bundle);
+  for (const [sourceKey, div] of Object.entries(divs)) replaceNarrative(copy, sourceKey, div);
+  return copy;
 }
 
 function setProduct(bundle: FhirBundle, productName: string, identifierValue: string): void {
@@ -286,10 +301,10 @@ export function createFakeReader(
     readBundleVersion(bundleId, versionId) {
       log.bundles.push(`${bundleId}/_history/${versionId}`);
       const document = documents.get(bundleId);
-      if (document === undefined || document.bundle.meta?.versionId !== versionId) {
-        return Promise.resolve(undefined);
-      }
-      return Promise.resolve(structuredClone(document.bundle));
+      const version = [document?.bundle, ...(document?.history ?? [])].find(
+        (bundle) => bundle !== undefined && bundle.meta?.versionId === versionId,
+      );
+      return Promise.resolve(version === undefined ? undefined : structuredClone(version));
     },
     findProvenanceForBundle(bundleId) {
       log.provenance.push(bundleId);
@@ -324,11 +339,14 @@ export async function connectHarness(options: {
   // request; a harness is one connection over which a test makes several calls, so the default
   // here is large enough that only a test that sets it small meets the exhausted path.
   readBudget?: number;
+  // Lets a test change what one kind of read answers — a store whose plain read of a document
+  // disagrees with its history, say — while the read log still records every read.
+  wrapReader?: (reader: FhirReader) => FhirReader;
 }): Promise<Harness> {
   const audits: QueryAuditRecord[] = [];
   const { reader, log } = createFakeReader(options.documents ?? options.store.documents);
   const server = createMcpServer({
-    reader,
+    reader: options.wrapReader === undefined ? reader : options.wrapReader(reader),
     mapping: options.store.mapping,
     serviceVersion: SERVICE_VERSION,
     identity: options.identity ?? testIdentity(options.principal),
