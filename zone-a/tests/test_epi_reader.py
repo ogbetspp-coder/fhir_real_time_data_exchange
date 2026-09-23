@@ -262,3 +262,32 @@ def test_colours_are_normalised_and_inherit_is_not_a_mark() -> None:
 def test_a_numbered_list_is_told_from_a_bulleted_one() -> None:
     paragraphs, _, _ = read_div(div("<ol><li>a</li></ol><ul><li>b</li></ul>"))
     assert [p.numbering.num_id if p.numbering else None for p in paragraphs] == [2, 1]
+
+
+# --- review round 2 -----------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "style",
+    [
+        "color: #ffffff00",
+        "color: #fff0",
+        "color: hsl(0, 0%, 100%)",
+        "color: rgba(0 0 0 / 0)",
+        "color: rgb(100%, 100%, 100%)",
+        "color: rgba(0, 0, 0, 0.001)",
+        "margin-left: -100%",
+        "text-indent: -100%",
+        "margin-left: -1e4px",
+        "margin-left: -100vw",
+        "text-indent: -999rem",
+        "margin-left: calc(-9999px)",
+    ],
+)
+def test_colours_and_offsets_the_reader_cannot_place_are_refused(style: str) -> None:
+    assert refusal(f'<p style="{style}">x</p>') == "unsupported-style"
+
+
+def test_nearly_white_is_faint_and_nearly_black_is_nothing() -> None:
+    body = '<p><span style="color: #f5f5f5">a</span><span style="color: #0d0d0d">b</span></p>'
+    assert kinds(body) == [(0, 1, "faint")]

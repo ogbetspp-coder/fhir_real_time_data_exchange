@@ -22,7 +22,7 @@
     "findings": {
       "deviation": 1,
       "document-quirk": 1,
-      "formatting": 5,
+      "formatting": 4,
       "heading-text": 2,
       "refused-section": 1
     },
@@ -51,13 +51,6 @@
       "paragraph": 0,
       "mark": "shading-lightgrey",
       "text": "the national reporting system listed in Appendix V"
-    },
-    {
-      "kind": "formatting",
-      "section": "5.1 Pharmacodynamic properties",
-      "paragraph": 194,
-      "mark": "color-#0d0d0d",
-      "text": "Kaplan-Meier Curve of IRC-assessed PFS in the SEQUOIA study Cohort 1 (ITT popul…"
     },
     {
       "kind": "formatting",
@@ -255,7 +248,7 @@
       "in": "5.1 Pharmacodynamic properties",
       "paragraph": 0,
       "start": 0,
-      "end": 105
+      "end": 98
     },
     {
       "id": "smpc.5.1#1",

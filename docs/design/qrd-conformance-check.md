@@ -59,18 +59,19 @@ EMA writes "GFR < 60 mL/min" that way in Jentadueto.
   section must carry that code's heading: for a numbered section one of the forms the registry
   allows (`zone_a/qrd/headings.py`), for a named subsection the mapping's title.
 - **Statements.** The registry's patterns are matched against the text of their section,
-  after whitespace is collapsed: literal text exactly, a fill-in as any text within one
-  paragraph, an optional segment present or absent, guidance and footnote markers dropped. A
+  after whitespace is collapsed: literal text exactly, every space included (a space next to
+  an optional segment belongs to it), a fill-in as any text within one paragraph, an optional
+  segment present or absent, guidance and footnote markers dropped. A
   statement over two paragraphs ("Traceability" and the sentence under it) is matched against
   consecutive paragraphs. Struck-through and faint text never counts as a match.
 - **Deviations.** A statement that does not match but resembles a paragraph of its section
-  (difflib's word-level ratio of at least 0.85) is reported with the word-level differences.
-  Text that an exact match of a sibling statement explains is not compared again; the rest of
-  the paragraph is.
+  (difflib's word-level ratio of at least 0.85) is reported with the word-level differences,
+  up to the end of the sentence; text in the place of a fill-in is not a difference, and
+  struck or faint words show as "[struck or faint text]". Text that an exact match of a sibling
+  statement explains is not compared again; the rest of the paragraph is. 0.85 is a proposal
+  threshold, set on these three labels; a lower one would find more and be wrong more often.
 - **Refused parts.** A statement not found in a section with a part the reader refused is
-  `not-checked`, not `absent`.
-  0.85 is a proposal threshold, set on these three labels; a lower one would find more and be
-  wrong more often.
+  `not-checked`, not `absent`. A resemblance in the readable part is still a deviation.
 - **Appendices.** Appendix I's statements against 4.6, Appendix II's frequency convention and
   system organ classes against 4.8, Appendix III's storage statements against 6.4.
 
@@ -108,7 +109,8 @@ Every finding below was confirmed by reading the source div.
 - **Formatting.** Blue text (an email address and the EMA link) and grey table shading in
   Brukinsa, besides the template's intended grey shading of "the national reporting system
   listed in Appendix V" in all three. Red, yellow and other colours in the source fall only on
-  pictures or spaces, which show no text differently, and are not reported.
+  pictures or spaces, which show no text differently, and nearly black text (`#0d0d0d`) reads
+  as black; neither is reported.
 
 The mapping lacks three EMA codes the labels use (Pregnancy, Breast-feeding and Fertility under
 4.6); the check reports them as `unmapped-code`, for information.

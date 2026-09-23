@@ -34,8 +34,9 @@ What is marked (``Paragraph.marks``, the Word reader's kinds): ``sup`` and ``ver
 super`` as superscript, ``sub`` and ``vertical-align: sub`` as subscript, ``s``, ``strike`` and
 ``text-decoration: line-through`` as strike, a background other than white as
 ``shading-<colour>``, a text colour other than black as ``color-<colour>`` (white or a
-transparent colour as faint instead; ``#abc`` and ``rgb()`` are written as ``#aabbcc``), and a
-font size under two points as faint. Bold, italic,
+nearly white colour as faint instead, a nearly black one as nothing; ``#abc`` and ``rgb()`` are
+written as ``#aabbcc``, and any other colour notation refuses the section), and a font size
+under two points as faint. Bold, italic,
 underline, font family and every layout property are not reported.
 
 What refuses a section (``SectionRefusal.code``):
@@ -57,7 +58,8 @@ What refuses a section (``SectionRefusal.code``):
 Also refused as ``malformed-xhtml``: a CDATA section (an XML parser reads it as text, an HTML
 parser as a comment). As ``unsupported-element``: text between the parts of a table, which a
 browser moves out of the table. As ``unsupported-style``: a margin or indent more than an inch
-to the left, which moves text off the page.
+to the left, which moves text off the page, or in a unit the reader does not know (``%``,
+``vw``, ``calc()``...).
 
 What refuses the document (``EpiRefusedError``): not a document Bundle, not exactly one entry
 with sections, or a section without a title.
@@ -175,30 +177,85 @@ def _declarations(style: str) -> list[tuple[str, str]]:
     return out
 
 
+# Colour names the reader accepts: CSS's basic colours, the ones Word writes, and keywords.
+_NAMED = {
+    "black",
+    "silver",
+    "gray",
+    "grey",
+    "white",
+    "maroon",
+    "red",
+    "purple",
+    "fuchsia",
+    "green",
+    "lime",
+    "olive",
+    "yellow",
+    "navy",
+    "blue",
+    "teal",
+    "aqua",
+    "lightgrey",
+    "lightgray",
+    "darkgray",
+    "darkgrey",
+    "windowtext",
+    "transparent",
+    "none",
+    "auto",
+    "inherit",
+    "initial",
+    "currentcolor",
+}
+
+
 def _colour(value: str) -> str:
-    """A colour in one spelling: ``#abc`` and ``rgb(170, 187, 204)`` as ``#aabbcc``."""
+    """A colour in one spelling (``#abc`` and ``rgb(170, 187, 204)`` as ``#aabbcc``), or a
+    refusal: any other notation (alpha, ``hsl()``, percentages) could hide text unseen."""
     short = re.fullmatch(r"#([0-9a-f])([0-9a-f])([0-9a-f])", value)
     if short:
         return "#" + "".join(2 * digit for digit in short.groups())
-    rgb = re.fullmatch(
-        r"rgba?\(\s*([0-9]{1,3})\s*,\s*([0-9]{1,3})\s*,\s*([0-9]{1,3})\s*(,[^)]*)?\)", value
-    )
-    if rgb:
-        if rgb.group(4) and re.fullmatch(r",\s*0(\.0*)?\s*", rgb.group(4)):
-            return "transparent"
-        return "#" + "".join(f"{min(int(part), 255):02x}" for part in rgb.groups()[:3])
-    return value
+    if re.fullmatch(r"#[0-9a-f]{6}", value) or value in _NAMED:
+        return value
+    rgb = re.fullmatch(r"rgb\(\s*([0-9]{1,3})\s*,\s*([0-9]{1,3})\s*,\s*([0-9]{1,3})\s*\)", value)
+    if rgb and all(int(part) <= 255 for part in rgb.groups()):
+        return "#" + "".join(f"{int(part):02x}" for part in rgb.groups())
+    raise _RefusedError("unsupported-style", f"colour {value!r}")
 
 
-def _off_screen(value: str) -> bool:
+def _channels(colour: str) -> tuple[int, int, int] | None:
+    if re.fullmatch(r"#[0-9a-f]{6}", colour):
+        return int(colour[1:3], 16), int(colour[3:5], 16), int(colour[5:7], 16)
+    return None
+
+
+def _light(colour: str) -> bool:
+    """Nearly white: hard to see on the page."""
+    channels = _channels(colour)
+    return channels is not None and min(channels) >= 0xF0
+
+
+def _dark(colour: str) -> bool:
+    """Nearly black: reads as black text."""
+    channels = _channels(colour)
+    return channels is not None and max(channels) <= 0x20
+
+
+def _on_page(value: str) -> bool:
+    """Every part of a margin or indent is ``0``, ``auto`` or a length in a unit the reader
+    knows, and none moves text more than an inch to the left."""
     for part in value.split():
-        match = re.fullmatch(r"-([0-9]+(?:\.[0-9]+)?)(pt|px|pc|in|cm|mm|em)", part)
-        if match is None:
+        if part in ("0", "auto"):
             continue
-        size = float(match.group(1)) * (12.0 if match.group(2) == "em" else _POINTS[match.group(2)])
-        if size > _OFF_SCREEN_POINTS:
-            return True
-    return False
+        match = re.fullmatch(r"(-?)([0-9]+(?:\.[0-9]+)?)(pt|px|pc|in|cm|mm|em)", part)
+        if match is None:
+            return False
+        unit = match.group(3)
+        size = float(match.group(2)) * (12.0 if unit == "em" else _POINTS[unit])
+        if match.group(1) and size > _OFF_SCREEN_POINTS:
+            return False
+    return True
 
 
 def _points(value: str) -> float | None:
@@ -211,7 +268,7 @@ def _style(style: str) -> set[str]:
     kinds: set[str] = set()
     for name, value in _declarations(style):
         if _LAYOUT.fullmatch(name):
-            if name.startswith(("margin", "text-indent")) and _off_screen(value):
+            if name.startswith(("margin", "text-indent")) and not _on_page(value):
                 raise _RefusedError("unsupported-style", f"{name}: {value}")
             continue
         if name == "visibility":
@@ -219,9 +276,11 @@ def _style(style: str) -> set[str]:
                 raise _RefusedError("unsupported-style", f"visibility: {value}")
         elif name == "color":
             colour = _colour(value)
-            if colour in _WHITE:
+            if colour in ("inherit", "currentcolor"):
+                continue
+            if colour in _WHITE or _light(colour):
                 kinds.add("faint")
-            elif colour not in _BLACK and colour not in ("inherit", "currentcolor"):
+            elif colour not in _BLACK and not _dark(colour):
                 kinds.add(f"color-{colour}")
         elif name in ("background", "background-color"):
             colour = _colour(value)

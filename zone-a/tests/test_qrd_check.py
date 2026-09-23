@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -341,3 +342,80 @@ def test_differences_stop_at_the_end_of_the_sentence() -> None:
     assert deviation["differences"] == [
         {"change": "replace", "template": "V.", "label": "V and include the batch number."}
     ]
+
+
+# --- review round 2 -----------------------------------------------------------------------
+
+DISPOSAL = (
+    "Any unused medicinal product or waste material should be disposed of in accordance with "
+    "local requirements."
+)
+
+
+def _deviation(result: dict[str, Any], identifier: str) -> dict[str, Any]:
+    (deviation,) = [f for f in findings(result, "deviation") if f["id"] == identifier]
+    return deviation
+
+
+def test_struck_words_inside_a_statement_are_named_in_its_differences() -> None:
+    text = DISPOSAL.replace("local", "national local")
+    start = text.index("national")
+    paragraph = Paragraph(text, None, None, None, marks=(Mark(start, start + 8, "strike"),))
+    result = check(document(smpc_6_6=(paragraph,)), REGISTRY, MAPPING)
+    identifier = f"smpc.6.6#{_item_index('smpc.6.6', '<Any unused')}"
+    assert _deviation(result, identifier)["differences"] == [
+        {"change": "insert", "template": "", "label": "[struck or faint text]"}
+    ]
+
+
+def test_differences_do_not_run_into_the_next_sentence_when_words_are_missing() -> None:
+    text = DISPOSAL.replace("local ", "") + " Store the pen in the fridge until use please."
+    result = check(document(smpc_6_6=_paragraphs(text)), REGISTRY, MAPPING)
+    identifier = f"smpc.6.6#{_item_index('smpc.6.6', '<Any unused')}"
+    assert _deviation(result, identifier)["differences"] == [
+        {"change": "delete", "template": "local", "label": ""}
+    ]
+
+
+def test_a_statement_over_paragraphs_keeps_its_paragraph_breaks() -> None:
+    entry = next(e for e in REGISTRY["appendices"]["I"]["entries"] if e["id"] == "pregnancy.4")
+    paragraphs = [p.replace("{", "").replace("}", "") for p in entry["paragraphs"]]
+    rendered = _paragraphs(*(re.sub(r"[<>]|\[[^\]]*\]", "", p) for p in paragraphs))
+    filler = _paragraphs(*(f"Unrelated paragraph {n}." for n in range(20)))
+    result = check(document(smpc_4_6=filler + rendered), REGISTRY, MAPPING)
+    assert status(result, "appendix-I#pregnancy.4") != "deviation"
+
+
+@pytest.mark.parametrize(
+    "text", ["Do not store above25 \u00b0C.", "No special requirementsfor disposal."]
+)
+def test_a_space_next_to_a_present_optional_segment_is_required(text: str) -> None:
+    result = check(
+        document(smpc_6_4=_paragraphs(text), smpc_6_6=_paragraphs(text)), REGISTRY, MAPPING
+    )
+    assert status(result, "appendix-III#0") != "used"
+    assert status(result, f"smpc.6.6#{_item_index('smpc.6.6', '<No special')}") != "used"
+
+
+def test_a_fill_in_inside_an_optional_segment_is_lazy() -> None:
+    closing = (
+        "Detailed information on this medicinal product is available on the website of the "
+        "European Medicines Agency https://www.ema.europa.eu, and on the website of the Irish "
+        "agency. More text follows. And more."
+    )
+    result = check(document(smpc_10=_paragraphs(closing)), REGISTRY, MAPPING)
+    used = next(s for s in result["statements"] if s["id"] == "document#1")
+    assert closing[used["start"] : used["end"]].endswith("Irish agency.")
+
+
+@pytest.mark.parametrize("title", ["Posology ", "Posology\n", "\u2003Posology"])
+def test_a_title_is_collapsed_as_the_heading_check_collapses_it(title: str) -> None:
+    root = document().sections[0]
+    four = root.sections[3]
+    two = four.sections[1]
+    posology = replace(two.sections[0], title=title)
+    new_two = replace(two, sections=(posology, *two.sections[1:]))
+    new_four = replace(four, sections=(four.sections[0], new_two, *four.sections[2:]))
+    edited = replace(root, sections=(*root.sections[:3], new_four, *root.sections[4:]))
+    result = check(replace(document(), sections=(edited,)), REGISTRY, MAPPING)
+    assert status(result, f"smpc.4.2#{_item_index('smpc.4.2', 'Posology')}") == "used"

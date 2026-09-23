@@ -21,11 +21,12 @@ subsection such as Posology belongs to its section's text. Label text and templa
 compared after runs of space, tab and no-break space are collapsed to one space. Characters the
 reader marked struck through or faint are masked: no statement matches them. In a pattern:
 
-- literal text must appear exactly, every space included, except that a space next to an
-  optional segment or at either end may be absent (removing "<months>" from "{x to y} <years>
-  <months>" leaves one space, not two);
+- literal text must appear exactly, every space included; a space between literal text and an
+  optional segment belongs to the segment ("above <25 C>" is "above 25 C" or "above", never
+  "above25 C"), and spaces at either end of the pattern are dropped;
 - a fill-in (``{...}``) is any non-empty text of at most 300 characters within one paragraph
-  (as little as possible between literals, and the rest of the line at the end);
+  (as little as possible, except at the very end of the pattern, where it takes the rest of the
+  line);
 - an optional segment (``<...>``) may be present or absent; a whole statement in ``<...>`` is
   matched on its content, since "absent" is the answer when it does not match;
 - guidance (``[...]``) is not label text and is dropped, and so are footnote markers (runs of
@@ -39,9 +40,12 @@ that does not match but resembles a paragraph of its section (a word-level
 similarity of at least ``SIMILARITY``, difflib's ratio over a window of the paragraph as long as
 the statement, taking the statement with all of its optional segments or with none, whichever
 is closer) is a ``deviation`` finding with the word-level differences; a person decides
-whether the wording was changed on purpose. The differences run to the end of the sentence the
-resemblance ends in. Characters that an exact match of another statement of the same section
-or appendix explains are not compared again, so one statement matching exactly does not make
+whether the wording was changed on purpose. The differences run from where the resemblance
+starts to the end of the sentence in which the statement's last matching word falls; text in
+the place of a fill-in is not a difference, and a run of struck or faint characters is shown
+as one word, ``HIDDEN_WORD``. A resemblance in the readable part of a section is reported even
+when another part was refused. Characters that an exact match of another statement of the same
+section or appendix explains are not compared again, so one statement matching exactly does not make
 its sibling a deviation, and the rest of the paragraph is still compared. A statement with no
 required literal text of at least ``MIN_LITERAL`` characters is ``not-checkable`` (too little
 to tell). A non-optional statement or subheading that is absent is a ``missing-statement`` or
@@ -113,15 +117,20 @@ def _excerpt(text: str) -> str:
 # --- patterns -------------------------------------------------------------------------------
 
 
-# Characters a reader cannot see (struck through or faint) are masked with this, so no
-# literal of a pattern matches them and no fill-in takes them.
+# Characters a reader cannot see (struck through or faint) are masked with HIDDEN, so no literal
+# of a pattern matches them and no fill-in takes them; in a deviation's differences a run of them
+# is one word, HIDDEN_WORD. Characters an exact match of a sibling statement already explains are
+# masked with TAKEN before the near-match pass, and a run of them separates words.
 HIDDEN = "\x00"
+TAKEN = "\x01"
+HIDDEN_WORD = "[struck or faint text]"
 _HIDING = {"strike", "faint"}
 _SPACES = " \t\u00a0"
 
 
 def _collapse(text: str) -> tuple[str, tuple[int, ...]]:
-    """``headings.collapse`` with, for each character kept, its index in ``text``."""
+    """The text as ``headings.collapse`` gives it, with, for each character kept, its index in
+    ``text``."""
     out: list[str] = []
     positions: list[int] = []
     pending: int | None = None
@@ -136,45 +145,71 @@ def _collapse(text: str) -> tuple[str, tuple[int, ...]]:
             pending = None
         out.append(character)
         positions.append(offset)
-    return "".join(out), tuple(positions)
+    # headings.collapse ends with str.strip(): no whitespace of any kind at either end.
+    start, end = 0, len(out)
+    while start < end and out[start].isspace():
+        start += 1
+    while end > start and out[end - 1].isspace():
+        end -= 1
+    return "".join(out[start:end]), tuple(positions[start:end])
 
 
-def _regex(tokens: list[Token]) -> str:
-    """The pattern as a regular expression over collapsed text. A space is required, except
-    one next to an optional segment or at either end, which may be absent: removing "<months>"
-    from "{x to y} <years> <months>" leaves one space, not two."""
+def _squeeze(value: str) -> str:
+    """Runs of space, tab and no-break space as one space, none next to a paragraph break or at
+    either end; paragraph breaks kept."""
+    text = re.sub(f"[{_SPACES}]+", " ", value).strip(" ")
+    return re.sub(r" ?\n ?", "\n", text)
+
+
+def _regex(tokens: list[Token], at_end: bool = True) -> str:
+    """The pattern as a regular expression over collapsed text.
+
+    A space is required. A space between literal text and an optional segment belongs to the
+    segment ("above <25 \u00b0C>" matches "above 25 \u00b0C" and "above", not "above25 \u00b0C"),
+    and spaces at either end of the pattern are dropped. A space after an optional segment that
+    opens the pattern may be absent."""
     out: list[str] = []
     last = len(tokens) - 1
+    carry = False
     for position, token in enumerate(tokens):
         value = token["value"]
-        before = position == 0 or tokens[position - 1]["kind"] == "optional"
-        after = position == last or tokens[position + 1]["kind"] == "optional"
+        before = tokens[position - 1]["kind"] if position else None
+        after = tokens[position + 1]["kind"] if position < last else None
         if token["kind"] == "text":
             assert isinstance(value, str)
-            core = re.sub(r" ?\n ?", "\n", collapse(value))
+            core = _squeeze(value)
+            opens = before == "optional" and position == 1
             if not core:
-                out.append(" ?" if before or after else " ")
+                if after == "optional":
+                    carry = True
+                elif before is not None and after is not None:
+                    out.append(" ?" if opens else " ")
                 continue
             piece = re.escape(core).replace("\\ ", " ")
-            if value[:1] in _SPACES:
-                piece = (" ?" if before else " ") + piece
+            if value[:1] in _SPACES and before is not None:
+                piece = (" ?" if opens else " ") + piece
             if value[-1:] in _SPACES:
-                piece += " ?" if after else " "
+                if after == "optional":
+                    carry = True
+                elif after is not None:
+                    piece += " "
             out.append(piece)
         elif token["kind"] == "fill":
-            # Lazy between literals; at the end of the pattern it takes the rest of the line,
-            # so the reported span covers what was filled in.
-            lazy = "?" if position < last else ""
-            out.append(f"[^\\n{HIDDEN}]{{1,{FILL_LIMIT}}}{lazy}")
+            # As little as possible, except at the very end of the pattern, where it takes the
+            # rest of the line so the reported span covers what was filled in.
+            lazy = "" if at_end and position == last else "?"
+            out.append(f"[^\\n{HIDDEN}{TAKEN}]{{1,{FILL_LIMIT}}}{lazy}")
         elif token["kind"] == "optional":
             assert isinstance(value, list)
-            out.append(f"(?:{_regex(value)})?")
+            inner = _regex(value, at_end and position == last)
+            out.append(f"(?:{' ' if carry else ''}{inner})?")
+            carry = False
     return "".join(out)
 
 
 def _literals(tokens: list[Token]) -> list[str]:
     """The literal pieces a match must contain."""
-    return [text for t in tokens if t["kind"] == "text" and (text := collapse(str(t["value"])))]
+    return [text for t in tokens if t["kind"] == "text" and (text := _squeeze(str(t["value"])))]
 
 
 _NOTE_MARKER = re.compile(r"\*+")
@@ -225,8 +260,25 @@ def _content(item_pattern: list[Token]) -> list[Token]:
     if len(meaningful) == 1 and meaningful[0]["kind"] == "optional":
         value = meaningful[0]["value"]
         assert isinstance(value, list)
-        return value
-    return [t for t in item_pattern if t["kind"] != "guidance"]
+        return _joined(value)
+    return _joined(item_pattern)
+
+
+def _joined(tokens: list[Token]) -> list[Token]:
+    """The tokens without guidance, with the literal text on either side of it made one."""
+    out: list[Token] = []
+    for token in tokens:
+        value = token["value"]
+        if token["kind"] == "guidance":
+            continue
+        if token["kind"] == "optional":
+            assert isinstance(value, list)
+            token = {"kind": "optional", "value": _joined(value)}
+        if token["kind"] == "text" and out and out[-1]["kind"] == "text":
+            out[-1] = {"kind": "text", "value": str(out[-1]["value"]) + str(value)}
+        else:
+            out.append(token)
+    return out
 
 
 def _parts(tokens: list[Token]) -> int:
@@ -323,7 +375,7 @@ def _mask(lines: list[_Line], taken: dict[tuple[int, int], set[int]]) -> list[_L
     for line in lines:
         used = taken.get(line.key)
         if used:
-            text = "".join(HIDDEN if at in used else c for at, c in enumerate(line.text))
+            text = "".join(TAKEN if at in used else c for at, c in enumerate(line.text))
             line = _Line(line.path, line.paragraph, text, line.positions, line.key)
         out.append(line)
     return out
@@ -362,7 +414,7 @@ class _Match:
 
 def _search(tokens: list[Token], lines: list[_Line]) -> _Match | None:
     literals = _literals(tokens)
-    anchor = max(literals, key=len).replace(" \n", "\n").replace("\n ", "\n") if literals else ""
+    anchor = max(literals, key=len) if literals else ""
     compiled = re.compile(_regex(tokens))
     for window in _windows(lines, _parts(tokens)):
         if anchor and anchor not in window.text:
@@ -373,13 +425,23 @@ def _search(tokens: list[Token], lines: list[_Line]) -> _Match | None:
     return None
 
 
+def _words(text: str) -> list[str]:
+    """Words for comparison: TAKEN separates words, and a run of HIDDEN is one word."""
+    out: list[str] = []
+    for word in re.split(f"[\\s{TAKEN}]+", text):
+        for piece in re.split(f"({HIDDEN}+)", word):
+            if piece:
+                out.append(HIDDEN_WORD if piece[0] == HIDDEN else piece)
+    return out
+
+
 def _closest(
     reference: list[str], lines: list[_Line], size: int
 ) -> tuple[float, _Window, list[str], int] | None:
     best: tuple[float, _Window, list[str], int] | None = None
     length = len(reference)
     for window in _windows(lines, size):
-        words = [word for word in window.text.split() if word.strip(HIDDEN)]
+        words = _words(window.text)
         if not words:
             continue
         for start in range(max(1, len(words) - length + 1)):
@@ -393,14 +455,26 @@ def _closest(
 def _differences(reference: list[str], words: list[str], start: int) -> list[dict[str, str]]:
     """Word-level differences from the statement to the stretch of the paragraph it resembles,
     carried on to the end of that sentence (at most half the statement's length again)."""
-    end = start + len(reference)
-    limit = min(len(words), end + len(reference) // 2)
+    limit = min(len(words), start + len(reference) + len(reference) // 2)
+    blocks = [
+        block
+        for block in difflib.SequenceMatcher(
+            None, reference, words[start:limit], autojunk=False
+        ).get_matching_blocks()
+        if block.size
+    ]
+    # The label's word where the statement's last matching word falls; the stretch runs from
+    # there to the end of that sentence, not into the next one.
+    end = start + (blocks[-1].b + blocks[-1].size if blocks else len(reference))
     while end < limit and not words[end - 1].endswith(TERMINAL):
         end += 1
     stretch = words[start:end]
     out: list[dict[str, str]] = []
     matcher = difflib.SequenceMatcher(None, reference, stretch, autojunk=False)
     for operation, a1, a2, b1, b2 in matcher.get_opcodes():
+        if operation == "replace" and set(reference[a1:a2]) == {"\u2026"}:
+            # Text in the place of a fill-in is what was filled in, not a difference.
+            continue
         if operation != "equal":
             out.append(
                 {
@@ -481,14 +555,17 @@ def _near(report: _Report, job: _Job, taken: _Taken) -> None:
         closest = _closest(reference, lines, _parts(tokens)) if len(reference) >= 4 else None
         if closest is not None and (best is None or closest[0] > best[0]):
             best = (*closest, reference)
-    if best is not None and best[0] >= SIMILARITY:
-        ratio, window, words, start, reference = best
+    differences = _differences(best[4], best[2], best[3]) if best is not None else []
+    if best is not None and best[0] >= SIMILARITY and differences:
+        ratio, window = best[0], best[1]
+        # A resemblance in the readable part is reported even when another part of the section
+        # was refused: the differing wording is there to see.
         report.finding(
             "deviation",
             id=job.identifier,
             similarity=round(ratio, 3),
             **{"in": window.lines[0].path, "paragraph": window.lines[0].paragraph},
-            differences=_differences(reference, words, start),
+            differences=differences,
         )
         report.statements.append({"id": job.identifier, "status": "deviation"})
         return
