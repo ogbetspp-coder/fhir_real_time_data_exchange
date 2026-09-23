@@ -17,8 +17,9 @@ narrative.
 carries the canonical source code system and a narrative `text.div`:
 
 1. the XHTML is converted to text by a fail-closed scanner that accepts only a closed list of
-   elements, attributes, and entities (no `style`, `hidden`, `title`, scripts, comments, or
-   processing instructions);
+   elements, attributes, and entities (no `style`, `hidden`, `title`, `class`, `id`, scripts,
+   comments, or processing instructions), and that folds into the text, or rejects, any markup
+   a renderer would draw differently from the text it emits (since `fidelity-norm/2.0.0`);
 2. the provenance spans are located in the extractor's page text, their raw-slice hashes are
    recomputed, and consecutive spans must be contiguous (only whitespace or page
    header/footer between them) and must not overlap another section's spans; the expected text
@@ -64,27 +65,61 @@ unit order, never locale-aware ordering, so a re-implementation can reproduce th
 
 ## Consequences
 
+_Amended 2026-09-23 for `fidelity-norm/2.0.0`
+(`docs/validation/changes/2026-09-23-fidelity-norm-2-0-0.md`): markup may not change what a
+reader sees without the check seeing it._
+
 - Structure is free (paragraph and cell boundaries flatten to spaces); words are checked.
+  Raised and lowered digits and signs are words: the digits and signs inside `sup` and `sub`
+  fold to their script code points, so `10<sup>6</sup>` is `10⁶` and never equals a source's
+  `106`; a number there with no script form, and U+00B1 or U+2213, rejects.
 - The extractor contract is explicit: emit discretionary hyphens as U+00AD, hard hyphens
-  verbatim, table cells row-major separated by TAB and rows by LF, and declare per-page
-  `bodyStart`/`bodyEnd` so repeated headers and footers are excluded from spans.
+  verbatim, table cells row-major separated by TAB and rows by LF with the same number of cells
+  in every row (a spanned cell's text once, in its first slot, and empty cells for the slots it
+  covers), raised and lowered digits and signs as script code points, no U+000B or U+000C (a
+  page break is the page record), and declare per-page `bodyStart`/`bodyEnd` so repeated
+  headers and footers are excluded from spans, with every non-empty body ending in its own line
+  feed. An extractor that cannot tell a glyph's baseline shift must refuse the document rather
+  than emit plain digits.
 - Tail-of-page omissions are visible only through the report's coverage figures, which are
   recorded as evidence for reviewers but do not fail the check. Because the body range is
   declared by the extractor, it is bounded rather than trusted: bodies must sit on line
-  boundaries and may exclude at most 240 code points per page (`docs/fidelity-normalization.md`
-  section 1), and the report records the full page length alongside the body length.
+  boundaries, end with their own line terminator even at the end of a page, and may exclude at
+  most 240 code points per page (`docs/fidelity-normalization.md` section 1); pages are
+  numbered 1..N, so none can be left out; and the report records the full page length
+  alongside the body length.
 - Across a page break the verifier concatenates the page bodies verbatim, blank gaps included,
   so the source's own characters (a final line terminator or a soft hyphen) decide whether a
   word continues; the verifier never inserts a character of its own.
 - Attribute values in narrative markup are token-limited (`docs/fidelity-normalization.md`
   section 5) because they are never compared against the source. The bounds limit the
-  capacity of that channel; they do not eliminate it. `ol` and `q` are not allowed because
-  renderers generate visible characters for them, and table sections must appear in rendering
-  order.
+  capacity of that channel; they do not eliminate it. Nothing a viewer's stylesheet or script
+  can key on to hide text is allowed: no `class`, no `id`, a language tag on the root only, no
+  in-page link. `ol` and `q` are not allowed because renderers generate visible characters for
+  them, and table sections must appear in rendering order.
+- Only `br` and `hr` may be self-closing, and must be, because an HTML parser ignores the `/`
+  of any other element. Tables contain only table parts and whitespace, every row has the same
+  number of cells, and `colspan`, `rowspan` and `pre` are not allowed, because a renderer moves
+  other content out of a table and draws spanned cells and preformatted columns the check
+  cannot see.
 - A section may omit words but never begin or end inside one: the outer span edges must fall
-  on word boundaries (`docs/fidelity-normalization.md` section 6, reason `word-cut`), and a
-  soft hyphen directly before a structural line break in the narrative rejects, so a word can
-  be neither truncated at a section edge nor joined across markup.
+  on word boundaries, read back through whitespace and across pages
+  (`docs/fidelity-normalization.md` section 6, reason `word-cut`), and a soft hyphen directly
+  before any line break in the narrative's text — raw, referenced, a block boundary or `br` —
+  rejects, so a word can be neither truncated at a section edge nor joined across markup.
+- Section 2 rejects on both sides the characters a renderer draws differently from the check:
+  C1 controls (remapped through windows-1252), U+000B and U+000C, and the bidirectional
+  controls. It applies to the whole narrative `div` as decoded from JSON, markup included,
+  before the scan, and to each decoded character reference on its own, so an unpaired
+  surrogate cannot be completed across markup or by a second reference. A text layer decoded
+  as Latin-1 therefore fails the page; that is intended.
+- Not closed by `fidelity-norm/2.0.0`, stated: two tables with the same text and the same row
+  width can still split that text into cells differently (cell association needs a table
+  extractor contract and is the next major version); a text layer that flattens a superscript
+  is outside the check, because the narrative is derived from it (only the extractor can close
+  that); a letter exponent (`2<sup>n</sup>` against `2n`) still verifies; strong right-to-left
+  letters can reorder adjacent numbers, and no EU product-information language uses them; a
+  viewer's own stylesheet or script can still act on the element names that remain.
 - Golden vectors are the fixed, reviewed floor of a re-implementation, not its proof. The first
   second-language port (Python, 2026-09-20) passed all 130 vectors and then diverged from the
   reference on inputs nobody had written a vector for — regex dialect (`\d`, `$`), unpaired
