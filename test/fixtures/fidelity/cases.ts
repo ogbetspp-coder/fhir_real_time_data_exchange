@@ -407,6 +407,17 @@ const CELL_ACROSS_PAGES = ["\ufdd0\n\ufdd2\t\ufdd3\tDose\t\ufdd3\t2", "\t\u2022 
 const CELL_ACROSS_PAGES_SOURCE = customSource(CELL_ACROSS_PAGES);
 const cellAcrossPagesSpans = (): SourceSpan[] =>
   CELL_ACROSS_PAGES.map((body, index) => spanFor(CELL_ACROSS_PAGES_SOURCE, index + 1, body));
+// A word in a cell hyphenated at a page break (section 7): the continuation begins with the rest
+// of the word, which section 3 step 1 joins across the soft hyphen and the line feed.
+const CELL_WORD_ACROSS_PAGES = [
+  "\ufdd0\n\ufdd2\t\ufdd3\tDose\t\ufdd3\tAdults with renal impair\u00ad",
+  "ment\t\ufdd3\t10 mg\n\ufdd1",
+];
+const CELL_WORD_ACROSS_PAGES_SOURCE = customSource(CELL_WORD_ACROSS_PAGES);
+const cellWordAcrossPagesSpans = (): SourceSpan[] =>
+  CELL_WORD_ACROSS_PAGES.map((body, index) =>
+    spanFor(CELL_WORD_ACROSS_PAGES_SOURCE, index + 1, body),
+  );
 const SPANNED_DOSE_TABLE =
   '<table><tr><td>Adults</td><td rowspan="3">10 mg</td></tr><tr><td>Children</td></tr><tr><td>Elderly</td></tr></table>';
 const MID_LINE_BULLET = "Take 2 \u2022 10 mg daily.";
@@ -2242,6 +2253,35 @@ export const verifyCases: VerifyCase[] = [
         "smpc.4.2.posology",
         div("<table><tr><td>Dose</td><td>2 10</td></tr></table>"),
         cellAcrossPagesSpans(),
+      ),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  // Review round 5: a word in a cell hyphenated at a page break is one word.
+  {
+    name: "cell-word-hyphenated-across-page-break-joins",
+    input: toInput(
+      CELL_WORD_ACROSS_PAGES_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div(
+          "<table><tr><td>Dose</td><td>Adults with renal impairment</td><td>10 mg</td></tr></table>",
+        ),
+        cellWordAcrossPagesSpans(),
+      ),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "cell-word-hyphenated-across-page-break-split-mismatches",
+    input: toInput(
+      CELL_WORD_ACROSS_PAGES_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div(
+          "<table><tr><td>Dose</td><td>Adults with renal impair ment</td><td>10 mg</td></tr></table>",
+        ),
+        cellWordAcrossPagesSpans(),
       ),
     ),
     expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },

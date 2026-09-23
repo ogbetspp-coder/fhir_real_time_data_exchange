@@ -609,7 +609,8 @@ extractor is a controlled component: its name and version are recorded in
 - decode the text layer as Unicode, never through Latin-1 or windows-1252: page text contains
   no section 2 character. Page text contains no U+000B or U+000C; a page break is the page
   record, not a character;
-- emit each table as section 5's scanner does: U+FDD0, then the caption's text if any; each row
+- emit each table as section 5's scanner does: U+FDD0, then on its own line the caption's text if
+  any; each row
   as U+000A U+FDD2 followed by its slots from left to right, where a slot in which a cell starts
   is U+0009 U+FDD3 U+0009 followed by the cell's text, a slot covered by a merged cell from the
   left in that cell's own first row is U+0009 U+FDD4 U+0009, and any other covered slot is
@@ -618,10 +619,14 @@ extractor is a controlled component: its name and version are recorded in
   extractor that cannot tell a merged slot from an empty cell, or cannot recover a table's grid,
   must refuse the document rather than guess: the grid is compared (section 5). A table that
   continues across a page break is one table: no U+FDD1 before the break and no U+FDD0 after
-  it, and a header row the document repeats on the new page is emitted once, where the table
-  first has it. A cell that continues across the break is one cell, and the text that continues
-  a row after the break begins with U+0009: every line of a table's text from its first U+FDD2
-  to its U+FDD1 that holds anything but whitespace holds U+0009 or U+FDD2, so section 3 step 4
+  it. A header or footer row the document repeats on the new page, and a continuation label
+  such as "Table 2 (continued)", is emitted once, where the table first has it (a label, not
+  at all); the repeated copy is drawn text that is excluded from the body like a running header,
+  and counts in `pageCodePoints` and against the page's 240 excluded code points (section 1). A cell that continues across the break is one cell, and the text that continues
+  a row after the break begins with U+0009, unless the body before the break ends with U+00AD
+  U+000A (a word continued): then it begins with the rest of the word, which section 3 step 1
+  joins to the row's line. After step 1, every line of a table's text from its first U+FDD2 to
+  the line before its U+FDD1 that holds anything but whitespace holds U+0009 or U+FDD2, so section 3 step 4
   reads a bullet in a cell as content on a continuation line too (a page body ends with a line
   feed, section 1, so the rest of the cell opens a new line). The verifier does not check this,
   as it checks no other duty of this section; an extractor that breaks it can make a bullet in
@@ -648,8 +653,9 @@ extractor is a controlled component: its name and version are recorded in
   U+FFFC or a code point in U+FDD0–U+FDEF must refuse the document (section 2);
 - put every block on its own line, as the scanner does: U+FDD0, a caption, each U+FDD2 and
   U+FDD1 each start a line, and a paragraph, heading or list item starts one. A title printed
-  above a table is a caption only where the document marks it as one (a PDF has no captions:
-  there it is a paragraph before U+FDD0). A `ul` item's bullet is emitted as section 3 step 4
+  above a table is a caption only where the document marks it as one (a Word caption bound to
+  the table, a tagged PDF's `Caption` structure element); otherwise, as in an untagged PDF, it
+  is a paragraph before U+FDD0. A `ul` item's bullet is emitted as section 3 step 4
   removes it, or not at all;
 - for a structured source (an authority's published FHIR ePI, ADR 0005), emit one page per
   source section, in source order, with the whole page as its body, holding the section

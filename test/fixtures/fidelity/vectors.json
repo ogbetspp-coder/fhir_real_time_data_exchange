@@ -13461,6 +13461,174 @@
         },
         "reportHash": "4f75df80b687fe396670136eccd908577704bf5afae1dcbfafe47ce4e29e574d"
       }
+    },
+    {
+      "name": "cell-word-hyphenated-across-page-break-joins",
+      "input": {
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n﷐\n﷒\t﷓\tDose\t﷓\tAdults with renal impair­\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 74
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nment\t﷓\t10 mg\n﷑\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 50
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>Dose</td><td>Adults with renal impairment</td><td>10 mg</td></tr></table></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 73,
+                "textSha256": "711d2afeeff657ba20b3377a256da8c8bcb0a7e74204187939d9f0d3f5ad521a"
+              },
+              {
+                "page": 2,
+                "startOffset": 35,
+                "endOffset": 49,
+                "textSha256": "a6e000af5f9f7c9e9243f5b49607b70b94d064196f47054504759c244922993c"
+              }
+            ],
+            "narrativeDivSha256": "ce69eda2532cf780f94e86ae3f49460f8242ff17cbc8c7a68f822aed52b9ce12",
+            "normalizedTextSha256": "6657fb1e8f37d22bd7f531937a70dba44298545d45f5b20932471955448aa1e9"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "extractedTextSha256": "5e6b7fae27afa12241754a7a945b8ba6f7ec969f8a6bbf5ddafd28b021cf64c0",
+        "narrativeBindingSha256": "f9345ff14cec6aaae3ba6122d2956d8001aa74dfc860eb6362754df8b5041800",
+        "status": "passed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "verified",
+            "spanCount": 2,
+            "normalizedTextSha256": "6657fb1e8f37d22bd7f531937a70dba44298545d45f5b20932471955448aa1e9"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 1
+        },
+        "coverage": {
+          "pageCodePoints": 146,
+          "bodyCodePoints": 54,
+          "coveredCodePoints": 52,
+          "uncoveredGaps": 0
+        },
+        "reportHash": "028b2c9a419685a86c8591ca71264ee7a06daf61c3dfa4a3cedc0f50099d03c0"
+      }
+    },
+    {
+      "name": "cell-word-hyphenated-across-page-break-split-mismatches",
+      "input": {
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n﷐\n﷒\t﷓\tDose\t﷓\tAdults with renal impair­\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 74
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nment\t﷓\t10 mg\n﷑\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 50
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>Dose</td><td>Adults with renal impair ment</td><td>10 mg</td></tr></table></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 73,
+                "textSha256": "711d2afeeff657ba20b3377a256da8c8bcb0a7e74204187939d9f0d3f5ad521a"
+              },
+              {
+                "page": 2,
+                "startOffset": 35,
+                "endOffset": 49,
+                "textSha256": "a6e000af5f9f7c9e9243f5b49607b70b94d064196f47054504759c244922993c"
+              }
+            ],
+            "narrativeDivSha256": "9471fef40cdc45c35cf0ef7266ce7befd3994a1389d6e6035d973febd5d87c2e",
+            "normalizedTextSha256": "7773c5e66a38790a73d655f109f78673286aed257b86c141b8047aa5af93661a"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "extractedTextSha256": "5e6b7fae27afa12241754a7a945b8ba6f7ec969f8a6bbf5ddafd28b021cf64c0",
+        "narrativeBindingSha256": "d79f60c6f48fd4fdfddab13eecd30491c3ff4a2b70e78c79bba64b743dfec146",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 2,
+            "details": {
+              "expectedLength": 51,
+              "actualLength": 52,
+              "firstDifferingOffset": 37,
+              "commonSuffixLength": 14,
+              "expectedWordCount": 13,
+              "actualWordCount": 14,
+              "expectedSha256": "6657fb1e8f37d22bd7f531937a70dba44298545d45f5b20932471955448aa1e9",
+              "actualSha256": "7773c5e66a38790a73d655f109f78673286aed257b86c141b8047aa5af93661a"
+            },
+            "normalizedTextSha256": "7773c5e66a38790a73d655f109f78673286aed257b86c141b8047aa5af93661a"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 146,
+          "bodyCodePoints": 54,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 2
+        },
+        "reportHash": "4a90721d16395460c87b133ca36b14cf31c96d3500efa0c321119d4449892e2e"
+      }
     }
   ]
 }

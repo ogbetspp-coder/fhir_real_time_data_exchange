@@ -72,6 +72,30 @@ def _composition(submission: Mapping[str, Any]) -> Mapping[str, Any]:
     raise AssertionError("the fixture carries no Composition")
 
 
+def quote_is_refused(quote: str) -> bool:
+    """Whether the real service answers ``invalid-request`` for this quote before searching.
+
+    ``src/query/tools.ts`` refuses a quote that normalises to nothing, one carrying a section 2
+    character of ``docs/fidelity-normalization.md`` (C0 controls other than tab, line feed and
+    carriage return; DEL and the C1 controls; U+FFFD, U+FFFE, U+FFFF; the bidirectional controls;
+    a lone surrogate), and since fidelity-norm/3.0.0 one carrying a table's grid marker or a
+    picture's U+FFFC (U+FDD0-U+FDEF, U+FFFC), which the scanner writes and a reader never sees.
+    """
+    if not quote.strip():
+        return True
+    for character in quote:
+        point = ord(character)
+        if point < 0x20 and point not in (0x09, 0x0A, 0x0D):
+            return True
+        if 0x7F <= point <= 0x9F or point in (0xFFFD, 0xFFFE, 0xFFFF, 0x061C, 0x200E, 0x200F):
+            return True
+        if 0x202A <= point <= 0x202E or 0x2066 <= point <= 0x2069 or 0xD800 <= point <= 0xDFFF:
+            return True
+        if point == 0xFFFC or 0xFDD0 <= point <= 0xFDEF:
+            return True
+    return False
+
+
 def _plain_text(div: str) -> str:
     """A deliberately small XHTML-to-text step, sufficient for the fixture's one-paragraph divs.
 
@@ -315,6 +339,10 @@ def _build_server(state: FakeQueryService) -> Any:
         versionId: str = VERSION_ID,  # noqa: N803
     ) -> dict[str, Any]:
         del bundleId
+        if quote_is_refused(quote):
+            # The real service answers with an error result; FastMCP turns this into one.
+            state.seen_quotes.append((quote, "invalid-request"))
+            raise ValueError("invalid-request")
         result: dict[str, Any] = {
             "document": {
                 "bundleId": BUNDLE_ID,

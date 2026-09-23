@@ -1,7 +1,7 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and two reviews of the
-implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md` (3.0.0) is the normative text; where this note and
+_Proposal, 2026-09-23, amended after two independent design reviews and three reviews of
+the implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md` (3.0.0) is the normative text; where this note and
 it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
 cells spanning columns, five spanning rows and two pictures, and every real summary of product
@@ -245,6 +245,10 @@ The contract replaces the 2.0.0 table and list rules:
   each ⟦row⟧ and ⟦/table⟧ each start a line, and so does a paragraph, heading or list item. A
   title printed above a table in a PDF is a paragraph before ⟦table⟧ (a PDF has no captions). A
   `ul` item's bullet is emitted as §3 step 4 removes it, or not at all.
+- **Page breaks.** A table, and a cell, that continue across a page break stay one table and one
+  cell; the continuation of a row begins with U+0009, or with the rest of a word hyphenated at the
+  break; a repeated header or footer row and a continuation label are emitted once (the spec's §7
+  is the full text).
 - **Structured sources.** An extractor over a structured source (an authority's FHIR ePI, ADR 0005) emits one page per source section, in source order, with the whole page as the body,
   beginning and ending with U+000A as the scanner's text does. Each page's text is the section
   narrative as a renderer draws it, following the rules above. The narrative section's span
@@ -460,3 +464,23 @@ divergence).
 5. **Low.** A bare list number counts as mandatory narrative. Kept, and recorded.
 6. **Low.** `get_section`'s cap also applies to the normalised text, which a grid lengthens.
    Recorded.
+
+## Fifth review (2026-09-23, of the implementation): findings and what changed
+
+The fifth review ran every page-break and section-boundary case of tables, lists and pictures
+through both verifiers (identical report hashes) and found no false pass in the verifier's own
+rules.
+
+1. **High.** Round 4's rule (a row's continuation after a page break begins with U+0009) stopped
+   a word hyphenated at the break inside a cell from joining, since step 1 removes U+00AD U+000A
+   but not the U+0009 after it: "impair ment" verified and "impairment" did not. Fixed in §7: when
+   the body before the break ends with U+00AD U+000A, the continuation begins with the rest of the
+   word. Two verify vectors pin it.
+2. **Medium.** The agent's test double still answered `match` for a quote carrying grid markers,
+   which the service now refuses, and the change record understated the agent's behaviour. Fixed:
+   the double refuses what the service refuses (tested), and the record says that until PR 5 a
+   block quoted from a section with a table or picture is unverified.
+3. **Low.** A tagged PDF does mark captions; repeated footer rows and continuation labels; stale
+   wording in ADR 0003 and the validation README. Fixed. §3 step 4's and §6's table-row examples
+   predate the grid; they describe the U+0009-line rule, which still applies, and a 3.0.0 table
+   row additionally starts with U+FDD2.

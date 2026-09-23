@@ -107,8 +107,8 @@ reader sees without the check seeing it._
   in-page link. `q` is not allowed because renderers generate visible characters for it; `ol`
   is allowed from fidelity-norm/3.0.0 because the numbers a renderer draws are folded into the
   text; and table sections must appear in rendering order.
-- Only `br` and `hr` may be self-closing, and must be, because an HTML parser ignores the `/`
-  of any other element. Inside a tag only TAB, LF, CR and SPACE are whitespace, because an HTML
+- Only `br` and `hr` (and, from `fidelity-norm/3.0.0`, `img`) may be self-closing, and must
+  be, because an HTML parser ignores the `/` of any other element. Inside a tag only TAB, LF, CR and SPACE are whitespace, because an HTML
   parser reads any other code point there as part of the tag name. Tables contain only table
   parts and whitespace, and `pre` is not allowed, because a renderer moves other content out of
   a table and draws preformatted columns the check cannot see. From fidelity-norm/3.0.0 the

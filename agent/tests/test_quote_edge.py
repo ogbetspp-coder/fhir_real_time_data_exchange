@@ -29,6 +29,7 @@ from .fake_query_service import (
     REPOSITORY_ROOT,
     FakeQueryService,
     quote_edge_cases,
+    quote_is_refused,
     synthetic_section,
 )
 
@@ -109,3 +110,16 @@ async def test_the_fakes_verify_quote_answers_as_the_service_did(
     finally:
         with contextlib.suppress(Exception):
             await toolset.close()
+
+
+def test_the_fake_refuses_the_quotes_the_service_refuses() -> None:
+    """The test double answers ``invalid-request`` where ``src/query/tools.ts`` does.
+
+    Since fidelity-norm/3.0.0 that includes a quote carrying a table's grid markers or a
+    picture's U+FFFC: such a quote could join two rows, or quote nothing a reader sees.
+    """
+    table = "Dose table \ufdd0 \ufdd2 \ufdd3 Adults \ufdd3 10 mg \ufdd1 end."
+    for refused in (table, "\ufdd3", "a \ufffc b", "dose\x00 is", "dose\u202e is", "   "):
+        assert quote_is_refused(refused), repr(refused)
+    for accepted in ("Adults", "10 mg", "\ufdcf x", "\ufdf0", "Take 2 \u2022 10 mg"):
+        assert not quote_is_refused(accepted), repr(accepted)

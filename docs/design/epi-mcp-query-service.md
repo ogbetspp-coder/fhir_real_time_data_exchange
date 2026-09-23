@@ -351,7 +351,10 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
 - **`verify_quote`** decides entitlement before it looks at the quote, so every argument shape
   naming a document outside the caller's entitlement — including one whose quote carries a
   character the normalisation forbids — is `document-not-found` to the caller and
-  `not-entitled` in the record. It then counts `sectionsSearched` as the number of candidate
+  `not-entitled` in the record. A quote that normalises to nothing, carries a character the
+  normalisation forbids, or (from `fidelity-norm/3.0.0`) carries a table's grid marker or a
+  picture's U+FFFC is `invalid-request`: such a quote could join two rows of a table, or quote
+  nothing a reader sees. It then counts `sectionsSearched` as the number of candidate
   sections that carry a narrative, normalises each candidate's text in turn, stops at the first
   match, and hashes only the matched section's text.
 - **The quote-edge rule.** A `verify_quote` match is a contiguous slice of a section's
