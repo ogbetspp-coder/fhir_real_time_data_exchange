@@ -8,7 +8,9 @@ Google Cloud Healthcare API and observe their native near-real-time BigQuery str
 
 ## Non-negotiable rules
 
-- Never generate, summarize, or infer regulated clinical narrative. Preserve supplied XHTML.
+- Never generate, summarize, or infer regulated clinical narrative. Preserve supplied XHTML: its
+  words, structure and pictures, proved by the fidelity check. Presentation (styles, classes)
+  may be dropped only by an authority import under ADR 0005, which proves the text unchanged.
 - Fail closed on missing, duplicate, or ambiguous mandatory QRD sections.
 - Pin and checksum all external FHIR packages and examples.
 - Do not claim regulatory or GxP compliance. Produce qualification-supporting evidence.

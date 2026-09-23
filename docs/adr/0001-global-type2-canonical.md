@@ -30,3 +30,10 @@ regeneration.
 - A mapping/evidence layer must be maintained.
 - Trial-use changes remain a material architecture risk.
 - An EMA-only deployment can remove the projection and author directly to EMA profiles.
+
+## Amendment (2026-09-23, ADR 0005)
+
+An authority's published ePI may enter the record as a Global ePI Type 1 graph: the
+Composition, the product name, the marketing authorisation holder and the authorisation, all
+from the authority's structured index. Packs, ingredients and substances are declared not
+supplied, never inferred from narrative. Every other submission stays a complete Type 2 graph.

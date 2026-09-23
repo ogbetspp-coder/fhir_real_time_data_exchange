@@ -5,6 +5,7 @@
 // a raised digit, content a table moves, a soft hyphen before a visible line break — the markup
 // is either folded into the text or rejected.
 
+import { sha256Utf8 } from "../lib/hash.js";
 import { findForbiddenCharacter, isForbiddenCodePoint } from "./normalize.js";
 
 export type XhtmlErrorCode =
@@ -29,6 +30,8 @@ export type XhtmlErrorCode =
   | "script-content"
   | "unmappable-script"
   | "table-content"
+  | "list-content"
+  | "reserved-character"
   | "table-section-order"
   | "table-structure"
   | "table-shape"
@@ -57,6 +60,7 @@ const BLOCK_ELEMENTS = new Set([
   "h5",
   "h6",
   "ul",
+  "ol",
   "li",
   "table",
   "thead",
@@ -87,15 +91,16 @@ const INLINE_ELEMENTS = new Set([
   "abbr",
   "cite",
   "code",
+  "img",
 ]);
 
-// Elements whose renderer-generated characters (list numbers, quotation marks) would show text
-// the source does not contain are excluded above: `ol` and `q`.
+// `q` is excluded: a renderer draws quotation marks the source may not contain. `ol` is allowed
+// because the numbers a renderer draws are emitted as text (below).
 
 // The only elements that may be, and must be, self-closing. An HTML parser ignores the `/` of
 // `<sup/>`, so any other element written that way opens around the text that follows it; and a
 // `<br>` without `/` is a start tag whose content an XML renderer does not draw.
-const VOID_ELEMENTS = new Set(["br", "hr"]);
+const VOID_ELEMENTS = new Set(["br", "hr", "img"]);
 
 // Table parts and the parents each may have. A renderer moves anything else it finds directly
 // inside a table container out of the table, so that is rejected (`table-content`).
@@ -109,6 +114,35 @@ const TABLE_PART_PARENTS = new Map<string, ReadonlySet<string>>([
   ["th", new Set(["tr"])],
 ]);
 const TABLE_CONTAINERS = new Set(["table", "thead", "tbody", "tfoot", "tr"]);
+const ROW_GROUPS = new Set(["thead", "tbody", "tfoot"]);
+
+// A renderer numbers only the `li` children of a list, and moves nothing out of it; anything else
+// directly inside `ol` or `ul` is drawn outside the numbering (`list-content`).
+const LIST_CONTAINERS = new Set(["ol", "ul"]);
+
+// Reserved code points (section 2 of 3.0.0's proposal, section 5): the scanner emits them for
+// table grids and pictures, so they never occur in narrative text itself.
+export const TABLE_START = "\ufdd0";
+export const TABLE_END = "\ufdd1";
+export const ROW_START = "\ufdd2";
+export const CELL_START = "\ufdd3";
+export const COVERED_LEFT = "\ufdd4";
+export const COVERED_ABOVE = "\ufdd5";
+export const PICTURE = "\ufffc";
+
+export function isReservedCodePoint(codePoint: number): boolean {
+  return codePoint === 0xfffc || (codePoint >= 0xfdd0 && codePoint <= 0xfdef);
+}
+
+// Code-point offset of the first reserved code point, if any.
+function findReservedCharacter(text: string): number | undefined {
+  let offset = 0;
+  for (const character of text) {
+    if (isReservedCodePoint(character.codePointAt(0) ?? 0)) return offset;
+    offset += 1;
+  }
+  return undefined;
+}
 
 type TableState = {
   caption: boolean;
@@ -116,9 +150,21 @@ type TableState = {
   body: boolean;
   foot: boolean;
   rows: boolean;
-  // Cell count (`td` and `th`) of every row of this table, in document order.
+  // The grid, laid out by the HTML table model. For each column, how many rows, from the current
+  // one, a cell above still covers.
+  above: number[];
+  // The current row: which slots are covered, the next slot not yet emitted, and for each column
+  // how many rows below it a cell placed in this row covers.
+  filled: boolean[];
+  cursor: number;
+  down: number[];
+  // The colspan of the open cell, whose covered-left slots its end tag emits.
+  openSpan: number;
+  // Slots covered by every row of this table, or -1 for a row with a hole.
   widths: number[];
 };
+
+type ListState = { style: string; next: number };
 
 const NAMED_ENTITIES = new Map<string, string>([
   ["amp", "&"],
@@ -223,28 +269,62 @@ function isAsciiWhitespace(character: string): boolean {
 // text (`class`, `id`, a language tag below the root, an in-page link) is allowed.
 const TOKEN_VALUE = /^[A-Za-z0-9_.:-]{1,32}$/;
 const HREF_VALUE = /^https:\/\/[A-Za-z0-9.-]{1,64}(?:\/[A-Za-z0-9._~-]{0,32}){0,8}\/?$/;
+const LIST_TYPE_VALUE = /^[1aAiI]$/;
+const LIST_START_VALUE = /^(?:0|-?[1-9][0-9]{0,3})$/;
+const SPAN_VALUE = /^(?:[1-9][0-9]{0,2}|1000)$/;
+// A picture's source: a relative reference whose segments cannot start with `.` (so no `.` or
+// `..` segment, no scheme, no leading `/` and no `//`), or a PNG or JPEG `data:` URI. The value
+// is compared with the source through its hash (the text `img` emits), so it carries only what the
+// source carries.
+const PICTURE_REFERENCE =
+  /^[A-Za-z0-9_~-][A-Za-z0-9._~-]{0,63}(?:\/[A-Za-z0-9_~-][A-Za-z0-9._~-]{0,63}){0,15}$/;
+const PICTURE_DATA_PREFIXES = ["data:image/png;base64,", "data:image/jpeg;base64,"];
+// The base64 length of 1 MiB.
+const PICTURE_DATA_LIMIT = 1_398_104;
+const BASE64_ALPHABET = /^[A-Za-z0-9+/]*$/;
+
+// A `data:` body is counted and tested directly, not matched by one regular expression over a
+// value of up to 1.4 million code points: non-empty, at most the limit, a multiple of 4 long, the
+// base64 alphabet, and `=` only as the last one or two code points.
+function isPictureData(value: string): boolean {
+  const prefix = PICTURE_DATA_PREFIXES.find((candidate) => value.startsWith(candidate));
+  if (prefix === undefined) return false;
+  const body = value.slice(prefix.length);
+  if (body.length === 0 || body.length > PICTURE_DATA_LIMIT || body.length % 4 !== 0) return false;
+  const padding = body.endsWith("==") ? 2 : body.endsWith("=") ? 1 : 0;
+  return BASE64_ALPHABET.test(body.slice(0, body.length - padding));
+}
 
 function attributeAllowed(name: string, value: string, element: string, isRoot: boolean): boolean {
   if (name === "xml:lang" || name === "lang") return isRoot && TOKEN_VALUE.test(value);
   if (name === "href") return element === "a" && HREF_VALUE.test(value);
   if (name === "scope") return element === "th" && TOKEN_VALUE.test(value);
+  if (name === "type") return element === "ol" && LIST_TYPE_VALUE.test(value);
+  if (name === "start") return element === "ol" && LIST_START_VALUE.test(value);
+  if (name === "colspan" || name === "rowspan") {
+    return (element === "td" || element === "th") && SPAN_VALUE.test(value);
+  }
+  if (name === "src") {
+    return element === "img" && (PICTURE_REFERENCE.test(value) || isPictureData(value));
+  }
   return false;
 }
 
+// Checks the attributes in document order and returns their values.
 function checkAttributes(
   element: string,
   attributeSource: string,
   isRoot: boolean,
   offset: number,
-): void {
+): Map<string, string> {
   ATTRIBUTE.lastIndex = 0;
   let sawNamespace = false;
-  const seen = new Set<string>();
+  const values = new Map<string, string>();
   for (const match of attributeSource.matchAll(ATTRIBUTE)) {
     const name = match[1] ?? "";
     const value = match[2] ?? match[3] ?? "";
-    if (seen.has(name)) throw new XhtmlError("forbidden-attribute", offset);
-    seen.add(name);
+    if (values.has(name)) throw new XhtmlError("forbidden-attribute", offset);
+    values.set(name, value);
     if (name === "xmlns") {
       if (!isRoot || value !== XHTML_NAMESPACE) throw new XhtmlError("forbidden-attribute", offset);
       sawNamespace = true;
@@ -255,6 +335,9 @@ function checkAttributes(
     }
   }
   if (isRoot && !sawNamespace) throw new XhtmlError("root-not-div", offset);
+  // A picture without a source would be drawn as nothing, or as the renderer's broken-image mark.
+  if (element === "img" && !values.has("src")) throw new XhtmlError("forbidden-attribute", offset);
+  return values;
 }
 
 // The decoded code point of a character reference, checked on its own: a reference to half a
@@ -274,14 +357,16 @@ function decodeEntity(match: RegExpExecArray, offset: number): number {
     throw new XhtmlError("unknown-entity", offset);
   }
   if (isForbiddenCodePoint(codePoint)) throw new XhtmlError("forbidden-character", offset);
+  if (isReservedCodePoint(codePoint)) throw new XhtmlError("reserved-character", offset);
   return codePoint;
 }
 
-// The parent check at a start tag: nothing but text inside `sup` and `sub`; each table part in
-// its own parent; nothing but table parts inside a table container.
+// The parent check at a start tag: nothing but text inside `sup` and `sub`; each table part, and
+// `li`, in its own parent; nothing but table parts inside a table container, and nothing but `li`
+// inside a list.
 function checkParent(name: string, parent: string | undefined, offset: number): void {
   if (parent === "sup" || parent === "sub") throw new XhtmlError("script-content", offset);
-  const allowedParents = TABLE_PART_PARENTS.get(name);
+  const allowedParents = name === "li" ? LIST_CONTAINERS : TABLE_PART_PARENTS.get(name);
   if (allowedParents !== undefined) {
     if (parent === undefined || !allowedParents.has(parent)) {
       throw new XhtmlError("misnested-tag", offset);
@@ -291,35 +376,36 @@ function checkParent(name: string, parent: string | undefined, offset: number): 
   if (parent !== undefined && TABLE_CONTAINERS.has(parent)) {
     throw new XhtmlError("table-content", offset);
   }
+  if (parent !== undefined && LIST_CONTAINERS.has(parent)) {
+    throw new XhtmlError("list-content", offset);
+  }
 }
 
 // Renderers place table parts by role, not by document position: a caption always renders
 // first, sections render head → body → foot, and rows placed directly under `table` are
 // wrapped in an implicit body. Only the one document order that renders as written is
 // accepted, so displayed text order equals the order the source was verified in. Parents are
-// already checked; this also records rows and cells for the shape check at `</table>`.
-function enterTableElement(
+// already checked. A table inside a cell is refused, so the grid text below never nests.
+function enterTableStructure(
   name: string,
   parent: string | undefined,
-  tables: TableState[],
+  state: TableState | undefined,
+  cellDepth: number,
   offset: number,
 ): void {
-  const state = tables[tables.length - 1];
-  if (state === undefined) return;
-  if (name === "td" || name === "th") {
-    const last = state.widths.length - 1;
-    state.widths[last] = (state.widths[last] ?? 0) + 1;
+  if (name === "table") {
+    if (cellDepth > 0) throw new XhtmlError("table-structure", offset);
     return;
   }
+  if (state === undefined) return;
   if (name === "tr") {
     if (parent === "table") {
       if (state.head || state.body || state.foot) throw new XhtmlError("table-structure", offset);
       state.rows = true;
     }
-    state.widths.push(0);
     return;
   }
-  if (name !== "caption" && name !== "thead" && name !== "tbody" && name !== "tfoot") return;
+  if (name !== "caption" && !ROW_GROUPS.has(name)) return;
   if (name === "caption") {
     if (state.caption || state.head || state.body || state.foot || state.rows) {
       throw new XhtmlError("table-structure", offset);
@@ -334,6 +420,124 @@ function enterTableElement(
   if (name === "tbody" && state.foot) throw new XhtmlError("table-section-order", offset);
   if (name === "tfoot" && state.foot) throw new XhtmlError("table-section-order", offset);
   state[name === "thead" ? "head" : name === "tbody" ? "body" : "foot"] = true;
+}
+
+function newTable(): TableState {
+  return {
+    caption: false,
+    head: false,
+    body: false,
+    foot: false,
+    rows: false,
+    above: [],
+    filled: [],
+    cursor: 0,
+    down: [],
+    openSpan: 1,
+    widths: [],
+  };
+}
+
+// One slot a cell covers but does not start in, as its own whitespace-delimited token.
+function coveredSlot(marker: string): string {
+  return `\t${marker}\t`;
+}
+
+function startRow(state: TableState): void {
+  state.filled = state.above.map((rows) => rows > 0);
+  state.cursor = 0;
+  state.down = [];
+}
+
+// Places a cell by the HTML table model: in the first slot of its row that no cell covers. The
+// slots before it that a cell above covers are emitted first. A cell that would cover a slot
+// already covered overlaps it, which a renderer draws as two texts on top of each other.
+function placeCell(state: TableState, colspan: number, rowspan: number, offset: number): string {
+  let before = "";
+  while (state.filled[state.cursor] === true) {
+    before += coveredSlot(COVERED_ABOVE);
+    state.cursor += 1;
+  }
+  for (let column = state.cursor; column < state.cursor + colspan; column += 1) {
+    if (state.filled[column] === true) throw new XhtmlError("table-shape", offset);
+  }
+  for (let column = state.cursor; column < state.cursor + colspan; column += 1) {
+    state.filled[column] = true;
+    state.down[column] = rowspan - 1;
+  }
+  state.cursor += colspan;
+  state.openSpan = colspan;
+  return before;
+}
+
+// Ends a row: the slots after its last cell that a cell above covers are emitted, and the row's
+// width is recorded, or -1 when a slot inside the row is covered by nothing.
+function endRow(state: TableState): string {
+  let after = "";
+  for (let column = state.cursor; column < state.filled.length; column += 1) {
+    if (state.filled[column] === true) after += coveredSlot(COVERED_ABOVE);
+  }
+  let width = 0;
+  while (state.filled[width] === true) width += 1;
+  const hole = state.filled.slice(width).some((covered) => covered);
+  state.widths.push(hole ? -1 : width);
+  const columns = Math.max(state.above.length, state.down.length);
+  const above: number[] = [];
+  for (let column = 0; column < columns; column += 1) {
+    const rows = state.above[column] ?? 0;
+    above.push(rows > 0 ? rows - 1 : (state.down[column] ?? 0));
+  }
+  state.above = above;
+  return after;
+}
+
+// The end of a row group: a cell whose rows run past its last row is clipped by a renderer,
+// silently, so it rejects.
+function endRowGroup(state: TableState, offset: number): void {
+  if (state.above.some((rows) => rows > 0)) throw new XhtmlError("table-shape", offset);
+  state.above = [];
+}
+
+// A list item's marker as a renderer draws it (CSS counter styles decimal, lower- and
+// upper-alpha, lower- and upper-roman), followed by `.` and a space.
+const ROMAN: readonly (readonly [number, string])[] = [
+  [1000, "m"],
+  [900, "cm"],
+  [500, "d"],
+  [400, "cd"],
+  [100, "c"],
+  [90, "xc"],
+  [50, "l"],
+  [40, "xl"],
+  [10, "x"],
+  [9, "ix"],
+  [5, "v"],
+  [4, "iv"],
+  [1, "i"],
+];
+
+export function listMarker(style: string, ordinal: number): string {
+  let marker = String(ordinal);
+  if ((style === "a" || style === "A") && ordinal >= 1) {
+    marker = "";
+    let rest = ordinal;
+    while (rest > 0) {
+      rest -= 1;
+      marker = String.fromCodePoint(0x61 + (rest % 26)) + marker;
+      rest = Math.floor(rest / 26);
+    }
+  } else if ((style === "i" || style === "I") && ordinal >= 1 && ordinal <= 3999) {
+    marker = "";
+    let rest = ordinal;
+    for (const [value, letters] of ROMAN) {
+      while (rest >= value) {
+        marker += letters;
+        rest -= value;
+      }
+    }
+  }
+  if (style === "A" || style === "I") marker = marker.toUpperCase();
+  return `${marker}. `;
 }
 
 // One code point of text inside the root, raw or decoded, as the scanner emits it: rejected
@@ -351,9 +555,9 @@ function emitText(
   // `br` is a line break. Emitting it as U+0020 keeps a bullet after it from reading as a list
   // item (section 3 step 4) and keeps a soft hyphen before it from joining a word (step 1).
   const emitted = codePoint === 0x000a || codePoint === 0x000d ? " " : character;
-  if (parent !== undefined && TABLE_CONTAINERS.has(parent)) {
+  if (parent !== undefined && (TABLE_CONTAINERS.has(parent) || LIST_CONTAINERS.has(parent))) {
     if (isReference || !isAsciiWhitespace(character)) {
-      throw new XhtmlError("table-content", offset);
+      throw new XhtmlError(TABLE_CONTAINERS.has(parent) ? "table-content" : "list-content", offset);
     }
     output.push(emitted);
     return;
@@ -400,10 +604,14 @@ export function xhtmlToText(div: string): string {
   // scan: an unpaired surrogate split by markup would otherwise be joined in the output.
   const forbidden = findForbiddenCharacter(div);
   if (forbidden !== undefined) throw new XhtmlError("forbidden-character", forbidden);
+  // The code points the scanner emits for grids and pictures never occur in the narrative itself.
+  const reserved = findReservedCharacter(div);
+  if (reserved !== undefined) throw new XhtmlError("reserved-character", reserved);
 
   const output: string[] = [];
   const stack: string[] = [];
   const tables: TableState[] = [];
+  const lists: ListState[] = [];
   let rootSeen = false;
   let rootClosed = false;
   let cellDepth = 0;
@@ -427,14 +635,25 @@ export function xhtmlToText(div: string): string {
         const open = stack.pop();
         if (open === undefined) throw new XhtmlError("unbalanced-tag", index);
         if (open !== name) throw new XhtmlError("misnested-tag", index);
-        if (name === "table") {
-          const widths = tables.pop()?.widths ?? [];
-          if (widths.some((width) => width !== widths[0])) {
+        const table = tables[tables.length - 1];
+        if (table !== undefined && ROW_GROUPS.has(name)) endRowGroup(table, index);
+        if (name === "table" && table !== undefined) {
+          if (table.rows) endRowGroup(table, index);
+          const widths = table.widths;
+          if (widths.some((width) => width !== widths[0] || width < 0)) {
             throw new XhtmlError("table-shape", index);
           }
+          tables.pop();
+          // On a line of its own, so an empty table's two markers are two tokens.
+          output.push("\n", TABLE_END);
         }
+        if (name === "tr" && table !== undefined) output.push(endRow(table));
+        if (name === "ol" || name === "ul") lists.pop();
         if (name === "td" || name === "th") cellDepth -= 1;
         if (BLOCK_ELEMENTS.has(name)) output.push(structuralBreak(name, cellDepth));
+        if ((name === "td" || name === "th") && table !== undefined) {
+          output.push(coveredSlot(COVERED_LEFT).repeat(table.openSpan - 1));
+        }
         if (stack.length === 0) rootClosed = true;
         index = END_TAG.lastIndex;
         continue;
@@ -457,29 +676,51 @@ export function xhtmlToText(div: string): string {
         if (name !== "div") throw new XhtmlError("root-not-div", index);
         rootSeen = true;
       }
-      checkAttributes(name, start[2] ?? "", isRoot, index);
+      const attributes = checkAttributes(name, start[2] ?? "", isRoot, index);
       const selfClosing = (start[3] ?? "") === "/";
       if (VOID_ELEMENTS.has(name) !== selfClosing) throw new XhtmlError("void-element", index);
       const parent = stack[stack.length - 1];
       checkParent(name, parent, index);
-      enterTableElement(name, parent, tables, index);
+      const table = tables[tables.length - 1];
+      enterTableStructure(name, parent, table, cellDepth, index);
+      let slotsBefore = "";
+      if ((name === "td" || name === "th") && table !== undefined) {
+        slotsBefore = placeCell(
+          table,
+          Number(attributes.get("colspan") ?? "1"),
+          Number(attributes.get("rowspan") ?? "1"),
+          index,
+        );
+      }
 
       const lineBreak = structuralBreak(name, cellDepth);
+      output.push(slotsBefore);
       if (BLOCK_ELEMENTS.has(name) || name === "br") output.push(lineBreak);
-      // A self-closing element is `br` or `hr`; `hr`, a block, also emits its closing break.
+      // What a renderer draws for the element itself: the grid markers of a table, a row and a
+      // cell, a numbered item's marker, and a picture.
+      if (name === "table") output.push(TABLE_START);
+      if (name === "tr" && table !== undefined) {
+        startRow(table);
+        output.push(ROW_START);
+      }
+      if (name === "td" || name === "th") output.push(CELL_START, "\t");
+      const list = lists[lists.length - 1];
+      if (name === "li" && parent === "ol" && list !== undefined) {
+        output.push(listMarker(list.style, list.next));
+        list.next += 1;
+      }
+      if (name === "img") output.push(PICTURE, sha256Utf8(attributes.get("src") ?? ""));
+      // A self-closing element is `br`, `hr` or `img`; `hr`, a block, also emits its closing break.
       if (selfClosing) {
         if (BLOCK_ELEMENTS.has(name)) output.push(lineBreak);
       } else {
         stack.push(name);
         if (name === "td" || name === "th") cellDepth += 1;
-        if (name === "table") {
-          tables.push({
-            caption: false,
-            head: false,
-            body: false,
-            foot: false,
-            rows: false,
-            widths: [],
+        if (name === "table") tables.push(newTable());
+        if (name === "ol" || name === "ul") {
+          lists.push({
+            style: attributes.get("type") ?? "1",
+            next: Number(attributes.get("start") ?? "1"),
           });
         }
       }

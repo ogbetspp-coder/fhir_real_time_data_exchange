@@ -1,13 +1,15 @@
 # Narrative fidelity normalisation specification
 
-Version: `fidelity-norm/2.0.0` (`NORMALIZATION_VERSION` in `src/fidelity/normalize.ts`; history
+Version: `fidelity-norm/3.0.0` (`NORMALIZATION_VERSION` in `src/fidelity/normalize.ts`; history
 in section 9)
 
 This document is the language-neutral specification of the text normalisation and XHTML
 extraction used by the narrative fidelity check (ADR 0003). The TypeScript implementation in
 `src/fidelity/` and any re-implementation must produce identical results for the golden vectors
 in `test/fixtures/fidelity/`. Every rule below is applied identically to the extractor's page
-text and to the narrative text; nothing is applied to one side only.
+text and to the narrative text; nothing is applied to one side only, with one exception: the
+reserved code points (section 2) reject in narrative and are written by the extractor into page
+text, because they carry the table grids and pictures that section 5 emits.
 
 ## 1. Text units
 
@@ -75,6 +77,16 @@ language needs them.
 
 Rejection applies to page text as well; a page containing these characters makes every span on
 it `span-not-found`.
+
+**Reserved code points (narrative only).** U+FFFC OBJECT REPLACEMENT CHARACTER and the
+noncharacters U+FDD0–U+FDEF are reserved: the scanner emits U+FFFC for a picture and U+FDD0–U+FDD5
+for a table's grid (section 5), so they never occur in narrative text itself. A narrative `div`
+that contains one is `malformed-narrative` with reason `reserved-character`, decided after the
+`forbidden-character` check of the whole `div` and before the scan; a character reference that
+decodes to one is `reserved-character`, decided right after its own `forbidden-character` check.
+This rule is one-sided: page text may contain these code points, because the extractor writes
+them for grids and pictures (section 7), and an extractor whose text layer itself contains one
+must refuse the document.
 
 For narrative, section 2 applies to the div string as decoded from JSON (RFC 8259, where an
 escaped surrogate pair is one code point). It covers every code point, including markup,
@@ -146,7 +158,8 @@ These are treated as content; a difference is a mismatch:
 - superscript and subscript code points (`m²`, `H₂O`) versus plain digits. Markup cannot turn
   one into the other: the digits and signs inside `sup` and `sub` are folded to these code
   points (section 5), so `m<sup>2</sup>` is `m²` and never equals a source's `m2`;
-- footnote and reference markers, numbered-list markers (`1.`, `a)`), and other punctuation;
+- footnote and reference markers, numbered-list markers (`1.`, `a)`), and other punctuation (an
+  `ol` emits the markers a renderer draws as text, section 5, so they are compared too);
 - U+200C ZERO WIDTH NON-JOINER and U+200D ZERO WIDTH JOINER;
 - any character not named in section 3.
 
@@ -161,9 +174,10 @@ markup is folded into the text or rejected.
 - Exactly one root element `div` carrying `xmlns="http://www.w3.org/1999/xhtml"`; only
   whitespace may appear outside it.
 - Element names are lower-case. Block elements emit a line break before their start tag and
-  after their end tag: `div p h1 h2 h3 h4 h5 h6 ul li table thead tbody tfoot tr td th caption
-blockquote dl dt dd hr`. `br` emits a line break. Inline elements contribute only their text:
-  `span b i u em strong sup sub small a abbr cite code` (`sup` and `sub` fold theirs, below).
+  after their end tag: `div p h1 h2 h3 h4 h5 h6 ul ol li table thead tbody tfoot tr td th
+caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contribute only their
+  text: `span b i u em strong sup sub small a abbr cite code` (`sup` and `sub` fold theirs,
+  below); `img` is inline and emits a picture (below).
 - The line break a block element or `br` emits is U+000A, except that the start and end tags
   of `td` and `th`, and every block element and `br` inside an open `td` or `th`, emit
   U+0009: a table cell and everything in it is on one line of U+0009-separated text, as the
@@ -174,15 +188,48 @@ blockquote dl dt dd hr`. `br` emits a line break. Inline elements contribute onl
   break. So `<p>Take 2` U+000A `• 10 mg</p>`, which renders "Take 2 • 10 mg", reads "Take 2 •
   10 mg" to the check (the bullet is mid-line and so content), and does not verify against a
   page whose "• 10 mg" starts a new line.
-- Only `br` and `hr` may be self-closing, and they must be: `<x/>` for any other element, and a
-  `br` or `hr` written as a start tag without `/` (`<br>`, `<hr></hr>`), reject
-  (`void-element`). An HTML parser ignores the `/` on every other element, so `<sup/>6`,
-  `<a href="…"/>text` and `<li/>` open an element around the text that follows; and an XML
-  renderer draws no children of a `br` written `<br>…</br>`.
-- Any other element (including `script`, `style`, `img`, `svg`, `object`, `iframe`, `del`,
-  `s`, `strike`, `math`, form controls, `ol` and `q`, whose renderers generate list numbers and
-  quotation marks the source may not contain, and `pre`, which keeps whitespace a renderer
-  draws as columns the check cannot see) rejects (`unknown-element`).
+- Only `br`, `hr` and `img` may be self-closing, and they must be: `<x/>` for any other
+  element, and a `br`, `hr` or `img` written as a start tag without `/` (`<br>`, `<hr></hr>`,
+  `<img src="x">`), reject (`void-element`). An HTML parser ignores the `/` on every other
+  element, so `<sup/>6`, `<a href="…"/>text` and `<li/>` open an element around the text that
+  follows; and an XML renderer draws no children of a `br` written `<br>…</br>`.
+- Any other element (including `script`, `style`, `svg`, `object`, `iframe`, `del`, `s`,
+  `strike`, `math`, form controls, and `q`, whose renderer generates quotation marks the source
+  may not contain, and `pre`, which keeps whitespace a renderer draws as columns the check
+  cannot see) rejects (`unknown-element`).
+- Lists. `li` is allowed only as a direct child of `ol` or `ul`; anywhere else it is
+  `misnested-tag` (an HTML parser closes an open `li` at the next `<li>`, and an `li` nested
+  anywhere inside an `ol`'s item continues its numbering). The only children of `ol` and `ul`
+  are `li`: any other element directly inside, any character reference, and any raw code point
+  other than U+0009, U+000A, U+000D and U+0020 directly inside, rejects (`list-content`); a
+  renderer draws such content outside the numbering. `li` of a `ul` emits nothing of its own:
+  a bullet carries no content, and section 3 step 4 removes a list bullet from page text. Each
+  `li` of an `ol` emits, directly after the line break of its start tag, its marker, then `.`,
+  then U+0020, because a renderer draws it. The item's ordinal is the `ol`'s `start` (default
+  1. plus the item's index among the `li` children, counted from 0. The marker is the ordinal
+     in the counter style the `ol`'s `type` names; an `ol` without `type` is decimal, whatever list
+     encloses it:
+  - `1`: decimal; a negative ordinal is U+002D followed by its magnitude; no leading zeros.
+  - `a` and `A`: alphabetic, for an ordinal of 1 or more. Start from an empty string; while
+    `n > 0`: `n = n − 1`, prepend the letter at index `n mod 26` of `a…z` (`A…Z` for `A`),
+    `n = floor(n / 26)`. So 26 is `z`, 27 is `aa` and 703 is `aaa`. An ordinal of 0 or less is
+    decimal.
+  - `i` and `I`: additive roman, for 1 to 3999. Repeatedly append the letters of the largest
+    value in 1000 `m`, 900 `cm`, 500 `d`, 400 `cd`, 100 `c`, 90 `xc`, 50 `l`, 40 `xl`, 10 `x`,
+    9 `ix`, 5 `v`, 4 `iv`, 1 `i` that is not more than the remainder; upper case for `I`. Any
+    other ordinal is decimal.
+
+  What this does not claim: a viewer that applies its own list style, or draws no list numbers
+  at all (a plain XML view), shows something other than what the check read; the narrative
+  cannot carry a stylesheet, so the style is the one `type` names.
+
+- Pictures. `img` has exactly one attribute, `src`, and must have it (`forbidden-attribute`
+  otherwise, including for `alt`, which a renderer draws when a picture does not load and which
+  would be compared with nothing). It emits U+FFFC followed by the 64 lower-case hexadecimal
+  digits of the SHA-256 of the UTF-8 bytes of its `src` value, with no whitespace added, so the
+  text states where each picture stands and which picture it is. For a `data:` source the hash
+  binds the picture's bytes; for a reference it binds the reference, not what the reference
+  resolves to. What a picture shows is not read by any text check.
 - The content of `sup` and `sub` is text and character references only; a child element
   rejects (`script-content`). Folding happens after references are decoded. Inside `sup`:
   `0`–`9` → U+2070, U+00B9, U+00B2, U+00B3, U+2074–U+2079; `+` → U+207A; `-` and U+2212 →
@@ -210,16 +257,36 @@ blockquote dl dt dd hr`. `br` emits a line break. Inline elements contribute onl
   `td` and `th`. Any other element directly inside `table`, `thead`, `tbody`, `tfoot` or `tr`
   rejects (`table-content`), and so does any character reference, and any raw code point other
   than U+0009, U+000A, U+000D and U+0020, directly inside them: a renderer moves such content
-  out of the table. Every `tr` of a table, in whichever section, has the same number of `td`
-  and `th` children; cells of a nested table do not count. Otherwise the table rejects
-  (`table-shape`), decided at its end tag. A table with no rows is accepted. `colspan` and
-  `rowspan` are not allowed (below), so no cell is drawn across a column or row by a span
-  attribute. That is all it closes: cell boundaries are not content (they flatten to
-  whitespace, below), so a narrative table of the same text and the same row width can still
-  put a value in a different cell from the source — a dose can move from the Adults column to
-  the Children column and verify. The empty slots section 7 requires for a spanned source cell
-  make that easier, because an empty narrative cell costs nothing. Cell association is not
-  checked; it needs a table extractor contract.
+  out of the table. A `table` inside a `td` or `th`, at any depth, rejects
+  (`table-structure`), so a table's grid text never nests.
+- Table grids. Cells are placed by the HTML table model: in each row a cell takes the first
+  slot, from the left, that no cell covers; it covers `colspan` slots of its own row and of each
+  of the next `rowspan − 1` rows (both default to 1). A cell that would cover a slot of its own
+  row that is already covered (a `colspan` running into a cell spanning down from above) rejects
+  (`table-shape`), decided at its start tag; that is the only way two cells can overlap. A cell
+  whose rows run past the last row of its row group (`thead`, a `tbody`, `tfoot`, or the rows
+  directly under `table`) rejects (`table-shape`), decided at the end tag of that group, or at
+  `</table>` for rows directly under it: a renderer clips it silently. At `</table>`, every row
+  must cover exactly the slots 0 … w−1, with one w for the whole table; otherwise `table-shape`
+  (a ragged row, or a slot inside a row that no cell covers). A table with no rows is accepted.
+
+  The text carries the grid, in six reserved code points (section 2): U+FDD0 (table) after the
+  line break of `<table>`; U+000A then U+FDD1 (end of table) before the line break of
+  `</table>`; U+FDD2 (row) after the line break of `<tr>`; U+FDD3 (cell) then U+0009 after the
+  U+0009 of a `td` or `th` start tag. A slot a cell covers without starting in it is U+0009, a
+  marker, U+0009: U+FDD4 when it is covered by the cell to its left in that cell's own row (its
+  `colspan`), U+FDD5 when it is covered by a cell in a row above (its `rowspan`). The U+FDD5
+  slots to the left of a cell are emitted just before the cell's start-tag break; a cell's
+  U+FDD4 slots just after its end-tag break; the U+FDD5 slots after a row's last cell just
+  before the line break of `</tr>`. A caption's text stands between U+FDD0 and the first U+FDD2.
+  After normalisation each marker is its own token, and the text determines the drawn grid:
+  rows are delimited by U+FDD2, a U+FDD3 slot holds the text up to the next marker, a U+FDD4
+  slot belongs to the cell owning the slot to its left, a U+FDD5 slot to the cell owning the
+  slot above, and U+FDD1 ends the table, so text after it is not in the last cell. Which cell a
+  value is in is therefore checked, and an empty cell is distinct from a covered slot. Not
+  compared: whitespace inside a cell, `td` versus `th`, `scope`, and which row group a row is
+  in (row groups are in rendering order and spans cannot cross them).
+
 - Table parts must appear in the one document order that renders as written, because
   renderers place them by role: `caption` (at most one) first; then either rows (`tr`)
   directly under `table`, or sections in the order `thead` (at most one), `tbody` (any
@@ -235,16 +302,25 @@ blockquote dl dt dd hr`. `br` emits a line break. Inline elements contribute onl
   step 1 joins it; in XHTML a block boundary or `br` is a visible new line, not a hyphenated
   word.
 - Allowed attributes: `xmlns` (root), `xml:lang` and `lang` (root `div` only), `href` (`a`
-  only, `https://` form only), `scope` (`th` only). Values must be double- or single-quoted.
-  Any other attribute — in particular `style`, `hidden`, `title`, `class`, `id`, `colspan` and
-  `rowspan` — rejects, and so does an allowed attribute on any other element and a repeated
-  attribute name on one element. A viewer's stylesheet or script can key on a class, an id, a
+  only, `https://` form only), `scope` (`th` only), `type` and `start` (`ol` only), `colspan`
+  and `rowspan` (`td` and `th` only), `src` (`img` only, required there). Values must be double-
+  or single-quoted. Any other attribute — in particular `style`, `hidden`, `title`, `class`,
+  `id`, `alt`, `reversed` and `value` — rejects, and so does an allowed attribute on any other
+  element and a repeated attribute name on one element. A viewer's stylesheet or script can key on a class, an id, a
   language tag or an in-page link to hide content, and a narrative needs none of them below the
   root.
 - Attribute values are never compared against the source, so they must not be able to carry
   text. Each value must match its token form or the element rejects: `xml:lang`, `lang`,
   `scope` — `[A-Za-z0-9_.:-]{1,32}`; `href` — `https://` host and up to eight path segments of
-  at most 32 unreserved characters (no query or fragment). Anything else (`javascript:` links,
+  at most 32 unreserved characters (no query or fragment); `type` — exactly `1`, `a`, `A`, `i`
+  or `I`; `start` — `0|-?[1-9][0-9]{0,3}`; `colspan`, `rowspan` — `[1-9][0-9]{0,2}|1000`;
+  `src` — a reference `SEG(/SEG){0,15}` with `SEG` = `[A-Za-z0-9_~-][A-Za-z0-9._~-]{0,63}` (no
+  scheme, no leading `/`, no `//`, and no segment starting with `.`), or `data:image/png;base64,`
+  or `data:image/jpeg;base64,` followed by a body that is non-empty, at most 1 398 104 code
+  points, a multiple of 4 long, all `[A-Za-z0-9+/=]`, with `=` only as its last one or two code
+  points (tested directly, not by one regular expression). `https:` and every other scheme are
+  refused for `src`: the picture behind them can change after approval, and fetching it tracks
+  the reader. `src` is the one value compared with the source, through the hash `img` emits. Anything else (`javascript:` links,
   `#` fragments, spaces, `<`, `&`, query strings) rejects. These bounds limit, but do not
   eliminate, what attribute values can carry; narrative markup should not need links.
 - Comments, processing instructions, CDATA sections, DOCTYPE declarations, a stray `<`, a
@@ -305,28 +381,33 @@ reason code is inside `reportHash`, so the order in which violations are decided
 
 - At a start tag: `malformed-tag`/`stray-lt`, then `uppercase-element`, then
   `unknown-element`, then `multiple-roots`/`root-not-div`, then attributes in document order
-  (`forbidden-attribute`; root without xmlns = `root-not-div`), then `void-element`, then the
-  parent check, then `table-structure`, then `table-section-order`. The parent check:
-  `script-content` if the parent is `sup` or `sub`; else `misnested-tag` for a table part
-  (`caption`, `thead`, `tbody`, `tfoot`, `tr`, `td`, `th`) in the wrong parent; else
-  `table-content` for any other element whose parent is `table`, `thead`, `tbody`, `tfoot` or
-  `tr`.
+  (`forbidden-attribute`; root without xmlns = `root-not-div`; an `img` without `src` =
+  `forbidden-attribute`, after its attributes), then `void-element`, then the parent check, then
+  `table-structure`, then `table-section-order`, then `table-shape` (an overlapping cell). The
+  parent check: `script-content` if the parent is `sup` or `sub`; else `misnested-tag` for a
+  table part (`caption`, `thead`, `tbody`, `tfoot`, `tr`, `td`, `th`) or an `li` in the wrong
+  parent; else `table-content` for any other element whose parent is `table`, `thead`,
+  `tbody`, `tfoot` or `tr`; else `list-content` for any other element whose parent is `ol` or
+  `ul`.
 - At an end tag: `malformed-tag`, then `uppercase-element`, then `unbalanced-tag`, then
-  `misnested-tag`, then `table-shape` (for `</table>`).
+  `misnested-tag`, then `table-shape` (for `</thead>`, `</tbody>`, `</tfoot>` and `</table>`: a
+  clipped row span, then at `</table>` the row widths).
 - At `&`: `stray-amp`, then `text-outside-root`, then `unknown-entity`, then
-  `forbidden-character`, then `table-content`, then `unmappable-script`.
-- At a raw code point: `text-outside-root` or `table-content`, then `unmappable-script`.
+  `forbidden-character`, then `reserved-character`, then `table-content`, then `list-content`,
+  then `unmappable-script`.
+- At a raw code point: `text-outside-root`, `table-content` or `list-content` (whichever the
+  parent makes applicable), then `unmappable-script`.
 - After a clean scan: `soft-hyphen-at-boundary`, then `empty-narrative`.
 
-(So `<table><td>a</td></table>` is `misnested-tag` and `<img/>` is `unknown-element`.) The
-section 2 check of the whole `div`, which precedes the scan, decides `forbidden-character`
-before any of these.
+(So `<table><td>a</td></table>` is `misnested-tag`, `<iframe/>` is `unknown-element` and
+`<img/>` is `forbidden-attribute`.) The section 2 checks of the whole `div`, which precede the
+scan, decide `forbidden-character` and then `reserved-character` before any of these.
 
 The scanner's reason codes are, in the order of this section: `forbidden-character`,
-`root-not-div`, `multiple-roots`, `text-outside-root`, `uppercase-element`,
-`unknown-element`, `void-element`, `script-content`, `unmappable-script`, `table-content`,
-`table-shape`, `table-structure`, `table-section-order`, `misnested-tag`,
-`soft-hyphen-at-boundary`, `forbidden-attribute`, `comment`, `processing-instruction`,
+`reserved-character`, `root-not-div`, `multiple-roots`, `text-outside-root`,
+`uppercase-element`, `unknown-element`, `void-element`, `list-content`, `script-content`,
+`unmappable-script`, `table-content`, `table-shape`, `table-structure`, `table-section-order`,
+`misnested-tag`, `soft-hyphen-at-boundary`, `forbidden-attribute`, `comment`, `processing-instruction`,
 `cdata`, `doctype`, `malformed-tag`, `stray-lt`, `stray-amp`, `unknown-entity`,
 `unbalanced-tag`.
 
@@ -491,18 +572,34 @@ extractor is a controlled component: its name and version are recorded in
 - decode the text layer as Unicode, never through Latin-1 or windows-1252: page text contains
   no section 2 character. Page text contains no U+000B or U+000C; a page break is the page
   record, not a character;
-- emit table cells row-major separated by U+0009 and rows by U+000A, with the same number of
-  cells in every row: a spanned cell's text is emitted once, in its first slot, and each other
-  slot it covers as an empty cell; a line break inside a cell is emitted as U+0020, except a
-  discretionary hyphen, which is U+00AD U+000A. A row is one line with U+0009 in it, so a
-  bullet glyph in a cell is content (section 3 step 4). Cell boundaries are not checked
-  (section 5), so these rules fix the page text's shape, not which cell a narrative puts a
-  value in;
+- emit each table as section 5's scanner does: U+FDD0, then the caption's text if any; each row
+  as U+000A U+FDD2 followed by its slots from left to right, where a slot in which a cell starts
+  is U+0009 U+FDD3 U+0009 followed by the cell's text, a slot covered by a merged cell from the
+  left in that cell's own first row is U+0009 U+FDD4 U+0009, and any other covered slot is
+  U+0009 U+FDD5 U+0009; then U+000A U+FDD1. Every row has the same number of slots; a line break
+  inside a cell is emitted as U+0020, except a discretionary hyphen, which is U+00AD U+000A. An
+  extractor that cannot tell a merged slot from an empty cell, or cannot recover a table's grid,
+  must refuse the document rather than guess: the grid is compared (section 5);
 - emit a list marker (a bullet glyph, section 3 step 4) followed by U+0020, never U+0009: the
   tab after a list marker is layout, not a cell boundary. A word processor's list (`•` U+0009
   `Adults: 10 mg`) extracted with its tab reads as a table row, its bullet as content, and a
   `<ul><li>` narrative fails against it — safe, but a false failure that the extractor must
-  avoid;
+  avoid. A numbered list's marker is emitted as drawn (`3.`, `b.`, `iv.`) followed by U+0020,
+  never U+0009 and never nothing, even where the document's text layer has no space after it;
+- emit an inline picture, in the text's reading order, as U+FFFC followed by the SHA-256 hex of
+  the `src` a narrative must carry for it: for an embedded picture, the `data:image/png;base64,`
+  or `data:image/jpeg;base64,` URI of its exact bytes in canonical padded base64 (the media type
+  is that of the stored part); for a structured source that references a picture, the reference
+  exactly as the source writes it. A picture is an embedded raster image or a referenced image
+  drawn inline, including a logo or a decorative image; vector drawings, shapes and text boxes
+  are not, and an extractor that meets one it cannot read as text must refuse the document. An
+  extractor that cannot place pictures must refuse a document that has them. An extractor whose
+  text layer itself contains U+FFFC or a code point in U+FDD0–U+FDEF must refuse the document
+  (section 2);
+- for a structured source (an authority's published FHIR ePI, ADR 0005), emit one page per
+  source section, in source order, with the whole page as its body, holding the section
+  narrative as a renderer draws it under the rules of this section; the narrative section's
+  span covers that page's body, and sections 1 and 6 apply unchanged;
 - in a raised or lowered glyph run, emit every digit and sign of section 5's folding tables as
   its script code point — raised: U+0030–U+0039 as U+2070, U+00B9, U+00B2, U+00B3,
   U+2074–U+2079, `+`, U+FE62, U+FF0B and U+2795 as U+207A, `-`, U+2212, U+2010–U+2015,
@@ -540,6 +637,23 @@ alone: vectors authored from the reference only establish agreement where its au
 looked. The vectors remain the fixed, reviewed floor; the differential run is the proof.
 
 ## 9. Version history
+
+- `fidelity-norm/3.0.0` (major) — numbered lists, table grids and pictures, seen as a reader
+  sees them (`docs/design/fidelity-norm-3-0-0.md`, as amended by its independent reviews; ADR
+  0005). `ol` is allowed with `type` and `start`, and each of its items emits the marker a
+  renderer draws (decimal, alphabetic, roman); `li` is allowed only directly in `ol` or `ul`,
+  whose only children are `li` (`list-content`). `colspan` and `rowspan` return, placed by the
+  HTML table model with overlaps, clipped row spans, holes and ragged rows refused
+  (`table-shape`), and nested tables refused (`table-structure`); every table's text carries its
+  grid in the reserved code points U+FDD0–U+FDD5, which closes the cell-association residual
+  2.0.0 stated. `img` is allowed with `src` alone (a reference or a PNG or JPEG `data:` URI) and
+  emits U+FFFC and the SHA-256 of its `src`. U+FFFC and U+FDD0–U+FDEF reject in narrative
+  (`reserved-character`, the one rule applied to one side only). The extractor contract (section 7) writes tables with their grid, numbered markers with a space, pictures with their hash, and
+  a structured source as one page per section. Major under section 8: extractor output that
+  conformed to 2.0.0 (tables without the grid) no longer does, every table's normalised text
+  changes, and narratives with `li` outside a list or non-`li` content in a `ul`, accepted by
+  2.0.0, now reject. The changed vectors are listed with their reasons in
+  `docs/validation/changes/2026-09-23-fidelity-norm-3-0-0.md`.
 
 - `fidelity-norm/2.0.0` (major) — markup may not change what a reader sees without the check
   seeing it (`docs/design/fidelity-norm-2-0-0.md`, as amended by its independent re-review).

@@ -552,36 +552,69 @@ function tableWhitespace(random: Random, classes: Set<string>): string {
 
 function table(random: Random, depth: number): Markup {
   const classes = new Set<string>(["table"]);
-  // One width per table: every row has the same number of cells (fidelity-norm/2.0.0). A row of
-  // another width is the `table-shape` violation.
+  // One width per table: every row covers the same number of slots (fidelity-norm/2.0.0). A row
+  // of another width is the `table-shape` violation.
   const width = between(random, 0, 3);
   if (width === 0) classes.add("table-empty-rows");
-  const row = (cell: "td" | "th"): string => {
-    let count = width;
-    if (chance(random, 0.06)) {
-      count = width === 0 ? 1 : width - 1 + 2 * between(random, 0, 1);
-      classes.add("table-uneven-row");
-    }
-    let cells = "";
-    for (let position = 0; position < count; position += 1) {
-      const attribute = attributes(random, cell);
-      for (const name of attribute.classes) classes.add(name);
-      const inner = node(random, depth + 1);
-      for (const name of inner.classes) classes.add(name);
-      // A bullet inside a cell is content, never a list item (the cell is on a U+0009 line).
-      let lead = "";
-      if (chance(random, 0.08)) {
-        lead = `${pick(random, BULLET)}${pick(random, [SPACE, TAB, "&#10;"])}`;
-        classes.add("table-cell-bullet");
+  // One row group of `count` rows. Cells are laid out by the HTML table model and span columns
+  // and rows now and then (fidelity-norm/3.0.0); a span made one too wide overlaps a cell or
+  // leaves the row ragged, and one made one too tall runs past the group, which a renderer clips
+  // (`table-shape`).
+  const rows = (cell: "td" | "th", count: number): string => {
+    const covered: boolean[][] = Array.from({ length: count }, () => []);
+    let markup = "";
+    for (let rowIndex = 0; rowIndex < count; rowIndex += 1) {
+      const coveredHere = covered[rowIndex] ?? [];
+      let slots = width;
+      if (chance(random, 0.06)) {
+        slots = width === 0 ? 1 : width - 1 + 2 * between(random, 0, 1);
+        classes.add("table-uneven-row");
       }
-      cells += `${tableWhitespace(random, classes)}<${cell}${attribute.markup}>${lead}${inner.markup}</${cell}>`;
+      let cells = "";
+      for (let column = 0; column < slots; column += 1) {
+        if (coveredHere[column] === true) continue;
+        let free = 0;
+        while (column + free < slots && coveredHere[column + free] !== true) free += 1;
+        let colspan = free >= 2 && chance(random, 0.3) ? between(random, 2, free) : 1;
+        let rowspan =
+          count - rowIndex >= 2 && chance(random, 0.25) ? between(random, 2, count - rowIndex) : 1;
+        if (colspan > 1) classes.add("table-colspan");
+        if (rowspan > 1) classes.add("table-rowspan");
+        if (chance(random, 0.02)) {
+          colspan += 1;
+          classes.add("table-span-perturbed");
+        }
+        if (chance(random, 0.02)) {
+          rowspan += 1;
+          classes.add("table-span-clipped");
+        }
+        for (let down = rowIndex; down < Math.min(count, rowIndex + rowspan); down += 1) {
+          const target = covered[down] ?? [];
+          for (let across = column; across < column + colspan; across += 1) target[across] = true;
+        }
+        let spans = "";
+        if (colspan > 1) spans += ` colspan="${String(colspan)}"`;
+        if (rowspan > 1) spans += ` rowspan="${String(rowspan)}"`;
+        const attribute = attributes(random, cell);
+        for (const name of attribute.classes) classes.add(name);
+        const inner = node(random, depth + 1, true);
+        for (const name of inner.classes) classes.add(name);
+        // A bullet inside a cell is content, never a list item (the cell is on a U+0009 line).
+        let lead = "";
+        if (chance(random, 0.08)) {
+          lead = `${pick(random, BULLET)}${pick(random, [SPACE, TAB, "&#10;"])}`;
+          classes.add("table-cell-bullet");
+        }
+        cells += `${tableWhitespace(random, classes)}<${cell}${attribute.markup}${spans}>${lead}${inner.markup}</${cell}>`;
+      }
+      // Content a renderer would move out of the table (`table-content`).
+      if (chance(random, 0.05)) {
+        cells += pick(random, ["x", "&#32;", "&#10;", "<span>x</span>", CP(0x00a0), "<br/>"]);
+        classes.add("table-stray-content");
+      }
+      markup += `<tr>${cells}${tableWhitespace(random, classes)}</tr>`;
     }
-    // Content a renderer would move out of the table (`table-content`).
-    if (chance(random, 0.05)) {
-      cells += pick(random, ["x", "&#32;", "&#10;", "<span>x</span>", CP(0x00a0), "<br/>"]);
-      classes.add("table-stray-content");
-    }
-    return `<tr>${cells}${tableWhitespace(random, classes)}</tr>`;
+    return markup;
   };
   let markup = "";
   if (chance(random, 0.25)) {
@@ -595,19 +628,19 @@ function table(random: Random, depth: number): Markup {
   } else if (chance(random, 0.5)) {
     // Sections, in the one document order that renders as written.
     if (chance(random, 0.7)) {
-      markup += `${tableWhitespace(random, classes)}<thead>${row("th")}</thead>`;
+      markup += `${tableWhitespace(random, classes)}<thead>${rows("th", between(random, 1, 2))}</thead>`;
       classes.add("table-thead");
     }
     for (let position = 0; position < between(random, 1, 2); position += 1) {
-      markup += `${tableWhitespace(random, classes)}<tbody>${row("td")}</tbody>`;
+      markup += `${tableWhitespace(random, classes)}<tbody>${rows("td", between(random, 1, 3))}</tbody>`;
       classes.add("table-tbody");
     }
     if (chance(random, 0.4)) {
-      markup += `<tfoot>${row("td")}${tableWhitespace(random, classes)}</tfoot>`;
+      markup += `<tfoot>${rows("td", between(random, 1, 2))}${tableWhitespace(random, classes)}</tfoot>`;
       classes.add("table-tfoot");
     }
   } else {
-    for (let position = 0; position < between(random, 1, 3); position += 1) markup += row("td");
+    markup += rows("td", between(random, 1, 3));
     classes.add("table-bare-rows");
   }
   if (chance(random, 0.03)) {
@@ -617,14 +650,56 @@ function table(random: Random, depth: number): Markup {
   return { markup: `<table>${markup}${tableWhitespace(random, classes)}</table>`, classes };
 }
 
-function node(random: Random, depth: number): Markup {
+// Picture sources fidelity-norm/3.0.0 accepts: relative references and PNG or JPEG `data:` URIs.
+const PICTURE_SOURCES: readonly string[] = [
+  "~/_entity/annotation/0c1d2e3f-aaaa-bbbb-cccc-0123456789ab",
+  "images/logo.png",
+  "a_b/c-d~e.f",
+  "x",
+];
+const PICTURE_DATA: readonly string[] = [
+  "data:image/png;base64,iVBORw0KGgo=",
+  "data:image/jpeg;base64,/9j/4AAQ",
+  "data:image/png;base64,AA==",
+];
+
+// An `ol`'s attributes: every counter style, and starts on each side of the style's range.
+function orderedListAttributes(random: Random, classes: Set<string>): string {
+  // Now and then a style with a start at the edge of its range.
+  if (chance(random, 0.3)) {
+    classes.add("ordered-list-edge");
+    return pick(random, [
+      ' type="i" start="3998"',
+      ' type="I" start="3999"',
+      ' type="a" start="26"',
+      ' type="A" start="702"',
+      ' type="i" start="-1"',
+      ' type="a" start="0"',
+      ' type="i" start="9999"',
+    ]);
+  }
+  let markup = "";
+  if (chance(random, 0.6)) {
+    markup += ` type="${pick(random, ["1", "a", "A", "i", "I"])}"`;
+    classes.add("ordered-list-type");
+  }
+  if (chance(random, 0.4)) {
+    markup += ` start="${pick(random, ["0", "1", "3", "-2", "26", "27", "3998", "9999", "-9999"])}"`;
+    classes.add("ordered-list-start");
+  }
+  return markup;
+}
+
+// `inCell`: inside a table cell, where a nested table is refused (fidelity-norm/3.0.0), so none
+// is generated there; the violation list has them.
+function node(random: Random, depth: number, inCell = false): Markup {
   const classes = new Set<string>();
   if (depth > 3) return markupTextNode(random);
   const kind = random();
   if (kind < 0.3) return markupTextNode(random);
   if (kind < 0.4) {
     const element = pick(random, INLINE_WRAPPERS);
-    const inner = node(random, depth + 1);
+    const inner = node(random, depth + 1, inCell);
     for (const name of inner.classes) classes.add(name);
     classes.add("inline-element");
     return { markup: `<${element}>${inner.markup}</${element}>`, classes };
@@ -651,7 +726,7 @@ function node(random: Random, depth: number): Markup {
   }
   if (kind < 0.74) {
     const element = pick(random, BLOCK_WRAPPERS);
-    const inner = node(random, depth + 1);
+    const inner = node(random, depth + 1, inCell);
     for (const name of inner.classes) classes.add(name);
     classes.add("block-element");
     // Whitespace inside a tag is TAB, LF, CR or SPACE, and those are accepted; one tag in
@@ -673,14 +748,20 @@ function node(random: Random, depth: number): Markup {
     };
   }
   if (kind < 0.8) {
+    const ordered = chance(random, 0.5);
+    const listAttributes = ordered ? orderedListAttributes(random, classes) : "";
+    // Now and then enough items to pass `z` and to cross a roman boundary.
+    const count = chance(random, 0.05) ? 28 : between(random, 1, 3);
+    if (count === 28) classes.add("ordered-list-long");
     let items = "";
-    for (let position = 0; position < between(random, 1, 3); position += 1) {
-      const inner = node(random, depth + 1);
+    for (let position = 0; position < count; position += 1) {
+      const inner = count === 28 ? markupTextNode(random) : node(random, depth + 1, inCell);
       for (const name of inner.classes) classes.add(name);
-      items += `<li>${inner.markup}</li>`;
+      items += `<li>${inner.markup}</li>${chance(random, 0.1) ? pick(random, [SPACE, LF, TAB]) : ""}`;
     }
-    classes.add("list");
-    return { markup: `<ul>${items}</ul>`, classes };
+    classes.add(ordered ? "ordered-list" : "list");
+    const element = ordered ? "ol" : "ul";
+    return { markup: `<${element}${listAttributes}>${items}</${element}>`, classes };
   }
   if (kind < 0.86) {
     let items = "";
@@ -693,7 +774,18 @@ function node(random: Random, depth: number): Markup {
     classes.add("definition-list");
     return { markup: `<dl>${items}</dl>`, classes };
   }
-  if (kind < 0.94) return table(random, depth);
+  if (kind < 0.94) return inCell ? markupTextNode(random) : table(random, depth);
+  if (kind < 0.955) {
+    const before = markupTextNode(random);
+    const data = chance(random, 0.3);
+    const source = pick(random, data ? PICTURE_DATA : PICTURE_SOURCES);
+    for (const name of before.classes) classes.add(name);
+    classes.add(data ? "picture-data" : "picture");
+    return {
+      markup: `${before.markup}<img${pick(random, ["", SPACE, LF])} src="${source}"${pick(random, ["", SPACE])}/>${chance(random, 0.5) ? word(random) : ""}`,
+      classes,
+    };
+  }
   if (kind < 0.97) {
     classes.add("self-closing-block");
     return { markup: pick(random, ["<hr/>", `<hr${SPACE}/>`]), classes };
@@ -741,17 +833,7 @@ const VIOLATIONS: readonly Violation[] = [
   {
     className: "unknown-element",
     apply: (body, attrs, random) => {
-      const element = pick(random, [
-        "ol",
-        "q",
-        "img",
-        "style",
-        "script",
-        "del",
-        "s",
-        "math",
-        "pre",
-      ]);
+      const element = pick(random, ["q", "iframe", "style", "script", "del", "s", "math", "pre"]);
       return root(`${body}<${element}>x</${element}>`, attrs);
     },
   },
@@ -808,11 +890,260 @@ const VIOLATIONS: readonly Violation[] = [
     apply: (body, attrs) => root(`${body}<p ${XMLNS}>x</p>`, attrs),
   },
   {
+    // Span values outside `[1-9][0-9]{0,2}|1000`, and `scope` on a `td`.
     className: "spanned-cell",
     apply: (body, attrs, random) => {
       const attribute = pick(random, ["colspan", "rowspan", "scope"]);
-      const value = pick(random, ["2", "1", "row"]);
+      const value = pick(random, ["0", "1001", "01", " 2", "2.0", "-1", "", "row", "1000"]);
       return root(`${body}<table><tr><td ${attribute}="${value}">x</td></tr></table>`, attrs);
+    },
+  },
+  {
+    className: "table-span-overlap",
+    apply: (body, attrs, random) => {
+      const inner = pick(random, [
+        '<table><tr><td>Adults</td><td rowspan="2">10 mg</td></tr><tr><td colspan="2">Children</td></tr></table>',
+        '<table><tr><td rowspan="2">a</td><td>b</td></tr><tr><td>c</td><td colspan="2">d</td></tr></table>',
+        '<table><tr><td>a</td><td rowspan="2">b</td><td>c</td></tr><tr><td colspan="3">d</td></tr></table>',
+      ]);
+      return root(`${body}${inner}`, attrs);
+    },
+  },
+  {
+    className: "table-span-hole",
+    apply: (body, attrs, random) => {
+      const inner = pick(random, [
+        '<table><tr><td>a</td><td>b</td><td rowspan="2">c</td></tr><tr><td>d</td></tr></table>',
+        '<table><tr><td>a</td><td rowspan="2">b</td></tr><tr></tr></table>',
+        '<table><tr><td>a</td><td>b</td><td rowspan="2">c</td></tr><tr><td>d</td><td>e</td></tr></table>',
+      ]);
+      return root(`${body}${inner}`, attrs);
+    },
+  },
+  {
+    className: "picture-source",
+    apply: (body, attrs, random) => {
+      const source = pick(random, [
+        "javascript:x",
+        "//evil/x",
+        "../x",
+        "a/../x",
+        "./x",
+        "a/./x",
+        "/x",
+        "https://example.org/x",
+        "a b",
+        "a//b",
+        "~/_entity/annotation/.x",
+        "a/b/",
+      ]);
+      return root(`${body}<p>a<img src="${source}"/>b</p>`, attrs);
+    },
+  },
+  {
+    className: "picture-data",
+    apply: (body, attrs, random) => {
+      const source = pick(random, [
+        "data:image/svg+xml;base64,AAAA",
+        "data:image/png;base64,AAAAA",
+        "data:image/png;base64,AA=A",
+        "data:image/png;base64,A===",
+        "data:image/png;base64,=AAA",
+        "data:image/png;base64,",
+        "data:image/jpeg;base64,AAA=",
+        "data:image/png;base64,AA==",
+      ]);
+      return root(`${body}<p>a<img src="${source}"/>b</p>`, attrs);
+    },
+  },
+  {
+    className: "picture-markup",
+    apply: (body, attrs, random) => {
+      const inner = pick(random, [
+        '<p><img src="x" alt="Take 10 mg"/></p>',
+        "<p><img/></p>",
+        "<p>a<img />b</p>",
+        '<p><img src="x"></img></p>',
+        '<p><img src="x" src="y"/></p>',
+      ]);
+      return root(`${body}${inner}`, attrs);
+    },
+  },
+  {
+    // The counter styles at the edges of their ranges.
+    className: "ordered-list-boundaries",
+    apply: (body, attrs, random) => {
+      const list = pick(random, [
+        ' type="I" start="3998"',
+        ' type="i" start="3999"',
+        ' type="a" start="25"',
+        ' type="A" start="701"',
+        ' type="I" start="-1"',
+        ' start="-9999"',
+      ]);
+      return root(`${body}<ol${list}><li>a</li><li>b</li><li>c</li></ol>`, attrs);
+    },
+  },
+  {
+    className: "attribute-limits",
+    apply: (body, attrs, random) => {
+      const inner = pick(random, [
+        '<table><tr><td colspan="1000">a</td></tr></table>',
+        '<table><tr><td colspan="999">a</td></tr></table>',
+        '<table><tr><td colspan="1001">a</td></tr></table>',
+        '<ol start="-0"><li>a</li></ol>',
+        '<ol start="9999"><li>a</li></ol>',
+        '<ol start="-9999"><li>a</li></ol>',
+        '<ol start="10000"><li>a</li></ol>',
+      ]);
+      return root(`${body}${inner}`, attrs);
+    },
+  },
+  {
+    className: "reserved-reference",
+    apply: (body, attrs, random) => {
+      const reference = pick(random, [
+        "&#xFFFC;",
+        "&#65532;",
+        "&#xFDD2;",
+        "&#64976;",
+        "&#xFDEF;",
+        "&#xFDE0;",
+        "&#xFDD9;",
+        CP(0xfde5),
+      ]);
+      return root(`${body}<p>a${reference}b</p>`, attrs);
+    },
+  },
+  {
+    // Grids a renderer draws with an overlap, a clipped span or a hole, and grids it accepts.
+    className: "table-span-shape",
+    apply: (body, attrs, random) => {
+      const inner = pick(random, [
+        '<table><tr><td>Adults</td><td rowspan="2">10 mg</td></tr><tr><td colspan="2">Children</td></tr></table>',
+        '<table><thead><tr><td rowspan="2">a</td><td>b</td></tr></thead><tbody><tr><td>c</td></tr></tbody></table>',
+        '<table><tr><td colspan="2">a</td><td>b</td></tr><tr><td>1</td><td>2</td><td>3</td></tr></table>',
+        '<table><tr><td rowspan="2">A</td><td>B</td><td>C</td></tr><tr><td>D</td><td>E</td></tr></table>',
+        '<table><tr><td>a</td><td>b</td><td rowspan="2">c</td></tr><tr><td>d</td></tr></table>',
+        '<table><tr><td rowspan="3">a</td><td>b</td></tr><tr><td>c</td></tr></table>',
+        '<table><tbody><tr><td rowspan="2">a</td></tr></tbody><tbody><tr><td>b</td></tr></tbody></table>',
+        '<table><tr><td colspan="2" rowspan="2">X</td><td>a</td></tr><tr><td>b</td></tr><tr><td>c</td><td></td><td>d</td></tr></table>',
+        '<table><tr><td>a</td><td rowspan="2">b</td></tr><tr></tr></table>',
+        '<table><tr><td rowspan="2">a</td></tr><tr></tr></table>',
+      ]);
+      return root(`${body}${inner}`, attrs);
+    },
+  },
+  {
+    className: "nested-table",
+    apply: (body, attrs, random) => {
+      const inner = pick(random, [
+        "<table><tr><td><table><tr><td>a</td></tr></table></td></tr></table>",
+        "<table><tr><td><div><table></table></div></td></tr></table>",
+        "<table><tr><th><ul><li><table><tr><td>a</td></tr></table></li></ul></th></tr></table>",
+      ]);
+      return root(`${body}${inner}`, attrs);
+    },
+  },
+  {
+    className: "list-content",
+    apply: (body, attrs, random) => {
+      const inner = pick(random, [
+        "<ol> text <li>x</li></ol>",
+        "<ul><p>x</p></ul>",
+        "<ol>&#32;<li>a</li></ol>",
+        "<ul><li>a</li><br/></ul>",
+        '<ol><img src="x"/><li>a</li></ol>',
+        `<ul>${CP(0x00a0)}<li>a</li></ul>`,
+        "<ol><ol><li>a</li></ol></ol>",
+      ]);
+      return root(`${body}${inner}`, attrs);
+    },
+  },
+  {
+    className: "li-outside-list",
+    apply: (body, attrs, random) => {
+      const inner = pick(random, [
+        "<div><li>x</li></div>",
+        "<ol><li>a<li>b</li></li></ol>",
+        "<li>x</li>",
+        "<table><tr><td><li>x</li></td></tr></table>",
+        "<ol><li>a<blockquote><li>b</li></blockquote></li></ol>",
+      ]);
+      return root(`${body}${inner}`, attrs);
+    },
+  },
+  {
+    className: "list-attribute",
+    apply: (body, attrs, random) => {
+      const inner = pick(random, [
+        '<ol reversed="reversed"><li>a</li></ol>',
+        '<ol type="disc"><li>a</li></ol>',
+        '<ol start="-0"><li>a</li></ol>',
+        '<ol start="007"><li>a</li></ol>',
+        '<ol start="10000"><li>a</li></ol>',
+        '<ul type="a"><li>a</li></ul>',
+        '<ol><li value="3">a</li></ol>',
+        '<ul start="2"><li>a</li></ul>',
+        '<ol type="a" type="i"><li>a</li></ol>',
+      ]);
+      return root(`${body}${inner}`, attrs);
+    },
+  },
+  {
+    className: "picture-violation",
+    apply: (body, attrs, random) => {
+      const inner = pick(random, [
+        '<p><img src="x" alt="Take 10 mg"/></p>',
+        "<p><img/></p>",
+        '<p><img src="x"></img></p>',
+        '<p><img src="x" title="t"/></p>',
+        '<p><img src="javascript:x"/></p>',
+        '<p><img src="//evil/x"/></p>',
+        '<p><img src="../x"/></p>',
+        '<p><img src="a/../x"/></p>',
+        '<p><img src="a/./x"/></p>',
+        '<p><img src="/x"/></p>',
+        '<p><img src="https://example.org/x"/></p>',
+        '<p><img src="data:image/svg+xml;base64,AAAA"/></p>',
+        '<p><img src="data:image/png;base64,AAAAA"/></p>',
+        '<p><img src="data:image/png;base64,AA=A"/></p>',
+        '<p><img src="data:image/png;base64,"/></p>',
+        '<p><img src="a b"/></p>',
+        '<p><sup><img src="x"/></sup></p>',
+        '<table><tr><img src="x"/></tr></table>',
+        '<p><img src="x"/><img src="x" src="y"/></p>',
+      ]);
+      return root(`${body}${inner}`, attrs);
+    },
+  },
+  {
+    className: "reserved-character",
+    apply: (body, attrs, random) => {
+      const reserved = pick(random, [
+        CP(0xfffc),
+        CP(0xfdd0),
+        CP(0xfdd3),
+        CP(0xfdd5),
+        CP(0xfdef),
+        "&#xFFFC;",
+        "&#65020;",
+        "&#xFDD2;",
+        "&#64976;",
+      ]);
+      const where = between(random, 0, 3);
+      if (where === 0) return root(`${body}<p>a${reserved}b</p>`, attrs);
+      if (where === 1) return root(`${body}<table><tr>${reserved}<td>a</td></tr></table>`, attrs);
+      if (where === 2) return root(`${body}<p><sup>${reserved}</sup></p>`, attrs);
+      return `${reserved}${root(body, attrs)}`;
+    },
+  },
+  {
+    // Code points next to the reserved ones, which are ordinary text.
+    className: "near-reserved",
+    apply: (body, attrs, random) => {
+      const near = pick(random, [CP(0xfdcf), CP(0xfdf0), CP(0xfffb), "&#xFFFB;", "&#xFDCF;"]);
+      return root(`${body}<p>a${near}b</p>`, attrs);
     },
   },
   {
@@ -1069,6 +1400,8 @@ const VIOLATIONS: readonly Violation[] = [
   },
 ];
 
+let violationTurn = 0;
+
 function xhtmlCase(random: Random, seed: number, index: number): CorpusCase {
   const classes = new Set<string>();
   const attribute = attributes(random, "div", true);
@@ -1081,7 +1414,11 @@ function xhtmlCase(random: Random, seed: number, index: number): CorpusCase {
   }
   let input: string;
   if (chance(random, 0.4)) {
-    const violation = pick(random, VIOLATIONS);
+    // In turn rather than at random: with this many classes a random pick leaves some class out
+    // of a 2000-case corpus at some seeds, and the coverage requirement then fails.
+    const violation = VIOLATIONS[violationTurn % VIOLATIONS.length];
+    if (violation === undefined) throw new Error("no violations");
+    violationTurn += 1;
     classes.add(violation.className);
     input = violation.apply(body, attribute.markup, random);
   } else {

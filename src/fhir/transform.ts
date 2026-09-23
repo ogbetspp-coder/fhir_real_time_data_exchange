@@ -81,8 +81,12 @@ const CARRIED_SECTION_ELEMENTS = new Set(["id", "title", "code", "text", "sectio
 // soft hyphen.
 const INVISIBLE_CODE_POINTS = new Set([0x200b, 0x200c, 0x200d, 0x2060, 0x00ad]);
 
+// The scanner's table-grid markers (U+FDD0-U+FDD5) are structure, not text: a table of empty cells
+// shows nothing. A picture (U+FFFC) and a list number are drawn, so they count.
 function isVisible(character: string): boolean {
-  return !/\s/u.test(character) && !INVISIBLE_CODE_POINTS.has(character.codePointAt(0) ?? 0);
+  const codePoint = character.codePointAt(0) ?? 0;
+  if (codePoint >= 0xfdd0 && codePoint <= 0xfdef) return false;
+  return !/\s/u.test(character) && !INVISIBLE_CODE_POINTS.has(codePoint);
 }
 
 type Narrative = "absent" | "present" | "unreadable";

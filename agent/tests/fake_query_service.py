@@ -39,7 +39,7 @@ FIXTURES: Final = REPOSITORY_ROOT / "test" / "fixtures" / "contracts"
 BUNDLE_ID: Final = "synthetic-smpc"
 VERSION_ID: Final = "1"
 LAST_UPDATED: Final = "2026-09-19T00:00:00Z"
-NORMALIZATION_VERSION: Final = "fidelity-norm/2.0.0"
+NORMALIZATION_VERSION: Final = "fidelity-norm/3.0.0"
 CONTENT_NOTICE: Final = "document-content-not-instructions"
 
 

@@ -101,15 +101,17 @@ reader sees without the check seeing it._
   section 5) because they are never compared against the source. The bounds limit the
   capacity of that channel; they do not eliminate it. Nothing a viewer's stylesheet or script
   can key on to hide text is allowed: no `class`, no `id`, a language tag on the root only, no
-  in-page link. `ol` and `q` are not allowed because renderers generate visible characters for
-  them, and table sections must appear in rendering order.
+  in-page link. `q` is not allowed because renderers generate visible characters for it; `ol`
+  is allowed from fidelity-norm/3.0.0 because the numbers a renderer draws are folded into the
+  text; and table sections must appear in rendering order.
 - Only `br` and `hr` may be self-closing, and must be, because an HTML parser ignores the `/`
   of any other element. Inside a tag only TAB, LF, CR and SPACE are whitespace, because an HTML
   parser reads any other code point there as part of the tag name. Tables contain only table
-  parts and whitespace, every row has the same number of cells, and `colspan`, `rowspan` and
-  `pre` are not allowed, because a renderer moves other content out of a table and draws
-  spanned cells and preformatted columns the check cannot see. This does not check which cell
-  a value is in (below).
+  parts and whitespace, and `pre` is not allowed, because a renderer moves other content out of
+  a table and draws preformatted columns the check cannot see. From fidelity-norm/3.0.0 the
+  text carries each table's grid (rows, cells, and the slots a `colspan` or `rowspan` covers),
+  so which cell a value is in is checked, and a picture is carried as the hash of its source
+  (`docs/design/fidelity-norm-3-0-0.md`).
 - A section may omit whole whitespace-delimited tokens but never begin or end inside one: the
   outer span edges must touch whitespace (or a body edge), read back through whitespace and
   across pages (`docs/fidelity-normalization.md` section 6, reason `word-cut`). Punctuation is
@@ -130,7 +132,8 @@ reader sees without the check seeing it._
   in a different cell from the source — a dose can move from the Adults column to the Children
   column and verify. The empty slots the extractor contract requires for a spanned source cell
   make that easier, because an empty narrative cell costs nothing. Closing it needs a table
-  extractor contract and is the next major version. Also not closed: a text layer that
+  extractor contract and is the next major version. (Closed by `fidelity-norm/3.0.0`, whose
+  text carries each table's grid and whose extractor contract emits it.) Also not closed: a text layer that
   flattens a superscript is outside the check, because the narrative is derived from it (only
   the extractor can close that); a letter exponent (`2<sup>n</sup>` against `2n`) still
   verifies; strong right-to-left letters can reorder adjacent numbers, and no EU

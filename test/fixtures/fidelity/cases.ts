@@ -61,6 +61,11 @@ export function paragraphs(...texts: string[]): string {
 const HEADER = "ACME Demo Product — Synthetic SmPC\n";
 const FOOTER = (page: number): string => `Page ${page} of 3`;
 
+// U+FDD0 table, U+FDD1 end of table, U+FDD2 row, U+FDD3 cell (fidelity-norm/3.0.0).
+const TABLE =
+  "\ufdd0\n\ufdd2\t\ufdd3\tDose\t\ufdd3\tFrequency\n\ufdd2\t\ufdd3\t10 mg\t\ufdd3\tOnce daily\n" +
+  "\ufdd2\t\ufdd3\t20 mg\t\ufdd3\tTwice daily\n\ufdd1";
+
 const PAGE_BODIES = [
   [
     "4.1 Therapeutic indications",
@@ -82,7 +87,9 @@ const PAGE_BODIES = [
     "• first warning item",
     "• second warning item",
     "4.5 Interactions",
-    "Dose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily",
+    // A table as the extractor writes it (section 7, fidelity-norm/3.0.0): its grid markers,
+    // then each row, then each cell's slot and text.
+    TABLE,
   ].join("\n"),
 ];
 
@@ -167,7 +174,6 @@ const POSOLOGY_TWO = "Part two of the posology text is on page two.";
 const DOSE = "The recommended dose is 10 mg once daily for a long-\nterm course.";
 const CONTRA = "Hypersensitivity to the active substance is a contraindication.";
 const WARNINGS = "• first warning item\n• second warning item";
-const TABLE = "Dose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily";
 
 const baseSpecs = (): SectionSpec[] => [
   {
@@ -366,14 +372,36 @@ const LIST_SPACE_ITEM = "\u2022 Adults: 10 mg";
 const LIST_SPACE_ITEM_SOURCE = customSource([LIST_SPACE_ITEM]);
 const NUMBER_AT_LINE_END = "Take 2\n10 mg is the daily dose.";
 const NUMBER_AT_LINE_END_SOURCE = customSource([NUMBER_AT_LINE_END]);
-const ROW = "2\t10";
+// One-row tables as the extractor writes them (section 7, fidelity-norm/3.0.0).
+const gridRow = (...cells: string[]): string =>
+  `\ufdd0\n\ufdd2${cells.map((cell) => `\t\ufdd3\t${cell}`).join("")}\n\ufdd1`;
+const ROW = gridRow("2", "10");
 const ROW_SOURCE = customSource([ROW]);
-const BULLET_ROW = "2\t\u2022 10";
+const BULLET_ROW = gridRow("2", "\u2022 10");
 const BULLET_ROW_SOURCE = customSource([BULLET_ROW]);
-const FIRST_CELL_BULLET_ROW = "\u2022 10\t2";
+const FIRST_CELL_BULLET_ROW = gridRow("\u2022 10", "2");
 const FIRST_CELL_BULLET_SOURCE = customSource([FIRST_CELL_BULLET_ROW]);
-const FIRST_CELL_ROW = "10\t2";
+const FIRST_CELL_ROW = gridRow("10", "2");
 const FIRST_CELL_ROW_SOURCE = customSource([FIRST_CELL_ROW]);
+// fidelity-norm/3.0.0: numbered lists, table grids and pictures, as the extractor writes them.
+const NUMBERED_ITEM = "3. Take one tablet.";
+const NUMBERED_ITEM_SOURCE = customSource([NUMBERED_ITEM]);
+// A dose drawn against every age group (a row span), and the same words with empty cells.
+const SPANNED_DOSE =
+  "\ufdd0\n\ufdd2\t\ufdd3\tAdults\t\ufdd3\t10 mg\n\ufdd2\t\ufdd3\tChildren\t\ufdd5\t\n" +
+  "\ufdd2\t\ufdd3\tElderly\t\ufdd5\t\n\ufdd1";
+const SPANNED_DOSE_SOURCE = customSource([SPANNED_DOSE]);
+const EMPTY_CELLS_DOSE =
+  "\ufdd0\n\ufdd2\t\ufdd3\tAdults\t\ufdd3\t10 mg\n\ufdd2\t\ufdd3\tChildren\t\ufdd3\t\n" +
+  "\ufdd2\t\ufdd3\tElderly\t\ufdd3\t\n\ufdd1";
+const EMPTY_CELLS_DOSE_SOURCE = customSource([EMPTY_CELLS_DOSE]);
+const DOSE_IN_SECOND_COLUMN = gridRow("Adults", "10 mg", "");
+const DOSE_IN_SECOND_COLUMN_SOURCE = customSource([DOSE_IN_SECOND_COLUMN]);
+const PICTURE_REFERENCE = "~/_entity/annotation/0c1d2e3f-aaaa-bbbb-cccc-0123456789ab";
+const PICTURE_LINE = `See \ufffc${sha256Utf8(PICTURE_REFERENCE)} below.`;
+const PICTURE_SOURCE = customSource([PICTURE_LINE]);
+const SPANNED_DOSE_TABLE =
+  '<table><tr><td>Adults</td><td rowspan="3">10 mg</td></tr><tr><td>Children</td></tr><tr><td>Elderly</td></tr></table>';
 const MID_LINE_BULLET = "Take 2 \u2022 10 mg daily.";
 const MID_LINE_BULLET_SOURCE = customSource([MID_LINE_BULLET]);
 const LIST_ITEM = "\u2022 Keep in the outer carton.";
@@ -1386,7 +1414,9 @@ export const verifyCases: VerifyCase[] = [
     },
   },
   {
-    name: "spanned-cell-rejected",
+    // fidelity-norm/3.0.0: a span is allowed, and the grid is compared. Two source cells drawn as
+    // one spanned cell is a different table, so it is a mismatch (it rejected in 2.0.0).
+    name: "spanned-cell-against-separate-cells",
     input: toInput(
       S,
       single(
@@ -1397,11 +1427,7 @@ export const verifyCases: VerifyCase[] = [
         [spanFor(S, 3, TABLE)],
       ),
     ),
-    expect: {
-      status: "failed",
-      sections: { "smpc.4.5": "malformed-narrative" },
-      reasons: { "smpc.4.5": "forbidden-attribute" },
-    },
+    expect: { status: "failed", sections: { "smpc.4.5": "mismatch" } },
   },
   {
     name: "merged-cells-uneven-rows-rejected",
@@ -2027,6 +2053,8 @@ export const verifyCases: VerifyCase[] = [
     expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
   },
   {
+    // Since fidelity-norm/3.0.0 a narrative table carries its grid, so it verifies only against a
+    // page that carries the same grid, which this 2.0.0-shaped row does not.
     name: "row-cell-cut-before-tab-against-cell",
     input: toInput(
       INTRO_THEN_ROW_SOURCE,
@@ -2034,7 +2062,7 @@ export const verifyCases: VerifyCase[] = [
         spanFor(INTRO_THEN_ROW_SOURCE, 1, "\u2022 Adults"),
       ]),
     ),
-    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
   },
   // Fix 3 (section 7): a list bullet must be followed by U+0020, not U+0009; with U+0009 the
   // line reads as a table row and a list narrative fails (safe, a false failure).
@@ -2057,6 +2085,116 @@ export const verifyCases: VerifyCase[] = [
       ]),
     ),
     expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  // -------------------------------------------------------------------------------------------
+  // fidelity-norm/3.0.0: an `ol`'s numbers, a table's grid and a picture's source are compared.
+  {
+    name: "ordered-list-number-verifies",
+    input: toInput(
+      NUMBERED_ITEM_SOURCE,
+      single("smpc.4.2.posology", div('<ol start="3"><li>Take one tablet.</li></ol>'), [
+        spanFor(NUMBERED_ITEM_SOURCE, 1, NUMBERED_ITEM),
+      ]),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "ordered-list-other-number-mismatches",
+    input: toInput(
+      NUMBERED_ITEM_SOURCE,
+      single("smpc.4.2.posology", div("<ol><li>Take one tablet.</li></ol>"), [
+        spanFor(NUMBERED_ITEM_SOURCE, 1, NUMBERED_ITEM),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "ordered-list-other-style-mismatches",
+    input: toInput(
+      NUMBERED_ITEM_SOURCE,
+      single("smpc.4.2.posology", div('<ol type="i" start="3"><li>Take one tablet.</li></ol>'), [
+        spanFor(NUMBERED_ITEM_SOURCE, 1, NUMBERED_ITEM),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "row-span-against-row-span-verifies",
+    input: toInput(
+      SPANNED_DOSE_SOURCE,
+      single("smpc.4.2.posology", div(SPANNED_DOSE_TABLE), [
+        spanFor(SPANNED_DOSE_SOURCE, 1, SPANNED_DOSE),
+      ]),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    // The first review's case 3: the same words, but the span draws the dose against every row.
+    name: "row-span-against-empty-cells-mismatches",
+    input: toInput(
+      EMPTY_CELLS_DOSE_SOURCE,
+      single("smpc.4.2.posology", div(SPANNED_DOSE_TABLE), [
+        spanFor(EMPTY_CELLS_DOSE_SOURCE, 1, EMPTY_CELLS_DOSE),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "empty-cells-against-row-span-mismatches",
+    input: toInput(
+      SPANNED_DOSE_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div(
+          "<table><tr><td>Adults</td><td>10 mg</td></tr><tr><td>Children</td><td></td></tr><tr><td>Elderly</td><td></td></tr></table>",
+        ),
+        [spanFor(SPANNED_DOSE_SOURCE, 1, SPANNED_DOSE)],
+      ),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    // 2.0.0's stated residual, closed: a value in another column is a different table.
+    name: "value-in-another-column-mismatches",
+    input: toInput(
+      DOSE_IN_SECOND_COLUMN_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div("<table><tr><td>Adults</td><td></td><td>10 mg</td></tr></table>"),
+        [spanFor(DOSE_IN_SECOND_COLUMN_SOURCE, 1, DOSE_IN_SECOND_COLUMN)],
+      ),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "picture-with-source-reference-verifies",
+    input: toInput(
+      PICTURE_SOURCE,
+      single("smpc.4.2.posology", div(`<p>See <img src="${PICTURE_REFERENCE}"/> below.</p>`), [
+        spanFor(PICTURE_SOURCE, 1, PICTURE_LINE),
+      ]),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "picture-with-other-reference-mismatches",
+    input: toInput(
+      PICTURE_SOURCE,
+      single("smpc.4.2.posology", div('<p>See <img src="images/dose-table.png"/> below.</p>'), [
+        spanFor(PICTURE_SOURCE, 1, PICTURE_LINE),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "picture-missing-mismatches",
+    input: toInput(
+      PICTURE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("See below."), [
+        spanFor(PICTURE_SOURCE, 1, PICTURE_LINE),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
   },
 ];
 
@@ -2364,14 +2502,16 @@ export const xhtmlCases: XhtmlCase[] = [
   { name: "accepts-decimal-entity", input: div("<p>&#65;</p>"), expected: "\n\nA\n\n" },
   // Renderer-generated characters (list numbers, quotation marks) and table sections placed
   // out of document order would show text or an order the source does not contain.
-  { name: "rejects-ol", input: div("<ol><li>a</li></ol>"), expected: { error: "unknown-element" } },
+  // An `ol`'s numbers are emitted as text (fidelity-norm/3.0.0).
+  { name: "accepts-ol", input: div("<ol><li>a</li></ol>"), expected: "\n\n\n1. a\n\n\n" },
   { name: "rejects-q", input: div("<p><q>a</q></p>"), expected: { error: "unknown-element" } },
   {
     name: "accepts-table-section-order",
     input: div(
       "<table><thead><tr><th>h</th></tr></thead><tbody><tr><td>b</td></tr></tbody><tfoot><tr><td>f</td></tr></tfoot></table>",
     ),
-    expected: "\n\n\n\n\th\t\n\n\n\n\tb\t\n\n\n\n\tf\t\n\n\n\n",
+    expected:
+      "\n\n\ufdd0\n\n\ufdd2\t\ufdd3\th\t\n\n\n\n\ufdd2\t\ufdd3\tb\t\n\n\n\n\ufdd2\t\ufdd3\tf\t\n\n\n\ufdd1\n\n",
   },
   {
     name: "rejects-tfoot-before-tbody",
@@ -2412,7 +2552,7 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "accepts-caption-first",
     input: div("<table><caption>c</caption><tr><td>a</td></tr></table>"),
-    expected: "\n\n\nc\n\n\ta\t\n\n\n",
+    expected: "\n\n\ufdd0\nc\n\n\ufdd2\t\ufdd3\ta\t\n\n\ufdd1\n\n",
   },
   {
     name: "rejects-cell-outside-row",
@@ -2469,7 +2609,7 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "table",
     input: div("<table><tr><td>a</td><td>b</td></tr></table>"),
-    expected: "\n\n\n\ta\t\tb\t\n\n\n",
+    expected: "\n\n\ufdd0\n\ufdd2\t\ufdd3\ta\t\t\ufdd3\tb\t\n\n\ufdd1\n\n",
   },
   {
     name: "entities",
@@ -2507,7 +2647,7 @@ export const xhtmlCases: XhtmlCase[] = [
   },
   {
     name: "rejects-unknown-element",
-    input: div("<p>a</p><img/>"),
+    input: div("<p>a</p><iframe/>"),
     expected: { error: "unknown-element" },
   },
   {
@@ -2867,7 +3007,7 @@ export const xhtmlCases: XhtmlCase[] = [
   },
   {
     name: "soft-hyphen-decided-after-scan",
-    input: div("<p>non&#173;</p><img/>"),
+    input: div("<p>non&#173;</p><iframe/>"),
     expected: { error: "unknown-element" },
   },
   {
@@ -3027,17 +3167,18 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "accepts-scope-on-th",
     input: div('<table><tr><th scope="row">h</th><td>a</td></tr></table>'),
-    expected: "\n\n\n\th\t\ta\t\n\n\n",
+    expected: "\n\n\ufdd0\n\ufdd2\t\ufdd3\th\t\t\ufdd3\ta\t\n\n\ufdd1\n\n",
   },
   {
-    name: "rejects-colspan",
+    name: "accepts-colspan",
     input: div('<table><tr><td colspan="2">a</td></tr></table>'),
-    expected: { error: "forbidden-attribute" },
+    expected: "\n\n\ufdd0\n\ufdd2\t\ufdd3\ta\t\t\ufdd4\t\n\n\ufdd1\n\n",
   },
   {
-    name: "rejects-rowspan",
+    // A renderer clips a row span that runs past its row group.
+    name: "rejects-rowspan-past-group",
     input: div('<table><tr><td rowspan="2">a</td></tr></table>'),
-    expected: { error: "forbidden-attribute" },
+    expected: { error: "table-shape" },
   },
   {
     name: "rejects-root-attribute-before-missing-namespace",
@@ -3090,7 +3231,8 @@ export const xhtmlCases: XhtmlCase[] = [
     input: div(
       "<table>\n <thead>\t<tr>\r\n<th>h</th> </tr></thead>\n<tbody> <tr><td>a</td></tr> </tbody></table>",
     ),
-    expected: "\n\n  \n\t\n  \th\t \n\n \n \n\ta\t\n \n\n\n",
+    expected:
+      "\n\n\ufdd0  \n\t\n\ufdd2  \t\ufdd3\th\t \n\n \n \n\ufdd2\t\ufdd3\ta\t\n \n\n\ufdd1\n\n",
   },
   {
     name: "rejects-span-in-table",
@@ -3123,11 +3265,12 @@ export const xhtmlCases: XhtmlCase[] = [
     expected: { error: "misnested-tag" },
   },
   {
-    name: "accepts-nested-table-in-cell",
+    // A table inside a cell is refused, so the grid text never nests (fidelity-norm/3.0.0).
+    name: "rejects-nested-table-in-cell",
     input: div(
       "<table><tr><td><table><tr><td>a</td><td>b</td></tr></table></td></tr><tr><td>c</td></tr></table>",
     ),
-    expected: "\n\n\n\t\t\t\ta\t\tb\t\t\t\t\n\n\tc\t\n\n\n",
+    expected: { error: "table-structure" },
   },
   {
     name: "rejects-uneven-rows",
@@ -3144,23 +3287,28 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "rejects-uneven-nested-table",
     input: div("<table><tr><td><table><tr><td>a</td></tr><tr></tr></table></td></tr></table>"),
-    expected: { error: "table-shape" },
+    expected: { error: "table-structure" },
   },
   {
     name: "accepts-header-and-data-cells",
     input: div("<table><tr><th>h</th><td>a</td></tr><tr><td>b</td><td>c</td></tr></table>"),
-    expected: "\n\n\n\th\t\ta\t\n\n\tb\t\tc\t\n\n\n",
+    expected:
+      "\n\n\ufdd0\n\ufdd2\t\ufdd3\th\t\t\ufdd3\ta\t\n\n\ufdd2\t\ufdd3\tb\t\t\ufdd3\tc\t\n\n\ufdd1\n\n",
   },
-  { name: "accepts-empty-table", input: div("<table></table>"), expected: "\n\n\n\n" },
+  {
+    name: "accepts-empty-table",
+    input: div("<table></table>"),
+    expected: "\n\n\ufdd0\n\ufdd1\n\n",
+  },
   {
     name: "accepts-caption-only-table",
     input: div("<table><caption>c</caption></table>"),
-    expected: "\n\n\nc\n\n\n",
+    expected: "\n\n\ufdd0\nc\n\n\ufdd1\n\n",
   },
   {
     name: "accepts-empty-rows",
     input: div("<table><tr></tr><tr></tr></table>"),
-    expected: "\n\n\n\n\n\n\n\n",
+    expected: "\n\n\ufdd0\n\ufdd2\n\n\ufdd2\n\n\ufdd1\n\n",
   },
   {
     name: "rejects-empty-and-full-row",
@@ -3176,7 +3324,7 @@ export const xhtmlCases: XhtmlCase[] = [
   },
   {
     name: "rejects-unknown-before-root",
-    input: `<img ${XHTML}/>`,
+    input: `<iframe ${XHTML}/>`,
     expected: { error: "unknown-element" },
   },
   {
@@ -3225,7 +3373,7 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "accepts-ascii-whitespace-in-tags",
     input: `<div\n${XHTML}\r\n><p\t>a<br\t/>b</p ><table\n><tr ><td\r>c</td\n></tr></table></div\t>`,
-    expected: "\n\na\nb\n\n\n\tc\t\n\n\n",
+    expected: "\n\na\nb\n\n\ufdd0\n\ufdd2\t\ufdd3\tc\t\n\n\ufdd1\n\n",
   },
   // Second review, round 2, item 1: a line break in text is emitted as a space.
   {
@@ -3262,12 +3410,12 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "cell-breaks-are-tabs",
     input: div("<table><tr><td><p>a</p>b<br/>c<hr/></td></tr></table>"),
-    expected: "\n\n\n\t\ta\tb\tc\t\t\t\n\n\n",
+    expected: "\n\n\ufdd0\n\ufdd2\t\ufdd3\t\ta\tb\tc\t\t\t\n\n\ufdd1\n\n",
   },
   {
     name: "accepts-soft-hyphen-before-br-in-cell",
     input: div("<table><tr><td>intra&#173;<br/>venous</td></tr></table>"),
-    expected: "\n\n\n\tintra\u00ad\tvenous\t\n\n\n",
+    expected: "\n\n\ufdd0\n\ufdd2\t\ufdd3\tintra\u00ad\tvenous\t\n\n\ufdd1\n\n",
   },
   {
     name: "rejects-soft-hyphen-before-caption-end",
@@ -3339,5 +3487,325 @@ export const xhtmlCases: XhtmlCase[] = [
     name: "sup-slash-kept",
     input: div("<p><sup>1/2</sup></p>"),
     expected: "\n\n\u00b9/\u00b2\n\n",
+  },
+  // -------------------------------------------------------------------------------------------
+  // fidelity-norm/3.0.0: numbered lists, table grids and pictures.
+  {
+    name: "accepts-ol-start",
+    input: div('<ol start="3"><li>Take</li></ol>'),
+    expected: "\n\n\n3. Take\n\n\n",
+  },
+  {
+    name: "accepts-ol-alpha-past-z",
+    input: div(
+      '<ol type="a"><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li></ol>',
+    ),
+    expected:
+      "\n\n\na. x\n\nb. x\n\nc. x\n\nd. x\n\ne. x\n\nf. x\n\ng. x\n\nh. x\n\ni. x\n\nj. x\n\nk. x\n\nl. x\n\nm. x\n\nn. x\n\no. x\n\np. x\n\nq. x\n\nr. x\n\ns. x\n\nt. x\n\nu. x\n\nv. x\n\nw. x\n\nx. x\n\ny. x\n\nz. x\n\naa. x\n\n\n",
+  },
+  {
+    name: "accepts-ol-upper-roman-from-negative",
+    input: div('<ol type="I" start="-1"><li>a</li><li>b</li><li>c</li></ol>'),
+    expected: "\n\n\n-1. a\n\n0. b\n\nI. c\n\n\n",
+  },
+  {
+    name: "accepts-ol-roman-past-range",
+    input: div('<ol type="i" start="3998"><li>a</li><li>b</li><li>c</li></ol>'),
+    expected: "\n\n\nmmmcmxcviii. a\n\nmmmcmxcix. b\n\n4000. c\n\n\n",
+  },
+  {
+    name: "accepts-ol-upper-alpha-large",
+    input: div('<ol type="A" start="703"><li>a</li></ol>'),
+    expected: "\n\n\nAAA. a\n\n\n",
+  },
+  {
+    name: "accepts-ol-nested-restarts-decimal",
+    input: div('<ol type="a"><li>x<ol><li>y</li></ol></li><li>z</li></ol>'),
+    expected: "\n\n\na. x\n\n1. y\n\n\n\nb. z\n\n\n",
+  },
+  {
+    name: "accepts-ol-in-cell",
+    input: div('<table><tr><td><ol start="2"><li>a</li></ol></td></tr></table>'),
+    expected: "\n\n\ufdd0\n\ufdd2\t\ufdd3\t\t\t2. a\t\t\t\n\n\ufdd1\n\n",
+  },
+  {
+    name: "accepts-ol-whitespace-between-items",
+    input: div("<ol>\n <li>a</li>\t<li>b</li>\r\n</ol>"),
+    expected: "\n\n  \n1. a\n\t\n2. b\n  \n\n",
+  },
+  {
+    name: "accepts-ul-items-emit-nothing",
+    input: div("<ul><li>a</li><li>b</li></ul>"),
+    expected: "\n\n\na\n\nb\n\n\n",
+  },
+  {
+    name: "rejects-text-in-ol",
+    input: div("<ol> text <li>x</li></ol>"),
+    expected: { error: "list-content" },
+  },
+  {
+    name: "rejects-p-in-ul",
+    input: div("<ul><p>x</p></ul>"),
+    expected: { error: "list-content" },
+  },
+  {
+    name: "rejects-reference-in-ol",
+    input: div("<ol>&#32;<li>a</li></ol>"),
+    expected: { error: "list-content" },
+  },
+  {
+    name: "rejects-li-in-li",
+    input: div("<ol><li>a<li>b</li></li></ol>"),
+    expected: { error: "misnested-tag" },
+  },
+  {
+    name: "rejects-li-in-div",
+    input: div("<div><li>x</li></div>"),
+    expected: { error: "misnested-tag" },
+  },
+  {
+    name: "rejects-li-in-blockquote-in-li",
+    input: div("<ol><li>a<blockquote><li>b</li></blockquote></li></ol>"),
+    expected: { error: "misnested-tag" },
+  },
+  {
+    name: "rejects-ol-reversed",
+    input: div('<ol reversed="reversed"><li>a</li></ol>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-ol-start-negative-zero",
+    input: div('<ol start="-0"><li>a</li></ol>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-ol-start-leading-zero",
+    input: div('<ol start="007"><li>a</li></ol>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-ol-start-five-digits",
+    input: div('<ol start="10000"><li>a</li></ol>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-ol-type-disc",
+    input: div('<ol type="disc"><li>a</li></ol>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-li-value",
+    input: div('<ol><li value="3">a</li></ol>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-ul-start",
+    input: div('<ul start="2"><li>a</li></ul>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "accepts-rowspan-grid",
+    input: div(
+      '<table><tr><td rowspan="2">A</td><td>B</td><td>C</td></tr><tr><td>D</td><td>E</td></tr></table>',
+    ),
+    expected:
+      "\n\n\ufdd0\n\ufdd2\t\ufdd3\tA\t\t\ufdd3\tB\t\t\ufdd3\tC\t\n\n\ufdd2\t\ufdd5\t\t\ufdd3\tD\t\t\ufdd3\tE\t\n\n\ufdd1\n\n",
+  },
+  {
+    name: "accepts-rowspan-trailing-slot",
+    input: div(
+      '<table><tr><td>a</td><td>b</td><td rowspan="2">c</td></tr><tr><td>d</td><td>e</td></tr></table>',
+    ),
+    expected:
+      "\n\n\ufdd0\n\ufdd2\t\ufdd3\ta\t\t\ufdd3\tb\t\t\ufdd3\tc\t\n\n\ufdd2\t\ufdd3\td\t\t\ufdd3\te\t\t\ufdd5\t\n\n\ufdd1\n\n",
+  },
+  {
+    name: "accepts-colspan-and-rowspan",
+    input: div(
+      '<table><caption>Cap</caption><tr><td colspan="2" rowspan="2">X</td><td>a</td></tr><tr><td>b</td></tr><tr><td>c</td><td></td><td>d</td></tr></table>',
+    ),
+    expected:
+      "\n\n\ufdd0\nCap\n\n\ufdd2\t\ufdd3\tX\t\t\ufdd4\t\t\ufdd3\ta\t\n\n\ufdd2\t\ufdd5\t\t\ufdd5\t\t\ufdd3\tb\t\n\n\ufdd2\t\ufdd3\tc\t\t\ufdd3\t\t\t\ufdd3\td\t\n\n\ufdd1\n\n",
+  },
+  {
+    name: "accepts-colspan-1000",
+    input: div('<table><tr><td colspan="1000">a</td></tr></table>'),
+    expected:
+      "\n\n\ufdd0\n\ufdd2\t\ufdd3\ta\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\t\ufdd4\t\n\n\ufdd1\n\n",
+  },
+  {
+    name: "accepts-rowspan-to-group-end",
+    input: div(
+      '<table><thead><tr><th>h</th><th>i</th></tr></thead><tbody><tr><td rowspan="2">a</td><td>b</td></tr><tr><td>c</td></tr></tbody></table>',
+    ),
+    expected:
+      "\n\n\ufdd0\n\n\ufdd2\t\ufdd3\th\t\t\ufdd3\ti\t\n\n\n\n\ufdd2\t\ufdd3\ta\t\t\ufdd3\tb\t\n\n\ufdd2\t\ufdd5\t\t\ufdd3\tc\t\n\n\n\ufdd1\n\n",
+  },
+  {
+    name: "rejects-colspan-1001",
+    input: div('<table><tr><td colspan="1001">a</td></tr></table>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-colspan-zero",
+    input: div('<table><tr><td colspan="0">a</td></tr></table>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-rowspan-leading-zero",
+    input: div('<table><tr><td rowspan="02">a</td></tr></table>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-span-overlap",
+    input: div(
+      '<table><tr><td>Adults</td><td rowspan="2">10 mg</td></tr><tr><td colspan="2">Children</td></tr></table>',
+    ),
+    expected: { error: "table-shape" },
+  },
+  {
+    name: "rejects-rowspan-into-tbody",
+    input: div(
+      '<table><thead><tr><td rowspan="2">a</td><td>b</td></tr></thead><tbody><tr><td>c</td></tr></tbody></table>',
+    ),
+    expected: { error: "table-shape" },
+  },
+  {
+    name: "rejects-rowspan-past-bare-rows",
+    input: div('<table><tr><td rowspan="3">a</td><td>b</td></tr><tr><td>c</td></tr></table>'),
+    expected: { error: "table-shape" },
+  },
+  {
+    name: "accepts-colspan-counted-in-width",
+    input: div(
+      '<table><tr><td colspan="2">a</td><td>b</td></tr><tr><td>1</td><td>2</td><td>3</td></tr></table>',
+    ),
+    expected:
+      "\n\n\ufdd0\n\ufdd2\t\ufdd3\ta\t\t\ufdd4\t\t\ufdd3\tb\t\n\n\ufdd2\t\ufdd3\t1\t\t\ufdd3\t2\t\t\ufdd3\t3\t\n\n\ufdd1\n\n",
+  },
+  {
+    name: "rejects-colspan-ragged",
+    input: div(
+      '<table><tr><td colspan="2">a</td><td>b</td></tr><tr><td>1</td><td>2</td></tr></table>',
+    ),
+    expected: { error: "table-shape" },
+  },
+  {
+    name: "rejects-row-with-hole",
+    input: div(
+      '<table><tr><td>a</td><td>b</td><td rowspan="2">c</td></tr><tr><td>d</td></tr></table>',
+    ),
+    expected: { error: "table-shape" },
+  },
+  {
+    name: "accepts-picture-reference",
+    input: div('<p>see <img src="~/_entity/annotation/0c1d"/> here</p>'),
+    expected:
+      "\n\nsee \ufffc33cf118a449536fbab5d5b507f152b8b4f817c90af14bf2e0fca2c36332c4f76 here\n\n",
+  },
+  {
+    name: "accepts-picture-data",
+    input: div('<p><img src="data:image/png;base64,AA=="/>x</p>'),
+    expected: "\n\n\ufffce2c4bf98685a8d0674e42fe055e6768d7da848691d4fa7c9dbd5b0703d9dfaf4x\n\n",
+  },
+  {
+    name: "rejects-picture-alt",
+    input: div('<p><img src="x" alt="Take 10 mg"/></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-picture-without-source",
+    input: div("<p><img/></p>"),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-picture-start-tag",
+    input: div('<p><img src="x"></img></p>'),
+    expected: { error: "void-element" },
+  },
+  {
+    name: "rejects-picture-javascript",
+    input: div('<p><img src="javascript:x"/></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-picture-protocol-relative",
+    input: div('<p><img src="//evil/x"/></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-picture-parent-segment",
+    input: div('<p><img src="a/../x"/></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-picture-dot-segment",
+    input: div('<p><img src="./x"/></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-picture-absolute-path",
+    input: div('<p><img src="/x"/></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-picture-https",
+    input: div('<p><img src="https://example.org/x"/></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-picture-svg-data",
+    input: div('<p><img src="data:image/svg+xml;base64,AAAA"/></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-picture-data-length",
+    input: div('<p><img src="data:image/png;base64,AAAAA"/></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-picture-data-inner-padding",
+    input: div('<p><img src="data:image/png;base64,AA=A"/></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-picture-in-sup",
+    input: div('<p>10<sup><img src="x"/></sup></p>'),
+    expected: { error: "script-content" },
+  },
+  {
+    name: "rejects-picture-in-row",
+    input: div('<table><tr><img src="x"/></tr></table>'),
+    expected: { error: "table-content" },
+  },
+  {
+    name: "rejects-reserved-object-replacement",
+    input: div("<p>&#xFFFC;</p>"),
+    expected: { error: "reserved-character" },
+  },
+  {
+    name: "rejects-reserved-raw-cell-marker",
+    input: div("<p>\ufdd3</p>"),
+    expected: { error: "reserved-character" },
+  },
+  {
+    name: "rejects-reserved-before-table-content",
+    input: div("<table><tr>&#xFFFC;</tr></table>"),
+    expected: { error: "reserved-character" },
+  },
+  {
+    name: "rejects-reserved-before-unmappable",
+    input: div("<p><sup>&#xFDD0;</sup></p>"),
+    expected: { error: "reserved-character" },
+  },
+  {
+    name: "rejects-reserved-last-noncharacter",
+    input: div("<p>&#xFDEF;</p>"),
+    expected: { error: "reserved-character" },
+  },
+  {
+    name: "accepts-near-reserved",
+    input: div("<p>&#xFDCF;&#xFDF0;&#xFFFB;</p>"),
+    expected: "\n\n\ufdcf\ufdf0\ufffb\n\n",
   },
 ];
