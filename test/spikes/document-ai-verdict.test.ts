@@ -32,9 +32,12 @@ const ADAPTER_VERSION = "1.0.0";
 const EXPECTED_TIMEOUT_MS = 60_000;
 const LIGATURE = "ﬁ";
 
-// The `reportHash` the verdict quotes for Part A.
+// The `reportHash` of Part A under the current normalisation version. The verdict quotes
+// `12449bee…` from its run under `fidelity-norm/1.1.1`; replaying the same recording under
+// `fidelity-norm/2.0.0` changes no section, status or figure, and the hash moves only because the
+// report carries the version (docs/validation/changes/2026-09-23-fidelity-norm-2-0-0.md).
 const VERDICT_FIDELITY_REPORT_HASH =
-  "12449bee74d936f9950b27378c2aaa9d3cd04789cae73bd9473878dd8c3a6a46";
+  "be91473dfb9552364c162b854ed1c69c3f1df8896a9411734270425e8438a4c1";
 
 type LayoutDocument = protos.google.cloud.documentai.v1.IDocument;
 

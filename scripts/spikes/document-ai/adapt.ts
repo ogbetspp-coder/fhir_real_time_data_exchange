@@ -81,16 +81,13 @@ const WORD_CHARACTER = /[\p{L}\p{N}\p{M}]/u;
 // because `findForbiddenCharacter` reports only the first one and the spike needs the count.
 function isForbidden(codePoint: number): boolean {
   if (codePoint === 0xfffd || codePoint === 0xfffe || codePoint === 0xffff) return true;
-  if (codePoint === 0x007f) return true;
+  if (codePoint >= 0x007f && codePoint <= 0x009f) return true;
   if (codePoint >= 0xd800 && codePoint <= 0xdfff) return true;
+  if (codePoint === 0x061c || codePoint === 0x200e || codePoint === 0x200f) return true;
+  if (codePoint >= 0x202a && codePoint <= 0x202e) return true;
+  if (codePoint >= 0x2066 && codePoint <= 0x2069) return true;
   if (codePoint < 0x0020) {
-    return !(
-      codePoint === 0x0009 ||
-      codePoint === 0x000a ||
-      codePoint === 0x000b ||
-      codePoint === 0x000c ||
-      codePoint === 0x000d
-    );
+    return !(codePoint === 0x0009 || codePoint === 0x000a || codePoint === 0x000d);
   }
   return false;
 }

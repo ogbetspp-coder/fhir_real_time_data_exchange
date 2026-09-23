@@ -37,7 +37,7 @@ def verification(
             "lastUpdated": "2026-09-19T00:00:00Z",
         },
         "result": "match" if result == "match" else "no-match",
-        "normalizationVersion": "fidelity-norm/1.1.1",
+        "normalizationVersion": "fidelity-norm/2.0.0",
         "quoteSha256": "1" * 64,
         "sectionsSearched": 32,
     }
