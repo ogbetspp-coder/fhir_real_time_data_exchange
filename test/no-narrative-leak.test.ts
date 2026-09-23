@@ -153,10 +153,13 @@ function codePointLength(text: string): number {
   return Array.from(text).length;
 }
 
+// A non-empty body ends with its own line terminator (spec section 1), so the page carries one
+// after the text the span covers.
 function singlePageSource(body: string): SourceDocumentText {
+  const text = `${body}\n`;
   return {
     extractorVersion: "adversarial-fixture/1.0.0",
-    pages: [{ page: 1, text: body, bodyStart: 0, bodyEnd: codePointLength(body) }],
+    pages: [{ page: 1, text, bodyStart: 0, bodyEnd: codePointLength(text) }],
   };
 }
 

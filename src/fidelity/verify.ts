@@ -5,6 +5,7 @@ import {
   NormalizationError,
   countWords,
   findForbiddenCharacter,
+  isWhitespace,
   isWordCharacter,
   normalizeText,
 } from "./normalize.js";
@@ -115,6 +116,8 @@ export class FidelityError extends Error {
 // extractor, so it is bounded and must sit on line boundaries rather than trusted outright.
 const MAX_EXCLUDED_CODE_POINTS_PER_PAGE = 240;
 
+const SOFT_HYPHEN = "\u00ad";
+
 type PageIndex = {
   page: SourcePage;
   codePoints: string[];
@@ -127,7 +130,7 @@ type PageIndex = {
 function softHyphenBreakBefore(codePoints: string[], offset: number): boolean {
   if (codePoints[offset - 1] !== "\n") return false;
   const before = codePoints[offset - 2] === "\r" ? offset - 3 : offset - 2;
-  return codePoints[before] === "­";
+  return codePoints[before] === SOFT_HYPHEN;
 }
 
 function bodyIssueFor(page: SourcePage, codePoints: string[]): string | undefined {
@@ -138,7 +141,9 @@ function bodyIssueFor(page: SourcePage, codePoints: string[]): string | undefine
   ) {
     return "body-boundary";
   }
-  if (bodyEnd !== codePoints.length && codePoints[bodyEnd - 1] !== "\n") return "body-boundary";
+  // A non-empty body always ends with its own line terminator, even at the end of the page:
+  // otherwise the last word of one page and the first word of the next would read as one.
+  if (bodyEnd !== bodyStart && codePoints[bodyEnd - 1] !== "\n") return "body-boundary";
   if (codePoints.length - (bodyEnd - bodyStart) > MAX_EXCLUDED_CODE_POINTS_PER_PAGE) {
     return "excluded-text";
   }
@@ -152,8 +157,12 @@ function indexPages(source: SourceDocumentText): {
   const pages = new Map<number, PageIndex>();
   const structural: string[] = [];
   const issues: string[] = [];
-  for (const page of source.pages) {
+  for (const [position, page] of source.pages.entries()) {
     if (pages.has(page.page)) structural.push(`Duplicate page number ${page.page}`);
+    // Pages are numbered 1..N in array order, so no page can be left out of the document and the
+    // text before a section's first span is always the text the document puts there.
+    if (page.page !== position + 1)
+      structural.push(`Page ${page.page} at position ${position + 1}`);
     const codePoints = Array.from(page.text);
     if (
       !Number.isInteger(page.page) ||
@@ -257,29 +266,53 @@ function resolveSpans(
 
   // The outer edges of a section must fall on word boundaries: a section may omit words, but
   // it may not begin or end inside one (spec section 6).
-  const first = pieces[0];
+  const firstSpan = spans[0];
+  const lastSpan = spans[spans.length - 1];
   const last = pieces[pieces.length - 1];
-  if (first !== undefined && last !== undefined) {
-    const head = first.index.codePoints;
-    const before = head[first.start - 1];
-    if (
-      first.start > first.index.page.bodyStart &&
-      before !== undefined &&
-      (isWordCharacter(before) || softHyphenBreakBefore(head, first.start))
-    ) {
+  if (firstSpan !== undefined && lastSpan !== undefined && last !== undefined) {
+    if (startCutsWord(pages, firstSpan) || endCutsWord(last.index, lastSpan)) {
       return { status: "invalid-provenance", reason: "word-cut" };
     }
-    const tail = last.index.codePoints;
-    const after = tail[last.end];
-    const cutsAfter =
-      tail[last.end - 1] === "­" ||
-      (last.end < last.index.page.bodyEnd
-        ? after !== undefined && isWordCharacter(after)
-        : softHyphenBreakBefore(tail, last.end));
-    if (cutsAfter) return { status: "invalid-provenance", reason: "word-cut" };
   }
 
   return { raw: pieces.map((piece) => slice(piece.index, piece.start, piece.end)) };
+}
+
+// Reads backwards from the code point before the first span, through its page's body and then
+// the bodies of the pages before it (as declared, whether or not they pass section 1 or 2),
+// skipping section 3 whitespace. The section starts inside a word if the first other code point
+// is U+00AD, or is a word character with nothing skipped. Reading past page 1 is no cut.
+function startCutsWord(pages: Map<number, PageIndex>, span: SourceSpan): boolean {
+  let skipped = false;
+  let pageNumber = span.page;
+  let position = span.startOffset - 1;
+  let index = pages.get(pageNumber);
+  while (index !== undefined) {
+    for (; position >= index.page.bodyStart; position -= 1) {
+      const character = index.codePoints[position] ?? "";
+      if (isWhitespace(character.codePointAt(0) ?? 0)) {
+        skipped = true;
+        continue;
+      }
+      return character === SOFT_HYPHEN || (!skipped && isWordCharacter(character));
+    }
+    pageNumber -= 1;
+    index = pages.get(pageNumber);
+    if (index !== undefined) position = index.page.bodyEnd - 1;
+  }
+  return false;
+}
+
+// The section ends inside a word if its last span, without trailing section 3 whitespace, ends
+// in U+00AD, or if the code point at its end offset is a word character inside the body.
+function endCutsWord(index: PageIndex, span: SourceSpan): boolean {
+  let end = span.endOffset;
+  while (end > span.startOffset && isWhitespace(index.codePoints[end - 1]?.codePointAt(0) ?? 0)) {
+    end -= 1;
+  }
+  if (end > span.startOffset && index.codePoints[end - 1] === SOFT_HYPHEN) return true;
+  const after = index.codePoints[span.endOffset];
+  return span.endOffset < index.page.bodyEnd && after !== undefined && isWordCharacter(after);
 }
 
 // Pieces from consecutive pages are concatenated verbatim: a page body ends with its own line

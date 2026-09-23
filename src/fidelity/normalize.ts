@@ -2,7 +2,7 @@
 // docs/fidelity-normalization.md sections 2-4; the golden vectors in test/fixtures/fidelity are
 // the language-neutral proof. Any change here is a new NORMALIZATION_VERSION.
 
-export const NORMALIZATION_VERSION = "fidelity-norm/1.1.1";
+export const NORMALIZATION_VERSION = "fidelity-norm/2.0.0";
 
 export class NormalizationError extends Error {
   public constructor(
@@ -29,12 +29,12 @@ const BULLET_GLYPHS = new Set([
   0x2022, 0x2023, 0x2043, 0x2219, 0x25a0, 0x25a1, 0x25aa, 0x25ab, 0x25cb, 0x25cf, 0x25e6,
 ]);
 
+// Section 3 step 5. U+000B, U+000C and U+0085 are not here: section 2 rejects them.
 const WHITESPACE = new Set([
-  0x0009, 0x000a, 0x000b, 0x000c, 0x000d, 0x0020, 0x0085, 0x00a0, 0x1680, 0x2028, 0x2029, 0x202f,
-  0x205f, 0x3000,
+  0x0009, 0x000a, 0x000d, 0x0020, 0x00a0, 0x1680, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000,
 ]);
 
-function isWhitespace(codePoint: number): boolean {
+export function isWhitespace(codePoint: number): boolean {
   return WHITESPACE.has(codePoint) || (codePoint >= 0x2000 && codePoint <= 0x200a);
 }
 
@@ -53,18 +53,18 @@ export function isWordCharacter(character: string): boolean {
   );
 }
 
-function isForbidden(codePoint: number): boolean {
+// Section 2's closed rejection list. Bidirectional controls are here because their reach differs
+// between a narrative block and page text; C1 controls because a renderer remaps them through
+// windows-1252; U+000B and U+000C because they are not XML characters.
+export function isForbiddenCodePoint(codePoint: number): boolean {
   if (codePoint === 0xfffd || codePoint === 0xfffe || codePoint === 0xffff) return true;
-  if (codePoint === 0x007f) return true;
+  if (codePoint >= 0x007f && codePoint <= 0x009f) return true;
   if (codePoint >= 0xd800 && codePoint <= 0xdfff) return true;
+  if (codePoint === 0x061c || codePoint === 0x200e || codePoint === 0x200f) return true;
+  if (codePoint >= 0x202a && codePoint <= 0x202e) return true;
+  if (codePoint >= 0x2066 && codePoint <= 0x2069) return true;
   if (codePoint < 0x0020) {
-    return !(
-      codePoint === 0x0009 ||
-      codePoint === 0x000a ||
-      codePoint === 0x000b ||
-      codePoint === 0x000c ||
-      codePoint === 0x000d
-    );
+    return !(codePoint === 0x0009 || codePoint === 0x000a || codePoint === 0x000d);
   }
   return false;
 }
@@ -73,7 +73,7 @@ function isForbidden(codePoint: number): boolean {
 export function findForbiddenCharacter(text: string): number | undefined {
   let offset = 0;
   for (const character of text) {
-    if (isForbidden(character.codePointAt(0) ?? 0)) return offset;
+    if (isForbiddenCodePoint(character.codePointAt(0) ?? 0)) return offset;
     offset += 1;
   }
   return undefined;

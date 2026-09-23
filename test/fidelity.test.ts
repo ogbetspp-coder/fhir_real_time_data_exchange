@@ -122,6 +122,19 @@ describe("xhtml scanner", () => {
       expect(tryXhtml(testCase.input), testCase.name).toEqual(testCase.expected);
     }
   });
+
+  // Section 2 applies to the div as decoded from JSON (RFC 8259). The vectors are written by
+  // JSON.stringify, which never escapes a valid pair, so the escaped form is pinned here.
+  it("reads an escaped surrogate pair in JSON as one code point", () => {
+    const fromJson = (inner: string): string => {
+      const opening = JSON.stringify('<div xmlns="http://www.w3.org/1999/xhtml"><p>');
+      return JSON.parse(`${opening.slice(0, -1)}${inner}</p></div>"`) as string;
+    };
+    expect(tryXhtml(fromJson("\\ud835\\udefc"))).toBe("\n\n\u{1d6fc}\n\n");
+    for (const rejected of ["\\ud835<b></b>\\udefc", "&#xD835;&#xDEFC;", "\\ud835"]) {
+      expect(tryXhtml(fromJson(rejected)), rejected).toEqual({ error: "forbidden-character" });
+    }
+  });
 });
 
 describe("narrative fidelity verification", () => {
