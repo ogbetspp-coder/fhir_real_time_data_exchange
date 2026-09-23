@@ -55,6 +55,49 @@ Every probe of that review named "FP …" now ends non-verified in both implemen
 to the Children column behind an empty cell. That is cell association, which the review asked
 to be stated as a residual rather than closed (below); it still verifies.
 
+**Second review, round 2, folded into 2.0.0.** The review of the fixes above found two more
+false passes and three smaller items, fixed in 2.0.0 as well:
+
+- **Text line breaks** — a raw or referenced U+000A or U+000D in narrative text is emitted as
+  U+0020, because a renderer draws it as a space. `<p>Take 2` U+000A `• 10 mg</p>` (and the
+  same with `&#10;` or `◦`) verified against a page whose "• 10 mg" starts a new line, because
+  the check read the bullet as a list item. `soft-hyphen-at-boundary` now concerns only U+00AD
+  before a block boundary or `br`; U+00AD before a text line break is followed by a space,
+  which section 3 step 1 does not join, so there is no false pass: `un` U+00AD U+000A `safe` in
+  a paragraph reads "un safe" and mismatches a page's "unsafe"
+  (`soft-hyphen-before-raw-line-feed-against-joined-word`), and verifies only against a page
+  that also reads "un safe".
+- **Grouped numbers at section edges** — a section edge is a cut when the code point on its
+  inner side is a digit (Nd) and the first non-whitespace code point beyond it, on the same
+  line, is a digit too; and U+00A0, U+2007 and U+202F are not edge whitespace. Against "The
+  maximum dose is 10 000 IU daily." (with a space, U+202F or U+2009 between the groups) a span
+  ending at "…is 10" verified, and so did one starting at "000 IU daily.".
+- **Bullets in table cells** — a bullet glyph on a line that contains U+0009 is content, and
+  the scanner writes a table cell, and everything inside it, on a U+0009-separated line (cells'
+  start and end tags, and blocks and `br` inside a cell, emit U+0009 instead of U+000A), so a
+  bullet in a cell is never a list item on either side. `<td>2</td><td>• 10</td>` verified
+  against the row 2 U+0009 10. With the start of a text still counted as a line start, a bullet
+  kept for its U+0009 would be replaced when the result was normalised again (the reviewer's
+  own normalisation fuzz found 2,728 such inputs in 200,000), so the start of a text is no
+  longer a line start: normalised text has no U+000A and cannot change again. The narrative's
+  text always begins with U+000A (the root `div`), and the verifier reads each page slice it
+  normalises — the first slice of a section and every gap it tests — from the U+000A that ends
+  the previous line when only whitespace lies between (section 6), so a list item that starts
+  a section is still a list item on both sides. This departs from the first round's wording
+  "after text start or LF" on purpose; it also closes a case nobody had reported: a span
+  starting at a mid-line bullet ("• 10 mg daily." of "Take 2 • 10 mg daily.") verified
+  against "10 mg daily." because the slice's first bullet was at the start of its text.
+- **Script letters and symbols** — inside `sub`, U+2071 and U+207F reject; inside `sup`,
+  U+2090–U+209C reject; inside either, any code point of general category Sm, Ps, Pe or Pd that
+  is neither a source nor a target of the fold tables rejects (U+FF1D, U+FE59, U+2E3A, U+FE31,
+  and `~`, `<`, `[`, `]` too).
+- **Rename** — the vector `span-ends-before-punctuation-passes` is now
+  `span-ends-before-punctuation-is-word-cut`.
+
+Every probe of round 2 named "FP2 …" now ends non-verified in both implementations; the
+reviewer's probes of both rounds (44 and 121 cases), both XHTML fuzzers (60,000 narratives
+each) and the normalisation fuzz (200,000 strings, now 0 non-idempotent) agree between them.
+
 **Why.** ADR 0003's rule is that false failures are acceptable and false passes are not. The
 design note's table lists ten narratives that verified under 1.1.1 while a reader saw something
 the source does not say (a superscript turning `106` into `10⁶`, a soft hyphen joining words
@@ -108,10 +151,10 @@ vector below and now fails.
 **Steps 1–6.** 1: `NORMALIZATION_VERSION` is `fidelity-norm/2.0.0` on both sides. 2:
 `npm run contracts:generate` (no drift), `npm run vectors:generate`, `npm run contracts:fixtures`,
 `npm run contracts:quote-edge` and `npm run differential:smoke` regenerated
-`test/fixtures/fidelity/vectors.json` (137 → 348 vectors: normalisation 25 → 57, XHTML 60 → 192,
-verify 52 → 99), the four contract fixtures and the smoke corpus; no `query-tools` or
+`test/fixtures/fidelity/vectors.json` (137 → 402 vectors: normalisation 25 → 62, XHTML 60 → 214,
+verify 52 → 126), the four contract fixtures and the smoke corpus; no `query-tools` or
 `agent-turn` change, so no vendored copy moved; `zone-a/scripts/generate_models.py --check`
-passes. 3: every changed vector, below. 4: the 211 new vectors — every row of the design note's
+passes. 3: every changed vector, below. 4: the 265 new vectors — every row of the design note's
 table, every amendment's boundary, and both the rejecting and the accepting side of each rule
 (for example `<sup>2</sup>` → `²`, `<sup>a</sup>` kept, `<sup>–6</sup>` → `⁻⁶`, `<sup>±1</sup>`
 rejects, a non-ASCII digit in `sup` rejects, whitespace-only text in table parts accepted, an
@@ -123,9 +166,16 @@ second review, `<sup` U+00A0 `>`, `</sup` U+00A0 `>`, `<br` U+00A0 `/>`, `<table
 `−20`, `0.5`, `1,000` and `non-steroidal` → `word-cut` with the whitespace-delimited forms
 verified, bullets at a line start replaced and mid-line, after CR alone, at the end, or U+2219
 and U+2043 kept, `2∙10` and `2 • 10` against a table row → mismatch, and the other script's
-digits and signs in `sup`/`sub` → `unmappable-script`); seven structural cases (a missing page,
-pages out of order, numbering from 2, a boolean span page, a boolean and a fractional span
-offset, a boolean page number) in `test/fixtures/fidelity/cases.ts`; the `verify_quote` acceptance case above; and the extended
+digits and signs in `sup`/`sub` → `unmappable-script`; and for its round 2, bullets after a raw
+or referenced line feed in a paragraph → mismatch, line feeds and carriage returns in text
+emitted as spaces, spans ending or starting inside `10 000` with each separator → `word-cut`
+and the whole number and a number at a line end verified, bullets in the first and a later cell
+against rows with and without the bullet, a bullet at a line start and at the very start of a
+page, a span starting at a mid-line bullet, a section continuing over a bullet at a page head,
+the other kind's script letters and the symbols, brackets and dashes in `sup`/`sub`);
+seven structural cases (a missing page, pages out of order, numbering from 2, a boolean span
+page, a boolean and a fractional span offset, a boolean page number) in
+`test/fixtures/fidelity/cases.ts`; the `verify_quote` acceptance case above; and the extended
 differential generator (below). 5: ADR 0003 amended (Decision item 1 and Consequences). 6: UR-09
 (design control and evidence) and UR-22 (the `invalid-request` note) updated.
 
@@ -134,15 +184,16 @@ differential generator (below). 5: ADR 0003 amended (Decision item 1 and Consequ
 the only change (every other member of `expected` compared equal with those two removed). The
 vectors whose outcome changed against 1.1.1, each reviewed:
 
-| Vector (family)                                | 1.1.1                | 2.0.0                                                   | Reason                                                                                                                                                                                              |
-| ---------------------------------------------- | -------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `allows-tab-lf-cr-ff-vt` (normalisation)       | `a b c d e f`        | `forbidden-character`                                   | R2: U+000B and U+000C reject on both sides. Name kept so the change is reviewable against 1.1.1; `allows-tab-lf-cr`, `rejects-vertical-tab` and `rejects-form-feed` state the new rule.             |
-| `inline-dropped` (XHTML)                       | `…c 2`               | `…c ²`                                                  | B: a digit inside `sup` folds to its script code point.                                                                                                                                             |
-| `allowed-attributes` (XHTML)                   | accepted             | `forbidden-attribute`                                   | F/R10: the root's `id` (then `class`, and the `#x` link) are no longer allowed; the first decides. `accepts-lang-on-root` is the accepting form.                                                    |
-| `superscript-markup-over-plain-digit` (verify) | `passed`, `verified` | `failed`, `mismatch`                                    | B: the case is the defect — `m<sup>2</sup>` and `H<sub>2</sub>O` against a source's `m2`, `H2O`. The generator fills the provenance's `normalizedTextSha256` from the new text, so the input moved. |
-| `hidden-extra-element` (verify)                | `failed`, `mismatch` | `failed`, `malformed-narrative` (`forbidden-attribute`) | F: `class` is refused before any comparison. The narrative no longer normalises, so the binding hash and the filled `normalizedTextSha256` moved too.                                               |
-| `bullets` (normalisation)                      | `one two three`      | `one two ▪ three`                                       | C3: `▪` mid-line is content; only the two bullets at line starts, each before a space, are list structure. Name kept for review against 1.1.1.                                                      |
-| `span-ends-before-punctuation-passes` (verify) | `passed`, `verified` | `failed`, `invalid-provenance` (`word-cut`)             | C2: the span ends at "use" before ".", and a full stop is no longer a boundary — the same rule must refuse "1" of "1.5". A false failure the rule accepts. Name kept for review against 1.1.1.      |
+| Vector (family)                                                                                    | 1.1.1                | 2.0.0                                                   | Reason                                                                                                                                                                                                                                                                                                        |
+| -------------------------------------------------------------------------------------------------- | -------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `allows-tab-lf-cr-ff-vt` (normalisation)                                                           | `a b c d e f`        | `forbidden-character`                                   | R2: U+000B and U+000C reject on both sides. Name kept so the change is reviewable against 1.1.1; `allows-tab-lf-cr`, `rejects-vertical-tab` and `rejects-form-feed` state the new rule.                                                                                                                       |
+| `inline-dropped` (XHTML)                                                                           | `…c 2`               | `…c ²`                                                  | B: a digit inside `sup` folds to its script code point.                                                                                                                                                                                                                                                       |
+| `allowed-attributes` (XHTML)                                                                       | accepted             | `forbidden-attribute`                                   | F/R10: the root's `id` (then `class`, and the `#x` link) are no longer allowed; the first decides. `accepts-lang-on-root` is the accepting form.                                                                                                                                                              |
+| `superscript-markup-over-plain-digit` (verify)                                                     | `passed`, `verified` | `failed`, `mismatch`                                    | B: the case is the defect — `m<sup>2</sup>` and `H<sub>2</sub>O` against a source's `m2`, `H2O`. The generator fills the provenance's `normalizedTextSha256` from the new text, so the input moved.                                                                                                           |
+| `hidden-extra-element` (verify)                                                                    | `failed`, `mismatch` | `failed`, `malformed-narrative` (`forbidden-attribute`) | F: `class` is refused before any comparison. The narrative no longer normalises, so the binding hash and the filled `normalizedTextSha256` moved too.                                                                                                                                                         |
+| `bullets` (normalisation)                                                                          | `one two three`      | `• one two ▪ three`                                     | C3: `▪` mid-line is content; round 2: the start of a text is not a line start, so the first `•` is content too (normalisation stays idempotent; the verifier reads page slices from their line terminator). Only `●`, after U+000A and before a space, is list structure. Name kept for review against 1.1.1. |
+| `span-ends-before-punctuation-passes` (verify), renamed `span-ends-before-punctuation-is-word-cut` | `passed`, `verified` | `failed`, `invalid-provenance` (`word-cut`)             | C2: the span ends at "use" before ".", and a full stop is no longer a boundary — the same rule must refuse "1" of "1.5". A false failure the rule accepts. Renamed in round 2 so the name says the outcome.                                                                                                   |
+| `table`, `accepts-caption-first`, `accepts-table-section-order` (XHTML)                            | cells between U+000A | cells between U+0009                                    | Round 2: a table cell and everything in it is emitted on a U+0009-separated line, so a bullet in a cell is never a list item. The normalised text is unchanged (both are whitespace).                                                                                                                         |
 
 Against the first 2.0.0 implementation (commit `e00e708`), the second review changed, besides
 `bullets` and `span-ends-before-punctuation-passes` above: `sup-dashes-fold-to-minus`,
@@ -151,6 +202,32 @@ gained U+2015, U+02D7, U+FE58, U+2795, U+2796, which now fold, L1); `sup-horizon
 became `sup-horizontal-bar-folds` (U+2015 now folds to U+207B, L1); and
 `sub-superscript-digit-kept` became `rejects-sub-superscript-digit` (`²` inside `sub` now
 rejects, L1). Those two were renamed because they were never released.
+
+Against the second-review commit (`fca8737`), round 2 changed:
+
+- `bullets` — `one two ▪ three` → `• one two ▪ three`: the start of a text is not a line start.
+- `bullet-at-text-start-replaced` → renamed `bullet-at-text-start-kept`, `▪ y` stays `▪ y`;
+  `bullet-after-line-feed-at-text-start-replaced` (`\n▪ y` → `y`) pins the replacing side.
+  `bullet-after-invisible-at-start-replaced` → renamed
+  `bullet-after-invisible-at-line-start-replaced`, input now begins with U+000A; and
+  `bullets-in-a-row-replaced` gained a leading U+000A for the same reason.
+- `rejects-soft-hyphen-before-raw-lf`, `rejects-soft-hyphen-before-lf-reference`,
+  `rejects-soft-hyphen-cr-then-br` and `rejects-raw-soft-hyphen-before-crlf` → renamed
+  `soft-hyphen-before-raw-lf-is-a-space`, `soft-hyphen-before-lf-reference-is-a-space`,
+  `soft-hyphen-cr-then-br-is-a-space` and `raw-soft-hyphen-before-crlf-is-a-space`; each now
+  accepted, with U+00AD followed by U+0020 (text line breaks are spaces, so no join).
+- `accepts-soft-hyphen-before-cr-alone` — U+000D is emitted as U+0020.
+- `soft-hyphen-before-cr-and-br` and `soft-hyphen-before-raw-line-feed` (verify) —
+  `malformed-narrative` (`soft-hyphen-at-boundary`) → `mismatch`: the narrative reads "non
+  smokers", the source "nonsmokers".
+- `sup-tilde-kept` → renamed `rejects-sup-tilde`: `~` is Sm, outside the fold tables.
+- `table`, `accepts-caption-first`, `accepts-table-section-order`, `accepts-scope-on-th`,
+  `accepts-nested-table-in-cell`, `accepts-header-and-data-cells`,
+  `accepts-ascii-whitespace-in-tags` and `accepts-whitespace-in-table-parts` — cells are
+  U+0009-separated (and, in the last, raw U+000A and U+000D in table parts are spaces).
+- `span-ends-before-punctuation-passes` → renamed `span-ends-before-punctuation-is-word-cut`.
+
+No verify vector's outcome changed from round 2 except the two soft-hyphen vectors above.
 
 No vector used `colspan`, `rowspan`, `pre`, `lang` below the root, U+0085 as whitespace or a
 non-self-closing `br`. Seven XHTML vectors keep their outcome, `forbidden-attribute`, but are now
@@ -182,12 +259,14 @@ attributes, and tags with ASCII whitespace that is accepted; numbers with punctu
 them and span edges next to punctuation inside a token; bullets at line starts (including
 U+2219 and U+2043) and mid-line; `sup`/`sub` text with the added fold forms and the other
 script's digits and signs; and spans with boolean, fractional or `null` fields and a boolean page
-number. Run as CI runs it (`npx tsx scripts/fidelity/differential.ts --seed <s> --count 2000 >
+number. For round 2: raw and referenced line feeds and carriage returns before a bullet in text,
+numbers grouped with a space, U+2009, U+00A0, U+2007 or U+202F and joiners before a unit, span
+edges inside them, bullets on U+0009 lines and at the start of table cells, and the other
+kind's script letters and symbols, brackets and dashes in `sup`/`sub`. Run as CI runs it (`npx tsx scripts/fidelity/differential.ts --seed <s> --count 2000 >
 <file>`, then `DIFFERENTIAL_CORPUS=<file> uv run --frozen pytest` in `zone-a/`) at seeds
 20260920, 1 and 2: 2002 passed each, **zero divergences**, and the class-coverage test (now
-requiring 43 more classes than under 1.1.1) passes on each. The reviewer's own probes (121
-cases) and XHTML fuzz (60,000 narratives) also agree between the two implementations, 0
-divergent.
+requiring 49 more classes than under 1.1.1) passes on each. The reviewer's own probes and fuzz
+also agree between the two implementations, 0 divergent (above).
 
 Rules were then broken in the Python port one at a time and the three corpora re-run
 (divergences at seeds 20260920 / 1 / 2). The second review's: tag whitespace back to `\s`
@@ -208,6 +287,17 @@ decided after the parent check 2 / 4 / 7; U+00AD before CR LF accepted 15 / 16 /
 all three; each was restored. (Under the first implementation's generator, before the second
 review, the first round's sixteen breaks each diverged on all three seeds; the generator
 changed, so those numbers are superseded.)
+
+Round 2's rules were broken the same way on its extended generator (seeds 20260920 / 1 / 2): a
+text line break kept as U+000A or U+000D 183 / 192 / 187; only raw line breaks, not
+references, turned into spaces 48 / 43 / 40; the end digit-group rule dropped 1 / 1 / 1; the
+start digit-group rule dropped 3 / 2 / 4; U+00A0, U+2007 and U+202F counted as edge whitespace
+5 / 4 / 8; the U+0009-line bullet rule dropped 111 / 129 / 122; table cells emitted with U+000A
+25 / 29 / 30; the start of a text counted as a line start again 11 / 2 / 6; page slices read
+from the span start instead of the line terminator 9 / 13 / 12; symbols, brackets and dashes
+kept in `sup`/`sub` 11 / 7 / 12; the other kind's script letters kept 1 / 3 / 2. Every one
+diverged on all three seeds and was restored. The earlier rounds' breaks were not re-run on
+this generator.
 
 **Blast radius.**
 
@@ -234,14 +324,18 @@ changed, so those numbers are superseded.)
   inside `sup`/`sub`, content directly inside table parts, rows of different widths, or C1,
   bidirectional, U+000B or U+000C characters is now `malformed-narrative`. Tables with spanned
   cells must be written as unspanned cells of one width (the extractor emits the covered slots
-  empty); the engine (roadmap item 8) must produce them that way. Tag whitespace other than
+  empty); the engine (roadmap item 8) must produce them that way. A line feed in a
+  paragraph's text is a space: a narrative that relied on one to start a list item needs a
+  `br` or a block. A bullet in a table cell is content. Tag whitespace other than
   TAB, LF, CR and SPACE is `malformed-tag`. A bullet glyph mid-line, and U+2219 and U+2043
   anywhere, are now content, so a narrative and a source that differ only there mismatch.
 - **Spans.** A section edge must touch whitespace or a body edge. A span that ends before
   punctuation ("… clinical use" before ".") or starts after it is now `word-cut`: a false
   failure the rule accepts, because the same rule refuses "1" of "1.5". Extractors and span
-  producers must put section edges at whitespace. A span with a non-integer field is a
-  structural error, not a status.
+  producers must put section edges at whitespace, and not between the groups of a number. A
+  section that begins with a list item at the very start of a page with no header is a
+  mismatch (there is no line terminator to read the slice from; a false failure). A span with
+  a non-integer field is a structural error, not a status.
 - **Clients of `verify_quote`** that send a quote with a C1, bidirectional, U+000B or U+000C
   character receive `invalid-request` instead of an answer.
 - **Not re-verified.** Fidelity reports and approvals recorded under 1.1.1 stay as recorded;

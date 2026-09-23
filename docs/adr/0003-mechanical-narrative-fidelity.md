@@ -71,8 +71,11 @@ _Amended 2026-09-23 for `fidelity-norm/2.0.0`
 reader sees without the check seeing it._
 
 - Structure is free (paragraph and cell boundaries flatten to spaces); words are checked. A
-  bullet glyph is structure only where it starts a list item (a line start, before whitespace);
-  mid-line it is content, and U+2219 and U+2043 are never bullets.
+  bullet glyph is structure only where it starts a list item (after a line feed, before
+  whitespace, on a line without a tab); mid-line or in a table cell it is content, and U+2219
+  and U+2043 are never bullets. A line feed in the narrative's text is a space, as a renderer
+  draws it; only a block boundary or `br` is a line break, and a table cell is a tab-separated
+  line, as the extractor writes a row.
   Raised and lowered digits and signs are words: the digits and signs inside `sup` and `sub`
   fold to their script code points, so `10<sup>6</sup>` is `10⁶` and never equals a source's
   `106`; a number there with no script form, and U+00B1 or U+2213, rejects.
@@ -111,9 +114,10 @@ reader sees without the check seeing it._
   outer span edges must touch whitespace (or a body edge), read back through whitespace and
   across pages (`docs/fidelity-normalization.md` section 6, reason `word-cut`). Punctuation is
   not a boundary, because inside a number it is part of the number (`1` of `1.5`, `20` of
-  `−20`). A soft hyphen directly before any line break in the narrative's text — raw,
-  referenced, a block boundary or `br` — rejects, so a token can be neither truncated at a
-  section edge nor joined across markup. The rule proves that edges touch whitespace, not that
+  `−20`), and neither is a space between the groups of a number (`10` of `10 000`) or a
+  no-break space. A soft hyphen directly before a block boundary or `br` rejects, and a line
+  feed in text is a space, so a token can be neither truncated at a section edge nor joined
+  across markup. The rule proves that edges touch whitespace, not that
   they end a sentence or a clause: "Take 5" can still be taken from "Take 5 mg twice".
 - Section 2 rejects on both sides the characters a renderer draws differently from the check:
   C1 controls (remapped through windows-1252), U+000B and U+000C, and the bidirectional

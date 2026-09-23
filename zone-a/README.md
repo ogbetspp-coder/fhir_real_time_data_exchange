@@ -181,17 +181,17 @@ defaults are wrong:
 
 ## Vector results
 
-All 348 golden vectors of `fidelity-norm/2.0.0` pass, byte for byte, including every error case:
+All 402 golden vectors of `fidelity-norm/2.0.0` pass, byte for byte, including every error case:
 
 | Module                         | Result          |
 | ------------------------------ | --------------- |
-| `zone_a/fidelity/normalize.py` | normalize 57/57 |
-| `zone_a/fidelity/xhtml.py`     | xhtml 192/192   |
-| `zone_a/fidelity/verify.py`    | verify 99/99    |
+| `zone_a/fidelity/normalize.py` | normalize 62/62 |
+| `zone_a/fidelity/xhtml.py`     | xhtml 214/214   |
+| `zone_a/fidelity/verify.py`    | verify 126/126  |
 
 Under `fidelity-norm/1.1.1` there were 137 (25, 60 and 52). Seven of those were added by the
 first round of this port: six XHTML cases and one verify case, each of them pinning a divergence
-the existing 130 could not see. The 211 added by `fidelity-norm/2.0.0` pin its rules and both
+the existing 130 could not see. The 265 added by `fidelity-norm/2.0.0` pin its rules and both
 sides of every boundary (`docs/validation/changes/2026-09-23-fidelity-norm-2-0-0.md`). They are defined in
 `test/fixtures/fidelity/cases.ts` on the Zone B side, where the TypeScript defines the expected
 behaviour, and regenerated with `npm run vectors:generate`.
@@ -378,6 +378,19 @@ runs went back to 2002 passed. Two breaks (the order of `void-element` and the e
 trailing whitespace) were at first invisible to the generator; the `void-element-and-parent`
 violation class and the `span-ends-after-soft-hyphen-space` and `span-page-end` layouts were
 added so that they are not.
+
+Round 2 of the second review (text line breaks as spaces, grouped numbers at section edges,
+bullets in table cells and the line-start rule that keeps normalisation idempotent, the other
+kind's script letters and symbols in `sup`/`sub`) extended the generator again; zero
+divergences at the same three seeds. Breaking each of its rules in this port diverged on all
+three seeds (20260920 / 1 / 2): text line breaks kept → 183 / 192 / 187; only raw ones turned
+into spaces → 48 / 43 / 40; end digit-group rule dropped → 1 / 1 / 1; start digit-group rule
+dropped → 3 / 2 / 4; joiners counted as edge whitespace → 5 / 4 / 8; the U+0009-line bullet
+rule dropped → 111 / 129 / 122; cells emitted with U+000A → 25 / 29 / 30; the start of a text
+counted as a line start → 11 / 2 / 6; page slices read from the span start → 9 / 13 / 12;
+symbols kept in `sup`/`sub` → 11 / 7 / 12; the other kind's letters kept → 1 / 3 / 2. The
+reviewer's probes (44 and 121 cases) and fuzz (two sets of 60,000 narratives) agree, 0
+divergent.
 
 The corpus is generated in CI rather than committed, because a committed corpus proves agreement
 with a past revision of the TypeScript rather than with the current one. A tiny 18-case smoke
