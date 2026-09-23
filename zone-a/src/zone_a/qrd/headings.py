@@ -6,6 +6,10 @@ section: the number as the template writes it ("4." for a first-level section, "
 second-level one), one space, and the title with each optional segment either present or
 absent. Case, punctuation and every other character must match exactly. Anything else is not
 a heading as far as this function is concerned; it never guesses.
+
+The registry is the SmPC's (Annex I). The labelling and the package leaflet reuse some of the
+same lines ("1. NAME OF THE MEDICINAL PRODUCT" is section 1 of the labelling too), so a caller
+must apply this only to text it already knows is Annex I.
 """
 
 from __future__ import annotations

@@ -49,25 +49,43 @@ version, and adopting it is a reviewed change: new bytes, new lock entry, regene
 `zone-a/src/zone_a/docx/reader.py` reads the text of a Word body and refuses a document whose
 text it cannot produce exactly. It is the first component of the engine and is written to the
 same rule as the fidelity check: false refusals are acceptable, silent changes are not. Its
-module docstring lists every rule. The three that the EMA files forced:
+module docstring lists every rule and every refusal. What the EMA files and the review forced:
 
 1. **Symbol-font glyphs.** Appendix II writes the "≥" of "Very common (≥ 1/10)" as
-   `<w:sym w:font="Symbol" w:char="F0B3"/>` (four times), Appendix III writes the "°" of
-   "25 °C" the same way (21 times), and the template writes the braces of its fill-in markers so.
-   A reader that collects only `<w:t>` text returns "( 1/10)" and "25 C" and reports nothing.
-   The reader maps Symbol-font codes through a closed table (Adobe's Symbol encoding as the
-   Unicode Consortium maps it) and refuses any other font or any code not in the table.
-2. **Field instructions.** Appendix V's header carries `DOCPROPERTY DM_emea_doc_ref_id \*
-MERGEFORMAT` as a field instruction next to its displayed value. The reader keeps the
-   displayed result and drops the instruction.
-3. **Hidden text.** The template marks four paragraph marks hidden and no text; the reader
-   accepts hidden paragraph marks and refuses a hidden run that carries text, whether it is
-   hidden directly or through a style.
+   `<w:sym w:font="Symbol" w:char="F0B3"/>` (four times) and Appendix III writes the "°" of
+   "25 °C" the same way (21 times). In the template, the Czech local representative's
+   placeholders "{Název}", "CZ {město}>" and "Tel: +{telefonní číslo}" have Symbol-font braces,
+   which is why a PDF text layer of the same template shows "Název". A reader that collects only
+   `<w:t>` text returns "( 1/10)" and "25 C" and reports nothing. The reader maps every character
+   of a run whose effective Latin font is Symbol — set directly, by a style, by the document
+   defaults or through the theme — through a closed table: Adobe's Symbol encoding as the
+   Unicode Consortium's `symbol.txt` maps it, checked entry by entry against that file. Where
+   `symbol.txt` gives two characters for one code, the table takes one and says so (0x6D is
+   U+03BC GREEK SMALL LETTER MU, not U+00B5 MICRO SIGN). Dingbat fonts are refused.
+2. **Formatting that changes what a reader sees.** Superscript, subscript, raised text,
+   capitals, strike-through, highlight and shading are reported as marks on the exact characters
+   (`Paragraph.marks`), because `text` alone flattens "10" with a superscript "9" to "109". A
+   caller that uses `text` must look at the marks. A picture is U+FFFC OBJECT REPLACEMENT
+   CHARACTER where it stands: the black triangle of the additional-monitoring statement is a
+   picture in the template.
+3. **Fields.** A field keeps its displayed result and drops its instruction, however deeply
+   nested; a paragraph that ends inside an instruction is refused.
+4. **Hidden text.** A run with text that is hidden at any level (the run, its character style,
+   its paragraph style or the default one, its table style, the document defaults) is refused
+   unless the run itself says it is visible. A hidden paragraph mark is reported
+   (`mark_hidden`): Word shows such a paragraph run on into the next.
+5. **The package.** The main part is found through the package relationships, not by name; a
+   duplicate part name, a part that is not UTF-8 and any DTD are refused.
 
-It also refuses tracked changes (a document with unaccepted revisions has two texts), text
-boxes, footnote references, embedded objects and alternate content. It does not render list
-numbering into the text: the number Word shows is computed, not stored, and is reported as
-metadata. Headers, footers and footnotes are separate parts and are not read.
+It also refuses any revision anywhere in the body (including formatting changes and deleted
+paragraph marks), text boxes, footnote references, embedded objects, charts and other
+non-picture drawings, alternate content, text whose whitespace is not preserved, and any
+element or container it does not know. List numbering, direct or through a style, is reported
+as metadata and never rendered into the text. Headers, footers, footnotes and comments are
+separate parts and are not read. The rule for field instructions was prompted by Appendix V's
+header, which carries `DOCPROPERTY DM_emea_doc_ref_id \* MERGEFORMAT` next to its displayed
+value; Appendix V is not pinned and headers are not read, so that rule is tested on synthetic
+files only.
 
 ## The grammar
 
@@ -77,7 +95,9 @@ selected or deleted, and `[text]` is guidance that is not part of the product in
 and every parsed item in the registry renders back to its source exactly (a test checks this).
 Two rules are read from the EMA's usage rather than its text: a `<` followed by whitespace is a
 less-than sign (Appendix II: "<Common (≥ 1/100 to < 1/10)>"), and a `>` with nothing open is a
-greater-than sign. A paragraph that leaves a bracket open is joined with the next until the
+greater-than sign. The second can misread text such as "<patients > 65 years>", so the registry
+build refuses any item whose parse leaves a literal `>` in its text; none of the pinned sources
+has one. A paragraph that leaves a bracket open is joined with the next until the
 brackets balance; that is how "<Traceability" and the sentence under it become one optional
 block.
 
@@ -96,7 +116,11 @@ and compared byte for byte with a fresh build in `zone-a/tests/test_qrd_registry
   fill-in or guidance, and marked optional when the whole item is in `<…>`. The classification
   is mechanical: guidance if it is only `[…]`; a fill-in if it is only `{…}`; a statement if it
   holds a fill-in, ends in sentence punctuation, contains ". " or spans paragraphs; otherwise a
-  subheading;
+  subheading. Trailing footnote markers ("…>_", "…Appendix V._") and Appendix III's " or"
+  between alternatives are split off into `note` and `connector`, with the exact characters in
+  `trailer`. The template's grey highlight and shading, which mean "not in the printed
+  material", are kept as `marks`; a source paragraph with any mark that changes its characters,
+  or a hidden paragraph mark, is refused by the build;
 - **documentStatements**: the additional-monitoring statement before section 1 and the
   "Detailed information on this medicinal product is available on the website…" statement at
   the end;
@@ -105,7 +129,9 @@ and compared byte for byte with a fresh build in `zone-a/tests/test_qrd_registry
   frequency, `007`–`033` for system organ classes), and Appendix III's twelve SmPC storage
   statements with their five footnotes, each attached to the section it serves (4.6, 4.8, 6.4).
 
-`zone-a/src/zone_a/qrd/headings.py` recognises a heading in a line of label text: after runs of
+`zone-a/src/zone_a/qrd/headings.py` recognises an SmPC heading in a line of label text that is
+already known to be Annex I (the labelling and the leaflet reuse lines such as "1. NAME OF THE
+MEDICINAL PRODUCT"): after runs of
 space, tab and no-break space are collapsed, the line must equal one of the forms the registry
 allows (the number as the template writes it, then the title with each optional segment present
 or absent). Case and every other character must match. It never guesses.
@@ -125,6 +151,8 @@ The registry records these rather than hiding them.
   (`pregnancy.1`, `.2`, `.3` and `.6`) the `<` that opens the statement is never closed, and
   `pregnancy.3` has a stray ")" inside a bracket. Rather than invent four corrections, those
   entries keep their paragraphs verbatim with `bracketsBalanced: false` and no pattern.
+- **An unclosed brace in the package leaflet.** The Polish local representative's "<{Adres:"
+  never closes its `{`. It is outside the SmPC and does not reach the registry.
 - **Drift in the template's own text.** "5.1 \tPharmacodynamic properties" has a space before the
   tab; "8.\tMARKETING AUTHORISATION NUMBER(S) " ends in a space; Appendix I writes "[1]<Based"
   and "[2] <Based", and "should not be used<during". The registry keeps each source string as

@@ -47,7 +47,7 @@ def _all_items(registry: dict[str, Any]) -> list[dict[str, Any]]:
 def test_every_parsed_item_renders_back_to_its_source() -> None:
     for item in _all_items(REGISTRY):
         expected = ERRATA[item["source"]][0] if "erratum" in item else item["source"]
-        assert render(item["pattern"]) == expected
+        assert render(item["pattern"]) + item.get("trailer", "") == expected
 
 
 def test_a_less_than_sign_followed_by_space_is_not_a_bracket() -> None:
@@ -92,6 +92,54 @@ def test_the_committed_registry_is_what_the_sources_build() -> None:
     expected = serialise(build(QRD / "sources", LOCK))
     current = (QRD / "registry" / "cap-smpc-en-10.4.json").read_text(encoding="utf-8")
     assert current == expected, "regenerate with zone-a/scripts/generate_qrd_registry.py"
+
+
+def test_every_appendix_i_pattern_and_heading_title_renders_back() -> None:
+    for entry in REGISTRY["appendices"]["I"]["entries"]:
+        if entry["pattern"] is not None:
+            assert render(entry["pattern"]) == "\n".join(entry["paragraphs"])
+    for section in REGISTRY["sections"]:
+        assert render(section["title"]).strip() in section["source"]
+
+
+def test_appendix_iii_statements_are_all_optional_with_their_markers_split_off() -> None:
+    items = REGISTRY["appendices"]["III"]["items"]
+    assert {(item["kind"], item["optional"]) for item in items} == {("statement", True)}
+    assert [item.get("note") for item in items] == [
+        None, None, None, "*", None, "**", None, "****", "****", "****", None, "*****",
+    ]  # fmt: skip
+    assert items[0]["connector"] == "or"
+
+
+def test_only_three_smpc_items_span_paragraphs() -> None:
+    spanning = [
+        item["source"].split("\n", 1)[0]
+        for section in REGISTRY["sections"]
+        for item in section["items"]
+        if "\n" in item["source"]
+    ]
+    assert spanning == [
+        "<Traceability",
+        "<This medicinal product has been authorised under a so-called \u2018conditional "
+        "approval\u2019 scheme. This means that further evidence on this medicinal product is "
+        "awaited.",
+        "<This medicinal product has been authorised under \u2018exceptional circumstances\u2019. "
+        "This means that <due to the rarity of the disease> <for scientific reasons> <for ethical "
+        "reasons> it has not been possible to obtain complete information on this medicinal "
+        "product.",
+    ]
+
+
+def test_the_black_triangle_and_the_not_printed_highlights_are_kept() -> None:
+    monitoring = REGISTRY["documentStatements"][0]
+    assert monitoring["source"].startswith("<\ufffcThis medicinal product is subject")
+    marked = {
+        item["source"][m["start"] : m["end"]]
+        for section in REGISTRY["sections"]
+        for item in section["items"]
+        for m in item.get("marks", [])
+    }
+    assert marked == {"the national reporting system listed in Appendix V", "not yet assigned"}
 
 
 def test_the_registry_names_its_sources_by_hash() -> None:

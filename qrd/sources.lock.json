@@ -2,7 +2,7 @@
   "schemaVersion": "1.0.0",
   "page": "https://www.ema.europa.eu/en/human-regulatory-overview/marketing-authorisation/product-information-requirements/product-information-qrd-templates-human",
   "retrieved": "2026-09-23",
-  "note": "EMA documents, reproduced with acknowledgement of the source as the EMA permits. The reference numbers and dates are copied from the page on the retrieval date; the files are byte copies. zone-a/tests/test_qrd_sources.py checks the hashes offline; zone-a/scripts/check_qrd_sources.py compares them with the live page on demand.",
+  "note": "EMA documents, reproduced with acknowledgement of the source as the EMA permits. The reference numbers and dates are copied from the page on the retrieval date; the files are byte copies. zone-a/tests/test_qrd_registry.py checks the hashes offline; zone-a/scripts/check_qrd_sources.py compares them with the live page on demand.",
   "sources": [
     {
       "name": "QRD product-information template version 10.4",

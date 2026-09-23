@@ -145,26 +145,97 @@ def _optional(tokens: list[Token]) -> bool:
     )
 
 
-def _items(paragraphs: list[str], where: str) -> list[dict[str, Any]]:
+# Marks that change which characters a reader sees. The registry is built from text alone, so a
+# source paragraph carrying one of these in its range is refused rather than flattened. Capitals
+# are refused only where they change a letter.
+_ALTERING = {"superscript", "subscript", "position", "strike", "dstrike"}
+_CASE = {"caps", "smallCaps"}
+# Marks kept in the registry: the template's grey highlight and shading mean "not in the printed
+# material" (the annotated template, "Text which will not appear in the final printed material
+# is to be presented as grey-shaded text").
+_KEPT = {"highlight", "shading"}
+
+
+def _check(paragraph: Paragraph, where: str) -> None:
+    if paragraph.mark_hidden and paragraph.text.strip():
+        raise RegistryError(f"{where}: a paragraph with text has a hidden paragraph mark")
+    for mark in paragraph.marks:
+        covered = paragraph.text[mark.start : mark.end]
+        if mark.kind in _ALTERING or (mark.kind in _CASE and covered != covered.upper()):
+            raise RegistryError(f"{where}: {mark.kind} changes what the text shows")
+
+
+def _guard(tokens: list[Token], where: str) -> None:
+    """Refuse a literal '>' left in text: the bracket reading around it is not certain."""
+    for token in tokens:
+        value = token["value"]
+        if token["kind"] == "optional":
+            assert isinstance(value, list)
+            _guard(value, where)
+        elif token["kind"] == "text" and ">" in str(value):
+            raise RegistryError(f"{where}: a literal '>' makes the bracket reading ambiguous")
+
+
+def _split_trailer(text: str) -> tuple[str, str | None, str | None]:
+    """(body, note marker, connector) of an item.
+
+    Appendix III ends statements with footnote markers ("...>*", "...>****") and joins
+    alternatives with " or"; section 4.8 ends its reporting statement with "Appendix V.*", the
+    marker of the guidance note that follows it. None of these is part of the statement.
+    """
+    body = text.rstrip()
+    note: str | None = None
+    stripped = body.rstrip("*")
+    if stripped != body and stripped.endswith((">", ".")):
+        note = body[len(stripped) :]
+        body = stripped
+    connector: str | None = None
+    if body.endswith(" or") and body[:-3].rstrip().endswith(">"):
+        connector = "or"
+        body = body[:-3]
+    return body, note, connector
+
+
+def _items(paragraphs: list[Paragraph], where: str) -> list[dict[str, Any]]:
     """Group paragraphs into balanced items and classify each."""
     items: list[dict[str, Any]] = []
-    pending: list[str] = []
-    for text in paragraphs:
-        if not pending and not text.strip():
+    pending: list[Paragraph] = []
+    for paragraph in paragraphs:
+        _check(paragraph, where)
+        if not pending and not paragraph.text.strip():
             continue
-        pending.append(text)
-        joined = "\n".join(pending)
+        pending.append(paragraph)
+        joined = "\n".join(p.text for p in pending)
         erratum = ERRATA.get(joined)
         corrected = erratum[0] if erratum is not None else joined
-        if not is_balanced(corrected):
+        body, note, connector = _split_trailer(corrected)
+        if not is_balanced(body):
             continue
-        tokens = parse(corrected)
+        tokens = parse(body)
+        _guard(tokens, where)
         item: dict[str, Any] = {
             "kind": _kind(tokens),
             "optional": _optional(tokens),
             "source": joined,
             "pattern": tokens,
         }
+        if corrected[len(body) :]:
+            item["trailer"] = corrected[len(body) :]
+        if note is not None:
+            item["note"] = note
+        if connector is not None:
+            item["connector"] = connector
+        marks: list[dict[str, Any]] = []
+        offset = 0
+        for part in pending:
+            marks += [
+                {"start": offset + m.start, "end": offset + m.end, "kind": m.kind}
+                for m in part.marks
+                if m.kind in _KEPT
+            ]
+            offset += len(part.text) + 1
+        if marks:
+            item["marks"] = marks
         if erratum is not None:
             item["erratum"] = erratum[1]
         items.append(item)
@@ -199,6 +270,7 @@ def _heading(text: str) -> dict[str, Any] | None:
         else:
             raise RegistryError(f"heading {number}: the opening '<' is never closed")
     tokens = parse(body)
+    _guard(tokens, f"heading {number}")
     if tokens and tokens[-1]["kind"] == "guidance":
         guidance = str(tokens[-1]["value"])
         tokens = tokens[:-1]
@@ -246,13 +318,13 @@ def build_smpc(template: Source) -> tuple[list[dict[str, Any]], list[dict[str, A
     if len(closing_at) != 1:
         raise RegistryError(f"closing statement occurs {len(closing_at)} times, expected once")
     closing_index = closing_at[0]
-    closing = _items([p.text for p in body[closing_index:]], "closing statement")
+    closing = _items(body[closing_index:], "closing statement")
     body = body[:closing_index]
 
     sections: list[dict[str, Any]] = []
-    preamble: list[str] = []
+    preamble: list[Paragraph] = []
     current: dict[str, Any] | None = None
-    lines: list[str] = []
+    lines: list[Paragraph] = []
 
     def close() -> None:
         if current is not None:
@@ -261,8 +333,9 @@ def build_smpc(template: Source) -> tuple[list[dict[str, Any]], list[dict[str, A
     for paragraph in body:
         heading = _heading(paragraph.text)
         if heading is None:
-            (lines if current is not None else preamble).append(paragraph.text)
+            (lines if current is not None else preamble).append(paragraph)
             continue
+        _check(paragraph, f"heading {heading['number']}")
         close()
         if sections and _order(heading["number"]) <= _order(sections[-1]["number"]):
             raise RegistryError(f"heading {heading['number']} is out of order")
@@ -280,6 +353,7 @@ def build_appendix_i(source: Source) -> list[dict[str, Any]]:
     topic: str | None = None
     current: dict[str, Any] | None = None
     for paragraph in source.paragraphs:
+        _check(paragraph, "Appendix I")
         text = paragraph.text
         stripped = text.strip()
         if stripped in APPENDIX_I_HEADINGS:
@@ -308,12 +382,15 @@ def build_appendix_i(source: Source) -> list[dict[str, Any]]:
         joined = "\n".join(entry["paragraphs"])
         entry["bracketsBalanced"] = is_balanced(joined)
         entry["pattern"] = parse(joined) if entry["bracketsBalanced"] else None
+        if entry["pattern"] is not None:
+            _guard(entry["pattern"], f"Appendix I {entry['id']}")
     return entries
 
 
 def build_appendix_ii(source: Source) -> dict[str, list[dict[str, str]]]:
     rows: dict[tuple[int, int], dict[int, str]] = {}
     for paragraph in source.paragraphs:
+        _check(paragraph, "Appendix II")
         if paragraph.table is None:
             continue
         table, row, cell = paragraph.table
@@ -340,7 +417,7 @@ def build_appendix_ii(source: Source) -> dict[str, list[dict[str, str]]]:
             raise RegistryError(f"Appendix II: unexpected row {key}")
         if group is None:
             raise RegistryError("Appendix II: a coded row before any group heading")
-        parse(text)
+        _guard(parse(text), f"Appendix II {code}")
         groups[group].append({"code": code, "text": text})
     codes = [row["code"] for rows_ in groups.values() for row in rows_]
     if codes != sorted(codes) or len(set(codes)) != len(codes):
@@ -352,7 +429,7 @@ def build_appendix_iii(source: Source) -> dict[str, Any]:
     texts = [p.text for p in source.paragraphs]
     start = _exactly_one(texts, APPENDIX_III_START, APPENDIX_III_FILE)
     end = _exactly_one(texts, APPENDIX_III_END, APPENDIX_III_FILE)
-    statements = [t for t in texts[start + 1 : end] if t.strip()]
+    statements = [p for p in source.paragraphs[start + 1 : end] if p.text.strip()]
     notes = [t for t in texts[end:] if re.match(r"^\*+ ", t)]
     if not statements or not notes:
         raise RegistryError("Appendix III: no SmPC statements or no footnotes")

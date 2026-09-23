@@ -573,12 +573,9 @@
                   "value": " been established."
                 }
               ]
-            },
-            {
-              "kind": "text",
-              "value": " "
             }
-          ]
+          ],
+          "trailer": " "
         },
         {
           "kind": "statement",
@@ -593,12 +590,9 @@
                   "value": "No data are available."
                 }
               ]
-            },
-            {
-              "kind": "text",
-              "value": " "
             }
-          ]
+          ],
+          "trailer": " "
         },
         {
           "kind": "statement",
@@ -740,12 +734,9 @@
                   "value": " concern(s)."
                 }
               ]
-            },
-            {
-              "kind": "text",
-              "value": " "
             }
-          ]
+          ],
+          "trailer": " "
         },
         {
           "kind": "statement",
@@ -931,9 +922,10 @@
           "pattern": [
             {
               "kind": "text",
-              "value": "Method of administration "
+              "value": "Method of administration"
             }
-          ]
+          ],
+          "trailer": " "
         },
         {
           "kind": "subheading",
@@ -1352,12 +1344,9 @@
                   "value": " on the ability to drive and use machines."
                 }
               ]
-            },
-            {
-              "kind": "text",
-              "value": " "
             }
-          ]
+          ],
+          "trailer": " "
         },
         {
           "kind": "statement",
@@ -1427,7 +1416,16 @@
           "pattern": [
             {
               "kind": "text",
-              "value": "Reporting suspected adverse reactions after authorisation of the medicinal product is important. It allows continued monitoring of the benefit/risk balance of the medicinal product. Healthcare professionals are asked to report any suspected adverse reactions via the national reporting system listed in Appendix V.*"
+              "value": "Reporting suspected adverse reactions after authorisation of the medicinal product is important. It allows continued monitoring of the benefit/risk balance of the medicinal product. Healthcare professionals are asked to report any suspected adverse reactions via the national reporting system listed in Appendix V."
+            }
+          ],
+          "trailer": "*",
+          "note": "*",
+          "marks": [
+            {
+              "start": 263,
+              "end": 313,
+              "kind": "highlight"
             }
           ]
         },
@@ -1549,6 +1547,13 @@
                   "value": "not yet assigned"
                 }
               ]
+            }
+          ],
+          "marks": [
+            {
+              "start": 56,
+              "end": 72,
+              "kind": "highlight"
             }
           ]
         },
@@ -2130,12 +2135,9 @@
                   "value": "Not applicable."
                 }
               ]
-            },
-            {
-              "kind": "text",
-              "value": " "
             }
-          ]
+          ],
+          "trailer": " "
         },
         {
           "kind": "statement",
@@ -2150,12 +2152,9 @@
                   "value": "In the absence of compatibility studies, this medicinal product must not be mixed with other medicinal products."
                 }
               ]
-            },
-            {
-              "kind": "text",
-              "value": " "
             }
-          ]
+          ],
+          "trailer": " "
         },
         {
           "kind": "statement",
@@ -2551,12 +2550,9 @@
                   "value": "Any unused medicinal product or waste material should be disposed of in accordance with local requirements."
                 }
               ]
-            },
-            {
-              "kind": "text",
-              "value": " "
             }
-          ]
+          ],
+          "trailer": " "
         }
       ]
     },
@@ -2835,14 +2831,14 @@
       "placement": "before-section-1",
       "kind": "statement",
       "optional": true,
-      "source": "<This medicinal product is subject to additional monitoring. This will allow quick identification of new safety information. Healthcare professionals are asked to report any suspected adverse reactions. See section 4.8 for how to report adverse reactions.> [For medicinal products subject to additional monitoring ONLY]",
+      "source": "<￼This medicinal product is subject to additional monitoring. This will allow quick identification of new safety information. Healthcare professionals are asked to report any suspected adverse reactions. See section 4.8 for how to report adverse reactions.> [For medicinal products subject to additional monitoring ONLY]",
       "pattern": [
         {
           "kind": "optional",
           "value": [
             {
               "kind": "text",
-              "value": "This medicinal product is subject to additional monitoring. This will allow quick identification of new safety information. Healthcare professionals are asked to report any suspected adverse reactions. See section 4.8 for how to report adverse reactions."
+              "value": "￼This medicinal product is subject to additional monitoring. This will allow quick identification of new safety information. Healthcare professionals are asked to report any suspected adverse reactions. See section 4.8 for how to report adverse reactions."
             }
           ]
         },
@@ -4166,7 +4162,7 @@
       "items": [
         {
           "kind": "statement",
-          "optional": false,
+          "optional": true,
           "source": "<Do not store above <25 °C> <30 °C>.> or",
           "pattern": [
             {
@@ -4203,12 +4199,10 @@
                   "value": "."
                 }
               ]
-            },
-            {
-              "kind": "text",
-              "value": " or"
             }
-          ]
+          ],
+          "trailer": " or",
+          "connector": "or"
         },
         {
           "kind": "statement",
@@ -4269,8 +4263,8 @@
           ]
         },
         {
-          "kind": "subheading",
-          "optional": false,
+          "kind": "statement",
+          "optional": true,
           "source": "<Store and transport refrigerated (2 °C – 8 °C).>*",
           "pattern": [
             {
@@ -4281,12 +4275,10 @@
                   "value": "Store and transport refrigerated (2 °C – 8 °C)."
                 }
               ]
-            },
-            {
-              "kind": "text",
-              "value": "*"
             }
-          ]
+          ],
+          "trailer": "*",
+          "note": "*"
         },
         {
           "kind": "statement",
@@ -4314,7 +4306,7 @@
         },
         {
           "kind": "statement",
-          "optional": false,
+          "optional": true,
           "source": "<Store and transport frozen {temperature range}.>**",
           "pattern": [
             {
@@ -4333,12 +4325,10 @@
                   "value": "."
                 }
               ]
-            },
-            {
-              "kind": "text",
-              "value": "**"
             }
-          ]
+          ],
+          "trailer": "**",
+          "note": "**"
         },
         {
           "kind": "statement",
@@ -4396,8 +4386,8 @@
           ]
         },
         {
-          "kind": "subheading",
-          "optional": false,
+          "kind": "statement",
+          "optional": true,
           "source": "<Store in the original package in order to protect from <light> <moisture>.>****",
           "pattern": [
             {
@@ -4434,16 +4424,14 @@
                   "value": "."
                 }
               ]
-            },
-            {
-              "kind": "text",
-              "value": "****"
             }
-          ]
+          ],
+          "trailer": "****",
+          "note": "****"
         },
         {
           "kind": "statement",
-          "optional": false,
+          "optional": true,
           "source": "<Keep the {container}*** tightly closed in order to protect from <light> <moisture>.>****",
           "pattern": [
             {
@@ -4488,16 +4476,14 @@
                   "value": "."
                 }
               ]
-            },
-            {
-              "kind": "text",
-              "value": "****"
             }
-          ]
+          ],
+          "trailer": "****",
+          "note": "****"
         },
         {
           "kind": "statement",
-          "optional": false,
+          "optional": true,
           "source": "<Keep the {container}*** in the outer carton in order to protect from <light> <moisture>.>****",
           "pattern": [
             {
@@ -4542,12 +4528,10 @@
                   "value": "."
                 }
               ]
-            },
-            {
-              "kind": "text",
-              "value": "****"
             }
-          ]
+          ],
+          "trailer": "****",
+          "note": "****"
         },
         {
           "kind": "statement",
@@ -4566,8 +4550,8 @@
           ]
         },
         {
-          "kind": "subheading",
-          "optional": false,
+          "kind": "statement",
+          "optional": true,
           "source": "<This medicinal product does not require any special temperature storage conditions.>*****",
           "pattern": [
             {
@@ -4578,12 +4562,10 @@
                   "value": "This medicinal product does not require any special temperature storage conditions."
                 }
               ]
-            },
-            {
-              "kind": "text",
-              "value": "*****"
             }
-          ]
+          ],
+          "trailer": "*****",
+          "note": "*****"
         }
       ],
       "notes": [
