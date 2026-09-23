@@ -159,7 +159,7 @@ shared foundation cannot rely on that. The plan must run on every pull request, 
 that can read but not change, and must stop a merge that destroys anything until a person has
 acknowledged it.
 
-_Status 2026-09-23: closed._ The identity exists, and `Plan` runs on every pull request as a
+_Status 2026-09-22: closed (PR #74)._ The identity exists, and `Plan` runs on every pull request as a
 required check. `.github/workflows/plan.yml` plans every pull request with the deploy's own inputs
 (one shared function in `scripts/gcp/deploy.sh`) against the deployed images and version, posts a
 summary of resource addresses and actions, never values, and fails on any destroy or replace unless
