@@ -75,7 +75,7 @@ step "Agent: uv run --frozen mypy --strict"
 (cd agent && "$UV" run --frozen mypy --strict)
 step "Agent: uv run --frozen python scripts/sync_contract.py --check"
 (cd agent && "$UV" run --frozen python scripts/sync_contract.py --check)
-step "Agent: uv run --frozen pytest"
-(cd agent && "$UV" run --frozen pytest)
+step "Agent: uv run --frozen pytest --cov"
+(cd agent && "$UV" run --frozen pytest --cov)
 
 printf '\ncheck-all: every CI gate passed (official HL7 validation not run; see header).\n'
