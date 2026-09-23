@@ -9,9 +9,22 @@ from typing import Any
 
 import pytest
 
+from zone_a.docx.reader import Mark, Paragraph
 from zone_a.qrd.headings import index, match_heading
 from zone_a.qrd.pattern import UnbalancedTemplateError, parse, render
-from zone_a.qrd.registry import ERRATA, build, serialise
+from zone_a.qrd.registry import (
+    ERRATA,
+    RegistryError,
+    Source,
+    _check,
+    _check_errata,
+    _guard,
+    _items,
+    _split_trailer,
+    build,
+    build_appendix_ii,
+    serialise,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 QRD = ROOT / "qrd"
@@ -288,3 +301,111 @@ def test_headings_are_recognised(line: str, key: str) -> None:
 )
 def test_near_misses_are_not_headings(line: str) -> None:
     assert match_heading(line, TABLE) is None
+
+
+# --- refusals of the build ----------------------------------------------------------------
+
+
+def _paragraph(text: str, *marks: Mark, table: tuple[int, int, int] | None = None) -> Paragraph:
+    return Paragraph(text=text, style=None, numbering=None, table=table, marks=marks)
+
+
+@pytest.mark.parametrize(
+    ("paragraph", "refused"),
+    [
+        (_paragraph("10", Mark(1, 2, "superscript")), True),
+        (_paragraph("gone", Mark(0, 4, "strike")), True),
+        (_paragraph("Text", Mark(0, 4, "caps")), True),
+        (_paragraph("TEXT", Mark(0, 4, "caps")), False),
+        (_paragraph("grey", Mark(0, 4, "highlight-lightGray")), False),
+        (_paragraph("yellow", Mark(0, 6, "highlight-yellow")), True),
+        (_paragraph("shade", Mark(0, 5, "shading")), False),
+        (_paragraph("abc", Mark(0, 3, "rtl")), True),
+        (_paragraph("abc", Mark(0, 3, "faint")), True),
+        (Paragraph("run on", None, None, None, mark_hidden=True), True),
+        (Paragraph("", None, None, None, mark_hidden=True), False),
+    ],
+)
+def test_a_source_paragraph_with_a_mark_that_changes_it_is_refused(
+    paragraph: Paragraph, refused: bool
+) -> None:
+    if refused:
+        with pytest.raises(RegistryError):
+            _check(paragraph, "test")
+    else:
+        _check(paragraph, "test")
+
+
+def test_a_literal_greater_than_sign_is_refused_at_any_depth() -> None:
+    with pytest.raises(RegistryError):
+        _guard(parse("<patients > 65 years>"), "test")
+    with pytest.raises(RegistryError):
+        _guard(parse("<a <b> c > d>"), "test")
+    _guard(parse("<Common (\u2265 1/100 to < 1/10)>"), "test")
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("<Store below 25\u00b0C.>*", ("<Store below 25\u00b0C.>", "*", None)),
+        ("<Do not freeze.>**** ", ("<Do not freeze.>", "****", None)),
+        ("<Store in a refrigerator.> or", ("<Store in a refrigerator.>", None, "or")),
+        ("listed in Appendix V.*", ("listed in Appendix V.", "*", None)),
+        ("a*b", ("a*b", None, None)),
+        ("Take it or", ("Take it or", None, None)),
+    ],
+)
+def test_footnote_markers_and_connectors_are_split_off(
+    text: str, expected: tuple[str, str | None, str | None]
+) -> None:
+    assert _split_trailer(text) == expected
+
+
+def test_a_bracket_left_open_at_the_end_of_a_section_is_refused() -> None:
+    with pytest.raises(RegistryError):
+        _items([_paragraph("<Opened"), _paragraph("and never closed")], "test")
+
+
+def _source(paragraphs: list[Paragraph]) -> Source:
+    return Source(file="synthetic.docx", sha256="0" * 64, paragraphs=paragraphs)
+
+
+def _rows(*rows: tuple[str, ...]) -> list[Paragraph]:
+    return [
+        _paragraph(text, table=(0, row, cell))
+        for row, cells in enumerate(rows)
+        for cell, text in enumerate(cells)
+    ]
+
+
+def test_appendix_ii_reads_a_well_formed_table() -> None:
+    table = _rows(("Ref", "EN"), ("", "[Frequency]"), ("001", "Very common"))
+    assert build_appendix_ii(_source(table)) == {
+        "Frequency": [{"code": "001", "text": "Very common"}]
+    }
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [
+        [("Ref", "EN"), ("", "[Frequency]"), ("001", "Very common", "Tr\u00e8s fr\u00e9quent")],
+        [("Ref", "FR"), ("", "[Frequency]"), ("001", "Very common")],
+        [("", "[Frequency]"), ("001", "Very common"), ("Ref", "EN")],
+        [("Ref", "EN"), ("001", "Very common")],
+        [("Ref", "EN"), ("", "[Frequency]"), ("002", "Common"), ("001", "Very common")],
+        [("Ref", "EN"), ("", "[Frequency]"), ("1", "Very common")],
+    ],
+)
+def test_appendix_ii_refuses_a_table_of_another_shape(rows: list[tuple[str, ...]]) -> None:
+    with pytest.raises(RegistryError):
+        build_appendix_ii(_source(_rows(*rows)))
+
+
+def test_an_erratum_must_apply_exactly_once() -> None:
+    source = next(iter(ERRATA))
+    item = {"source": source, "erratum": ERRATA[source][1]}
+    _check_errata([item])
+    with pytest.raises(RegistryError):
+        _check_errata([])
+    with pytest.raises(RegistryError):
+        _check_errata([item, item])

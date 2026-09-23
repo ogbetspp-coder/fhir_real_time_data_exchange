@@ -15,26 +15,41 @@ What a paragraph carries:
   ``<w:cr/>`` are U+000A, except a page or column break, which is layout and emits nothing;
   ``<w:noBreakHyphen/>`` is U+2011, ``<w:softHyphen/>`` U+00AD, and a picture is U+FFFC OBJECT
   REPLACEMENT CHARACTER at the place it stands.
-- ``marks``: every range of ``text`` whose appearance changes what a reader sees or means:
-  superscript, subscript, raised or lowered text, capitals and small capitals, single and double
-  strike-through, highlight and shading. ``text`` alone flattens "10" with a superscript "9" to
-  "109"; a caller that uses ``text`` must look at ``marks``.
-- ``mark_hidden``: the paragraph mark is hidden, so Word shows this paragraph run on into the
-  next one.
+- ``marks``: ranges of ``text`` whose appearance changes what a reader sees or means, set on
+  the run, its styles or the document defaults: superscript, subscript, raised or lowered
+  text, capitals and small capitals, single and double strike-through, highlight (with its
+  colour), shading (a fill or a pattern, on the run or the paragraph), right-to-left, and faint
+  text (white, under two points, or scaled under a fifth). ``text`` alone flattens "10" with a
+  superscript "9" to "109"; a caller that uses ``text`` must look at ``marks``. Other
+  appearance (colour other than white, font size, underline, bold, italic, borders) is not
+  reported.
+- ``mark_hidden``: the paragraph mark is hidden (``vanish`` or ``specVanish``, directly or
+  through the paragraph's styles), so Word shows this paragraph run on into the next one.
 - ``numbering``: the list the paragraph belongs to, directly or through its style. The number
   Word shows is computed, not stored, and is never rendered into ``text``.
 - ``table``: ``(table, row, cell)`` counted from zero in document order, else ``None``. A nested
   table's paragraphs carry the outermost cell; cells are counted as ``<w:tc>`` elements, not
   grid columns.
 
-Symbol fonts. A run whose effective Latin font (``ascii`` or ``hAnsi``, set directly, by a
-style, by the document defaults or through the theme) is Symbol has every character mapped
-through ``SYMBOL_FONT``; a character the table does not hold is refused. ``<w:sym>`` in the
-Symbol font is mapped the same way. A dingbat font (Wingdings, Webdings, Zapf Dingbats, Marlett,
-MT Extra), or a Symbol font set only for East Asian or complex-script text, is refused.
+Styles. Run properties are looked up on the run, then its character style, its paragraph
+style, its table style (each with its ``basedOn`` chain; an absent or unknown style id falls
+back to the document's default style of that kind, as Word does) and the document defaults. A
+table whose effective table style has conditional formatting (``tblStylePr`` for the first row,
+banded rows and so on) is refused, because the reader does not apply it.
 
-Fields keep their displayed result and drop their instruction, however deeply nested, so
-``DOCPROPERTY ... MERGEFORMAT`` never reaches the text.
+Symbol fonts. A run whose effective ``ascii`` and ``hAnsi`` fonts (set directly, by a style, by
+the document defaults or through the theme) are both Symbol, with no complex-script or
+right-to-left property and no font hint, has every character mapped through ``SYMBOL_FONT``; a
+character the table does not hold is refused. ``<w:sym>`` in the Symbol font is mapped the same
+way. Any other run with Symbol in one of its four font slots is refused, because Word picks the
+font per character and the reader cannot be sure which characters it draws in Symbol. A dingbat
+font (Wingdings, Webdings, Zapf Dingbats, Marlett, MT Extra), or any font the document's font
+table declares symbol-encoded (charset 02), is refused.
+
+Fields keep their stored result and drop their instruction, however deeply nested, so
+``DOCPROPERTY ... MERGEFORMAT`` never reaches the text. A field with no stored result (no
+``separate``, such as a form checkbox or a SYMBOL field, or an empty ``fldSimple``), a form
+field and a field marked for update are refused: what Word shows for them is computed.
 
 What it refuses (``DocxRefusedError.code``):
 
@@ -47,14 +62,21 @@ What it refuses (``DocxRefusedError.code``):
   in any other font.
 - ``symbol-font``: text in a dingbat font, or a Symbol font the reader cannot place.
 - ``private-use-character``: a private-use code point outside a Symbol-font run.
-- ``unpreserved-whitespace``: ``<w:t>`` text with leading or trailing XML whitespace, or a tab or
-  line break, without ``xml:space="preserve"``; a consumer may drop it.
+- ``reserved-character``: U+FFFC in ``<w:t>``, which the reader uses for a picture.
+- ``unpreserved-whitespace``: ``<w:t>`` text with leading or trailing spaces without
+  ``xml:space="preserve"`` (a consumer may drop them), or a tab or line break inside ``<w:t>``
+  (Word writes those as elements).
 - ``unbalanced-field``: a paragraph that ends inside a field instruction.
+- ``field-without-result``: a field with no stored result.
+- ``stale-field``: a field marked for update.
 - ``unsupported-element``: anything that can carry text and is not read above, and any element
   the reader does not know: text boxes, footnote and endnote references, embedded objects,
-  charts and other non-picture drawings, alternate content, math, ``altChunk``.
-- ``invalid-package``: not a readable .docx, no main document relationship, a duplicate part
-  name, a part that is not UTF-8, a DTD, or a part over the size cap.
+  charts and other non-picture drawings, alternate content, math, ``altChunk``, form fields,
+  content controls bound to data, conditional table formatting, and text in a vertically
+  merged-away cell.
+- ``invalid-package``: not a readable .docx, no main document relationship, a part name that
+  occurs twice (ignoring case), a related part that is missing or duplicated, a part that is
+  not UTF-8, a DTD, or a part over the size cap.
 
 Headers, footers, footnotes, comments and the glossary are separate parts and are not read.
 """
@@ -63,6 +85,7 @@ from __future__ import annotations
 
 import io
 import posixpath
+import re
 import xml.etree.ElementTree as ET
 import zipfile
 from dataclasses import dataclass, field
@@ -183,9 +206,7 @@ _MARKERS = {
 _RUN_SILENT = {_w(name) for name in ("rPr", "lastRenderedPageBreak", "commentReference")}
 # Paragraph-level containers whose children are read as the paragraph's own. fldSimple's
 # children are the field's displayed result; its instruction is an attribute and is dropped.
-_INLINE_TRANSPARENT = {
-    _w(name) for name in ("hyperlink", "smartTag", "customXml", "fldSimple", "dir", "bdo")
-}
+_INLINE_TRANSPARENT = {_w(name) for name in ("hyperlink", "smartTag", "customXml")}
 
 _TOGGLE_MARKS = ("caps", "smallCaps", "strike", "dstrike")
 
@@ -211,8 +232,10 @@ class Numbering:
 class Mark:
     """``text[start:end]`` is shown as ``kind``.
 
-    One of superscript, subscript, position, caps, smallCaps, strike, dstrike, highlight,
-    shading.
+    One of superscript, subscript, position, caps, smallCaps, strike, dstrike,
+    ``highlight-<colour>`` (Word's colour name, e.g. ``highlight-lightGray``), shading, rtl
+    (right-to-left) and faint (white, under two points, or scaled under a fifth). Marks of one
+    kind that touch are merged; marks of different kinds may overlap.
     """
 
     start: int
@@ -257,7 +280,8 @@ class _Package:
         except zipfile.BadZipFile as error:
             raise DocxRefusedError("invalid-package", "not a zip archive") from error
         names = self.zip.namelist()
-        if len(names) != len(set(names)):
+        # Part names in a package are compared without regard to case (ECMA-376 Part 2).
+        if len({name.lower() for name in names}) != len(names):
             raise DocxRefusedError("invalid-package", "a part name occurs twice")
         self.names = set(names)
 
@@ -297,15 +321,26 @@ class _Style:
     based_on: str | None
     rpr: ET.Element | None
     ppr: ET.Element | None
+    # A table style with formatting for its first row, banded rows and the like.
+    conditional: bool = False
 
 
 @dataclass
 class _Styles:
     styles: dict[str, _Style] = field(default_factory=dict)
     default_rpr: ET.Element | None = None
-    default_paragraph: str | None = None
+    defaults: dict[str, str] = field(default_factory=dict)
     theme_fonts: dict[str, str] = field(default_factory=dict)
     has_theme: bool = False
+    # Fonts the font table declares symbol-encoded (charset 02), other than Symbol itself.
+    symbol_encoded: set[str] = field(default_factory=set)
+
+    def resolve(self, style_id: str | None, kind: str) -> list[_Style]:
+        """The chain of ``style_id``, or of the default style of ``kind`` when it is absent or
+        unknown, as Word falls back."""
+        if style_id is None or style_id not in self.styles:
+            style_id = self.defaults.get(kind)
+        return self.chain(style_id)
 
     def chain(self, style_id: str | None) -> list[_Style]:
         out: list[_Style] = []
@@ -318,12 +353,19 @@ class _Styles:
         return out
 
 
-def _styles(root: ET.Element | None, theme: ET.Element | None) -> _Styles:
+def _styles(root: ET.Element | None, theme: ET.Element | None, fonts: ET.Element | None) -> _Styles:
     styles = _Styles()
+    if fonts is not None:
+        for entry in fonts.findall(_w("font")):
+            charset = entry.find(_w("charset"))
+            name = entry.get(_w("name"), "")
+            encoded = charset is not None and charset.get(_w("val"), "").upper() == "02"
+            if encoded and _font_class(name) != "symbol":
+                styles.symbol_encoded.add(name.lower())
     if theme is not None:
         styles.has_theme = True
         for prefix in ("major", "minor"):
-            font = next(iter(theme.iter(f"{{{A}}}{prefix}Font")), None)
+            font = theme.find(f".//{{{A}}}{prefix}Font")
             if font is None:
                 continue
             for script, child in (("Latin", "latin"), ("EastAsia", "ea"), ("Bidi", "cs")):
@@ -344,9 +386,13 @@ def _styles(root: ET.Element | None, theme: ET.Element | None) -> _Styles:
             based_on=based.get(_w("val")) if based is not None else None,
             rpr=style.find(_w("rPr")),
             ppr=style.find(_w("pPr")),
+            conditional=any(
+                part.find(_w("rPr")) is not None or part.find(_w("pPr")) is not None
+                for part in style.findall(_w("tblStylePr"))
+            ),
         )
-        if kind == "paragraph" and style.get(_w("default")) in ("1", "true", "on"):
-            styles.default_paragraph = style_id
+        if style.get(_w("default")) in ("1", "true", "on"):
+            styles.defaults.setdefault(kind, style_id)
     return styles
 
 
@@ -374,9 +420,9 @@ class _Properties:
             element = direct.find(_w("rStyle"))
             run_style = element.get(_w("val")) if element is not None else None
         levels: list[ET.Element | None] = []
-        levels += [style.rpr for style in styles.chain(run_style)]
-        levels += [style.rpr for style in styles.chain(paragraph_style or styles.default_paragraph)]
-        levels += [style.rpr for style in styles.chain(table_style)]
+        levels += [style.rpr for style in styles.resolve(run_style, "character")]
+        levels += [style.rpr for style in styles.resolve(paragraph_style, "paragraph")]
+        levels += [style.rpr for style in styles.resolve(table_style, "table")]
         levels.append(styles.default_rpr)
         self.inherited = [level for level in levels if level is not None]
 
@@ -404,7 +450,7 @@ class _Properties:
             fonts = level.find(_w("rFonts"))
             if fonts is None:
                 continue
-            theme = fonts.get(_w(slot + "Theme"))
+            theme = fonts.get(_w(_THEME_ATTRIBUTE[slot]))
             if theme is not None:
                 return self._theme_font(theme)
             name = fonts.get(_w(slot))
@@ -417,10 +463,20 @@ class _Properties:
             raise DocxRefusedError("symbol-font", f"theme font {theme} without a theme")
         for prefix in ("major", "minor"):
             if theme.startswith(prefix):
-                script = theme[len(prefix) :]
-                key = prefix + ("Latin" if script in ("HAnsi", "Ascii") else script)
-                return self.styles.theme_fonts.get(key, "")
-        raise DocxRefusedError("symbol-font", f"unknown theme font {theme}")
+                script = {"HAnsi": "Latin", "Ascii": "Latin"}.get(theme[len(prefix) :])
+                script = script or theme[len(prefix) :]
+                key = prefix + script
+                if key in self.styles.theme_fonts:
+                    return self.styles.theme_fonts[key]
+        raise DocxRefusedError("symbol-font", f"theme font {theme} is not in the theme")
+
+
+_THEME_ATTRIBUTE = {
+    "ascii": "asciiTheme",
+    "hAnsi": "hAnsiTheme",
+    "eastAsia": "eastAsiaTheme",
+    "cs": "cstheme",
+}
 
 
 def _font_class(name: str | None) -> str:
@@ -471,6 +527,13 @@ class _ParagraphReader:
         self.marks: list[Mark] = []
         # One entry per open field: True while in its instruction, False once in its result.
         self.fields: list[bool] = []
+        self.rtl = 0
+
+    def _font(self, name: str | None) -> str:
+        font = _font_class(name)
+        if font == "text" and name is not None and name.lower() in self.styles.symbol_encoded:
+            return "dingbat"
+        return font
 
     def in_instruction(self) -> bool:
         return True in self.fields
@@ -480,9 +543,22 @@ class _ParagraphReader:
             tag = child.tag
             if tag == _w("r"):
                 self.run(child)
+            elif tag == _w("fldSimple"):
+                if child.get(_w("dirty")) in ("1", "true", "on"):
+                    raise DocxRefusedError("stale-field", "a field marked for update")
+                before = self.length
+                self.container(child)
+                if self.length == before:
+                    raise DocxRefusedError("field-without-result", "a simple field shows nothing")
+            elif tag in (_w("bdo"), _w("dir")):
+                rtl = child.get(_w("val")) == "rtl"
+                self.rtl += rtl
+                self.container(child)
+                self.rtl -= rtl
             elif tag in _INLINE_TRANSPARENT:
                 self.container(child)
             elif tag == _w("sdt"):
+                _content_control(child)
                 content = child.find(_w("sdtContent"))
                 if content is not None:
                     self.container(content)
@@ -495,24 +571,26 @@ class _ParagraphReader:
         properties = _Properties(
             self.styles, run.find(_w("rPr")), self.paragraph_style, self.table_style
         )
-        latin = [_font_class(properties.font(slot)) for slot in ("ascii", "hAnsi")]
-        other = [_font_class(properties.font(slot)) for slot in ("eastAsia", "cs")]
-        if "dingbat" in latin + other:
-            raise DocxRefusedError("symbol-font", "a run in a dingbat font")
-        symbol = "symbol" in latin
-        if not symbol and "symbol" in other:
-            raise DocxRefusedError("symbol-font", "Symbol set for East Asian or complex script")
+        names = {slot: properties.font(slot) for slot in ("ascii", "hAnsi", "eastAsia", "cs")}
+        classes = {slot: self._font(name) for slot, name in names.items()}
+        if "dingbat" in classes.values():
+            raise DocxRefusedError("symbol-font", "a run in a dingbat or symbol-encoded font")
+        symbol = "symbol" in classes.values()
+        if symbol and (
+            classes["ascii"] != "symbol"
+            or classes["hAnsi"] != "symbol"
+            or properties.toggle("cs")
+            or properties.toggle("rtl")
+            or properties.value("rFonts", "hint") is not None
+        ):
+            # Word chooses the font per character from these slots; the reader maps a run
+            # only when every Latin character is certain to be drawn in Symbol.
+            raise DocxRefusedError("symbol-font", "Symbol set for only some characters")
         emitted: list[str] = []
         for child in run:
             tag = child.tag
             if tag == _w("fldChar"):
-                kind = child.get(_w("fldCharType"))
-                if kind == "begin":
-                    self.fields.append(True)
-                elif kind == "separate" and self.fields:
-                    self.fields[-1] = False
-                elif kind == "end" and self.fields:
-                    self.fields.pop()
+                self._field(child)
                 continue
             if tag == _w("instrText") or tag in _RUN_SILENT:
                 continue
@@ -536,6 +614,22 @@ class _ParagraphReader:
         self.length += len(text)
         self._mark(properties, start, self.length)
 
+    def _field(self, child: ET.Element) -> None:
+        if len(child):
+            raise DocxRefusedError("unsupported-element", "form field")
+        if child.get(_w("dirty")) in ("1", "true", "on"):
+            raise DocxRefusedError("stale-field", "a field marked for update")
+        kind = child.get(_w("fldCharType"))
+        if kind == "begin":
+            self.fields.append(True)
+        elif kind == "separate" and self.fields:
+            self.fields[-1] = False
+        elif kind == "end" and self.fields:
+            if self.fields[-1]:
+                # No separate: the field stores no result, and what Word shows is computed.
+                raise DocxRefusedError("field-without-result", "a field with no stored result")
+            self.fields.pop()
+
     def _special(self, child: ET.Element) -> str:
         tag = child.tag
         if tag in (_w("tab"), _w("ptab")):
@@ -551,11 +645,10 @@ class _ParagraphReader:
         if tag == _w("sym"):
             if _font_class(child.get(_w("font"))) != "symbol":
                 raise DocxRefusedError("unmapped-symbol", f"w:sym in {child.get(_w('font'))!r}")
-            try:
-                code = int(child.get(_w("char"), ""), 16)
-            except ValueError as error:
-                raise DocxRefusedError("unmapped-symbol", "w:sym without a hex code") from error
-            return _symbol(code, "w:sym")
+            char = child.get(_w("char"), "")
+            if not re.fullmatch(r"[0-9A-Fa-f]{1,4}", char):
+                raise DocxRefusedError("unmapped-symbol", "w:sym without a hex code")
+            return _symbol(int(char, 16), "w:sym")
         if tag == _w("drawing"):
             return _drawing(child)
         raise DocxRefusedError("unsupported-element", _local(tag))
@@ -570,6 +663,8 @@ class _ParagraphReader:
                 out.append(_symbol(code, "w:t"))
             elif _private_use(code):
                 raise DocxRefusedError("private-use-character", f"U+{code:04X}")
+            elif character == OBJECT:
+                raise DocxRefusedError("reserved-character", "U+FFFC stands for a picture")
             else:
                 out.append(character)
         return "".join(out)
@@ -582,11 +677,15 @@ class _ParagraphReader:
         if properties.value("position") not in (None, "0"):
             kinds.append("position")
         kinds += [name for name in _TOGGLE_MARKS if properties.toggle(name)]
-        if properties.value("highlight") not in (None, "none"):
-            kinds.append("highlight")
-        fill = properties.value("shd", "fill")
-        if fill is not None and fill.lower() not in ("auto", "ffffff"):
+        highlight = properties.value("highlight")
+        if highlight not in (None, "none"):
+            kinds.append(f"highlight-{highlight}")
+        if _shaded(properties.value("shd"), properties.value("shd", "fill")):
             kinds.append("shading")
+        if self.rtl or properties.toggle("rtl"):
+            kinds.append("rtl")
+        if _faint(properties):
+            kinds.append("faint")
         for kind in kinds:
             previous = next((m for m in reversed(self.marks) if m.kind == kind), None)
             if previous is not None and previous.end == start:
@@ -595,27 +694,53 @@ class _ParagraphReader:
                 self.marks.append(Mark(start, end, kind))
 
 
+def _shaded(pattern: str | None, fill: str | None) -> bool:
+    if pattern not in (None, "clear", "nil"):
+        return True
+    return fill is not None and fill.lower() not in ("auto", "ffffff")
+
+
+def _faint(properties: _Properties) -> bool:
+    """White text, text under two points, or text scaled under a fifth: easy not to see."""
+    color = properties.value("color")
+    if color is not None and color.lower() in ("ffffff", "white"):
+        return True
+    size = properties.value("sz")
+    if size is not None and size.isdigit() and int(size) < 4:
+        return True
+    scale = properties.value("w")
+    return scale is not None and scale.isdigit() and int(scale) < 20
+
+
 def _check_whitespace(element: ET.Element, text: str) -> None:
-    if element.get(XML_SPACE) == "preserve":
-        return
-    if text != text.strip(" \t\r\n") or any(c in text for c in "\t\r\n"):
+    if any(c in text for c in "\t\r\n"):
+        # Word writes a tab or a break as an element; one inside the text is not what it shows.
+        raise DocxRefusedError("unpreserved-whitespace", "a tab or line break inside w:t")
+    if element.get(XML_SPACE) != "preserve" and text != text.strip(" "):
         raise DocxRefusedError("unpreserved-whitespace", "w:t without xml:space=preserve")
 
 
+def _content_control(element: ET.Element) -> None:
+    properties = element.find(_w("sdtPr"))
+    if properties is not None and properties.find(_w("dataBinding")) is not None:
+        # The stored content is a cache; Word shows the bound data.
+        raise DocxRefusedError("unsupported-element", "content control bound to data")
+
+
 def _numbering(ppr: ET.Element | None, style_chain: list[_Style]) -> Numbering | None:
+    """numId and ilvl, each from the nearest level that sets it."""
+    found: dict[str, int] = {}
     for source in [ppr, *(style.ppr for style in style_chain)]:
-        if source is None:
-            continue
-        numpr = source.find(_w("numPr"))
+        numpr = source.find(_w("numPr")) if source is not None else None
         if numpr is None:
             continue
-        num_id = numpr.find(_w("numId"))
-        level = numpr.find(_w("ilvl"))
-        return Numbering(
-            num_id=int(num_id.get(_w("val"), "0")) if num_id is not None else 0,
-            level=int(level.get(_w("val"), "0")) if level is not None else 0,
-        )
-    return None
+        for name in ("numId", "ilvl"):
+            element = numpr.find(_w(name))
+            if name not in found and element is not None:
+                found[name] = int(element.get(_w("val"), "0"))
+    if not found:
+        return None
+    return Numbering(num_id=found.get("numId", 0), level=found.get("ilvl", 0))
 
 
 def _paragraph(
@@ -626,11 +751,11 @@ def _paragraph(
 ) -> Paragraph:
     ppr = element.find(_w("pPr"))
     style = None
-    mark_hidden = False
     if ppr is not None:
         style_element = ppr.find(_w("pStyle"))
         style = style_element.get(_w("val")) if style_element is not None else None
-        mark_hidden = bool(_on(ppr.find(f"{_w('rPr')}/{_w('vanish')}")))
+    mark = _Properties(styles, ppr.find(_w("rPr")) if ppr is not None else None, style, table_style)
+    mark_hidden = mark.toggle("vanish") or mark.toggle("specVanish")
     reader = _ParagraphReader(styles, style, table_style)
     reader.container(element)
     if reader.in_instruction():
@@ -638,11 +763,38 @@ def _paragraph(
     return Paragraph(
         text="".join(reader.parts),
         style=style,
-        numbering=_numbering(ppr, styles.chain(style or styles.default_paragraph)),
+        numbering=_numbering(ppr, styles.resolve(style, "paragraph")),
         table=table,
-        marks=tuple(sorted(reader.marks, key=lambda m: (m.start, m.kind))),
+        marks=_paragraph_marks(reader, [ppr, *(s.ppr for s in styles.resolve(style, "paragraph"))]),
         mark_hidden=mark_hidden,
     )
+
+
+def _paragraph_marks(reader: _ParagraphReader, levels: list[ET.Element | None]) -> tuple[Mark, ...]:
+    """The runs' marks, and shading or right-to-left set on the paragraph (or its style), which
+    covers every character."""
+    marks = list(reader.marks)
+
+    def nearest(name: str) -> ET.Element | None:
+        return next(
+            (
+                e
+                for level in levels
+                if level is not None and (e := level.find(_w(name))) is not None
+            ),
+            None,
+        )
+
+    shading = nearest("shd")
+    if (
+        reader.length
+        and shading is not None
+        and _shaded(shading.get(_w("val")), shading.get(_w("fill")))
+    ):
+        marks.append(Mark(0, reader.length, "shading"))
+    if reader.length and _on(nearest("bidi")):
+        marks.append(Mark(0, reader.length, "rtl"))
+    return tuple(sorted(set(marks), key=lambda m: (m.start, m.end, m.kind)))
 
 
 # --- blocks and tables ---------------------------------------------------------------------
@@ -664,6 +816,7 @@ class _Body:
             elif tag == _w("tbl"):
                 self.table(child, table)
             elif tag == _w("sdt"):
+                _content_control(child)
                 content = child.find(_w("sdtContent"))
                 if content is not None:
                     self.blocks(content, table, table_style)
@@ -679,13 +832,22 @@ class _Body:
         self.tables += 1
         style_element = element.find(f"{_w('tblPr')}/{_w('tblStyle')}")
         table_style = style_element.get(_w("val")) if style_element is not None else None
+        if any(style.conditional for style in self.styles.resolve(table_style, "table")):
+            # Formatting for the first row, banded rows and the like; the reader does not apply
+            # it, so it could hide or change text unseen.
+            raise DocxRefusedError("unsupported-element", "conditional table formatting")
         rows: list[ET.Element] = []
         _collect(element, _w("tr"), rows, {_w("tblPr"), _w("tblGrid")})
         for row_index, row in enumerate(rows):
             cells: list[ET.Element] = []
             _collect(row, _w("tc"), cells, {_w("trPr"), _w("tblPrEx")})
             for cell_index, cell in enumerate(cells):
+                start = len(self.out)
                 self.blocks(cell, outer or (index, row_index, cell_index), table_style)
+                merge = cell.find(f"{_w('tcPr')}/{_w('vMerge')}")
+                continued = merge is not None and merge.get(_w("val")) in (None, "continue")
+                if continued and any(p.text.strip() for p in self.out[start:]):
+                    raise DocxRefusedError("unsupported-element", "text in a merged-away cell")
 
 
 def _collect(element: ET.Element, wanted: str, out: list[ET.Element], silent: set[str]) -> None:
@@ -695,6 +857,7 @@ def _collect(element: ET.Element, wanted: str, out: list[ET.Element], silent: se
         if tag == wanted:
             out.append(child)
         elif tag == _w("sdt"):
+            _content_control(child)
             content = child.find(_w("sdtContent"))
             if content is not None:
                 _collect(content, wanted, out, silent)
@@ -716,14 +879,16 @@ def read_docx(data: bytes) -> list[Paragraph]:
         document = package.part(mains[0])
         if document is None:
             raise DocxRefusedError("invalid-package", f"no {mains[0]}")
-        style_parts = package.related(mains[0], "styles")
-        theme_parts = package.related(mains[0], "theme")
-        if len(style_parts) > 1 or len(theme_parts) > 1:
-            raise DocxRefusedError("invalid-package", "more than one styles or theme part")
-        styles = _styles(
-            package.part(style_parts[0]) if style_parts else None,
-            package.part(theme_parts[0]) if theme_parts else None,
-        )
+        parts: list[ET.Element | None] = []
+        for kind in ("styles", "theme", "fontTable"):
+            targets = package.related(mains[0], kind)
+            if len(targets) > 1:
+                raise DocxRefusedError("invalid-package", f"more than one {kind} part")
+            part = package.part(targets[0]) if targets else None
+            if targets and part is None:
+                raise DocxRefusedError("invalid-package", f"no {targets[0]}")
+            parts.append(part)
+        styles = _styles(*parts)
     for element in document.iter():
         if element.tag in _TRACKED:
             raise DocxRefusedError("tracked-change", _local(element.tag))

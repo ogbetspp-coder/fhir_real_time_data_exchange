@@ -145,15 +145,13 @@ def _optional(tokens: list[Token]) -> bool:
     )
 
 
-# Marks that change which characters a reader sees. The registry is built from text alone, so a
-# source paragraph carrying one of these in its range is refused rather than flattened. Capitals
-# are refused only where they change a letter.
-_ALTERING = {"superscript", "subscript", "position", "strike", "dstrike"}
-_CASE = {"caps", "smallCaps"}
 # Marks kept in the registry: the template's grey highlight and shading mean "not in the printed
 # material" (the annotated template, "Text which will not appear in the final printed material
-# is to be presented as grey-shaded text").
-_KEPT = {"highlight", "shading"}
+# is to be presented as grey-shaded text"). The registry is built from text alone, so every
+# other mark in a source paragraph is refused rather than flattened, except capitals over text
+# that is already in capitals, which change nothing.
+_KEPT = {"highlight-lightGray", "shading"}
+_CASE = {"caps", "smallCaps"}
 
 
 def _check(paragraph: Paragraph, where: str) -> None:
@@ -161,8 +159,9 @@ def _check(paragraph: Paragraph, where: str) -> None:
         raise RegistryError(f"{where}: a paragraph with text has a hidden paragraph mark")
     for mark in paragraph.marks:
         covered = paragraph.text[mark.start : mark.end]
-        if mark.kind in _ALTERING or (mark.kind in _CASE and covered != covered.upper()):
-            raise RegistryError(f"{where}: {mark.kind} changes what the text shows")
+        if mark.kind in _KEPT or (mark.kind in _CASE and covered == covered.upper()):
+            continue
+        raise RegistryError(f"{where}: {mark.kind} changes what the text shows")
 
 
 def _guard(tokens: list[Token], where: str) -> None:
@@ -396,6 +395,8 @@ def build_appendix_ii(source: Source) -> dict[str, list[dict[str, str]]]:
         table, row, cell = paragraph.table
         if table != 0:
             raise RegistryError("Appendix II: more than one table")
+        if cell > 1:
+            raise RegistryError(f"Appendix II: row {row} has more than two cells")
         rows.setdefault((table, row), {})
         previous = rows[(table, row)].get(cell)
         rows[(table, row)][cell] = (
@@ -408,6 +409,8 @@ def build_appendix_ii(source: Source) -> dict[str, list[dict[str, str]]]:
         code = cells.get(0, "").strip()
         text = cells.get(1, "")
         if code == "Ref":
+            if key != min(rows) or text.strip() != "EN":
+                raise RegistryError(f"Appendix II: unexpected header row {key}")
             continue
         if not code and text.strip().startswith("[") and text.strip().endswith("]"):
             group = text.strip()[1:-1]
@@ -430,10 +433,20 @@ def build_appendix_iii(source: Source) -> dict[str, Any]:
     start = _exactly_one(texts, APPENDIX_III_START, APPENDIX_III_FILE)
     end = _exactly_one(texts, APPENDIX_III_END, APPENDIX_III_FILE)
     statements = [p for p in source.paragraphs[start + 1 : end] if p.text.strip()]
-    notes = [t for t in texts[end:] if re.match(r"^\*+ ", t)]
+    notes = [p for p in source.paragraphs[end:] if re.match(r"^\*+ ", p.text)]
     if not statements or not notes:
         raise RegistryError("Appendix III: no SmPC statements or no footnotes")
-    return {"items": _items(statements, "Appendix III SmPC"), "notes": notes}
+    for note in notes:
+        _check(note, "Appendix III note")
+    return {"items": _items(statements, "Appendix III SmPC"), "notes": [p.text for p in notes]}
+
+
+def _check_errata(items: list[dict[str, Any]]) -> None:
+    """Each erratum corrects exactly one item; one that matches nothing is a stale correction."""
+    for source in ERRATA:
+        applied = sum(1 for item in items if item.get("erratum") and item["source"] == source)
+        if applied != 1:
+            raise RegistryError(f"an erratum applies {applied} times, expected once")
 
 
 def build(directory: Path, lock: dict[str, Any]) -> dict[str, Any]:
@@ -446,6 +459,14 @@ def build(directory: Path, lock: dict[str, Any]) -> dict[str, Any]:
         if name not in by_file or by_file[name]["sha256"] != source.sha256:
             raise RegistryError(f"{name} does not match qrd/sources.lock.json")
     sections, document_statements = build_smpc(sources[TEMPLATE_FILE])
+    appendix_iii = build_appendix_iii(sources[APPENDIX_III_FILE])
+    _check_errata(
+        [
+            *(item for section in sections for item in section["items"]),
+            *document_statements,
+            *appendix_iii["items"],
+        ]
+    )
     keys = {section["key"] for section in sections}
     for required in ("smpc.4.6", "smpc.4.8", "smpc.6.4"):
         if required not in keys:
@@ -478,7 +499,7 @@ def build(directory: Path, lock: dict[str, Any]) -> dict[str, Any]:
                 "attachesTo": "smpc.4.8",
                 "groups": build_appendix_ii(sources[APPENDIX_II_FILE]),
             },
-            "III": {"attachesTo": "smpc.6.4", **build_appendix_iii(sources[APPENDIX_III_FILE])},
+            "III": {"attachesTo": "smpc.6.4", **appendix_iii},
         },
     }
 

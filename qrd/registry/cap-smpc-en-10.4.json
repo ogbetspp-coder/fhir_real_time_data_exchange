@@ -1425,7 +1425,7 @@
             {
               "start": 263,
               "end": 313,
-              "kind": "highlight"
+              "kind": "highlight-lightGray"
             }
           ]
         },
@@ -1553,7 +1553,7 @@
             {
               "start": 56,
               "end": 72,
-              "kind": "highlight"
+              "kind": "highlight-lightGray"
             }
           ]
         },

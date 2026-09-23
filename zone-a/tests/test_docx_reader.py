@@ -23,12 +23,9 @@ ROOT_RELS = (
     '<Relationship Id="r1" Type="http://schemas.openxmlformats.org/officeDocument/2006/'
     'relationships/officeDocument" Target="{target}"/></Relationships>'
 )
-DOCUMENT_RELS = (
-    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-    '<Relationship Id="s" Type="http://schemas.openxmlformats.org/officeDocument/2006/'
-    'relationships/styles" Target="styles.xml"/>'
-    '<Relationship Id="t" Type="http://schemas.openxmlformats.org/officeDocument/2006/'
-    'relationships/theme" Target="theme/theme1.xml"/></Relationships>'
+RELATIONSHIP = (
+    '<Relationship Id="{kind}" Type="http://schemas.openxmlformats.org/officeDocument/2006/'
+    'relationships/{kind}" Target="{target}"/>'
 )
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
 THEME = (
@@ -49,17 +46,34 @@ def document_xml(body: str, doctype: bool = False) -> str:
 
 
 def docx(
-    body: str, styles: str | None = None, doctype: bool = False, minor_font: str | None = None
+    body: str,
+    styles: str | None = None,
+    doctype: bool = False,
+    minor_font: str | None = None,
+    fonts: str | None = None,
 ) -> bytes:
+    parts: dict[str, tuple[str, str]] = {}
+    if styles is not None:
+        parts["styles"] = ("styles.xml", f'<w:styles xmlns:w="{W}">{styles}</w:styles>')
+    if minor_font is not None:
+        parts["theme"] = ("theme/theme1.xml", THEME.replace("{minor}", minor_font))
+    if fonts is not None:
+        parts["fontTable"] = ("fontTable.xml", f'<w:fonts xmlns:w="{W}">{fonts}</w:fonts>')
+    rels = "".join(
+        RELATIONSHIP.format(kind=kind, target=target) for kind, (target, _) in parts.items()
+    )
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as package:
         package.writestr("_rels/.rels", ROOT_RELS.format(target="word/document.xml"))
-        package.writestr("word/_rels/document.xml.rels", DOCUMENT_RELS)
+        package.writestr(
+            "word/_rels/document.xml.rels",
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            + rels
+            + "</Relationships>",
+        )
         package.writestr("word/document.xml", document_xml(body, doctype))
-        if styles is not None:
-            package.writestr("word/styles.xml", f'<w:styles xmlns:w="{W}">{styles}</w:styles>')
-        if minor_font is not None:
-            package.writestr("word/theme/theme1.xml", THEME.replace("{minor}", minor_font))
+        for target, content in parts.values():
+            package.writestr("word/" + target, content)
     return buffer.getvalue()
 
 
@@ -308,7 +322,7 @@ def test_capitals_strike_highlight_and_shading_are_marked() -> None:
     assert [(m.start, m.end, m.kind) for m in marks] == [
         (0, 2, "caps"),
         (2, 6, "strike"),
-        (6, 10, "highlight"),
+        (6, 10, "highlight-lightGray"),
         (10, 15, "shading"),
         (15, 17, "position"),
     ]
@@ -496,6 +510,232 @@ def test_tables_carry_their_position_and_numbering_is_metadata() -> None:
     numbering = paragraphs[0].numbering
     assert numbering is not None
     assert (numbering.num_id, numbering.level) == (3, 1)
+
+
+# --- second review: styles Word falls back to ----------------------------------------------
+
+
+def test_an_unknown_paragraph_style_falls_back_to_the_default_one() -> None:
+    default = (
+        '<w:style w:type="paragraph" w:default="1" w:styleId="Normal">'
+        "<w:rPr><w:vanish/></w:rPr></w:style>"
+    )
+    assert refusal(p(r("<w:t>x</w:t>"), '<w:pStyle w:val="Missing"/>'), default) == "hidden-text"
+
+
+def test_the_default_character_and_table_styles_apply() -> None:
+    character = (
+        '<w:style w:type="character" w:default="1" w:styleId="Font">'
+        "<w:rPr><w:vanish/></w:rPr></w:style>"
+    )
+    assert refusal(p(r("<w:t>x</w:t>")), character) == "hidden-text"
+    table = (
+        '<w:style w:type="table" w:default="1" w:styleId="Grid">'
+        "<w:rPr><w:vanish/></w:rPr></w:style>"
+    )
+    body = "<w:tbl><w:tr><w:tc>" + p(r("<w:t>x</w:t>")) + "</w:tc></w:tr></w:tbl>"
+    assert refusal(body, table) == "hidden-text"
+
+
+def test_conditional_table_formatting_in_force_is_refused_and_unused_is_not() -> None:
+    style = (
+        '<w:style w:type="table" w:styleId="Banded"><w:tblStylePr w:type="firstRow">'
+        '<w:rPr><w:vertAlign w:val="superscript"/></w:rPr></w:tblStylePr></w:style>'
+    )
+    cell = "<w:tr><w:tc>" + p(r("<w:t>10</w:t>")) + "</w:tc></w:tr>"
+    used = '<w:tbl><w:tblPr><w:tblStyle w:val="Banded"/></w:tblPr>' + cell + "</w:tbl>"
+    assert refusal(used, style) == "unsupported-element"
+    as_default = style.replace('w:styleId="Banded"', 'w:default="1" w:styleId="Banded"')
+    assert refusal("<w:tbl>" + cell + "</w:tbl>", as_default) == "unsupported-element"
+    # The EMA template defines such a style and never applies it.
+    assert text_of("<w:tbl>" + cell + "</w:tbl>", style) == ["10"]
+
+
+# --- second review: Symbol in some font slots only -------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "fonts",
+    [
+        '<w:rFonts w:ascii="Symbol"/>',
+        '<w:rFonts w:ascii="Symbol" w:hAnsi="Times New Roman"/>',
+        '<w:rFonts w:hAnsi="Symbol"/>',
+        '<w:rFonts w:cs="Symbol"/>',
+        '<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol" w:hint="eastAsia"/>',
+        '<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/><w:cs/>',
+        '<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/><w:rtl/>',
+    ],
+)
+def test_symbol_in_only_some_font_slots_is_refused(fonts: str) -> None:
+    assert refusal(p(r("<w:t>b</w:t>", fonts))) == "symbol-font"
+
+
+def test_the_complex_script_theme_attribute_is_read() -> None:
+    run = r("<w:t>b</w:t>", '<w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cstheme="minorHAnsi"/>')
+    with pytest.raises(DocxRefusedError) as caught:
+        read_docx(docx(p(run), minor_font="Symbol"))
+    assert caught.value.code == "symbol-font"
+
+
+def test_a_theme_font_the_theme_does_not_define_is_refused() -> None:
+    run = r("<w:t>b</w:t>", '<w:rFonts w:asciiTheme="minorFoo" w:hAnsiTheme="minorFoo"/>')
+    with pytest.raises(DocxRefusedError) as caught:
+        read_docx(docx(p(run), minor_font="Calibri"))
+    assert caught.value.code == "symbol-font"
+
+
+def test_a_font_the_font_table_declares_symbol_encoded_is_refused() -> None:
+    fonts = '<w:font w:name="Monotype Sorts"><w:charset w:val="02"/></w:font>'
+    run = r("<w:t>n</w:t>", '<w:rFonts w:ascii="Monotype Sorts" w:hAnsi="Monotype Sorts"/>')
+    with pytest.raises(DocxRefusedError) as caught:
+        read_docx(docx(p(run), fonts=fonts))
+    assert caught.value.code == "symbol-font"
+    plain = '<w:font w:name="Monotype Sorts"><w:charset w:val="00"/></w:font>'
+    assert read_docx(docx(p(run), fonts=plain))[0].text == "n"
+
+
+# --- second review: fields with no stored result ---------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("body", "code"),
+    [
+        (
+            p(
+                r('<w:fldChar w:fldCharType="begin"/>')
+                + r("<w:instrText>SYMBOL 179 \\f Symbol</w:instrText>")
+                + r('<w:fldChar w:fldCharType="end"/>')
+            ),
+            "field-without-result",
+        ),
+        (
+            p(
+                r(
+                    '<w:fldChar w:fldCharType="begin"><w:ffData><w:checkBox><w:default w:val="1"/>'
+                    "</w:checkBox></w:ffData></w:fldChar>"
+                )
+                + r("<w:instrText>FORMCHECKBOX</w:instrText>")
+                + r('<w:fldChar w:fldCharType="end"/>')
+            ),
+            "unsupported-element",
+        ),
+        (
+            p(
+                r('<w:fldChar w:fldCharType="begin" w:dirty="true"/>')
+                + r("<w:instrText>DATE</w:instrText>")
+                + r('<w:fldChar w:fldCharType="separate"/>')
+                + r("<w:t>1 January</w:t>")
+                + r('<w:fldChar w:fldCharType="end"/>')
+            ),
+            "stale-field",
+        ),
+        (p('<w:fldSimple w:instr="PAGE"/>'), "field-without-result"),
+        (
+            p('<w:fldSimple w:instr="PAGE" w:dirty="1">' + r("<w:t>1</w:t>") + "</w:fldSimple>"),
+            "stale-field",
+        ),
+    ],
+)
+def test_fields_whose_display_is_computed_are_refused(body: str, code: str) -> None:
+    assert refusal(body) == code
+
+
+# --- second review: text the reader cannot vouch for -----------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("body", "code"),
+    [
+        (p(r("<w:t>a\ufffcb</w:t>")), "reserved-character"),
+        (p(r('<w:t xml:space="preserve">a\tb</w:t>')), "unpreserved-whitespace"),
+        (p(r('<w:t xml:space="preserve">a\nb</w:t>')), "unpreserved-whitespace"),
+        (p(r('<w:sym w:font="Symbol" w:char="F0_B"/>')), "unmapped-symbol"),
+        (
+            p(
+                '<w:sdt><w:sdtPr><w:dataBinding w:xpath="/a" w:storeItemID="{0}"/></w:sdtPr>'
+                "<w:sdtContent>" + r("<w:t>cached</w:t>") + "</w:sdtContent></w:sdt>"
+            ),
+            "unsupported-element",
+        ),
+        (
+            "<w:tbl><w:tr><w:tc>"
+            + p(r("<w:t>top</w:t>"))
+            + "</w:tc></w:tr><w:tr><w:tc><w:tcPr><w:vMerge/></w:tcPr>"
+            + p(r("<w:t>hidden by the merge</w:t>"))
+            + "</w:tc></w:tr></w:tbl>",
+            "unsupported-element",
+        ),
+    ],
+)
+def test_text_the_reader_cannot_vouch_for_is_refused(body: str, code: str) -> None:
+    assert refusal(body) == code
+
+
+# --- second review: marks -------------------------------------------------------------------
+
+
+def _kinds(body: str, styles: str | None = None) -> list[tuple[int, int, str]]:
+    return [(m.start, m.end, m.kind) for m in read_docx(docx(body, styles))[0].marks]
+
+
+def test_highlight_carries_its_colour_and_pattern_shading_is_marked() -> None:
+    body = p(
+        r("<w:t>y</w:t>", '<w:highlight w:val="yellow"/>')
+        + r("<w:t>s</w:t>", '<w:shd w:val="pct50" w:color="000000" w:fill="auto"/>')
+        + r("<w:t>n</w:t>", '<w:shd w:val="clear" w:fill="auto"/>')
+    )
+    assert _kinds(body) == [(0, 1, "highlight-yellow"), (1, 2, "shading")]
+
+
+def test_paragraph_shading_and_right_to_left_cover_the_paragraph() -> None:
+    body = p(r("<w:t>abc</w:t>"), '<w:shd w:val="clear" w:fill="D9D9D9"/><w:bidi/>')
+    assert _kinds(body) == [(0, 3, "rtl"), (0, 3, "shading")]
+    styles = (
+        '<w:style w:type="paragraph" w:styleId="Grey"><w:pPr>'
+        '<w:shd w:val="clear" w:fill="D9D9D9"/></w:pPr></w:style>'
+    )
+    assert _kinds(p(r("<w:t>ab</w:t>"), '<w:pStyle w:val="Grey"/>'), styles) == [(0, 2, "shading")]
+    assert _kinds(p('<w:bdo w:val="rtl">' + r("<w:t>ab</w:t>") + "</w:bdo>")) == [(0, 2, "rtl")]
+    assert _kinds(p(r("<w:t>ab</w:t>", "<w:rtl/>"))) == [(0, 2, "rtl")]
+
+
+@pytest.mark.parametrize(
+    "props", ['<w:color w:val="FFFFFF"/>', '<w:sz w:val="2"/>', '<w:w w:val="10"/>']
+)
+def test_text_that_is_hard_to_see_is_marked_faint(props: str) -> None:
+    assert _kinds(p(r("<w:t>ab</w:t>", props))) == [(0, 2, "faint")]
+
+
+def test_a_hidden_paragraph_mark_through_a_style_or_spec_vanish_is_reported() -> None:
+    styles = '<w:style w:type="paragraph" w:styleId="RunOn"><w:rPr><w:vanish/></w:rPr></w:style>'
+    styled = p(r("<w:t>a</w:t>"), '<w:pStyle w:val="RunOn"/>')
+    # The run inherits the style's vanish too; an empty run shows the mark alone.
+    assert read_docx(docx(p("", '<w:pStyle w:val="RunOn"/>'), styles))[0].mark_hidden
+    assert refusal(styled, styles) == "hidden-text"
+    spec = p(r("<w:t>a</w:t>"), "<w:rPr><w:specVanish/></w:rPr>")
+    assert read_docx(docx(spec))[0].mark_hidden
+
+
+def test_numbering_takes_each_of_list_and_level_from_the_nearest_level_setting_it() -> None:
+    styles = (
+        '<w:style w:type="paragraph" w:styleId="List"><w:pPr><w:numPr><w:ilvl w:val="2"/>'
+        '<w:numId w:val="7"/></w:numPr></w:pPr></w:style>'
+    )
+    body = p(r("<w:t>x</w:t>"), '<w:pStyle w:val="List"/><w:numPr><w:ilvl w:val="1"/></w:numPr>')
+    numbering = read_docx(docx(body, styles))[0].numbering
+    assert numbering is not None
+    assert (numbering.num_id, numbering.level) == (7, 1)
+
+
+def test_part_names_that_differ_only_in_case_are_refused() -> None:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as package:
+        package.writestr("_rels/.rels", ROOT_RELS.format(target="word/document.xml"))
+        package.writestr("word/document.xml", document_xml(p(r("<w:t>x</w:t>"))))
+        package.writestr("Word/Document.xml", document_xml(p(r("<w:t>y</w:t>"))))
+    with pytest.raises(DocxRefusedError) as caught:
+        read_docx(buffer.getvalue())
+    assert caught.value.code == "invalid-package"
 
 
 # --- the pinned EMA files -----------------------------------------------------------------

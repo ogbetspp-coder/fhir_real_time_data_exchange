@@ -57,30 +57,45 @@ module docstring lists every rule and every refusal. What the EMA files and the 
    placeholders "{Název}", "CZ {město}>" and "Tel: +{telefonní číslo}" have Symbol-font braces,
    which is why a PDF text layer of the same template shows "Název". A reader that collects only
    `<w:t>` text returns "( 1/10)" and "25 C" and reports nothing. The reader maps every character
-   of a run whose effective Latin font is Symbol — set directly, by a style, by the document
-   defaults or through the theme — through a closed table: Adobe's Symbol encoding as the
-   Unicode Consortium's `symbol.txt` maps it, checked entry by entry against that file. Where
-   `symbol.txt` gives two characters for one code, the table takes one and says so (0x6D is
-   U+03BC GREEK SMALL LETTER MU, not U+00B5 MICRO SIGN). Dingbat fonts are refused.
+   of a run whose two Latin font slots (`ascii` and `hAnsi`) are both Symbol — set directly, by
+   a style, by the document defaults or through the theme — through a closed table: Adobe's
+   Symbol encoding as the Unicode Consortium's `symbol.txt` maps it, checked entry by entry
+   against that file. Where `symbol.txt` gives two characters for one code, the table takes one
+   and says so (0x6D is U+03BC GREEK SMALL LETTER MU, not U+00B5 MICRO SIGN). A run with Symbol
+   in only some of its font slots, or with a font hint or a complex-script or right-to-left
+   property, is refused: Word picks the font character by character there. Dingbat fonts, and
+   any font the document's font table declares symbol-encoded, are refused.
 2. **Formatting that changes what a reader sees.** Superscript, subscript, raised text,
-   capitals, strike-through, highlight and shading are reported as marks on the exact characters
-   (`Paragraph.marks`), because `text` alone flattens "10" with a superscript "9" to "109". A
-   caller that uses `text` must look at the marks. A picture is U+FFFC OBJECT REPLACEMENT
-   CHARACTER where it stands: the black triangle of the additional-monitoring statement is a
-   picture in the template.
-3. **Fields.** A field keeps its displayed result and drops its instruction, however deeply
-   nested; a paragraph that ends inside an instruction is refused.
-4. **Hidden text.** A run with text that is hidden at any level (the run, its character style,
-   its paragraph style or the default one, its table style, the document defaults) is refused
-   unless the run itself says it is visible. A hidden paragraph mark is reported
-   (`mark_hidden`): Word shows such a paragraph run on into the next.
+   capitals, strike-through, highlight (with its colour), shading (on the run or the
+   paragraph), right-to-left text and faint text (white, under two points, or scaled under a
+   fifth) are reported as marks on the exact characters (`Paragraph.marks`), because `text`
+   alone flattens "10" with a superscript "9" to "109". A caller that uses `text` must look at
+   the marks. Other appearance (colour, size, bold, italic, underline) is not reported. A
+   picture is U+FFFC OBJECT REPLACEMENT CHARACTER where it stands: the black triangle of the
+   additional-monitoring statement is a picture in the template; a U+FFFC typed as text is
+   refused.
+3. **Fields.** A field keeps its stored result and drops its instruction, however deeply
+   nested; a paragraph that ends inside an instruction is refused, and so is a field with no
+   stored result (a form checkbox, a SYMBOL field without a result, an empty simple field) or
+   one marked for update, because what Word shows for those is computed.
+4. **Styles and hidden text.** Run properties are looked up on the run, its character style,
+   its paragraph style and its table style (each through its `basedOn` chain, falling back to
+   the document's default style of that kind when the id is absent or unknown, as Word does),
+   then the document defaults. A run with text that any of these levels hides is refused
+   unless the run itself says it is visible. A hidden paragraph mark, direct or through the
+   paragraph's style, is reported (`mark_hidden`): Word shows such a paragraph run on into the
+   next. A table whose effective style has conditional formatting (first row, banded rows) is
+   refused, because the reader does not apply it; the template defines one such style and
+   never uses it.
 5. **The package.** The main part is found through the package relationships, not by name; a
-   duplicate part name, a part that is not UTF-8 and any DTD are refused.
+   part name that occurs twice (ignoring case), a part that is not UTF-8 and any DTD are
+   refused.
 
 It also refuses any revision anywhere in the body (including formatting changes and deleted
 paragraph marks), text boxes, footnote references, embedded objects, charts and other
-non-picture drawings, alternate content, text whose whitespace is not preserved, and any
-element or container it does not know. List numbering, direct or through a style, is reported
+non-picture drawings, alternate content, content controls bound to data, text in a vertically
+merged-away cell, text whose whitespace is not preserved or that holds a raw tab or line break,
+and any element or container it does not know. List numbering, direct or through a style, is reported
 as metadata and never rendered into the text. Headers, footers, footnotes and comments are
 separate parts and are not read. The rule for field instructions was prompted by Appendix V's
 header, which carries `DOCPROPERTY DM_emea_doc_ref_id \* MERGEFORMAT` next to its displayed
@@ -116,11 +131,12 @@ and compared byte for byte with a fresh build in `zone-a/tests/test_qrd_registry
   fill-in or guidance, and marked optional when the whole item is in `<…>`. The classification
   is mechanical: guidance if it is only `[…]`; a fill-in if it is only `{…}`; a statement if it
   holds a fill-in, ends in sentence punctuation, contains ". " or spans paragraphs; otherwise a
-  subheading. Trailing footnote markers ("…>_", "…Appendix V._") and Appendix III's " or"
+  subheading. Trailing footnote markers (`…>*`, `…Appendix V.*`) and Appendix III's " or"
   between alternatives are split off into `note` and `connector`, with the exact characters in
-  `trailer`. The template's grey highlight and shading, which mean "not in the printed
-  material", are kept as `marks`; a source paragraph with any mark that changes its characters,
-  or a hidden paragraph mark, is refused by the build;
+  `trailer`. The template's light-grey highlight and its shading, which mean "not in the
+  printed material", are kept as `marks` (`highlight-lightGray`, `shading`). Any other mark on a
+  source paragraph the build reads is refused (capitals only where they change a letter), and so
+  is a hidden paragraph mark on a paragraph with text;
 - **documentStatements**: the additional-monitoring statement before section 1 and the
   "Detailed information on this medicinal product is available on the website…" statement at
   the end;
@@ -128,6 +144,7 @@ and compared byte for byte with a fresh build in `zone-a/tests/test_qrd_registry
   `lactation.1`–`lactation.3`), Appendix II's rows by the EMA's own codes (`001`–`006` for
   frequency, `007`–`033` for system organ classes), and Appendix III's twelve SmPC storage
   statements with their five footnotes, each attached to the section it serves (4.6, 4.8, 6.4).
+  Appendix II must be a single table of two cells per row under a "Ref | EN" header.
 
 `zone-a/src/zone_a/qrd/headings.py` recognises an SmPC heading in a line of label text that is
 already known to be Annex I (the labelling and the leaflet reuse lines such as "1. NAME OF THE
@@ -146,7 +163,9 @@ The registry records these rather than hiding them.
   registry applies one erratum (`ERRATA` in `zone_a/qrd/registry.py`): it closes the bracket
   after the guidance, as in the sibling statement "<{X} should not be used in children aged …
   […] because of …>", keeps the verbatim source beside the corrected pattern, and says why in
-  the item's `erratum` field. A test pins that exactly one erratum exists.
+  the item's `erratum` field. The build refuses an erratum that does not apply to exactly one
+  item, so a new template that fixes the text makes the correction fail loudly instead of
+  lingering.
 - **Appendix I does not keep its own convention.** In four of its twelve entries
   (`pregnancy.1`, `.2`, `.3` and `.6`) the `<` that opens the statement is never closed, and
   `pregnancy.3` has a stray ")" inside a bracket. Rather than invent four corrections, those
