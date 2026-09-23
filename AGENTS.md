@@ -51,7 +51,7 @@ Google Cloud Healthcare API and observe their native near-real-time BigQuery str
 
 ## Toolchain
 
-Node 22.14 (`.nvmrc`, the version CI uses), Python 3.14 with uv for `zone-a/` and `agent/`
+Node 22.22.0 (`.nvmrc`, the version CI uses and ADR 0003 pins), Python 3.14 with uv for `zone-a/` and `agent/`
 (`.python-version`), Java 21 for the official HL7 validator, and Terraform 1.16+.
 Read-only development and unit tests need no cloud credentials. Real-cloud smoke tests use
 Application Default Credentials and an explicitly configured non-production GCP project.
