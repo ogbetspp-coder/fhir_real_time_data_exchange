@@ -1,9 +1,11 @@
 # Deploying the verifiable-answer agent
 
-Nothing in this directory has been executed. It is written from Google's documentation, with
-every claim cited, so that the person who does run it can check each step against the source
-before touching a project. Documentation dates are the dates the pages were read, 2026-09-18 to
-2026-09-20.
+Written first from Google's documentation, with every claim cited, and corrected by the first
+real deploy on 2026-09-22 (below). The agent is live as
+`projects/398017980210/locations/europe-west4/reasoningEngines/6226059359072288768`, Python
+3.14, and was redeployed on 2026-09-23 with the draft-hold fix (PR #98) and again from `main` at
+`caa5d9a`. Its post-check has not yet run in a live Gemini turn. Documentation dates are the
+dates the pages were read, 2026-09-18 to 2026-09-20.
 
 Six steps. Steps 1 and 4 were done for the MCP connector on 2026-09-21 and are reused; the
 OAuth client is a console decision, the invoker grant a Terraform variable.
@@ -29,8 +31,9 @@ prompt and stored encrypted by the API; it is never an argument, a file or a rep
 ## Prerequisites, stated before anything is spent
 
 - **Gemini Enterprise is a licensed product.** Confirm the organisation or the demonstration
-  tenant has it before scheduling any of this. The query service and roadmap item 1c do not
-  depend on it.
+  tenant has it before scheduling any of this (for `dev`, confirmed 2026-09-21: a trial until
+  2026-10-20). The query service and the demonstration set (delivered, was roadmap item 1c) do
+  not depend on it.
 - **Residency.** Gemini Enterprise offers the `eu` multi-region and `europe-west2` (London,
   which is not the EU); some features fall back to global. The Agent Runtime location must
   match the Gemini Enterprise app location — a global app takes any region, a US app takes
@@ -53,10 +56,10 @@ consent screen is an organisational decision.
 - Redirect URI: `https://vertexaisearch.cloud.google.com/oauth-redirect`
 - Grant the scopes the query service expects, and capture the client id and client secret for
   the connector configuration.
-- **The client id becomes the audience the query service accepts on an access token.** That is
-  the one change to roadmap item 1 the design note names: the service must accept both a
-  Google-signed OIDC ID token (verified by signature and audience, as built) and a Google
-  OAuth 2.0 access token (verified through the token-info endpoint, audience equal to this
+- **The client id becomes the audience the query service accepts on an access token.** That is the
+  one change to the query service (delivered, was roadmap item 1) the design note names: the service
+  must accept both a Google-signed OIDC ID token (verified by signature and audience, as built) and
+  a Google OAuth 2.0 access token (verified through the token-info endpoint, audience equal to this
   client id, `sub` as the principal), with `credentialType` recorded in the audit record.
 
 Source: [Set up a custom MCP server](https://docs.cloud.google.com/gemini/enterprise/docs/connectors/custom-mcp-server/set-up-custom-mcp-server).
@@ -258,9 +261,9 @@ Sources: [ADK MCP tools](https://adk.dev/tools-custom/mcp-tools/),
 
 ## What is not here
 
-- No Terraform for Agent Engine. It would need a project, a region, and a bucket that do not
-  exist yet; the `query_invokers` grant in step 4 is the only infrastructure change this agent
-  requires, and it is a variable in a module that already exists.
+- No Terraform for Agent Engine. The engine is created and updated by `deploy_agent_engine.py`,
+  and its invoker role (step 4b) by `grant-invoker.sh`, both run by hand; the `query_invokers`
+  grant in step 4 is the only change this agent needed in the existing Terraform.
 - No CI deploy step. The agent's CI job lints, type-checks and tests; it does not deploy.
 - No A2A agent card. `render.A2UI_EXTENSION_URI` names the extension a card would advertise,
   but publishing one belongs with whatever serves the agent over A2A.

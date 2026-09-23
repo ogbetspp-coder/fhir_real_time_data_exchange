@@ -6,9 +6,9 @@
   "Phase 1 as built" below describes the code in this tree and each of its acceptance tests
   exists as a named test under `test/query/` (criterion 18 under `test/ci/`). Everything above
   that section — the tool surface, the component table, the phasing — is the original plan and
-  is not a description of the code. The demonstration documents are not yet exercised: no
-  synthetic product has been seeded into the validated store since the deploy, so
-  `find_product` answers an empty list and `get_provenance` has nothing to answer about.
+  is not a description of the code. The demonstration set was seeded on 2026-09-21 (three
+  synthetic products, one of them at two versions), and all four tools answered live against it
+  that day.
 - Date: 2026-09-20
 - Related: `docs/architecture.md`, `docs/adr/0002-two-trust-zones-and-canonical-submission.md`,
   `docs/adr/0003-mechanical-narrative-fidelity.md`
@@ -144,8 +144,8 @@ names the caller account, and separating which human used it is the change-contr
 `query_token_creators`, not the token. The _effective_ IAM
 policy can still be widened outside Terraform, so `scripts/gcp/deploy.sh` exports the effective
 policy for this service account after each successful apply, into the deploy log and the
-evidence bucket (`docs/architecture.md`, "Evidence and observability"); that export has not yet
-run against a project.
+evidence bucket (`docs/architecture.md`, "Evidence and observability"); it runs on every deploy
+of `dev`, and the exports are under `deploy-evidence/` in that bucket.
 
 Cross-tenant isolation is the highest-risk area of this design. Phase 1's answer is the tenant-
 wall acceptance test: two principals with disjoint bundle lists, and every tool, for every
