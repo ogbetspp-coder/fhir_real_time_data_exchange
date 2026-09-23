@@ -3,22 +3,32 @@
     "allow": [
       "Bash(npm run *)",
       "Bash(npm ci)",
-      "Bash(terraform fmt *)",
-      "Bash(terraform validate *)"
-    ],
-    "ask": [
-      "Bash(git push *)",
-      "Bash(terraform apply *)",
-      "Bash(terraform destroy *)",
-      "Bash(gcloud *)"
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(node *)",
+      "Bash(python3 *)",
+      "Bash(bash *)",
+      "Bash(cd *)",
+      "Bash(git *)",
+      "Bash(gh *)",
+      "Bash(env -u GITHUB_TOKEN gh *)",
+      "Bash(.uv-bootstrap/bin/uv *)",
+      "Bash(agent/.uv-bootstrap/bin/uv *)",
+      "Bash(gcloud *)",
+      "Bash(terraform *)",
+      "Bash(curl *)"
     ],
     "deny": [
       "Read(./.env)",
       "Read(./.env.*)",
       "Read(./fhir/vendor/**)",
       "Bash(git reset --hard *)",
+      "Bash(git clean -f*)",
       "Bash(git push --force *)",
-      "Bash(git clean -f*)"
+      "Bash(git push -f *)",
+      "Bash(terraform apply *)",
+      "Bash(terraform destroy *)",
+      "Bash(gcloud projects delete *)"
     ]
   },
   "hooks": {
