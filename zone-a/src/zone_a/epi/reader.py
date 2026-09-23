@@ -16,7 +16,9 @@ What a section's text is:
 
 - Block elements (``div``, ``p``, ``li``, ``td``, ``th``, ``table``, ``tr``, ``ul``, ``ol``,
   ``thead``, ``tbody``, ``hr``) end one paragraph and start the next. A paragraph with no text
-  is dropped.
+  is dropped. A list item carries ``numbering``: ``num_id`` 1 in a ``ul`` (a bullet), 2 in an
+  ``ol`` (a number the browser computes); like the Word reader, the bullet or number is never
+  in the text.
 - Whitespace is collapsed as a browser does under ``white-space: normal``: a run of space, tab,
   line feed, carriage return or form feed is one space, and none is kept at the start or end of
   a paragraph. No-break space (U+00A0) is text and is kept. ``<br/>`` is U+000A.
@@ -32,7 +34,8 @@ What is marked (``Paragraph.marks``, the Word reader's kinds): ``sup`` and ``ver
 super`` as superscript, ``sub`` and ``vertical-align: sub`` as subscript, ``s``, ``strike`` and
 ``text-decoration: line-through`` as strike, a background other than white as
 ``shading-<colour>``, a text colour other than black as ``color-<colour>`` (white or a
-transparent colour as faint instead), and a font size under two points as faint. Bold, italic,
+transparent colour as faint instead; ``#abc`` and ``rgb()`` are written as ``#aabbcc``), and a
+font size under two points as faint. Bold, italic,
 underline, font family and every layout property are not reported.
 
 What refuses a section (``SectionRefusal.code``):
@@ -46,6 +49,15 @@ What refuses a section (``SectionRefusal.code``):
   unparsable font size...).
 - ``embedded-comment``: Word comment markup (``msocom...`` classes), whose text would otherwise
   read as label text.
+- ``reserved-character``: U+FFFC in the text, which the reader uses for a picture.
+- ``format-character``: an invisible formatting character (Unicode category Cf: soft hyphen,
+  zero-width characters, bidirectional controls), which a browser hides or which reorders
+  what it shows.
+
+Also refused as ``malformed-xhtml``: a CDATA section (an XML parser reads it as text, an HTML
+parser as a comment). As ``unsupported-element``: text between the parts of a table, which a
+browser moves out of the table. As ``unsupported-style``: a margin or indent more than an inch
+to the left, which moves text off the page.
 
 What refuses the document (``EpiRefusedError``): not a document Bundle, not exactly one entry
 with sections, or a section without a title.
@@ -55,6 +67,7 @@ from __future__ import annotations
 
 import json
 import re
+import unicodedata
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from typing import Any
@@ -98,8 +111,10 @@ _LAYOUT = re.compile(
     r"|min-width|min-height|break-(before|after|inside)|page-break-(before|after|inside)"
     r"|font-family|font-weight|font-style|layout-grid-mode|mso-[a-z-]+"
 )
-_BLACK = {"black", "windowtext", "#000", "#000000", "auto", "initial", "inherit"}
-_WHITE = {"white", "#fff", "#ffffff", "transparent", "none", "initial", "inherit"}
+_BLACK = {"black", "windowtext", "#000000", "auto", "initial"}
+_WHITE = {"white", "#ffffff", "transparent", "none"}
+# A margin or indent further left than one inch moves text off the page, not to its edge.
+_OFF_SCREEN_POINTS = 72.0
 _POINTS = {"pt": 1.0, "px": 0.75, "pc": 12.0, "in": 72.0, "cm": 72 / 2.54, "mm": 72 / 25.4}
 
 
@@ -160,6 +175,32 @@ def _declarations(style: str) -> list[tuple[str, str]]:
     return out
 
 
+def _colour(value: str) -> str:
+    """A colour in one spelling: ``#abc`` and ``rgb(170, 187, 204)`` as ``#aabbcc``."""
+    short = re.fullmatch(r"#([0-9a-f])([0-9a-f])([0-9a-f])", value)
+    if short:
+        return "#" + "".join(2 * digit for digit in short.groups())
+    rgb = re.fullmatch(
+        r"rgba?\(\s*([0-9]{1,3})\s*,\s*([0-9]{1,3})\s*,\s*([0-9]{1,3})\s*(,[^)]*)?\)", value
+    )
+    if rgb:
+        if rgb.group(4) and re.fullmatch(r",\s*0(\.0*)?\s*", rgb.group(4)):
+            return "transparent"
+        return "#" + "".join(f"{min(int(part), 255):02x}" for part in rgb.groups()[:3])
+    return value
+
+
+def _off_screen(value: str) -> bool:
+    for part in value.split():
+        match = re.fullmatch(r"-([0-9]+(?:\.[0-9]+)?)(pt|px|pc|in|cm|mm|em)", part)
+        if match is None:
+            continue
+        size = float(match.group(1)) * (12.0 if match.group(2) == "em" else _POINTS[match.group(2)])
+        if size > _OFF_SCREEN_POINTS:
+            return True
+    return False
+
+
 def _points(value: str) -> float | None:
     match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)(pt|px|pc|in|cm|mm)", value)
     return float(match.group(1)) * _POINTS[match.group(2)] if match else None
@@ -170,18 +211,22 @@ def _style(style: str) -> set[str]:
     kinds: set[str] = set()
     for name, value in _declarations(style):
         if _LAYOUT.fullmatch(name):
+            if name.startswith(("margin", "text-indent")) and _off_screen(value):
+                raise _RefusedError("unsupported-style", f"{name}: {value}")
             continue
         if name == "visibility":
             if value != "visible":
                 raise _RefusedError("unsupported-style", f"visibility: {value}")
         elif name == "color":
-            if value in _WHITE:
+            colour = _colour(value)
+            if colour in _WHITE:
                 kinds.add("faint")
-            elif value not in _BLACK:
-                kinds.add(f"color-{value}")
+            elif colour not in _BLACK and colour not in ("inherit", "currentcolor"):
+                kinds.add(f"color-{colour}")
         elif name in ("background", "background-color"):
-            if value not in _WHITE:
-                kinds.add(f"shading-{value}")
+            colour = _colour(value)
+            if colour not in _WHITE and colour not in ("inherit", "initial"):
+                kinds.add(f"shading-{colour}")
         elif name == "font-size":
             points = _points(value)
             if points is None:
@@ -215,6 +260,8 @@ class _Builder:
     pending: frozenset[str] | None = None
     table: tuple[int, int, int] | None = None
     numbering: Numbering | None = None
+    # 1 inside ``ul`` (a bullet), 2 inside ``ol`` (a number the browser computes).
+    list_kind: int = 1
     tables: int = 0
 
     def text(self, text: str, marks: frozenset[str]) -> None:
@@ -225,6 +272,10 @@ class _Builder:
                 continue
             if character == OBJECT:
                 raise _RefusedError("reserved-character", "U+FFFC stands for a picture")
+            if unicodedata.category(character) == "Cf":
+                # Soft hyphens, zero-width characters and bidirectional controls: a browser
+                # hides them or reorders the text around them.
+                raise _RefusedError("format-character", f"U+{ord(character):04X}")
             self._emit(character, marks)
 
     def _emit(self, character: str, marks: frozenset[str]) -> None:
@@ -331,13 +382,17 @@ def _walk(element: ET.Element, builder: _Builder, marks: frozenset[str], depth: 
         builder.flush()
     saved = builder.numbering
     if name == "li":
-        builder.numbering = Numbering(num_id=1, level=depth)
+        builder.numbering = Numbering(num_id=builder.list_kind, level=depth)
+    saved_kind = builder.list_kind
+    if name in ("ul", "ol"):
+        builder.list_kind = 1 if name == "ul" else 2
     builder.text(element.text or "", here)
     for child in element:
         _walk(child, builder, here, depth + (name in ("ul", "ol")))
     if block:
         builder.flush()
     builder.numbering = saved
+    builder.list_kind = saved_kind
     builder.text(element.tail or "", marks)
 
 
@@ -347,8 +402,12 @@ def _table(element: ET.Element, builder: _Builder, marks: frozenset[str], depth:
     builder.tables += 1
     outer = builder.table
     row_index = 0
+    _no_stray_text(element.text)
     for part in element:
         part_name = _local(part)
+        _no_stray_text(part.tail)
+        if part_name != "tr":
+            _no_stray_text(part.text)
         rows = [part] if part_name == "tr" else list(part)
         if part_name not in ("tr", "thead", "tbody"):
             raise _RefusedError("unsupported-element", f"{part_name} in a table")
@@ -357,7 +416,11 @@ def _table(element: ET.Element, builder: _Builder, marks: frozenset[str], depth:
             if _local(row) != "tr":
                 raise _RefusedError("unsupported-element", f"{_local(row)} in a table body")
             row_marks = frozenset(set(marks) | _check_attributes(row, "tr"))
+            _no_stray_text(row.text)
+            if row is not part:
+                _no_stray_text(row.tail)
             for cell_index, cell in enumerate(row):
+                _no_stray_text(cell.tail)
                 if _local(cell) not in ("td", "th"):
                     raise _RefusedError("unsupported-element", f"{_local(cell)} in a row")
                 builder.table = outer or (index, row_index, cell_index)
@@ -370,12 +433,21 @@ def _table(element: ET.Element, builder: _Builder, marks: frozenset[str], depth:
 _BARE_LESS_THAN = re.compile(r"<(?![A-Za-z/!?])")
 
 
+def _no_stray_text(text: str | None) -> None:
+    """Text between table parts: a browser moves it out of the table; the reader refuses."""
+    if text is not None and text.strip(_COLLAPSIBLE):
+        raise _RefusedError("unsupported-element", "text between the parts of a table")
+
+
 def read_div(div: str) -> tuple[tuple[Paragraph, ...], SectionRefusal | None, tuple[str, ...]]:
     """The paragraphs of one section's XHTML div, or a refusal, and notes on defects read
     through."""
     lowered = div.lower()
     if "<!doctype" in lowered or "<!entity" in lowered:
         return (), SectionRefusal("malformed-xhtml", "a DTD"), ()
+    if "<![cdata[" in lowered:
+        # An XML parser reads CDATA as text; an HTML parser reads it as a comment.
+        return (), SectionRefusal("malformed-xhtml", "a CDATA section"), ()
     notes: tuple[str, ...] = ()
     bare = len(_BARE_LESS_THAN.findall(div))
     if bare:

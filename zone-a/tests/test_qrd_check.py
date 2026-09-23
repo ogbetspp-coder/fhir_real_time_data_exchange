@@ -214,15 +214,19 @@ def test_a_refused_section_is_reported_and_its_statements_are_not_guessed() -> N
     result = check(replace(base, sections=(edited,)), REGISTRY, MAPPING)
     assert findings(result, "refused-section")[0]["code"] == "embedded-comment"
     identifier = f"smpc.4.8#{_item_index('smpc.4.8', 'Reporting suspected')}"
-    (missing,) = [f for f in findings(result, "missing-statement") if f["id"] == identifier]
-    assert missing["refused"] == [
-        "4.8 Undesirable effects > Reporting of suspected adverse reactions"
-    ]
+    assert status(result, identifier) == "not-checked"
+    assert identifier not in {f["id"] for f in findings(result, "missing-statement")}
 
 
 @pytest.mark.parametrize(
     ("mark", "reported"),
-    [("color-red", True), ("shading-yellow", True), ("faint", True), ("superscript", False)],
+    [
+        ("color-red", True),
+        ("shading-yellow", True),
+        ("faint", True),
+        ("strike", True),
+        ("superscript", False),
+    ],
 )
 def test_colour_shading_and_faint_marks_are_formatting_findings(mark: str, reported: bool) -> None:
     paragraph = Paragraph("see below", None, None, None, marks=(Mark(0, 3, mark), Mark(3, 4, mark)))
@@ -281,3 +285,59 @@ def test_every_label_links_to_the_old_ema_address() -> None:
         (closing,) = [f for f in findings(result, "deviation") if f["id"] == "document#1"]
         assert closing["differences"][0]["template"] == "https://www.ema.europa.eu.", name
         assert closing["differences"][0]["label"].startswith("http://www.ema.europa.eu"), name
+
+
+# --- review round 1 -----------------------------------------------------------------------
+
+
+def test_struck_or_faint_text_is_not_a_match() -> None:
+    text = "No interaction studies have been performed."
+    for kind in ("strike", "faint"):
+        paragraph = Paragraph(text, None, None, None, marks=(Mark(0, len(text), kind),))
+        result = check(document(smpc_4_5=(paragraph,)), REGISTRY, MAPPING)
+        assert status(result, f"smpc.4.5#{_item_index('smpc.4.5', '<No interaction')}") != "used"
+
+
+def test_an_exact_sibling_does_not_hide_a_deviation_in_the_same_paragraph() -> None:
+    text = (
+        "No special requirements for disposal. Any unused medicinal product or waste material "
+        "should be disposed of in accordance with national requirements."
+    )
+    result = check(document(smpc_6_6=_paragraphs(text)), REGISTRY, MAPPING)
+    identifier = f"smpc.6.6#{_item_index('smpc.6.6', '<Any unused')}"
+    assert status(result, identifier) == "deviation"
+    (deviation,) = [f for f in findings(result, "deviation") if f["id"] == identifier]
+    assert deviation["differences"] == [
+        {"change": "replace", "template": "local", "label": "national"}
+    ]
+
+
+def test_a_required_space_is_required() -> None:
+    text = (
+        "Currentlyavailable dataare described insection 5.1 but no recommendation on a posology "
+        "can be made."
+    )
+    result = check(document(smpc_4_2=_paragraphs(text)), REGISTRY, MAPPING)
+    assert status(result, f"smpc.4.2#{_item_index('smpc.4.2', '<Currently available')}") != "used"
+
+
+def test_a_match_is_located_in_the_paragraph_as_read() -> None:
+    text = "Note:\u00a0   No interaction studies have been performed."
+    result = check(document(smpc_4_5=_paragraphs(text)), REGISTRY, MAPPING)
+    used = next(
+        s
+        for s in result["statements"]
+        if s["id"] == f"smpc.4.5#{_item_index('smpc.4.5', '<No interaction')}"
+    )
+    assert text[used["start"] : used["end"]] == "No interaction studies have been performed."
+
+
+def test_differences_stop_at_the_end_of_the_sentence() -> None:
+    text = REPORTING.replace("Appendix V.", "Appendix V and include the batch number.")
+    text += " The vial contents must be used within six hours."
+    result = check(document(smpc_4_8_reporting=_paragraphs(text)), REGISTRY, MAPPING)
+    identifier = f"smpc.4.8#{_item_index('smpc.4.8', 'Reporting suspected')}"
+    (deviation,) = [f for f in findings(result, "deviation") if f["id"] == identifier]
+    assert deviation["differences"] == [
+        {"change": "replace", "template": "V.", "label": "V and include the batch number."}
+    ]

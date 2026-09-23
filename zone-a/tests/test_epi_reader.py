@@ -223,3 +223,42 @@ def test_what_the_pinned_epis_refuse_and_note() -> None:
 def test_the_black_triangle_is_read_where_the_markup_is_well_formed() -> None:
     root = _read("brukinsa-smpc-en.json")[0]
     assert root.paragraphs[0].text.startswith("\ufffcThis medicinal product is subject to")
+
+
+# --- review round 1 -----------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("inner", "code"),
+    [
+        ("<table>STRAY<tr><td>a</td></tr></table>", "unsupported-element"),
+        ("<table><tbody>STRAY<tr><td>a</td></tr></tbody></table>", "unsupported-element"),
+        ("<table><tr>STRAY<td>a</td></tr></table>", "unsupported-element"),
+        ("<table><tr><td>a</td>STRAY</tr></table>", "unsupported-element"),
+        ('<p style="margin-left: -9999px">x</p>', "unsupported-style"),
+        ('<p style="text-indent: -200pt">x</p>', "unsupported-style"),
+        ("<p>a\u200bb</p>", "format-character"),
+        ("<p>a\u202eb\u202c</p>", "format-character"),
+        ("<p>soft\u00adhyphen</p>", "format-character"),
+        ("<p><![CDATA[x]]></p>", "malformed-xhtml"),
+    ],
+)
+def test_review_round_one_refusals(inner: str, code: str) -> None:
+    assert refusal(inner) == code
+
+
+def test_a_hanging_indent_is_layout() -> None:
+    assert texts('<p style="margin-left: 36pt; text-indent: -18pt">x</p>') == ["x"]
+
+
+def test_colours_are_normalised_and_inherit_is_not_a_mark() -> None:
+    body = (
+        '<p><span style="color: rgb(255, 255, 255)">a</span><span style="color: #FFF">b</span>'
+        '<span style="color: red"><span style="color: inherit">c</span></span></p>'
+    )
+    assert kinds(body) == [(0, 2, "faint"), (2, 3, "color-red")]
+
+
+def test_a_numbered_list_is_told_from_a_bulleted_one() -> None:
+    paragraphs, _, _ = read_div(div("<ol><li>a</li></ol><ul><li>b</li></ul>"))
+    assert [p.numbering.num_id if p.numbering else None for p in paragraphs] == [2, 1]

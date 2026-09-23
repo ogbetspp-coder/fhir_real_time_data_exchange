@@ -28,7 +28,7 @@
       "xhtml-defect": 7
     },
     "statements": {
-      "absent": 68,
+      "absent": 77,
       "deviation": 1,
       "not-checkable": 8,
       "used": 37
@@ -186,6 +186,10 @@
       "in": "4.2 Posology and method of administration > Method of administration"
     },
     {
+      "id": "smpc.4.2#9",
+      "status": "absent"
+    },
+    {
       "id": "smpc.4.2#10",
       "status": "absent"
     },
@@ -198,12 +202,20 @@
       "status": "absent"
     },
     {
+      "id": "smpc.4.4#1",
+      "status": "absent"
+    },
+    {
       "id": "smpc.4.5#0",
       "status": "used",
       "in": "4.5 Interaction with other medicinal products and other forms of interaction",
       "paragraph": 0,
       "start": 0,
       "end": 43
+    },
+    {
+      "id": "smpc.4.5#1",
+      "status": "absent"
     },
     {
       "id": "smpc.4.5#2",
@@ -255,6 +267,10 @@
       "end": 314
     },
     {
+      "id": "smpc.4.9#0",
+      "status": "absent"
+    },
+    {
       "id": "smpc.5.1#0",
       "status": "used",
       "in": "5.1 Pharmacodynamic properties",
@@ -270,6 +286,10 @@
       "id": "smpc.5.1#2",
       "status": "used",
       "in": "5.1 Pharmacodynamic properties > Linagliptin > Mechanism of action"
+    },
+    {
+      "id": "smpc.5.1#3",
+      "status": "absent"
     },
     {
       "id": "smpc.5.1#4",
@@ -322,6 +342,14 @@
       "in": "5.2 Pharmacokinetic properties > Linagliptin > Elimination"
     },
     {
+      "id": "smpc.5.2#4",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.5.2#5",
+      "status": "absent"
+    },
+    {
       "id": "smpc.5.3#0",
       "status": "used",
       "in": "5.3 Preclinical safety data > Metformin",
@@ -335,6 +363,10 @@
     },
     {
       "id": "smpc.5.3#2",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.5.3#3",
       "status": "absent"
     },
     {
@@ -372,6 +404,10 @@
       "paragraph": 4,
       "start": 0,
       "end": 35
+    },
+    {
+      "id": "smpc.6.6#0",
+      "status": "absent"
     },
     {
       "id": "smpc.6.6#1",

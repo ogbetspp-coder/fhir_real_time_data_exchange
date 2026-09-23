@@ -62,10 +62,13 @@ EMA writes "GFR < 60 mL/min" that way in Jentadueto.
   after whitespace is collapsed: literal text exactly, a fill-in as any text within one
   paragraph, an optional segment present or absent, guidance and footnote markers dropped. A
   statement over two paragraphs ("Traceability" and the sentence under it) is matched against
-  consecutive paragraphs.
+  consecutive paragraphs. Struck-through and faint text never counts as a match.
 - **Deviations.** A statement that does not match but resembles a paragraph of its section
-  (difflib's word-level ratio of at least 0.85) is reported with the word-level differences. A
-  paragraph that already holds an exact match of a sibling statement is not compared again.
+  (difflib's word-level ratio of at least 0.85) is reported with the word-level differences.
+  Text that an exact match of a sibling statement explains is not compared again; the rest of
+  the paragraph is.
+- **Refused parts.** A statement not found in a section with a part the reader refused is
+  `not-checked`, not `absent`.
   0.85 is a proposal threshold, set on these three labels; a lower one would find more and be
   wrong more often.
 - **Appendices.** Appendix I's statements against 4.6, Appendix II's frequency convention and
@@ -102,8 +105,10 @@ Every finding below was confirmed by reading the source div.
     4.8. That is common for vaccines, and a person should confirm it.
   - Nuvaxovid writes the paediatric deferral statement in 5.1 with a comma where the template
     has brackets.
-- **Formatting.** Coloured text (red, blue) and yellow highlight left in the published text,
-  besides the template's intended grey shading.
+- **Formatting.** Blue text (an email address and the EMA link) and grey table shading in
+  Brukinsa, besides the template's intended grey shading of "the national reporting system
+  listed in Appendix V" in all three. Red, yellow and other colours in the source fall only on
+  pictures or spaces, which show no text differently, and are not reported.
 
 The mapping lacks three EMA codes the labels use (Pregnancy, Breast-feeding and Fertility under
 4.6); the check reports them as `unmapped-code`, for information.
