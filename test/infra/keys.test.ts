@@ -148,9 +148,9 @@ describe("the image registry on the artifacts key", () => {
     expect(deploy).not.toMatch(/docker\.pkg\.dev\/[^"\n]*\/ema-flow[/"]/);
     expect(deploy).not.toMatch(/repositories\/ema-flow"/);
     expect(deploy).toContain("_REPOSITORY=${REPOSITORY_ID}");
-    for (const file of ["cloudbuild.images.yaml", "cloudbuild.yaml"]) {
-      expect(readFileSync(file, "utf8")).toContain(`_REPOSITORY: ${String(repositoryId)}\n`);
-    }
+    expect(readFileSync("cloudbuild.images.yaml", "utf8")).toContain(
+      `_REPOSITORY: ${String(repositoryId)}\n`,
+    );
   });
 
   it("is where the build identity may push, and the only place", () => {

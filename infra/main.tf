@@ -208,14 +208,6 @@ resource "google_pubsub_topic" "fhir_changes" {
   depends_on                 = [google_project_service.required]
 }
 
-resource "google_pubsub_topic" "dead_letter" {
-  name   = "${local.name_prefix}-dead-letter"
-  labels = local.labels
-
-  message_retention_duration = "1209600s"
-  depends_on                 = [google_project_service.required]
-}
-
 # The Google-managed dataset the stores lived in until CMEK step 5c. Released from Terraform's
 # management without being destroyed: the dataset keeps its stores until the switch to `record` is
 # verified, and is then deleted by hand, deliberately, as the plan records. A `removed` block

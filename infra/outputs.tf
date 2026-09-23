@@ -80,8 +80,3 @@ output "workflow_console_url" {
 output "bigquery_console_url" {
   value = "https://console.cloud.google.com/bigquery?project=${var.project_id}&ws=!1m4!1m3!3m2!1s${var.project_id}!2s${google_bigquery_dataset.fhir_analytics.dataset_id}"
 }
-
-output "document_ai_processor" {
-  description = "Document AI Layout Parser processor for the extractor spike, as projects/{project}/locations/{location}/processors/{name}"
-  value       = google_document_ai_processor.layout.id
-}

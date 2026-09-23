@@ -54,7 +54,6 @@ PERMISSIONS=(
   bigquery.tables.get
   run.services.get
   run.services.getIamPolicy
-  documentai.processors.get
   healthcare.datasets.get
   healthcare.datasets.getIamPolicy
   cloudkms.keyRings.get

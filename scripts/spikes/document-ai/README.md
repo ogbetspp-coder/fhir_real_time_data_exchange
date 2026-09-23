@@ -25,24 +25,19 @@ synthetic PDF committed as a test fixture.
 
 ## Infrastructure
 
-The Document AI Layout Parser processor is managed in `infra/documentai.tf`, in the multi-region
-`eu` (Document AI does not offer per-region processors such as `europe-west4`). It is created by
-the same `terraform apply` as everything else (`scripts/gcp/deploy.sh`).
+No Document AI processor exists any more. The spike is complete (its verdict is in
+`docs/design/extractor-spike.md`), and the Layout Parser processor it used, formerly
+`infra/documentai.tf`, was removed from Terraform on 2026-09-22 so that nothing idle is kept
+running. Recreate a processor when roadmap item 8 (the engine) starts, declared in Terraform like
+everything else: Document AI offers processors only in the multi-regions `eu` and `us`, never in a
+specific region such as `europe-west4`, so it goes in `eu`.
 
-Get the processor's full resource name one of two ways:
+To rerun the spike before then, create a Layout Parser processor in `eu` by hand in a
+non-production project and export its full resource name, the only name `extract.ts` reads:
 
 ```
-# after `terraform apply` in this environment
-terraform -chdir=infra output -raw document_ai_processor
-
-# or directly from Document AI, without going through Terraform state
 gcloud documentai processors list --location=eu
-```
-
-Export it for the scripts below. `DOCUMENT_AI_PROCESSOR` is the only name `extract.ts` reads:
-
-```
-export DOCUMENT_AI_PROCESSOR="$(terraform -chdir=infra output -raw document_ai_processor)"
+export DOCUMENT_AI_PROCESSOR="projects/<project>/locations/eu/processors/<id>"
 ```
 
 ## Part A — controlled round trip

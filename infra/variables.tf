@@ -52,13 +52,6 @@ variable "submission_retention_days" {
   }
 }
 
-variable "bigquery_partition_expiration_days" {
-  description = "FHIR history partition retention. Set null to retain indefinitely."
-  type        = number
-  default     = 2555
-  nullable    = true
-}
-
 variable "alert_notification_channels" {
   description = "Existing Cloud Monitoring notification channel resource names."
   type        = list(string)
