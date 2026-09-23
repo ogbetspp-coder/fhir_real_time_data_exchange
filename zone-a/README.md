@@ -181,17 +181,17 @@ defaults are wrong:
 
 ## Vector results
 
-All 402 golden vectors of `fidelity-norm/2.0.0` pass, byte for byte, including every error case:
+All 411 golden vectors of `fidelity-norm/2.0.0` pass, byte for byte, including every error case:
 
 | Module                         | Result          |
 | ------------------------------ | --------------- |
 | `zone_a/fidelity/normalize.py` | normalize 62/62 |
 | `zone_a/fidelity/xhtml.py`     | xhtml 214/214   |
-| `zone_a/fidelity/verify.py`    | verify 126/126  |
+| `zone_a/fidelity/verify.py`    | verify 135/135  |
 
 Under `fidelity-norm/1.1.1` there were 137 (25, 60 and 52). Seven of those were added by the
 first round of this port: six XHTML cases and one verify case, each of them pinning a divergence
-the existing 130 could not see. The 265 added by `fidelity-norm/2.0.0` pin its rules and both
+the existing 130 could not see. The 274 added by `fidelity-norm/2.0.0` pin its rules and both
 sides of every boundary (`docs/validation/changes/2026-09-23-fidelity-norm-2-0-0.md`). They are defined in
 `test/fixtures/fidelity/cases.ts` on the Zone B side, where the TypeScript defines the expected
 behaviour, and regenerated with `npm run vectors:generate`.
@@ -390,6 +390,15 @@ rule dropped → 111 / 129 / 122; cells emitted with U+000A → 25 / 29 / 30; th
 counted as a line start → 11 / 2 / 6; page slices read from the span start → 9 / 13 / 12;
 symbols kept in `sup`/`sub` → 11 / 7 / 12; the other kind's letters kept → 1 / 3 / 2. The
 reviewer's probes (44 and 121 cases) and fuzz (two sets of 60,000 narratives) agree, 0
+divergent.
+
+Round 3 (the digit-group rule reading past whitespace at a span edge, and a page line's tab
+status decided on the whole line) extended the generator with numbers grouped by two
+whitespace code points, edges inside them, and rows cut before their tab. Zero divergences at
+the same seeds. Breaks (20260920 / 1 / 2): end inner code point read raw → 3 / 5 / 4; start
+inner code point read raw → 1 / 6 / 4; whole-line tab status dropped → 17 / 11 / 9; the round 2
+end and start digit-group rules dropped → 6 / 6 / 5 and 1 / 7 / 4 (they were 1 / 1 / 1 and
+3 / 2 / 4 before these shapes were generated). The round's probes (37 cases) agree, 0
 divergent.
 
 The corpus is generated in CI rather than committed, because a committed corpus proves agreement

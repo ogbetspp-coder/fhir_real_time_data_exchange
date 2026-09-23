@@ -98,6 +98,34 @@ Every probe of round 2 named "FP2 …" now ends non-verified in both implementat
 reviewer's probes of both rounds (44 and 121 cases), both XHTML fuzzers (60,000 narratives
 each) and the normalisation fuzz (200,000 strings, now 0 non-idempotent) agree between them.
 
+**Second review, round 3, folded into 2.0.0.** Two more false passes and an extractor
+obligation:
+
+- **Digit groups at a whitespace edge** — the digit-group rule read the span's raw first or last
+  code point, so a span ending with whitespace never triggered it: against "The maximum dose is
+  10␠␠000 IU daily." (two spaces between the groups) the span "The maximum dose is 10␠" verified
+  as "…is 10", and the start variant (" 000 IU daily.") passed too. The inner code point is now
+  the span's first or last that is not §3 whitespace. That goes one step beyond the review's
+  wording ("not edge whitespace"): with edge whitespace, a span ending "10" U+202F before a
+  space ("10" U+202F ␠ "000") still verified, because U+202F is not edge whitespace and so
+  stayed the inner code point; the joiners are skipped too
+  (`span-ends-with-narrow-no-break-space-inside-number`).
+- **A row cut before its tab** — step 4's tab status was decided on the normalised slice, so a
+  span "• Adults" of the page row "• Adults" U+0009 "10 mg" verified against "Adults". The tab
+  status of a page slice's last line is now that of the whole page line in the body
+  (`normalizeText` takes `lastLineHasTab` for the verifier's page slices; the narrative side
+  never needs it).
+- **Extractor lists** — section 7 now requires a list marker to be followed by U+0020, never
+  U+0009. "•" U+0009 "Adults: 10 mg" against `<ul><li>` is a mismatch (safe, a false failure);
+  "• Adults: 10 mg" verifies. The normaliser is not changed for it.
+- **False failures stated** in section 6 and section 9: a list item at the very top of a page
+  whose body starts at 0; a row cut before its tab against a paragraph narrative; a bracketed
+  footnote marker in `sup` (`<sup>[1]</sup>` is `unmappable-script`).
+
+Every "FP3 …" probe now ends non-verified in both implementations; the probes of all three rounds
+(37, 44 and 121 cases) agree between them, and the normalisation fuzz is still 0 non-idempotent.
+No existing vector changed in round 3; nine were added.
+
 **Why.** ADR 0003's rule is that false failures are acceptable and false passes are not. The
 design note's table lists ten narratives that verified under 1.1.1 while a reader saw something
 the source does not say (a superscript turning `106` into `10⁶`, a soft hyphen joining words
@@ -151,10 +179,10 @@ vector below and now fails.
 **Steps 1–6.** 1: `NORMALIZATION_VERSION` is `fidelity-norm/2.0.0` on both sides. 2:
 `npm run contracts:generate` (no drift), `npm run vectors:generate`, `npm run contracts:fixtures`,
 `npm run contracts:quote-edge` and `npm run differential:smoke` regenerated
-`test/fixtures/fidelity/vectors.json` (137 → 402 vectors: normalisation 25 → 62, XHTML 60 → 214,
-verify 52 → 126), the four contract fixtures and the smoke corpus; no `query-tools` or
+`test/fixtures/fidelity/vectors.json` (137 → 411 vectors: normalisation 25 → 62, XHTML 60 → 214,
+verify 52 → 135), the four contract fixtures and the smoke corpus; no `query-tools` or
 `agent-turn` change, so no vendored copy moved; `zone-a/scripts/generate_models.py --check`
-passes. 3: every changed vector, below. 4: the 265 new vectors — every row of the design note's
+passes. 3: every changed vector, below. 4: the 274 new vectors — every row of the design note's
 table, every amendment's boundary, and both the rejecting and the accepting side of each rule
 (for example `<sup>2</sup>` → `²`, `<sup>a</sup>` kept, `<sup>–6</sup>` → `⁻⁶`, `<sup>±1</sup>`
 rejects, a non-ASCII digit in `sup` rejects, whitespace-only text in table parts accepted, an
@@ -298,6 +326,15 @@ from the span start instead of the line terminator 9 / 13 / 12; symbols, bracket
 kept in `sup`/`sub` 11 / 7 / 12; the other kind's script letters kept 1 / 3 / 2. Every one
 diverged on all three seeds and was restored. The earlier rounds' breaks were not re-run on
 this generator.
+
+Round 3 extended the generator with lines holding a number whose groups are separated by one
+or two whitespace code points (`10␠␠000`, `10` U+2009 `␠000`, `10` U+202F `␠000`), span edges
+anywhere in that run, table rows whose first cell starts with a bullet, and sections that stop
+at a row's U+0009. Zero divergences at seeds 20260920, 1 and 2. Breaking the round's rules in
+the Python port (divergences at 20260920 / 1 / 2): the end inner code point read raw 3 / 5 / 4;
+the start inner code point read raw 1 / 6 / 4; the whole-line tab status dropped 17 / 11 / 9.
+The round 2 digit-group rules, which diverged only 1 / 1 / 1 (end) and 3 / 2 / 4 (start) on the
+previous generator, now diverge 6 / 6 / 5 and 1 / 7 / 4. Each break was restored.
 
 **Blast radius.**
 
