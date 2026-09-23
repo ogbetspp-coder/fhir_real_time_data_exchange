@@ -14,8 +14,10 @@ what section 4.4 of a label said, answered twice from its own memory: fluently, 
 formatted, citing a real document, a plausible version and correct-looking hashes, all invented.
 No reader could have told. Once the assistant was made to answer through the record, it could only
 quote the approved text or say that it could not. The model stayed nondeterministic. The system
-stopped being. **Taming nondeterministic behaviour in regulated work** is the thesis, and it is
-true today for one document.
+stopped being. **Taming nondeterministic behaviour in regulated work** is the thesis. It will be
+true for one document once the first live turn shows the answer post-checked — find, fetch and
+verify under one turn id; until then the answers are quoted from the record, but not yet
+re-checked after they are composed.
 
 ## Three layers, one model
 
@@ -61,9 +63,11 @@ imperfect engine shippable: every span it produces is checkable against its sour
 4. **Refusal over plausibility.** An answer that cannot be verified is not shown as an answer.
 5. **A record that outlives the model.** Person, version, hash, time. Any model, any vendor.
 6. **Google's chassis, a portable core.** Managed components for everything that is not the
-   product; the contracts, the fidelity check, the pipeline and the proof layer import no cloud.
+   product. The contracts and the fidelity check import no cloud. The pipeline and the query
+   service do: they reach Google through adapters (`src/gcp/`; the query service's store reader
+   and token verification).
 7. **No custom interface where a Google surface serves.** The client's own assistant, Looker over
-   the ledger, a form for the approver's button.
+   the ledger, the approver's decision taken in Google Chat.
 8. **Foundations before features, evidence before claims.** Delivered means it ran, and there is a
    record to point at.
 

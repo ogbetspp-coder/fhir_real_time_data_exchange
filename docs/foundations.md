@@ -25,7 +25,8 @@ Stated first, because the gaps below should not obscure it.
   seven-year retention policy, and the encryption key rotates every 90 days.
 - **Every bucket enforces uniform access**, the organisation enforces it, and every container
   image is pinned by digest and checked in CI.
-- **Four required checks gate every merge** to `main`, including the official HL7 validator.
+- **Six required checks gate every merge** to `main` — `Check`, `Zone A`, `Agent`,
+  `Official validation`, `Plan` and `Vulnerabilities` — including the official HL7 validator.
 - **The FHIR stores keep full version history and enforce referential integrity**, and writes are
   atomic transactions.
 
@@ -78,13 +79,11 @@ regional Cloud Build in `europe-west4` with an EU staging bucket, then set
 `gcp.resourceLocations` to `in:eu-locations` on the product folder. The order matters: the
 policy first would break the build.
 
-_Status 2026-09-22: closed for production._ `in:eu-locations` is set on the production folder
-(A1). `dev` carries no location policy by decision: it hosts the global Gemini Enterprise trial.
-
-_Status 2026-09-21: builds moved, policy pending._ Image builds run in `europe-west4`, staged in
-an EU bucket, since PR #44 — proved on build `07fb41b9…` — and the US staging bucket is deleted;
-every bucket in the project is now in `europe-west4`. The location policy waits for the product
-folder (A1).
+_Status 2026-09-22: closed for production; `dev` by decision without a policy._ Image builds
+run in `europe-west4`, staged in an EU bucket, since PR #44 (2026-09-21) — proved on build
+`07fb41b9…` — and the US staging bucket is deleted; every bucket in the project is in
+`europe-west4`. `in:eu-locations` is set on the production folder (A1). `dev` carries no location
+policy by decision: it hosts the global Gemini Enterprise trial.
 
 **A3. The regulated record itself is on Google-managed keys.** The evidence bucket is CMEK;
 the FHIR dataset (`encryptionSpec` empty), both BigQuery datasets, the regulated audit log
@@ -160,16 +159,16 @@ shared foundation cannot rely on that. The plan must run on every pull request, 
 that can read but not change, and must stop a merge that destroys anything until a person has
 acknowledged it.
 
-_Status 2026-09-22: built; waiting on the owner to create the identity._
-`.github/workflows/plan.yml` plans every pull request with the deploy's own inputs (one shared
-function in `scripts/gcp/deploy.sh`) against the deployed images and version, posts a summary
-of resource addresses and actions, never values, and fails on any destroy or replace unless the
-pull request is labelled `allow-replace`. It runs as `ema-flow-planner-dev`
-(`scripts/gcp/plan-identity.sh`), in its own Workload Identity pool: the deployer's grant
-covers every identity in the deployer's pool that names this repository, so a pull-request
-provider there would have admitted pull requests to the deployer. The planner's custom role was
-derived from a trace of every API call a live plan makes — all reads — and holds no permission
-that returns a stored record (`test/infra/plan-identity.test.ts`).
+_Status 2026-09-23: closed._ The identity exists, and `Plan` runs on every pull request as a
+required check. `.github/workflows/plan.yml` plans every pull request with the deploy's own inputs
+(one shared function in `scripts/gcp/deploy.sh`) against the deployed images and version, posts a
+summary of resource addresses and actions, never values, and fails on any destroy or replace unless
+the pull request is labelled `allow-replace`. It runs as `ema-flow-planner-dev`
+(`scripts/gcp/plan-identity.sh`), in its own Workload Identity pool, `github-plan-pool`: the
+deployer's grant covers every identity in the deployer's pool that names this repository, so a
+pull-request provider there would have admitted pull requests to the deployer. The planner's custom
+role was derived from a trace of every API call a live plan makes — all reads — and holds no
+permission that returns a stored record (`test/infra/plan-identity.test.ts`).
 
 Reviewed adversarially before enabling. No path from a pull request to the deployer or to any
 write was found. Two defects were fixed: the verdict failed open if the summariser crashed, and
@@ -251,6 +250,8 @@ notifications have no named recipient (the Essential Contacts API is not enabled
 could not be read — the owner's account lacks access to the billing account from this project.
 Set essential contacts at the organisation, and a budget with alerts on the billing account.
 
+_Status 2026-09-23: open._ Needs billing account access (owner decision 4 below).
+
 **C8. The validated store does not enforce profiles itself.** `disableProfileValidation` is
 `true` on both stores; every write is validated by the worker (official validator and the
 Healthcare API's `$validate`) before it is sent, so nothing unvalidated has been written. But a
@@ -258,14 +259,16 @@ write that bypassed the worker would not be checked. Enabling store-level enforc
 the imported EMA profiles is defence in depth. It needs a test first, because it will refuse
 writes the worker currently accepts if the two validators disagree.
 
-**C9. The official validator is not hermetic, and not locale-pinned.** In progress. Measured
-2026-09-21 in a clean sandbox: it downloads **nine** packages on every clean run, not the seven
-previously recorded — the two missed are the FHIR R5 core specification itself and
-`hl7.fhir.xver-extensions`. Every content file of each registry download is byte-identical to
-what the validator installs; only its own `.index.json` files differ. With the network blocked
-and an empty cache it refuses to run, which is the check the fix will use. The same run showed
-the validator adopting the machine's locale and jurisdiction (Denmark on the owner's laptop),
-which is a second reproducibility gap to pin.
+_Status 2026-09-23: open._ Last in the order of work (9).
+
+**C9. The official validator is not hermetic, and not locale-pinned.** Closed 2026-09-21 (PR #52);
+the status below. Measured 2026-09-21 in a clean sandbox: it downloads **nine** packages on every
+clean run, not the seven previously recorded — the two missed are the FHIR R5 core specification
+itself and `hl7.fhir.xver-extensions`. Every content file of each registry download is
+byte-identical to what the validator installs; only its own `.index.json` files differ. With the
+network blocked and an empty cache it refuses to run, which is the check the fix will use. The same
+run showed the validator adopting the machine's locale and jurisdiction (Denmark on the owner's
+laptop), which is a second reproducibility gap to pin.
 
 _Status 2026-09-21: closed, verified deployed._ Proved three ways: the CI gate passed offline
 (every resource: twelve packages loaded, every one pinned, zero errors); Cloud Build started the
@@ -286,6 +289,8 @@ validation gate".
 `google_monitoring_dashboard.operations` changing: the API reformats the dashboard JSON
 (adds `targetAxis`, drops zero positions) and Terraform re-applies it. Harmless, but noise in a
 plan is where a real change hides. Write the JSON in the form the API returns.
+
+_Status 2026-09-23: open._
 
 **C11. Deploy failure issues were never closed.** The deploy workflow opens an issue on every
 failure and nothing closed them: 27 were open on 2026-09-21, the oldest from the first day, each
@@ -393,13 +398,14 @@ second should skip both steps.
 
 ## Decisions only the owner can make
 
-1. **Landing zone.** Create a product folder under `khsadvisory.com`, move `dev` into it, and
-   create an empty `prod` project — now, or when the first client is signed.
-2. **CMEK on the record in `dev`**, which means rebuilding the dataset and re-seeding once.
-3. **HSM signing key** in `dev` now, so production copies a proven setup.
+1. ~~**Landing zone.**~~ **Decided and done 2026-09-22** (A1): the `EMA Flow` folder, `dev` in
+   `non-production`, `khs-ema-flow-prod` empty in `production`.
+2. ~~**CMEK on the record in `dev`**~~ **Decided and done 2026-09-22** (A3): the dataset rebuilt
+   on a key and re-seeded.
+3. ~~**HSM signing key** in `dev`~~ **Decided and done 2026-09-21** (A4).
 4. **A budget** on the billing account, and who receives its alerts. Needs billing account access
-   the deploy identity does not and should not have.
-5. **The licence** under which the repository and the sellable component are offered.
+   the deploy identity does not and should not have. Open (C7).
+5. ~~**The licence**~~ **Decided 2026-09-22** (D1): proprietary, all rights reserved.
 6. **The real address for security alerts** — the repository variable still holds the example
    `you@khsadvisory.com`, so the deploy of 2026-09-21 created an alert channel that points at
-   it.
+   it. Open; on the production gate.

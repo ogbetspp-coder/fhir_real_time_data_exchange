@@ -1,6 +1,6 @@
 # Demonstration script: the verifiable label
 
-- Status: written 2026-09-20 for roadmap item 1c
+- Status: written 2026-09-20 for the demonstration enablers (delivered, was roadmap item 1c)
 - Related: `docs/design/verifiable-answers.md` (section "The demonstration"),
   `docs/design/epi-mcp-query-service.md`, `docs/adr/0002-two-trust-zones-and-canonical-submission.md`
 - Data: synthetic throughout. Three invented products, no clinical content, every sentence says
@@ -15,22 +15,23 @@ The line the whole demonstration exists to land:
 
 Say this out loud at the start. It is the difference between a demonstration and a pitch.
 
-| Shown                                                                             | Built?                                                                                                                                 |
-| --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Canonical submission, ingress gate, fidelity check, EMA transform                 | Yes — `src/`, run by the deployed worker                                                                                               |
-| Validated resources in the Cloud Healthcare FHIR store                            | Yes                                                                                                                                    |
-| Near-real-time BigQuery projection of those resources                             | Yes — the store's native ANALYTICS_V2 stream                                                                                           |
-| Transformation ledger rows with approval and fidelity columns                     | Yes — `ema_flow_ledger_<ENV>.transformation_runs`                                                                                      |
-| Signed evidence and a Provenance resource per approval                            | Yes                                                                                                                                    |
-| MCP query tools (`find_product`, `get_section`, `verify_quote`, `get_provenance`) | Yes — deployed as `ema-flow-dev-query`; all four answered live 2026-09-21, one audit record per call                                   |
-| Gemini Enterprise answering from those tools (assistant rollout step 1)           | Yes — custom MCP connector `epi verified labels`; a person asked for section 4.4 on 2026-09-21 and got the version 2 sentence verbatim |
-| The self-checking agent (re-verifies every quote, writes an `AgentTurnRecord`)    | **Built and tested, not deployed** — roadmap item 1b, `agent/`; the Agent Engine deploy is scripted in `agent/deploy/`, not executed   |
+| Shown                                                                             | Built?                                                                                                                                                                                                                                                                  |
+| --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Canonical submission, ingress gate, fidelity check, EMA transform                 | Yes — `src/`, run by the deployed worker                                                                                                                                                                                                                                |
+| Validated resources in the Cloud Healthcare FHIR store                            | Yes                                                                                                                                                                                                                                                                     |
+| Near-real-time BigQuery projection of those resources                             | Yes — the store's native ANALYTICS_V2 stream                                                                                                                                                                                                                            |
+| Transformation ledger rows with approval and fidelity columns                     | Yes — `ema_flow_ledger_<ENV>.transformation_runs`                                                                                                                                                                                                                       |
+| Signed evidence and a Provenance resource per approval                            | Yes                                                                                                                                                                                                                                                                     |
+| MCP query tools (`find_product`, `get_section`, `verify_quote`, `get_provenance`) | Yes — deployed as `ema-flow-dev-query`; all four answered live 2026-09-21, one audit record per call                                                                                                                                                                    |
+| Gemini Enterprise answering from those tools (assistant rollout step 1)           | Yes — custom MCP connector `epi verified labels`; a person asked for section 4.4 on 2026-09-21 and got the version 2 sentence verbatim                                                                                                                                  |
+| The self-checking agent (re-verifies every quote, writes an `AgentTurnRecord`)    | **Deployed, post-check not yet seen live** — `agent/`, Agent Engine `reasoningEngines/6226059359072288768` (europe-west4), redeployed 2026-09-23 with the draft-hold fix (PR #98); it has answered live, but no live turn has yet shown `verify_quote` (roadmap item 1) |
 
 Where a scene below has an assistant window, the Gemini Enterprise version works today through
 the connector. The console-only equivalent is kept beside it because it is the version that
 shows the hashes, and because it is the fallback if the room's network or the trial licence
-misbehaves. What is still not deployed is the self-checking agent (item 1b): Gemini quotes the
-tool's text today because the tool returns it verbatim, not because anything re-checks the
+misbehaves. The self-checking agent is deployed and registered, but its post-check has not yet
+run in a live turn (roadmap item 1 is awaiting that turn). Until it has, the connector path
+quotes the tool's text because the tool returns it verbatim, not because anything re-checks the
 quote after the answer is composed. Say that distinction, do not blur it.
 
 **The assistant cannot drift to the public web in the demonstration app.** Asked the
@@ -52,7 +53,7 @@ Fill these in before the meeting; every command and query below uses them verbat
 | `<PROJECT_ID>`    | the demonstration project                                                       |
 | `<ENV>`           | `dev`, `staging`, …                                                             |
 | `<REGION>`        | `terraform -chdir=infra output -raw region`                                     |
-| `<DATASET>`       | `ema-flow-<ENV>-dataset`                                                        |
+| `<DATASET>`       | `ema-flow-<ENV>-fhir-record`                                                    |
 | `<STORE>`         | `ema-flow-<ENV>-validated-r5` (the validated target store)                      |
 | `<EMA_BUNDLE_ID>` | `targetBundleId` printed by the seeding script for `synthetic-paracetamol`      |
 | `<EMA_COMP_ID>`   | `Composition.id` inside that Bundle                                             |
@@ -60,39 +61,33 @@ Fill these in before the meeting; every command and query below uses them verbat
 | `<SECTION_HASH>`  | SHA-256 of the section 4.4 narrative `div`, recomputed in front of the audience |
 | `<RUN_ID_V1/V2>`  | `runId` printed for version 1 and version 2 of the same product                 |
 
-## Before the meeting: deploy in this order, then seed
+## Before the meeting: the set is seeded; do not re-seed
 
-**The order matters, and getting it wrong breaks scene 1 quietly.** The worker's Provenance
-projection now writes the approver's role on the attester agent (`src/fhir/provenance.ts`), and
-`get_provenance` reads only that coding — it never infers a role. Any document already in the
-validated store was written before that change, so `get_provenance` answers `unavailable` for
-it: no approver, no role, no error that explains why.
+The demonstration set is already in `dev`: seeded once on 2026-09-21 through the real document
+path, into a store rebuilt first. The one-time deploy order that preceded it (re-ingest after
+the worker began recording the approver's role) is spent, and deploying between seeding and
+demonstrating is safe: the smoke run publishes `synthetic-smoketest`, which no entitlement names.
 
-There is no worker-only or query-only deploy to order: `scripts/gcp/deploy.sh` runs one
-untargeted `terraform apply` that reconciles both Cloud Run services together. What has to be
-ordered is the re-ingest, which must land after the new worker is serving and before anyone
-asks `get_provenance` anything.
+A document with two approved versions has two `Provenance` resources. `get_provenance` and
+`get_section` answer with the most recently _written_ approval, and state it only for the
+document's current version; a request naming an earlier version gets no approval. The rule, and
+why it is write order rather than the approval date, is in
+`docs/design/epi-mcp-query-service.md` ("An approval is stated only for the current version").
 
-1. Deploy this branch — the `Deploy to Google Cloud` workflow, or `bash scripts/gcp/deploy.sh`.
-   Worker and query service both come up from this commit, and until step 2 the query service
-   answers `unavailable` from `get_provenance` for every document already in the store.
-2. **Re-ingest** with the seeding script below. That writes a second `Provenance` resource for
-   the document rather than replacing the first, because the resource id is derived from the
-   submission id.
-3. Call `get_provenance` for the document you plan to show and confirm an approver role comes
-   back. A document with two approved versions has two `Provenance` resources, and since
-   2026-09-21 the one you get is the most recent approval by construction: the search asks the
-   store for `recorded` descending and the answer is chosen under a total order, ties broken by
-   resource id. Re-seeding therefore no longer changes which record answers.
+**Do not re-seed without rebuilding the store.** A second seed adds a second `Provenance` per
+document rather than replacing the first, because the resource id is derived from the
+submission id, and publishes the same content again as further versions. The section below is
+for a rebuilt store or a new environment.
 
 Scenes 1 and 2 as written below use the console and BigQuery and do not depend on any of this;
 it matters for the `get_provenance` parts of the assistant scenes.
 
 ## Seed the set
 
-One command, once per environment. It writes three synthetic products at version 1 and then the
-first product at version 2, each through the ordinary `document` run path: Cloud Storage
-hand-off, ingress gate, fidelity check, transform, validation, store write, ledger row.
+One command, once per environment (or per rebuilt store). It writes three synthetic products at
+version 1 and then the first product at version 2, each through the ordinary `document` run path:
+Cloud Storage hand-off, ingress gate, fidelity check, transform, validation, store write, ledger
+row.
 
 Both exports are required: the script reads them when it loads and exits immediately without
 them. `terraform output` needs the real backend — a working copy initialised with
@@ -367,18 +362,19 @@ Say plainly what this is not: the narrative is still human-written regulated tex
 found it because the section is coded, not because anything understood it.
 
 The assistant version, in Gemini Enterprise today: the same question in English, answered from
-`find_product` plus `get_section`, each quote carrying its product, version and `sourceKey`.
-What today's version does **not** do is re-check each quote through `verify_quote` after the
-answer is composed; that is the self-checking agent (item 1b, built, not deployed), and it is
-the difference between "Gemini happened to quote correctly" and "the system refused to emit a
-quote it could not verify". Say which one is on screen. One honesty point for the room: `find_product` answers `truncated: true` whenever
-the answer is shorter than the caller's entitlement holds — either documents went unsearched
-(the scan horizon of 200, or the request's read budget) or more documents matched than `limit`
-returns. So the assistant is never able to present a short list as a complete one. With three
-entitled products and no small `limit` it will be false here. The assistant is instructed
-never to say "no such product" when it is true. The promise is narrow and worth repeating exactly as
-`docs/design/verifiable-answers.md` states it: every sentence presented as label content is
-verbatim, hashed, and re-checked — not that the assistant is right.
+`find_product` plus `get_section`, each quote carrying its product, version and `sourceKey`. The
+connector path does **not** re-check each quote through `verify_quote` after the answer is composed.
+The self-checking agent does — it is deployed, but its post-check has not yet been seen in a live
+turn, so do not claim it until the audit record shows `verify_quote` under the turn id — and that is
+the difference between "Gemini happened to quote correctly" and "the system refused to emit a quote
+it could not verify". Say which one is on screen. One honesty point for the room: `find_product`
+answers `truncated: true` whenever the answer is shorter than the caller's entitlement holds —
+either documents went unsearched (the scan horizon of 200, or the request's read budget) or more
+documents matched than `limit` returns. So the assistant is never able to present a short list as a
+complete one. With three entitled products and no small `limit` it will be false here. The assistant
+is instructed never to say "no such product" when it is true. The promise is narrow and worth
+repeating exactly as `docs/design/verifiable-answers.md` states it: every sentence presented as
+label content is verbatim, hashed, and re-checked — not that the assistant is right.
 
 ## Closing
 
@@ -391,9 +387,10 @@ than by reading. That is what an ePI hub is for.
 - No GxP, Annex 11, or 21 CFR Part 11 compliance. This produces qualification-supporting
   evidence; validation is a separate exercise (`docs/validation/README.md`).
 - Every product, every sentence, and every identifier in this demonstration is invented.
-- The query service and the assistant are built and tested but not deployed; no live tenant
-  has exercised them. When deployed, the assistant is an information-retrieval aid for trained
-  staff — not a regulatory decision system.
+- The query service, the connector and the agent are deployed in the owner's own `dev` tenant
+  only, answering synthetic labels; no client tenant has exercised them, and the agent's
+  post-check is still awaiting its first live turn. The assistant is an information-retrieval
+  aid for trained staff — not a regulatory decision system.
 - The fidelity check proves that published narrative matches the approved source document. It
   does not prove the source document is correct; a human approved that, and the Provenance
   resource says who.

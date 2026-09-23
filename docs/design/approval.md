@@ -82,7 +82,7 @@ ApprovalStatement {
   previousStatementSha256 the document's head before this one, or null
   submissionId
   approvedContentSha256   as today
-  mappingVersion          e.g. cap-smpc-en#1.1.0
+  mappingVersion          e.g. cap-smpc-en#1.2.0
   sections                [{ sourceKey, narrativeDivSha256 }] // what the query service re-checks
   reviewSha256            hash of the exact review the approver was shown (D6)
   approver                { sub, role, approverMapSha256 }

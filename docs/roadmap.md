@@ -16,12 +16,13 @@ Three rules decided the sequence below.
 
 1. **Test the load-bearing assumption first.** The entire Zone A design rests on an extractor
    producing page text that satisfies `docs/fidelity-normalization.md` section 7. That
-   contract was written before any extractor met it. Item 0 exists to find out, cheaply,
-   before anything is built on it.
+   contract was written before any extractor met it. Item 0, the extractor spike, existed to
+   find out, cheaply, before anything was built on it; it is complete, and its verdict is in
+   `docs/design/extractor-spike.md`.
 2. **Reach a demonstrable end-to-end path before hardening further.** Four adversarial
    review rounds have made the deterministic pipe solid. The larger risk is now building
-   nothing on it. The query service (item 1) is demonstrable on the store as it stands today
-   and is deliberately placed ahead of the structuring work it does not depend on.
+   nothing on it. The query service (delivered, was item 1) was demonstrable on the store as it
+   stood and was deliberately placed ahead of the structuring work it does not depend on.
 3. **Math first, AI on the remainder.** SmPC section headings are standardised and numbered.
    A deterministic segmenter sections most CAP documents with no model and passes fidelity by
    construction; AI structuring is then added as a measured improvement over it, not as the
@@ -60,31 +61,32 @@ environment" is built, not delivered.
 Things above that work but are weaker than they look. Listed here rather than buried, because a
 control believed to be stronger than it is is worse than a control known to be weak.
 
-- **Official validation is not hermetic.** The validator loads the four checksum-pinned packages
-  and then resolves seven further package versions from the FHIR registry over the network at
-  run time, and the pinned extensions package currently contributes nothing because the same
-  package is fetched first. A validation result is therefore reproducible only as far as the
-  registry is stable. The fix is to pre-seed the validator's package cache with pinned dependency
-  tarballs and prove no fetch occurs. Measured and written up in `docs/validation/README.md`,
-  "Official validation gate". **S**
+- ~~**Official validation is not hermetic.**~~ **Closed 2026-09-21, PR #52** (foundations C9).
+  The validator's nine registry packages are pinned in `fhir/validator-packages.lock` and
+  installed into the image, and both the CI gate and the deployed sidecar run with no network
+  access and a pinned jurisdiction and locale. Written up in `docs/validation/README.md`,
+  "Official validation gate".
 - ~~The deploy's smoke run writes to the demonstrator on every deploy.~~ **Closed 2026-09-21.**
   The `fixture` run source now builds `synthetic-smoketest`, a product that exists only for that
   path, so the smoke run proves the pipeline after every deploy without writing a version over a
   label the demonstration is about. Before this, the store could be continuously proven or
   demonstration-ready, but not both. The official validation gate follows the same product,
   because it exists to validate what a `fixture` run actually sends.
-- ~~`get_provenance` resolves with `_count=1` and no `_sort`.~~ **Closed 2026-09-21.** The
-  search now asks the store for `recorded` descending over a bounded page, and the answer is
-  then chosen in code under a total order — newest approval first, ties broken by resource id —
-  so the same set of Provenance resources always yields the same one. The store's sort was
-  verified honoured rather than assumed: reversing it swapped the two paracetamol records. The
-  tie-break lives in code and not in a second sort key because a tie could not be produced
-  against the live store without writing into it, and the validated store holds only what the
-  pipeline published. Verified deployed: on revision `ema-flow-dev-query-00013-2fv`, three
-  `get_provenance` calls for `0c18c50e…` — the document with two approvals — each answered with
-  `17774cb7-3424-5580-a631-fdf871c00270`, `recorded` 2026-09-20, the version 2 record. Residual,
-  stated rather than hidden: a document with more approvals than one page that all share the
-  newest timestamp could still see the page composed differently.
+- ~~`get_provenance` resolves with `_count=1` and no `_sort`.~~ **Closed 2026-09-21, revised
+  2026-09-22.** The store is asked for a bounded page and the answer is chosen in code under a
+  total order, so the same set of Provenance resources always yields the same one. The order is
+  now the most recently _written_ approval — the store's `meta.lastUpdated`, then resource id —
+  and `get_provenance` and `get_section` state it only for the document's current version; a
+  request naming an earlier version gets no approval. The first fix ordered by `recorded`, the
+  approval date the submission carries, so version 1 republished after version 2 would have been
+  answered with version 2's approval; the independent review of 2026-09-22 found that. The page
+  is still sorted by `-recorded`, the one sort verified honoured against the Healthcare API
+  (reversing it swapped the two paracetamol records), so write order is exact for a document with
+  at most 20 approvals. The rule and its residuals are in `docs/design/epi-mcp-query-service.md`
+  ("An approval is stated only for the current version"). The first rule was verified deployed on
+  revision `ema-flow-dev-query-00013-2fv` (three calls for `0c18c50e…`, each answering the
+  version 2 record `17774cb7-3424-5580-a631-fdf871c00270`); the revised rule is deployed with
+  `caa5d9a`.
 
 ## Next, in order
 
@@ -96,24 +98,26 @@ content hash; every call is in the audit record. Near-zero interface code: the c
 the login, sharing, history, mobile app and security review. What we sell is the proof layer
 under it and, later, the parser that feeds it.
 
-Foundations are closed (`docs/foundations.md`). Each item below names the evidence that would
-show it delivered, because 2026-09-22 showed why: with no agent routed, Gemini's default
-assistant answered a label question twice from session memory, citing a real bundle, a stale
-version and correct-looking hashes, and a regulatory reader could not have told.
+Foundations are closed except C7, C8 and C10, which are listed in `docs/foundations.md`. Each item
+below names the evidence that would show it delivered, because 2026-09-22 showed why: with no agent
+routed, Gemini's default assistant answered a label question twice from session memory, citing a
+real bundle, a stale version and correct-looking hashes, and a regulatory reader could not have
+told.
 
-| #   | Item                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Components                                                                                    | Size | Delivered when                                                                                                                                                                                                         |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | **The answer shown is the checked one.** _Built and deployed 2026-09-22 (PR #94)_: the post-check runs at the end of every turn through the same MCP session, as the same user, under the same turn id; the rendering reads as a person reads, with the full checksum on its own line. Awaiting one live turn                                                                                                                                                                                                           | ADK callbacks, the query service's tools                                                      | done | One live turn whose audit record shows `find_product`, `get_section` **and** `verify_quote` under one turn id                                                                                                          |
-| 2   | **Approval.** A named person approves a submission, a signing service signs a statement that binds that person to the document and to the exact section text, and the query service answers only from the current signed version, re-checking the served text against the statement on every answer. Design: `docs/design/approval.md` (revised after independent review); the one open choice is which Google surface asserts the approver (AppSheet, a Chat add-on, or a page behind IAP), settled by a one-day spike | Cloud KMS (HSM), Cloud Run, Eventarc, Cloud Storage, and the approver surface the spike picks | M    | An unapproved version is refused; the same content, approved, answers; the answer's evidence names the approver (name, time, meaning); a superseded version is not served as current, and an approval can be withdrawn |
-| 3   | **A real label, through the cheapest door.** One client's product as structured content under an NDA, or an authority's published ePI for a real medicine. Not the parser. Moved up: it is the first genuine test of value, it decides what the engine must produce, and the conversation has a long lead time, so it starts now, in parallel with item 2                                                                                                                                                               | Existing pipeline                                                                             | ext. | One real product published, queried through the agent with proof, and the defects it surfaced recorded                                                                                                                 |
-| 4   | **Looker Studio over the ledger.** Version history, what changed between versions, answers served per version, and the table every buyer asks for: every answer, its principal, its version, its hash. Configuration only; it is the evidence surface for items 1–3                                                                                                                                                                                                                                                     | Looker Studio, BigQuery                                                                       | S    | A report over the ledger and the query audit records, opened as a Workspace user with no project role                                                                                                                  |
-| 5   | **Role agents over one source.** Medical information (a healthcare professional's question, answered with citations), promotional review (a claim checked against the approved label), pharmacovigilance look-up (what section 4.8 says), each as description-and-prompt configuration over the same four tools, each with an adversarial evaluation set run in CI against the fake service and once live                                                                                                               | Gemini Enterprise agent registration, ADK, CI                                                 | M    | Each agent's evaluation report in the repository; each refusing what it must, live                                                                                                                                     |
-| 6   | **The entitlement store**, before a second tenant. Today the map is a JSON value in a CI variable; the audit record's principal and the service's resolution must not change when it moves                                                                                                                                                                                                                                                                                                                              | Firestore (Datastore mode) or BigQuery, Cloud Run                                             | M    | Two tenants, two principals, each answered from its own documents only, in the audit record                                                                                                                            |
-| 7   | **Production.** Deploy into `khs-ema-flow-prod` through the production gate, using the 2026-09-22 runbook as a checklist                                                                                                                                                                                                                                                                                                                                                                                                | Terraform, the deploy, Gemini Enterprise in `eu`                                              | M    | The gate's every line checked, and one live turn from a production user                                                                                                                                                |
-| 8   | **The engine, for one document set.** English, born-digital summaries of product characteristics: characters from the document's text layer, sections from the quality-review template, structure from Document AI's blocks, the model's text never in the record; every span carrying its source provenance. Scoped by what item 3 showed the record needs. Its own product; this line is the boundary                                                                                                                 | pdf.js / PyMuPDF, Document AI, the pipeline                                                   | L    | Its output on a labelled evaluation set of real labels, measured, in the repository; one converted label answering through the agent with proof                                                                        |
-| 9   | **The shared core model.** One `MedicinalProductDefinition` carrying identity and version across label, packaging and quality documentation, with crosswalks by profile and concept map to each authority's shape                                                                                                                                                                                                                                                                                                       | FHIR profiles, ConceptMap, the pipeline                                                       | L    | The same product answered from its label and from its quality documentation with one version chain                                                                                                                     |
+| #   | Item                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Components                                                                                | Size | Delivered when                                                                                                                                                                                                         |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **The answer shown is the checked one.** _Built and deployed 2026-09-22 (PR #94)_: the post-check runs at the end of every turn through the same MCP session, as the same user, under the same turn id; the rendering reads as a person reads, with the full checksum on its own line. Redeployed 2026-09-23 with the draft-hold fix (PR #98), so the only text a turn emits is the checked answer, and again from `caa5d9a`; that is the deployed build. Awaiting one live turn                                                                                                                                                                                                                                    | ADK callbacks, the query service's tools                                                  | done | One live turn whose audit record shows `find_product`, `get_section` **and** `verify_quote` under one turn id                                                                                                          |
+| 2   | **Approval.** A named person approves a submission, a signing service signs a statement that binds that person to the document and to the exact section text, and the query service answers only from the current signed version, re-checking the served text against the statement on every answer. Design: `docs/design/approval.md`, merged after independent review. The approver surface is decided (2026-09-22): option B, a Google Chat app built as a Workspace add-on, whose Google-signed user token the signer verifies itself; the re-authentication gap is recorded. Phase 1 builds what the claim depends on, starting with a spike on that add-on; phase 2, the hardening, is on the production gate | Cloud KMS (HSM), Cloud Run, Eventarc, Cloud Storage, a Google Chat app (Workspace add-on) | M    | An unapproved version is refused; the same content, approved, answers; the answer's evidence names the approver (name, time, meaning); a superseded version is not served as current, and an approval can be withdrawn |
+| 3a  | **A real label, through the cheapest door: an authority's published ePI.** Public, approved text for a real medicine. Needs a small Zone A producer from the EMA ePI shape; the authority's own ePI is the oracle for a round trip. Not the parser. Moved up: it is the first genuine test of value and it decides what the engine must produce. Starts now in `dev` under a scoped exception to the synthetic-only rule (`AGENTS.md`), in parallel with item 2                                                                                                                                                                                                                                                     | Existing pipeline, a small Zone A producer                                                | S    | One authority-published label published, round-tripped against the authority's own ePI, queried through the agent with proof, and the defects it surfaced recorded                                                     |
+| 3b  | **A client's structured export, under NDA.** Ask now: the conversation has a long lead time. It lands only once the data-handling paragraph in `docs/design/verifiable-answers.md` (contract basis, regions, data-processing agreement) is written, and only in the environment that paragraph names                                                                                                                                                                                                                                                                                                                                                                                                                | Existing pipeline                                                                         | ext. | One client product published, queried through the agent with proof, and the defects it surfaced recorded                                                                                                               |
+| 4   | **Looker Studio over the ledger.** Version history, what changed between versions, answers served per version, and the table every buyer asks for: every answer, its principal, its version, its hash. Configuration only; it is the evidence surface for items 1–3                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Looker Studio, BigQuery                                                                   | S    | A report over the ledger and the query audit records, opened as a Workspace user with no project role                                                                                                                  |
+| 5   | **Role agents over one source.** Medical information (a healthcare professional's question, answered with citations), promotional review (the approved text a claim cites, found and quoted; whether the claim is consistent with it stays the reviewer's call), pharmacovigilance look-up (what section 4.8 says), each as description-and-prompt configuration over the same four tools, each with an adversarial evaluation set run in CI against the fake service and once live                                                                                                                                                                                                                                 | Gemini Enterprise agent registration, ADK, CI                                             | M    | Each agent's evaluation report in the repository; each refusing what it must, live, and answering what it can: the false-refusal rate on answerable questions is measured in the evaluation report                     |
+| 6   | **The entitlement store**, before a second tenant. Today the map is a JSON value in a CI variable; the audit record's principal and the service's resolution must not change when it moves                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Firestore (Datastore mode) or BigQuery, Cloud Run                                         | M    | Two tenants, two principals, each answered from its own documents only, in the audit record                                                                                                                            |
+| 7   | **Production.** Deploy into `khs-ema-flow-prod` through the production gate, using the 2026-09-22 runbook as a checklist                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Terraform, the deploy, Gemini Enterprise in `eu`                                          | M    | The gate's every line checked, and one live turn from a production user                                                                                                                                                |
+| 8   | **The engine, for one document set.** English, born-digital summaries of product characteristics: characters from the document's text layer, sections from the quality-review template, structure from Document AI's blocks, the model's text never in the record; every span carrying its source provenance. Scoped by what items 3a and 3b showed the record needs. Its own product; this line is the boundary                                                                                                                                                                                                                                                                                                    | pdf.js / PyMuPDF, Document AI, the pipeline                                               | L    | Its output on a labelled evaluation set of real labels, measured, in the repository; one converted label answering through the agent with proof                                                                        |
+| 9   | **The shared core model.** One `MedicinalProductDefinition` carrying identity and version across label, packaging and quality documentation, with crosswalks by profile and concept map to each authority's shape                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | FHIR profiles, ConceptMap, the pipeline                                                   | L    | The same product answered from its label and from its quality documentation with one version chain                                                                                                                     |
 
-**Dated decision:** the Gemini Enterprise trial ends **2026-10-20**. Item 1 and item 3 are the
+**Dated decision:** the Gemini Enterprise trial ends **2026-10-20**. Items 1 and 4 are the
 evidence for it.
 
 **Two changes made on revisiting this against `docs/vision.md`.** The real label moved up, ahead
@@ -121,6 +125,12 @@ of role agents and the evidence report: it is the first genuine test of value, i
 engine must produce, and the client conversation has a long lead time, so it starts in parallel
 with approval. And the engine and the shared core model are now on the list as items 8 and 9,
 because they are the north star's last two layers and the plan should say where they begin.
+
+**Agreed with the owner 2026-09-22.** Item 3 is split: an authority's published ePI (3a) starts
+now, because it is public, approved text; a client's export (3b) is asked for now but lands only
+once its data handling is written down. Role agents are measured on what they answer as well as
+on what they refuse, because an agent that refuses everything passes every refusal test. And the
+trial decision rests on items 1 and 4: the checked answer, and the table that shows it.
 
 **Rendering and role agents are where "very powerful" lives.** One verified source, many roles,
 no new interface. Every hour on surfaces beyond items 1 and 4 is an hour not on items 2 and 3,
@@ -130,10 +140,10 @@ which are what turn a demonstration into a product.
 
 | #   | Item                                                                                                                                | Components                            | Size |
 | --- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ---- |
-| 8   | Adapter framework: one contract plus a conformance test suite, so each system integration is a configuration rather than a project  | Cloud Run, Eventarc, Pub/Sub          | M    |
-| 9   | First adapters — Veeva Vault RIM, then SAP and LIMS — proving the framework against real integration depth                          | Application Integration, Cloud Run    | L    |
-| 10  | Query service phases 2–4: version history and diffs from the ledger, semantic section search, signed results                        | BigQuery, Vertex AI Search, Cloud KMS | M    |
-| 11  | Adoption metrics that double as the commercial case: share of fields auto-extracted, corrections per document, minutes per document | BigQuery, Looker                      | S    |
+| L1  | Adapter framework: one contract plus a conformance test suite, so each system integration is a configuration rather than a project  | Cloud Run, Eventarc, Pub/Sub          | M    |
+| L2  | First adapters — Veeva Vault RIM, then SAP and LIMS — proving the framework against real integration depth                          | Application Integration, Cloud Run    | L    |
+| L3  | Query service phases 2–4: version history and diffs from the ledger, semantic section search, signed results                        | BigQuery, Vertex AI Search, Cloud KMS | M    |
+| L4  | Adoption metrics that double as the commercial case: share of fields auto-extracted, corrections per document, minutes per document | BigQuery, Looker                      | S    |
 
 ## AI and analytics
 
@@ -141,34 +151,34 @@ Ranked by business value against demonstrable effect. The rule for every item: *
 math proves, humans decide.** Nothing on this list is permitted to author, alter, or summarise
 regulated narrative inside the system of record.
 
-| Rank | Item                                                                                                                                                                                                                                                                 | Components                                   | Size | Depends on                                |
-| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ---- | ----------------------------------------- |
-| 1    | Auditable AI structuring — the headline capability, mechanically verified rather than trusted                                                                                                                                                                        | Document AI, Vertex AI                       | L    | Items 0, 3, 6                             |
-| 2    | Review-cycle-time prediction over the ledger, surfaced as a dashboard tile: the cheapest credible ML win                                                                                                                                                             | BigQuery ML linear regression, Looker        | S    | Real runs in the ledger (it has none yet) |
-| 3    | Change-impact analysis — which documents, markets, and translations a variation touches, hash-linked                                                                                                                                                                 | Vertex AI embeddings, BigQuery vector search | M    | Converted content                         |
-| 4    | Portfolio question answering with FHIR citations                                                                                                                                                                                                                     | Vertex AI Search                             | M    | Item 10                                   |
-| 5    | Anomaly detection on numeric changes between versions (strengths, volumes, ages)                                                                                                                                                                                     | BigQuery ML                                  | S    | Version history                           |
-| 6    | QRD compliance advisor: structural and terminology conformance advice before submission                                                                                                                                                                              | Vertex AI, existing validation outcomes      | M    | Item 7                                    |
-| 7    | Multilingual meaning-drift check between language versions of the same ePI                                                                                                                                                                                           | Vertex AI (Translation LLM), embeddings      | M    | Multilingual content                      |
-| 8    | Patient-facing ePI assistant over the published leaflet                                                                                                                                                                                                              | Vertex AI Search, Firebase App Hosting       | M    | Item 10                                   |
-| 9    | **Information-request evidence pack.** Given a question, one artefact holding each verbatim extract with its document id, version, section code, hash, approver and approval date, referencing the signed manifest. Deterministic assembly of what is already stored | Existing query service, Cloud Storage        | S    | Items 1b, 10                              |
+| Rank | Item                                                                                                                                                                                                                                                                 | Components                                   | Size | Depends on                                                                         |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ---- | ---------------------------------------------------------------------------------- |
+| 1    | Auditable AI structuring — the headline capability, mechanically verified rather than trusted                                                                                                                                                                        | Document AI, Vertex AI                       | L    | Item 8, the engine (was items 3 and 6); the extractor spike (complete, was item 0) |
+| 2    | Review-cycle-time prediction over the ledger, surfaced as a dashboard tile: the cheapest credible ML win                                                                                                                                                             | BigQuery ML linear regression, Looker        | S    | Real runs in the ledger (it has none yet)                                          |
+| 3    | Change-impact analysis — which documents, markets, and translations a variation touches, hash-linked                                                                                                                                                                 | Vertex AI embeddings, BigQuery vector search | M    | Converted content                                                                  |
+| 4    | Portfolio question answering with FHIR citations                                                                                                                                                                                                                     | Vertex AI Search                             | M    | Later L3                                                                           |
+| 5    | Anomaly detection on numeric changes between versions (strengths, volumes, ages)                                                                                                                                                                                     | BigQuery ML                                  | S    | Version history                                                                    |
+| 6    | QRD compliance advisor: structural and terminology conformance advice before submission                                                                                                                                                                              | Vertex AI, existing validation outcomes      | M    | A terminology facade (was item 7; not scheduled now)                               |
+| 7    | Multilingual meaning-drift check between language versions of the same ePI                                                                                                                                                                                           | Vertex AI (Translation LLM), embeddings      | M    | Multilingual content                                                               |
+| 8    | Patient-facing ePI assistant over the published leaflet                                                                                                                                                                                                              | Vertex AI Search, Firebase App Hosting       | M    | Later L3                                                                           |
+| 9    | **Information-request evidence pack.** Given a question, one artefact holding each verbatim extract with its document id, version, section code, hash, approver and approval date, referencing the signed manifest. Deterministic assembly of what is already stored | Existing query service, Cloud Storage        | S    | The agent (delivered, was item 1b); Later L3                                       |
 
-### The health-authority information request, as the framing for items 4, 9 and 10
+### The health-authority information request, as the framing for AI items 4 and 9 and Later L3
 
-Items 4, 9 and 10 are easier to justify against one concrete situation than in the abstract: a
-health authority asks a question about a product's labelling and the answer is due on a short
-clock. The instinct that this is a retrieval problem is worth resisting. Finding the paragraph
-is the quick part. What consumes the time is proving the wording is the _current approved_ text
-for _that market_ — which version, approved by whom, superseded by which variation. That proof
-is what this system holds and a document store does not.
+AI items 4 and 9 and Later L3 are easier to justify against one concrete situation than in the
+abstract: a health authority asks a question about a product's labelling and the answer is due on a
+short clock. The instinct that this is a retrieval problem is worth resisting. Finding the paragraph
+is the quick part. What consumes the time is proving the wording is the _current approved_ text for
+_that market_ — which version, approved by whom, superseded by which variation. That proof is what
+this system holds and a document store does not.
 
 So the claim is narrow and should stay narrow:
 
 - It covers **labelling and product information**. Most information requests concern
   manufacturing, nonclinical or pharmacovigilance data, which live in other systems. If a client
-  wants those, the adapter framework (item 8) is the honest route, not an extension of this
+  wants those, the adapter framework (Later L1) is the honest route, not an extension of this
   store.
-- **Semantic search belongs inside the query service** (item 10), returning a bundle id, section
+- **Semantic search belongs inside the query service** (Later L3), returning a bundle id, section
   key and hash. A separate retrieval index that returns ranked chunks would give answers that
   cannot be verified alongside answers that can, which weakens the only claim that distinguishes
   this system.
@@ -189,20 +199,22 @@ So the claim is narrow and should stay narrow:
    first, because its id derives from the submission id, so do not re-seed without rebuilding.
 3. **(Closed 2026-09-21 — no longer a thing to check on the day.)** `get_provenance` used to
    resolve a Provenance without asking for an order, so which of paracetamol's two records it
-   returned was the store's choice and not the code's. It now asks for the newest approval and
-   decides ties itself, so the v2 record is the answer by construction. Re-seeding no longer
-   changes it.
+   returned was the store's choice and not the code's. It now answers with the most recently
+   written approval, stated only for the document's current version (revised 2026-09-22;
+   `docs/design/epi-mcp-query-service.md`), so the version 2 record is the answer by construction
+   while version 2 is current.
 4. **Deploying between seeding and demonstrating is safe** as of 2026-09-21. The smoke step
    publishes `synthetic-smoketest`, which nothing demonstrates, so a deploy no longer writes over
    a seeded label. It does leave a fourth document in the store — but the entitlement map names
    only the three demonstration bundles, so the query service never returns it: `find_product`
    on the deliberately broad query "synthetic" answers with exactly the three labels and
    `truncated: false`. Entitlement, not tidiness, is what keeps it out of sight.
-5. **Set the four GitHub Actions repository variables** — done 2026-09-20; all four are set
-   (Settings → Secrets and variables → Actions → Variables). They are variables and not secrets: an IAM member string, an opaque
-   subject id, a bundle id and an OAuth client id are identifiers, and holding one grants
-   nothing. Each is optional and an unset one leaves the Terraform default, so a deploy with
-   none of them set succeeds and authorises nobody.
+5. **Set the five GitHub Actions repository variables** — the four query variables done 2026-09-20,
+   `ALERT_NOTIFICATION_EMAIL` 2026-09-21; all five are set (Settings → Secrets and variables →
+   Actions → Variables). They are variables and not secrets: an IAM member string, an opaque subject
+   id, a bundle id, an OAuth client id and an e-mail address are identifiers, and holding one grants
+   nothing. Each is optional and an unset one leaves the Terraform default, so a deploy with none of
+   them set succeeds and authorises nobody.
    - `QUERY_INVOKERS` — comma-separated IAM members that receive `run.invoker` on the query
      service, e.g. `user:you@example.com,serviceAccount:agent@proj.iam.gserviceaccount.com`.
      This is for callers presenting a credential that authenticates as themselves: a human on
@@ -223,6 +235,9 @@ So the claim is narrow and should stay narrow:
      well as at startup. Default `{}`.
    - `QUERY_OAUTH_CLIENT_IDS` — comma-separated OAuth 2.0 client ids whose access tokens are
      accepted. Default `[]`, which rejects every access token.
+   - `ALERT_NOTIFICATION_EMAIL` — where the entitlement-denial alert goes (Standing items).
+     Default `""`, which creates the metric but no channel or policy. Still a placeholder
+     address in `dev` (production gate).
 6. **(Decided 2026-09-21: the connector's client only.)** For the record of why it was a decision:
    **Decide `query_oauth_client_ids` deliberately.** Two different ids could go in it. The
    Gemini Enterprise MCP connector's own internal OAuth client (created in the console, not by
@@ -238,9 +253,10 @@ So the claim is narrow and should stay narrow:
 
 ### Standing items
 
-- ~~Enable GitHub branch protection on `main` requiring the CI check.~~ **Done.** Required checks
-  are `Check`, `Zone A`, `Agent` and, since 2026-09-21, `Official validation` — until then the
-  official HL7 gate ran on every pull request without being able to block a merge.
+- ~~Enable GitHub branch protection on `main` requiring the CI check.~~ **Done.** Six required
+  checks: `Check`, `Zone A`, `Agent`, `Official validation` (since 2026-09-21 — until then the
+  official HL7 gate ran on every pull request without being able to block a merge), `Plan`
+  (foundations B4) and `Vulnerabilities` (foundations C1).
 - Confirm the `approverId` policy: an opaque identity-provider subject id, never an e-mail
   address. The contract enforces the shape; the policy is an organisational decision.
 - Set `enabled_run_sources` per environment (ADR 0002: production = `["document"]`). The
@@ -289,30 +305,21 @@ that skips one is not a production deploy.
   it is `false` and not applied today. Separately, no reader role scoped to that bucket exists
   — who can read the retained audit log is whoever the project's logging roles allow, and
   narrowing that is the same person's decision.
-- Tighten the worker's Healthcare role to the dataset. Today
-  `google_project_iam_member.worker_healthcare` (`infra/security.tf`) binds
-  `roles/healthcare.fhirResourceEditor` at project level, so the worker can edit FHIR resources
-  in every dataset in the project, while the query service's reader is dataset-scoped
-  (`google_healthcare_dataset_iam_member.query_fhir_reader`). The change is a
-  `google_healthcare_dataset_iam_member` on `google_healthcare_dataset.epi` plus updating the
-  worker service's `depends_on`; it is a project-level role removal, so it needs a plan review
-  and a check that `scripts/gcp/reconcile-fhir-stores.sh` and `bootstrap.sh` do not rely on
-  project-wide Healthcare access through the worker's service account.
-- Confirm on the first real deploy that the effective-IAM export actually uploaded. It runs
-  after a successful apply and writes to
-  `gs://<evidence bucket>/deploy-evidence/<YYYY>/<MM>/<DD>/<stamp>-<env>-<commit>/`, but every
-  step is warning-only, so a deployer lacking `resourcemanager.projects.getIamPolicy`,
-  `healthcare.datasets.getIamPolicy`, or write access to the evidence bucket leaves a
-  `::warning::` in the log and no file in the bucket.
-- For item 1b: ~~confirm the organisation has a Gemini Enterprise licence~~ **confirmed 2026-09-21** —
-  a free trial, 50 seats, active until 2026-10-20, with the app already created. Still open:
-  confirm Agent Engine offers a 3.14 runtime in `europe-west4` at the first real deploy; the
-  deploy script's dry run passes but does not ask the service. Steps are in
+- ~~Confirm on the first real deploy that the effective-IAM export actually uploaded.~~
+  **Confirmed.** The exports are under
+  `gs://<evidence bucket>/deploy-evidence/<YYYY>/<MM>/<DD>/<stamp>-<env>-<commit>/`, the latest
+  for `caa5d9a`. Every step stays warning-only, so a deployer that loses
+  `resourcemanager.projects.getIamPolicy`, `healthcare.datasets.getIamPolicy`, or write access to
+  the evidence bucket would leave a `::warning::` in the log and no file in the bucket.
+- For the agent (delivered, was item 1b): ~~confirm the organisation has a Gemini Enterprise
+  licence~~ **confirmed 2026-09-21** — a free trial, 50 seats, active until 2026-10-20, with the
+  app already created. ~~Confirm Agent Engine offers a 3.14 runtime in `europe-west4`~~
+  **confirmed 2026-09-22**: the agent runs there on Python 3.14. Steps are in
   `agent/deploy/README.md`.
-- (Done 2026-09-20 for item 0: the deployer was granted `roles/documentai.editor` by hand —
-  its roles are bootstrapped outside Terraform by design — and the spike's real-world inputs
-  were EudraLex Volume 2C documents, which carry no product information, so the synthetic-only
-  rule needed no exception.)
+- (Done 2026-09-20 for the extractor spike, was item 0: the deployer was granted
+  `roles/documentai.editor` by hand — its roles are bootstrapped outside Terraform by design — and
+  the spike's real-world inputs were EudraLex Volume 2C documents, which carry no product
+  information, so the synthetic-only rule needed no exception.)
 
 ## Deliberately not on this roadmap
 
