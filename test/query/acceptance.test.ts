@@ -245,6 +245,21 @@ describe("ePI query service, phase 1", () => {
           error: "invalid-request",
         });
       }
+
+      // fidelity-norm/3.0.0: a table's grid markers and a picture's U+FFFC are the scanner's,
+      // never a reader's, so a quote carrying one, even alone, is a bad request.
+      for (const codePoint of [0xfdd0, 0xfdd2, 0xfdd3, 0xfdd5, 0xfdef, 0xfffc]) {
+        for (const quote of [
+          `dose ${String.fromCodePoint(codePoint)} is`,
+          String.fromCodePoint(codePoint),
+        ]) {
+          const refused = await callTool(harness, "verify_quote", { bundleId: typography, quote });
+          expect(refused.structured, codePoint.toString(16)).toEqual({
+            tool: "verify_quote",
+            error: "invalid-request",
+          });
+        }
+      }
     });
   });
 

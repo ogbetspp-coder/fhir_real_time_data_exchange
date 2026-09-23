@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and one review of the
+_Proposal, 2026-09-23, amended after two independent design reviews and two reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md` (3.0.0) is the normative text; where this note and
 it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -441,3 +441,22 @@ own (no divergence), drew 800 random span tables in Chrome, and applied its own 
 7. **Low.** Change-record counts and claims. Fixed.
 8. **Low.** §7 did not say how a table crossing a page break is written, or which stored image
    forms are a PNG or JPEG file. Fixed.
+
+## Fourth review (2026-09-23, of the implementation): findings and what changed
+
+The fourth review drew about 5 700 accepted random span tables in Chrome (standards, quirks and
+XML modes; default and bordered cells; two viewport widths) and found none whose drawn grid
+differed from the text, and fuzzed the two implementations with 20 000 cases of its own (no
+divergence).
+
+1. **High.** A table cell continued across a page break: §1 ends a page body with a line feed,
+   so the rest of the cell opened a line without U+0009, and §3 step 4 removed a leading bullet
+   on the page side only (`2` / `• 10` verified against `2 10`). Fixed in §7: the text that
+   continues a row after a page break begins with U+0009; two verify vectors pin it.
+2. **Medium.** `verify_quote` matched a quote carrying grid markers across two rows, and a quote
+   of a lone marker. Fixed: such a quote is `invalid-request`.
+3. **Medium.** The Python port takes up to 1.5 s on 2 MB narratives (linear). Recorded.
+4. **Low.** §5's wording on empty rows. Fixed.
+5. **Low.** A bare list number counts as mandatory narrative. Kept, and recorded.
+6. **Low.** `get_section`'s cap also applies to the normalised text, which a grid lengthens.
+   Recorded.

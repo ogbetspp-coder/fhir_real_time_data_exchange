@@ -13293,6 +13293,174 @@
         },
         "reportHash": "a94555aed3d47d2c7af92b70e4f2a54620183e538f99c4efb5abeaaa166aa2c9"
       }
+    },
+    {
+      "name": "cell-across-page-break-keeps-its-bullet",
+      "input": {
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n﷐\n﷒\t﷓\tDose\t﷓\t2\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 50
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\n\t• 10\n﷑\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 43
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>Dose</td><td>2 • 10</td></tr></table></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 49,
+                "textSha256": "4717936dea5a99a62587dc661b7c4dbbb2c7f3894f3acbf73f632a5d164ac18c"
+              },
+              {
+                "page": 2,
+                "startOffset": 35,
+                "endOffset": 42,
+                "textSha256": "4ed1c27ffbf78dda95a1fa5ff86a56862de56d982ea030bd9123afa864b84786"
+              }
+            ],
+            "narrativeDivSha256": "f9a272ebd788e60dec397c1548b530f2816971e073227ceb4aac12d9bd6949f9",
+            "normalizedTextSha256": "1a62b5792e347866376c10f94d0a02e4425dc6832ca50ba5faed50752d695c18"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "extractedTextSha256": "c65d2fdb39a50a381b72570409ef43462d9db1f5ca42080b7bcb7ba9aa6faebf",
+        "narrativeBindingSha256": "42adb7df2285ebd6822d4a777d5af096946b557d7a96275bd4be4f8a2e764a2a",
+        "status": "passed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "verified",
+            "spanCount": 2,
+            "normalizedTextSha256": "1a62b5792e347866376c10f94d0a02e4425dc6832ca50ba5faed50752d695c18"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 1
+        },
+        "coverage": {
+          "pageCodePoints": 115,
+          "bodyCodePoints": 23,
+          "coveredCodePoints": 21,
+          "uncoveredGaps": 0
+        },
+        "reportHash": "e00985ccfb768c98e25654772d74fcb268027b34ded93368e60fc65f82afbd09"
+      }
+    },
+    {
+      "name": "cell-across-page-break-without-its-bullet-mismatches",
+      "input": {
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n﷐\n﷒\t﷓\tDose\t﷓\t2\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 50
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\n\t• 10\n﷑\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 43
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>Dose</td><td>2 10</td></tr></table></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 49,
+                "textSha256": "4717936dea5a99a62587dc661b7c4dbbb2c7f3894f3acbf73f632a5d164ac18c"
+              },
+              {
+                "page": 2,
+                "startOffset": 35,
+                "endOffset": 42,
+                "textSha256": "4ed1c27ffbf78dda95a1fa5ff86a56862de56d982ea030bd9123afa864b84786"
+              }
+            ],
+            "narrativeDivSha256": "1028bdebdad533d004a350b9c0d3f6ba8764064a3cd69faa9acb9ac86cb99c03",
+            "normalizedTextSha256": "26413a00c4e6d230e2606df00d4a80fee69f5a42afb682b0feda9dc1dbe25e5e"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "extractedTextSha256": "c65d2fdb39a50a381b72570409ef43462d9db1f5ca42080b7bcb7ba9aa6faebf",
+        "narrativeBindingSha256": "e46bc6fee26e9bc4e34a0826ed45be97eedd62a17b4416da89b3b60ca3e23100",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 2,
+            "details": {
+              "expectedLength": 21,
+              "actualLength": 19,
+              "firstDifferingOffset": 15,
+              "commonSuffixLength": 4,
+              "expectedWordCount": 9,
+              "actualWordCount": 8,
+              "expectedSha256": "1a62b5792e347866376c10f94d0a02e4425dc6832ca50ba5faed50752d695c18",
+              "actualSha256": "26413a00c4e6d230e2606df00d4a80fee69f5a42afb682b0feda9dc1dbe25e5e"
+            },
+            "normalizedTextSha256": "26413a00c4e6d230e2606df00d4a80fee69f5a42afb682b0feda9dc1dbe25e5e"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 115,
+          "bodyCodePoints": 23,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 2
+        },
+        "reportHash": "4f75df80b687fe396670136eccd908577704bf5afae1dcbfafe47ce4e29e574d"
+      }
     }
   ]
 }

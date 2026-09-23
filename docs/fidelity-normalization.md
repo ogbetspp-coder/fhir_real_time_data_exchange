@@ -281,7 +281,8 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   covers), and in every column 0 … w−1 a cell spanning one column must start (a renderer draws
   a column without one at zero width, its spanning cells' text reading against the columns
   beside it); otherwise `table-shape`, decided in that order after the row group's clipped
-  spans. A table with no rows, and a row that covers no slot, are accepted.
+  spans. A table with no rows, or whose rows all cover no slot (w = 0), is accepted; next to a
+  row that covers a slot, a row that covers none is ragged.
   The tables of one narrative cover at most 50 000 slots together, counting each cell's
   `colspan` × `rowspan` when it is placed; the cell that crosses the bound rejects
   (`table-size`), decided after its overlap check: a small table can span a grid whose markers
@@ -310,7 +311,7 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   cannot tell a wrapped line from a line break, so a rule that compared lines would refuse most
   real tables. Which cell a value is in is proved; where in the cell it sits is not. The slots
   are the HTML table model's, and the zero-height and zero-width rules above make every
-  accepted row and column drawn with some size. How large is not compared: a row or column
+  accepted row that covers a slot, and every column, drawn with some size. How large is not compared: a row or column
   whose only single cells are empty is drawn a few pixels high or wide, which a reader can
   overlook, as a source drawn the same way can be.
 
@@ -618,7 +619,13 @@ extractor is a controlled component: its name and version are recorded in
   must refuse the document rather than guess: the grid is compared (section 5). A table that
   continues across a page break is one table: no U+FDD1 before the break and no U+FDD0 after
   it, and a header row the document repeats on the new page is emitted once, where the table
-  first has it. A cell that continues across the break is one cell;
+  first has it. A cell that continues across the break is one cell, and the text that continues
+  a row after the break begins with U+0009: every line of a table's text from its first U+FDD2
+  to its U+FDD1 that holds anything but whitespace holds U+0009 or U+FDD2, so section 3 step 4
+  reads a bullet in a cell as content on a continuation line too (a page body ends with a line
+  feed, section 1, so the rest of the cell opens a new line). The verifier does not check this,
+  as it checks no other duty of this section; an extractor that breaks it can make a bullet in
+  a cell's continuation vanish on the page side only;
 - emit a list marker (a bullet glyph, section 3 step 4) followed by U+0020, never U+0009: the
   tab after a list marker is layout, not a cell boundary. A word processor's list (`•` U+0009
   `Adults: 10 mg`) extracted with its tab reads as a table row, its bullet as content, and a

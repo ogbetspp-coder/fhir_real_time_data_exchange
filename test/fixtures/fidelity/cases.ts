@@ -401,6 +401,12 @@ const DOSE_IN_SECOND_COLUMN_SOURCE = customSource([DOSE_IN_SECOND_COLUMN]);
 const PICTURE_SOURCE = "data:image/png;base64,iVBORw0KGgo=";
 const PICTURE_LINE = `See \ufffc${sha256Utf8(PICTURE_SOURCE)}\ufffc below.`;
 const PICTURE_LINE_SOURCE = customSource([PICTURE_LINE]);
+// A row whose last cell continues on the next page (section 7): the continuation begins with
+// U+0009, so the bullet at its start is content, as in any cell.
+const CELL_ACROSS_PAGES = ["\ufdd0\n\ufdd2\t\ufdd3\tDose\t\ufdd3\t2", "\t\u2022 10\n\ufdd1"];
+const CELL_ACROSS_PAGES_SOURCE = customSource(CELL_ACROSS_PAGES);
+const cellAcrossPagesSpans = (): SourceSpan[] =>
+  CELL_ACROSS_PAGES.map((body, index) => spanFor(CELL_ACROSS_PAGES_SOURCE, index + 1, body));
 const SPANNED_DOSE_TABLE =
   '<table><tr><td>Adults</td><td rowspan="3">10 mg</td></tr><tr><td>Children</td></tr><tr><td>Elderly</td></tr></table>';
 const MID_LINE_BULLET = "Take 2 \u2022 10 mg daily.";
@@ -2212,6 +2218,31 @@ export const verifyCases: VerifyCase[] = [
       single("smpc.4.2.posology", paragraphs("See below."), [
         spanFor(PICTURE_LINE_SOURCE, 1, PICTURE_LINE),
       ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  // Review round 4: a cell continued across a page break keeps its bullet as content.
+  {
+    name: "cell-across-page-break-keeps-its-bullet",
+    input: toInput(
+      CELL_ACROSS_PAGES_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div("<table><tr><td>Dose</td><td>2 \u2022 10</td></tr></table>"),
+        cellAcrossPagesSpans(),
+      ),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "cell-across-page-break-without-its-bullet-mismatches",
+    input: toInput(
+      CELL_ACROSS_PAGES_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div("<table><tr><td>Dose</td><td>2 10</td></tr></table>"),
+        cellAcrossPagesSpans(),
+      ),
     ),
     expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
   },

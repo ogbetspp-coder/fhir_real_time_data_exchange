@@ -24,6 +24,7 @@ import {
 } from "../contracts/query-tools.js";
 import {
   NORMALIZATION_VERSION,
+  isReservedCodePoint,
   isWordCharacter,
   normalizeText,
   xhtmlToText,
@@ -692,6 +693,12 @@ export async function verifyQuote(
     return fail("verify_quote", "invalid-request", { bundleId: input.bundleId });
   }
   if (normalizedQuote.length === 0) {
+    return fail("verify_quote", "invalid-request", { bundleId: input.bundleId });
+  }
+  // A table's grid markers and a picture's U+FFFC are the scanner's, never a reader's: a quote
+  // carrying one could join two rows or quote nothing a reader sees (fidelity-norm/3.0.0 section
+  // 2, the rule narratives follow).
+  if (Array.from(normalizedQuote).some((point) => isReservedCodePoint(point.codePointAt(0) ?? 0))) {
     return fail("verify_quote", "invalid-request", { bundleId: input.bundleId });
   }
 

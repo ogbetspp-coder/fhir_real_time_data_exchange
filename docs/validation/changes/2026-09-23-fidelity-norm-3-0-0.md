@@ -48,7 +48,9 @@ value sits on inside a multi-line cell). Each was fixed before this change, or, 
 stated. A third review, of the implementation, found rows and columns a renderer draws at
 zero size (a false pass the second review had called a false failure), a scan whose cost grew
 with rows × table width, and three untested precedence rules; each was fixed. The design note
-lists all three reviews' findings and what changed.
+lists all four reviews' findings and what changed. A fourth review found a cell continued
+across a page break losing a leading bullet on the page side (fixed in section 7, with two verify
+vectors), and quotes carrying grid markers matching across rows (now `invalid-request`).
 
 **Impact assessment (step 0).** Importers of `src/fidelity/`:
 
@@ -64,7 +66,9 @@ lists all three reviews' findings and what changed.
 - **Query service** (`src/query/tools.ts`): `get_section` returns normalised text, so a
   section's table text now carries the grid markers and a picture's token. `verify_quote`
   matches a quote inside one cell, a list item with or without its number, and text separated
-  from a picture by whitespace (text touching a picture is cut by the quote-edge rule). A quote that runs across two cells or across a picture is `no-match`: a
+  from a picture by whitespace (text touching a picture is cut by the quote-edge rule). A quote that runs across two cells or across a picture is `no-match`, and a quote that
+  carries a grid marker or U+FFFC itself is `invalid-request` (it could join two rows, or quote
+  nothing a reader sees): a
   false failure, and a correct one, because such a quote loses which cell a value is in or what
   stands between the words. The agent's instructions and the query's presentation of the
   markers are changed in roadmap item 3a's publishing step (PR 5); until then the demonstration
@@ -72,8 +76,18 @@ lists all three reviews' findings and what changed.
   contract caps a `div` at 200 000 code points (`src/contracts/query-tools.ts`), while a
   picture's `src` may be 1 398 104: a section holding a picture larger than about 150 KB is
   `unavailable` from `get_section`. Not changed here, because the query contract is versioned
-  and vendored by the agent; it is recorded for the publishing step (PR 5), and the Imatinib
-  Teva import carries no picture.
+  and vendored by the agent; it is recorded for the publishing step (PR 5), and the Imatinib Teva import carries no picture. The
+  normalised `text` has the same cap, and a spanned grid makes it much longer than its markup
+  (an 11 738-code-point `div` of one row of 1000 cells and 49 rows spanning them normalises to
+  102 201), so a `div` of about 110 000 code points can be `unavailable` there too.
+- **Cost.** The scan and the normalisation are linear in the narrative's length, which no
+  per-section bound limits (the submission may be 64 MB). The TypeScript takes at most 0.42 s on
+  2 MB inputs of 45 000 pictures, 220 000 empty rows, 200 000 list items or deep lists; the Python
+  port takes up to 1.5 s, and picture tokens make the text 1.65 times the markup. Recorded, not
+  bounded: the Python runs offline in Zone A.
+- **Crosswalk, a bare list number.** `<ol start="2"><li></li></ol>` counts as narrative for a
+  mandatory section: its number is drawn. Kept deliberately; the fidelity check still requires
+  the source to show the same empty numbered item.
 - **Contracts** (`src/contracts/`): no schema changed (`NormalizationVersion` is a pattern).
   The four contract fixtures moved only in the version string and the hashes that embed it.
 - **Synthetic fixtures and demonstration store**: the synthetic submission and the seeded
@@ -94,7 +108,7 @@ lists all three reviews' findings and what changed.
 **Steps 1–6.** 1: `NORMALIZATION_VERSION` is `fidelity-norm/3.0.0` on both sides. 2:
 `npm run contracts:generate` (no drift), `npm run vectors:generate`, `npm run contracts:fixtures`,
 `npm run contracts:quote-edge` and `npm run differential:smoke` regenerated
-`test/fixtures/fidelity/vectors.json` (411 → 491 vectors: normalisation 62 → 63, XHTML 214 → 282, verify 135 → 146), the four contract fixtures and the smoke corpus. 3: every changed vector,
+`test/fixtures/fidelity/vectors.json` (411 → 493 vectors: normalisation 62 → 63, XHTML 214 → 282, verify 135 → 148), the four contract fixtures and the smoke corpus. 3: every changed vector,
 below. 4: the new vectors: every case the design names, both sides of every boundary (counter
 styles at 26/27, 703, 3999/4000 (702 in the differential), −1/0/1; `start` at `-0`, `007`, `9999`, `10000`; spans at
 0, `02`, 1000, 1001; each `src` form and each refused form; U+FFFC, U+FDD0 and U+FDEF by reference,
@@ -105,7 +119,8 @@ placement cases (overlap, a row drawn at zero height, a column drawn at zero wid
 hole, a ragged row, a row span to its group's end, covered slots before, after and between
 cells), and verification cases (a list number against another number and another style, a row
 span against empty cells and the reverse, a value moved to another column, a picture against
-other bytes and against none, an empty table as `empty-narrative`). 5: ADR 0003 amended (Consequences), ADR 0001 amended for
+other bytes and against none, an empty table as `empty-narrative`, a cell continued across a page break with and without its
+bullet). 5: ADR 0003 amended (Consequences), ADR 0001 amended for
 ADR 0005's Type 1 record, ADR 0005 added, `AGENTS.md`'s "Preserve supplied XHTML" reworded to
 the owner's decision of 2026-09-23. 6: UR-09 and UR-22 updated.
 
