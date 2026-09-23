@@ -1,8 +1,8 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after its first independent review (findings listed at the end).
-Changes `docs/fidelity-normalization.md` sections 2, 5, 7 and 9, and is implemented only after
-the amended proposal is reviewed again. Prompted by roadmap item 3a (ADR 0005): the first real
+_Proposal, 2026-09-23, amended after two independent reviews (findings listed at the end), and
+implemented. `docs/fidelity-normalization.md` (3.0.0) is the normative text; where this note and
+it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
 cells spanning columns, five spanning rows and two pictures, and every real summary of product
 characteristics has some of each. 2.0.0 refuses all four._
@@ -24,11 +24,14 @@ was refused because a renderer draws something the scanner did not see:
   against every row.
 - `img` (always refused): a renderer draws a picture the check cannot read.
 
-Every fix below does the same thing. What the renderer draws is folded into the text the check
-compares, and anything that cannot be folded is refused. For lists, that means the numbers. For
-tables, it means the grid itself: the text states where every row and cell starts, and which cell
-covers each slot. That also closes the cell-association residual 2.0.0 stated for tables without
-spans. For pictures, it means the identity of the picture. The reserved code points that carry
+Every fix below does the same thing. What the renderer draws that changes what the words say
+is folded into the text the check compares, and what cannot be folded is refused. For lists,
+that means the numbers. For tables, it means the grid itself: the text states where every row
+and cell starts, and which cell covers each slot. That also closes the cell-association residual
+2.0.0 stated for tables without spans, apart from the line a value sits on inside a multi-line
+cell (below). For pictures, it means the picture's bytes. Layout that changes where words stand
+but not what they say (paragraph breaks, headings, line breaks, bullets, list nesting,
+emphasis) is not compared, and is stated. The reserved code points that carry
 the grid and the pictures can never occur in narrative text itself, so in the scanner's output
 they mean exactly what the markup says.
 
@@ -82,9 +85,13 @@ Grammar:
 
 - `colspan` and `rowspan` are allowed on `td` and `th`, each matching `[1-9][0-9]{0,2}|1000`.
   `0`, leading zeros and any other form reject (`forbidden-attribute`).
-- A `table` inside a `td` or `th` rejects (`table-structure`). Nested tables are refused rather
-  than bracketed. No real label in `labels/ema-epi/` has one, and the grid text below then never
-  nests.
+- A `table` start tag while another table is open (in a cell or in a caption, at any depth)
+  rejects (`table-structure`). Nested tables are refused rather than bracketed. No real label in
+  `labels/ema-epi/` has one, and the grid text below then never nests.
+- The tables of one narrative cover at most 50 000 slots together, counted as each cell's
+  `colspan` × `rowspan` when it is placed; the cell that crosses the bound rejects (`table-size`,
+  new), after its overlap check. Without it, 9 KB of markup produced 3 million code points of
+  grid text.
 
 Placement follows the HTML table model:
 
@@ -107,7 +114,7 @@ permanently for internal use, and XML allows them. Written ⟦table⟧, ⟦/tabl
 | Code point | Emitted                                                                           | Written  |
 | ---------- | --------------------------------------------------------------------------------- | -------- |
 | U+FDD0     | after the line break of `<table>`                                                 | ⟦table⟧  |
-| U+FDD1     | before the line break of `</table>`                                               | ⟦/table⟧ |
+| U+FDD1     | U+000A, then U+FDD1, before the line break of `</table>`                          | ⟦/table⟧ |
 | U+FDD2     | after the line break of `<tr>`                                                    | ⟦row⟧    |
 | U+FDD3     | a slot where a cell starts: after the U+0009 of the cell's start tag, then U+0009 | ⟦cell⟧   |
 | U+FDD4     | a slot covered by the cell to its left in the same row (its `colspan`)            | ⟦left⟧   |
@@ -128,28 +135,35 @@ permanently for internal use, and XML allows them. Written ⟦table⟧, ⟦/tabl
   Two narratives with the same normalised text therefore draw the same cells, with the same text,
   over the same slots. What is still not compared is whitespace inside a cell, whether a cell is
   `td` or `th`, `scope`, and which row group a row is in. These are presentation, because row
-  groups are in rendering order (2.0.0) and spans cannot cross them (above).
+  groups are in rendering order (2.0.0) and spans cannot cross them (above). Nor is which line
+  of a multi-line cell a value is on (second review, finding 1): `<td>10 mg<br/>&#160;</td>`
+  and `<td>&#160;<br/>10 mg</td>` read the same next to a two-line cell, and a renderer draws
+  the value level with a different line of its neighbour. Comparing lines was rejected: line
+  alignment across cells also depends on wrapping and margins, and an extractor of a drawn
+  document cannot tell a wrap from a line break, so a line rule would refuse most real PDF
+  tables. ADR 0005's import, where both sides' markup is at hand, compares each cell's line
+  breaks structurally instead.
 - An empty cell is ⟦cell⟧ followed directly by the next marker. It is no longer indistinguishable
   from a covered slot, or from a slot the extractor dropped.
 
 What this closes: the review's finding 3, and 2.0.0's stated residual that cell association is
 not checked. A narrative that moves a dose from the Adults column to the Children column no
-longer verifies. The price is on the extractor side (§7 below). An extractor that cannot
+longer verifies; one that moves it to another line of the same cell still does (above). The price is on the extractor side (§7 below). An extractor that cannot
 recover a table's grid cannot produce these markers, so any narrative with a table fails against
 it. That is a false failure, and acceptable.
 
-### C. `img`: a picture is bound to its source (§5, §7)
+### C. `img`: a picture is bound to its bytes (§5, §7)
 
 - `img` is an inline, void element. It must be self-closing, like `br` and `hr`, or it is
   `void-element`.
 - It takes exactly one attribute, `src`, and `src` is required: `<img/>` without it is
-  `forbidden-attribute`. `alt`, `title`, `width` and every other attribute reject
+  `forbidden-attribute`, decided after the attributes and before `void-element` (so `<img>` is
+  `forbidden-attribute`, not `void-element`). `alt`, `title`, `width` and every other attribute reject
   (`forbidden-attribute`). `alt` is refused because a renderer draws it when the picture does not
   load, and its text would be compared with nothing.
-- `src` must match one of these forms exactly:
-  - A reference: `REF = SEG ( "/" SEG ){0,15}`, where `SEG = [A-Za-z0-9_~-][A-Za-z0-9._~-]{0,63}`.
-    A segment cannot start with `.`, so there are no `.` or `..` segments. There is no scheme, no
-    leading `/`, and no `//`. The EMA's `~/_entity/annotation/<uuid>` matches.
+- `src` must be exactly this form (the first draft also accepted a relative reference; the
+  second review showed the EMA's own references draw at zero size, and that a reference that
+  resolves draws whatever the viewer's origin serves, so references are refused):
   - A `data:` URI: `data:image/png;base64,` or `data:image/jpeg;base64,` followed by a non-empty
     body `B` of at most 1 398 104 code points (the base64 length of 1 MiB). `B` must satisfy all
     of the following:
@@ -160,24 +174,22 @@ it. That is a false failure, and acceptable.
     These are counted and tested directly, not by one regular expression over a
     1.4-million-code-point value.
 
-  - Anything else rejects (`forbidden-attribute`): `https:`, `http:`, `javascript:`, protocol-relative
-    `//…`, SVG or GIF `data:`, and a query or fragment. `https` is refused because the picture
+  - Anything else rejects (`forbidden-attribute`): a path, `https:`, `http:`, `javascript:`,
+    protocol-relative `//…`, SVG or GIF `data:`, and a query or fragment. `https` is refused because the picture
     behind it can change after approval, and because fetching it tracks the reader.
-- An `img` emits U+FFFC followed by the 64 lowercase hexadecimal digits of the SHA-256 of the
-  UTF-8 bytes of its `src` value. No whitespace is added. The token has a fixed length and
-  U+FFFC occurs nowhere else, so the text states where each picture stands and which picture it
-  is.
+- An `img` emits U+FFFC, the 64 lowercase hexadecimal digits of the SHA-256 of the UTF-8 bytes
+  of its `src` value, and U+FFFC again. No whitespace is added. U+FFFC occurs nowhere else, so
+  the text states where each picture stands and which bytes it draws. The closing U+FFFC
+  composes with nothing, so a combining mark after the picture cannot join its last digit under
+  NFC (second review, finding 11).
 - An `img` may stand wherever inline text may. Inside `sup` or `sub` it is `script-content`, and
   directly inside a table part or a list container it is `table-content` or `list-content`, as
   for any element.
 
 What this proves, and does not:
 
-- For a `data:` URI, the token binds the bytes. The narrative shows the source's own picture, and
-  it cannot be swapped after approval without changing `normalizedTextSha256` and the binding.
-- For a reference, the token binds the reference and not the bytes behind it. Two narratives with
-  the same reference show whatever that reference resolves to. For the EMA's references, that is
-  nothing: they resolve only inside the EMA's own system.
+- The token binds the bytes. The narrative shows the source's own picture, and it cannot be
+  swapped after approval without changing `normalizedTextSha256` and the binding.
 - A `data:` media type is not checked against the bytes. A renderer sniffs them and may draw a
   GIF or WebP, including an animated one, but it draws the same bytes on both sides.
 - What a picture shows is unverifiable by a text check. A picture of a dose table is carried
@@ -196,7 +208,7 @@ What this proves, and does not:
   `table-content`, and `<sup>&#xFFFC;</sup>` is not `unmappable-script`.
 - The rule is one-sided, and deliberately so. Page text may contain these code points, because
   §7 has the extractor emit them for grids and pictures. This is the only rule applied to one
-  side only, and §1's preamble says so.
+  side only, and the document preamble says so.
 - An extractor must refuse the document, and emit no SourceDocumentText, if its text layer itself
   contains U+FFFC or a code point in U+FDD0–U+FDEF, because the check would read it as a picture
   or as grid structure.
@@ -215,21 +227,24 @@ The contract replaces the 2.0.0 table and list rules:
 - **Numbered lists.** Emit the number as drawn, followed by U+0020, never U+0009 and never
   nothing. A browser-made PDF that has no space code point after the number must still yield
   U+0020.
-- **Pictures.** An inline picture in the text's reading order is U+FFFC followed by the SHA-256
-  hex of the `src` the narrative must carry:
-  - for an embedded picture, the `data:image/png;base64,` or `data:image/jpeg;base64,` URI of its
-    exact bytes, in canonical padded base64 (the media type is that of the stored part);
-  - for a structured source that references a picture, the reference exactly as the source
-    writes it.
+- **Pictures.** An inline picture in the text's reading order is U+FFFC, the SHA-256 hex of the
+  `data:image/png;base64,` or `data:image/jpeg;base64,` URI of its exact bytes in canonical
+  padded base64 (the media type is that of the stored part), and U+FFFC. A structured source's
+  referenced picture is resolved to its bytes when they can be fetched and pinned, and otherwise
+  draws nothing and is emitted as nothing (ADR 0005 records it).
 
-  A picture is an embedded raster image or a referenced image that is drawn inline, including a
-  logo and a decorative picture. Vector drawings, shapes and text boxes are not pictures, and
+  A picture is an embedded raster image drawn inline, including a logo and a decorative picture. Vector drawings, shapes and text boxes are not pictures, and
   the extractor must refuse the document when it meets one it cannot read as text. An extractor
   that cannot place pictures must refuse a document that has them.
 
-- **Structured sources.** An extractor over a structured source (an authority's FHIR ePI, ADR 0005) emits one page per source section, in source order, with the whole page as the body.
-  Each page's text is the section narrative as a renderer draws it, following the rules above.
-  The narrative section's span covers that page's body. §1 and §6 then apply unchanged.
+- **Line layout.** Every block is on its own line, as the scanner writes it: ⟦table⟧, a caption,
+  each ⟦row⟧ and ⟦/table⟧ each start a line, and so does a paragraph, heading or list item. A
+  title printed above a table in a PDF is a paragraph before ⟦table⟧ (a PDF has no captions). A
+  `ul` item's bullet is emitted as §3 step 4 removes it, or not at all.
+- **Structured sources.** An extractor over a structured source (an authority's FHIR ePI, ADR 0005) emits one page per source section, in source order, with the whole page as the body,
+  beginning and ending with U+000A as the scanner's text does. Each page's text is the section
+  narrative as a renderer draws it, following the rules above. The narrative section's span
+  covers that page's body. §1 and §6 then apply unchanged.
 
 ## Impact
 
@@ -250,15 +265,19 @@ The contract replaces the 2.0.0 table and list rules:
 - Both implementations (`src/fidelity/xhtml.ts`, `zone-a/src/zone_a/fidelity/xhtml.py`) change
   together. The differential generator gains lists, spans, pictures, nested tables and reserved
   references, including the overlap, clip and hole cases.
-- **Reason codes.** `list-content` and `reserved-character` are added to the catalogue. The
-  §5 precedence statement is extended:
+- **Reason codes.** `list-content`, `reserved-character` and `table-size` are added to the
+  catalogue, in its order: `reserved-character` after `forbidden-character`, `list-content`
+  after `void-element`, `table-size` after `table-shape`. A narrative whose normalised text is
+  only U+0020 and grid markers is `empty-narrative` (a table of empty cells draws nothing), and
+  `transform.ts` uses the same rule for whether a narrative is present. The §5 precedence
+  statement is extended:
   - At a start tag, the parent check has four steps, in this order:
     1. `script-content`;
     2. `misnested-tag`, for a table part or `li` in the wrong parent;
     3. `table-content`;
     4. `list-content`.
   - After the parent check come `table-structure` (which now includes a nested `table`), then
-    `table-section-order`, then `table-shape` for an overlapping cell.
+    `table-section-order`, then `table-shape` for an overlapping cell, then `table-size`.
   - At an end tag, `table-shape` is decided for `</table>`, `</thead>`, `</tbody>` and
     `</tfoot>`.
   - At `&`: `reserved-character` comes right after `forbidden-character`, and `list-content`
@@ -289,15 +308,19 @@ Against the reference, parse5, and a browser in both HTML and XML parsing:
     against a source row set with empty cells there.
 11. A value that sits in column 2 in the narrative and column 1 in the source mismatches.
     This case was accepted in 2.0.0.
-12. `<table>` inside a `<td>` is `table-structure`.
-13. `<img src="~/_entity/annotation/0c1d…"/>` inside `<p>` gives U+FFFC and the hash, in place.
-    A different reference mismatches.
-14. `<img src="x" alt="Take 10 mg"/>` and `<img/>` are `forbidden-attribute`. `<img src="x">` is
-    `void-element`.
-15. `&#xFFFC;` and a raw U+FDD3 in text are `reserved-character`. So are `<tr>&#xFFFC;</tr>` and
-    `<sup>&#xFDD0;</sup>`.
-16. These `src` values reject: `javascript:x`, `//evil/x`, `../x`, `a/../x`, `/x`, `https://h/x`,
-    `data:image/svg+xml;base64,AAAA`, a base64 body of length 5, and `=` in the middle of a body.
+12. `<table>` inside a `<td>`, and inside a `<caption>`, is `table-structure`.
+13. `<img src="data:image/png;base64,AA=="/>` inside `<p>` gives U+FFFC, the hash and U+FFFC, in
+    place. Other bytes mismatch; a reference (`~/_entity/annotation/0c1d…`) is
+    `forbidden-attribute`.
+14. `<img src="data:…" alt="Take 10 mg"/>` and `<img/>` are `forbidden-attribute`.
+    `<img src="data:…">` is `void-element`.
+15. `&#xFFFC;` and a raw U+FDD3 in text are `reserved-character`. So are
+    `<table><tr>&#xFFFC;</tr></table>` and `<sup>&#xFDD0;</sup>`.
+16. These `src` values reject: `javascript:x`, `//evil/x`, `../x`, `a/../x`, `/x`, `x`,
+    `https://h/x`, `data:image/svg+xml;base64,AAAA`, a base64 body of length 5, and `=` in the
+    middle of a body.
+17. 50 rows of `<td colspan="1000">` are accepted; one more slot is `table-size`.
+18. `<table><tr><td></td></tr></table>` alone is `empty-narrative`.
 
 ## First review (2026-09-23): findings and what changed
 
@@ -343,3 +366,46 @@ the session scratchpad.
 12. **Low.** Residuals were unstated. They are now stated under A and C.
 13. **Low.** Wording. The one-sided rule is stated in §1's preamble, and the impact claim is
     corrected.
+
+## Second review (2026-09-23): findings and what changed
+
+The second review tested the amended proposal and the draft TypeScript against Chrome 153 (one
+instance, HTML and XML parsing; list numbers from the accessibility tree, grids from cell
+rectangles) and parse5 7.1.2, and ran 1000 random span tables whose grid decoded from the
+scanner's text equalled Chrome's drawn grid in both modes. Its scripts are in the session
+scratchpad.
+
+1. **High.** A line break inside a cell reopens cell association (`10 mg<br/>&#160;` against
+   `&#160;<br/>10 mg` next to a two-line cell). Decided: stated as a residual (B), and the
+   overclaim withdrawn; comparing lines would refuse most PDF tables, because wrapping and line
+   breaks look alike on a page. ADR 0005's import compares each cell's line breaks
+   structurally.
+2. **High.** A table inside a caption was accepted and the grid nested. Fixed: any `table` while
+   a table is open is `table-structure`.
+3. **High.** The end-of-table marker's line break was stated differently in the code and here.
+   Fixed: U+000A, then U+FDD1, then the end tag's break, in both documents.
+4. **High.** The precedence of a missing `src` was unstated here. Fixed (C).
+5. **High.** A reference `src` binds a string, not what is drawn; the EMA's references draw at
+   zero size. Fixed: `src` is a `data:` URI only, and ADR 0005 decision 3 carries a referenced
+   picture as its fetched, pinned bytes, or not at all when it cannot be fetched (recorded).
+6. **Medium.** A small table produced a huge text. Fixed: 50 000 slots per narrative
+   (`table-size`).
+7. **Medium.** An empty table counted as present. Fixed: grid markers are not drawn text, for
+   `empty-narrative` and in `transform.ts`.
+8. **Medium.** The extractor contract left line layout open. Fixed (E, line layout and
+   structured sources).
+9. **Medium (ADR 0005).** The reader and the clean-div builder could share a misreading. Fixed in
+   ADR 0005: a renderer cross-check in CI over every pinned publication, the reader refusing
+   out-of-grammar values, self-closing non-void elements and zero-size pictures, and the
+   authority stylesheet stated as a residual.
+10. **Medium.** The ADRs and AGENTS.md claimed more than is proved. Fixed: AGENTS.md now says the
+    check proves words, list numbers, table grids and embedded pictures, and that paragraph
+    breaks, headings, bullets, list nesting and emphasis are kept, not proved; ADR 0003's first
+    two Consequences are updated; list nesting and bullets are stated as residuals (§5).
+11. **Low.** NFC could merge a combining mark into a picture's last digit. Fixed: the token is
+    closed by U+FFFC.
+12. **Low.** Slots are the table model's logical slots; a renderer draws some at zero size.
+    Stated (§5): at most a false failure.
+13. **Low.** Test case 15, "§1's preamble", and a Markdown formatter turning "(default 1) plus"
+    into a numbered list in the specification. Fixed.
+14. **Low.** The catalogue order of the new codes. Stated (Impact).

@@ -306,6 +306,9 @@ describe("deterministic Type 2 to EMA conversion", () => {
     ["an attribute holding a >", '<p title="x>y"></p>', "has unreadable narrative"],
     ["a comment holding an img", "<!-- <img> -->", "has unreadable narrative"],
     ["an image only", '<img src="https://khs.dev/pictogram.png"/>', "has unreadable narrative"],
+    // fidelity-norm/3.0.0: a table's grid markers are structure, not text.
+    ["a table of empty cells", "<table><tr><td></td><td> </td></tr></table>", "has no narrative"],
+    ["a picture by reference", '<p><img src="images/logo.png"/></p>', "has unreadable narrative"],
   ])("fails closed when a mandatory leaf section holds only %s", (_name, content, outcome) => {
     const source = createSyntheticType2Bundle(mapping);
     findSection(composition(source).section, "smpc.4.3").text = {
@@ -314,6 +317,20 @@ describe("deterministic Type 2 to EMA conversion", () => {
     };
 
     expect(transformIssues(source)).toEqual([`Mandatory source section smpc.4.3 ${outcome}`]);
+  });
+
+  it.each([
+    ["a picture", '<p><img src="data:image/png;base64,AA=="/></p>'],
+    ["a numbered item", '<ol start="2"><li></li></ol>'],
+    ["a table with one filled cell", "<table><tr><td></td><td>x</td></tr></table>"],
+  ])("counts %s as narrative a reader sees", (_name, content) => {
+    const source = createSyntheticType2Bundle(mapping);
+    findSection(composition(source).section, "smpc.4.3").text = {
+      status: "generated",
+      div: div(content),
+    };
+
+    expect(() => transformType2ToEma(source, mapping)).not.toThrow();
   });
 
   it("fails closed when 4.8 has no narrative above its reporting subsection", () => {

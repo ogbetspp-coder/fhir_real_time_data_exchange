@@ -35,6 +35,7 @@ export type XhtmlErrorCode =
   | "table-section-order"
   | "table-structure"
   | "table-shape"
+  | "table-size"
   | "soft-hyphen-at-boundary";
 
 export class XhtmlError extends Error {
@@ -129,6 +130,26 @@ export const CELL_START = "\ufdd3";
 export const COVERED_LEFT = "\ufdd4";
 export const COVERED_ABOVE = "\ufdd5";
 export const PICTURE = "\ufffc";
+
+// The grid markers: structure, not text a reader sees.
+export function isGridMarker(codePoint: number): boolean {
+  return codePoint >= 0xfdd0 && codePoint <= 0xfdd5;
+}
+
+// Whether normalised narrative text holds anything a reader sees: a table of empty cells, whose
+// text is only grid markers, draws nothing (section 5, `empty-narrative`).
+export function hasDrawnText(normalized: string): boolean {
+  for (const character of normalized) {
+    const codePoint = character.codePointAt(0) ?? 0;
+    if (codePoint !== 0x0020 && !isGridMarker(codePoint)) return true;
+  }
+  return false;
+}
+
+// The slots all tables of one narrative may cover together. A small table can span a large grid
+// (`colspan="1000" rowspan="1000"` is a million slots, each a marker in the text), so the grid is
+// bounded, and a real table is far inside the bound (`table-size`).
+export const TABLE_SLOT_LIMIT = 50_000;
 
 export function isReservedCodePoint(codePoint: number): boolean {
   return codePoint === 0xfffc || (codePoint >= 0xfdd0 && codePoint <= 0xfdef);
@@ -272,12 +293,9 @@ const HREF_VALUE = /^https:\/\/[A-Za-z0-9.-]{1,64}(?:\/[A-Za-z0-9._~-]{0,32}){0,
 const LIST_TYPE_VALUE = /^[1aAiI]$/;
 const LIST_START_VALUE = /^(?:0|-?[1-9][0-9]{0,3})$/;
 const SPAN_VALUE = /^(?:[1-9][0-9]{0,2}|1000)$/;
-// A picture's source: a relative reference whose segments cannot start with `.` (so no `.` or
-// `..` segment, no scheme, no leading `/` and no `//`), or a PNG or JPEG `data:` URI. The value
-// is compared with the source through its hash (the text `img` emits), so it carries only what the
-// source carries.
-const PICTURE_REFERENCE =
-  /^[A-Za-z0-9_~-][A-Za-z0-9._~-]{0,63}(?:\/[A-Za-z0-9_~-][A-Za-z0-9._~-]{0,63}){0,15}$/;
+// A picture's source is a PNG or JPEG `data:` URI: the picture's own bytes, compared with the
+// source through the hash `img` emits. A reference (a path or a URL) is refused: what it draws is
+// whatever the viewer's origin serves, or nothing, and neither is bound by the check.
 const PICTURE_DATA_PREFIXES = ["data:image/png;base64,", "data:image/jpeg;base64,"];
 // The base64 length of 1 MiB.
 const PICTURE_DATA_LIMIT = 1_398_104;
@@ -305,7 +323,7 @@ function attributeAllowed(name: string, value: string, element: string, isRoot: 
     return (element === "td" || element === "th") && SPAN_VALUE.test(value);
   }
   if (name === "src") {
-    return element === "img" && (PICTURE_REFERENCE.test(value) || isPictureData(value));
+    return element === "img" && isPictureData(value);
   }
   return false;
 }
@@ -385,16 +403,16 @@ function checkParent(name: string, parent: string | undefined, offset: number): 
 // first, sections render head → body → foot, and rows placed directly under `table` are
 // wrapped in an implicit body. Only the one document order that renders as written is
 // accepted, so displayed text order equals the order the source was verified in. Parents are
-// already checked. A table inside a cell is refused, so the grid text below never nests.
+// already checked. A table inside an open table (in a cell or in a caption) is refused, so the
+// grid text below never nests.
 function enterTableStructure(
   name: string,
   parent: string | undefined,
   state: TableState | undefined,
-  cellDepth: number,
   offset: number,
 ): void {
   if (name === "table") {
-    if (cellDepth > 0) throw new XhtmlError("table-structure", offset);
+    if (state !== undefined) throw new XhtmlError("table-structure", offset);
     return;
   }
   if (state === undefined) return;
@@ -452,7 +470,13 @@ function startRow(state: TableState): void {
 // Places a cell by the HTML table model: in the first slot of its row that no cell covers. The
 // slots before it that a cell above covers are emitted first. A cell that would cover a slot
 // already covered overlaps it, which a renderer draws as two texts on top of each other.
-function placeCell(state: TableState, colspan: number, rowspan: number, offset: number): string {
+function placeCell(
+  state: TableState,
+  colspan: number,
+  rowspan: number,
+  grid: { slots: number },
+  offset: number,
+): string {
   let before = "";
   while (state.filled[state.cursor] === true) {
     before += coveredSlot(COVERED_ABOVE);
@@ -461,6 +485,8 @@ function placeCell(state: TableState, colspan: number, rowspan: number, offset: 
   for (let column = state.cursor; column < state.cursor + colspan; column += 1) {
     if (state.filled[column] === true) throw new XhtmlError("table-shape", offset);
   }
+  grid.slots += colspan * rowspan;
+  if (grid.slots > TABLE_SLOT_LIMIT) throw new XhtmlError("table-size", offset);
   for (let column = state.cursor; column < state.cursor + colspan; column += 1) {
     state.filled[column] = true;
     state.down[column] = rowspan - 1;
@@ -612,6 +638,7 @@ export function xhtmlToText(div: string): string {
   const stack: string[] = [];
   const tables: TableState[] = [];
   const lists: ListState[] = [];
+  const grid = { slots: 0 };
   let rootSeen = false;
   let rootClosed = false;
   let cellDepth = 0;
@@ -682,13 +709,14 @@ export function xhtmlToText(div: string): string {
       const parent = stack[stack.length - 1];
       checkParent(name, parent, index);
       const table = tables[tables.length - 1];
-      enterTableStructure(name, parent, table, cellDepth, index);
+      enterTableStructure(name, parent, table, index);
       let slotsBefore = "";
       if ((name === "td" || name === "th") && table !== undefined) {
         slotsBefore = placeCell(
           table,
           Number(attributes.get("colspan") ?? "1"),
           Number(attributes.get("rowspan") ?? "1"),
+          grid,
           index,
         );
       }
@@ -709,7 +737,9 @@ export function xhtmlToText(div: string): string {
         output.push(listMarker(list.style, list.next));
         list.next += 1;
       }
-      if (name === "img") output.push(PICTURE, sha256Utf8(attributes.get("src") ?? ""));
+      // U+FFFC, the hash, U+FFFC: closed, so a combining mark after the picture cannot compose
+      // with its last digit.
+      if (name === "img") output.push(PICTURE, sha256Utf8(attributes.get("src") ?? ""), PICTURE);
       // A self-closing element is `br`, `hr` or `img`; `hr`, a block, also emits its closing break.
       if (selfClosing) {
         if (BLOCK_ELEMENTS.has(name)) output.push(lineBreak);

@@ -650,13 +650,7 @@ function table(random: Random, depth: number): Markup {
   return { markup: `<table>${markup}${tableWhitespace(random, classes)}</table>`, classes };
 }
 
-// Picture sources fidelity-norm/3.0.0 accepts: relative references and PNG or JPEG `data:` URIs.
-const PICTURE_SOURCES: readonly string[] = [
-  "~/_entity/annotation/0c1d2e3f-aaaa-bbbb-cccc-0123456789ab",
-  "images/logo.png",
-  "a_b/c-d~e.f",
-  "x",
-];
+// Picture sources fidelity-norm/3.0.0 accepts: PNG or JPEG `data:` URIs only.
 const PICTURE_DATA: readonly string[] = [
   "data:image/png;base64,iVBORw0KGgo=",
   "data:image/jpeg;base64,/9j/4AAQ",
@@ -777,12 +771,17 @@ function node(random: Random, depth: number, inCell = false): Markup {
   if (kind < 0.94) return inCell ? markupTextNode(random) : table(random, depth);
   if (kind < 0.955) {
     const before = markupTextNode(random);
-    const data = chance(random, 0.3);
-    const source = pick(random, data ? PICTURE_DATA : PICTURE_SOURCES);
+    const source = pick(random, PICTURE_DATA);
     for (const name of before.classes) classes.add(name);
-    classes.add(data ? "picture-data" : "picture");
+    classes.add("picture");
+    // A combining mark right after a picture composes with nothing: the token is closed.
+    let after = chance(random, 0.5) ? word(random) : "";
+    if (chance(random, 0.15)) {
+      after = `${pick(random, [CP(0x0301), "&#x301;", CP(0x0308)])}${after}`;
+      classes.add("picture-then-combining");
+    }
     return {
-      markup: `${before.markup}<img${pick(random, ["", SPACE, LF])} src="${source}"${pick(random, ["", SPACE])}/>${chance(random, 0.5) ? word(random) : ""}`,
+      markup: `${before.markup}<img${pick(random, ["", SPACE, LF])} src="${source}"${pick(random, ["", SPACE])}/>${after}`,
       classes,
     };
   }
@@ -935,13 +934,16 @@ const VIOLATIONS: readonly Violation[] = [
         "a b",
         "a//b",
         "~/_entity/annotation/.x",
+        "~/_entity/annotation/0c1d2e3f-aaaa-bbbb-cccc-0123456789ab",
+        "images/logo.png",
+        "x",
         "a/b/",
       ]);
       return root(`${body}<p>a<img src="${source}"/>b</p>`, attrs);
     },
   },
   {
-    className: "picture-data",
+    className: "picture-data-body",
     apply: (body, attrs, random) => {
       const source = pick(random, [
         "data:image/svg+xml;base64,AAAA",
@@ -997,6 +999,23 @@ const VIOLATIONS: readonly Violation[] = [
         '<ol start="10000"><li>a</li></ol>',
       ]);
       return root(`${body}${inner}`, attrs);
+    },
+  },
+  {
+    className: "table-in-caption",
+    apply: (body, attrs) =>
+      root(
+        `${body}<table><caption>X<table><tr><td>y</td></tr></table></caption><tr><td>z</td></tr></table>`,
+        attrs,
+      ),
+  },
+  {
+    // At most 50 000 slots over all tables of a narrative (`table-size`).
+    className: "table-size",
+    apply: (body, attrs, random) => {
+      const rows = pick(random, [50, 51]);
+      const row = '<tr><td colspan="1000">a</td></tr>';
+      return root(`${body}<table>${row.repeat(rows)}</table>`, attrs);
     },
   },
   {

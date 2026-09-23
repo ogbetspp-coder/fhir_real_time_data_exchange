@@ -70,7 +70,9 @@ _Amended 2026-09-23 for `fidelity-norm/2.0.0`
 (`docs/validation/changes/2026-09-23-fidelity-norm-2-0-0.md`): markup may not change what a
 reader sees without the check seeing it._
 
-- Structure is free (paragraph and cell boundaries flatten to spaces); words are checked. A
+- Structure is free (paragraph boundaries, headings, line breaks, list nesting and bullets
+  flatten to spaces; from `fidelity-norm/3.0.0` a table's grid, an `ol`'s numbers and a
+  picture's bytes are folded into the text and checked); words are checked. A
   bullet glyph is structure only where it starts a list item (after a line feed, before
   whitespace, on a line without a tab); mid-line or in a table cell it is content, and U+2219
   and U+2043 are never bullets. A line feed in the narrative's text is a space, as a renderer
@@ -80,9 +82,10 @@ reader sees without the check seeing it._
   fold to their script code points, so `10<sup>6</sup>` is `10⁶` and never equals a source's
   `106`; a number there with no script form, and U+00B1 or U+2213, rejects.
 - The extractor contract is explicit: emit discretionary hyphens as U+00AD, hard hyphens
-  verbatim, table cells row-major separated by TAB and rows by LF with the same number of cells
-  in every row (a spanned cell's text once, in its first slot, and empty cells for the slots it
-  covers), raised and lowered digits and signs as script code points, no U+000B or U+000C (a
+  verbatim, each table with its grid (from `fidelity-norm/3.0.0`: table, row, cell and
+  covered-slot markers, the slots a merged cell covers marked as covered, never as empty cells),
+  numbered-list markers as drawn with a space, pictures as the hash of their bytes, raised and
+  lowered digits and signs as script code points, no U+000B or U+000C (a
   page break is the page record), and declare per-page `bodyStart`/`bodyEnd` so repeated
   headers and footers are excluded from spans, with every non-empty body ending in its own line
   feed. An extractor that cannot tell a glyph's baseline shift must refuse the document rather

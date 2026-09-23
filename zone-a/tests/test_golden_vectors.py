@@ -138,3 +138,20 @@ def test_an_escaped_surrogate_pair_in_json_is_one_code_point() -> None:
         with pytest.raises(XhtmlError) as raised:
             xhtml_to_text(_div_from_json(rejected))
         assert raised.value.code == "forbidden-character"
+
+
+def test_a_grid_of_exactly_the_slot_limit_is_accepted() -> None:
+    """The tables of one narrative cover at most 50 000 slots (fidelity-norm/3.0.0).
+
+    The accepted side is pinned here rather than as a vector, whose text would be 150 000 code
+    points long; the refused side is the vector ``rejects-table-over-slot-limit``.
+    """
+    row = '<tr><td colspan="1000">a</td></tr>'
+
+    def table(rows: int, extra: str = "") -> str:
+        return f'<div xmlns="http://www.w3.org/1999/xhtml"><table>{row * rows}</table>{extra}</div>'
+
+    assert isinstance(xhtml_to_text(table(50)), str)
+    with pytest.raises(XhtmlError) as raised:
+        xhtml_to_text(table(50, "<table><tr><td>b</td></tr></table>"))
+    assert raised.value.code == "table-size"

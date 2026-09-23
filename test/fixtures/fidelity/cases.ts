@@ -397,9 +397,10 @@ const EMPTY_CELLS_DOSE =
 const EMPTY_CELLS_DOSE_SOURCE = customSource([EMPTY_CELLS_DOSE]);
 const DOSE_IN_SECOND_COLUMN = gridRow("Adults", "10 mg", "");
 const DOSE_IN_SECOND_COLUMN_SOURCE = customSource([DOSE_IN_SECOND_COLUMN]);
-const PICTURE_REFERENCE = "~/_entity/annotation/0c1d2e3f-aaaa-bbbb-cccc-0123456789ab";
-const PICTURE_LINE = `See \ufffc${sha256Utf8(PICTURE_REFERENCE)} below.`;
-const PICTURE_SOURCE = customSource([PICTURE_LINE]);
+// A picture is its `data:` URI's hash between two U+FFFC (section 5).
+const PICTURE_SOURCE = "data:image/png;base64,iVBORw0KGgo=";
+const PICTURE_LINE = `See \ufffc${sha256Utf8(PICTURE_SOURCE)}\ufffc below.`;
+const PICTURE_LINE_SOURCE = customSource([PICTURE_LINE]);
 const SPANNED_DOSE_TABLE =
   '<table><tr><td>Adults</td><td rowspan="3">10 mg</td></tr><tr><td>Children</td></tr><tr><td>Elderly</td></tr></table>';
 const MID_LINE_BULLET = "Take 2 \u2022 10 mg daily.";
@@ -946,6 +947,22 @@ export const verifyCases: VerifyCase[] = [
   {
     name: "whitespace-only-div",
     input: toInput(S, single("smpc.4.1", div("<p> \n </p>"), [spanFor(S, 1, INDICATIONS)])),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.1": "malformed-narrative" },
+      reasons: { "smpc.4.1": "empty-narrative" },
+    },
+  },
+  {
+    // fidelity-norm/3.0.0: grid markers are not text a reader sees, so an empty table draws
+    // nothing and a narrative of one is empty.
+    name: "empty-table-div",
+    input: toInput(
+      S,
+      single("smpc.4.1", div("<table><tr><td></td><td> </td></tr></table>"), [
+        spanFor(S, 1, INDICATIONS),
+      ]),
+    ),
     expect: {
       status: "failed",
       sections: { "smpc.4.1": "malformed-narrative" },
@@ -2167,31 +2184,33 @@ export const verifyCases: VerifyCase[] = [
     expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
   },
   {
-    name: "picture-with-source-reference-verifies",
+    name: "picture-with-source-bytes-verifies",
     input: toInput(
-      PICTURE_SOURCE,
-      single("smpc.4.2.posology", div(`<p>See <img src="${PICTURE_REFERENCE}"/> below.</p>`), [
-        spanFor(PICTURE_SOURCE, 1, PICTURE_LINE),
+      PICTURE_LINE_SOURCE,
+      single("smpc.4.2.posology", div(`<p>See <img src="${PICTURE_SOURCE}"/> below.</p>`), [
+        spanFor(PICTURE_LINE_SOURCE, 1, PICTURE_LINE),
       ]),
     ),
     expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
   },
   {
-    name: "picture-with-other-reference-mismatches",
+    name: "picture-with-other-bytes-mismatches",
     input: toInput(
-      PICTURE_SOURCE,
-      single("smpc.4.2.posology", div('<p>See <img src="images/dose-table.png"/> below.</p>'), [
-        spanFor(PICTURE_SOURCE, 1, PICTURE_LINE),
-      ]),
+      PICTURE_LINE_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div('<p>See <img src="data:image/png;base64,AA=="/> below.</p>'),
+        [spanFor(PICTURE_LINE_SOURCE, 1, PICTURE_LINE)],
+      ),
     ),
     expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
   },
   {
     name: "picture-missing-mismatches",
     input: toInput(
-      PICTURE_SOURCE,
+      PICTURE_LINE_SOURCE,
       single("smpc.4.2.posology", paragraphs("See below."), [
-        spanFor(PICTURE_SOURCE, 1, PICTURE_LINE),
+        spanFor(PICTURE_LINE_SOURCE, 1, PICTURE_LINE),
       ]),
     ),
     expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
@@ -2403,6 +2422,12 @@ export const normalizationCases: NormalizationCase[] = [
   { name: "soft-hyphen-crlf", input: "intra­\r\nvenous", expected: "intravenous" },
   { name: "soft-hyphen-then-space-stays", input: "intra­ venous", expected: "intra venous" },
   { name: "ligature-then-combining", input: "ﬁ́", expected: "fí" },
+  // A picture token is closed by U+FFFC, which composes with nothing, so NFC leaves its digits.
+  {
+    name: "combining-mark-after-picture-token",
+    input: `\ufffc${"e".repeat(64)}\ufffc\u0301x`,
+    expected: `\ufffc${"e".repeat(64)}\ufffc\u0301x`,
+  },
   { name: "plain", input: "Take one tablet daily.", expected: "Take one tablet daily." },
   {
     name: "collapse-whitespace",
@@ -3698,19 +3723,43 @@ export const xhtmlCases: XhtmlCase[] = [
     expected: { error: "table-shape" },
   },
   {
-    name: "accepts-picture-reference",
+    // A reference draws whatever the viewer's origin serves, or nothing: only `data:` is bound.
+    name: "rejects-picture-reference",
     input: div('<p>see <img src="~/_entity/annotation/0c1d"/> here</p>'),
-    expected:
-      "\n\nsee \ufffc33cf118a449536fbab5d5b507f152b8b4f817c90af14bf2e0fca2c36332c4f76 here\n\n",
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-picture-relative-path",
+    input: div('<p><img src="images/logo.png"/></p>'),
+    expected: { error: "forbidden-attribute" },
   },
   {
     name: "accepts-picture-data",
     input: div('<p><img src="data:image/png;base64,AA=="/>x</p>'),
-    expected: "\n\n\ufffce2c4bf98685a8d0674e42fe055e6768d7da848691d4fa7c9dbd5b0703d9dfaf4x\n\n",
+    expected:
+      "\n\n\ufffce2c4bf98685a8d0674e42fe055e6768d7da848691d4fa7c9dbd5b0703d9dfaf4\ufffcx\n\n",
+  },
+  {
+    name: "accepts-combining-mark-after-picture",
+    input: div('<p><img src="data:image/png;base64,AA=="/>&#x301;x</p>'),
+    expected:
+      "\n\n\ufffce2c4bf98685a8d0674e42fe055e6768d7da848691d4fa7c9dbd5b0703d9dfaf4\ufffc\u0301x\n\n",
+  },
+  {
+    name: "rejects-table-in-caption",
+    input: div(
+      "<table><caption>X<table><tr><td>y</td></tr></table></caption><tr><td>z</td></tr></table>",
+    ),
+    expected: { error: "table-structure" },
+  },
+  {
+    name: "rejects-table-over-slot-limit",
+    input: div(`<table>${'<tr><td colspan="1000">a</td></tr>'.repeat(51)}</table>`),
+    expected: { error: "table-size" },
   },
   {
     name: "rejects-picture-alt",
-    input: div('<p><img src="x" alt="Take 10 mg"/></p>'),
+    input: div('<p><img src="data:image/png;base64,AA==" alt="Take 10 mg"/></p>'),
     expected: { error: "forbidden-attribute" },
   },
   {
@@ -3720,7 +3769,7 @@ export const xhtmlCases: XhtmlCase[] = [
   },
   {
     name: "rejects-picture-start-tag",
-    input: div('<p><img src="x"></img></p>'),
+    input: div('<p><img src="data:image/png;base64,AA=="></img></p>'),
     expected: { error: "void-element" },
   },
   {
@@ -3770,12 +3819,12 @@ export const xhtmlCases: XhtmlCase[] = [
   },
   {
     name: "rejects-picture-in-sup",
-    input: div('<p>10<sup><img src="x"/></sup></p>'),
+    input: div('<p>10<sup><img src="data:image/png;base64,AA=="/></sup></p>'),
     expected: { error: "script-content" },
   },
   {
     name: "rejects-picture-in-row",
-    input: div('<table><tr><img src="x"/></tr></table>'),
+    input: div('<table><tr><img src="data:image/png;base64,AA=="/></tr></table>'),
     expected: { error: "table-content" },
   },
   {

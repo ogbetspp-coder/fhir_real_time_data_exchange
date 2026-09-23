@@ -123,6 +123,18 @@ describe("xhtml scanner", () => {
     }
   });
 
+  // fidelity-norm/3.0.0: the tables of one narrative cover at most 50 000 slots. The accepted side
+  // is pinned here rather than as a vector, whose text would be 150 000 code points long.
+  it("accepts a grid of exactly the slot limit and refuses one slot more", () => {
+    const row = '<tr><td colspan="1000">a</td></tr>';
+    const table = (rows: number, extra = ""): string =>
+      `<div xmlns="http://www.w3.org/1999/xhtml"><table>${row.repeat(rows)}</table>${extra}</div>`;
+    expect(typeof tryXhtml(table(50))).toBe("string");
+    expect(tryXhtml(table(50, "<table><tr><td>b</td></tr></table>"))).toEqual({
+      error: "table-size",
+    });
+  });
+
   // Section 2 applies to the div as decoded from JSON (RFC 8259). The vectors are written by
   // JSON.stringify, which never escapes a valid pair, so the escaped form is pinned here.
   it("reads an escaped surrogate pair in JSON as one code point", () => {

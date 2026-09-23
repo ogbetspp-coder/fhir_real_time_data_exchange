@@ -36,7 +36,7 @@ from .normalize import (
     is_whitespace,
     normalize_text,
 )
-from .xhtml import SOFT_HYPHEN, XhtmlError, xhtml_to_text
+from .xhtml import SOFT_HYPHEN, XhtmlError, has_drawn_text, xhtml_to_text
 
 # Most text a page may exclude as running header/footer. The body range is declared by the
 # extractor, so it is bounded and must sit on line boundaries rather than trusted outright.
@@ -452,7 +452,7 @@ def normalize_narrative(div: str) -> dict[str, str]:
         return {"reason": error.code}
     except NormalizationError as error:
         return {"reason": error.code}
-    return {"reason": "empty-narrative"} if text == "" else {"text": text}
+    return {"text": text} if has_drawn_text(text) else {"reason": "empty-narrative"}
 
 
 def compute_narrative_binding(sections: list[Json]) -> tuple[list[Json], str]:

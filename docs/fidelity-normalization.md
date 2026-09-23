@@ -205,10 +205,10 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   renderer draws such content outside the numbering. `li` of a `ul` emits nothing of its own:
   a bullet carries no content, and section 3 step 4 removes a list bullet from page text. Each
   `li` of an `ol` emits, directly after the line break of its start tag, its marker, then `.`,
-  then U+0020, because a renderer draws it. The item's ordinal is the `ol`'s `start` (default
-  1. plus the item's index among the `li` children, counted from 0. The marker is the ordinal
-     in the counter style the `ol`'s `type` names; an `ol` without `type` is decimal, whatever list
-     encloses it:
+  then U+0020, because a renderer draws it. The item's ordinal is the `ol`'s `start`, or one
+  when it has none, plus the item's index among the `li` children, counted from 0. The marker is
+  the ordinal in the counter style the `ol`'s `type` names; an `ol` without `type` is decimal,
+  whatever list encloses it:
   - `1`: decimal; a negative ordinal is U+002D followed by its magnitude; no leading zeros.
   - `a` and `A`: alphabetic, for an ordinal of 1 or more. Start from an empty string; while
     `n > 0`: `n = n − 1`, prepend the letter at index `n mod 26` of `a…z` (`A…Z` for `A`),
@@ -221,15 +221,22 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
 
   What this does not claim: a viewer that applies its own list style, or draws no list numbers
   at all (a plain XML view), shows something other than what the check read; the narrative
-  cannot carry a stylesheet, so the style is the one `type` names.
+  cannot carry a stylesheet, so the style is the one `type` names. List nesting is not compared
+  (`<ol><li>A<ol><li>B</li></ol></li></ol>` and two consecutive lists both read `1. A 1. B`),
+  and neither is a `ul` bullet (`<ul><li>1. x</li></ul>` reads as `<ol><li>x</li></ol>`): both
+  are indentation and bullets, which section 3 step 4 already removes from page text.
 
-- Pictures. `img` has exactly one attribute, `src`, and must have it (`forbidden-attribute`
-  otherwise, including for `alt`, which a renderer draws when a picture does not load and which
-  would be compared with nothing). It emits U+FFFC followed by the 64 lower-case hexadecimal
-  digits of the SHA-256 of the UTF-8 bytes of its `src` value, with no whitespace added, so the
-  text states where each picture stands and which picture it is. For a `data:` source the hash
-  binds the picture's bytes; for a reference it binds the reference, not what the reference
-  resolves to. What a picture shows is not read by any text check.
+- Pictures. `img` has exactly one attribute, `src`, a PNG or JPEG `data:` URI (below), and must
+  have it (`forbidden-attribute` otherwise, including for `alt`, which a renderer draws when a
+  picture does not load and which would be compared with nothing; the missing `src` is decided
+  after the attributes and before `void-element`). A reference (a path or a URL) is refused:
+  what it draws is whatever the viewer's origin serves at that path, or nothing, and neither is
+  bound by the check. `img` emits U+FFFC, the 64 lower-case hexadecimal digits of the SHA-256 of
+  the UTF-8 bytes of its `src` value, and U+FFFC again, with no whitespace added, so the text
+  states where each picture stands and which bytes it draws; the closing U+FFFC composes with
+  nothing, so a combining mark after a picture cannot join its last digit (section 3 step 3).
+  What a picture shows is not read by any text check; a `data:` media type is not checked
+  against the bytes, which a renderer sniffs, but it draws the same bytes on both sides.
 - The content of `sup` and `sub` is text and character references only; a child element
   rejects (`script-content`). Folding happens after references are decoded. Inside `sup`:
   `0`–`9` → U+2070, U+00B9, U+00B2, U+00B3, U+2074–U+2079; `+` → U+207A; `-` and U+2212 →
@@ -257,8 +264,8 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   `td` and `th`. Any other element directly inside `table`, `thead`, `tbody`, `tfoot` or `tr`
   rejects (`table-content`), and so does any character reference, and any raw code point other
   than U+0009, U+000A, U+000D and U+0020, directly inside them: a renderer moves such content
-  out of the table. A `table` inside a `td` or `th`, at any depth, rejects
-  (`table-structure`), so a table's grid text never nests.
+  out of the table. A `table` start tag while another table is open — in a cell, in a caption,
+  at any depth — rejects (`table-structure`), so a table's grid text never nests.
 - Table grids. Cells are placed by the HTML table model: in each row a cell takes the first
   slot, from the left, that no cell covers; it covers `colspan` slots of its own row and of each
   of the next `rowspan − 1` rows (both default to 1). A cell that would cover a slot of its own
@@ -269,6 +276,10 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   `</table>` for rows directly under it: a renderer clips it silently. At `</table>`, every row
   must cover exactly the slots 0 … w−1, with one w for the whole table; otherwise `table-shape`
   (a ragged row, or a slot inside a row that no cell covers). A table with no rows is accepted.
+  The tables of one narrative cover at most 50 000 slots together, counting each cell's
+  `colspan` × `rowspan` when it is placed; the cell that crosses the bound rejects
+  (`table-size`), decided after its overlap check: a small table can span a grid whose markers
+  are hundreds of times its own length.
 
   The text carries the grid, in six reserved code points (section 2): U+FDD0 (table) after the
   line break of `<table>`; U+000A then U+FDD1 (end of table) before the line break of
@@ -285,7 +296,16 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   slot above, and U+FDD1 ends the table, so text after it is not in the last cell. Which cell a
   value is in is therefore checked, and an empty cell is distinct from a covered slot. Not
   compared: whitespace inside a cell, `td` versus `th`, `scope`, and which row group a row is
-  in (row groups are in rendering order and spans cannot cross them).
+  in (row groups are in rendering order and spans cannot cross them). Nor is which line of a
+  cell a value is on: a line break inside a cell is a space, so `<td>10 mg<br/>&#160;</td>` and
+  `<td>&#160;<br/>10 mg</td>` read the same next to a cell of two lines, while a renderer draws
+  the value level with a different line of its neighbour. Line alignment across cells also
+  depends on wrapping and margins, which no text check sees; an extractor of a drawn document
+  cannot tell a wrapped line from a line break, so a rule that compared lines would refuse most
+  real tables. Which cell a value is in is proved; where in the cell it sits is not. The slots
+  are the HTML table model's: a renderer draws a column that no single-column cell starts in at
+  zero width, and a row whose slots are all covered from above at zero height, which can only
+  make an extractor that reads the drawn grid disagree (a false failure).
 
 - Table parts must appear in the one document order that renders as written, because
   renderers place them by role: `caption` (at most one) first; then either rows (`tr`)
@@ -314,13 +334,13 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   `scope` — `[A-Za-z0-9_.:-]{1,32}`; `href` — `https://` host and up to eight path segments of
   at most 32 unreserved characters (no query or fragment); `type` — exactly `1`, `a`, `A`, `i`
   or `I`; `start` — `0|-?[1-9][0-9]{0,3}`; `colspan`, `rowspan` — `[1-9][0-9]{0,2}|1000`;
-  `src` — a reference `SEG(/SEG){0,15}` with `SEG` = `[A-Za-z0-9_~-][A-Za-z0-9._~-]{0,63}` (no
-  scheme, no leading `/`, no `//`, and no segment starting with `.`), or `data:image/png;base64,`
-  or `data:image/jpeg;base64,` followed by a body that is non-empty, at most 1 398 104 code
-  points, a multiple of 4 long, all `[A-Za-z0-9+/=]`, with `=` only as its last one or two code
-  points (tested directly, not by one regular expression). `https:` and every other scheme are
-  refused for `src`: the picture behind them can change after approval, and fetching it tracks
-  the reader. `src` is the one value compared with the source, through the hash `img` emits. Anything else (`javascript:` links,
+  `src` — `data:image/png;base64,` or `data:image/jpeg;base64,` followed by a body that is
+  non-empty, at most 1 398 104 code points (the base64 length of 1 MiB), a multiple of 4 long,
+  all `[A-Za-z0-9+/=]`, with `=` only as its last one or two code points (tested directly, not
+  by one regular expression); a reference, `https:` and every other scheme are refused, because
+  what they draw can change after approval or is nothing, and fetching it tracks the reader.
+  `src` is the one value compared with the source, through the hash `img` emits. Anything else
+  (`javascript:` links,
   `#` fragments, spaces, `<`, `&`, query strings) rejects. These bounds limit, but do not
   eliminate, what attribute values can carry; narrative markup should not need links.
 - Comments, processing instructions, CDATA sections, DOCTYPE declarations, a stray `<`, a
@@ -329,11 +349,15 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   Each decoded code point is subject to section 2 on its own. Named HTML entities such as
   `&nbsp;` reject.
 - The extracted text is then normalised (section 3) by the verifier, which is where an empty
-  result is decided: a narrative whose normalised text is empty is `malformed-narrative` with
-  reason `empty-narrative`. The scanner itself never produces that reason.
+  result is decided: a narrative whose normalised text holds nothing but U+0020 and the grid
+  markers U+FDD0–U+FDD5 draws nothing, and is `malformed-narrative` with reason
+  `empty-narrative` (a table of empty cells is empty; a list number or a picture is drawn). The
+  scanner itself never produces that reason. The same rule decides elsewhere whether a
+  narrative is present (`src/fhir/transform.ts`).
 
 Because block boundaries become U+000A or U+0009 and the whitespace step collapses them,
-paragraph and table-cell boundaries are structure, not content. Cell text is content.
+paragraph boundaries, headings and line breaks are structure, not content. A table's cells are
+content through its grid markers, and cell text is content.
 
 ### Tokeniser
 
@@ -383,7 +407,8 @@ reason code is inside `reportHash`, so the order in which violations are decided
   `unknown-element`, then `multiple-roots`/`root-not-div`, then attributes in document order
   (`forbidden-attribute`; root without xmlns = `root-not-div`; an `img` without `src` =
   `forbidden-attribute`, after its attributes), then `void-element`, then the parent check, then
-  `table-structure`, then `table-section-order`, then `table-shape` (an overlapping cell). The
+  `table-structure`, then `table-section-order`, then `table-shape` (an overlapping cell), then
+  `table-size`. The
   parent check: `script-content` if the parent is `sup` or `sub`; else `misnested-tag` for a
   table part (`caption`, `thead`, `tbody`, `tfoot`, `tr`, `td`, `th`) or an `li` in the wrong
   parent; else `table-content` for any other element whose parent is `table`, `thead`,
@@ -406,7 +431,8 @@ scan, decide `forbidden-character` and then `reserved-character` before any of t
 The scanner's reason codes are, in the order of this section: `forbidden-character`,
 `reserved-character`, `root-not-div`, `multiple-roots`, `text-outside-root`,
 `uppercase-element`, `unknown-element`, `void-element`, `list-content`, `script-content`,
-`unmappable-script`, `table-content`, `table-shape`, `table-structure`, `table-section-order`,
+`unmappable-script`, `table-content`, `table-shape`, `table-size`, `table-structure`,
+`table-section-order`,
 `misnested-tag`, `soft-hyphen-at-boundary`, `forbidden-attribute`, `comment`, `processing-instruction`,
 `cdata`, `doctype`, `malformed-tag`, `stray-lt`, `stray-amp`, `unknown-entity`,
 `unbalanced-tag`.
@@ -586,20 +612,26 @@ extractor is a controlled component: its name and version are recorded in
   `<ul><li>` narrative fails against it — safe, but a false failure that the extractor must
   avoid. A numbered list's marker is emitted as drawn (`3.`, `b.`, `iv.`) followed by U+0020,
   never U+0009 and never nothing, even where the document's text layer has no space after it;
-- emit an inline picture, in the text's reading order, as U+FFFC followed by the SHA-256 hex of
-  the `src` a narrative must carry for it: for an embedded picture, the `data:image/png;base64,`
-  or `data:image/jpeg;base64,` URI of its exact bytes in canonical padded base64 (the media type
-  is that of the stored part); for a structured source that references a picture, the reference
-  exactly as the source writes it. A picture is an embedded raster image or a referenced image
-  drawn inline, including a logo or a decorative image; vector drawings, shapes and text boxes
-  are not, and an extractor that meets one it cannot read as text must refuse the document. An
-  extractor that cannot place pictures must refuse a document that has them. An extractor whose
-  text layer itself contains U+FFFC or a code point in U+FDD0–U+FDEF must refuse the document
-  (section 2);
+- emit an inline picture, in the text's reading order, as U+FFFC, the SHA-256 hex of the `src`
+  a narrative must carry for it, and U+FFFC: the `data:image/png;base64,` or
+  `data:image/jpeg;base64,` URI of its exact bytes in canonical padded base64 (the media type is
+  that of the stored part). A picture is an embedded raster image drawn inline, including a logo
+  or a decorative image; vector drawings, shapes and text boxes are not, and an extractor that
+  meets one it cannot read as text must refuse the document. A structured source's picture that
+  is a reference is resolved to its bytes when they can be fetched and pinned, and otherwise
+  draws nothing and is emitted as nothing (ADR 0005 records it). An extractor that cannot place
+  pictures must refuse a document that has them. An extractor whose text layer itself contains
+  U+FFFC or a code point in U+FDD0–U+FDEF must refuse the document (section 2);
+- put every block on its own line, as the scanner does: U+FDD0, a caption, each U+FDD2 and
+  U+FDD1 each start a line, and a paragraph, heading or list item starts one. A title printed
+  above a table is a caption only where the document marks it as one (a PDF has no captions:
+  there it is a paragraph before U+FDD0). A `ul` item's bullet is emitted as section 3 step 4
+  removes it, or not at all;
 - for a structured source (an authority's published FHIR ePI, ADR 0005), emit one page per
   source section, in source order, with the whole page as its body, holding the section
-  narrative as a renderer draws it under the rules of this section; the narrative section's
-  span covers that page's body, and sections 1 and 6 apply unchanged;
+  narrative as a renderer draws it under the rules of this section, beginning with U+000A and
+  ending with U+000A as the scanner's text does; the narrative section's span covers that page's
+  body, and sections 1 and 6 apply unchanged;
 - in a raised or lowered glyph run, emit every digit and sign of section 5's folding tables as
   its script code point — raised: U+0030–U+0039 as U+2070, U+00B9, U+00B2, U+00B3,
   U+2074–U+2079, `+`, U+FE62, U+FF0B and U+2795 as U+207A, `-`, U+2212, U+2010–U+2015,
@@ -646,8 +678,11 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   HTML table model with overlaps, clipped row spans, holes and ragged rows refused
   (`table-shape`), and nested tables refused (`table-structure`); every table's text carries its
   grid in the reserved code points U+FDD0–U+FDD5, which closes the cell-association residual
-  2.0.0 stated. `img` is allowed with `src` alone (a reference or a PNG or JPEG `data:` URI) and
-  emits U+FFFC and the SHA-256 of its `src`. U+FFFC and U+FDD0–U+FDEF reject in narrative
+  2.0.0 stated, apart from the line a value sits on inside a multi-line cell, which is stated as
+  a residual. `img` is allowed with `src` alone (a PNG or JPEG `data:` URI; references refused) and
+  emits U+FFFC, the SHA-256 of its `src` and U+FFFC; the tables of a narrative cover at most
+  50 000 slots (`table-size`); a narrative of only grid markers is `empty-narrative`. U+FFFC and
+  U+FDD0–U+FDEF reject in narrative
   (`reserved-character`, the one rule applied to one side only). The extractor contract (section 7) writes tables with their grid, numbered markers with a space, pictures with their hash, and
   a structured source as one page per section. Major under section 8: extractor output that
   conformed to 2.0.0 (tables without the grid) no longer does, every table's normalised text

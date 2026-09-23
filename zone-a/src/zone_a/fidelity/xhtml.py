@@ -139,6 +139,25 @@ COVERED_ABOVE: Final = "\ufdd5"
 PICTURE: Final = "\ufffc"
 
 
+def is_grid_marker(code_point: int) -> bool:
+    """The grid markers U+FDD0-U+FDD5: structure, not text a reader sees."""
+    return 0xFDD0 <= code_point <= 0xFDD5
+
+
+def has_drawn_text(normalized: str) -> bool:
+    """Whether normalised narrative text holds anything a reader sees (section 5).
+
+    A table of empty cells, whose text is only grid markers, draws nothing: ``empty-narrative``.
+    """
+    return any(character != " " and not is_grid_marker(ord(character)) for character in normalized)
+
+
+# The slots all tables of one narrative may cover together. A small table can span a large grid
+# (`colspan="1000" rowspan="1000"` is a million slots, each a marker in the text), so the grid is
+# bounded, and a real table is far inside the bound (`table-size`).
+TABLE_SLOT_LIMIT: Final = 50_000
+
+
 def is_reserved(code_point: int) -> bool:
     """U+FFFC and the noncharacters U+FDD0-U+FDEF."""
     return code_point == 0xFFFC or 0xFDD0 <= code_point <= 0xFDEF
@@ -263,13 +282,9 @@ HREF_VALUE: Final = re.compile(r"https://[A-Za-z0-9.-]{1,64}(?:/[A-Za-z0-9._~-]{
 LIST_TYPE_VALUE: Final = re.compile(r"[1aAiI]")
 LIST_START_VALUE: Final = re.compile(r"0|-?[1-9][0-9]{0,3}")
 SPAN_VALUE: Final = re.compile(r"[1-9][0-9]{0,2}|1000")
-# A picture's source: a relative reference whose segments cannot start with `.` (so no `.` or
-# `..` segment, no scheme, no leading `/` and no `//`), or a PNG or JPEG `data:` URI. The value is
-# compared with the source through its hash (the text `img` emits), so it carries only what the
-# source carries.
-PICTURE_REFERENCE: Final = re.compile(
-    r"[A-Za-z0-9_~-][A-Za-z0-9._~-]{0,63}(?:/[A-Za-z0-9_~-][A-Za-z0-9._~-]{0,63}){0,15}"
-)
+# A picture's source is a PNG or JPEG `data:` URI: the picture's own bytes, compared with the
+# source through the hash `img` emits. A reference (a path or a URL) is refused: what it draws is
+# whatever the viewer's origin serves, or nothing, and neither is bound by the check.
 PICTURE_DATA_PREFIXES: Final = ("data:image/png;base64,", "data:image/jpeg;base64,")
 # The base64 length of 1 MiB.
 PICTURE_DATA_LIMIT: Final = 1_398_104
@@ -374,9 +389,7 @@ def _attribute_allowed(name: str, value: str, element: str, is_root: bool) -> bo
     if name in ("colspan", "rowspan"):
         return element in ("td", "th") and SPAN_VALUE.fullmatch(value) is not None
     if name == "src":
-        return element == "img" and (
-            PICTURE_REFERENCE.fullmatch(value) is not None or _is_picture_data(value)
-        )
+        return element == "img" and _is_picture_data(value)
     return False
 
 
@@ -446,17 +459,17 @@ def _check_parent(name: str, parent: str | None, offset: int) -> None:
 
 
 def _enter_table_structure(
-    name: str, parent: str | None, state: _TableState | None, cell_depth: int, offset: int
+    name: str, parent: str | None, state: _TableState | None, offset: int
 ) -> None:
     """Only the one document order that renders as written is accepted.
 
     Renderers place table parts by role, not by document position: a caption always renders
     first and sections render head then body then foot, so displayed text order must equal the
-    order the source was verified in. Parents are already checked. A table inside a cell is
-    refused, so the grid text never nests.
+    order the source was verified in. Parents are already checked. A table inside an open table
+    (in a cell or in a caption) is refused, so the grid text never nests.
     """
     if name == "table":
-        if cell_depth > 0:
+        if state is not None:
             raise XhtmlError("table-structure", offset)
         return
     if state is None:
@@ -505,7 +518,9 @@ def _is_filled(state: _TableState, column: int) -> bool:
     return column < len(state.filled) and state.filled[column]
 
 
-def _place_cell(state: _TableState, colspan: int, rowspan: int, offset: int) -> str:
+def _place_cell(
+    state: _TableState, colspan: int, rowspan: int, grid: list[int], offset: int
+) -> str:
     """Place a cell by the HTML table model, in the first slot of its row no cell covers.
 
     The slots before it that a cell above covers are emitted first. A cell that would cover a
@@ -518,6 +533,9 @@ def _place_cell(state: _TableState, colspan: int, rowspan: int, offset: int) -> 
     columns = range(state.cursor, state.cursor + colspan)
     if any(_is_filled(state, column) for column in columns):
         raise XhtmlError("table-shape", offset)
+    grid[0] += colspan * rowspan
+    if grid[0] > TABLE_SLOT_LIMIT:
+        raise XhtmlError("table-size", offset)
     if len(state.filled) < columns.stop:
         state.filled.extend([False] * (columns.stop - len(state.filled)))
     for column in columns:
@@ -663,6 +681,8 @@ def xhtml_to_text(div: str) -> str:
     stack: list[str] = []
     tables: list[_TableState] = []
     lists: list[_ListState] = []
+    # The slots every table so far covers, against TABLE_SLOT_LIMIT.
+    grid = [0]
     root_seen = False
     root_closed = False
     cell_depth = 0
@@ -746,13 +766,14 @@ def xhtml_to_text(div: str) -> str:
             parent = stack[-1] if stack else None
             _check_parent(name, parent, index)
             table = tables[-1] if tables else None
-            _enter_table_structure(name, parent, table, cell_depth, index)
+            _enter_table_structure(name, parent, table, index)
             if name in ("td", "th") and table is not None:
                 output.append(
                     _place_cell(
                         table,
                         int(attributes.get("colspan", "1")),
                         int(attributes.get("rowspan", "1")),
+                        grid,
                         index,
                     )
                 )
@@ -774,7 +795,10 @@ def xhtml_to_text(div: str) -> str:
                 lists[-1].next += 1
             if name == "img":
                 src = attributes.get("src", "")
-                output.append(PICTURE + hashlib.sha256(src.encode("utf-8")).hexdigest())
+                # U+FFFC, the hash, U+FFFC: closed, so a combining mark after the picture
+                # cannot compose with its last digit.
+                digest = hashlib.sha256(src.encode("utf-8")).hexdigest()
+                output.append(PICTURE + digest + PICTURE)
             # A self-closing element is `br`, `hr` or `img`; `hr`, a block, also emits its
             # closing break.
             if self_closing:

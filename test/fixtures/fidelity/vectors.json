@@ -27,6 +27,11 @@
       "expected": "fí"
     },
     {
+      "name": "combining-mark-after-picture-token",
+      "input": "￼eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee￼́x",
+      "expected": "￼eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee￼́x"
+    },
+    {
       "name": "plain",
       "input": "Take one tablet daily.",
       "expected": "Take one tablet daily."
@@ -1938,18 +1943,46 @@
       }
     },
     {
-      "name": "accepts-picture-reference",
+      "name": "rejects-picture-reference",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>see <img src=\"~/_entity/annotation/0c1d\"/> here</p></div>",
-      "expected": "\n\nsee ￼33cf118a449536fbab5d5b507f152b8b4f817c90af14bf2e0fca2c36332c4f76 here\n\n"
+      "expected": {
+        "error": "forbidden-attribute"
+      }
+    },
+    {
+      "name": "rejects-picture-relative-path",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><img src=\"images/logo.png\"/></p></div>",
+      "expected": {
+        "error": "forbidden-attribute"
+      }
     },
     {
       "name": "accepts-picture-data",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><img src=\"data:image/png;base64,AA==\"/>x</p></div>",
-      "expected": "\n\n￼e2c4bf98685a8d0674e42fe055e6768d7da848691d4fa7c9dbd5b0703d9dfaf4x\n\n"
+      "expected": "\n\n￼e2c4bf98685a8d0674e42fe055e6768d7da848691d4fa7c9dbd5b0703d9dfaf4￼x\n\n"
+    },
+    {
+      "name": "accepts-combining-mark-after-picture",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><img src=\"data:image/png;base64,AA==\"/>&#x301;x</p></div>",
+      "expected": "\n\n￼e2c4bf98685a8d0674e42fe055e6768d7da848691d4fa7c9dbd5b0703d9dfaf4￼́x\n\n"
+    },
+    {
+      "name": "rejects-table-in-caption",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><caption>X<table><tr><td>y</td></tr></table></caption><tr><td>z</td></tr></table></div>",
+      "expected": {
+        "error": "table-structure"
+      }
+    },
+    {
+      "name": "rejects-table-over-slot-limit",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr><tr><td colspan=\"1000\">a</td></tr></table></div>",
+      "expected": {
+        "error": "table-size"
+      }
     },
     {
       "name": "rejects-picture-alt",
-      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><img src=\"x\" alt=\"Take 10 mg\"/></p></div>",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><img src=\"data:image/png;base64,AA==\" alt=\"Take 10 mg\"/></p></div>",
       "expected": {
         "error": "forbidden-attribute"
       }
@@ -1963,7 +1996,7 @@
     },
     {
       "name": "rejects-picture-start-tag",
-      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><img src=\"x\"></img></p></div>",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><img src=\"data:image/png;base64,AA==\"></img></p></div>",
       "expected": {
         "error": "void-element"
       }
@@ -2033,14 +2066,14 @@
     },
     {
       "name": "rejects-picture-in-sup",
-      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>10<sup><img src=\"x\"/></sup></p></div>",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>10<sup><img src=\"data:image/png;base64,AA==\"/></sup></p></div>",
       "expected": {
         "error": "script-content"
       }
     },
     {
       "name": "rejects-picture-in-row",
-      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><img src=\"x\"/></tr></table></div>",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><img src=\"data:image/png;base64,AA==\"/></tr></table></div>",
       "expected": {
         "error": "table-content"
       }
@@ -5825,6 +5858,85 @@
             ],
             "narrativeDivSha256": "0d0bd9ae9e17a1a8f6612a0c6a5347de641e612205b48c099edc402384b81856",
             "normalizedTextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
+        "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "malformed-narrative",
+            "spanCount": 1,
+            "reason": "empty-narrative"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 851,
+          "bodyCodePoints": 713,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "bb66eb17d8dfa57571c5e5a1c53a721d0a44916dd5389c1ec5a1f417ba37faa5"
+      }
+    },
+    {
+      "name": "empty-table-div",
+      "input": {
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 397
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 233
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\n﷐\n﷒\t﷓\tDose\t﷓\tFrequency\n﷒\t﷓\t10 mg\t﷓\tOnce daily\n﷒\t﷓\t20 mg\t﷓\tTwice daily\n﷑\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 188
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td></td><td> </td></tr></table></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 63,
+                "endOffset": 133,
+                "textSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+              }
+            ],
+            "narrativeDivSha256": "0fced5593600c54a23079f4316e76e76f4128429c93993c6e630027aa61d14e1",
+            "normalizedTextSha256": "9a00ab6360e114fce944378a5770c0ce428f175ada44f00ba29250fc9beab652"
           }
         ]
       },
@@ -12922,7 +13034,7 @@
       }
     },
     {
-      "name": "picture-with-source-reference-verifies",
+      "name": "picture-with-source-bytes-verifies",
       "input": {
         "normalizationVersion": "fidelity-norm/3.0.0",
         "source": {
@@ -12930,9 +13042,9 @@
           "pages": [
             {
               "page": 1,
-              "text": "ACME Demo Product — Synthetic SmPC\nSee ￼dd7fb79b06786f157eded82fabf38a8c02e4a77a89e96beb6cea812473154ddd below.\nPage 1 of 3",
+              "text": "ACME Demo Product — Synthetic SmPC\nSee ￼e1e10747c2374f621aa59fefede6ef99dc6acdb41b267ab4af408d5529f89ea8￼ below.\nPage 1 of 3",
               "bodyStart": 35,
-              "bodyEnd": 112
+              "bodyEnd": 113
             }
           ]
         },
@@ -12940,7 +13052,7 @@
           {
             "sourceKey": "smpc.4.2.posology",
             "path": "Composition.section[0].section[0]",
-            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>See <img src=\"~/_entity/annotation/0c1d2e3f-aaaa-bbbb-cccc-0123456789ab\"/> below.</p></div>"
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>See <img src=\"data:image/png;base64,iVBORw0KGgo=\"/> below.</p></div>"
           }
         ],
         "provenance": [
@@ -12950,20 +13062,20 @@
               {
                 "page": 1,
                 "startOffset": 35,
-                "endOffset": 111,
-                "textSha256": "441fd59a5e8b5c24f7967e04815d1556d956a56f5ea67f67fd0503fce8c45f7b"
+                "endOffset": 112,
+                "textSha256": "777da6065a8b75e5318619184262db1087e5905bccaa21c256532e38cc5d1cd2"
               }
             ],
-            "narrativeDivSha256": "9d6061c378bcc8b0a07941a6b6188f90fa8d459cc229075d6d39d7a2660e8389",
-            "normalizedTextSha256": "441fd59a5e8b5c24f7967e04815d1556d956a56f5ea67f67fd0503fce8c45f7b"
+            "narrativeDivSha256": "1f18e8acba3fc8b2fef2603dee6b3b38fa8a39d8b75883b2e6952e0765cd14e3",
+            "normalizedTextSha256": "777da6065a8b75e5318619184262db1087e5905bccaa21c256532e38cc5d1cd2"
           }
         ]
       },
       "expected": {
         "reportVersion": "1.0.0",
         "normalizationVersion": "fidelity-norm/3.0.0",
-        "extractedTextSha256": "53183969f404ac2279c059281fb3939a368e619398c9517ca416c0f81a1935b5",
-        "narrativeBindingSha256": "a1e6cd9d62c3e8ed4b112e9376a3a875bb046cdb67c58a48c1b6e1702d51e256",
+        "extractedTextSha256": "dc7dee0ccf736255f86b3b33512562d330df716b4bf2047dc2b4b05e78d772c7",
+        "narrativeBindingSha256": "27ebe6a0acb737addc8ca723455cdc3bae04268e5a308e498ecf241de90aa4f7",
         "status": "passed",
         "sections": [
           {
@@ -12971,7 +13083,7 @@
             "path": "Composition.section[0].section[0]",
             "status": "verified",
             "spanCount": 1,
-            "normalizedTextSha256": "441fd59a5e8b5c24f7967e04815d1556d956a56f5ea67f67fd0503fce8c45f7b"
+            "normalizedTextSha256": "777da6065a8b75e5318619184262db1087e5905bccaa21c256532e38cc5d1cd2"
           }
         ],
         "issues": [],
@@ -12980,16 +13092,16 @@
           "verified": 1
         },
         "coverage": {
-          "pageCodePoints": 123,
-          "bodyCodePoints": 77,
-          "coveredCodePoints": 76,
+          "pageCodePoints": 124,
+          "bodyCodePoints": 78,
+          "coveredCodePoints": 77,
           "uncoveredGaps": 0
         },
-        "reportHash": "4857fb68378170d61fc031efc2e174faebb8c6aa4d3732dc708c6d5b9ead965c"
+        "reportHash": "f3f969c1efe1a347acc48068dfa36c70af1cccfb7ff8034981047a73bc5b2f79"
       }
     },
     {
-      "name": "picture-with-other-reference-mismatches",
+      "name": "picture-with-other-bytes-mismatches",
       "input": {
         "normalizationVersion": "fidelity-norm/3.0.0",
         "source": {
@@ -12997,9 +13109,9 @@
           "pages": [
             {
               "page": 1,
-              "text": "ACME Demo Product — Synthetic SmPC\nSee ￼dd7fb79b06786f157eded82fabf38a8c02e4a77a89e96beb6cea812473154ddd below.\nPage 1 of 3",
+              "text": "ACME Demo Product — Synthetic SmPC\nSee ￼e1e10747c2374f621aa59fefede6ef99dc6acdb41b267ab4af408d5529f89ea8￼ below.\nPage 1 of 3",
               "bodyStart": 35,
-              "bodyEnd": 112
+              "bodyEnd": 113
             }
           ]
         },
@@ -13007,7 +13119,7 @@
           {
             "sourceKey": "smpc.4.2.posology",
             "path": "Composition.section[0].section[0]",
-            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>See <img src=\"images/dose-table.png\"/> below.</p></div>"
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>See <img src=\"data:image/png;base64,AA==\"/> below.</p></div>"
           }
         ],
         "provenance": [
@@ -13017,20 +13129,20 @@
               {
                 "page": 1,
                 "startOffset": 35,
-                "endOffset": 111,
-                "textSha256": "441fd59a5e8b5c24f7967e04815d1556d956a56f5ea67f67fd0503fce8c45f7b"
+                "endOffset": 112,
+                "textSha256": "777da6065a8b75e5318619184262db1087e5905bccaa21c256532e38cc5d1cd2"
               }
             ],
-            "narrativeDivSha256": "58c3b4a5401c94b7c7a464f30aa2bce381b188d94c4f5e67d9bad6f2fb0e2ae0",
-            "normalizedTextSha256": "49e6f1251d9fa917a62d8ef4c67b555aef6031eb14bf64a6bfc4c59e7c8d86aa"
+            "narrativeDivSha256": "fc9fe669c2e882b4ba706047d80bbcfb5c029436e250499b458a6bda74dd875e",
+            "normalizedTextSha256": "2b4f4854a21067e6a7b8e458e6e0cc537cdde9e5684452bf0194ac63d7b53760"
           }
         ]
       },
       "expected": {
         "reportVersion": "1.0.0",
         "normalizationVersion": "fidelity-norm/3.0.0",
-        "extractedTextSha256": "53183969f404ac2279c059281fb3939a368e619398c9517ca416c0f81a1935b5",
-        "narrativeBindingSha256": "a8b27b7cd4e9e03264a30e7d7b4e5b18b47ce33247042f7f2387ddd66841593a",
+        "extractedTextSha256": "dc7dee0ccf736255f86b3b33512562d330df716b4bf2047dc2b4b05e78d772c7",
+        "narrativeBindingSha256": "bd26e50e17c140e3dea8bc9ae0c8e7e1e001ec4bafb65d7f5420a5e446fb0be5",
         "status": "failed",
         "sections": [
           {
@@ -13039,16 +13151,16 @@
             "status": "mismatch",
             "spanCount": 1,
             "details": {
-              "expectedLength": 76,
-              "actualLength": 76,
-              "firstDifferingOffset": 5,
-              "commonSuffixLength": 7,
+              "expectedLength": 77,
+              "actualLength": 77,
+              "firstDifferingOffset": 6,
+              "commonSuffixLength": 8,
               "expectedWordCount": 3,
               "actualWordCount": 3,
-              "expectedSha256": "441fd59a5e8b5c24f7967e04815d1556d956a56f5ea67f67fd0503fce8c45f7b",
-              "actualSha256": "49e6f1251d9fa917a62d8ef4c67b555aef6031eb14bf64a6bfc4c59e7c8d86aa"
+              "expectedSha256": "777da6065a8b75e5318619184262db1087e5905bccaa21c256532e38cc5d1cd2",
+              "actualSha256": "2b4f4854a21067e6a7b8e458e6e0cc537cdde9e5684452bf0194ac63d7b53760"
             },
-            "normalizedTextSha256": "49e6f1251d9fa917a62d8ef4c67b555aef6031eb14bf64a6bfc4c59e7c8d86aa"
+            "normalizedTextSha256": "2b4f4854a21067e6a7b8e458e6e0cc537cdde9e5684452bf0194ac63d7b53760"
           }
         ],
         "issues": [],
@@ -13057,12 +13169,12 @@
           "verified": 0
         },
         "coverage": {
-          "pageCodePoints": 123,
-          "bodyCodePoints": 77,
+          "pageCodePoints": 124,
+          "bodyCodePoints": 78,
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "ea22291075a0cde64d97028727a8aef725ec18926c39f260a97c9c061ccf60ac"
+        "reportHash": "07af8c9dcb757eb87024967a5bfb2d8ddcd882436b49ccf6704c9ff50bf6d6d1"
       }
     },
     {
@@ -13074,9 +13186,9 @@
           "pages": [
             {
               "page": 1,
-              "text": "ACME Demo Product — Synthetic SmPC\nSee ￼dd7fb79b06786f157eded82fabf38a8c02e4a77a89e96beb6cea812473154ddd below.\nPage 1 of 3",
+              "text": "ACME Demo Product — Synthetic SmPC\nSee ￼e1e10747c2374f621aa59fefede6ef99dc6acdb41b267ab4af408d5529f89ea8￼ below.\nPage 1 of 3",
               "bodyStart": 35,
-              "bodyEnd": 112
+              "bodyEnd": 113
             }
           ]
         },
@@ -13094,8 +13206,8 @@
               {
                 "page": 1,
                 "startOffset": 35,
-                "endOffset": 111,
-                "textSha256": "441fd59a5e8b5c24f7967e04815d1556d956a56f5ea67f67fd0503fce8c45f7b"
+                "endOffset": 112,
+                "textSha256": "777da6065a8b75e5318619184262db1087e5905bccaa21c256532e38cc5d1cd2"
               }
             ],
             "narrativeDivSha256": "ead4e8cd11ffcaaef5ffb8ac5a5a2d2c33a2bf21efa9cd08db8b71220c3ab5c9",
@@ -13106,7 +13218,7 @@
       "expected": {
         "reportVersion": "1.0.0",
         "normalizationVersion": "fidelity-norm/3.0.0",
-        "extractedTextSha256": "53183969f404ac2279c059281fb3939a368e619398c9517ca416c0f81a1935b5",
+        "extractedTextSha256": "dc7dee0ccf736255f86b3b33512562d330df716b4bf2047dc2b4b05e78d772c7",
         "narrativeBindingSha256": "0801db7e57b6630f3c52fc763f303d7a0d192a2810f5d778397f6cd9728de6df",
         "status": "failed",
         "sections": [
@@ -13116,13 +13228,13 @@
             "status": "mismatch",
             "spanCount": 1,
             "details": {
-              "expectedLength": 76,
+              "expectedLength": 77,
               "actualLength": 10,
               "firstDifferingOffset": 4,
               "commonSuffixLength": 6,
               "expectedWordCount": 3,
               "actualWordCount": 2,
-              "expectedSha256": "441fd59a5e8b5c24f7967e04815d1556d956a56f5ea67f67fd0503fce8c45f7b",
+              "expectedSha256": "777da6065a8b75e5318619184262db1087e5905bccaa21c256532e38cc5d1cd2",
               "actualSha256": "e4396b6f8ecb9b2f388dc05a545cc5c2ff5165fa0b6294f4ae34b1a88fba8d83"
             },
             "normalizedTextSha256": "e4396b6f8ecb9b2f388dc05a545cc5c2ff5165fa0b6294f4ae34b1a88fba8d83"
@@ -13134,12 +13246,12 @@
           "verified": 0
         },
         "coverage": {
-          "pageCodePoints": 123,
-          "bodyCodePoints": 77,
+          "pageCodePoints": 124,
+          "bodyCodePoints": 78,
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "ee8b3b879e9fa527fd7b1e5d25b8c0c018836c6cdbcce6bd8e002b629857be9b"
+        "reportHash": "a94555aed3d47d2c7af92b70e4f2a54620183e538f99c4efb5abeaaa166aa2c9"
       }
     }
   ]

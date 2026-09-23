@@ -14,17 +14,20 @@ amended by its independent reviews, prompted by roadmap item 3a and ADR 0005. In
 - `li` is allowed only directly in `ol` or `ul`, whose only children are `li` (`list-content`);
 - `colspan` and `rowspan` (`[1-9][0-9]{0,2}|1000`) return, placed by the HTML table model, with
   an overlapping cell, a row span clipped at its row group's end, a hole and a ragged row
-  refused (`table-shape`), and a table inside a cell refused (`table-structure`);
+  refused (`table-shape`), a table inside an open table refused (`table-structure`), and at most
+  50 000 slots per narrative (`table-size`);
 - every table's text carries its grid in the reserved code points U+FDD0–U+FDD5 (table, end of
   table, row, cell, slot covered from the left, slot covered from above);
-- `img` is allowed with `src` alone (a reference, or a PNG or JPEG `data:` URI) and emits U+FFFC
-  and the SHA-256 of its `src`;
+- `img` is allowed with `src` alone, a PNG or JPEG `data:` URI (references are refused), and
+  emits U+FFFC, the SHA-256 of its `src` and U+FFFC;
+- a narrative whose normalised text is only spaces and grid markers is `empty-narrative`, and
+  the crosswalk decides whether a narrative is present by the same rule;
 - U+FFFC and U+FDD0–U+FDEF reject in narrative (`reserved-character`), the one rule applied to
   one side only;
 - the extractor contract writes tables with their grid, numbered markers with a space, pictures
   with their hash, and a structured source as one page per section.
 
-`XhtmlErrorCode` gains `list-content` and `reserved-character`.
+`XhtmlErrorCode` gains `list-content`, `reserved-character` and `table-size`.
 
 **Why.** Roadmap item 3a takes the EMA's own ePI for Imatinib Teva through the system. Its
 summary of product characteristics has six numbered lists, 46 cells spanning columns, five
@@ -35,7 +38,12 @@ independent review found that spans widen 2.0.0's stated cell-association residu
 draws "10 mg" against every age group while the text reads as if it applied to one), that an
 `li` outside a direct `ol` parent is still numbered, and that a picture's content was unbound.
 The design was changed so that the text carries each table's grid, which also closes the
-residual, and each picture is bound to its source by hash.
+residual, and each picture is bound to its source by hash. The second review, of the amended
+design and a draft of the code, found a table nested in a caption, unbound picture references
+(the EMA's draw at zero size), an unbounded grid size, an empty table counted as present, a
+combining mark joining a picture's hash, and a residual the design overclaimed (the line a
+value sits on inside a multi-line cell). Each was fixed before this change, or, for the line,
+stated; the design note lists both reviews' findings and what changed.
 
 **Impact assessment (step 0).** Importers of `src/fidelity/`:
 
@@ -74,16 +82,19 @@ residual, and each picture is bound to its source by hash.
 **Steps 1–6.** 1: `NORMALIZATION_VERSION` is `fidelity-norm/3.0.0` on both sides. 2:
 `npm run contracts:generate` (no drift), `npm run vectors:generate`, `npm run contracts:fixtures`,
 `npm run contracts:quote-edge` and `npm run differential:smoke` regenerated
-`test/fixtures/fidelity/vectors.json` (411 → 479 vectors: normalisation 62, XHTML 214 → 272,
-verify 135 → 145), the four contract fixtures and the smoke corpus. 3: every changed vector,
+`test/fixtures/fidelity/vectors.json` (411 → 485 vectors: normalisation 62 → 63, XHTML 214 →
+276, verify 135 → 146), the four contract fixtures and the smoke corpus. 3: every changed vector,
 below. 4: the new vectors: every case the design names, both sides of every boundary (counter
 styles at 26/27, 702/703, 3999/4000, −1/0/1; `start` at `-0`, `007`, `9999`, `10000`; spans at
 0, `02`, 1000, 1001; each `src` form and each refused form; each reserved code point raw and by
-reference, and its neighbours), placement cases (overlap, clip at `thead` and at bare rows, a
+reference, and its neighbours; a table in a caption; the slot limit, with its accepted side in a
+unit test on each side because its text is 150 000 code points; a combining mark after a
+picture, which stays outside its token under NFC; a picture by reference, refused), placement
+cases (overlap, clip at `thead` and at bare rows, a
 hole, a ragged row, a row span to its group's end, covered slots before, after and between
 cells), and verification cases (a list number against another number and another style, a row
 span against empty cells and the reverse, a value moved to another column, a picture against
-another reference and against none). 5: ADR 0003 amended (Consequences), ADR 0001 amended for
+other bytes and against none, an empty table as `empty-narrative`). 5: ADR 0003 amended (Consequences), ADR 0001 amended for
 ADR 0005's Type 1 record, ADR 0005 added, `AGENTS.md`'s "Preserve supplied XHTML" reworded to
 the owner's decision of 2026-09-23. 6: UR-09 and UR-22 updated.
 
@@ -100,6 +111,7 @@ whose outcome changed, each reviewed:
 | `rejects-rowspan` → `rejects-rowspan-past-group` (xhtml)                                                                                                                                                                                                                                                                                                                  | `forbidden-attribute`                         | `table-shape`                       | A row span of 2 in a one-row table is clipped by a renderer.                                                                          |
 | `accepts-nested-table-in-cell` → `rejects-nested-table-in-cell` (xhtml)                                                                                                                                                                                                                                                                                                   | text                                          | `table-structure`                   | Nested tables are refused, so grid text never nests.                                                                                  |
 | `rejects-uneven-nested-table` (xhtml)                                                                                                                                                                                                                                                                                                                                     | `table-shape`                                 | `table-structure`                   | The nested table is refused before its shape is decided.                                                                              |
+| `empty-table-div` (verify, new)                                                                                                                                                                                                                                                                                                                                           | —                                             | `empty-narrative`                   | Grid markers are not drawn text; a table of empty cells draws nothing.                                                                |
 | `rejects-unknown-element`, `soft-hyphen-decided-after-scan`, `rejects-unknown-before-root` (xhtml)                                                                                                                                                                                                                                                                        | `unknown-element`                             | `unknown-element`                   | Input changed from `img` to `iframe`, since `img` is now known; the rule each pins is unchanged.                                      |
 | 11 accepted tables (`table`, `accepts-table-section-order`, `accepts-caption-first`, `accepts-scope-on-th`, `accepts-whitespace-in-table-parts`, `accepts-header-and-data-cells`, `accepts-empty-table`, `accepts-caption-only-table`, `accepts-empty-rows`, `accepts-ascii-whitespace-in-tags`, `cell-breaks-are-tabs`, `accepts-soft-hyphen-before-br-in-cell`) (xhtml) | text                                          | the same text with the grid markers | Every table's text carries its grid; nothing else moved.                                                                              |
 | `spanned-cell-rejected` → `spanned-cell-against-separate-cells` (verify)                                                                                                                                                                                                                                                                                                  | `malformed-narrative` / `forbidden-attribute` | `mismatch`                          | A span is allowed; drawing two source cells as one spanned cell is a different table.                                                 |
@@ -110,50 +122,54 @@ whose outcome changed, each reviewed:
 style, starts at the edges of each range, 28-item lists), grids with column and row spans
 placed by the table model, with deliberate overlaps, clipped spans and ragged rows, pictures
 with every accepted source form, and violation classes for list content, `li` outside a list,
-list attributes, attribute limits, nested tables, span overlaps and holes, picture sources,
-`data:` bodies and markup, and reserved code points raw and by reference. Violation classes are
+list attributes, attribute limits, nested tables (in cells and captions), span overlaps and
+holes, the slot limit, picture sources (references included), `data:` bodies and markup,
+combining marks after pictures, and reserved code points raw and by reference. Violation classes are
 now drawn in turn rather than at random: with this many classes, a random draw left one class
 out of a 2000-case corpus at some seeds. Zero divergences at seeds 20260920, 1, 2, 3 and 4 (2000
 cases each) and at seeds 1, 2 and 3 (6000 cases each). Breaking each rule in the Python port
 (divergences in the differential at seeds 20260920 / 1 / 2, then failures in the golden
 vectors):
 
-| Break                                     | Differential    | Vectors |
-| ----------------------------------------- | --------------- | ------- |
-| alphabetic counter off by one             | 9 / 13 / 10     | 3       |
-| roman range to 4000                       | 4 / 5 / 1       | 1       |
-| ordinal not advanced                      | 23 / 32 / 25    | 5       |
-| `li` allowed anywhere                     | 127 / 136 / 118 | 22      |
-| an element allowed in a list              | 2 / 3 / 3       | 1       |
-| text allowed in a list                    | 1 / 0 / 1       | 2       |
-| overlap not checked                       | 6 / 3 / 3       | 1       |
-| clipped row span not checked              | 4 / 6 / 5       | 2       |
-| covered-left slots dropped                | 9 / 14 / 17     | 5       |
-| covered-above slots before a cell dropped | 4 / 4 / 5       | 3       |
-| covered-above slots after a row dropped   | 11 / 11 / 7     | 3       |
-| cell marker dropped                       | 30 / 37 / 38    | 31      |
-| row marker dropped                        | 42 / 48 / 54    | 32      |
-| end-of-table marker dropped               | 44 / 53 / 60    | 34      |
-| nested table allowed                      | 4 / 7 / 5       | 2       |
-| picture hashed from another value         | 4 / 9 / 9       | 1       |
-| reserved check of the whole `div` dropped | 2 / 4 / 7       | 1       |
-| reserved reference allowed                | 3 / 5 / 3       | 4       |
-| reserved range narrowed to U+FDD0–U+FDD5  | 1 / 5 / 4       | 1       |
-| span 1000 refused                         | 2 / 1 / 1       | 1       |
-| `start="-0"` accepted                     | 0 / 0 / 0       | 1       |
-| `data:` padding inside the body accepted  | 1 / 4 / 3       | 1       |
-| dot-initial `src` segment accepted        | 1 / 6 / 4       | 2       |
-| `img` without `src` accepted              | 1 / 1 / 0       | 1       |
-| `img` not a void element                  | 30 / 38 / 40    | 7       |
-| a row with a hole not refused             | 0 / 0 / 0       | 0       |
+| Break                                         | Differential    | Vectors |
+| --------------------------------------------- | --------------- | ------- |
+| alphabetic counter off by one                 | 14 / 11 / 13    | 3       |
+| roman range to 4000                           | 2 / 1 / 4       | 1       |
+| ordinal not advanced                          | 26 / 29 / 32    | 5       |
+| `li` allowed anywhere                         | 130 / 129 / 134 | 22      |
+| an element allowed in a list                  | 1 / 1 / 2       | 1       |
+| text allowed in a list                        | 1 / 1 / 3       | 2       |
+| overlap not checked                           | 6 / 4 / 3       | 1       |
+| clipped row span not checked                  | 5 / 1 / 4       | 2       |
+| covered-left slots dropped                    | 18 / 16 / 17    | 5       |
+| covered-above slots before a cell dropped     | 3 / 4 / 5       | 3       |
+| covered-above slots after a row dropped       | 7 / 13 / 11     | 3       |
+| cell marker dropped                           | 33 / 37 / 37    | 31      |
+| row marker dropped                            | 48 / 49 / 53    | 32      |
+| end-of-table marker dropped                   | 52 / 52 / 60    | 34      |
+| nested table (in a cell or a caption) allowed | 8 / 9 / 9       | 3       |
+| slot limit not checked                        | 2 / 2 / 1       | 2       |
+| picture hashed from another value             | 20 / 22 / 25    | 4       |
+| picture token not closed                      | 20 / 22 / 25    | 4       |
+| reference `src` accepted                      | 8 / 7 / 4       | 6       |
+| reserved check of the whole `div` dropped     | 3 / 3 / 2       | 1       |
+| reserved reference allowed                    | 3 / 4 / 7       | 4       |
+| reserved range narrowed to U+FDD0–U+FDD5      | 2 / 3 / 4       | 1       |
+| span 1000 refused                             | 7 / 4 / 5       | 3       |
+| `start="-0"` accepted                         | 0 / 1 / 1       | 1       |
+| `data:` padding inside the body accepted      | 1 / 0 / 2       | 1       |
+| `img` without `src` accepted                  | 0 / 4 / 3       | 1       |
+| `img` not a void element                      | 28 / 42 / 48    | 7       |
+| a row with a hole not refused                 | 0 / 0 / 0       | 0       |
 
-Every break but one is caught, by the differential on at least one seed and by the vectors.
-`start="-0"` is drawn rarely enough that an earlier error in the same generated document masks
-it at these seeds; the vectors pin it. The hole check is never decisive on its own: a row with a
-hole always also covers fewer slots than the row its row span starts in (a cell takes the first
-uncovered slot, so the span's first row covers every slot up to the spanned column), so the
-unequal-width check already refuses it. It is kept because the specification states the rule
-directly. Each break was restored.
+Every break but one is caught both by the vectors and by the differential on at least two of
+the three seeds; the rarest (`start="-0"`, a `data:` body with inner padding, an `img` without
+`src`) are missed at one seed, where an earlier error in the same generated document masks them,
+and the vectors pin each. The hole check is never
+decisive on its own: a row with a hole always also covers fewer slots than the row its row span
+starts in (a cell takes the first uncovered slot, so the span's first row covers every slot up to
+the spanned column), so the unequal-width check already refuses it. It is kept because the
+specification states the rule directly. Each break was restored.
 
 **Blast radius.**
 

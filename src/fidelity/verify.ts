@@ -8,7 +8,7 @@ import {
   isWhitespace,
   normalizeText,
 } from "./normalize.js";
-import { XhtmlError, xhtmlToText } from "./xhtml.js";
+import { hasDrawnText, XhtmlError, xhtmlToText } from "./xhtml.js";
 
 // Pure, synchronous verifier for ADR 0003. Per-section problems become statuses in the report;
 // only structurally unusable input (wrong normalisation version, duplicate keys, invalid pages)
@@ -445,7 +445,7 @@ function diffHint(expected: string, actual: string): DiffHint {
 export function normalizeNarrative(div: string): { text: string } | { reason: string } {
   try {
     const text = normalizeText(xhtmlToText(div));
-    return text === "" ? { reason: "empty-narrative" } : { text };
+    return hasDrawnText(text) ? { text } : { reason: "empty-narrative" };
   } catch (error) {
     if (error instanceof XhtmlError) return { reason: error.code };
     if (error instanceof NormalizationError) return { reason: error.code };
