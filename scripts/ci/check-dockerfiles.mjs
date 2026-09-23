@@ -19,6 +19,9 @@ import path from "node:path";
 // it does not contact a registry, and a digest it accepts is only as good as the registry
 // content addressed by it.
 //
+// Cloud Build configurations at the root (cloudbuild*.yaml) are held to the same rule: every
+// step's `name:` image must be pinned by digest, and a node builder shares the one node digest.
+//
 // usage: node scripts/ci/check-dockerfiles.mjs [<repository root>]
 
 const root = path.resolve(process.argv[2] ?? ".");
@@ -123,6 +126,32 @@ for (const name of dockerfiles) {
   }
 }
 
+// Cloud Build configurations at the root (cloudbuild*.yaml). Every step's `name:` is an image
+// the build runs with the build identity's credentials, so it is held to the same rule as a
+// FROM. The scan is textual: any `name:` key (with or without the list dash) whose value is not
+// a quoted or unquoted digest reference fails, including a substitution such as `${_BUILDER}`.
+// It fails closed: a `name:` that is not an image (a step volume's) is judged too, so this
+// check has to learn that shape before a configuration can use it.
+const buildConfigs = readdirSync(root)
+  .filter((name) => /^cloudbuild.*\.ya?ml$/.test(name))
+  .sort();
+let builderSteps = 0;
+for (const name of buildConfigs) {
+  readFileSync(path.join(root, name), "utf8")
+    .split(/\r?\n/)
+    .forEach((line, index) => {
+      const step = /^\s*(?:-\s+)?name:\s*(\S+)\s*(?:#.*)?$/.exec(line);
+      if (step === null) return;
+      builderSteps += 1;
+      const ref = unquote(step[1]);
+      if (!DIGEST.test(ref)) {
+        failures.push(`${name}:${index + 1}: step name ${ref} is not pinned by @sha256 digest`);
+      } else if (ref.startsWith("node:")) {
+        nodeDigests.set(`${name}:${index + 1}`, ref.slice(ref.indexOf("@") + 1));
+      }
+    });
+}
+
 const distinct = new Set(nodeDigests.values());
 if (distinct.size > 1) {
   failures.push(
@@ -137,5 +166,5 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  `Dockerfile image references are pinned by digest (${dockerfiles.length} files, ${nodeDigests.size} node images sharing one digest)`,
+  `Dockerfile image references are pinned by digest (${dockerfiles.length} files, ${nodeDigests.size} node images sharing one digest); ${builderSteps} Cloud Build steps in ${buildConfigs.length} configurations pinned by digest`,
 );
