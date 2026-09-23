@@ -238,7 +238,8 @@ variable "query_audience" {
 variable "service_version" {
   description = <<-EOT
     Identifier of the code being deployed, recorded as QUERY_SERVICE_VERSION in every query
-    audit record. scripts/gcp/deploy.sh passes the git commit SHA; the default marks an apply
+    audit record and as GIT_COMMIT (runtime.sourceCommit) in every signed run manifest the
+    worker writes. scripts/gcp/deploy.sh passes the git commit SHA; the default marks an apply
     made outside that script.
   EOT
   type        = string

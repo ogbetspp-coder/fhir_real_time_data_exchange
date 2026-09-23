@@ -177,6 +177,13 @@ bucket, and the FHIR store are the only places narrative rests — while `fideli
 `ingestion-provenance`, `provenance-resource`, the signed manifest, and the BigQuery ledger row
 never do. FHIR payloads and narrative are not written to Cloud Logging.
 
+The signed manifest's `runtime` block ties a run to what produced it: `sourceCommit` is the
+deployed git commit (`GIT_COMMIT`, the same `service_version` the query service records),
+`imageDigest` is the digest of the worker image (`IMAGE_DIGEST`), both set on the worker by
+`infra/run.tf` since 2026-09-22 (`test/infra/worker-provenance.test.ts`); manifests signed before
+that record `development` for both. `workflowRevision` is the Cloud Run revision (`K_REVISION`):
+the workflow's own revision cannot be passed to the worker without a Terraform dependency cycle.
+
 Cloud Monitoring presents throughput, failures, validation rejections, service latency,
 workflow executions, and architectural guidance. Data Access audit logging is enabled for
 Healthcare API, Storage, BigQuery, and KMS and routed to a retained regional log bucket.

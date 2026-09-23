@@ -1,3 +1,11 @@
+locals {
+  # The digest part of the worker image reference: every signed run manifest names the exact
+  # bytes that produced it (runtime.imageDigest, src/pipeline.ts), as the query service's audit
+  # records do (infra/query.tf). null when the reference carries no digest; the precondition on
+  # the service turns that into a plan-time error.
+  worker_image_digest = try(regex("@(sha256:[0-9a-f]{64})$", var.worker_image)[0], null)
+}
+
 resource "google_cloud_run_v2_service" "worker" {
   name                = "${local.name_prefix}-worker"
   location            = var.region
@@ -144,6 +152,28 @@ resource "google_cloud_run_v2_service" "worker" {
         name  = "GLOBAL_EPI_PACKAGE"
         value = "hl7.fhir.uv.emedicinal-product-info#1.0.0"
       }
+      # Tie every signed run manifest to the code and the image that produced it
+      # (runtime.sourceCommit and runtime.imageDigest, src/pipeline.ts). Without these the worker
+      # recorded "development" for both. The commit is the value the query service records as
+      # QUERY_SERVICE_VERSION: scripts/gcp/deploy.sh passes the full git SHA as service_version.
+      # WORKFLOW_REVISION is deliberately not set: the workflow depends on this service's URI, so
+      # naming the workflow's revision here would be a dependency cycle. runtime.workflowRevision
+      # falls back to K_REVISION, the revision name Cloud Run sets on the container itself.
+      env {
+        name  = "GIT_COMMIT"
+        value = var.service_version
+      }
+      env {
+        name  = "IMAGE_DIGEST"
+        value = local.worker_image_digest
+      }
+    }
+  }
+
+  lifecycle {
+    precondition {
+      condition     = local.worker_image_digest != null
+      error_message = "worker_image must be an image reference by digest (…@sha256:<64 hex>) so IMAGE_DIGEST can name the exact image in every signed run manifest."
     }
   }
 
