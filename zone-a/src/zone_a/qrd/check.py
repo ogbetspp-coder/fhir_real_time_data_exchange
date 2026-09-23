@@ -40,21 +40,23 @@ A statement spanning paragraphs (``<Traceability`` and the sentence under it) is
 as many consecutive paragraphs. A statement that matches is ``used``, with where it matched: the
 section's path, the paragraph's index and the character offsets in the paragraph's text as the
 reader returned it (``lastParagraph`` when it runs over several). One that does not match but
-resembles a stretch of its section (at least ``SIMILARITY`` of its literal words, fill-ins left
-out, appear there in order, for the closest choice of its optional segments) is a ``deviation``
-finding with the word-level differences; the same words with other paragraph breaks are a
-``layout`` difference; a person decides whether the wording was changed on purpose. A paragraph
-that resembles several statements of one section or appendix is a deviation of the one it
-resembles most. The differences run from where the resemblance starts to the end of the sentence
-in which the statement's last matching word falls; text in the place of a fill-in is not a
-difference, and a run of struck or faint characters is shown as one word, ``HIDDEN_WORD``. A
-resemblance in the readable part of a section is reported even when another part was refused.
-Characters that an exact match of another statement of the same section or appendix explains are
-not compared again, so one statement matching exactly does not make its sibling a deviation, and
-the rest of the paragraph is still compared. A statement with no required literal text of at
-least ``MIN_LITERAL`` characters is ``not-checkable`` (too little to tell). A non-optional
-statement or subheading that is absent is a ``missing-statement`` or ``missing-subheading``
-finding.
+resembles a stretch of its section is a ``deviation`` finding, a proposal for a person to judge.
+Resemblance is an alignment of the statement with the text, token by token (words, a word with
+"(s)", and single punctuation marks): a token matches an equal one, a fill-in takes any run of
+tokens within one paragraph, an optional segment is taken or skipped, and each substituted,
+missing or inserted token costs one. The score is matched tokens over matched tokens plus cost,
+and a deviation needs at least ``SIMILARITY`` and either ``MIN_MATCHED`` matched words or every
+word outside the optional segments. The differences are the alignment's runs of changes, the
+label's side as its text reads; where the statement's last tokens are missing, the label's words
+to the end of that sentence stand in their place. The same tokens with other spaces or paragraph
+breaks are a ``layout`` difference. Struck or faint text is one token, ``HIDDEN_WORD``, that
+nothing matches and no fill-in takes. Characters that an exact match of another statement of the
+same section or appendix explains are not compared again, and where two resemblances of one
+section or appendix overlap, only the closer is reported. A resemblance in the readable part of
+a section is reported even when another part was refused. A statement with no required literal
+text of at least ``MIN_LITERAL`` characters is ``not-checkable`` (too little to tell). A
+non-optional statement or subheading that is absent is a ``missing-statement`` or
+``missing-subheading`` finding.
 
 Sections the reader refused are ``refused-section`` findings. A statement not found in a section
 with a refused part is ``not-checked``, not ``absent``: it may be in the part that could not be
@@ -66,7 +68,6 @@ left-over from review.
 
 from __future__ import annotations
 
-import difflib
 import hashlib
 import itertools
 import json
@@ -84,7 +85,7 @@ SIMILARITY = 0.85
 MIN_LITERAL = 12
 FILL_LIMIT = 300
 EXCERPT = 80
-CHOICES_LIMIT = 4
+MIN_MATCHED = 6
 TERMINAL = (".", ":", ";", "!", "?")
 
 
@@ -282,6 +283,7 @@ def _regex(pieces: list[_Piece], at_end: bool = True, opening: bool = True) -> s
             joint = f"(?:{joint}|(?<![^ \\n]))"
         if (
             piece.kind == "optional"
+            and piece.joint == "\n"
             and at_end
             and rest_optional
             and not any(char.isalnum() for run in _required(list(piece.pieces)) for char in run)
@@ -293,6 +295,10 @@ def _regex(pieces: list[_Piece], at_end: bool = True, opening: bool = True) -> s
         if piece.kind == "text":
             # "(s)" is the template's choice of singular or plural ("substance(s)").
             text = re.escape(piece.text)
+            if opening and piece.text[:1].isalpha():
+                # A statement's first letter is a capital only where it starts a sentence.
+                head = piece.text[0]
+                text = f"[{head.upper()}{head.lower()}]" + re.escape(piece.text[1:])
             text = text.replace(r"\(s\)", r"(?:s|\(s\))?").replace(r"\(S\)", r"(?:S|\(S\))?")
             out.append(joint + text)
         elif piece.kind == "fill":
@@ -330,56 +336,6 @@ def _span(pieces: list[_Piece]) -> int:
         if piece.kind == "optional":
             breaks += _span(list(piece.pieces)) - 1
     return breaks + 1
-
-
-def _plural(template: str, word: str) -> bool:
-    """The word is the template's word with its "(s)" chosen one way or the other."""
-    if not _PLURAL.search(template):
-        return False
-    pattern = re.escape(template).replace(r"\(s\)", r"(?:s|\(s\))?")
-    pattern = pattern.replace(r"\(S\)", r"(?:S|\(S\))?")
-    return re.fullmatch(pattern, word) is not None
-
-
-def _optionals(pieces: list[_Piece]) -> int:
-    return sum(1 + _optionals(list(p.pieces)) for p in pieces if p.kind == "optional")
-
-
-def _rendered(pieces: list[_Piece], choose: tuple[bool, ...], counter: list[int]) -> str:
-    out: list[str] = []
-    for piece in pieces:
-        if piece.kind == "text":
-            out.append(piece.joint + piece.text)
-        elif piece.kind == "fill":
-            out.append(piece.joint + "\u2026")
-        else:
-            index = counter[0]
-            counter[0] += 1
-            if choose[index]:
-                out.append(piece.joint + _rendered(list(piece.pieces), choose, counter))
-    return "".join(out)
-
-
-def _references(pieces: list[_Piece]) -> list[list[str]]:
-    """The statement as words, each fill-in an ellipsis, for every choice of its optional
-    segments when it has at most ``CHOICES_LIMIT`` of them, else for four: all present, none,
-    and every other one either way."""
-    count = _optionals(pieces)
-    if count <= CHOICES_LIMIT:
-        choices = list(itertools.product((True, False), repeat=count))
-    else:
-        choices = [
-            (True,) * count,
-            (False,) * count,
-            tuple(k % 2 == 0 for k in range(count)),
-            tuple(k % 2 == 1 for k in range(count)),
-        ]
-    out: list[list[str]] = []
-    for choice in choices:
-        words = _rendered(pieces, choice, [0]).split()
-        if words not in out:
-            out.append(words)
-    return out
 
 
 _NOTE_MARKER = re.compile(r"\*+")
@@ -554,6 +510,9 @@ def _search(pieces: list[_Piece], lines: list[_Line]) -> _Match | None:
     # The longest stretch of required text, cut at each "(s)", must be in the window.
     stretches = [part for run in _required(pieces) for part in _PLURAL.split(run)]
     anchor = max(stretches, key=len) if stretches else ""
+    if pieces and pieces[0].kind == "text" and anchor and pieces[0].text.startswith(anchor[:1]):
+        # The statement's first letter may be either case in the label.
+        anchor = anchor[1:]
     compiled = re.compile(_regex(pieces))
     for window in _windows(lines, _span(pieces)):
         if anchor and anchor not in window.text:
@@ -572,96 +531,276 @@ def _search(pieces: list[_Piece], lines: list[_Line]) -> _Match | None:
     return None
 
 
-def _words(text: str) -> list[str]:
-    """Words for comparison: TAKEN separates words, and a run of HIDDEN is one word."""
-    out: list[str] = []
-    for word in re.split(f"[\\s{TAKEN}]+", text):
-        for piece in re.split(f"({HIDDEN}+)", word):
-            if piece:
-                out.append(HIDDEN_WORD if piece[0] == HIDDEN else piece)
+# --- resemblance: aligning the statement with the label ----------------------------------
+
+# Words, a word with the template's "(s)", and single punctuation marks, compared one by one.
+_TOKEN = re.compile(r"[^\W_]+\([sS]\)|[^\W_]+|[^\w\s]|_")
+
+
+@dataclass(frozen=True)
+class _Node:
+    """One step of a statement: a token, a fill-in, or the opening or closing of an optional
+    segment (``end`` is the index of an opening's closing)."""
+
+    kind: str
+    text: str = ""
+    space: bool = False
+    end: int = 0
+
+
+def _nodes(pieces: list[_Piece]) -> list[_Node]:
+    out: list[_Node] = []
+    for piece in pieces:
+        if piece.kind == "text":
+            for number, token in enumerate(_TOKEN.findall(piece.text)):
+                out.append(_Node("token", token, space=number == 0 and bool(piece.joint)))
+        elif piece.kind == "fill":
+            out.append(_Node("fill", "\u2026", space=bool(piece.joint)))
+        else:
+            start = len(out)
+            out.append(_Node("open"))
+            inner = _nodes(list(piece.pieces))
+            if inner and piece.joint:
+                first = inner[0]
+                inner[0] = _Node(first.kind, first.text, True, first.end)
+            out += inner
+            out.append(_Node("close"))
+            out[start] = _Node("open", end=len(out) - 1)
     return out
 
 
-def _is_fill(word: str) -> bool:
-    return "\u2026" in word
+@dataclass(frozen=True)
+class _Token:
+    text: str
+    line: int
+    start: int
+    end: int
+
+    @property
+    def fillable(self) -> bool:
+        return self.text not in (HIDDEN_WORD, TAKEN)
+
+
+def _tokens(window: _Window) -> list[_Token]:
+    """The window's tokens; a run of struck or faint characters is one token, ``HIDDEN_WORD``,
+    and a character an exact match of a sibling explains is a token nothing matches."""
+    out: list[_Token] = []
+    pattern = re.compile(f"{HIDDEN}+|{TAKEN}|" + _TOKEN.pattern)
+    for number, line in enumerate(window.lines):
+        for match in pattern.finditer(line.text):
+            text = match.group()
+            if text[0] == HIDDEN:
+                text = HIDDEN_WORD
+            out.append(_Token(text, number, match.start(), match.end()))
+    return out
+
+
+def _same(template: str, label: str, first: bool = False) -> bool:
+    if template == label:
+        return True
+    if first and template[1:] == label[1:] and template[:1].lower() == label[:1].lower():
+        return True
+    plural = _PLURAL.search(template)
+    return plural is not None and label in (
+        template[: plural.start()],
+        template[: plural.start()] + plural.group()[1],
+    )
+
+
+_INFINITE = 1 << 30
+
+
+@dataclass(frozen=True)
+class _Alignment:
+    cost: int
+    matched: int
+    # (operation, node index or -1, token index or -1), in order.
+    steps: tuple[tuple[str, int, int], ...]
+
+    @property
+    def score(self) -> float:
+        return self.matched / (self.matched + self.cost) if self.matched else 0.0
+
+
+def _align(nodes: list[_Node], tokens: list[_Token]) -> _Alignment | None:
+    """The cheapest alignment of the whole statement with a stretch of the tokens.
+
+    Edit distance over tokens, with the statement's structure: a token matches an equal token
+    (cost 0) or is substituted, deleted or has a token inserted before it (cost 1 each); a
+    fill-in takes one or more tokens of one paragraph (cost 0, never struck or faint text) or
+    is missing (cost 1); an optional segment is taken or skipped (cost 0). The stretch may
+    start and end anywhere."""
+    rows, columns = len(nodes) + 1, len(tokens) + 1
+    # The first token of the statement, whose capital a label may drop mid-sentence.
+    opening = next((n for n, node in enumerate(nodes) if node.kind == "token"), -1)
+    cost = [[_INFINITE] * columns for _ in range(rows)]
+    back: list[list[tuple[str, int, int] | None]] = [[None] * columns for _ in range(rows)]
+    cost[0] = [0] * columns
+
+    def relax(row: int, column: int, value: int, step: tuple[str, int, int]) -> None:
+        if value < cost[row][column]:
+            cost[row][column] = value
+            back[row][column] = step
+
+    for row in range(rows):
+        if row:
+            for column in range(columns - 1):
+                relax(row, column + 1, cost[row][column] + 1, ("insert", row, column))
+        if row == rows - 1:
+            break
+        node = nodes[row]
+        current = cost[row]
+        if node.kind == "token":
+            for column in range(columns):
+                if current[column] >= _INFINITE:
+                    continue
+                relax(row + 1, column, current[column] + 1, ("delete", row, column))
+                if column < columns - 1:
+                    equal = _same(node.text, tokens[column].text, first=row == opening)
+                    step = ("match" if equal else "replace", row, column)
+                    relax(row + 1, column + 1, current[column] + (0 if equal else 1), step)
+        elif node.kind == "fill":
+            best, origin = _INFINITE, -1
+            for column in range(columns):
+                if current[column] < _INFINITE:
+                    relax(row + 1, column, current[column] + 1, ("delete", row, column))
+                if column == columns - 1:
+                    break
+                token = tokens[column]
+                if not token.fillable:
+                    # Struck or faint text where the fill-in stands is one change.
+                    if current[column] < _INFINITE:
+                        relax(row + 1, column + 1, current[column] + 1, ("replace", row, column))
+                    best, origin = _INFINITE, -1
+                    continue
+                if column and tokens[column - 1].line != token.line:
+                    best, origin = _INFINITE, -1
+                if current[column] < best:
+                    best, origin = current[column], column
+                if best < _INFINITE:
+                    relax(row + 1, column + 1, best, ("fill", row, origin))
+        else:
+            for column in range(columns):
+                if current[column] < _INFINITE:
+                    relax(row + 1, column, current[column], ("pass", row, column))
+                    if node.kind == "open":
+                        relax(node.end + 1, column, current[column], ("skip", row, column))
+    last = cost[rows - 1]
+    end = min(range(columns), key=lambda column: (last[column], column))
+    if last[end] >= _INFINITE:
+        return None
+    steps: list[tuple[str, int, int]] = []
+    row, column = rows - 1, end
+    while True:
+        previous = back[row][column]
+        if previous is None:
+            break
+        operation, from_row, from_column = previous
+        if operation == "fill":
+            for index in range(column - 1, from_column - 1, -1):
+                steps.append(("fill", from_row, index))
+        elif operation == "insert":
+            steps.append(("insert", -1, from_column))
+        elif operation in ("match", "replace"):
+            steps.append((operation, from_row, from_column))
+        elif operation == "delete":
+            steps.append(("delete", from_row, -1))
+        row, column = from_row, from_column
+    steps.reverse()
+    matched = sum(1 for operation, _, _ in steps if operation == "match")
+    return _Alignment(last[end], matched, tuple(steps))
 
 
 @dataclass(frozen=True)
 class _Near:
-    score: float
+    alignment: _Alignment
     window: _Window
-    # The window's words, each with the index of the line it is on.
-    words: list[tuple[str, int]]
-    start: int
-    reference: list[str]
+    tokens: list[_Token]
+    nodes: list[_Node]
+
+    def used(self) -> list[int]:
+        """The tokens the alignment covers, from its first to its last."""
+        indices = [index for _, _, index in self.alignment.steps if index >= 0]
+        return list(range(min(indices), max(indices) + 1)) if indices else []
 
 
-def _closest(reference: list[str], lines: list[_Line], size: int) -> _Near | None:
-    """The stretch of text that holds most of the statement's literal words, in order.
-
-    The score is the share of the statement's literal words (fill-ins left out, since any text
-    may stand in their place) that the stretch holds in the statement's order. A stretch starts
-    at one of those words, in the first line of a window, and is as long as the statement and
-    half again."""
-    literal = [word for word in reference if not _is_fill(word)]
-    if len(literal) < 4:
-        return None
-    wanted = set(literal)
-    length = len(reference) + len(reference) // 2
+def _closest(nodes: list[_Node], lines: list[_Line], size: int) -> _Near | None:
+    """The best alignment over windows whose tokens hold enough of the statement's words."""
+    literal = {node.text for node in nodes if node.kind == "token"}
     best: _Near | None = None
     for window in _windows(lines, size):
-        words = [(word, n) for n, line in enumerate(window.lines) for word in _words(line.text)]
-        plain = [word for word, _ in words]
-        for start, (word, line) in enumerate(words):
-            if line or word not in wanted:
-                continue
-            matcher = difflib.SequenceMatcher(
-                None, literal, plain[start : start + length], autojunk=False
-            )
-            score = sum(block.size for block in matcher.get_matching_blocks()) / len(literal)
-            if best is None or score > best.score:
-                best = _Near(score, window, words, start, reference)
+        tokens = _tokens(window)
+        if len(literal & {token.text for token in tokens}) < min(4, len(literal)):
+            continue
+        alignment = _align(nodes, tokens)
+        if alignment is None:
+            continue
+        near = _Near(alignment, window, tokens, nodes)
+        if best is None or (alignment.score, -alignment.cost) > (
+            best.alignment.score,
+            -best.alignment.cost,
+        ):
+            best = near
     return best
 
 
 def _differences(near: _Near) -> list[dict[str, str]]:
-    """Word-level differences from the statement to the stretch it resembles, which runs to the
-    end of the sentence where the statement's last matching word falls. Text in the place of a
-    fill-in is what was filled in, and a word written with or without the template's "(s)" is
-    the same word; neither is a difference."""
-    reference = near.reference
-    words = [word for word, _ in near.words]
-    start = near.start
-    limit = min(len(words), start + len(reference) + len(reference) // 2)
-    blocks = [
-        block
-        for block in difflib.SequenceMatcher(
-            None, reference, words[start:limit], autojunk=False
-        ).get_matching_blocks()
-        if block.size
-    ]
-    end = start + (blocks[-1].b + blocks[-1].size if blocks else len(reference))
-    while end < limit and not words[end - 1].endswith(TERMINAL):
-        end += 1
-    stretch = words[start:end]
+    """The alignment's substitutions, deletions and insertions, grouped into runs: the
+    template's tokens as the template spaces them, the label's as its text reads."""
     out: list[dict[str, str]] = []
-    matcher = difflib.SequenceMatcher(None, reference, stretch, autojunk=False)
-    for operation, a1, a2, b1, b2 in matcher.get_opcodes():
-        template, label = reference[a1:a2], stretch[b1:b2]
-        if operation == "equal":
-            continue
-        if operation == "replace" and all(map(_is_fill, template)) and HIDDEN_WORD not in label:
-            continue
-        if (
-            operation == "replace"
-            and len(template) == len(label)
-            and all(_plural(t, w) for t, w in zip(template, label, strict=True))
-        ):
-            continue
-        if operation == "delete" and all(map(_is_fill, template)):
-            continue
-        out.append({"change": operation, "template": " ".join(template), "label": " ".join(label)})
+    run: list[tuple[str, int, int]] = []
+
+    def flush() -> None:
+        if not run:
+            return
+        template = ""
+        for operation, node, _ in run:
+            if operation in ("replace", "delete"):
+                piece = near.nodes[node]
+                template += (" " if piece.space and template else "") + piece.text
+        label_tokens = [near.tokens[t] for op, _, t in run if op in ("replace", "insert")]
+        label = _label_text(near, label_tokens)
+        change = "replace" if template and label else ("delete" if template else "insert")
+        out.append({"change": change, "template": template, "label": label})
+        run.clear()
+
+    steps = list(near.alignment.steps)
+    # The stretch ends where the alignment does. When the statement's last tokens are missing
+    # there, the label's words up to the end of its sentence stand in their place.
+    covered = [index for _, _, index in steps if index >= 0]
+    if steps and steps[-1][0] == "delete" and covered:
+        last = max(covered)
+        line = near.tokens[last].line
+        limit = min(len(near.tokens), last + 1 + len(near.nodes))
+        for index in range(last + 1, limit):
+            token = near.tokens[index]
+            if token.line != line or not token.fillable:
+                break
+            steps.append(("insert", -1, index))
+            if token.text in TERMINAL:
+                break
+    for step in steps:
+        if step[0] in ("replace", "delete", "insert"):
+            run.append(step)
+        else:
+            flush()
+    flush()
     return out
+
+
+def _label_text(near: _Near, tokens: list[_Token]) -> str:
+    if not tokens:
+        return ""
+    if any(token.text == HIDDEN_WORD for token in tokens):
+        return " ".join(token.text for token in tokens)
+    first, last = tokens[0], tokens[-1]
+    lines = near.window.lines
+    if first.line == last.line:
+        return lines[first.line].text[first.start : last.end]
+    parts = [lines[first.line].text[first.start :]]
+    parts += [lines[n].text for n in range(first.line + 1, last.line)]
+    parts.append(lines[last.line].text[: last.end])
+    return "\n".join(parts)
 
 
 # --- the check ------------------------------------------------------------------------------
@@ -727,36 +866,60 @@ def _exact(report: _Report, job: _Job, taken: _Taken) -> bool:
 def _candidate(job: _Job, taken: _Taken) -> _Near | None:
     """The closest resemblance of a statement not matched exactly, if close enough."""
     pieces = _statement(job.item["pattern"])
-    lines = _mask(job.lines, taken.get(job.group, {}))
-    # The statement as each choice of its optional segments writes it; the closest one counts.
-    best: _Near | None = None
-    for reference in _references(pieces):
-        near = _closest(reference, lines, _span(pieces))
-        if near is not None and (best is None or near.score > best.score):
-            best = near
-    return best if best is not None and best.score >= SIMILARITY else None
+    nodes = _nodes(pieces)
+    near = _closest(nodes, _mask(job.lines, taken.get(job.group, {})), _span(pieces))
+    if near is None:
+        return None
+    words = sum(
+        1
+        for operation, node, _ in near.alignment.steps
+        if operation == "match" and near.nodes[node].text[:1].isalnum()
+    )
+    if words < MIN_MATCHED and not _all_required_words(near):
+        # Too few words in common to tell a resemblance from a coincidence, unless every word
+        # the statement requires is there and only punctuation or optional text differs.
+        return None
+    return near if near.alignment.score >= SIMILARITY else None
 
 
-def _claims(near: _Near) -> set[tuple[int, int]]:
-    """The lines a resemblance covers."""
-    first = near.words[near.start][1]
-    last = near.words[min(len(near.words), near.start + len(near.reference)) - 1][1]
-    return {line.key for line in near.window.lines[first : last + 1]}
+def _all_required_words(near: _Near) -> bool:
+    """Every word outside the statement's optional segments is matched."""
+    required: set[int] = set()
+    depth = 0
+    for position, node in enumerate(near.nodes):
+        if node.kind == "open":
+            depth += 1
+        elif node.kind == "close":
+            depth -= 1
+        elif node.kind == "token" and not depth and node.text[:1].isalnum():
+            required.add(position)
+    matched = {node for operation, node, _ in near.alignment.steps if operation == "match"}
+    return bool(required) and required <= matched
+
+
+def _claims(near: _Near) -> set[tuple[tuple[int, int], int]]:
+    """The characters a resemblance covers, as (line, offset) pairs."""
+    out: set[tuple[tuple[int, int], int]] = set()
+    for used in near.used():
+        token = near.tokens[used]
+        key = near.window.lines[token.line].key
+        out.update((key, offset) for offset in range(token.start, token.end))
+    return out
 
 
 def _near(report: _Report, job: _Job, near: _Near | None) -> None:
     if near is not None:
         differences = _differences(near) or [
-            # The same words, with paragraph breaks or spaces placed otherwise.
+            # The same tokens, with paragraph breaks or spaces placed otherwise.
             {"change": "layout", "template": "", "label": ""}
         ]
-        line = near.window.lines[near.words[near.start][1]]
+        line = near.window.lines[near.tokens[near.used()[0]].line]
         # A resemblance in the readable part is reported even when another part of the section
         # was refused: the differing wording is there to see.
         report.finding(
             "deviation",
             id=job.identifier,
-            similarity=round(near.score, 3),
+            similarity=round(near.alignment.score, 3),
             **{"in": line.path, "paragraph": line.paragraph},
             differences=differences,
         )
@@ -885,10 +1048,10 @@ def check(document: Document, registry: dict[str, Any], mapping: dict[str, Any])
     # A paragraph that resembles several statements of one section or appendix (alternatives
     # such as "waived" and "deferred") is a deviation of the one it resembles most.
     candidates = {job.identifier: _candidate(job, taken) for job in pending}
-    claimed: dict[str, set[tuple[int, int]]] = {}
+    claimed: dict[str, set[tuple[tuple[int, int], int]]] = {}
     ranked = sorted(
         (job for job in pending if candidates[job.identifier] is not None),
-        key=lambda job: -candidates[job.identifier].score,  # type: ignore[union-attr]
+        key=lambda job: -candidates[job.identifier].alignment.score,  # type: ignore[union-attr]
     )
     for job in ranked:
         near = candidates[job.identifier]

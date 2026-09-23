@@ -20,7 +20,7 @@
   },
   "summary": {
     "findings": {
-      "deviation": 1,
+      "deviation": 2,
       "document-quirk": 1,
       "formatting": 1,
       "heading-text": 2,
@@ -28,10 +28,10 @@
       "xhtml-defect": 7
     },
     "statements": {
-      "absent": 76,
-      "deviation": 1,
+      "absent": 70,
+      "deviation": 2,
       "not-checkable": 8,
-      "used": 38
+      "used": 43
     }
   },
   "findings": [
@@ -113,14 +113,33 @@
     {
       "kind": "deviation",
       "id": "document#1",
-      "similarity": 0.941,
+      "similarity": 0.929,
       "in": "10. DATE OF REVISION OF THE TEXT",
       "paragraph": 0,
       "differences": [
         {
           "change": "replace",
-          "template": "https://www.ema.europa.eu.",
-          "label": "http://www.ema.europa.eu/."
+          "template": "https",
+          "label": "http"
+        },
+        {
+          "change": "replace",
+          "template": ".",
+          "label": "/."
+        }
+      ]
+    },
+    {
+      "kind": "deviation",
+      "id": "appendix-II#006",
+      "similarity": 0.917,
+      "in": "4.8 Undesirable effects > Summary of the safety profile > Tabulated list of adverse reactions",
+      "paragraph": 2,
+      "differences": [
+        {
+          "change": "delete",
+          "template": "frequency",
+          "label": ""
         }
       ]
     }
@@ -280,7 +299,7 @@
       "in": "5.1 Pharmacodynamic properties",
       "paragraph": 0,
       "start": 0,
-      "end": 111
+      "end": 119
     },
     {
       "id": "smpc.5.1#1",
@@ -559,27 +578,47 @@
     },
     {
       "id": "appendix-II#001",
-      "status": "absent"
+      "status": "used",
+      "in": "4.8 Undesirable effects > Summary of the safety profile > Tabulated list of adverse reactions",
+      "paragraph": 2,
+      "start": 106,
+      "end": 126
     },
     {
       "id": "appendix-II#002",
-      "status": "absent"
+      "status": "used",
+      "in": "4.8 Undesirable effects > Summary of the safety profile > Tabulated list of adverse reactions",
+      "paragraph": 2,
+      "start": 128,
+      "end": 154
     },
     {
       "id": "appendix-II#003",
-      "status": "absent"
+      "status": "used",
+      "in": "4.8 Undesirable effects > Summary of the safety profile > Tabulated list of adverse reactions",
+      "paragraph": 2,
+      "start": 156,
+      "end": 187
     },
     {
       "id": "appendix-II#004",
-      "status": "absent"
+      "status": "used",
+      "in": "4.8 Undesirable effects > Summary of the safety profile > Tabulated list of adverse reactions",
+      "paragraph": 2,
+      "start": 189,
+      "end": 219
     },
     {
       "id": "appendix-II#005",
-      "status": "absent"
+      "status": "used",
+      "in": "4.8 Undesirable effects > Summary of the safety profile > Tabulated list of adverse reactions",
+      "paragraph": 2,
+      "start": 224,
+      "end": 246
     },
     {
       "id": "appendix-II#006",
-      "status": "absent"
+      "status": "deviation"
     },
     {
       "id": "appendix-II#007",

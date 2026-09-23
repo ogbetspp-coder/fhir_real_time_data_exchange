@@ -20,14 +20,14 @@
   },
   "summary": {
     "findings": {
-      "deviation": 3,
+      "deviation": 8,
       "document-quirk": 1,
       "formatting": 1,
       "refused-section": 1
     },
     "statements": {
-      "absent": 80,
-      "deviation": 3,
+      "absent": 75,
+      "deviation": 8,
       "not-checkable": 8,
       "not-checked": 1,
       "used": 31
@@ -54,47 +54,122 @@
     {
       "kind": "deviation",
       "id": "smpc.4.8#2",
-      "similarity": 0.977,
+      "similarity": 0.979,
       "in": "4.8 Undesirable effects > Reporting of suspected adverse reactions",
       "paragraph": 1,
       "differences": [
         {
           "change": "replace",
-          "template": "V.",
-          "label": "V and include batch/Lot number if available."
+          "template": ".",
+          "label": "and include batch/Lot number if available."
         }
       ]
     },
     {
       "kind": "deviation",
       "id": "smpc.5.1#7",
-      "similarity": 0.939,
+      "similarity": 0.947,
       "in": "5.1 Pharmacodynamic properties",
       "paragraph": 216,
       "differences": [
         {
           "change": "replace",
-          "template": "… (see",
-          "label": "prevention of COVID-19, see"
+          "template": "(",
+          "label": ","
         },
         {
-          "change": "replace",
-          "template": "use).",
-          "label": "use."
+          "change": "delete",
+          "template": ")",
+          "label": ""
         }
       ]
     },
     {
       "kind": "deviation",
       "id": "document#1",
-      "similarity": 0.941,
+      "similarity": 0.964,
       "in": "10. DATE OF REVISION OF THE TEXT",
       "paragraph": 1,
       "differences": [
         {
           "change": "replace",
-          "template": "https://www.ema.europa.eu.",
-          "label": "http://www.ema.europa.eu."
+          "template": "https",
+          "label": "http"
+        }
+      ]
+    },
+    {
+      "kind": "deviation",
+      "id": "appendix-III#2",
+      "similarity": 1.0,
+      "in": "6.4 Special precautions for storage",
+      "paragraph": 1,
+      "differences": [
+        {
+          "change": "layout",
+          "template": "",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "kind": "deviation",
+      "id": "appendix-II#003",
+      "similarity": 0.929,
+      "in": "4.8 Undesirable effects",
+      "paragraph": 36,
+      "differences": [
+        {
+          "change": "insert",
+          "template": "",
+          "label": ","
+        }
+      ]
+    },
+    {
+      "kind": "deviation",
+      "id": "appendix-II#004",
+      "similarity": 0.875,
+      "in": "4.8 Undesirable effects",
+      "paragraph": 37,
+      "differences": [
+        {
+          "change": "insert",
+          "template": "",
+          "label": ","
+        },
+        {
+          "change": "insert",
+          "template": "",
+          "label": ","
+        }
+      ]
+    },
+    {
+      "kind": "deviation",
+      "id": "appendix-II#005",
+      "similarity": 0.9,
+      "in": "4.8 Undesirable effects",
+      "paragraph": 38,
+      "differences": [
+        {
+          "change": "insert",
+          "template": "",
+          "label": ","
+        }
+      ]
+    },
+    {
+      "kind": "deviation",
+      "id": "appendix-II#006",
+      "similarity": 0.917,
+      "in": "4.8 Undesirable effects",
+      "paragraph": 39,
+      "differences": [
+        {
+          "change": "delete",
+          "template": "frequency",
+          "label": ""
         }
       ]
     }
@@ -259,7 +334,7 @@
       "in": "5.1 Pharmacodynamic properties",
       "paragraph": 1,
       "start": 0,
-      "end": 62
+      "end": 70
     },
     {
       "id": "smpc.5.1#1",
@@ -477,7 +552,7 @@
     },
     {
       "id": "appendix-III#2",
-      "status": "absent"
+      "status": "deviation"
     },
     {
       "id": "appendix-III#3",
@@ -537,19 +612,19 @@
     },
     {
       "id": "appendix-II#003",
-      "status": "absent"
+      "status": "deviation"
     },
     {
       "id": "appendix-II#004",
-      "status": "absent"
+      "status": "deviation"
     },
     {
       "id": "appendix-II#005",
-      "status": "absent"
+      "status": "deviation"
     },
     {
       "id": "appendix-II#006",
-      "status": "absent"
+      "status": "deviation"
     },
     {
       "id": "appendix-II#007",

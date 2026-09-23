@@ -67,15 +67,16 @@ EMA writes "GFR < 60 mL/min" that way in Jentadueto.
   statement over two paragraphs ("Traceability" and the sentence under it) is matched against
   consecutive paragraphs. Struck-through and faint text never counts as a match.
 - **Deviations.** A statement that does not match but resembles a stretch of its section is
-  reported with the word-level differences: at least 85% of its literal words (fill-ins left
-  out, since any text may stand in their place) must appear there in order, for the closest
-  choice of its optional segments. A stretch that resembles several alternatives ("waived",
-  "deferred") is a deviation of the closest one only. The same words set out with other
-  paragraph breaks are a `layout` difference. The differences are shown
-  up to the end of the sentence; text in the place of a fill-in is not a difference, and
-  struck or faint words show as "[struck or faint text]". Text that an exact match of a sibling
-  statement explains is not compared again; the rest of the paragraph is. 0.85 is a proposal
-  threshold, set on these three labels; a lower one would find more and be wrong more often.
+  reported with its differences, as a proposal for a person to judge. Resemblance is an
+  alignment of the statement with the text, token by token (words and single punctuation
+  marks): a fill-in takes any run of words, an optional segment is taken or skipped, and each
+  substituted, missing or inserted token costs one. A deviation needs at least 85% of matched
+  tokens against matched tokens plus changes, and either six matched words or every word the
+  statement requires. The differences are exact ("https" against "http", "," against ";"); the
+  same tokens with other spaces or paragraph breaks are a `layout` difference ("2°C" against
+  "2 °C"). Text an exact match of a sibling statement explains is not compared again, and where
+  two resemblances overlap only the closer is reported. 85% and six words are proposal
+  thresholds, set on these three labels.
 - **Refused parts.** A statement not found in a section with a part the reader refused is
   `not-checked`, not `absent`. A resemblance in the readable part is still a deviation.
 - **Appendices.** Appendix I's statements against 4.6, Appendix II's frequency convention and
@@ -118,6 +119,11 @@ Every finding below was confirmed by reading the source div.
     where the template has "in {condition}", and its 4.2 paediatric statement reads "in
     children and adolescents below 18 years of age" where the template has "in children aged {x
     to y}". Both are common, and a person should confirm them.
+  - Nuvaxovid writes the frequency convention in 4.8 with thousands commas ("1/1,000") where
+    Appendix II has a space ("1/1 000"), and both Nuvaxovid and Jentadueto write "not known
+    (cannot be estimated from the available data)" without "frequency".
+  - Nuvaxovid writes "Store in a refrigerator (2°C – 8°C)" where Appendix III has "2 °C – 8
+    °C" (a `layout` difference).
 - **Formatting.** Blue text (an email address and the EMA link) in Brukinsa, besides the
   template's intended grey shading of "the national reporting system listed in Appendix V" in
   all three. Red, yellow and other colours in the source fall only on pictures or spaces, which
@@ -128,6 +134,10 @@ The mapping lacks three EMA codes the labels use (Pregnancy, Breast-feeding and 
 4.6); the check reports them as `unmapped-code`, for information.
 
 ## Known limits
+
+- A resemblance is a proposal. A short statement (fewer than six words) resembles text only
+  when every word it requires is there, so a changed word in "No data are available." is not
+  found; a heavily reworded statement is not found either.
 
 - Pilot data from 2024, checked against template 10.4.
 - The similarity threshold proposes deviations; it can miss a heavily reworded statement and

@@ -167,7 +167,7 @@ def test_changed_wording_is_a_deviation_with_the_difference() -> None:
     assert status(result, identifier) == "deviation"
     (deviation,) = [f for f in findings(result, "deviation") if f["id"] == identifier]
     assert deviation["differences"] == [
-        {"change": "replace", "template": "V.", "label": "V and include the batch number."}
+        {"change": "replace", "template": ".", "label": "and include the batch number."}
     ]
 
 
@@ -257,8 +257,7 @@ def test_brukinsa() -> None:
         {"change": "replace", "template": "on", "label": "in"}
     ]
     waiver = _deviation(result, "smpc.5.1#6")["differences"]
-    assert waiver[0]["template"] == "in \u2026"
-    assert waiver[0]["label"].startswith("for the treatment of")
+    assert waiver == [{"change": "delete", "template": "in", "label": ""}]
 
 
 def test_jentadueto() -> None:
@@ -281,8 +280,8 @@ def test_nuvaxovid() -> None:
     assert deviation["differences"] == [
         {
             "change": "replace",
-            "template": "V.",
-            "label": "V and include batch/Lot number if available.",
+            "template": ".",
+            "label": "and include batch/Lot number if available.",
         }
     ]
 
@@ -290,8 +289,11 @@ def test_nuvaxovid() -> None:
 def test_every_label_links_to_the_old_ema_address() -> None:
     for name, result in RESULTS.items():
         (closing,) = [f for f in findings(result, "deviation") if f["id"] == "document#1"]
-        assert closing["differences"][0]["template"] == "https://www.ema.europa.eu.", name
-        assert closing["differences"][0]["label"].startswith("http://www.ema.europa.eu"), name
+        assert closing["differences"][0] == {
+            "change": "replace",
+            "template": "https",
+            "label": "http",
+        }, name
 
 
 # --- review round 1 -----------------------------------------------------------------------
@@ -346,7 +348,7 @@ def test_differences_stop_at_the_end_of_the_sentence() -> None:
     identifier = f"smpc.4.8#{_item_index('smpc.4.8', 'Reporting suspected')}"
     (deviation,) = [f for f in findings(result, "deviation") if f["id"] == identifier]
     assert deviation["differences"] == [
-        {"change": "replace", "template": "V.", "label": "V and include the batch number."}
+        {"change": "replace", "template": ".", "label": "and include the batch number."}
     ]
 
 
@@ -601,11 +603,7 @@ def test_a_fill_in_next_to_punctuation_is_not_a_difference() -> None:
     )
     result = check(document(smpc_10=_paragraphs(closing)), REGISTRY, MAPPING)
     assert _deviation(result, "document#1")["differences"] == [
-        {
-            "change": "replace",
-            "template": "https://www.ema.europa.eu,",
-            "label": "http://www.ema.europa.eu,",
-        }
+        {"change": "replace", "template": "https", "label": "http"}
     ]
 
 
@@ -614,3 +612,65 @@ def test_a_present_opening_segment_needs_its_break() -> None:
     text += "newborns/infants cannot be excluded."
     result = check(document(smpc_4_6=_paragraphs(text)), REGISTRY, MAPPING)
     assert status(result, "appendix-I#lactation.2") != "used"
+
+
+# --- review round 5 -----------------------------------------------------------------------
+
+
+def test_inserted_words_count_against_a_short_statement() -> None:
+    text = "There is no relevant effect of food, so use of Zeta with or without food is possible."
+    result = check(document(smpc_4_2=_paragraphs("Posology", text)), REGISTRY, MAPPING)
+    assert not [f for f in findings(result, "deviation") if f["id"].startswith("smpc.4.2")]
+
+
+def test_two_statements_deviating_in_one_paragraph_are_both_reported() -> None:
+    text = (
+        "Keep the vial in the outer box in order to protect from light. Store in the original "
+        "packaging in order to protect from moisture."
+    )
+    result = check(document(smpc_6_4=_paragraphs(text)), REGISTRY, MAPPING)
+    deviations = {f["id"] for f in findings(result, "deviation")}
+    assert {"appendix-III#7", "appendix-III#9"} <= deviations
+
+
+def test_punctuation_beside_a_fill_in_is_compared() -> None:
+    text = "Pharmacotherapeutic group: Vaccines; ATC code: J07BN04"
+    result = check(document(smpc_5_1=_paragraphs(text)), REGISTRY, MAPPING)
+    assert _deviation(result, "smpc.5.1#0")["differences"] == [
+        {"change": "replace", "template": ",", "label": ";"}
+    ]
+
+
+def test_every_choice_of_optional_segments_is_considered() -> None:
+    text = (
+        "The safety and efficacy of Zeta in children aged 2 to 6 years has not yet been establishd."
+    )
+    result = check(document(smpc_4_2=_paragraphs("Posology", text)), REGISTRY, MAPPING)
+    identifier = f"smpc.4.2#{_item_index('smpc.4.2', '<The <safety>')}"
+    assert _deviation(result, identifier)["differences"] == [
+        {"change": "replace", "template": "established", "label": "establishd"}
+    ]
+
+
+def test_an_optional_fill_in_in_the_same_paragraph_is_matched() -> None:
+    for name, result in RESULTS.items():
+        used = next(s for s in result["statements"] if s["id"] == "smpc.5.1#0")
+        source = LABELS / "sources" / name
+        assert used["status"] == "used", name
+        assert source.exists()
+    text = "Pharmacotherapeutic group: Vaccines, ATC code: J07BN04"
+    result = check(document(smpc_5_1=_paragraphs(text)), REGISTRY, MAPPING)
+    used = next(s for s in result["statements"] if s["id"] == "smpc.5.1#0")
+    assert text[used["start"] : used["end"]] == text
+
+
+def test_a_resemblance_starts_at_the_first_matching_word() -> None:
+    text = (
+        "No special requirements for disposal of this product. Any unused medicinal product or "
+        "waste material should be disposed of in accordance with national requirements."
+    )
+    result = check(document(smpc_6_6=_paragraphs(text)), REGISTRY, MAPPING)
+    identifier = f"smpc.6.6#{_item_index('smpc.6.6', '<Any unused')}"
+    assert _deviation(result, identifier)["differences"] == [
+        {"change": "replace", "template": "local", "label": "national"}
+    ]
