@@ -25,6 +25,7 @@ on:
       - ".github/workflows/plan.yml"
       - ".github/workflows/vulnerabilities.yml"
       - "osv-scanner.toml"
+      - ".gitleaks.toml"
       - ".claude/**"
       - ".cursor/**"
   workflow_dispatch:

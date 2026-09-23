@@ -1,0 +1,20 @@
+# gitleaks configuration for scripts/ci/secret-scan.sh (docs/foundations.md, D4).
+#
+# Every default rule applies. An exception here must be as narrow as the false positive it
+# covers: one rule, one file, one line shape, all three required (condition AND), with the reason.
+# A path-only or rule-only exception would also hide a real secret added beside it.
+
+[extend]
+useDefault = true
+
+# deploy.sh authenticates to Artifact Registry's Docker v2 API with HTTP Basic, the fixed user
+# `oauth2accesstoken` and a freshly minted access token as the password. The line carries a
+# command substitution, never a credential; curl-auth-user matches the `--user name:value` shape.
+[[allowlists]]
+description = "deploy.sh: Artifact Registry basic auth with a token minted at run time"
+condition = "AND"
+targetRules = ["curl-auth-user"]
+paths = ['''^scripts/gcp/deploy\.sh$''']
+# The rule's captured secret, exactly: the user name and the command substitution, quotes included.
+regexTarget = "secret"
+regexes = ['''^"oauth2accesstoken:\$\(ema_flow_access_token\)"$''']
