@@ -108,6 +108,16 @@ const BULLET = CHARS(0x2022, 0x2023, 0x25a0, 0x25a1, 0x25aa, 0x25ab, 0x25cb, 0x2
 // joiners are whitespace but not a boundary for the edge rules.
 const GROUP_SEPARATORS = CHARS(0x0020, 0x2009);
 const GROUP_JOINERS = CHARS(0x00a0, 0x2007, 0x202f);
+// What stands between two groups: one code point, or two (a span can then end or start inside
+// the run and still cut the number, review round 3).
+const GROUP_RUNS: readonly string[] = [
+  ...GROUP_SEPARATORS,
+  ...GROUP_JOINERS,
+  "  ",
+  `${CP(0x2009)} `,
+  ` ${CP(0x00a0)}`,
+  `${CP(0x202f)} `,
+];
 // U+2043 and U+2219 were bullets until the review of fidelity-norm/2.0.0 made them content.
 const NEAR_BULLET = CHARS(0x2024, 0x25a2, 0x25cc, 0x00b7, 0x2027, 0x2043, 0x2219);
 // Section 3 step 5. U+000B, U+000C and U+0085 left the list in fidelity-norm/2.0.0: section 2
@@ -269,7 +279,7 @@ const FRAGMENTS: readonly Fragment[] = [
     className: "number-grouped",
     make: (random) =>
       chance(random, 0.7)
-        ? `${between(random, 1, 99)}${pick(random, [...GROUP_SEPARATORS, ...GROUP_JOINERS])}${String(
+        ? `${between(random, 1, 99)}${pick(random, GROUP_RUNS)}${String(
             between(random, 0, 999),
           ).padStart(3, "0")}`
         : `${between(random, 1, 99)}${pick(random, GROUP_JOINERS)}${pick(random, ["mg", "IU", "%"])}`,
@@ -1141,6 +1151,24 @@ function buildPage(random: Random, number: number, shape: PageShape): BuiltPage 
     body += `${sentence}${LF}`;
     sentences.push({ start, end: start + Array.from(sentence).length });
   }
+  // A line with a grouped number (`is 10  000 IU`, review round 3), so span edges inside the
+  // number are common enough that the digit-group rule is exercised, not only reachable.
+  if (chance(random, 0.35)) {
+    const digits = String(between(random, 0, 999)).padStart(3, "0");
+    const runs = chance(random, 0.7) ? GROUP_RUNS.filter((run) => run.length > 1) : GROUP_RUNS;
+    const grouped = `${word(random)}${SPACE}${between(random, 1, 99)}${pick(random, runs)}${digits}${SPACE}${word(random)}`;
+    const start = headerLength + Array.from(body).length;
+    body += `${grouped}${LF}`;
+    sentences.push({ start, end: start + Array.from(grouped).length });
+  }
+  // A table row whose first cell starts with a bullet (review round 3): a section cut before
+  // the row's U+0009 must still read the bullet as content.
+  if (chance(random, 0.2)) {
+    const row = `${pick(random, BULLET)}${SPACE}${word(random)}${TAB}${word(random)}`;
+    const start = headerLength + Array.from(body).length;
+    body += `${row}${LF}`;
+    sentences.push({ start, end: start + Array.from(row).length });
+  }
   if (sentences.length === 0) {
     const filler = word(random);
     const start = headerLength + Array.from(body).length;
@@ -1355,6 +1383,31 @@ const SPAN_LAYOUTS: readonly SpanLayout[] = [
     },
   },
   {
+    // A section that ends at a table row's U+0009, the row's first cell starting with a bullet:
+    // the row's U+0009 lies outside the slice, and the whole page line decides (review round 3).
+    className: "span-row-cut-before-tab",
+    build: (pages, random) => {
+      const built = pick(random, pages);
+      const points = Array.from(built.page.text);
+      const rows = built.sentences.filter(
+        (sentence) =>
+          BULLET.includes(points[sentence.start] ?? "") &&
+          points.slice(sentence.start, sentence.end).includes(TAB),
+      );
+      if (rows.length === 0) return sentenceSection(pages, random, 0);
+      const row = pick(random, rows);
+      const end = points.indexOf(TAB, row.start);
+      const earlier = built.sentences.filter((sentence) => sentence.end < row.start);
+      const start =
+        chance(random, 0.5) && earlier.length > 0 ? pick(random, earlier).start : row.start;
+      return {
+        sourceKey: "k",
+        div: narrativeFor(sliceOf(built.page, start, end)),
+        spans: [spanOver(built.page, start, end)],
+      };
+    },
+  },
+  {
     // A section whose first or last edge falls inside a number grouped with a space or a joiner.
     className: "span-number-group-edge",
     build: (pages, random) => {
@@ -1363,21 +1416,28 @@ const SPAN_LAYOUTS: readonly SpanLayout[] = [
       const isDigit = (character: string | undefined): boolean =>
         character !== undefined && character >= "0" && character <= "9";
       const separators = [...GROUP_SEPARATORS, ...GROUP_JOINERS];
-      const candidates: { sentence: { start: number; end: number }; at: number }[] = [];
+      const candidates: { sentence: { start: number; end: number }; at: number; run: number }[] =
+        [];
       for (const sentence of built.sentences) {
         for (let at = sentence.start + 1; at + 1 < sentence.end; at += 1) {
-          if (
-            isDigit(points[at - 1]) &&
-            separators.includes(points[at] ?? "") &&
-            (isDigit(points[at + 1]) || GROUP_JOINERS.includes(points[at] ?? ""))
-          ) {
-            candidates.push({ sentence, at });
+          if (!isDigit(points[at - 1]) || !separators.includes(points[at] ?? "")) continue;
+          let run = at;
+          while (run < sentence.end && separators.includes(points[run] ?? "")) run += 1;
+          if (isDigit(points[run]) || GROUP_JOINERS.includes(points[at] ?? "")) {
+            candidates.push({ sentence, at, run });
           }
         }
       }
       if (candidates.length === 0) return sentenceSection(pages, random, 0);
-      const { sentence, at } = pick(random, candidates);
-      const [start, end] = chance(random, 0.5) ? [at + 1, sentence.end] : [sentence.start, at];
+      const { sentence, at, run } = pick(random, candidates);
+      // The edge anywhere from the last digit of one group to the first of the next: inside the
+      // run, the span begins or ends with whitespace and the digit rule reads past it.
+      const edge =
+        run - at >= 2 && chance(random, 0.6)
+          ? between(random, at + 1, run - 1)
+          : between(random, at, run);
+      const [start, end] = chance(random, 0.5) ? [edge, sentence.end] : [sentence.start, edge];
+      if (start >= end) return sentenceSection(pages, random, 0);
       return {
         sourceKey: "k",
         div: narrativeFor(sliceOf(built.page, start, end)),

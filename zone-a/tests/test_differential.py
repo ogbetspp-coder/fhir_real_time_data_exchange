@@ -268,5 +268,7 @@ def test_the_corpus_exercises_the_classes_the_review_named() -> None:
         "bullet-on-tab-line",
         "table-cell-bullet",
         "script-letter-or-symbol",
+        # Round 3.
+        "span-row-cut-before-tab",
     }
     assert required <= seen, sorted(required - seen)

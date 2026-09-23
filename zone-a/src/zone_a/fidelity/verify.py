@@ -213,11 +213,35 @@ def _from_line_start(index: PageIndex, start: int) -> int:
     return position - 1 if _at(index.text, position - 1) == "\n" else start
 
 
+def _last_line_has_tab(index: PageIndex, end: int) -> bool:
+    """Whether the whole page line a slice ending at ``end`` ends on contains U+0009.
+
+    The line is read in the body from the U+000A before it to the next U+000A, not only its part
+    inside the slice. A slice that ends with U+000A ends on no partial line.
+    """
+    if end <= index.body_start or index.text[end - 1] == "\n":
+        return False
+    line_start = end - 1
+    while line_start > index.body_start and index.text[line_start - 1] != "\n":
+        line_start -= 1
+    line_end = end
+    while line_end < index.body_end and index.text[line_end] != "\n":
+        line_end += 1
+    return "\t" in index.text[line_start:line_end]
+
+
+@dataclass(slots=True)
+class _Resolved:
+    raw: list[str]
+    last_line_has_tab: bool
+
+
 def _is_blank_slice(index: PageIndex, start: int, end: int) -> bool:
     if end <= start:
         return True
     try:
-        return normalize_text(index.text[_from_line_start(index, start) : end]) == ""
+        text = index.text[_from_line_start(index, start) : end]
+        return normalize_text(text, last_line_has_tab=_last_line_has_tab(index, end)) == ""
     except NormalizationError:
         return False
 
@@ -270,13 +294,18 @@ def _start_cuts_word(pages: dict[int, PageIndex], span: Json) -> bool:
     skipping edge whitespace. The first other code point cuts a token if nothing was skipped
     before it, whatever it is (a letter, a digit, the ``.`` of ``0.5``, the minus of ``-20``,
     U+00A0 of ``10 000``), or if it is U+00AD. Reading past page 1 is no cut. It also cuts a
-    number when the span's first code point is a digit and the first non-whitespace code point
-    before it on the same line is a digit too.
+    number when the span's first code point that is not edge whitespace is a digit and the first
+    non-whitespace code point before that on the same line is a digit too.
     """
     first = pages.get(span["page"])
     start = span["startOffset"]
-    if first is not None and _cuts_digit_group(first, start, start - 1, -1):
-        return True
+    if first is not None:
+        # The span's first code point that is not section 3 whitespace (joiners included).
+        inner = start
+        while inner < span["endOffset"] and is_whitespace(ord(first.text[inner])):
+            inner += 1
+        if inner < span["endOffset"] and _cuts_digit_group(first, inner, inner - 1, -1):
+            return True
     skipped = False
     page_number = span["page"]
     position = start - 1
@@ -302,8 +331,8 @@ def _end_cuts_word(index: PageIndex, span: Json) -> bool:
     It does if the last span, without trailing edge whitespace, ends in U+00AD; otherwise it does
     unless the code point at its end offset is edge whitespace or the end offset is at or past
     ``bodyEnd``. The ``1`` of ``1.5`` is a cut. It also cuts a number when the span's last code
-    point is a digit and the first non-whitespace code point after it on the same line is a
-    digit too.
+    point that is not edge whitespace is a digit and the first non-whitespace code point after
+    that on the same line is a digit too.
     """
     start, end = span["startOffset"], span["endOffset"]
     trimmed = end
@@ -315,10 +344,14 @@ def _end_cuts_word(index: PageIndex, span: Json) -> bool:
         return False
     if not _is_edge_whitespace(_at(index.text, end)):
         return True
-    return _cuts_digit_group(index, end - 1, end, 1)
+    # The span's last code point that is not section 3 whitespace (joiners included).
+    inner = trimmed
+    while inner > start and is_whitespace(ord(index.text[inner - 1])):
+        inner -= 1
+    return inner > start and _cuts_digit_group(index, inner - 1, inner, 1)
 
 
-def _resolve_spans(spans: list[Json], pages: dict[int, PageIndex]) -> list[str] | tuple[str, str]:
+def _resolve_spans(spans: list[Json], pages: dict[int, PageIndex]) -> _Resolved | tuple[str, str]:
     """Locate and hash-check a section's spans.
 
     Returns one contiguous raw slice per page — so the source's own characters, never
@@ -381,7 +414,11 @@ def _resolve_spans(spans: list[Json], pages: dict[int, PageIndex]) -> list[str] 
     ):
         return ("invalid-provenance", "word-cut")
 
-    return [piece.index.text[piece.start : piece.end] for piece in pieces]
+    last = pieces[-1] if pieces else None
+    return _Resolved(
+        raw=[piece.index.text[piece.start : piece.end] for piece in pieces],
+        last_line_has_tab=last is not None and _last_line_has_tab(last.index, last.end),
+    )
 
 
 def _diff_hint(expected: str, actual: str) -> dict[str, Json]:
@@ -555,7 +592,9 @@ def verify_narrative_fidelity(payload: Json) -> dict[str, Json]:
             continue
         # Pieces from consecutive pages are concatenated verbatim: a page body ends with its own
         # line terminator (or a soft hyphen when a word continues), so nothing is inserted here.
-        expected = normalize_text("".join(resolved))
+        expected = normalize_text(
+            "".join(resolved.raw), last_line_has_tab=resolved.last_line_has_tab
+        )
         if expected != normalized["text"]:
             results.append(
                 {

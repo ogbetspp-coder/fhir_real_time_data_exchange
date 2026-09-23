@@ -119,7 +119,7 @@ def _lines_with_tab(text: str) -> list[bool]:
     return result
 
 
-def normalize_text(text: str) -> str:
+def normalize_text(text: str, *, last_line_has_tab: bool = False) -> str:
     """Apply section 3's five ordered steps. Raises NormalizationError on a section 2 character."""
     forbidden = find_forbidden_character(text)
     if forbidden is not None:
@@ -156,6 +156,11 @@ def normalize_text(text: str) -> str:
     output: list[str] = []
     composed = unicodedata.normalize("NFC", "".join(expanded))
     on_tab_line = _lines_with_tab(composed)
+    if last_line_has_tab:
+        # A page slice whose last line continues past it on a page line with U+0009 (section 6).
+        last_break = composed.rfind("\n")
+        for position in range(last_break + 1, len(composed)):
+            on_tab_line[position] = True
     at_line_start = False
     for position, character in enumerate(composed):
         code_point = ord(character)
