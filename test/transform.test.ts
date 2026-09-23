@@ -163,6 +163,23 @@ describe("deterministic Type 2 to EMA conversion", () => {
     ]);
   });
 
+  it("fails closed when a section without a source code carries only a picture", () => {
+    // Dropping the section would drop the picture with it.
+    const source = createSyntheticType2Bundle(mapping);
+    findSection(composition(source).section, "smpc.6").section?.push({
+      title: "6.7 Additional information",
+      code: { coding: [{ system: "https://khs.dev/fhir/CodeSystem/other", code: "extra" }] },
+      text: {
+        status: "generated",
+        div: '<div xmlns="http://www.w3.org/1999/xhtml"><p><img src="data:image/png;base64,AA=="/></p></div>',
+      },
+    });
+
+    expect(transformIssues(source)).toEqual([
+      "Uncoded source section with narrative at Composition.section[0].section[5].section[6]",
+    ]);
+  });
+
   it.each([
     ["CDATA", "<p><![CDATA[Do not use in children]]></p>"],
     ["a comment", "<!-- Do not use in children -->"],
@@ -309,6 +326,9 @@ describe("deterministic Type 2 to EMA conversion", () => {
     // fidelity-norm/3.0.0: a table's grid markers are structure, not text.
     ["a table of empty cells", "<table><tr><td></td><td> </td></tr></table>", "has no narrative"],
     ["a picture by reference", '<p><img src="images/logo.png"/></p>', "has unreadable narrative"],
+    // A picture can draw nothing (these bytes draw a broken-image icon), and what one shows is
+    // never read, so a mandatory section needs text.
+    ["a picture", '<p><img src="data:image/png;base64,AA=="/></p>', "has no narrative"],
   ])("fails closed when a mandatory leaf section holds only %s", (_name, content, outcome) => {
     const source = createSyntheticType2Bundle(mapping);
     findSection(composition(source).section, "smpc.4.3").text = {
@@ -320,7 +340,6 @@ describe("deterministic Type 2 to EMA conversion", () => {
   });
 
   it.each([
-    ["a picture", '<p><img src="data:image/png;base64,AA=="/></p>'],
     ["a numbered item", '<ol start="2"><li></li></ol>'],
     ["a table with one filled cell", "<table><tr><td></td><td>x</td></tr></table>"],
   ])("counts %s as narrative a reader sees", (_name, content) => {

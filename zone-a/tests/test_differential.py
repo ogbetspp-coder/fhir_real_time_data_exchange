@@ -296,6 +296,8 @@ def test_the_corpus_exercises_the_classes_the_review_named() -> None:
         "picture-data-body",
         "picture-then-combining",
         "table-in-caption",
+        "table-zero-size",
+        "precedence-3-0-0",
         "table-size",
         "picture-violation",
         "reserved-character",

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 from typing import Any
 
 import pytest
@@ -144,14 +145,30 @@ def test_a_grid_of_exactly_the_slot_limit_is_accepted() -> None:
     """The tables of one narrative cover at most 50 000 slots (fidelity-norm/3.0.0).
 
     The accepted side is pinned here rather than as a vector, whose text would be 150 000 code
-    points long; the refused side is the vector ``rejects-table-over-slot-limit``.
+    points long; the refused side is the vector ``rejects-table-over-slot-limit``. One row of
+    1000 single cells gives every column one; 49 rows then span them all.
     """
-    row = '<tr><td colspan="1000">a</td></tr>'
+    grid = "<tr>" + "<td>a</td>" * 1000 + "</tr>" + '<tr><td colspan="1000">a</td></tr>' * 49
 
-    def table(rows: int, extra: str = "") -> str:
-        return f'<div xmlns="http://www.w3.org/1999/xhtml"><table>{row * rows}</table>{extra}</div>'
+    def div(extra: str = "") -> str:
+        return f'<div xmlns="http://www.w3.org/1999/xhtml"><table>{grid}</table>{extra}</div>'
 
-    assert isinstance(xhtml_to_text(table(50)), str)
+    assert isinstance(xhtml_to_text(div()), str)
     with pytest.raises(XhtmlError) as raised:
-        xhtml_to_text(table(50, "<table><tr><td>b</td></tr></table>"))
+        xhtml_to_text(div("<table><tr><td>b</td></tr></table>"))
     assert raised.value.code == "table-size"
+
+
+def test_empty_rows_under_a_wide_row_scan_in_linear_time() -> None:
+    """The grid is sparse, so a row costs only the slots it covers (review round 3).
+
+    Twenty thousand empty rows under a 50 000-slot row took 79 s here before.
+    """
+    wide = "<tr>" + '<td colspan="1000">a</td>' * 50 + "</tr>"
+    empty = "<tr></tr>" * 20_000
+    div = f'<div xmlns="http://www.w3.org/1999/xhtml"><table>{wide}{empty}</table></div>'
+    started = time.monotonic()
+    with pytest.raises(XhtmlError) as raised:
+        xhtml_to_text(div)
+    assert raised.value.code == "table-shape"
+    assert time.monotonic() - started < 5

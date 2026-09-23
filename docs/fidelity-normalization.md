@@ -273,9 +273,15 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   (`table-shape`), decided at its start tag; that is the only way two cells can overlap. A cell
   whose rows run past the last row of its row group (`thead`, a `tbody`, `tfoot`, or the rows
   directly under `table`) rejects (`table-shape`), decided at the end tag of that group, or at
-  `</table>` for rows directly under it: a renderer clips it silently. At `</table>`, every row
-  must cover exactly the slots 0 … w−1, with one w for the whole table; otherwise `table-shape`
-  (a ragged row, or a slot inside a row that no cell covers). A table with no rows is accepted.
+  `</table>` for rows directly under it: a renderer clips it silently. A row that covers a slot
+  but in which no cell spanning one row starts rejects (`table-shape`), decided at its `</tr>`:
+  a renderer draws it at zero height, so a cell that starts in it and spans down reads, drawn,
+  against the next row only. At `</table>`, every row must cover exactly the slots 0 … w−1,
+  with one w for the whole table (otherwise a ragged row, or a slot inside a row that no cell
+  covers), and in every column 0 … w−1 a cell spanning one column must start (a renderer draws
+  a column without one at zero width, its spanning cells' text reading against the columns
+  beside it); otherwise `table-shape`, decided in that order after the row group's clipped
+  spans. A table with no rows, and a row that covers no slot, are accepted.
   The tables of one narrative cover at most 50 000 slots together, counting each cell's
   `colspan` × `rowspan` when it is placed; the cell that crosses the bound rejects
   (`table-size`), decided after its overlap check: a small table can span a grid whose markers
@@ -303,9 +309,10 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   depends on wrapping and margins, which no text check sees; an extractor of a drawn document
   cannot tell a wrapped line from a line break, so a rule that compared lines would refuse most
   real tables. Which cell a value is in is proved; where in the cell it sits is not. The slots
-  are the HTML table model's: a renderer draws a column that no single-column cell starts in at
-  zero width, and a row whose slots are all covered from above at zero height, which can only
-  make an extractor that reads the drawn grid disagree (a false failure).
+  are the HTML table model's, and the zero-height and zero-width rules above make every
+  accepted row and column drawn with some size. How large is not compared: a row or column
+  whose only single cells are empty is drawn a few pixels high or wide, which a reader can
+  overlook, as a source drawn the same way can be.
 
 - Table parts must appear in the one document order that renders as written, because
   renderers place them by role: `caption` (at most one) first; then either rows (`tr`)
@@ -352,8 +359,10 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   result is decided: a narrative whose normalised text holds nothing but U+0020 and the grid
   markers U+FDD0–U+FDD5 draws nothing, and is `malformed-narrative` with reason
   `empty-narrative` (a table of empty cells is empty; a list number or a picture is drawn). The
-  scanner itself never produces that reason. The same rule decides elsewhere whether a
-  narrative is present (`src/fhir/transform.ts`).
+  scanner itself never produces that reason. The crosswalk (`src/fhir/transform.ts`) decides
+  whether a mandatory section carries narrative by a stricter rule of its own: it also ignores
+  invisible characters (U+200B, U+200C, U+200D, U+2060, U+00AD) and pictures, because a picture
+  can draw nothing and what one shows is never read.
 
 Because block boundaries become U+000A or U+0009 and the whitespace step collapses them,
 paragraph boundaries, headings and line breaks are structure, not content. A table's cells are
@@ -415,8 +424,9 @@ reason code is inside `reportHash`, so the order in which violations are decided
   `tbody`, `tfoot` or `tr`; else `list-content` for any other element whose parent is `ol` or
   `ul`.
 - At an end tag: `malformed-tag`, then `uppercase-element`, then `unbalanced-tag`, then
-  `misnested-tag`, then `table-shape` (for `</thead>`, `</tbody>`, `</tfoot>` and `</table>`: a
-  clipped row span, then at `</table>` the row widths).
+  `misnested-tag`, then `table-shape` (for `</tr>`, a row drawn at zero height; for `</thead>`,
+  `</tbody>`, `</tfoot>` and `</table>`, a clipped row span, then at `</table>` the row widths,
+  then a column drawn at zero width).
 - At `&`: `stray-amp`, then `text-outside-root`, then `unknown-entity`, then
   `forbidden-character`, then `reserved-character`, then `table-content`, then `list-content`,
   then `unmappable-script`.
@@ -605,7 +615,10 @@ extractor is a controlled component: its name and version are recorded in
   U+0009 U+FDD5 U+0009; then U+000A U+FDD1. Every row has the same number of slots; a line break
   inside a cell is emitted as U+0020, except a discretionary hyphen, which is U+00AD U+000A. An
   extractor that cannot tell a merged slot from an empty cell, or cannot recover a table's grid,
-  must refuse the document rather than guess: the grid is compared (section 5);
+  must refuse the document rather than guess: the grid is compared (section 5). A table that
+  continues across a page break is one table: no U+FDD1 before the break and no U+FDD0 after
+  it, and a header row the document repeats on the new page is emitted once, where the table
+  first has it. A cell that continues across the break is one cell;
 - emit a list marker (a bullet glyph, section 3 step 4) followed by U+0020, never U+0009: the
   tab after a list marker is layout, not a cell boundary. A word processor's list (`•` U+0009
   `Adults: 10 mg`) extracted with its tab reads as a table row, its bullet as content, and a
@@ -615,7 +628,11 @@ extractor is a controlled component: its name and version are recorded in
 - emit an inline picture, in the text's reading order, as U+FFFC, the SHA-256 hex of the `src`
   a narrative must carry for it, and U+FFFC: the `data:image/png;base64,` or
   `data:image/jpeg;base64,` URI of its exact bytes in canonical padded base64 (the media type is
-  that of the stored part). A picture is an embedded raster image drawn inline, including a logo
+  that of the stored part). The bytes are a complete PNG or JPEG file as the document stores
+  it: a Word part of type `image/png` or `image/jpeg`, a PDF image stored as a DCT (JPEG)
+  stream. A picture stored any other way (a PDF's Flate-compressed samples, JPX, JBIG2, CCITT, a
+  Word EMF or GIF) has no such file, and the extractor must refuse the document rather than
+  re-encode it. A picture is an embedded raster image drawn inline, including a logo
   or a decorative image; vector drawings, shapes and text boxes are not, and an extractor that
   meets one it cannot read as text must refuse the document. A structured source's picture that
   is a reference is resolved to its bytes when they can be fetched and pinned, and otherwise
@@ -675,7 +692,7 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   0005). `ol` is allowed with `type` and `start`, and each of its items emits the marker a
   renderer draws (decimal, alphabetic, roman); `li` is allowed only directly in `ol` or `ul`,
   whose only children are `li` (`list-content`). `colspan` and `rowspan` return, placed by the
-  HTML table model with overlaps, clipped row spans, holes and ragged rows refused
+  HTML table model with overlaps, clipped row spans, holes, ragged rows, rows drawn at zero height and columns drawn at zero width refused
   (`table-shape`), and nested tables refused (`table-structure`); every table's text carries its
   grid in the reserved code points U+FDD0–U+FDD5, which closes the cell-association residual
   2.0.0 stated, apart from the line a value sits on inside a multi-line cell, which is stated as

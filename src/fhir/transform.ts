@@ -91,18 +91,25 @@ function isVisible(character: string): boolean {
 
 type Narrative = "absent" | "present" | "unreadable";
 
+// A picture in the scanner's text: U+FFFC, the SHA-256 of its source, U+FFFC.
+const PICTURE_TOKEN = /\ufffc[0-9a-f]{64}\ufffc/gu;
+
 // Whether a section's text.div holds anything a reader would see, read with the same fail-closed
 // scanner the fidelity check uses (src/fidelity/xhtml.ts): entities decoded, markup removed,
 // invisible characters ignored. A div that scanner rejects — a comment, CDATA, an unknown
-// element such as img, an unknown entity such as &nbsp;, a forbidden attribute — is
+// element, an unknown entity such as &nbsp;, a forbidden attribute, a picture by reference — is
 // "unreadable", and both checks that use this refuse it: an uncoded section might be hiding text
-// in it, and a mandatory section cannot be shown to carry any.
-function readNarrative(section: CompositionSection): Narrative {
+// in it, and a mandatory section cannot be shown to carry any. `pictures` says whether a picture
+// counts: it does where a section would otherwise be dropped (a picture would be lost with it),
+// and it does not where a mandatory section must carry text (a picture can draw nothing, and what
+// one shows is never read).
+function readNarrative(section: CompositionSection, pictures: boolean): Narrative {
   const div: unknown = section.text?.div;
   if (div === undefined) return "absent";
   if (typeof div !== "string") return "unreadable";
   try {
-    return Array.from(xhtmlToText(div)).some(isVisible) ? "present" : "absent";
+    const text = pictures ? xhtmlToText(div) : xhtmlToText(div).replace(PICTURE_TOKEN, "");
+    return Array.from(text).some(isVisible) ? "present" : "absent";
   } catch {
     // An XhtmlError, or anything else the scanner throws: either way nothing can be shown.
     return "unreadable";
@@ -188,7 +195,7 @@ function sourceSectionIssues(sections: SourceSection[], mapping: EmaMapping): st
         `Ambiguous source section at ${path}: ${codes.length} codes in the source code system`,
       );
     } else if (code === undefined) {
-      const narrative = readNarrative(section);
+      const narrative = readNarrative(section, true);
       if (narrative === "present") {
         issues.push(`Uncoded source section with narrative at ${path}`);
       } else if (narrative === "unreadable") {
@@ -260,7 +267,7 @@ function mapSection(
   // subsections, unless its rule says the section carries text of its own above them.
   const childRules = rule.children ?? [];
   if (rule.narrative === "required" || (rule.required && childRules.length === 0)) {
-    const narrative = readNarrative(match.section);
+    const narrative = readNarrative(match.section, false);
     if (narrative === "absent") {
       issues.push(`Mandatory source section ${rule.sourceKey} has no narrative`);
     } else if (narrative === "unreadable") {

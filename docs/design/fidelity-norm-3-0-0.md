@@ -1,7 +1,7 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent reviews (findings listed at the end), and
-implemented. `docs/fidelity-normalization.md` (3.0.0) is the normative text; where this note and
+_Proposal, 2026-09-23, amended after two independent design reviews and one review of the
+implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md` (3.0.0) is the normative text; where this note and
 it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
 cells spanning columns, five spanning rows and two pictures, and every real summary of product
@@ -106,6 +106,10 @@ Placement follows the HTML table model:
   it). A renderer clips such a cell silently.
 - At `</table>`, every row must cover exactly the slots 0 … w−1, with the same w for every row.
   Otherwise the result is `table-shape`. So there are no holes and no ragged rows.
+- A row that covers a slot but in which no cell spanning one row starts is `table-shape` at its
+  `</tr>`, and a column in which no cell spanning one column starts is `table-shape` at
+  `</table>` (third review, finding 1): a renderer draws such a row at zero height and such a
+  column at zero width, so a cell starting there reads, drawn, against its neighbours only.
 
 Text. Six reserved code points, U+FDD0 to U+FDD5, carry the grid. Unicode sets them aside
 permanently for internal use, and XML allows them. Written ⟦table⟧, ⟦/table⟧, ⟦row⟧, ⟦cell⟧,
@@ -409,3 +413,31 @@ scratchpad.
 13. **Low.** Test case 15, "§1's preamble", and a Markdown formatter turning "(default 1) plus"
     into a numbered list in the specification. Fixed.
 14. **Low.** The catalogue order of the new codes. Stated (Impact).
+
+## Third review (2026-09-23, of the implementation): findings and what changed
+
+The third review fuzzed the two implementations against each other with 40 000 cases of its
+own (no divergence), drew 800 random span tables in Chrome, and applied its own mutations.
+
+1. **High.** A row in which cells start but all span down is drawn at zero height, and a column
+   no single-column cell starts in at zero width, so "600 mg" spanning an Adults row and a
+   Children row was drawn against Children only while the text read both. Second review finding
+   12 had called this a false failure only. Fixed: both are `table-shape` (B), and §5 states that
+   a thin row or column (only empty single cells) is still drawn, a few pixels high.
+2. **Medium.** Work grew with rows × table width: 20 000 empty rows under a 50 000-slot row took
+   20 s (TypeScript) and 79 s (Python). Fixed: the grid is sparse in both, so a row costs only
+   the slots it covers (32 ms and 90 ms), with a timed test on each side.
+3. **Medium.** Three precedence rules of §5 (forbidden before reserved, a missing `src` before
+   `void-element`, overlap before `table-size`) were pinned by no vector. Fixed: three vectors
+   and a differential class.
+4. **Medium.** `get_section`'s contract caps a `div` at 200 000 code points, so a section with a
+   large picture is `unavailable`. Recorded in the change record; the query contract changes in
+   roadmap item 3a's publishing step, and the Imatinib Teva import carries no picture.
+5. **Medium.** A picture alone satisfied a mandatory section. Fixed: the crosswalk ignores
+   pictures when a mandatory section must carry text, and counts them when an uncoded section
+   would otherwise be dropped.
+6. **Low.** "The same rule" decides presence was false. Fixed: §5 states the crosswalk's
+   stricter rule.
+7. **Low.** Change-record counts and claims. Fixed.
+8. **Low.** §7 did not say how a table crossing a page break is written, or which stored image
+   forms are a PNG or JPEG file. Fixed.

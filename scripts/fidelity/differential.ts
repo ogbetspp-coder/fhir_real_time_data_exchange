@@ -560,10 +560,17 @@ function table(random: Random, depth: number): Markup {
   // and rows now and then (fidelity-norm/3.0.0); a span made one too wide overlaps a cell or
   // leaves the row ragged, and one made one too tall runs past the group, which a renderer clips
   // (`table-shape`).
+  // The table's first row has only single-column cells, so every column has one, and each row's
+  // first cell spans one row, so no row is drawn at zero height (fidelity-norm/3.0.0); the
+  // perturbations below still break both now and then.
+  let firstRow = true;
   const rows = (cell: "td" | "th", count: number): string => {
     const covered: boolean[][] = Array.from({ length: count }, () => []);
     let markup = "";
     for (let rowIndex = 0; rowIndex < count; rowIndex += 1) {
+      const onlySingleColumns = firstRow;
+      firstRow = false;
+      let placedSingleRow = false;
       const coveredHere = covered[rowIndex] ?? [];
       let slots = width;
       if (chance(random, 0.06)) {
@@ -575,9 +582,13 @@ function table(random: Random, depth: number): Markup {
         if (coveredHere[column] === true) continue;
         let free = 0;
         while (column + free < slots && coveredHere[column + free] !== true) free += 1;
-        let colspan = free >= 2 && chance(random, 0.3) ? between(random, 2, free) : 1;
+        let colspan =
+          !onlySingleColumns && free >= 2 && chance(random, 0.3) ? between(random, 2, free) : 1;
         let rowspan =
-          count - rowIndex >= 2 && chance(random, 0.25) ? between(random, 2, count - rowIndex) : 1;
+          placedSingleRow && count - rowIndex >= 2 && chance(random, 0.25)
+            ? between(random, 2, count - rowIndex)
+            : 1;
+        if (rowspan === 1) placedSingleRow = true;
         if (colspan > 1) classes.add("table-colspan");
         if (rowspan > 1) classes.add("table-rowspan");
         if (chance(random, 0.02)) {
@@ -1016,6 +1027,37 @@ const VIOLATIONS: readonly Violation[] = [
       const rows = pick(random, [50, 51]);
       const row = '<tr><td colspan="1000">a</td></tr>';
       return root(`${body}<table>${row.repeat(rows)}</table>`, attrs);
+    },
+  },
+  {
+    // A row whose cells all span down, and a column no single-column cell starts in: drawn at
+    // zero height or width (review round 3).
+    className: "table-zero-size",
+    apply: (body, attrs, random) => {
+      const inner = pick(random, [
+        '<table><tr><th>P</th><th>D</th></tr><tr><td rowspan="2">Adults</td><td>400 mg</td></tr><tr><td rowspan="2">600 mg</td></tr><tr><td>Children</td></tr></table>',
+        '<table><tr><td colspan="2">a</td></tr></table>',
+        '<table><tr><td>a</td><td colspan="2">b</td></tr><tr><td colspan="2">c</td><td>d</td></tr></table>',
+        '<table><tr><td rowspan="2">a</td><td rowspan="2">b</td></tr><tr></tr></table>',
+        '<table><tr><td rowspan="2">a</td><td>b</td></tr><tr><td>c</td></tr></table>',
+      ]);
+      return root(`${body}${inner}`, attrs);
+    },
+  },
+  {
+    // The precedence rules section 5 states: forbidden before reserved, a missing picture source
+    // before void-element, overlap before table-size.
+    className: "precedence-3-0-0",
+    apply: (body, attrs, random) => {
+      const nearLimit = `<table><tr>${"<td>a</td>".repeat(1000)}</tr>${'<tr><td colspan="1000">a</td></tr>'.repeat(48)}</table>`;
+      const inner = pick(random, [
+        `<p>${CP(0xfdd0)}${CP(0x0001)}</p>`,
+        `<p>${CP(0xfffc)}${CP(0x0085)}</p>`,
+        "<p><img></img></p>",
+        "<p><img>x</img></p>",
+        `${nearLimit}<table><tr><td>a</td><td rowspan="2">b</td></tr><tr><td colspan="1000">c</td></tr></table>`,
+      ]);
+      return root(`${body}${inner}`, attrs);
     },
   },
   {

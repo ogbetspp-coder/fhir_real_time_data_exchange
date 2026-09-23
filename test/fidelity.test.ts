@@ -126,13 +126,22 @@ describe("xhtml scanner", () => {
   // fidelity-norm/3.0.0: the tables of one narrative cover at most 50 000 slots. The accepted side
   // is pinned here rather than as a vector, whose text would be 150 000 code points long.
   it("accepts a grid of exactly the slot limit and refuses one slot more", () => {
-    const row = '<tr><td colspan="1000">a</td></tr>';
-    const table = (rows: number, extra = ""): string =>
-      `<div xmlns="http://www.w3.org/1999/xhtml"><table>${row.repeat(rows)}</table>${extra}</div>`;
-    expect(typeof tryXhtml(table(50))).toBe("string");
-    expect(tryXhtml(table(50, "<table><tr><td>b</td></tr></table>"))).toEqual({
-      error: "table-size",
-    });
+    // One row of 1000 single cells (so every column has one) and 49 rows spanning them all.
+    const grid = `<tr>${"<td>a</td>".repeat(1000)}</tr>${'<tr><td colspan="1000">a</td></tr>'.repeat(49)}`;
+    const div = (extra = ""): string =>
+      `<div xmlns="http://www.w3.org/1999/xhtml"><table>${grid}</table>${extra}</div>`;
+    expect(typeof tryXhtml(div())).toBe("string");
+    expect(tryXhtml(div("<table><tr><td>b</td></tr></table>"))).toEqual({ error: "table-size" });
+  });
+
+  // Review round 3: the grid is kept sparse, so a row costs only the slots it covers. Twenty
+  // thousand empty rows under a 50 000-slot row took 20 s here and 79 s in Python before.
+  it("scans empty rows under a wide row in linear time", () => {
+    const wide = `<tr>${'<td colspan="1000">a</td>'.repeat(50)}</tr>`;
+    const div = `<div xmlns="http://www.w3.org/1999/xhtml"><table>${wide}${"<tr></tr>".repeat(20_000)}</table></div>`;
+    const started = performance.now();
+    expect(tryXhtml(div)).toEqual({ error: "table-shape" });
+    expect(performance.now() - started).toBeLessThan(2_000);
   });
 
   // Section 2 applies to the div as decoded from JSON (RFC 8259). The vectors are written by

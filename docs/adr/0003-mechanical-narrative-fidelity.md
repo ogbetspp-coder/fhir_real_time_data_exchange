@@ -136,7 +136,9 @@ reader sees without the check seeing it._
   column and verify. The empty slots the extractor contract requires for a spanned source cell
   make that easier, because an empty narrative cell costs nothing. Closing it needs a table
   extractor contract and is the next major version. (Closed by `fidelity-norm/3.0.0`, whose
-  text carries each table's grid and whose extractor contract emits it.) Also not closed: a text layer that
+  text carries each table's grid and whose extractor contract emits it, apart from the line a
+  value sits on inside a multi-line cell and how high or wide a row or column is drawn, which it
+  states.) Also not closed: a text layer that
   flattens a superscript is outside the check, because the narrative is derived from it (only
   the extractor can close that); a letter exponent (`2<sup>n</sup>` against `2n`) still
   verifies; strong right-to-left letters can reorder adjacent numbers, and no EU

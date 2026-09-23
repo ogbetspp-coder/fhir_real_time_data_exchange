@@ -171,14 +171,20 @@ type TableState = {
   body: boolean;
   foot: boolean;
   rows: boolean;
-  // The grid, laid out by the HTML table model. For each column, how many rows, from the current
-  // one, a cell above still covers.
-  above: number[];
-  // The current row: which slots are covered, the next slot not yet emitted, and for each column
-  // how many rows below it a cell placed in this row covers.
-  filled: boolean[];
+  // The grid, laid out by the HTML table model, and kept sparse so that a row costs only the
+  // slots it covers: for each column a cell above still covers, how many rows from the current
+  // one it covers.
+  above: Map<number, number>;
+  // The current row: the slots covered, the highest of them, the next slot not yet emitted, for
+  // each column how many rows below it a cell placed in this row covers, and whether a cell that
+  // spans no rows starts in it.
+  covered: Set<number>;
+  last: number;
   cursor: number;
-  down: number[];
+  down: Map<number, number>;
+  single: boolean;
+  // The columns in which a cell that spans no columns starts, over the whole table.
+  singleColumns: Set<number>;
   // The colspan of the open cell, whose covered-left slots its end tag emits.
   openSpan: number;
   // Slots covered by every row of this table, or -1 for a row with a hole.
@@ -447,10 +453,13 @@ function newTable(): TableState {
     body: false,
     foot: false,
     rows: false,
-    above: [],
-    filled: [],
+    above: new Map(),
+    covered: new Set(),
+    last: -1,
     cursor: 0,
-    down: [],
+    down: new Map(),
+    single: false,
+    singleColumns: new Set(),
     openSpan: 1,
     widths: [],
   };
@@ -462,9 +471,12 @@ function coveredSlot(marker: string): string {
 }
 
 function startRow(state: TableState): void {
-  state.filled = state.above.map((rows) => rows > 0);
+  state.covered = new Set(state.above.keys());
+  state.last = -1;
+  for (const column of state.above.keys()) state.last = Math.max(state.last, column);
   state.cursor = 0;
-  state.down = [];
+  state.down = new Map();
+  state.single = false;
 }
 
 // Places a cell by the HTML table model: in the first slot of its row that no cell covers. The
@@ -478,41 +490,41 @@ function placeCell(
   offset: number,
 ): string {
   let before = "";
-  while (state.filled[state.cursor] === true) {
+  while (state.covered.has(state.cursor)) {
     before += coveredSlot(COVERED_ABOVE);
     state.cursor += 1;
   }
   for (let column = state.cursor; column < state.cursor + colspan; column += 1) {
-    if (state.filled[column] === true) throw new XhtmlError("table-shape", offset);
+    if (state.covered.has(column)) throw new XhtmlError("table-shape", offset);
   }
   grid.slots += colspan * rowspan;
   if (grid.slots > TABLE_SLOT_LIMIT) throw new XhtmlError("table-size", offset);
   for (let column = state.cursor; column < state.cursor + colspan; column += 1) {
-    state.filled[column] = true;
-    state.down[column] = rowspan - 1;
+    state.covered.add(column);
+    if (rowspan > 1) state.down.set(column, rowspan - 1);
   }
+  if (rowspan === 1) state.single = true;
+  if (colspan === 1) state.singleColumns.add(state.cursor);
+  state.last = Math.max(state.last, state.cursor + colspan - 1);
   state.cursor += colspan;
   state.openSpan = colspan;
   return before;
 }
 
 // Ends a row: the slots after its last cell that a cell above covers are emitted, and the row's
-// width is recorded, or -1 when a slot inside the row is covered by nothing.
-function endRow(state: TableState): string {
-  let after = "";
-  for (let column = state.cursor; column < state.filled.length; column += 1) {
-    if (state.filled[column] === true) after += coveredSlot(COVERED_ABOVE);
-  }
-  let width = 0;
-  while (state.filled[width] === true) width += 1;
-  const hole = state.filled.slice(width).some((covered) => covered);
-  state.widths.push(hole ? -1 : width);
-  const columns = Math.max(state.above.length, state.down.length);
-  const above: number[] = [];
-  for (let column = 0; column < columns; column += 1) {
-    const rows = state.above[column] ?? 0;
-    above.push(rows > 0 ? rows - 1 : (state.down[column] ?? 0));
-  }
+// width is recorded, or -1 when a slot inside the row is covered by nothing. A row that covers a
+// slot but in which no cell spanning no rows starts is drawn at zero height, its cells' text in
+// the rows around it, so it rejects.
+function endRow(state: TableState, offset: number): string {
+  const trailing = [...state.above.keys()].filter((column) => column >= state.cursor);
+  trailing.sort((left, right) => left - right);
+  const after = trailing.map(() => coveredSlot(COVERED_ABOVE)).join("");
+  if (state.covered.size > 0 && !state.single) throw new XhtmlError("table-shape", offset);
+  const hole = state.last + 1 !== state.covered.size;
+  state.widths.push(hole ? -1 : state.covered.size);
+  const above = new Map<number, number>();
+  for (const [column, rows] of state.above) if (rows > 1) above.set(column, rows - 1);
+  for (const [column, rows] of state.down) above.set(column, rows);
   state.above = above;
   return after;
 }
@@ -520,8 +532,21 @@ function endRow(state: TableState): string {
 // The end of a row group: a cell whose rows run past its last row is clipped by a renderer,
 // silently, so it rejects.
 function endRowGroup(state: TableState, offset: number): void {
-  if (state.above.some((rows) => rows > 0)) throw new XhtmlError("table-shape", offset);
-  state.above = [];
+  if (state.above.size > 0) throw new XhtmlError("table-shape", offset);
+}
+
+// The end of a table: every row as wide as the first, and in every column a cell that spans no
+// columns starts; a renderer draws a column without one at zero width, its cells' text in the
+// columns around it.
+function endTable(state: TableState, offset: number): void {
+  if (state.rows) endRowGroup(state, offset);
+  const width = state.widths[0] ?? 0;
+  if (state.widths.some((covered) => covered !== width || covered < 0)) {
+    throw new XhtmlError("table-shape", offset);
+  }
+  for (let column = 0; column < width; column += 1) {
+    if (!state.singleColumns.has(column)) throw new XhtmlError("table-shape", offset);
+  }
 }
 
 // A list item's marker as a renderer draws it (CSS counter styles decimal, lower- and
@@ -665,16 +690,12 @@ export function xhtmlToText(div: string): string {
         const table = tables[tables.length - 1];
         if (table !== undefined && ROW_GROUPS.has(name)) endRowGroup(table, index);
         if (name === "table" && table !== undefined) {
-          if (table.rows) endRowGroup(table, index);
-          const widths = table.widths;
-          if (widths.some((width) => width !== widths[0] || width < 0)) {
-            throw new XhtmlError("table-shape", index);
-          }
+          endTable(table, index);
           tables.pop();
           // On a line of its own, so an empty table's two markers are two tokens.
           output.push("\n", TABLE_END);
         }
-        if (name === "tr" && table !== undefined) output.push(endRow(table));
+        if (name === "tr" && table !== undefined) output.push(endRow(table, index));
         if (name === "ol" || name === "ul") lists.pop();
         if (name === "td" || name === "th") cellDepth -= 1;
         if (BLOCK_ELEMENTS.has(name)) output.push(structuralBreak(name, cellDepth));

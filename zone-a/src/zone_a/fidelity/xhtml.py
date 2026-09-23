@@ -315,13 +315,16 @@ class _TableState:
         "above",
         "body",
         "caption",
+        "covered",
         "cursor",
         "down",
-        "filled",
         "foot",
         "head",
+        "last",
         "open_span",
         "rows",
+        "single",
+        "single_columns",
         "widths",
     )
 
@@ -331,14 +334,20 @@ class _TableState:
         self.body = False
         self.foot = False
         self.rows = False
-        # The grid, laid out by the HTML table model. For each column, how many rows, from the
-        # current one, a cell above still covers.
-        self.above: list[int] = []
-        # The current row: which slots are covered, the next slot not yet emitted, and for each
-        # column how many rows below it a cell placed in this row covers.
-        self.filled: list[bool] = []
+        # The grid, laid out by the HTML table model, and kept sparse so that a row costs only the
+        # slots it covers: for each column a cell above still covers, how many rows from the
+        # current one it covers.
+        self.above: dict[int, int] = {}
+        # The current row: the slots covered, the highest of them, the next slot not yet emitted,
+        # for each column how many rows below it a cell placed in this row covers, and whether a
+        # cell that spans no rows starts in it.
+        self.covered: set[int] = set()
+        self.last = -1
         self.cursor = 0
         self.down: dict[int, int] = {}
+        self.single = False
+        # The columns in which a cell that spans no columns starts, over the whole table.
+        self.single_columns: set[int] = set()
         # The colspan of the open cell, whose covered-left slots its end tag emits.
         self.open_span = 1
         # Slots covered by every row of this table, or -1 for a row with a hole.
@@ -509,13 +518,11 @@ def _covered_slot(marker: str) -> str:
 
 
 def _start_row(state: _TableState) -> None:
-    state.filled = [rows > 0 for rows in state.above]
+    state.covered = set(state.above)
+    state.last = max(state.above, default=-1)
     state.cursor = 0
     state.down = {}
-
-
-def _is_filled(state: _TableState, column: int) -> bool:
-    return column < len(state.filled) and state.filled[column]
+    state.single = False
 
 
 def _place_cell(
@@ -527,54 +534,67 @@ def _place_cell(
     slot already covered overlaps it, which a renderer draws as two texts on top of each other.
     """
     before = ""
-    while _is_filled(state, state.cursor):
+    while state.cursor in state.covered:
         before += _covered_slot(COVERED_ABOVE)
         state.cursor += 1
     columns = range(state.cursor, state.cursor + colspan)
-    if any(_is_filled(state, column) for column in columns):
+    if any(column in state.covered for column in columns):
         raise XhtmlError("table-shape", offset)
     grid[0] += colspan * rowspan
     if grid[0] > TABLE_SLOT_LIMIT:
         raise XhtmlError("table-size", offset)
-    if len(state.filled) < columns.stop:
-        state.filled.extend([False] * (columns.stop - len(state.filled)))
     for column in columns:
-        state.filled[column] = True
-        state.down[column] = rowspan - 1
+        state.covered.add(column)
+        if rowspan > 1:
+            state.down[column] = rowspan - 1
+    if rowspan == 1:
+        state.single = True
+    if colspan == 1:
+        state.single_columns.add(state.cursor)
+    state.last = max(state.last, columns.stop - 1)
     state.cursor += colspan
     state.open_span = colspan
     return before
 
 
-def _end_row(state: _TableState) -> str:
+def _end_row(state: _TableState, offset: int) -> str:
     """End a row: emit the covered slots after its last cell and record its width.
 
-    The width is -1 when a slot inside the row is covered by nothing.
+    The width is -1 when a slot inside the row is covered by nothing. A row that covers a slot
+    but in which no cell spanning no rows starts is drawn at zero height, its cells' text in the
+    rows around it, so it rejects.
     """
-    after = "".join(
-        _covered_slot(COVERED_ABOVE)
-        for column in range(state.cursor, len(state.filled))
-        if state.filled[column]
-    )
-    width = 0
-    while _is_filled(state, width):
-        width += 1
-    hole = any(state.filled[width:])
-    state.widths.append(-1 if hole else width)
-    columns = max(len(state.above), max(state.down, default=-1) + 1)
-    above: list[int] = []
-    for column in range(columns):
-        rows = state.above[column] if column < len(state.above) else 0
-        above.append(rows - 1 if rows > 0 else state.down.get(column, 0))
+    trailing = sorted(column for column in state.above if column >= state.cursor)
+    after = "".join(_covered_slot(COVERED_ABOVE) for _ in trailing)
+    if state.covered and not state.single:
+        raise XhtmlError("table-shape", offset)
+    hole = state.last + 1 != len(state.covered)
+    state.widths.append(-1 if hole else len(state.covered))
+    above = {column: rows - 1 for column, rows in state.above.items() if rows > 1}
+    above.update(state.down)
     state.above = above
     return after
 
 
 def _end_row_group(state: _TableState, offset: int) -> None:
     """A cell whose rows run past its group's last row is clipped by a renderer, silently."""
-    if any(rows > 0 for rows in state.above):
+    if state.above:
         raise XhtmlError("table-shape", offset)
-    state.above = []
+
+
+def _end_table(state: _TableState, offset: int) -> None:
+    """Every row as wide as the first, and a cell spanning no columns starts in every column.
+
+    A renderer draws a column without one at zero width, its cells' text in the columns around
+    it.
+    """
+    if state.rows:
+        _end_row_group(state, offset)
+    width = state.widths[0] if state.widths else 0
+    if any(covered != width or covered < 0 for covered in state.widths):
+        raise XhtmlError("table-shape", offset)
+    if any(column not in state.single_columns for column in range(width)):
+        raise XhtmlError("table-shape", offset)
 
 
 # A list item's marker as a renderer draws it (CSS counter styles decimal, lower- and
@@ -717,16 +737,12 @@ def xhtml_to_text(div: str) -> str:
                 if table is not None and name in ROW_GROUPS:
                     _end_row_group(table, index)
                 if name == "table" and table is not None:
-                    if table.rows:
-                        _end_row_group(table, index)
-                    widths = table.widths
-                    if any(width != widths[0] or width < 0 for width in widths):
-                        raise XhtmlError("table-shape", index)
+                    _end_table(table, index)
                     tables.pop()
                     # On a line of its own, so an empty table's two markers are two tokens.
                     output.append("\n" + TABLE_END)
                 if name == "tr" and table is not None:
-                    output.append(_end_row(table))
+                    output.append(_end_row(table, index))
                 if name in LIST_CONTAINERS:
                     lists.pop()
                 if name in ("td", "th"):
