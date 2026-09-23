@@ -5,6 +5,15 @@ every case below against the reference and against an HTML parser (parse5). Chan
 `docs/fidelity-normalization.md` sections 1, 2, 3, 5, 6, 7 and 9. Implemented only after this
 revision is reviewed._
 
+_Amended and implemented, 2026-09-23. An independent re-review of this revision found one more
+live false pass (R1) and gaps in changes B, D, E, F, G, H and I; its eleven amendments (R1–R11,
+"Amendments adopted" at the end of this note) were adopted exactly as worded and supersede the
+text they name. Where the body below and an amendment disagree, the amendment and
+`docs/fidelity-normalization.md` 2.0.0 decide; the body is kept as the reasoning that was
+reviewed, with the statements the amendments reversed (E's page-text whitespace, F's
+allowed list, the impact on real tables, and the root `id`) corrected in place. The change
+record is `docs/validation/changes/2026-09-23-fidelity-norm-2-0-0.md`._
+
 ## Why
 
 ADR 0003's rule is one sentence: **false failures are acceptable; false passes are not.** Each
@@ -90,7 +99,8 @@ Closes 4.
   a pair rejects (`forbidden-character`) even when the next reference would complete it.
 - U+0080–U+009F reject on both sides. U+0085 leaves the whitespace list in §3 step 5.
 - In narrative text, raw or decoded, U+000B and U+000C reject: they are not XML characters, and a
-  renderer draws them as nothing or as a box. Page text keeps them as whitespace.
+  renderer draws them as nothing or as a box. ~~Page text keeps them as whitespace.~~ Amended
+  (R2): they reject on both sides, and page text contains none.
 - Bidirectional controls U+202A–U+202E and U+2066–U+2069 reject on both sides: their reach
   differs between a narrative block and page text, and no EU product-information language needs
   them.
@@ -104,7 +114,9 @@ Closes 5 and 9.
   form: a viewer's stylesheet or script can key on any of them to hide content, and a narrative
   needs none of them below the root.
 - The allowed list becomes: `xmlns`, `xml:lang`, `lang`, `id` (root `div` only); `href` (on `a`
-  only, `https://` form only); `scope`.
+  only, `https://` form only); `scope`. Amended (R10): `id` is dropped entirely, the root
+  included, and `scope` is allowed on `th` only — `xmlns` (root), `xml:lang` and `lang` (root
+  `div` only), `href` (`a` only, `https://` form only), `scope` (`th` only).
 
 Closes 6.
 
@@ -165,8 +177,11 @@ section beginning after a blank line that follows a hyphenated word) become `wor
   under 1.1.1, and the version is part of the approved content, so the demonstration store is
   re-seeded and re-approved when this ships.
 - **Real labels.** Tables with merged or spanned cells, and `pre`, are refused until the table
-  contract exists. That is the intended direction of error, and it blocks many real 4.8 tables:
-  the engine (roadmap item 8) must produce unspanned tables, or the table contract comes first.
+  contract exists. That is the intended direction of error. Amended (R7): it does not block a
+  spanned source table outright — the extractor emits a spanned cell's text once, in its first
+  slot, and each other slot it covers as an empty cell, so the narrative can carry the same
+  table as unspanned cells of one width; the engine (roadmap item 8) must produce such
+  unspanned tables, and a narrative that keeps `colspan` or `rowspan` is refused.
 
 ## Lockstep
 
@@ -191,5 +206,84 @@ section beginning after a blank line that follows a hyphenated word) become `wor
 - **A flattened text layer** (change I). Outside the check until the extractor proves it.
 - **Letter exponents** (change B).
 - **A viewer's own stylesheet or script** acting on the element names that remain. After this
-  change the narrative carries no class, no id below the root and no language tag below the root
-  to attach them to.
+  change the narrative carries no class, no id (amended, R10: not even on the root) and no
+  language tag below the root to attach them to.
+- **Strong right-to-left letters** can reorder adjacent numbers (R9); no EU product-information
+  language uses them.
+
+## Amendments adopted (independent re-review, 2026-09-23)
+
+Adopted exactly as worded; each supersedes the text of the change it names.
+
+- **R1 (§1).** "`bodyEnd` must equal `bodyStart`, or the code point before it must be U+000A: a
+  non-empty body always ends with its own line terminator." Closes a live false pass: page 1
+  "The maximum daily dose is 1" with no final LF, page 2 "0 mg.\n", a section ending on page 1
+  verified.
+- **R2 (E).** "U+000B and U+000C reject on both sides (`forbidden-character`)." §7: "Page text
+  contains no U+000B or U+000C; a page break is the page record, not a character." The vector
+  `allows-tab-lf-cr-ff-vt` changes intentionally.
+- **R3 (H), exact order.** At a start tag: malformed-tag/stray-lt, then uppercase-element, then
+  unknown-element, then multiple-roots/root-not-div, then attributes in document order
+  (forbidden-attribute; root without xmlns = root-not-div), then void-element, then the parent
+  check, then table-structure, then table-section-order. The parent check: script-content if
+  the parent is sup or sub; else misnested-tag for a table part (caption, thead, tbody, tfoot,
+  tr, td, th) in the wrong parent; else table-content for any other element whose parent is
+  table, thead, tbody, tfoot or tr. At an end tag: malformed-tag, then uppercase-element, then
+  unbalanced-tag, then misnested-tag, then table-shape (for `</table>`). At `&`: stray-amp, then
+  text-outside-root, then unknown-entity, then forbidden-character, then table-content. At a
+  raw code point: text-outside-root or table-content. After a clean scan:
+  soft-hyphen-at-boundary, then empty-narrative. (Pin: `rejects-cell-outside-row` stays
+  misnested-tag; `rejects-unknown-element` (`<img/>`) stays unknown-element.) The
+  implementation places `unmappable-script`, which R3 does not name, last at `&` and at a raw
+  code point (it can co-occur with neither table code); the specification states it.
+- **R4 (D).** Start: "Read backwards from the code point before the first span's start offset
+  through page n's body. On passing its bodyStart, continue from the last code point of page
+  n−1's body, and so on through earlier pages. Only body text is read, and earlier pages are
+  read as declared even if they fail §1 or §2. Skip code points in the §3 step 5 whitespace list
+  and stop at the first other code point c. The result is word-cut if c is U+00AD, or if c is a
+  word character and no code point was skipped. If reading passes the start of page 1's body,
+  there is no cut." End: "The result is word-cut if the last span, with trailing §3 step 5
+  whitespace removed, ends in U+00AD, or if the code point at its end offset is a word character
+  and lies inside the body." Pages: "The `page` values of `pages`, in array order, are 1, 2, …,
+  N; anything else is a structural error." These replace the start and end rules of change D;
+  the re-review simulated them over all golden verify vectors and no currently verified vector
+  changes (confirmed by the implementation).
+- **R5 (B).** "Folding applies to U+0030–U+0039. Inside sup, U+2010–U+2014, U+FE63 and U+FF0D
+  fold to U+207B, and U+FE62 and U+FF0B fold to U+207A (as well as '-', U+2212 → U+207B and '+'
+  → U+207A). Inside sub, the same characters fold to U+208B and U+208A. Inside sup or sub, any
+  other code point of general category N that is not a target of these tables, and U+00B1 and
+  U+2213, reject (unmappable-script)." Other code points (letters, footnote marks, ®) are kept
+  unchanged. §7's extractor rule mirrors these tables. "Target of these tables" is read as the
+  script digits of either table (U+2070, U+00B9, U+00B2, U+00B3, U+2074–U+2079, U+2080–U+2089),
+  which are kept in both `sup` and `sub`.
+- **R6 (E).** "§2 applies to the div string as decoded from JSON (RFC 8259, where an escaped
+  surrogate pair is one code point). It covers every code point, including markup, attribute
+  values and text outside the root. A surrogate code point that remains rejects. The code is
+  forbidden-character, and this check precedes the scan." Each decoded character reference is
+  also checked on its own (a reference to half a pair rejects even if the next completes it).
+- **R7 (I).** Unverifiable: "…must refuse the document (emit no SourceDocumentText)." Tables: "a
+  spanned cell's text is emitted once, in its first slot, and each other slot it covers as an
+  empty cell; a line break inside a cell is emitted as U+0020, except a discretionary hyphen,
+  which is U+00AD U+000A." "Blocks many real 4.8 tables" is softened accordingly (above).
+- **R8 (G).** "Any character reference, and any raw code point other than U+0009, U+000A, U+000D
+  and U+0020" directly inside table/thead/tbody/tfoot/tr rejects (table-content). "Every tr of a
+  table, in whichever section, has the same number of td and th children; cells of a nested
+  table do not count." A table with no rows is accepted.
+- **R9 (E).** Bidi rejection on both sides also covers U+200E, U+200F and U+061C (with
+  U+202A–U+202E, U+2066–U+2069). Added to "What this does not close": strong right-to-left
+  letters can reorder adjacent numbers; no EU product-information language uses them.
+- **R10 (F).** Drop `id` entirely (root too); `scope` allowed on `th` only. Allowed attributes:
+  xmlns (root), xml:lang and lang (root div only), href (a only, https:// form only), scope (th
+  only).
+- **R11 (lockstep).** The differential generator treated U+0085, U+000B and U+000C as
+  whitespace; it now draws them as section 2 characters, so generated cases exercise §3 rather
+  than mostly returning forbidden-character, and it produces every new construct: self-closing
+  tags, sup/sub with digits, signs, letters, dashes and non-ASCII digits, table children and
+  uneven rows, surrogates split by markup and by reference, C1, bidi, VT and FF characters, soft
+  hyphens before whitespace and line breaks (raw, entity, CR LF, br, block), pages beginning
+  blank, missing and misnumbered pages, and page bodies without a final LF. `XhtmlErrorCode`
+  and the reason-code catalogue gain `void-element`, `script-content`, `unmappable-script`,
+  `table-content` and `table-shape`. The query-tools UR-22 record notes that `verify_quote` now
+  returns `invalid-request` for a quote containing a C1, bidi, VT or FF character. Impact: real
+  PDFs whose text layer was decoded as Latin-1 (U+0092, U+0095, U+0096) now fail the page —
+  intended.
