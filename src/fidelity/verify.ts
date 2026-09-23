@@ -192,10 +192,26 @@ function slice(index: PageIndex, start: number, end: number): string {
   return index.codePoints.slice(start, end).join("");
 }
 
+// Where a slice of page text that starts at `start` is read from: the U+000A that ends the
+// previous line when only whitespace other than U+000A lies between it and `start` (before
+// `bodyStart`, section 1 makes that code point U+000A), otherwise `start` itself. Normalisation
+// does not treat the start of a text as the start of a line (section 3 step 4), so a slice that
+// begins at a line start carries its line terminator with it.
+function fromLineStart(index: PageIndex, start: number): number {
+  let position = start;
+  while (position > index.page.bodyStart) {
+    const character = index.codePoints[position - 1] ?? "";
+    if (character === "\n") return position - 1;
+    if (!isWhitespace(character.codePointAt(0) ?? 0)) return start;
+    position -= 1;
+  }
+  return index.codePoints[position - 1] === "\n" ? position - 1 : start;
+}
+
 function isBlankSlice(index: PageIndex, start: number, end: number): boolean {
   if (end <= start) return true;
   try {
-    return normalizeText(slice(index, start, end)) === "";
+    return normalizeText(slice(index, fromLineStart(index, start), end)) === "";
   } catch {
     return false;
   }
@@ -258,7 +274,7 @@ function resolveSpans(
         return { status: "invalid-provenance", reason: "non-contiguous" };
       }
     } else {
-      pieces.push({ index, start: span.startOffset, end: span.endOffset });
+      pieces.push({ index, start: fromLineStart(index, span.startOffset), end: span.endOffset });
     }
     previous = span;
   }
@@ -277,20 +293,59 @@ function resolveSpans(
   return { raw: pieces.map((piece) => slice(piece.index, piece.start, piece.end)) };
 }
 
+// Whitespace for the edge rules: section 3 step 5's list without U+00A0, U+2007 and U+202F,
+// which join the groups of a number (`10 000`) and so are not a boundary between tokens.
+const NUMBER_JOINERS = new Set([0x00a0, 0x2007, 0x202f]);
+
+function isEdgeWhitespace(character: string | undefined): boolean {
+  const codePoint = character?.codePointAt(0);
+  return codePoint !== undefined && isWhitespace(codePoint) && !NUMBER_JOINERS.has(codePoint);
+}
+
+const DECIMAL_DIGIT = /^\p{Nd}$/u;
+
+function isDecimalDigit(character: string | undefined): boolean {
+  return character !== undefined && DECIMAL_DIGIT.test(character);
+}
+
+// The first code point from `from` in direction `step` (+1 or -1) that is not section 3
+// whitespace, read inside the body and without crossing U+000A; undefined if there is none.
+function nextToken(index: PageIndex, from: number, step: 1 | -1): string | undefined {
+  const { bodyStart, bodyEnd } = index.page;
+  for (let position = from; position >= bodyStart && position < bodyEnd; position += step) {
+    const character = index.codePoints[position] ?? "";
+    if (character === "\n") return undefined;
+    if (!isWhitespace(character.codePointAt(0) ?? 0)) return character;
+  }
+  return undefined;
+}
+
+// A digit at the edge with a digit beyond it, across nothing but whitespace on the same line,
+// is one number grouped with spaces (`10 000`): the edge cuts it.
+function cutsDigitGroup(index: PageIndex, inner: number, beyond: number, step: 1 | -1): boolean {
+  return isDecimalDigit(index.codePoints[inner]) && isDecimalDigit(nextToken(index, beyond, step));
+}
+
 // Reads backwards from the code point before the first span, through its page's body and then
 // the bodies of the pages before it (as declared, whether or not they pass section 1 or 2),
-// skipping section 3 whitespace. The section starts inside a word if nothing was skipped before
-// the first other code point, whatever that code point is (a letter, a digit, `.` of `0.5`, `−`
-// of `−20`), or if that code point is U+00AD. Reading past page 1 is no cut.
+// skipping edge whitespace. The section starts inside a token if nothing was skipped before the
+// first other code point, whatever that code point is (a letter, a digit, `.` of `0.5`, `−` of
+// `−20`, U+00A0 of `10 000`), or if that code point is U+00AD. Reading past page 1 is no cut. It
+// also starts inside a number when its first code point is a digit and the first non-whitespace
+// code point before it on the same line is a digit too.
 function startCutsWord(pages: Map<number, PageIndex>, span: SourceSpan): boolean {
+  const first = pages.get(span.page);
+  if (first !== undefined && cutsDigitGroup(first, span.startOffset, span.startOffset - 1, -1)) {
+    return true;
+  }
   let skipped = false;
   let pageNumber = span.page;
   let position = span.startOffset - 1;
-  let index = pages.get(pageNumber);
+  let index = first;
   while (index !== undefined) {
     for (; position >= index.page.bodyStart; position -= 1) {
       const character = index.codePoints[position] ?? "";
-      if (isWhitespace(character.codePointAt(0) ?? 0)) {
+      if (isEdgeWhitespace(character)) {
         skipped = true;
         continue;
       }
@@ -303,18 +358,18 @@ function startCutsWord(pages: Map<number, PageIndex>, span: SourceSpan): boolean
   return false;
 }
 
-// The section ends inside a word if its last span, without trailing section 3 whitespace, ends
-// in U+00AD, or unless the code point at its end offset is section 3 whitespace or the end
-// offset is at or past `bodyEnd` (whose code point before is U+000A, section 1). `1` of `1.5`
-// is a cut: the `.` after it is not a boundary.
+// The section ends inside a token if its last span, without trailing edge whitespace, ends in
+// U+00AD; or unless the code point at its end offset is edge whitespace or the end offset is at
+// or past `bodyEnd` (whose code point before is U+000A, section 1). `1` of `1.5` is a cut: the
+// `.` after it is not a boundary. It also ends inside a number when its last code point is a
+// digit and the first non-whitespace code point after it on the same line is a digit too.
 function endCutsWord(index: PageIndex, span: SourceSpan): boolean {
   let end = span.endOffset;
-  while (end > span.startOffset && isWhitespace(index.codePoints[end - 1]?.codePointAt(0) ?? 0)) {
-    end -= 1;
-  }
+  while (end > span.startOffset && isEdgeWhitespace(index.codePoints[end - 1])) end -= 1;
   if (end > span.startOffset && index.codePoints[end - 1] === SOFT_HYPHEN) return true;
   if (span.endOffset >= index.page.bodyEnd) return false;
-  return !isWhitespace(index.codePoints[span.endOffset]?.codePointAt(0) ?? 0);
+  if (!isEdgeWhitespace(index.codePoints[span.endOffset])) return true;
+  return cutsDigitGroup(index, span.endOffset - 1, span.endOffset, 1);
 }
 
 // Pieces from consecutive pages are concatenated verbatim: a page body ends with its own line

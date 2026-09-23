@@ -146,11 +146,18 @@ const MINUS_SIGNS = [
   0x2796,
 ];
 
+// The script letters of each kind: a subscript letter raised is not a superscript one.
+const SUPERSCRIPT_LETTERS = [0x2071, 0x207f];
+const SUBSCRIPT_LETTERS = [
+  0x2090, 0x2091, 0x2092, 0x2093, 0x2094, 0x2095, 0x2096, 0x2097, 0x2098, 0x2099, 0x209a, 0x209b,
+  0x209c,
+];
+
 type ScriptRule = {
   folding: ReadonlyMap<number, number>;
-  // The element's own script digits, kept as they are.
+  // The element's own script digits and signs, kept as they are.
   own: ReadonlySet<number>;
-  // The other script's digits and signs: a subscript digit raised is not a superscript one.
+  // The other script's digits, signs and letters.
   foreign: ReadonlySet<number>;
 };
 
@@ -167,25 +174,35 @@ function scriptRule(
   folding.set(0x003d, equals);
   folding.set(0x0028, open);
   folding.set(0x0029, close);
-  return { folding, own: new Set(digits), foreign: new Set(foreign) };
+  return { folding, own: new Set([...digits, ...signs]), foreign: new Set(foreign) };
 }
 
 const SCRIPT_RULES = new Map<string, ScriptRule>([
   [
     "sup",
-    scriptRule(SUPERSCRIPT_DIGITS, SUPERSCRIPT_SIGNS, [...SUBSCRIPT_DIGITS, ...SUBSCRIPT_SIGNS]),
+    scriptRule(SUPERSCRIPT_DIGITS, SUPERSCRIPT_SIGNS, [
+      ...SUBSCRIPT_DIGITS,
+      ...SUBSCRIPT_SIGNS,
+      ...SUBSCRIPT_LETTERS,
+    ]),
   ],
   [
     "sub",
-    scriptRule(SUBSCRIPT_DIGITS, SUBSCRIPT_SIGNS, [...SUPERSCRIPT_DIGITS, ...SUPERSCRIPT_SIGNS]),
+    scriptRule(SUBSCRIPT_DIGITS, SUBSCRIPT_SIGNS, [
+      ...SUPERSCRIPT_DIGITS,
+      ...SUPERSCRIPT_SIGNS,
+      ...SUPERSCRIPT_LETTERS,
+    ]),
   ],
 ]);
 
-// The element's own script digits are kept; the other script's digits and signs, every other
-// number (a non-ASCII digit, a fraction, a numeral) and a plus-minus sign have no script form
-// here and reject.
+// The element's own script digits and signs are kept; the other script's digits, signs and
+// letters, every other number (a non-ASCII digit, a fraction, a numeral), a plus-minus sign, and
+// every other mathematical symbol, bracket or dash (general category Sm, Ps, Pe, Pd: `＝`, `﹙`,
+// `⸺`) have no script form here and reject.
 const UNMAPPABLE_SIGNS = new Set([0x00b1, 0x2213]);
 const NUMBER = /^\p{N}$/u;
+const SIGN_OR_BRACKET = /^[\p{Sm}\p{Ps}\p{Pe}\p{Pd}]$/u;
 
 // Whitespace inside a tag is U+0009, U+000A, U+000D and U+0020 only, never `\s`: an HTML
 // parser reads any other code point (U+00A0, U+3000, U+FEFF) as part of the tag name, so
@@ -330,11 +347,19 @@ function emitText(
   isReference: boolean,
 ): void {
   const character = String.fromCodePoint(codePoint);
+  // A line feed or carriage return in text is a space to a renderer: only a block boundary or
+  // `br` is a line break. Emitting it as U+0020 keeps a bullet after it from reading as a list
+  // item (section 3 step 4) and keeps a soft hyphen before it from joining a word (step 1).
+  const emitted = codePoint === 0x000a || codePoint === 0x000d ? " " : character;
   if (parent !== undefined && TABLE_CONTAINERS.has(parent)) {
     if (isReference || !isAsciiWhitespace(character)) {
       throw new XhtmlError("table-content", offset);
     }
-    output.push(character);
+    output.push(emitted);
+    return;
+  }
+  if (emitted !== character) {
+    output.push(emitted);
     return;
   }
   const rule = parent === undefined ? undefined : SCRIPT_RULES.get(parent);
@@ -347,7 +372,7 @@ function emitText(
     if (
       UNMAPPABLE_SIGNS.has(codePoint) ||
       rule.foreign.has(codePoint) ||
-      (NUMBER.test(character) && !rule.own.has(codePoint))
+      ((NUMBER.test(character) || SIGN_OR_BRACKET.test(character)) && !rule.own.has(codePoint))
     ) {
       throw new XhtmlError("unmappable-script", offset);
     }
@@ -355,9 +380,17 @@ function emitText(
   output.push(character);
 }
 
-// U+00AD followed by U+000A, or by U+000D U+000A, anywhere in the emitted text: section 3 step 1
-// would join a word across what a renderer draws as a space or a line break.
-const SOFT_HYPHEN_BEFORE_BREAK = /\u00ad\r?\n/u;
+// U+00AD followed by U+000A in the emitted text: section 3 step 1 would join a word across what
+// a renderer draws as a line break. The emitted text has U+000A only from a block boundary or
+// `br`, and no U+000D at all (text line breaks are emitted as U+0020).
+const SOFT_HYPHEN_BEFORE_BREAK = /\u00ad\n/u;
+
+// A structural break: U+000A, except that a table cell and everything inside one is on one line
+// of U+0009-separated text, as the extractor writes a table row (section 7). A bullet in a cell
+// is therefore on a line with U+0009 and is never read as a list item (section 3 step 4).
+function structuralBreak(name: string, cellDepth: number): string {
+  return name === "td" || name === "th" || cellDepth > 0 ? "\t" : "\n";
+}
 
 // Converts a FHIR narrative `div` to text. Block boundaries become U+000A; inline markup is
 // dropped except that `sup` and `sub` fold their digits and signs; the result still needs
@@ -373,6 +406,7 @@ export function xhtmlToText(div: string): string {
   const tables: TableState[] = [];
   let rootSeen = false;
   let rootClosed = false;
+  let cellDepth = 0;
   let index = 0;
 
   while (index < div.length) {
@@ -399,7 +433,8 @@ export function xhtmlToText(div: string): string {
             throw new XhtmlError("table-shape", index);
           }
         }
-        if (BLOCK_ELEMENTS.has(name)) output.push("\n");
+        if (name === "td" || name === "th") cellDepth -= 1;
+        if (BLOCK_ELEMENTS.has(name)) output.push(structuralBreak(name, cellDepth));
         if (stack.length === 0) rootClosed = true;
         index = END_TAG.lastIndex;
         continue;
@@ -429,12 +464,14 @@ export function xhtmlToText(div: string): string {
       checkParent(name, parent, index);
       enterTableElement(name, parent, tables, index);
 
-      if (BLOCK_ELEMENTS.has(name) || name === "br") output.push("\n");
+      const lineBreak = structuralBreak(name, cellDepth);
+      if (BLOCK_ELEMENTS.has(name) || name === "br") output.push(lineBreak);
       // A self-closing element is `br` or `hr`; `hr`, a block, also emits its closing break.
       if (selfClosing) {
-        if (BLOCK_ELEMENTS.has(name)) output.push("\n");
+        if (BLOCK_ELEMENTS.has(name)) output.push(lineBreak);
       } else {
         stack.push(name);
+        if (name === "td" || name === "th") cellDepth += 1;
         if (name === "table") {
           tables.push({
             caption: false,

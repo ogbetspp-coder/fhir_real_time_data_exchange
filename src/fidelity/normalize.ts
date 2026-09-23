@@ -83,6 +83,19 @@ export function findForbiddenCharacter(text: string): number | undefined {
   return undefined;
 }
 
+// For each code point, whether the line it is on (delimited by U+000A) contains U+0009.
+function linesWithTab(points: readonly string[]): boolean[] {
+  const result: boolean[] = [];
+  let lineStart = 0;
+  for (let position = 0; position <= points.length; position += 1) {
+    if (position < points.length && points[position] !== "\n") continue;
+    const hasTab = points.slice(lineStart, position).includes("\t");
+    for (let inLine = lineStart; inLine < position; inLine += 1) result[inLine] = hasTab;
+    lineStart = position + 1;
+  }
+  return result;
+}
+
 export function normalizeText(text: string): string {
   const forbidden = findForbiddenCharacter(text);
   if (forbidden !== undefined) throw new NormalizationError("forbidden-character", forbidden);
@@ -107,12 +120,18 @@ export function normalizeText(text: string): string {
   }
 
   // Step 4: a bullet glyph is list structure only where a list item starts — at the start of a
-  // line (the text start or U+000A, then optional whitespace) and followed by whitespace.
-  // Anywhere else it is content (`2 • 10` in a sentence is not `2 10`). A bullet this step
-  // replaced counts as whitespace for the bullet after it, which keeps the procedure idempotent.
+  // line (after U+000A, then optional whitespace), followed by whitespace, on a line that
+  // contains no U+0009. Anywhere else it is content (`2 • 10` in a line is not `2 10`). The start
+  // of the text is not a line start: normalised text has no U+000A, so normalising it again
+  // replaces nothing, which keeps the procedure idempotent; the scanner's text begins with
+  // U+000A, and the verifier reads a page slice from its line terminator (section 6). A line
+  // with U+0009 is a table row (section 7; the scanner emits cells with U+0009), so a bullet in a
+  // table cell is always content. A bullet this step replaced counts as whitespace for the
+  // bullet after it.
   const output: string[] = [];
   const composed = Array.from(expanded.join("").normalize("NFC"));
-  let atLineStart = true;
+  const onTabLine = linesWithTab(composed);
+  let atLineStart = false;
   for (let position = 0; position < composed.length; position += 1) {
     const character = composed[position] ?? "";
     const codePoint = character.codePointAt(0) ?? 0;
@@ -122,7 +141,13 @@ export function normalizeText(text: string): string {
       continue;
     }
     const next = composed[position + 1]?.codePointAt(0);
-    if (BULLET_GLYPHS.has(codePoint) && atLineStart && next !== undefined && isWhitespace(next)) {
+    if (
+      BULLET_GLYPHS.has(codePoint) &&
+      atLineStart &&
+      onTabLine[position] !== true &&
+      next !== undefined &&
+      isWhitespace(next)
+    ) {
       output.push(" ");
       continue;
     }

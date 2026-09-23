@@ -64,7 +64,7 @@
     {
       "name": "bullets",
       "input": "• one\n● two ▪ three",
-      "expected": "one two ▪ three"
+      "expected": "• one two ▪ three"
     },
     {
       "name": "keeps-case",
@@ -137,6 +137,26 @@
       }
     },
     {
+      "name": "bullet-on-tab-line-kept",
+      "input": "x\n• 10\t2",
+      "expected": "x • 10 2"
+    },
+    {
+      "name": "bullet-after-tab-kept",
+      "input": "x\n\t• a",
+      "expected": "x • a"
+    },
+    {
+      "name": "bullet-on-later-tab-line-kept",
+      "input": "x\n• a\tb",
+      "expected": "x • a b"
+    },
+    {
+      "name": "bullet-with-tab-on-another-line-replaced",
+      "input": "x\t\ny\n• z",
+      "expected": "x y z"
+    },
+    {
       "name": "bullet-line-start-replaced",
       "input": "x\n• y",
       "expected": "x y"
@@ -147,18 +167,23 @@
       "expected": "x y"
     },
     {
-      "name": "bullet-at-text-start-replaced",
-      "input": "▪\ty",
+      "name": "bullet-at-text-start-kept",
+      "input": "▪ y",
+      "expected": "▪ y"
+    },
+    {
+      "name": "bullet-after-line-feed-at-text-start-replaced",
+      "input": "\n▪ y",
       "expected": "y"
     },
     {
-      "name": "bullet-after-invisible-at-start-replaced",
-      "input": "​• x",
+      "name": "bullet-after-invisible-at-line-start-replaced",
+      "input": "\n​• x",
       "expected": "x"
     },
     {
       "name": "bullets-in-a-row-replaced",
-      "input": "• • x",
+      "input": "\n• • x",
       "expected": "x"
     },
     {
@@ -400,7 +425,7 @@
     {
       "name": "accepts-table-section-order",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><thead><tr><th>h</th></tr></thead><tbody><tr><td>b</td></tr></tbody><tfoot><tr><td>f</td></tr></tfoot></table></div>",
-      "expected": "\n\n\n\n\nh\n\n\n\n\n\nb\n\n\n\n\n\nf\n\n\n\n\n"
+      "expected": "\n\n\n\n\th\t\n\n\n\n\tb\t\n\n\n\n\tf\t\n\n\n\n"
     },
     {
       "name": "rejects-tfoot-before-tbody",
@@ -447,7 +472,7 @@
     {
       "name": "accepts-caption-first",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><caption>c</caption><tr><td>a</td></tr></table></div>",
-      "expected": "\n\n\nc\n\n\na\n\n\n\n"
+      "expected": "\n\n\nc\n\n\ta\t\n\n\n"
     },
     {
       "name": "rejects-cell-outside-row",
@@ -526,7 +551,7 @@
     {
       "name": "table",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>a</td><td>b</td></tr></table></div>",
-      "expected": "\n\n\n\na\n\nb\n\n\n\n"
+      "expected": "\n\n\n\ta\t\tb\t\n\n\n"
     },
     {
       "name": "entities",
@@ -844,9 +869,11 @@
       "expected": "\n\n⁻⁶\n\n"
     },
     {
-      "name": "sup-tilde-kept",
+      "name": "rejects-sup-tilde",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><sup>~</sup></p></div>",
-      "expected": "\n\n~\n\n"
+      "expected": {
+        "error": "unmappable-script"
+      }
     },
     {
       "name": "sup-horizontal-bar-folds",
@@ -1042,32 +1069,24 @@
       }
     },
     {
-      "name": "rejects-soft-hyphen-before-raw-lf",
+      "name": "soft-hyphen-before-raw-lf-is-a-space",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>non&#173;\nsmokers</p></div>",
-      "expected": {
-        "error": "soft-hyphen-at-boundary"
-      }
+      "expected": "\n\nnon­ smokers\n\n"
     },
     {
-      "name": "rejects-soft-hyphen-before-lf-reference",
+      "name": "soft-hyphen-before-lf-reference-is-a-space",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>non&#173;&#10;smokers</p></div>",
-      "expected": {
-        "error": "soft-hyphen-at-boundary"
-      }
+      "expected": "\n\nnon­ smokers\n\n"
     },
     {
-      "name": "rejects-soft-hyphen-cr-then-br",
+      "name": "soft-hyphen-cr-then-br-is-a-space",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>non&#173;&#13;<br/>smokers</p></div>",
-      "expected": {
-        "error": "soft-hyphen-at-boundary"
-      }
+      "expected": "\n\nnon­ \nsmokers\n\n"
     },
     {
-      "name": "rejects-raw-soft-hyphen-before-crlf",
+      "name": "raw-soft-hyphen-before-crlf-is-a-space",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>non­\r\nsmokers</p></div>",
-      "expected": {
-        "error": "soft-hyphen-at-boundary"
-      }
+      "expected": "\n\nnon­  smokers\n\n"
     },
     {
       "name": "rejects-soft-hyphen-before-hr",
@@ -1079,7 +1098,7 @@
     {
       "name": "accepts-soft-hyphen-before-cr-alone",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>non&#173;&#13;smokers</p></div>",
-      "expected": "\n\nnon­\rsmokers\n\n"
+      "expected": "\n\nnon­ smokers\n\n"
     },
     {
       "name": "accepts-soft-hyphen-before-space",
@@ -1303,7 +1322,7 @@
     {
       "name": "accepts-scope-on-th",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><th scope=\"row\">h</th><td>a</td></tr></table></div>",
-      "expected": "\n\n\n\nh\n\na\n\n\n\n"
+      "expected": "\n\n\n\th\t\ta\t\n\n\n"
     },
     {
       "name": "rejects-colspan",
@@ -1385,7 +1404,7 @@
     {
       "name": "accepts-whitespace-in-table-parts",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table>\n <thead>\t<tr>\r\n<th>h</th> </tr></thead>\n<tbody> <tr><td>a</td></tr> </tbody></table></div>",
-      "expected": "\n\n\n \n\t\n\r\n\nh\n \n\n\n\n \n\na\n\n \n\n\n"
+      "expected": "\n\n  \n\t\n  \th\t \n\n \n \n\ta\t\n \n\n\n"
     },
     {
       "name": "rejects-span-in-table",
@@ -1432,7 +1451,7 @@
     {
       "name": "accepts-nested-table-in-cell",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td><table><tr><td>a</td><td>b</td></tr></table></td></tr><tr><td>c</td></tr></table></div>",
-      "expected": "\n\n\n\n\n\n\na\n\nb\n\n\n\n\n\n\nc\n\n\n\n"
+      "expected": "\n\n\n\t\t\t\ta\t\tb\t\t\t\t\n\n\tc\t\n\n\n"
     },
     {
       "name": "rejects-uneven-rows",
@@ -1458,7 +1477,7 @@
     {
       "name": "accepts-header-and-data-cells",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><th>h</th><td>a</td></tr><tr><td>b</td><td>c</td></tr></table></div>",
-      "expected": "\n\n\n\nh\n\na\n\n\n\nb\n\nc\n\n\n\n"
+      "expected": "\n\n\n\th\t\ta\t\n\n\tb\t\tc\t\n\n\n"
     },
     {
       "name": "accepts-empty-table",
@@ -1562,7 +1581,141 @@
     {
       "name": "accepts-ascii-whitespace-in-tags",
       "input": "<div\nxmlns=\"http://www.w3.org/1999/xhtml\"\r\n><p\t>a<br\t/>b</p ><table\n><tr ><td\r>c</td\n></tr></table></div\t>",
-      "expected": "\n\na\nb\n\n\n\nc\n\n\n\n"
+      "expected": "\n\na\nb\n\n\n\tc\t\n\n\n"
+    },
+    {
+      "name": "raw-line-feed-in-text-is-a-space",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a\nb</p></div>",
+      "expected": "\n\na b\n\n"
+    },
+    {
+      "name": "line-feed-reference-is-a-space",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a&#10;b</p></div>",
+      "expected": "\n\na b\n\n"
+    },
+    {
+      "name": "carriage-return-reference-is-a-space",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a&#13;b</p></div>",
+      "expected": "\n\na b\n\n"
+    },
+    {
+      "name": "raw-crlf-in-text-is-two-spaces",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a\r\nb</p></div>",
+      "expected": "\n\na  b\n\n"
+    },
+    {
+      "name": "line-feed-in-sup-is-a-space",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x<sup>2\n3</sup></p></div>",
+      "expected": "\n\nx² ³\n\n"
+    },
+    {
+      "name": "rejects-line-feed-reference-in-tr",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr>&#10;<td>a</td></tr></table></div>",
+      "expected": {
+        "error": "table-content"
+      }
+    },
+    {
+      "name": "cell-breaks-are-tabs",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td><p>a</p>b<br/>c<hr/></td></tr></table></div>",
+      "expected": "\n\n\n\t\ta\tb\tc\t\t\t\n\n\n"
+    },
+    {
+      "name": "accepts-soft-hyphen-before-br-in-cell",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>intra&#173;<br/>venous</td></tr></table></div>",
+      "expected": "\n\n\n\tintra­\tvenous\t\n\n\n"
+    },
+    {
+      "name": "rejects-soft-hyphen-before-caption-end",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><caption>intra&#173;</caption></table></div>",
+      "expected": {
+        "error": "soft-hyphen-at-boundary"
+      }
+    },
+    {
+      "name": "rejects-sub-superscript-i",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x<sub>ⁱ</sub></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-superscript-n",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x<sub>ⁿ</sub></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sup-subscript-a",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x<sup>ₐ</sup></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sup-subscript-t",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x<sup>ₜ</sup></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "sup-superscript-n-kept",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>2<sup>ⁿ</sup></p></div>",
+      "expected": "\n\n2ⁿ\n\n"
+    },
+    {
+      "name": "sub-subscript-a-kept",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x<sub>ₐ</sub></p></div>",
+      "expected": "\n\nxₐ\n\n"
+    },
+    {
+      "name": "rejects-sup-fullwidth-equals",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x<sup>＝</sup></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sup-small-parenthesis",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x<sup>﹙</sup></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sup-two-em-dash",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x<sup>⸺</sup></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sup-vertical-em-dash",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x<sup>︱</sup></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-less-than",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x<sub>&lt;</sub></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sup-square-bracket",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x<sup>[1]</sup></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "sup-slash-kept",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><sup>1/2</sup></p></div>",
+      "expected": "\n\n¹/²\n\n"
     }
   ],
   "verify": [
@@ -2023,7 +2176,7 @@
       }
     },
     {
-      "name": "span-ends-before-punctuation-passes",
+      "name": "span-ends-before-punctuation-is-word-cut",
       "input": {
         "normalizationVersion": "fidelity-norm/2.0.0",
         "source": {
@@ -7426,7 +7579,7 @@
               }
             ],
             "narrativeDivSha256": "685e9ccdb621963b46b3ac0f9d2843ed5487bfda5127eb7b94cc40ab614afcf3",
-            "normalizedTextSha256": "0000000000000000000000000000000000000000000000000000000000000000"
+            "normalizedTextSha256": "ba9d7dc172716337d917e98a936e4abc1754a52ac90faff3e135b0f8484dd1af"
           }
         ]
       },
@@ -7434,15 +7587,25 @@
         "reportVersion": "1.0.0",
         "normalizationVersion": "fidelity-norm/2.0.0",
         "extractedTextSha256": "efece94cba1bfb50e7370bedfb066d3151e0d1b20215a53d20d0b717d08c30a9",
-        "narrativeBindingSha256": "8503b01e08b1d87de0cc2f67e44d4bd7ac0433e7d9e89851676497d66456e056",
+        "narrativeBindingSha256": "7a341ddc366008274b77082154244779ed1ee4a1ae676cc354f8f36ac2f43c1e",
         "status": "failed",
         "sections": [
           {
             "sourceKey": "smpc.4.4",
             "path": "Composition.section[0].section[0]",
-            "status": "malformed-narrative",
+            "status": "mismatch",
             "spanCount": 1,
-            "reason": "soft-hyphen-at-boundary"
+            "details": {
+              "expectedLength": 29,
+              "actualLength": 30,
+              "firstDifferingOffset": 16,
+              "commonSuffixLength": 13,
+              "expectedWordCount": 4,
+              "actualWordCount": 5,
+              "expectedSha256": "c0f3535f58dd2c88e32f8e835c1a73aaf3a7e3afe2500234ffa4a79d74f85531",
+              "actualSha256": "ba9d7dc172716337d917e98a936e4abc1754a52ac90faff3e135b0f8484dd1af"
+            },
+            "normalizedTextSha256": "ba9d7dc172716337d917e98a936e4abc1754a52ac90faff3e135b0f8484dd1af"
           }
         ],
         "issues": [],
@@ -7456,7 +7619,7 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "8ba7a20c8cd4311fa2d04b0731478dbfa64536d35ecd46bcc1e5ff5cc3ae655e"
+        "reportHash": "7291cd2dff86f03ea9165ff6e1248263c85e3e5f838fa7e4ea8d365eb353df40"
       }
     },
     {
@@ -7493,7 +7656,7 @@
               }
             ],
             "narrativeDivSha256": "57dc33ddc9816e5fdd5b3cda62a7d7e92c95630d080215e866498eab44849360",
-            "normalizedTextSha256": "0000000000000000000000000000000000000000000000000000000000000000"
+            "normalizedTextSha256": "ba9d7dc172716337d917e98a936e4abc1754a52ac90faff3e135b0f8484dd1af"
           }
         ]
       },
@@ -7501,15 +7664,25 @@
         "reportVersion": "1.0.0",
         "normalizationVersion": "fidelity-norm/2.0.0",
         "extractedTextSha256": "efece94cba1bfb50e7370bedfb066d3151e0d1b20215a53d20d0b717d08c30a9",
-        "narrativeBindingSha256": "8503b01e08b1d87de0cc2f67e44d4bd7ac0433e7d9e89851676497d66456e056",
+        "narrativeBindingSha256": "7a341ddc366008274b77082154244779ed1ee4a1ae676cc354f8f36ac2f43c1e",
         "status": "failed",
         "sections": [
           {
             "sourceKey": "smpc.4.4",
             "path": "Composition.section[0].section[0]",
-            "status": "malformed-narrative",
+            "status": "mismatch",
             "spanCount": 1,
-            "reason": "soft-hyphen-at-boundary"
+            "details": {
+              "expectedLength": 29,
+              "actualLength": 30,
+              "firstDifferingOffset": 16,
+              "commonSuffixLength": 13,
+              "expectedWordCount": 4,
+              "actualWordCount": 5,
+              "expectedSha256": "c0f3535f58dd2c88e32f8e835c1a73aaf3a7e3afe2500234ffa4a79d74f85531",
+              "actualSha256": "ba9d7dc172716337d917e98a936e4abc1754a52ac90faff3e135b0f8484dd1af"
+            },
+            "normalizedTextSha256": "ba9d7dc172716337d917e98a936e4abc1754a52ac90faff3e135b0f8484dd1af"
           }
         ],
         "issues": [],
@@ -7523,7 +7696,151 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "8ba7a20c8cd4311fa2d04b0731478dbfa64536d35ecd46bcc1e5ff5cc3ae655e"
+        "reportHash": "7291cd2dff86f03ea9165ff6e1248263c85e3e5f838fa7e4ea8d365eb353df40"
+      }
+    },
+    {
+      "name": "soft-hyphen-before-raw-line-feed-against-split-word",
+      "input": {
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nNot safe: un safe.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 54
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.4",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Not safe: un&#173;\nsafe.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.4",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 53,
+                "textSha256": "b2615eea70763cc9d304f30c9b59e7d88becdb778da893bc56cd68f08aafec4a"
+              }
+            ],
+            "narrativeDivSha256": "123ec5d5a9f06197c71b5567a22fe9c8e3827c8e38dabd4f9a82a3c667ae9484",
+            "normalizedTextSha256": "b2615eea70763cc9d304f30c9b59e7d88becdb778da893bc56cd68f08aafec4a"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "extractedTextSha256": "bb96fcc31d5f0231cef42d2ed9556ae82af0652378fa39830c14ce39970afef5",
+        "narrativeBindingSha256": "43489f618ee698d3efae07586a76eedd431a84ddc7432ee152e102ba30c61f78",
+        "status": "passed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.4",
+            "path": "Composition.section[0].section[0]",
+            "status": "verified",
+            "spanCount": 1,
+            "normalizedTextSha256": "b2615eea70763cc9d304f30c9b59e7d88becdb778da893bc56cd68f08aafec4a"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 1
+        },
+        "coverage": {
+          "pageCodePoints": 65,
+          "bodyCodePoints": 19,
+          "coveredCodePoints": 18,
+          "uncoveredGaps": 0
+        },
+        "reportHash": "77d3325668b82c401b3a7564ae5c0f6f5ebbec10d87d8b4dc876c7108d69570e"
+      }
+    },
+    {
+      "name": "soft-hyphen-before-raw-line-feed-against-joined-word",
+      "input": {
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nNot safe: unsafe.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 53
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.4",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Not safe: un&#173;\nsafe.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.4",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 52,
+                "textSha256": "23757dee921b4da341bc877f36df2d3669d0d43a9f9682dee317e7722812b9fd"
+              }
+            ],
+            "narrativeDivSha256": "123ec5d5a9f06197c71b5567a22fe9c8e3827c8e38dabd4f9a82a3c667ae9484",
+            "normalizedTextSha256": "b2615eea70763cc9d304f30c9b59e7d88becdb778da893bc56cd68f08aafec4a"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "extractedTextSha256": "6f938f4c76c2e5d9740737c29eb9f977b0fee02fd2a4f46b5b3c94e3d90ee8db",
+        "narrativeBindingSha256": "43489f618ee698d3efae07586a76eedd431a84ddc7432ee152e102ba30c61f78",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.4",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 1,
+            "details": {
+              "expectedLength": 17,
+              "actualLength": 18,
+              "firstDifferingOffset": 12,
+              "commonSuffixLength": 5,
+              "expectedWordCount": 3,
+              "actualWordCount": 4,
+              "expectedSha256": "23757dee921b4da341bc877f36df2d3669d0d43a9f9682dee317e7722812b9fd",
+              "actualSha256": "b2615eea70763cc9d304f30c9b59e7d88becdb778da893bc56cd68f08aafec4a"
+            },
+            "normalizedTextSha256": "b2615eea70763cc9d304f30c9b59e7d88becdb778da893bc56cd68f08aafec4a"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 64,
+          "bodyCodePoints": 18,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "ca52a574208bbb8fbe4288d48c00c65327fdab9e08ffa4309f47e6a94523f8a3"
       }
     },
     {
@@ -9264,6 +9581,1800 @@
           "uncoveredGaps": 0
         },
         "reportHash": "339d14a337b948b4c428947d1ffe478e2cab8b77175a562e17ebce5740192388"
+      }
+    },
+    {
+      "name": "bullet-after-raw-line-feed-in-paragraph",
+      "input": {
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nTake 2\n• 10 mg\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 50
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Take 2\n• 10 mg</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 49,
+                "textSha256": "d70d28712e6183a4ac947504d9054a8f656461edf0f12f5e8c2f9d221a5d8382"
+              }
+            ],
+            "narrativeDivSha256": "3fd5db87f5d93ba525c8396b309322bdca7ee02744d3e5b7ebf1ae2bae7007de",
+            "normalizedTextSha256": "f3b1e0e2e61be02e7b838c09bf7506b23136184e9e0c0ae7ed8a0cec3e85eca4"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "extractedTextSha256": "ed028b6e650231eb67d13264e1dae229a2fda313781059688dd16b47d945d1dd",
+        "narrativeBindingSha256": "f54835ddbe2d3b0b22f90d00604a7028ccfa4012e29d202abdc0202d84cdb428",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 1,
+            "details": {
+              "expectedLength": 12,
+              "actualLength": 14,
+              "firstDifferingOffset": 7,
+              "commonSuffixLength": 5,
+              "expectedWordCount": 4,
+              "actualWordCount": 5,
+              "expectedSha256": "22d22be9699f1d1158fcc73877fe9b54adc0df11b79456c0bf56d5f9a3d34d66",
+              "actualSha256": "f3b1e0e2e61be02e7b838c09bf7506b23136184e9e0c0ae7ed8a0cec3e85eca4"
+            },
+            "normalizedTextSha256": "f3b1e0e2e61be02e7b838c09bf7506b23136184e9e0c0ae7ed8a0cec3e85eca4"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 61,
+          "bodyCodePoints": 15,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "e63f51de846ea89326852ffcbf9aaf1ee7aa42bb656bc806cb6163a7c02111c8"
+      }
+    },
+    {
+      "name": "bullet-after-line-feed-reference-in-paragraph",
+      "input": {
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nTake 2\n• 10 mg\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 50
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Take 2&#10;• 10 mg</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 49,
+                "textSha256": "d70d28712e6183a4ac947504d9054a8f656461edf0f12f5e8c2f9d221a5d8382"
+              }
+            ],
+            "narrativeDivSha256": "f9e58b7372a0393900e79461f01fc029f12795d13baa6fc33221ac85e8a88a2c",
+            "normalizedTextSha256": "f3b1e0e2e61be02e7b838c09bf7506b23136184e9e0c0ae7ed8a0cec3e85eca4"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "extractedTextSha256": "ed028b6e650231eb67d13264e1dae229a2fda313781059688dd16b47d945d1dd",
+        "narrativeBindingSha256": "f54835ddbe2d3b0b22f90d00604a7028ccfa4012e29d202abdc0202d84cdb428",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 1,
+            "details": {
+              "expectedLength": 12,
+              "actualLength": 14,
+              "firstDifferingOffset": 7,
+              "commonSuffixLength": 5,
+              "expectedWordCount": 4,
+              "actualWordCount": 5,
+              "expectedSha256": "22d22be9699f1d1158fcc73877fe9b54adc0df11b79456c0bf56d5f9a3d34d66",
+              "actualSha256": "f3b1e0e2e61be02e7b838c09bf7506b23136184e9e0c0ae7ed8a0cec3e85eca4"
+            },
+            "normalizedTextSha256": "f3b1e0e2e61be02e7b838c09bf7506b23136184e9e0c0ae7ed8a0cec3e85eca4"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 61,
+          "bodyCodePoints": 15,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "e63f51de846ea89326852ffcbf9aaf1ee7aa42bb656bc806cb6163a7c02111c8"
+      }
+    },
+    {
+      "name": "bullet-after-raw-line-feed-against-plain-text",
+      "input": {
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nTake 2 10 mg\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 48
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Take 2\n• 10 mg</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 47,
+                "textSha256": "22d22be9699f1d1158fcc73877fe9b54adc0df11b79456c0bf56d5f9a3d34d66"
+              }
+            ],
+            "narrativeDivSha256": "3fd5db87f5d93ba525c8396b309322bdca7ee02744d3e5b7ebf1ae2bae7007de",
+            "normalizedTextSha256": "f3b1e0e2e61be02e7b838c09bf7506b23136184e9e0c0ae7ed8a0cec3e85eca4"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "extractedTextSha256": "cba16cf8bbe0c51c0c85f26ab480f9298240caab3a1689c9f1d1edca23cba3ee",
+        "narrativeBindingSha256": "f54835ddbe2d3b0b22f90d00604a7028ccfa4012e29d202abdc0202d84cdb428",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 1,
+            "details": {
+              "expectedLength": 12,
+              "actualLength": 14,
+              "firstDifferingOffset": 7,
+              "commonSuffixLength": 5,
+              "expectedWordCount": 4,
+              "actualWordCount": 5,
+              "expectedSha256": "22d22be9699f1d1158fcc73877fe9b54adc0df11b79456c0bf56d5f9a3d34d66",
+              "actualSha256": "f3b1e0e2e61be02e7b838c09bf7506b23136184e9e0c0ae7ed8a0cec3e85eca4"
+            },
+            "normalizedTextSha256": "f3b1e0e2e61be02e7b838c09bf7506b23136184e9e0c0ae7ed8a0cec3e85eca4"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 59,
+          "bodyCodePoints": 13,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "f25174e066dca43318c2a1702e83b80ccf9825c315869fcda2bb3f6e5080a230"
+      }
+    },
+    {
+      "name": "white-bullet-after-raw-line-feed",
+      "input": {
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nStore below 25\n◦ C\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 54
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.6.4",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store below 25\n◦ C</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.6.4",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 53,
+                "textSha256": "b2c85f2d399371276baa197fbceea69a24e2ecaff7d4ddd3b54335bbe358dd68"
+              }
+            ],
+            "narrativeDivSha256": "89de9fbfe71d7373320f15f040cd93ad6f9d41512430a6f0ef1cdaf6e1dd9168",
+            "normalizedTextSha256": "9bde54238ea281002e531032715d1ea9291b6087113455b28283f9ae9c6ea021"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "extractedTextSha256": "349a3a693a03e2e605dd30b41ebf5fedac5dc11c840e3a051cfd49ae1a3888ac",
+        "narrativeBindingSha256": "db96273ae8e836c3ea38b1346636b65560b8f193c34ddfd38a69d7714a4bc876",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.6.4",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 1,
+            "details": {
+              "expectedLength": 16,
+              "actualLength": 18,
+              "firstDifferingOffset": 15,
+              "commonSuffixLength": 1,
+              "expectedWordCount": 4,
+              "actualWordCount": 5,
+              "expectedSha256": "385e4b4d6d7f9b7d9add103ef44ee4fcdffc5d8a1c2af7df12ec5c2aef3b1260",
+              "actualSha256": "9bde54238ea281002e531032715d1ea9291b6087113455b28283f9ae9c6ea021"
+            },
+            "normalizedTextSha256": "9bde54238ea281002e531032715d1ea9291b6087113455b28283f9ae9c6ea021"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 65,
+          "bodyCodePoints": 19,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "8bf4b63a3d4485676afde393922727423d65c5477ee9802d6ebae336ba3fe349"
+      }
+    },
+    {
+      "name": "bullet-after-br-is-a-list-item",
+      "input": {
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nTake 2\n• 10 mg\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 50
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Take 2<br/>• 10 mg</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 49,
+                "textSha256": "d70d28712e6183a4ac947504d9054a8f656461edf0f12f5e8c2f9d221a5d8382"
+              }
+            ],
+            "narrativeDivSha256": "cdf4dfc8b282f654dfc23cd37718bc1cb273566bc1840c0fa088c1222d7e9f40",
+            "normalizedTextSha256": "22d22be9699f1d1158fcc73877fe9b54adc0df11b79456c0bf56d5f9a3d34d66"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "extractedTextSha256": "ed028b6e650231eb67d13264e1dae229a2fda313781059688dd16b47d945d1dd",
+        "narrativeBindingSha256": "14e85d5d06fc9ae63d2554a75fcddd02ed35e946874e7cc75b0c7c9737386a59",
+        "status": "passed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "verified",
+            "spanCount": 1,
+            "normalizedTextSha256": "22d22be9699f1d1158fcc73877fe9b54adc0df11b79456c0bf56d5f9a3d34d66"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 1
+        },
+        "coverage": {
+          "pageCodePoints": 61,
+          "bodyCodePoints": 15,
+          "coveredCodePoints": 14,
+          "uncoveredGaps": 0
+        },
+        "reportHash": "dbce113cf596eb919122302dd36984aebcec4bd3bbd6ff4bc9116a585a297a86"
+      }
+    },
+    {
+      "name": "span-ends-inside-space-grouped-number",
+      "input": {
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nThe maximum dose is 10 000 IU daily.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 72
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>The maximum dose is 10</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 57,
+                "textSha256": "da700767eb4597f7ce966d1da2204d155fafa98bdae4a359b864595926a8c4f0"
+              }
+            ],
+            "narrativeDivSha256": "6cdd2bb42275223e42560bd4b8f7f5278a7e387682cbe78ea77f892c2b9f4421",
+            "normalizedTextSha256": "da700767eb4597f7ce966d1da2204d155fafa98bdae4a359b864595926a8c4f0"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "extractedTextSha256": "569ce78c1a31a2e44baf62582bfeb0e649568fe9351146cfdff6be75df093391",
+        "narrativeBindingSha256": "ceff77f23ecdc1aa2962875c9a5496b7b83dc7711573eddbef46fa76b97db39f",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "invalid-provenance",
+            "spanCount": 1,
+            "reason": "word-cut",
+            "normalizedTextSha256": "da700767eb4597f7ce966d1da2204d155fafa98bdae4a359b864595926a8c4f0"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 83,
+          "bodyCodePoints": 37,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "0ee2f73cd5884c51ead2b9c0abc12876532b90b2bedf6ac7cf4adb29130e839d"
+      }
+    },
+    {
+      "name": "span-ends-inside-no-break-space-grouped-number",
+      "input": {
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nThe maximum dose is 10 000 IU daily.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 72
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>The maximum dose is 10</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 57,
+                "textSha256": "da700767eb4597f7ce966d1da2204d155fafa98bdae4a359b864595926a8c4f0"
+              }
+            ],
+            "narrativeDivSha256": "6cdd2bb42275223e42560bd4b8f7f5278a7e387682cbe78ea77f892c2b9f4421",
+            "normalizedTextSha256": "da700767eb4597f7ce966d1da2204d155fafa98bdae4a359b864595926a8c4f0"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "extractedTextSha256": "06cb8d1aa35b78060c0939ae173edc06d8648c0e665725ce866f8e3223b7fef6",
+        "narrativeBindingSha256": "ceff77f23ecdc1aa2962875c9a5496b7b83dc7711573eddbef46fa76b97db39f",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "invalid-provenance",
+            "spanCount": 1,
+            "reason": "word-cut",
+            "normalizedTextSha256": "da700767eb4597f7ce966d1da2204d155fafa98bdae4a359b864595926a8c4f0"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 83,
+          "bodyCodePoints": 37,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "12a85358397df637351963e3a5d61f1e23c9dd25aa65ec812cfc3d771802cf28"
+      }
+    },
+    {
+      "name": "span-ends-inside-narrow-no-break-space-grouped-number",
+      "input": {
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nThe maximum dose is 10 000 IU daily.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 72
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>The maximum dose is 10</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 57,
+                "textSha256": "da700767eb4597f7ce966d1da2204d155fafa98bdae4a359b864595926a8c4f0"
+              }
+            ],
+            "narrativeDivSha256": "6cdd2bb42275223e42560bd4b8f7f5278a7e387682cbe78ea77f892c2b9f4421",
+            "normalizedTextSha256": "da700767eb4597f7ce966d1da2204d155fafa98bdae4a359b864595926a8c4f0"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "extractedTextSha256": "49dc88631dbc73e55912803d0ab63e83758f0f03d1e1523dcfaec4721279d0c0",
+        "narrativeBindingSha256": "ceff77f23ecdc1aa2962875c9a5496b7b83dc7711573eddbef46fa76b97db39f",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "invalid-provenance",
+            "spanCount": 1,
+            "reason": "word-cut",
+            "normalizedTextSha256": "da700767eb4597f7ce966d1da2204d155fafa98bdae4a359b864595926a8c4f0"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 83,
+          "bodyCodePoints": 37,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "89abe5ec66d10805fe1351742dcc13ade4d67584fdec772907ebd716ca415b74"
+      }
+    },
+    {
+      "name": "span-ends-inside-thin-space-grouped-number",
+      "input": {
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nThe maximum dose is 10 000 IU daily.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 72
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>The maximum dose is 10</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 57,
+                "textSha256": "da700767eb4597f7ce966d1da2204d155fafa98bdae4a359b864595926a8c4f0"
+              }
+            ],
+            "narrativeDivSha256": "6cdd2bb42275223e42560bd4b8f7f5278a7e387682cbe78ea77f892c2b9f4421",
+            "normalizedTextSha256": "da700767eb4597f7ce966d1da2204d155fafa98bdae4a359b864595926a8c4f0"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "extractedTextSha256": "829371911c8332aaea33a61b9f2c96dbd55079c9da9c3e270b32a2643236fefb",
+        "narrativeBindingSha256": "ceff77f23ecdc1aa2962875c9a5496b7b83dc7711573eddbef46fa76b97db39f",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "invalid-provenance",
+            "spanCount": 1,
+            "reason": "word-cut",
+            "normalizedTextSha256": "da700767eb4597f7ce966d1da2204d155fafa98bdae4a359b864595926a8c4f0"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 83,
+          "bodyCodePoints": 37,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "92c897ecc23358ae4bde5539b62ebfbb94b4436b858b1ddde9df50d6d2c1cece"
+      }
+    },
+    {
+      "name": "span-ends-inside-figure-space-grouped-number",
+      "input": {
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nThe maximum dose is 10 000 IU daily.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 72
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>The maximum dose is 10</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 57,
+                "textSha256": "da700767eb4597f7ce966d1da2204d155fafa98bdae4a359b864595926a8c4f0"
+              }
+            ],
+            "narrativeDivSha256": "6cdd2bb42275223e42560bd4b8f7f5278a7e387682cbe78ea77f892c2b9f4421",
+            "normalizedTextSha256": "da700767eb4597f7ce966d1da2204d155fafa98bdae4a359b864595926a8c4f0"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "extractedTextSha256": "9255c479705bc40f27a4a38e29a3c542d0e275331376b86b160d2a2facbd16c2",
+        "narrativeBindingSha256": "ceff77f23ecdc1aa2962875c9a5496b7b83dc7711573eddbef46fa76b97db39f",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "invalid-provenance",
+            "spanCount": 1,
+            "reason": "word-cut",
+            "normalizedTextSha256": "da700767eb4597f7ce966d1da2204d155fafa98bdae4a359b864595926a8c4f0"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 83,
+          "bodyCodePoints": 37,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "49a4c70da715a7ecfe1d3d3c1ec34ed2a283c6b45f23ff3eb13bd7ab8c95d61c"
+      }
+    },
+    {
+      "name": "span-starts-inside-space-grouped-number",
+      "input": {
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nThe maximum dose is 10 000 IU daily.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 72
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>000 IU daily.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 58,
+                "endOffset": 71,
+                "textSha256": "44af22655bd9b2c1353795c8cef5e1c9ec2fc16a6d1fd6282ba2ac730fea894d"
+              }
+            ],
+            "narrativeDivSha256": "9684c9d5671e4d9c1b8948a78a1c2ff2a1a4bd1dc845f1efd230f17f02c5de0d",
+            "normalizedTextSha256": "44af22655bd9b2c1353795c8cef5e1c9ec2fc16a6d1fd6282ba2ac730fea894d"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "extractedTextSha256": "569ce78c1a31a2e44baf62582bfeb0e649568fe9351146cfdff6be75df093391",
+        "narrativeBindingSha256": "3b689e709653a8fe593bcf14cd73c95a9ba9e4790f9cafa564bbc7c986d8537c",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "invalid-provenance",
+            "spanCount": 1,
+            "reason": "word-cut",
+            "normalizedTextSha256": "44af22655bd9b2c1353795c8cef5e1c9ec2fc16a6d1fd6282ba2ac730fea894d"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 83,
+          "bodyCodePoints": 37,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "80c6422def8d4f4bbf26444429def7e6ff2a34acb5cd0880af5f31fba3a467a0"
+      }
+    },
+    {
+      "name": "span-starts-inside-no-break-space-grouped-number",
+      "input": {
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nThe maximum dose is 10 000 IU daily.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 72
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>000 IU daily.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 58,
+                "endOffset": 71,
+                "textSha256": "44af22655bd9b2c1353795c8cef5e1c9ec2fc16a6d1fd6282ba2ac730fea894d"
+              }
+            ],
+            "narrativeDivSha256": "9684c9d5671e4d9c1b8948a78a1c2ff2a1a4bd1dc845f1efd230f17f02c5de0d",
+            "normalizedTextSha256": "44af22655bd9b2c1353795c8cef5e1c9ec2fc16a6d1fd6282ba2ac730fea894d"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "extractedTextSha256": "06cb8d1aa35b78060c0939ae173edc06d8648c0e665725ce866f8e3223b7fef6",
+        "narrativeBindingSha256": "3b689e709653a8fe593bcf14cd73c95a9ba9e4790f9cafa564bbc7c986d8537c",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "invalid-provenance",
+            "spanCount": 1,
+            "reason": "word-cut",
+            "normalizedTextSha256": "44af22655bd9b2c1353795c8cef5e1c9ec2fc16a6d1fd6282ba2ac730fea894d"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 83,
+          "bodyCodePoints": 37,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "5192f4d1dfd3290086e5f8a51ae7578834279f4553b8ec7ac56b70fa17a61f32"
+      }
+    },
+    {
+      "name": "span-ends-after-grouped-number",
+      "input": {
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nThe maximum dose is 10 000 IU daily.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 72
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>The maximum dose is 10 000 IU</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 64,
+                "textSha256": "49b87cc0a4f09319c216959a6d87de58b0f5421b64c76c9f52f431c33ff6d207"
+              }
+            ],
+            "narrativeDivSha256": "c17c012c68d09d4158952e7755eb2dd7eedadbc24f744205776fddd65bc360d8",
+            "normalizedTextSha256": "49b87cc0a4f09319c216959a6d87de58b0f5421b64c76c9f52f431c33ff6d207"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "extractedTextSha256": "569ce78c1a31a2e44baf62582bfeb0e649568fe9351146cfdff6be75df093391",
+        "narrativeBindingSha256": "970996104d2ec7028805b4c5974c4c01a5f8a42647780bd699c2af9a80093f2b",
+        "status": "passed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "verified",
+            "spanCount": 1,
+            "normalizedTextSha256": "49b87cc0a4f09319c216959a6d87de58b0f5421b64c76c9f52f431c33ff6d207"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 1
+        },
+        "coverage": {
+          "pageCodePoints": 83,
+          "bodyCodePoints": 37,
+          "coveredCodePoints": 29,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "fa309bf26cba4f391f0d953b65d6c888de1304c5324d6542b55a28bc1de66022"
+      }
+    },
+    {
+      "name": "span-ends-at-number-before-line-feed-and-number",
+      "input": {
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nTake 2\n10 mg is the daily dose.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 67
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Take 2</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 41,
+                "textSha256": "1e177c8c827c3efeb259963b8bd3fdca3dc9a0fb3d9ff71ec88328afff8b44ea"
+              }
+            ],
+            "narrativeDivSha256": "9841cb555cd9eee8f17bc1f218c8fd207e4f12f41d7c35c4f0878354380d7dc9",
+            "normalizedTextSha256": "1e177c8c827c3efeb259963b8bd3fdca3dc9a0fb3d9ff71ec88328afff8b44ea"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "extractedTextSha256": "3a05b517c416e21090307db89148e5d9ac904a7662a87341af3f0a2b4d8f70a9",
+        "narrativeBindingSha256": "8d9afa855953e92a65ca78a2685a8eeea1c0e5c270c29d318adf2af97074f4ce",
+        "status": "passed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "verified",
+            "spanCount": 1,
+            "normalizedTextSha256": "1e177c8c827c3efeb259963b8bd3fdca3dc9a0fb3d9ff71ec88328afff8b44ea"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 1
+        },
+        "coverage": {
+          "pageCodePoints": 78,
+          "bodyCodePoints": 32,
+          "coveredCodePoints": 6,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "d8bfc19dda3e43d32cf36d4459923390b577affb04452301c66240d5676194db"
+      }
+    },
+    {
+      "name": "span-starts-at-number-after-line-feed-and-number",
+      "input": {
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nTake 2\n10 mg is the daily dose.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 67
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>10 mg is the daily dose.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 42,
+                "endOffset": 66,
+                "textSha256": "aa552802a96ecafdc6dca0c6db916bd848490235abdef1f2f386e654cd317260"
+              }
+            ],
+            "narrativeDivSha256": "0cf1f76e5b841e41164ff8e699af985fb01288c5405284ce8ef98e9f0c066c6f",
+            "normalizedTextSha256": "aa552802a96ecafdc6dca0c6db916bd848490235abdef1f2f386e654cd317260"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "extractedTextSha256": "3a05b517c416e21090307db89148e5d9ac904a7662a87341af3f0a2b4d8f70a9",
+        "narrativeBindingSha256": "6c3acb8a9a9f50789cce0eeae9c03f69eb04b629f32492bb82a3b6aff63975b8",
+        "status": "passed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "verified",
+            "spanCount": 1,
+            "normalizedTextSha256": "aa552802a96ecafdc6dca0c6db916bd848490235abdef1f2f386e654cd317260"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 1
+        },
+        "coverage": {
+          "pageCodePoints": 78,
+          "bodyCodePoints": 32,
+          "coveredCodePoints": 24,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "660765c3654e7a6313bf6f07dd5237789fffe54e827001e993e76fb446182c69"
+      }
+    },
+    {
+      "name": "bullet-in-later-cell-against-row",
+      "input": {
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n2\t10\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 40
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>2</td><td>• 10</td></tr></table></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 39,
+                "textSha256": "59069359e58587348a91558d3cc050a34d191f71ba947e57c991b86a2de8599c"
+              }
+            ],
+            "narrativeDivSha256": "c622b8f64ede3c49f55dd320be32dc4ea8e9af8f9c2d18595e22416d4784a22f",
+            "normalizedTextSha256": "f81102adb1d4d271aa41194e673665c65de8205c7e30b0df1df3f26d2efb8d67"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "extractedTextSha256": "829e17a934e5dfec4d0c4f9015ef5f096cc282d4b1fc1446270a8b781aa556d4",
+        "narrativeBindingSha256": "0ee0f544884ada7708e50673d0d66bc88512d8321154a44baa5db3e4244b0deb",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 1,
+            "details": {
+              "expectedLength": 4,
+              "actualLength": 6,
+              "firstDifferingOffset": 2,
+              "commonSuffixLength": 2,
+              "expectedWordCount": 2,
+              "actualWordCount": 3,
+              "expectedSha256": "7fe98bb13fe3668e59703d5ceefe140ae1f736e84e6f26d24bde35e0e555971f",
+              "actualSha256": "f81102adb1d4d271aa41194e673665c65de8205c7e30b0df1df3f26d2efb8d67"
+            },
+            "normalizedTextSha256": "f81102adb1d4d271aa41194e673665c65de8205c7e30b0df1df3f26d2efb8d67"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 51,
+          "bodyCodePoints": 5,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "a1133dcbd86dfd95f8b9a74d20eeed230ab26e3431b96619bb6b2010b988e629"
+      }
+    },
+    {
+      "name": "bullet-in-later-cell-against-bullet-row",
+      "input": {
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n2\t• 10\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 42
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>2</td><td>• 10</td></tr></table></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 41,
+                "textSha256": "86315cce31d177fec289911ca1f2f6f7ca7477f82b43b3d43a6d92698379ec90"
+              }
+            ],
+            "narrativeDivSha256": "c622b8f64ede3c49f55dd320be32dc4ea8e9af8f9c2d18595e22416d4784a22f",
+            "normalizedTextSha256": "f81102adb1d4d271aa41194e673665c65de8205c7e30b0df1df3f26d2efb8d67"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "extractedTextSha256": "f9b5913211b2c549976ab93e5e7a152d4e12f436bf36f0704e7a8fa824bdb2bf",
+        "narrativeBindingSha256": "0ee0f544884ada7708e50673d0d66bc88512d8321154a44baa5db3e4244b0deb",
+        "status": "passed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "verified",
+            "spanCount": 1,
+            "normalizedTextSha256": "f81102adb1d4d271aa41194e673665c65de8205c7e30b0df1df3f26d2efb8d67"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 1
+        },
+        "coverage": {
+          "pageCodePoints": 53,
+          "bodyCodePoints": 7,
+          "coveredCodePoints": 6,
+          "uncoveredGaps": 0
+        },
+        "reportHash": "8e59161f7a4b11a76fe68fd3e807b87990b4e00aaeb1009f0493e7554af795e2"
+      }
+    },
+    {
+      "name": "bullet-in-first-cell-against-row",
+      "input": {
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n10\t2\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 40
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>• 10</td><td>2</td></tr></table></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 39,
+                "textSha256": "a3f0769a1372130adb56a16eaca59e5f2d0398e37cc00a6babd539f9aa62c3f1"
+              }
+            ],
+            "narrativeDivSha256": "95f8cdf4c4d8de59c78cac4a1a3b6116b2577e8445167a894c8d0b90dc8a6a0c",
+            "normalizedTextSha256": "4c8f78711159a8990dc0b44a9f81e54a1b6bf2497ff1fd2b270a4ae652fbfb85"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "extractedTextSha256": "1a66aba5655fe1579e4b50ebbc3adb74d9ab545af1023f8da653c34c27c21d90",
+        "narrativeBindingSha256": "6e9f6c3412168c2c5465f1a8d0101bf2a671825ac29f752a5633b27ce13d894c",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 1,
+            "details": {
+              "expectedLength": 4,
+              "actualLength": 6,
+              "firstDifferingOffset": 0,
+              "commonSuffixLength": 4,
+              "expectedWordCount": 2,
+              "actualWordCount": 3,
+              "expectedSha256": "60052058137f493fdcf5478c0cb2c5b9d6537a4cb99c1d7c6c15a1db6e4a04ca",
+              "actualSha256": "4c8f78711159a8990dc0b44a9f81e54a1b6bf2497ff1fd2b270a4ae652fbfb85"
+            },
+            "normalizedTextSha256": "4c8f78711159a8990dc0b44a9f81e54a1b6bf2497ff1fd2b270a4ae652fbfb85"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 51,
+          "bodyCodePoints": 5,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "b857fc59e0414c5b084156b29fe46164fa7aad5b2513eea5d27de3d9e650d127"
+      }
+    },
+    {
+      "name": "bullet-in-first-cell-against-bullet-row",
+      "input": {
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n• 10\t2\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 42
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>• 10</td><td>2</td></tr></table></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 41,
+                "textSha256": "653eeeec3ceceaec8e36e1f284f5def4bb16974a4312d158d402b6e114231094"
+              }
+            ],
+            "narrativeDivSha256": "95f8cdf4c4d8de59c78cac4a1a3b6116b2577e8445167a894c8d0b90dc8a6a0c",
+            "normalizedTextSha256": "4c8f78711159a8990dc0b44a9f81e54a1b6bf2497ff1fd2b270a4ae652fbfb85"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "extractedTextSha256": "1c20029bf1e29aa6710a322cbe930d444c11ba86df3029342ea7b171d56c2a0c",
+        "narrativeBindingSha256": "6e9f6c3412168c2c5465f1a8d0101bf2a671825ac29f752a5633b27ce13d894c",
+        "status": "passed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "verified",
+            "spanCount": 1,
+            "normalizedTextSha256": "4c8f78711159a8990dc0b44a9f81e54a1b6bf2497ff1fd2b270a4ae652fbfb85"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 1
+        },
+        "coverage": {
+          "pageCodePoints": 53,
+          "bodyCodePoints": 7,
+          "coveredCodePoints": 6,
+          "uncoveredGaps": 0
+        },
+        "reportHash": "d8c84c00f1341fa5a83b9603ce77fe0bd3822e52264fa0c8ecf5fdeb52b97f53"
+      }
+    },
+    {
+      "name": "bullet-row-against-cells-without-bullet",
+      "input": {
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n• 10\t2\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 42
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>10</td><td>2</td></tr></table></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 41,
+                "textSha256": "653eeeec3ceceaec8e36e1f284f5def4bb16974a4312d158d402b6e114231094"
+              }
+            ],
+            "narrativeDivSha256": "a192596ac5454381142d37087ef39fa1b8d088385c773ff7f7760b6b6db7981d",
+            "normalizedTextSha256": "60052058137f493fdcf5478c0cb2c5b9d6537a4cb99c1d7c6c15a1db6e4a04ca"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "extractedTextSha256": "1c20029bf1e29aa6710a322cbe930d444c11ba86df3029342ea7b171d56c2a0c",
+        "narrativeBindingSha256": "b12ad57f776a810a848accbdbcef2930bf5c2d3e2a90bf2935db0036834083ab",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 1,
+            "details": {
+              "expectedLength": 6,
+              "actualLength": 4,
+              "firstDifferingOffset": 0,
+              "commonSuffixLength": 4,
+              "expectedWordCount": 3,
+              "actualWordCount": 2,
+              "expectedSha256": "4c8f78711159a8990dc0b44a9f81e54a1b6bf2497ff1fd2b270a4ae652fbfb85",
+              "actualSha256": "60052058137f493fdcf5478c0cb2c5b9d6537a4cb99c1d7c6c15a1db6e4a04ca"
+            },
+            "normalizedTextSha256": "60052058137f493fdcf5478c0cb2c5b9d6537a4cb99c1d7c6c15a1db6e4a04ca"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 53,
+          "bodyCodePoints": 7,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "bea58eba49a41dce4bf111b721f933c1611675cf842cc189facb09bbb161eea8"
+      }
+    },
+    {
+      "name": "bullet-in-cell-paragraph-against-row",
+      "input": {
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n2\t10\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 40
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>2</td><td><p>• 10</p></td></tr></table></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 39,
+                "textSha256": "59069359e58587348a91558d3cc050a34d191f71ba947e57c991b86a2de8599c"
+              }
+            ],
+            "narrativeDivSha256": "1c882fb517824617ec947d93fe40db74532b44d304f2ca7ea254a3dd8d13d5c4",
+            "normalizedTextSha256": "f81102adb1d4d271aa41194e673665c65de8205c7e30b0df1df3f26d2efb8d67"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "extractedTextSha256": "829e17a934e5dfec4d0c4f9015ef5f096cc282d4b1fc1446270a8b781aa556d4",
+        "narrativeBindingSha256": "0ee0f544884ada7708e50673d0d66bc88512d8321154a44baa5db3e4244b0deb",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 1,
+            "details": {
+              "expectedLength": 4,
+              "actualLength": 6,
+              "firstDifferingOffset": 2,
+              "commonSuffixLength": 2,
+              "expectedWordCount": 2,
+              "actualWordCount": 3,
+              "expectedSha256": "7fe98bb13fe3668e59703d5ceefe140ae1f736e84e6f26d24bde35e0e555971f",
+              "actualSha256": "f81102adb1d4d271aa41194e673665c65de8205c7e30b0df1df3f26d2efb8d67"
+            },
+            "normalizedTextSha256": "f81102adb1d4d271aa41194e673665c65de8205c7e30b0df1df3f26d2efb8d67"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 51,
+          "bodyCodePoints": 5,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "a1133dcbd86dfd95f8b9a74d20eeed230ab26e3431b96619bb6b2010b988e629"
+      }
+    },
+    {
+      "name": "list-item-at-body-start-verifies",
+      "input": {
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n• Keep in the outer carton.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 63
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.6.4",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><ul><li>Keep in the outer carton.</li></ul></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.6.4",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 62,
+                "textSha256": "c161a19b966bbfc04b077855595e0c9e19e1ac5a99a4f0ca223e2f6f59c672b8"
+              }
+            ],
+            "narrativeDivSha256": "9697610e3cf75c0271adb2f78f8bf4c3cf882919b271162ee70b248fcdebdad3",
+            "normalizedTextSha256": "8792e2ccdc755b6ba8800605bb75007e108545afce6fc378ea02936b6bf4368d"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "extractedTextSha256": "1c672eaf6b30cf3b655ba5c3c104d493d0ba6b55a688c875eb8fa45fc1e175ee",
+        "narrativeBindingSha256": "273f3e1bfc9db6be6eaad0f336800e12ab2f361fbe9e0d788273efdc42e2fb90",
+        "status": "passed",
+        "sections": [
+          {
+            "sourceKey": "smpc.6.4",
+            "path": "Composition.section[0].section[0]",
+            "status": "verified",
+            "spanCount": 1,
+            "normalizedTextSha256": "8792e2ccdc755b6ba8800605bb75007e108545afce6fc378ea02936b6bf4368d"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 1
+        },
+        "coverage": {
+          "pageCodePoints": 74,
+          "bodyCodePoints": 28,
+          "coveredCodePoints": 27,
+          "uncoveredGaps": 0
+        },
+        "reportHash": "fb99c56901d3c0f21f3db536a20e17070e754d6f71f56ae1549ba5e886e0b49a"
+      }
+    },
+    {
+      "name": "list-item-at-page-start-without-header",
+      "input": {
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "• Keep in the outer carton.\n",
+              "bodyStart": 0,
+              "bodyEnd": 28
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.6.4",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><ul><li>Keep in the outer carton.</li></ul></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.6.4",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 0,
+                "endOffset": 27,
+                "textSha256": "c161a19b966bbfc04b077855595e0c9e19e1ac5a99a4f0ca223e2f6f59c672b8"
+              }
+            ],
+            "narrativeDivSha256": "9697610e3cf75c0271adb2f78f8bf4c3cf882919b271162ee70b248fcdebdad3",
+            "normalizedTextSha256": "8792e2ccdc755b6ba8800605bb75007e108545afce6fc378ea02936b6bf4368d"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "extractedTextSha256": "08940332fc991d6a254c942901df3c885b120f929f8d8232e83b0d2d1d732e0d",
+        "narrativeBindingSha256": "273f3e1bfc9db6be6eaad0f336800e12ab2f361fbe9e0d788273efdc42e2fb90",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.6.4",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 1,
+            "details": {
+              "expectedLength": 27,
+              "actualLength": 25,
+              "firstDifferingOffset": 0,
+              "commonSuffixLength": 25,
+              "expectedWordCount": 6,
+              "actualWordCount": 5,
+              "expectedSha256": "c161a19b966bbfc04b077855595e0c9e19e1ac5a99a4f0ca223e2f6f59c672b8",
+              "actualSha256": "8792e2ccdc755b6ba8800605bb75007e108545afce6fc378ea02936b6bf4368d"
+            },
+            "normalizedTextSha256": "8792e2ccdc755b6ba8800605bb75007e108545afce6fc378ea02936b6bf4368d"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 28,
+          "bodyCodePoints": 28,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "3408f71375dc76c805fe2281bc7c83bc50e8848d5da42a017f42910a93996391"
+      }
+    },
+    {
+      "name": "span-starting-at-mid-line-bullet",
+      "input": {
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nTake 2 • 10 mg daily.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 57
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>10 mg daily.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 42,
+                "endOffset": 56,
+                "textSha256": "4807163f0ff44fbfb8753a90bb8a3ceea9a9697b57874cf490c7392e65b5a61e"
+              }
+            ],
+            "narrativeDivSha256": "d5d471252ac32f55f8f9cc03b16ca4d25ef352507bf2082ebc8cc07c5083b4b8",
+            "normalizedTextSha256": "2f082de1b71ff0868b61638b421ff8b8bc684669a13e05e478beb6e39b983f49"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "extractedTextSha256": "f5a80ed6c732b66c40a7d99c7577bd8cc164e45e0237c89237a3062408ac3a46",
+        "narrativeBindingSha256": "833bf5e0ec7cfd80f61a33b41956502b9bd5dd3e4c20bfe3067621f0836c5e5e",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 1,
+            "details": {
+              "expectedLength": 14,
+              "actualLength": 12,
+              "firstDifferingOffset": 0,
+              "commonSuffixLength": 12,
+              "expectedWordCount": 4,
+              "actualWordCount": 3,
+              "expectedSha256": "4807163f0ff44fbfb8753a90bb8a3ceea9a9697b57874cf490c7392e65b5a61e",
+              "actualSha256": "2f082de1b71ff0868b61638b421ff8b8bc684669a13e05e478beb6e39b983f49"
+            },
+            "normalizedTextSha256": "2f082de1b71ff0868b61638b421ff8b8bc684669a13e05e478beb6e39b983f49"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 68,
+          "bodyCodePoints": 22,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "bae5bf2ba8cbaabb3b82d47a5c232854a92dc4197d487fcf3ffa5f24806c0889"
+      }
+    },
+    {
+      "name": "section-continues-over-bullet-at-page-head",
+      "input": {
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nKeep the bottle\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 51
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\n• in the outer carton.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 58
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.6.4",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Keep the bottle in the outer carton.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.6.4",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 50,
+                "textSha256": "5f60afe7d3785338a46c16e295ea2d50420847fd4ffc4854f6e479a83d4b5310"
+              },
+              {
+                "page": 2,
+                "startOffset": 37,
+                "endOffset": 57,
+                "textSha256": "f92805668aac6df6835a3726708b01cf4fabd07944b77ae76bf42b5d4a735754"
+              }
+            ],
+            "narrativeDivSha256": "57afcd9103922fd6ed3c71decabac36cdf4b726f2fba12aba8674d470a2e2eba",
+            "normalizedTextSha256": "9fcbd604979b02ad6b24da4a6625ad23946e60d96b86fc65b29c7162cc4b0379"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/2.0.0",
+        "extractedTextSha256": "95bb272088914c9b028d15d23b396c41f9623dbe9c89bd2641f21dc0657f5201",
+        "narrativeBindingSha256": "a23781a9baaed80ad5e374c533f3d3567b708f56696becf3bf1e4367edd031dc",
+        "status": "passed",
+        "sections": [
+          {
+            "sourceKey": "smpc.6.4",
+            "path": "Composition.section[0].section[0]",
+            "status": "verified",
+            "spanCount": 2,
+            "normalizedTextSha256": "9fcbd604979b02ad6b24da4a6625ad23946e60d96b86fc65b29c7162cc4b0379"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 1
+        },
+        "coverage": {
+          "pageCodePoints": 131,
+          "bodyCodePoints": 39,
+          "coveredCodePoints": 35,
+          "uncoveredGaps": 0
+        },
+        "reportHash": "74ad2211af21b2faa428c20fc19246a369ac6d5455a7f3763753b47383d7ee58"
       }
     }
   ]

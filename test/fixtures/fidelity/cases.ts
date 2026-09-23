@@ -337,6 +337,39 @@ const TABLE_ROW = "Dose (mg)\t2\t10";
 const TABLE_ROW_SOURCE = customSource([TABLE_ROW]);
 const RAISED = "Count 10\u2076/L";
 const RAISED_SOURCE = customSource([RAISED]);
+// Round 2 of the second review.
+const UNSAFE = "Not safe: unsafe.";
+const UNSAFE_SOURCE = customSource([UNSAFE]);
+const UNSAFE_SPLIT = "Not safe: un safe.";
+const UNSAFE_SPLIT_SOURCE = customSource([UNSAFE_SPLIT]);
+const BULLET_LINE = "Take 2\n\u2022 10 mg";
+const BULLET_LINE_SOURCE = customSource([BULLET_LINE]);
+const PLAIN_LINE = "Take 2 10 mg";
+const PLAIN_LINE_SOURCE = customSource([PLAIN_LINE]);
+const WHITE_BULLET_LINE = "Store below 25\n\u25e6 C";
+const WHITE_BULLET_SOURCE = customSource([WHITE_BULLET_LINE]);
+const GROUPED = (separator: string): string => `The maximum dose is 10${separator}000 IU daily.`;
+const GROUPED_SPACE_SOURCE = customSource([GROUPED(" ")]);
+const GROUPED_NBSP_SOURCE = customSource([GROUPED("\u00a0")]);
+const GROUPED_NNBSP_SOURCE = customSource([GROUPED("\u202f")]);
+const GROUPED_THIN_SOURCE = customSource([GROUPED("\u2009")]);
+const GROUPED_FIGURE_SOURCE = customSource([GROUPED("\u2007")]);
+const NUMBER_AT_LINE_END = "Take 2\n10 mg is the daily dose.";
+const NUMBER_AT_LINE_END_SOURCE = customSource([NUMBER_AT_LINE_END]);
+const ROW = "2\t10";
+const ROW_SOURCE = customSource([ROW]);
+const BULLET_ROW = "2\t\u2022 10";
+const BULLET_ROW_SOURCE = customSource([BULLET_ROW]);
+const FIRST_CELL_BULLET_ROW = "\u2022 10\t2";
+const FIRST_CELL_BULLET_SOURCE = customSource([FIRST_CELL_BULLET_ROW]);
+const FIRST_CELL_ROW = "10\t2";
+const FIRST_CELL_ROW_SOURCE = customSource([FIRST_CELL_ROW]);
+const MID_LINE_BULLET = "Take 2 \u2022 10 mg daily.";
+const MID_LINE_BULLET_SOURCE = customSource([MID_LINE_BULLET]);
+const LIST_ITEM = "\u2022 Keep in the outer carton.";
+const LIST_ITEM_SOURCE = customSource([LIST_ITEM]);
+const LIST_ITEM_PAGE_START_SOURCE = rawSource([{ text: `${LIST_ITEM}\n` }]);
+const BULLET_AT_PAGE_HEAD = customSource(["Keep the bottle", "\u2022 in the outer carton."]);
 
 export const verifyCases: VerifyCase[] = [
   // A body boundary inside a line, or a body that excludes more than a header/footer could hold,
@@ -432,8 +465,9 @@ export const verifyCases: VerifyCase[] = [
   },
   {
     // 2.0.0 (review): a span edge must touch whitespace; a full stop is not a boundary, because
-    // the same rule must refuse `1` of `1.5`. The name is kept for review against 1.1.1.
-    name: "span-ends-before-punctuation-passes",
+    // the same rule must refuse `1` of `1.5`. Named `span-ends-before-punctuation-passes` under
+    // 1.1.1.
+    name: "span-ends-before-punctuation-is-word-cut",
     input: toInput(
       S,
       single(
@@ -1224,7 +1258,10 @@ export const verifyCases: VerifyCase[] = [
       reasons: { "smpc.4.2.posology": "unmappable-script" },
     },
   },
-  // Rows 2 and 3: a soft hyphen before a line break in narrative text.
+  // Rows 2 and 3: a soft hyphen before a line break in narrative text. A line break in text
+  // (raw or referenced U+000A or U+000D) is emitted as a space, so no word is joined: the
+  // narrative reads "non smokers" and mismatches the source's "nonsmokers". A block boundary or
+  // `br` directly after U+00AD still rejects (`rejects-soft-hyphen-before-br`).
   {
     name: "soft-hyphen-before-cr-and-br",
     input: toInput(
@@ -1233,11 +1270,7 @@ export const verifyCases: VerifyCase[] = [
         spanFor(SMOKERS_SOURCE, 1, SMOKERS),
       ]),
     ),
-    expect: {
-      status: "failed",
-      sections: { "smpc.4.4": "malformed-narrative" },
-      reasons: { "smpc.4.4": "soft-hyphen-at-boundary" },
-    },
+    expect: { status: "failed", sections: { "smpc.4.4": "mismatch" } },
   },
   {
     name: "soft-hyphen-before-raw-line-feed",
@@ -1247,11 +1280,27 @@ export const verifyCases: VerifyCase[] = [
         spanFor(SMOKERS_SOURCE, 1, SMOKERS),
       ]),
     ),
-    expect: {
-      status: "failed",
-      sections: { "smpc.4.4": "malformed-narrative" },
-      reasons: { "smpc.4.4": "soft-hyphen-at-boundary" },
-    },
+    expect: { status: "failed", sections: { "smpc.4.4": "mismatch" } },
+  },
+  {
+    name: "soft-hyphen-before-raw-line-feed-against-split-word",
+    input: toInput(
+      UNSAFE_SPLIT_SOURCE,
+      single("smpc.4.4", paragraphs("Not safe: un&#173;\nsafe."), [
+        spanFor(UNSAFE_SPLIT_SOURCE, 1, UNSAFE_SPLIT),
+      ]),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.4": "verified" } },
+  },
+  {
+    name: "soft-hyphen-before-raw-line-feed-against-joined-word",
+    input: toInput(
+      UNSAFE_SOURCE,
+      single("smpc.4.4", paragraphs("Not safe: un&#173;\nsafe."), [
+        spanFor(UNSAFE_SOURCE, 1, UNSAFE),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.4": "mismatch" } },
   },
   // Row 5: section 2 on the div as received and on each reference as decoded.
   {
@@ -1594,6 +1643,296 @@ export const verifyCases: VerifyCase[] = [
     ),
     expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
   },
+  // Second review, round 2, item 1: a line break in narrative text is a space, so a bullet after
+  // it is mid-line (content), as a renderer draws it.
+  {
+    name: "bullet-after-raw-line-feed-in-paragraph",
+    input: toInput(
+      BULLET_LINE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("Take 2\n\u2022 10 mg"), [
+        spanFor(BULLET_LINE_SOURCE, 1, BULLET_LINE),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "bullet-after-line-feed-reference-in-paragraph",
+    input: toInput(
+      BULLET_LINE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("Take 2&#10;\u2022 10 mg"), [
+        spanFor(BULLET_LINE_SOURCE, 1, BULLET_LINE),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "bullet-after-raw-line-feed-against-plain-text",
+    input: toInput(
+      PLAIN_LINE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("Take 2\n\u2022 10 mg"), [
+        spanFor(PLAIN_LINE_SOURCE, 1, PLAIN_LINE),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "white-bullet-after-raw-line-feed",
+    input: toInput(
+      WHITE_BULLET_SOURCE,
+      single("smpc.6.4", paragraphs("Store below 25\n\u25e6 C"), [
+        spanFor(WHITE_BULLET_SOURCE, 1, WHITE_BULLET_LINE),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.6.4": "mismatch" } },
+  },
+  {
+    name: "bullet-after-br-is-a-list-item",
+    input: toInput(
+      BULLET_LINE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("Take 2<br/>\u2022 10 mg"), [
+        spanFor(BULLET_LINE_SOURCE, 1, BULLET_LINE),
+      ]),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  // Item 2: a number grouped with a space, U+00A0, U+202F, U+2009 or U+2007 cannot be cut.
+  {
+    name: "span-ends-inside-space-grouped-number",
+    input: toInput(
+      GROUPED_SPACE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("The maximum dose is 10"), [
+        spanFor(GROUPED_SPACE_SOURCE, 1, "The maximum dose is 10"),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
+    },
+  },
+  {
+    name: "span-ends-inside-no-break-space-grouped-number",
+    input: toInput(
+      GROUPED_NBSP_SOURCE,
+      single("smpc.4.2.posology", paragraphs("The maximum dose is 10"), [
+        spanFor(GROUPED_NBSP_SOURCE, 1, "The maximum dose is 10"),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
+    },
+  },
+  {
+    name: "span-ends-inside-narrow-no-break-space-grouped-number",
+    input: toInput(
+      GROUPED_NNBSP_SOURCE,
+      single("smpc.4.2.posology", paragraphs("The maximum dose is 10"), [
+        spanFor(GROUPED_NNBSP_SOURCE, 1, "The maximum dose is 10"),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
+    },
+  },
+  {
+    name: "span-ends-inside-thin-space-grouped-number",
+    input: toInput(
+      GROUPED_THIN_SOURCE,
+      single("smpc.4.2.posology", paragraphs("The maximum dose is 10"), [
+        spanFor(GROUPED_THIN_SOURCE, 1, "The maximum dose is 10"),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
+    },
+  },
+  {
+    name: "span-ends-inside-figure-space-grouped-number",
+    input: toInput(
+      GROUPED_FIGURE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("The maximum dose is 10"), [
+        spanFor(GROUPED_FIGURE_SOURCE, 1, "The maximum dose is 10"),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
+    },
+  },
+  {
+    name: "span-starts-inside-space-grouped-number",
+    input: toInput(
+      GROUPED_SPACE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("000 IU daily."), [
+        spanFor(GROUPED_SPACE_SOURCE, 1, "000 IU daily."),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
+    },
+  },
+  {
+    name: "span-starts-inside-no-break-space-grouped-number",
+    input: toInput(
+      GROUPED_NBSP_SOURCE,
+      single("smpc.4.2.posology", paragraphs("000 IU daily."), [
+        spanFor(GROUPED_NBSP_SOURCE, 1, "000 IU daily."),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
+    },
+  },
+  {
+    name: "span-ends-after-grouped-number",
+    input: toInput(
+      GROUPED_SPACE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("The maximum dose is 10 000 IU"), [
+        spanFor(GROUPED_SPACE_SOURCE, 1, "The maximum dose is 10 000 IU"),
+      ]),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "span-ends-at-number-before-line-feed-and-number",
+    input: toInput(
+      NUMBER_AT_LINE_END_SOURCE,
+      single("smpc.4.2.posology", paragraphs("Take 2"), [
+        spanFor(NUMBER_AT_LINE_END_SOURCE, 1, "Take 2"),
+      ]),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "span-starts-at-number-after-line-feed-and-number",
+    input: toInput(
+      NUMBER_AT_LINE_END_SOURCE,
+      single("smpc.4.2.posology", paragraphs("10 mg is the daily dose."), [
+        spanFor(NUMBER_AT_LINE_END_SOURCE, 1, "10 mg is the daily dose."),
+      ]),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  // Item 3: a bullet in a table cell is content on both sides (a line with U+0009 is a row).
+  {
+    name: "bullet-in-later-cell-against-row",
+    input: toInput(
+      ROW_SOURCE,
+      single("smpc.4.2.posology", div("<table><tr><td>2</td><td>\u2022 10</td></tr></table>"), [
+        spanFor(ROW_SOURCE, 1, ROW),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "bullet-in-later-cell-against-bullet-row",
+    input: toInput(
+      BULLET_ROW_SOURCE,
+      single("smpc.4.2.posology", div("<table><tr><td>2</td><td>\u2022 10</td></tr></table>"), [
+        spanFor(BULLET_ROW_SOURCE, 1, BULLET_ROW),
+      ]),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "bullet-in-first-cell-against-row",
+    input: toInput(
+      FIRST_CELL_ROW_SOURCE,
+      single("smpc.4.2.posology", div("<table><tr><td>\u2022 10</td><td>2</td></tr></table>"), [
+        spanFor(FIRST_CELL_ROW_SOURCE, 1, FIRST_CELL_ROW),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "bullet-in-first-cell-against-bullet-row",
+    input: toInput(
+      FIRST_CELL_BULLET_SOURCE,
+      single("smpc.4.2.posology", div("<table><tr><td>\u2022 10</td><td>2</td></tr></table>"), [
+        spanFor(FIRST_CELL_BULLET_SOURCE, 1, FIRST_CELL_BULLET_ROW),
+      ]),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "bullet-row-against-cells-without-bullet",
+    input: toInput(
+      FIRST_CELL_BULLET_SOURCE,
+      single("smpc.4.2.posology", div("<table><tr><td>10</td><td>2</td></tr></table>"), [
+        spanFor(FIRST_CELL_BULLET_SOURCE, 1, FIRST_CELL_BULLET_ROW),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "bullet-in-cell-paragraph-against-row",
+    input: toInput(
+      ROW_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div("<table><tr><td>2</td><td><p>\u2022 10</p></td></tr></table>"),
+        [spanFor(ROW_SOURCE, 1, ROW)],
+      ),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  // The verifier reads a page slice from its line terminator (section 6): a bullet at the start
+  // of a line is a list item on both sides, and a bullet mid-line is content even when a span
+  // starts at it.
+  {
+    name: "list-item-at-body-start-verifies",
+    input: toInput(
+      LIST_ITEM_SOURCE,
+      single("smpc.6.4", div("<ul><li>Keep in the outer carton.</li></ul>"), [
+        spanFor(LIST_ITEM_SOURCE, 1, LIST_ITEM),
+      ]),
+    ),
+    expect: { status: "passed", sections: { "smpc.6.4": "verified" } },
+  },
+  {
+    // A false failure the rule accepts: at a page start with no header there is no line
+    // terminator to read from, so the bullet is content.
+    name: "list-item-at-page-start-without-header",
+    input: toInput(
+      LIST_ITEM_PAGE_START_SOURCE,
+      single("smpc.6.4", div("<ul><li>Keep in the outer carton.</li></ul>"), [
+        spanFor(LIST_ITEM_PAGE_START_SOURCE, 1, LIST_ITEM),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.6.4": "mismatch" } },
+  },
+  {
+    name: "span-starting-at-mid-line-bullet",
+    input: toInput(
+      MID_LINE_BULLET_SOURCE,
+      single("smpc.4.2.posology", paragraphs("10 mg daily."), [
+        spanFor(MID_LINE_BULLET_SOURCE, 1, "\u2022 10 mg daily."),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "section-continues-over-bullet-at-page-head",
+    input: toInput(
+      BULLET_AT_PAGE_HEAD,
+      single("smpc.6.4", paragraphs("Keep the bottle in the outer carton."), [
+        spanFor(BULLET_AT_PAGE_HEAD, 1, "Keep the bottle"),
+        spanFor(BULLET_AT_PAGE_HEAD, 2, "in the outer carton."),
+      ]),
+    ),
+    expect: { status: "passed", sections: { "smpc.6.4": "verified" } },
+  },
 ];
 
 export const throwCases: ThrowCase[] = [
@@ -1707,13 +2046,31 @@ export const throwCases: ThrowCase[] = [
 // fidelity-norm/2.0.0, section 2 and section 3 step 5: C1 controls, U+000B, U+000C and the
 // bidirectional controls reject on both sides; the accepting neighbours of each range are kept.
 const NORMALIZATION_CASES_2_0_0: NormalizationCase[] = [
+  // Second review, round 2, item 3: a bullet on a line that contains U+0009 (a table row) is
+  // content; a U+0009 on another line does not matter.
+  { name: "bullet-on-tab-line-kept", input: "x\n\u2022 10\t2", expected: "x \u2022 10 2" },
+  { name: "bullet-after-tab-kept", input: "x\n\t\u2022 a", expected: "x \u2022 a" },
+  { name: "bullet-on-later-tab-line-kept", input: "x\n\u2022 a\tb", expected: "x \u2022 a b" },
+  {
+    name: "bullet-with-tab-on-another-line-replaced",
+    input: "x\t\ny\n\u2022 z",
+    expected: "x y z",
+  },
   // Step 4 (review C3): a bullet glyph is list structure only at the start of a line, followed
   // by whitespace; U+2219 and U+2043 are never bullets.
   { name: "bullet-line-start-replaced", input: "x\n• y", expected: "x y" },
   { name: "bullet-after-indent-replaced", input: "x\n  ◦ y", expected: "x y" },
-  { name: "bullet-at-text-start-replaced", input: "▪\ty", expected: "y" },
-  { name: "bullet-after-invisible-at-start-replaced", input: "\u200b• x", expected: "x" },
-  { name: "bullets-in-a-row-replaced", input: "• • x", expected: "x" },
+  // The start of a text is not a line start (round 2): normalised text has no U+000A, so the
+  // procedure stays idempotent. The scanner's text begins with U+000A and the verifier reads a
+  // page slice from its line terminator (section 6), so both sides still see a list item there.
+  { name: "bullet-at-text-start-kept", input: "▪ y", expected: "▪ y" },
+  { name: "bullet-after-line-feed-at-text-start-replaced", input: "\n▪ y", expected: "y" },
+  {
+    name: "bullet-after-invisible-at-line-start-replaced",
+    input: "\n\u200b• x",
+    expected: "x",
+  },
+  { name: "bullets-in-a-row-replaced", input: "\n• • x", expected: "x" },
   { name: "bullet-mid-line-kept", input: "2 • 10", expected: "2 • 10" },
   { name: "bullet-without-following-space-kept", input: "•x", expected: "•x" },
   { name: "bullet-at-end-kept", input: "x\n•", expected: "x •" },
@@ -1795,8 +2152,14 @@ export const normalizationCases: NormalizationCase[] = [
   { name: "zero-width", input: "a​b﻿c⁠d", expected: "abcd" },
   { name: "ligatures", input: "ﬀ ﬁ ﬂ ﬃ ﬄ ﬆ", expected: "ff fi fl ffi ffl st" },
   // 2.0.0 (review): a bullet glyph is list structure only at the start of a line and followed by
-  // whitespace; the mid-line one is content. The name is kept for review against 1.1.1.
-  { name: "bullets", input: "• one\n● two ▪ three", expected: "one two ▪ three" },
+  // whitespace; the mid-line one is content; and the start of the text is not a line start, so
+  // the first one is content too (the verifier reads a page slice from its line terminator).
+  // The name is kept for review against 1.1.1.
+  {
+    name: "bullets",
+    input: "• one\n● two ▪ three",
+    expected: "• one two ▪ three",
+  },
   { name: "keeps-case", input: "Take ONE", expected: "Take ONE" },
   { name: "keeps-typographic-quotes", input: "‘a’ “b”", expected: "‘a’ “b”" },
   {
@@ -1883,7 +2246,7 @@ export const xhtmlCases: XhtmlCase[] = [
     input: div(
       "<table><thead><tr><th>h</th></tr></thead><tbody><tr><td>b</td></tr></tbody><tfoot><tr><td>f</td></tr></tfoot></table>",
     ),
-    expected: "\n\n\n\n\nh\n\n\n\n\n\nb\n\n\n\n\n\nf\n\n\n\n\n",
+    expected: "\n\n\n\n\th\t\n\n\n\n\tb\t\n\n\n\n\tf\t\n\n\n\n",
   },
   {
     name: "rejects-tfoot-before-tbody",
@@ -1924,7 +2287,7 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "accepts-caption-first",
     input: div("<table><caption>c</caption><tr><td>a</td></tr></table>"),
-    expected: "\n\n\nc\n\n\na\n\n\n\n",
+    expected: "\n\n\nc\n\n\ta\t\n\n\n",
   },
   {
     name: "rejects-cell-outside-row",
@@ -1981,7 +2344,7 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "table",
     input: div("<table><tr><td>a</td><td>b</td></tr></table>"),
-    expected: "\n\n\n\na\n\nb\n\n\n\n",
+    expected: "\n\n\n\ta\t\tb\t\n\n\n",
   },
   {
     name: "entities",
@@ -2201,7 +2564,11 @@ export const xhtmlCases: XhtmlCase[] = [
     expected: "\n\n⁻⁶\n\n",
   },
   // A dash-like character outside the fold tables is kept as it is.
-  { name: "sup-tilde-kept", input: div("<p><sup>~</sup></p>"), expected: "\n\n~\n\n" },
+  {
+    name: "rejects-sup-tilde",
+    input: div("<p><sup>~</sup></p>"),
+    expected: { error: "unmappable-script" },
+  },
   {
     name: "sup-horizontal-bar-folds",
     input: div("<p><sup>―</sup></p>"),
@@ -2339,24 +2706,24 @@ export const xhtmlCases: XhtmlCase[] = [
   },
   // U+00AD followed by a line break anywhere in the emitted text, decided after the scan.
   {
-    name: "rejects-soft-hyphen-before-raw-lf",
+    name: "soft-hyphen-before-raw-lf-is-a-space",
     input: div("<p>non&#173;\nsmokers</p>"),
-    expected: { error: "soft-hyphen-at-boundary" },
+    expected: "\n\nnon\u00ad smokers\n\n",
   },
   {
-    name: "rejects-soft-hyphen-before-lf-reference",
+    name: "soft-hyphen-before-lf-reference-is-a-space",
     input: div("<p>non&#173;&#10;smokers</p>"),
-    expected: { error: "soft-hyphen-at-boundary" },
+    expected: "\n\nnon\u00ad smokers\n\n",
   },
   {
-    name: "rejects-soft-hyphen-cr-then-br",
+    name: "soft-hyphen-cr-then-br-is-a-space",
     input: div("<p>non&#173;&#13;<br/>smokers</p>"),
-    expected: { error: "soft-hyphen-at-boundary" },
+    expected: "\n\nnon\u00ad \nsmokers\n\n",
   },
   {
-    name: "rejects-raw-soft-hyphen-before-crlf",
+    name: "raw-soft-hyphen-before-crlf-is-a-space",
     input: div("<p>non\u00ad\r\nsmokers</p>"),
-    expected: { error: "soft-hyphen-at-boundary" },
+    expected: "\n\nnon\u00ad  smokers\n\n",
   },
   {
     name: "rejects-soft-hyphen-before-hr",
@@ -2366,7 +2733,7 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "accepts-soft-hyphen-before-cr-alone",
     input: div("<p>non&#173;&#13;smokers</p>"),
-    expected: "\n\nnon\u00ad\rsmokers\n\n",
+    expected: "\n\nnon\u00ad smokers\n\n",
   },
   {
     name: "accepts-soft-hyphen-before-space",
@@ -2535,7 +2902,7 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "accepts-scope-on-th",
     input: div('<table><tr><th scope="row">h</th><td>a</td></tr></table>'),
-    expected: "\n\n\n\nh\n\na\n\n\n\n",
+    expected: "\n\n\n\th\t\ta\t\n\n\n",
   },
   {
     name: "rejects-colspan",
@@ -2598,7 +2965,7 @@ export const xhtmlCases: XhtmlCase[] = [
     input: div(
       "<table>\n <thead>\t<tr>\r\n<th>h</th> </tr></thead>\n<tbody> <tr><td>a</td></tr> </tbody></table>",
     ),
-    expected: "\n\n\n \n\t\n\r\n\nh\n \n\n\n\n \n\na\n\n \n\n\n",
+    expected: "\n\n  \n\t\n  \th\t \n\n \n \n\ta\t\n \n\n\n",
   },
   {
     name: "rejects-span-in-table",
@@ -2635,7 +3002,7 @@ export const xhtmlCases: XhtmlCase[] = [
     input: div(
       "<table><tr><td><table><tr><td>a</td><td>b</td></tr></table></td></tr><tr><td>c</td></tr></table>",
     ),
-    expected: "\n\n\n\n\n\n\na\n\nb\n\n\n\n\n\n\nc\n\n\n\n",
+    expected: "\n\n\n\t\t\t\ta\t\tb\t\t\t\t\n\n\tc\t\n\n\n",
   },
   {
     name: "rejects-uneven-rows",
@@ -2657,7 +3024,7 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "accepts-header-and-data-cells",
     input: div("<table><tr><th>h</th><td>a</td></tr><tr><td>b</td><td>c</td></tr></table>"),
-    expected: "\n\n\n\nh\n\na\n\n\n\nb\n\nc\n\n\n\n",
+    expected: "\n\n\n\th\t\ta\t\n\n\tb\t\tc\t\n\n\n",
   },
   { name: "accepts-empty-table", input: div("<table></table>"), expected: "\n\n\n\n" },
   {
@@ -2733,6 +3100,119 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "accepts-ascii-whitespace-in-tags",
     input: `<div\n${XHTML}\r\n><p\t>a<br\t/>b</p ><table\n><tr ><td\r>c</td\n></tr></table></div\t>`,
-    expected: "\n\na\nb\n\n\n\nc\n\n\n\n",
+    expected: "\n\na\nb\n\n\n\tc\t\n\n\n",
+  },
+  // Second review, round 2, item 1: a line break in text is emitted as a space.
+  {
+    name: "raw-line-feed-in-text-is-a-space",
+    input: div("<p>a\nb</p>"),
+    expected: "\n\na b\n\n",
+  },
+  {
+    name: "line-feed-reference-is-a-space",
+    input: div("<p>a&#10;b</p>"),
+    expected: "\n\na b\n\n",
+  },
+  {
+    name: "carriage-return-reference-is-a-space",
+    input: div("<p>a&#13;b</p>"),
+    expected: "\n\na b\n\n",
+  },
+  {
+    name: "raw-crlf-in-text-is-two-spaces",
+    input: div("<p>a\r\nb</p>"),
+    expected: "\n\na  b\n\n",
+  },
+  {
+    name: "line-feed-in-sup-is-a-space",
+    input: div("<p>x<sup>2\n3</sup></p>"),
+    expected: "\n\nx\u00b2 \u00b3\n\n",
+  },
+  {
+    name: "rejects-line-feed-reference-in-tr",
+    input: div("<table><tr>&#10;<td>a</td></tr></table>"),
+    expected: { error: "table-content" },
+  },
+  // Item 3: cells are U+0009-separated, and so is everything inside a cell.
+  {
+    name: "cell-breaks-are-tabs",
+    input: div("<table><tr><td><p>a</p>b<br/>c<hr/></td></tr></table>"),
+    expected: "\n\n\n\t\ta\tb\tc\t\t\t\n\n\n",
+  },
+  {
+    name: "accepts-soft-hyphen-before-br-in-cell",
+    input: div("<table><tr><td>intra&#173;<br/>venous</td></tr></table>"),
+    expected: "\n\n\n\tintra\u00ad\tvenous\t\n\n\n",
+  },
+  {
+    name: "rejects-soft-hyphen-before-caption-end",
+    input: div("<table><caption>intra&#173;</caption></table>"),
+    expected: { error: "soft-hyphen-at-boundary" },
+  },
+  // Item 4: the other kind of script letter, and any other symbol, bracket or dash, rejects.
+  {
+    name: "rejects-sub-superscript-i",
+    input: div("<p>x<sub>\u2071</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-superscript-n",
+    input: div("<p>x<sub>\u207f</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sup-subscript-a",
+    input: div("<p>x<sup>\u2090</sup></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sup-subscript-t",
+    input: div("<p>x<sup>\u209c</sup></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "sup-superscript-n-kept",
+    input: div("<p>2<sup>\u207f</sup></p>"),
+    expected: "\n\n2\u207f\n\n",
+  },
+  {
+    name: "sub-subscript-a-kept",
+    input: div("<p>x<sub>\u2090</sub></p>"),
+    expected: "\n\nx\u2090\n\n",
+  },
+  {
+    name: "rejects-sup-fullwidth-equals",
+    input: div("<p>x<sup>\uff1d</sup></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sup-small-parenthesis",
+    input: div("<p>x<sup>\ufe59</sup></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sup-two-em-dash",
+    input: div("<p>x<sup>\u2e3a</sup></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sup-vertical-em-dash",
+    input: div("<p>x<sup>\ufe31</sup></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-less-than",
+    input: div("<p>x<sub>&lt;</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sup-square-bracket",
+    input: div("<p>x<sup>[1]</sup></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "sup-slash-kept",
+    input: div("<p><sup>1/2</sup></p>"),
+    expected: "\n\n\u00b9/\u00b2\n\n",
   },
 ];
