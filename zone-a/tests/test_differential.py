@@ -261,5 +261,12 @@ def test_the_corpus_exercises_the_classes_the_review_named() -> None:
         "script-dash-review",
         "span-non-integer",
         "page-number-boolean",
+        # The second review's round 2.
+        "text-line-break-then-bullet",
+        "number-grouped",
+        "span-number-group-edge",
+        "bullet-on-tab-line",
+        "table-cell-bullet",
+        "script-letter-or-symbol",
     }
     assert required <= seen, sorted(required - seen)

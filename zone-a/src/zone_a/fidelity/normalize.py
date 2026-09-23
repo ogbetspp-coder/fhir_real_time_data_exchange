@@ -109,6 +109,16 @@ def find_forbidden_character(text: str) -> int | None:
     return None
 
 
+def _lines_with_tab(text: str) -> list[bool]:
+    """For each code point, whether the line it is on (delimited by U+000A) contains U+0009."""
+    result: list[bool] = []
+    for line in text.split("\n"):
+        has_tab = "\t" in line
+        result.extend([has_tab] * len(line))
+        result.append(False)  # the U+000A itself, or one past the end
+    return result
+
+
 def normalize_text(text: str) -> str:
     """Apply section 3's five ordered steps. Raises NormalizationError on a section 2 character."""
     forbidden = find_forbidden_character(text)
@@ -138,17 +148,21 @@ def normalize_text(text: str) -> str:
 
     # Steps 4 and 5, with the space collapse folded into the same pass: a space is emitted only
     # when the previous emitted character was not one, which drops runs and the leading space.
-    # Step 4: a bullet glyph is list structure only at the start of a line (the text start or
-    # U+000A, then optional whitespace) and followed by whitespace; anywhere else it is content.
-    # A bullet replaced here counts as whitespace for the bullet after it (idempotence).
+    # Step 4: a bullet glyph is list structure only at the start of a line (after U+000A, then
+    # optional whitespace), followed by whitespace, on a line that contains no U+0009 (a line with
+    # U+0009 is a table row); anywhere else it is content. The start of the text is not a line
+    # start, so normalising the result again (it has no U+000A) replaces nothing: idempotence. A
+    # bullet replaced here counts as whitespace for the bullet after it.
     output: list[str] = []
     composed = unicodedata.normalize("NFC", "".join(expanded))
-    at_line_start = True
+    on_tab_line = _lines_with_tab(composed)
+    at_line_start = False
     for position, character in enumerate(composed):
         code_point = ord(character)
         replaced_bullet = (
             code_point in BULLET_GLYPHS
             and at_line_start
+            and not on_tab_line[position]
             and position + 1 < len(composed)
             and is_whitespace(ord(composed[position + 1]))
         )

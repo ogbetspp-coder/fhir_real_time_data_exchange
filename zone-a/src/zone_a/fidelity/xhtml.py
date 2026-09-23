@@ -137,8 +137,13 @@ MINUS_SIGNS: Final = (
 )
 
 
+# The script letters of each kind: a subscript letter raised is not a superscript one.
+SUPERSCRIPT_LETTERS: Final = (0x2071, 0x207F)
+SUBSCRIPT_LETTERS: Final = tuple(range(0x2090, 0x209D))
+
+
 class _ScriptRule:
-    """Folding table, the element's own script digits, and the other script's digits and signs."""
+    """Folding table, the element's own script digits and signs, the other script's."""
 
     __slots__ = ("folding", "foreign", "own")
 
@@ -153,19 +158,29 @@ class _ScriptRule:
         folding[0x0028] = open_
         folding[0x0029] = close
         self.folding: dict[int, int] = folding
-        self.own: frozenset[int] = frozenset(digits)
+        self.own: frozenset[int] = frozenset(digits + signs)
         self.foreign: frozenset[int] = frozenset(foreign)
 
 
 SCRIPT_RULES: Final[dict[str, _ScriptRule]] = {
-    "sup": _ScriptRule(SUPERSCRIPT_DIGITS, SUPERSCRIPT_SIGNS, SUBSCRIPT_DIGITS + SUBSCRIPT_SIGNS),
-    "sub": _ScriptRule(SUBSCRIPT_DIGITS, SUBSCRIPT_SIGNS, SUPERSCRIPT_DIGITS + SUPERSCRIPT_SIGNS),
+    "sup": _ScriptRule(
+        SUPERSCRIPT_DIGITS,
+        SUPERSCRIPT_SIGNS,
+        SUBSCRIPT_DIGITS + SUBSCRIPT_SIGNS + SUBSCRIPT_LETTERS,
+    ),
+    "sub": _ScriptRule(
+        SUBSCRIPT_DIGITS,
+        SUBSCRIPT_SIGNS,
+        SUPERSCRIPT_DIGITS + SUPERSCRIPT_SIGNS + SUPERSCRIPT_LETTERS,
+    ),
 }
 
-# The element's own script digits are kept; the other script's digits and signs, every other
-# number (general category N: a non-ASCII digit, a fraction, a numeral) and a plus-minus sign
-# have no script form there and reject.
+# The element's own script digits and signs are kept; the other script's digits, signs and
+# letters, every other number (general category N), a plus-minus sign, and every other
+# mathematical symbol, bracket or dash (general category Sm, Ps, Pe, Pd) have no script form
+# there and reject.
 UNMAPPABLE_SIGNS: Final = frozenset({0x00B1, 0x2213})
+UNMAPPABLE_CATEGORIES: Final = frozenset({"Sm", "Ps", "Pe", "Pd"})
 
 # Whitespace inside a tag: U+0009, U+000A, U+000D and U+0020, and nothing else. Neither
 # language's `\s` is used: an HTML parser reads any other code point (U+00A0, U+3000, U+FEFF)
@@ -196,8 +211,14 @@ TOKEN_VALUE: Final = re.compile(r"[A-Za-z0-9_.:-]{1,32}")
 HREF_VALUE: Final = re.compile(r"https://[A-Za-z0-9.-]{1,64}(?:/[A-Za-z0-9._~-]{0,32}){0,8}/?")
 
 SOFT_HYPHEN: Final = chr(0x00AD)
-# U+00AD followed by U+000A, or by U+000D U+000A, anywhere in the emitted text.
-SOFT_HYPHEN_BEFORE_BREAK: Final = re.compile(SOFT_HYPHEN + "\r?\n")
+# U+00AD followed by U+000A in the emitted text. The emitted text has U+000A only from a block
+# boundary or `br`, and no U+000D at all (text line breaks are emitted as U+0020).
+SOFT_HYPHEN_BEFORE_BREAK: Final = re.compile(SOFT_HYPHEN + "\n")
+
+
+def _structural_break(name: str, cell_depth: int) -> str:
+    """U+000A, except that a table cell and everything inside one is on one U+0009 line."""
+    return "\t" if name in ("td", "th") or cell_depth > 0 else "\n"
 
 
 class XhtmlError(ValueError):
@@ -349,10 +370,16 @@ def _emit_text(
     ``unicodedata`` because ``re`` has no ``\\p{N}``.
     """
     character = chr(code_point)
+    # A line feed or carriage return in text is a space to a renderer: only a block boundary or
+    # `br` is a line break.
+    emitted = " " if code_point in (0x000A, 0x000D) else character
     if parent is not None and parent in TABLE_CONTAINERS:
         if is_reference or not _is_ascii_whitespace(character):
             raise XhtmlError("table-content", offset)
-        output.append(character)
+        output.append(emitted)
+        return
+    if emitted != character:
+        output.append(emitted)
         return
     rule = SCRIPT_RULES.get(parent) if parent is not None else None
     if rule is not None:
@@ -363,7 +390,13 @@ def _emit_text(
         if (
             code_point in UNMAPPABLE_SIGNS
             or code_point in rule.foreign
-            or (unicodedata.category(character)[0] == "N" and code_point not in rule.own)
+            or (
+                (
+                    unicodedata.category(character)[0] == "N"
+                    or unicodedata.category(character) in UNMAPPABLE_CATEGORIES
+                )
+                and code_point not in rule.own
+            )
         ):
             raise XhtmlError("unmappable-script", offset)
     output.append(character)
@@ -386,6 +419,7 @@ def xhtml_to_text(div: str) -> str:
     tables: list[_TableState] = []
     root_seen = False
     root_closed = False
+    cell_depth = 0
     index = 0
 
     while index < len(div):
@@ -417,8 +451,10 @@ def xhtml_to_text(div: str) -> str:
                     widths = tables.pop().widths if tables else []
                     if any(width != widths[0] for width in widths):
                         raise XhtmlError("table-shape", index)
+                if name in ("td", "th"):
+                    cell_depth -= 1
                 if name in BLOCK_ELEMENTS:
-                    output.append("\n")
+                    output.append(_structural_break(name, cell_depth))
                 if not stack:
                     root_closed = True
                 index = end.end()
@@ -451,14 +487,17 @@ def xhtml_to_text(div: str) -> str:
             _check_parent(name, parent, index)
             _enter_table_element(name, parent, tables, index)
 
+            line_break = _structural_break(name, cell_depth)
             if name in BLOCK_ELEMENTS or name == "br":
-                output.append("\n")
+                output.append(line_break)
             # A self-closing element is `br` or `hr`; `hr`, a block, also emits its closing break.
             if self_closing:
                 if name in BLOCK_ELEMENTS:
-                    output.append("\n")
+                    output.append(line_break)
             else:
                 stack.append(name)
+                if name in ("td", "th"):
+                    cell_depth += 1
                 if name == "table":
                     tables.append(_TableState())
             index = start.end()

@@ -104,6 +104,10 @@ const LIGATURE = CHARS(0xfb00, 0xfb01, 0xfb02, 0xfb03, 0xfb04, 0xfb06);
 // NFKC, which section 3 deliberately does not use.
 const NEAR_LIGATURE = CHARS(0xfb05, 0xfb13, 0x0132, 0x01c4);
 const BULLET = CHARS(0x2022, 0x2023, 0x25a0, 0x25a1, 0x25aa, 0x25ab, 0x25cb, 0x25cf, 0x25e6);
+// Separators between the groups of a number: a space and a thin space are whitespace, the
+// joiners are whitespace but not a boundary for the edge rules.
+const GROUP_SEPARATORS = CHARS(0x0020, 0x2009);
+const GROUP_JOINERS = CHARS(0x00a0, 0x2007, 0x202f);
 // U+2043 and U+2219 were bullets until the review of fidelity-norm/2.0.0 made them content.
 const NEAR_BULLET = CHARS(0x2024, 0x25a2, 0x25cc, 0x00b7, 0x2027, 0x2043, 0x2219);
 // Section 3 step 5. U+000B, U+000C and U+0085 left the list in fidelity-norm/2.0.0: section 2
@@ -259,6 +263,24 @@ const FRAGMENTS: readonly Fragment[] = [
     make: (random) =>
       `${pick(random, ["", CP(0x2212), "-"])}${between(random, 0, 99)}${pick(random, [".", ",", "/"])}${between(random, 0, 999)}`,
   },
+  // A number grouped with a space, a thin space or a joiner (`10 000`): an edge inside it cuts.
+  {
+    weight: 3,
+    className: "number-grouped",
+    make: (random) =>
+      chance(random, 0.7)
+        ? `${between(random, 1, 99)}${pick(random, [...GROUP_SEPARATORS, ...GROUP_JOINERS])}${String(
+            between(random, 0, 999),
+          ).padStart(3, "0")}`
+        : `${between(random, 1, 99)}${pick(random, GROUP_JOINERS)}${pick(random, ["mg", "IU", "%"])}`,
+  },
+  // A bullet on a line with U+0009 (a table row) is content, wherever it stands.
+  {
+    weight: 2,
+    className: "bullet-on-tab-line",
+    make: (random) =>
+      `${LF}${pick(random, ["", TAB])}${pick(random, BULLET)}${SPACE}${word(random)}${TAB}${word(random)}`,
+  },
   { weight: 4, className: "nfc-singleton", make: (random) => pick(random, NFC_SINGLETON) },
   {
     weight: 4,
@@ -390,6 +412,12 @@ function markupText(random: Random): Passage {
     ]);
     classes.add("entity");
   }
+  // A line break in text is a space to a renderer, so a bullet after it is mid-line.
+  if (chance(random, 0.08)) {
+    const lineBreak = pick(random, [LF, `${CR}${LF}`, CR, "&#10;", "&#13;", "&#13;&#10;"]);
+    safe += `${lineBreak}${pick(random, BULLET)}${SPACE}${word(random)}`;
+    classes.add("text-line-break-then-bullet");
+  }
   if (chance(random, 0.04)) {
     safe += CP(0x1d6fc);
     classes.add("supplementary-character");
@@ -470,11 +498,23 @@ const SCRIPT_UNMAPPABLE = {
     "&#x1D7CE;",
   ],
 };
+// Script letters of both kinds (an element's own are kept, the other's reject) and symbols,
+// brackets and dashes outside the fold tables (reject).
+const SCRIPT_ROUND_TWO = {
+  className: "script-letter-or-symbol",
+  pool: [
+    ...CHARS(0x2071, 0x207f, 0x2090, 0x2093, 0x209c),
+    ...CHARS(0xff1d, 0xfe59, 0x2e3a, 0xfe31, 0x007e, 0x005b, 0x005d, 0x2e17),
+    "&lt;",
+  ],
+};
 
 function scriptText(random: Random, classes: Set<string>): string {
   let text = "";
   for (let position = 0; position < between(random, 1, 4); position += 1) {
-    const piece = chance(random, 0.05) ? SCRIPT_UNMAPPABLE : pick(random, SCRIPT_PIECES);
+    const roll = random();
+    const piece =
+      roll < 0.05 ? SCRIPT_UNMAPPABLE : roll < 0.1 ? SCRIPT_ROUND_TWO : pick(random, SCRIPT_PIECES);
     classes.add(piece.className);
     text += pick(random, piece.pool);
   }
@@ -518,7 +558,13 @@ function table(random: Random, depth: number): Markup {
       for (const name of attribute.classes) classes.add(name);
       const inner = node(random, depth + 1);
       for (const name of inner.classes) classes.add(name);
-      cells += `${tableWhitespace(random, classes)}<${cell}${attribute.markup}>${inner.markup}</${cell}>`;
+      // A bullet inside a cell is content, never a list item (the cell is on a U+0009 line).
+      let lead = "";
+      if (chance(random, 0.08)) {
+        lead = `${pick(random, BULLET)}${pick(random, [SPACE, TAB, "&#10;"])}`;
+        classes.add("table-cell-bullet");
+      }
+      cells += `${tableWhitespace(random, classes)}<${cell}${attribute.markup}>${lead}${inner.markup}</${cell}>`;
     }
     // Content a renderer would move out of the table (`table-content`).
     if (chance(random, 0.05)) {
@@ -1301,6 +1347,37 @@ const SPAN_LAYOUTS: readonly SpanLayout[] = [
       const end = pick(random, candidates);
       const start = built.sentences.find((sentence) => sentence.end >= end)?.start;
       if (start === undefined || start >= end) return sentenceSection(pages, random, 0);
+      return {
+        sourceKey: "k",
+        div: narrativeFor(sliceOf(built.page, start, end)),
+        spans: [spanOver(built.page, start, end)],
+      };
+    },
+  },
+  {
+    // A section whose first or last edge falls inside a number grouped with a space or a joiner.
+    className: "span-number-group-edge",
+    build: (pages, random) => {
+      const built = pick(random, pages);
+      const points = Array.from(built.page.text);
+      const isDigit = (character: string | undefined): boolean =>
+        character !== undefined && character >= "0" && character <= "9";
+      const separators = [...GROUP_SEPARATORS, ...GROUP_JOINERS];
+      const candidates: { sentence: { start: number; end: number }; at: number }[] = [];
+      for (const sentence of built.sentences) {
+        for (let at = sentence.start + 1; at + 1 < sentence.end; at += 1) {
+          if (
+            isDigit(points[at - 1]) &&
+            separators.includes(points[at] ?? "") &&
+            (isDigit(points[at + 1]) || GROUP_JOINERS.includes(points[at] ?? ""))
+          ) {
+            candidates.push({ sentence, at });
+          }
+        }
+      }
+      if (candidates.length === 0) return sentenceSection(pages, random, 0);
+      const { sentence, at } = pick(random, candidates);
+      const [start, end] = chance(random, 0.5) ? [at + 1, sentence.end] : [sentence.start, at];
       return {
         sourceKey: "k",
         div: narrativeFor(sliceOf(built.page, start, end)),

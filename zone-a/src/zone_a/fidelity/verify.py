@@ -22,6 +22,7 @@ normalisation to ``int`` that Python's slicing and arithmetic need afterwards.
 
 from __future__ import annotations
 
+import unicodedata
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -193,32 +194,97 @@ def index_pages(source: Json) -> tuple[dict[int, PageIndex], list[str]]:
     return pages, issues
 
 
+def _from_line_start(index: PageIndex, start: int) -> int:
+    """Where a slice of page text starting at ``start`` is read from.
+
+    The U+000A that ends the previous line when only whitespace other than U+000A lies between
+    it and ``start`` (before ``bodyStart``, section 1 makes that code point U+000A), otherwise
+    ``start``. Normalisation does not treat the start of a text as the start of a line (section
+    3 step 4), so a slice that begins at a line start carries its line terminator with it.
+    """
+    position = start
+    while position > index.body_start:
+        character = index.text[position - 1]
+        if character == "\n":
+            return position - 1
+        if not is_whitespace(ord(character)):
+            return start
+        position -= 1
+    return position - 1 if _at(index.text, position - 1) == "\n" else start
+
+
 def _is_blank_slice(index: PageIndex, start: int, end: int) -> bool:
     if end <= start:
         return True
     try:
-        return normalize_text(index.text[start:end]) == ""
+        return normalize_text(index.text[_from_line_start(index, start) : end]) == ""
     except NormalizationError:
         return False
 
 
+# Whitespace for the edge rules: section 3 step 5's list without U+00A0, U+2007 and U+202F, which
+# join the groups of a number (`10 000`) and so are not a boundary between tokens.
+NUMBER_JOINERS: Final = frozenset({0x00A0, 0x2007, 0x202F})
+
+
+def _is_edge_whitespace(character: str | None) -> bool:
+    if character is None:
+        return False
+    code_point = ord(character)
+    return is_whitespace(code_point) and code_point not in NUMBER_JOINERS
+
+
+def _is_decimal_digit(character: str | None) -> bool:
+    """General category Nd, which is what JavaScript's ``\\p{Nd}`` tests."""
+    return character is not None and unicodedata.category(character) == "Nd"
+
+
+def _next_token(index: PageIndex, start: int, step: int) -> str | None:
+    """The first non-whitespace code point from ``start`` in direction ``step``, in the body.
+
+    Reading stops at U+000A (``None``): a number is never read across a line break.
+    """
+    position = start
+    while index.body_start <= position < index.body_end:
+        character = index.text[position]
+        if character == "\n":
+            return None
+        if not is_whitespace(ord(character)):
+            return character
+        position += step
+    return None
+
+
+def _cuts_digit_group(index: PageIndex, inner: int, beyond: int, step: int) -> bool:
+    """A digit at the edge with a digit beyond it, on the same line, is one grouped number."""
+    return _is_decimal_digit(_at(index.text, inner)) and _is_decimal_digit(
+        _next_token(index, beyond, step)
+    )
+
+
 def _start_cuts_word(pages: dict[int, PageIndex], span: Json) -> bool:
-    """Section 6 start rule: does the section begin inside a word?
+    """Section 6 start rule: does the section begin inside a token?
 
     Reads backwards from the code point before the first span, through its page's body and then
     the bodies of the pages before it (as declared, whether or not they pass section 1 or 2),
-    skipping section 3 whitespace. The first other code point cuts a word if nothing was skipped
-    before it, whatever it is (a letter, a digit, the ``.`` of ``0.5``, the minus of ``-20``), or
-    if it is U+00AD. Reading past page 1 is no cut.
+    skipping edge whitespace. The first other code point cuts a token if nothing was skipped
+    before it, whatever it is (a letter, a digit, the ``.`` of ``0.5``, the minus of ``-20``,
+    U+00A0 of ``10 000``), or if it is U+00AD. Reading past page 1 is no cut. It also cuts a
+    number when the span's first code point is a digit and the first non-whitespace code point
+    before it on the same line is a digit too.
     """
+    first = pages.get(span["page"])
+    start = span["startOffset"]
+    if first is not None and _cuts_digit_group(first, start, start - 1, -1):
+        return True
     skipped = False
     page_number = span["page"]
-    position = span["startOffset"] - 1
-    index = pages.get(page_number)
+    position = start - 1
+    index = first
     while index is not None:
         while position >= index.body_start:
             character = index.text[position]
-            if is_whitespace(ord(character)):
+            if _is_edge_whitespace(character):
                 skipped = True
                 position -= 1
                 continue
@@ -231,22 +297,25 @@ def _start_cuts_word(pages: dict[int, PageIndex], span: Json) -> bool:
 
 
 def _end_cuts_word(index: PageIndex, span: Json) -> bool:
-    """Section 6 end rule: does the section end inside a word?
+    """Section 6 end rule: does the section end inside a token?
 
-    It does if the last span, without trailing section 3 whitespace, ends in U+00AD; otherwise it
-    does unless the code point at its end offset is section 3 whitespace or the end offset is at
-    or past ``bodyEnd``. The ``1`` of ``1.5`` is a cut: the ``.`` after it is no boundary.
+    It does if the last span, without trailing edge whitespace, ends in U+00AD; otherwise it does
+    unless the code point at its end offset is edge whitespace or the end offset is at or past
+    ``bodyEnd``. The ``1`` of ``1.5`` is a cut. It also cuts a number when the span's last code
+    point is a digit and the first non-whitespace code point after it on the same line is a
+    digit too.
     """
     start, end = span["startOffset"], span["endOffset"]
     trimmed = end
-    while trimmed > start and is_whitespace(ord(index.text[trimmed - 1])):
+    while trimmed > start and _is_edge_whitespace(index.text[trimmed - 1]):
         trimmed -= 1
     if trimmed > start and index.text[trimmed - 1] == SOFT_HYPHEN:
         return True
     if end >= index.body_end:
         return False
-    after = _at(index.text, end)
-    return after is None or not is_whitespace(ord(after))
+    if not _is_edge_whitespace(_at(index.text, end)):
+        return True
+    return _cuts_digit_group(index, end - 1, end, 1)
 
 
 def _resolve_spans(spans: list[Json], pages: dict[int, PageIndex]) -> list[str] | tuple[str, str]:
@@ -298,7 +367,9 @@ def _resolve_spans(spans: list[Json], pages: dict[int, PageIndex]) -> list[str] 
             else:
                 return ("invalid-provenance", "non-contiguous")
         else:
-            pieces.append(_Piece(index=index, start=start_offset, end=end_offset))
+            pieces.append(
+                _Piece(index=index, start=_from_line_start(index, start_offset), end=end_offset)
+            )
         previous = span
 
     # The outer edges of a section must fall on word boundaries: a section may omit words, but
