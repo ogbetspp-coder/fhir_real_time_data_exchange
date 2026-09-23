@@ -251,6 +251,40 @@ jobs:
           WORKER_ID_TOKEN: ${{ steps.worker_token.outputs.id_token }}
         run: bash scripts/gcp/deploy.sh smoke 2>&1 | tee -a deploy-run.log
 
+      # The query service's URL, read from Terraform like the worker's above. The next step mints
+      # a token for it that only gets a request past Cloud Run's edge.
+      - name: Read the query service's URL
+        id: query
+        run: |
+          uri="$(terraform -chdir=infra output -raw query_service_url)"
+          echo "uri=${uri}" >>"$GITHUB_OUTPUT"
+
+      # The deployer may invoke the query service through its project-level roles/run.admin (the
+      # same entitlement the worker smoke uses). The token travels in X-Serverless-Authorization
+      # only, never in Authorization, so the service itself sees a caller with no Bearer: it
+      # authenticates nothing, and no entitlement or tool is involved.
+      - name: Mint an ID token for the query service's edge
+        id: query_token
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          create_credentials_file: false
+          export_environment_variables: false
+          token_format: id_token
+          id_token_audience: ${{ steps.query.outputs.uri }}
+          id_token_include_email: true
+
+      # Up, current and walled: Cloud Run reports this deploy's revision Ready; anonymous POST
+      # /mcp and GET /readyz are refused at the edge; past the edge with no Bearer, /mcp is the
+      # service's own 401 and /readyz names this commit. No tool is called: the authenticated
+      # get_section / verify_quote smoke is still to come.
+      - name: Smoke the deployed query service
+        env:
+          QUERY_EDGE_ID_TOKEN: ${{ steps.query_token.outputs.id_token }}
+        run: bash scripts/gcp/deploy.sh query-smoke 2>&1 | tee -a deploy-run.log
+
       # A green deploy supersedes every earlier failure: close their issues, each with a pointer to
       # the run that superseded it, so an open deploy-failure issue always means a live failure
       # (foundations C11). Only issues this workflow opened, by title and author, are touched.

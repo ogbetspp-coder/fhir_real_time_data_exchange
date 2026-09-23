@@ -20,7 +20,8 @@ Google Cloud Healthcare API and observe their native near-real-time BigQuery str
 
 - Bootstrap: `npm ci`
 - Format: `npm run format`
-- Full local gate: `npm run check`
+- Full local gate: `npm run check` (its test step is `npm run test:coverage`: the suite under v8
+  coverage with per-directory floors in `vitest.config.ts`; raise a floor when coverage rises)
 - Build: `npm run build`
 - Local deterministic demo: `npm run demo`
 - Service: `npm run dev`

@@ -199,6 +199,18 @@ from the body. A `422 source-disabled` answer — an environment whose `enabled_
 excludes `fixture`, as production should — skips the step with a notice, because that answer is
 the allowlist working as configured.
 
+**After deploy — `scripts/gcp/deploy.sh query-smoke`** (step "Smoke the deployed query service",
+right after the worker smoke). No tool is called. It fails the deploy unless: Cloud Run reports
+the query service Ready with its latest created revision serving; an anonymous `POST /mcp` and
+`GET /readyz` are both refused (401 or 403 — Cloud Run's IAM edge, since the service has no
+`allUsers` invoker); and, past the edge with the deployer's ID token for the service URL in
+`X-Serverless-Authorization` and no `Authorization`, `POST /mcp` is the service's own
+`401 {"error":"unauthenticated"}` and `GET /readyz` is 200 naming `ema-flow-query` at this
+deploy's commit. Only status codes and closed JSON fields are printed. Its verdicts are tested
+hermetically (`test/infra/query-smoke.test.ts`, stand-ins for terraform, gcloud and curl); it
+has not yet run against a deployed service. The authenticated `get_section` / `verify_quote`
+smoke is still to come.
+
 **Status (2026-09-20).** The two gates are evidenced to different depths, and the difference
 matters.
 
