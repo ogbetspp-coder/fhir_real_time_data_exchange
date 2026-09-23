@@ -291,3 +291,15 @@ def test_colours_and_offsets_the_reader_cannot_place_are_refused(style: str) -> 
 def test_nearly_white_is_faint_and_nearly_black_is_nothing() -> None:
     body = '<p><span style="color: #f5f5f5">a</span><span style="color: #0d0d0d">b</span></p>'
     assert kinds(body) == [(0, 1, "faint")]
+
+
+# --- review round 3 -----------------------------------------------------------------------
+
+
+def test_colour_keywords_are_not_marks_and_light_greys_are_faint() -> None:
+    body = (
+        '<p><span style="color: none">a</span><span style="background: auto">b</span>'
+        '<span style="background: currentcolor">c</span><span style="color: #EFEFEF">d</span>'
+        '<span style="color: #EEECE1">e</span></p>'
+    )
+    assert kinds(body) == [(3, 5, "faint")]

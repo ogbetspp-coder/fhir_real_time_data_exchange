@@ -21,16 +21,20 @@ subsection such as Posology belongs to its section's text. Label text and templa
 compared after runs of space, tab and no-break space are collapsed to one space. Characters the
 reader marked struck through or faint are masked: no statement matches them. In a pattern:
 
-- literal text must appear exactly, every space included; a space between literal text and an
-  optional segment belongs to the segment ("above <25 C>" is "above 25 C" or "above", never
-  "above25 C"), and spaces at either end of the pattern are dropped;
+- literal text must appear exactly, word for word, with a space wherever the template has one
+  and a paragraph break wherever it has one (blank paragraphs fold into one break); the space
+  or break before an optional segment belongs to the segment ("above <25 C>" is "above 25 C" or
+  "above", never "above25 C"); two segments the template writes together between letters are
+  separated by a space, as a person writes them; nothing is required before the first word;
 - a fill-in (``{...}``) is any non-empty text of at most 300 characters within one paragraph
   (as little as possible, except at the very end of the pattern, where it takes the rest of the
   line);
 - an optional segment (``<...>``) may be present or absent; a whole statement in ``<...>`` is
   matched on its content, since "absent" is the answer when it does not match;
 - guidance (``[...]``) is not label text and is dropped, and so are footnote markers (runs of
-  ``*``).
+  ``*``);
+- "(s)" after a word is the template's choice of singular or plural: "substance(s)" matches
+  "substance" and "substances".
 
 A statement spanning paragraphs (``<Traceability`` and the sentence under it) is matched
 against as many consecutive paragraphs. A statement that matches is ``used``, with where it
@@ -38,8 +42,8 @@ matched: the section's path, the paragraph's index and the character offsets in 
 paragraph's text as the reader returned it (``lastParagraph`` when it runs over several). One
 that does not match but resembles a paragraph of its section (a word-level
 similarity of at least ``SIMILARITY``, difflib's ratio over a window of the paragraph as long as
-the statement, taking the statement with all of its optional segments or with none, whichever
-is closer) is a ``deviation`` finding with the word-level differences; a person decides
+the statement, taking the statement as the closest choice of its optional segments writes it)
+is a ``deviation`` finding with the word-level differences; a person decides
 whether the wording was changed on purpose. The differences run from where the resemblance
 starts to the end of the sentence in which the statement's last matching word falls; text in
 the place of a fill-in is not a difference, and a run of struck or faint characters is shown
@@ -79,6 +83,7 @@ SIMILARITY = 0.85
 MIN_LITERAL = 12
 FILL_LIMIT = 300
 EXCERPT = 80
+CHOICES_LIMIT = 4
 TERMINAL = (".", ":", ";", "!", "?")
 
 
@@ -154,62 +159,189 @@ def _collapse(text: str) -> tuple[str, tuple[int, ...]]:
     return "".join(out[start:end]), tuple(positions[start:end])
 
 
-def _squeeze(value: str) -> str:
-    """Runs of space, tab and no-break space as one space, none next to a paragraph break or at
-    either end; paragraph breaks kept."""
-    text = re.sub(f"[{_SPACES}]+", " ", value).strip(" ")
-    return re.sub(r" ?\n ?", "\n", text)
+@dataclass(frozen=True)
+class _Piece:
+    """A word of literal text, a fill-in or an optional segment, and the joint before it:
+    nothing, a space or a paragraph break."""
+
+    joint: str
+    kind: str
+    text: str = ""
+    pieces: tuple[_Piece, ...] = ()
+
+    def first(self) -> str | None:
+        if self.kind == "text":
+            return self.text[0]
+        return self.pieces[0].first() if self.kind == "optional" else None
+
+    def last(self) -> str | None:
+        if self.kind == "text":
+            return self.text[-1]
+        return self.pieces[-1].last() if self.kind == "optional" else None
 
 
-def _regex(tokens: list[Token], at_end: bool = True) -> str:
-    """The pattern as a regular expression over collapsed text.
+_ORDER = {"": 0, " ": 1, "\n": 2}
+_PLURAL = re.compile(r"\([sS]\)")
 
-    A space is required. A space between literal text and an optional segment belongs to the
-    segment ("above <25 \u00b0C>" matches "above 25 \u00b0C" and "above", not "above25 \u00b0C"),
-    and spaces at either end of the pattern are dropped. A space after an optional segment that
-    opens the pattern may be absent."""
-    out: list[str] = []
-    last = len(tokens) - 1
-    carry = False
-    for position, token in enumerate(tokens):
+
+def _stronger(one: str, other: str) -> str:
+    return one if _ORDER[one] >= _ORDER[other] else other
+
+
+def _pieces(tokens: list[Token]) -> tuple[list[_Piece], str, str]:
+    """The pieces of a pattern, and the joints before its first piece and after its last.
+
+    Whitespace between two pieces is their joint: a paragraph break if it holds a line feed
+    (blank paragraphs fold into one), otherwise a space. Whitespace at the start or end of an
+    optional segment is lifted out of it, so the segment owns the joint before it and the
+    joint after it belongs to what follows. Two pieces the template writes together, one of
+    them optional, with a letter or digit on each side ("<due to the rarity of the
+    disease><for scientific reasons>"), are joined by a space, as a person writes them."""
+    out: list[_Piece] = []
+    pending = ""
+    leading: str | None = None
+
+    def add(piece: _Piece) -> None:
+        nonlocal pending, leading
+        if not out:
+            leading = pending
+            joint = ""
+        else:
+            joint = pending
+            previous = out[-1]
+            if not joint and "optional" in (previous.kind, piece.kind):
+                before, after = previous.last(), piece.first()
+                if before and after and before.isalnum() and after.isalnum():
+                    joint = " "
+        out.append(_Piece(joint, piece.kind, piece.text, piece.pieces))
+        pending = ""
+
+    for token in tokens:
         value = token["value"]
-        before = tokens[position - 1]["kind"] if position else None
-        after = tokens[position + 1]["kind"] if position < last else None
         if token["kind"] == "text":
-            assert isinstance(value, str)
-            core = _squeeze(value)
-            opens = before == "optional" and position == 1
-            if not core:
-                if after == "optional":
-                    carry = True
-                elif before is not None and after is not None:
-                    out.append(" ?" if opens else " ")
-                continue
-            piece = re.escape(core).replace("\\ ", " ")
-            if value[:1] in _SPACES and before is not None:
-                piece = (" ?" if opens else " ") + piece
-            if value[-1:] in _SPACES:
-                if after == "optional":
-                    carry = True
-                elif after is not None:
-                    piece += " "
-            out.append(piece)
+            for part in re.split(r"(\s+)", str(value)):
+                if not part:
+                    continue
+                if part.isspace():
+                    pending = _stronger(pending, "\n" if "\n" in part else " ")
+                else:
+                    add(_Piece("", "text", part))
         elif token["kind"] == "fill":
-            # As little as possible, except at the very end of the pattern, where it takes the
-            # rest of the line so the reported span covers what was filled in.
-            lazy = "" if at_end and position == last else "?"
-            out.append(f"[^\\n{HIDDEN}{TAKEN}]{{1,{FILL_LIMIT}}}{lazy}")
+            add(_Piece("", "fill"))
         elif token["kind"] == "optional":
             assert isinstance(value, list)
-            inner = _regex(value, at_end and position == last)
-            out.append(f"(?:{' ' if carry else ''}{inner})?")
-            carry = False
+            inner, lead, trail = _pieces(value)
+            if not inner:
+                pending = _stronger(pending, _stronger(lead, trail))
+                continue
+            pending = _stronger(pending, lead)
+            add(_Piece("", "optional", pieces=tuple(inner)))
+            pending = trail
+    return out, leading or "", pending
+
+
+def _regex(pieces: list[_Piece], at_end: bool = True, opening: bool = True) -> str:
+    """The pieces as a regular expression over collapsed text. An optional segment's joint is
+    inside it, so an absent segment leaves no extra space or break. While every piece so far
+    is optional and at the start of the pattern, the next joint may be absent too. A fill-in
+    takes as little as it can, except where nothing required follows it to the end of the
+    pattern: there it takes the rest of the line, so a reported span covers what was filled
+    in."""
+    out: list[str] = []
+    for position, piece in enumerate(pieces):
+        rest_optional = all(later.kind == "optional" for later in pieces[position + 1 :])
+        joint = {"": "", " ": " ", "\n": "\\n"}[piece.joint]
+        if joint and opening and position:
+            joint += "?"
+        if piece.kind == "text":
+            # "(s)" is the template's choice of singular or plural ("substance(s)").
+            out.append(
+                joint + re.escape(piece.text).replace(r"\(s\)", "s?").replace(r"\(S\)", "S?")
+            )
+        elif piece.kind == "fill":
+            lazy = "" if at_end and rest_optional else "?"
+            out.append(f"{joint}[^\\n{HIDDEN}{TAKEN}]{{1,{FILL_LIMIT}}}{lazy}")
+        else:
+            inner = _regex(list(piece.pieces), at_end and rest_optional, opening=False)
+            out.append(f"(?:{joint}{inner})?")
+        if piece.kind != "optional":
+            opening = False
     return "".join(out)
 
 
-def _literals(tokens: list[Token]) -> list[str]:
-    """The literal pieces a match must contain."""
-    return [text for t in tokens if t["kind"] == "text" and (text := _squeeze(str(t["value"])))]
+def _required(pieces: list[_Piece]) -> list[str]:
+    """Runs of consecutive required words, as they must appear."""
+    runs: list[str] = []
+    current = ""
+    for piece in pieces:
+        if piece.kind == "text":
+            current = current + piece.joint + piece.text if current else piece.text
+        else:
+            if current:
+                runs.append(current)
+            current = ""
+    if current:
+        runs.append(current)
+    return runs
+
+
+def _span(pieces: list[_Piece]) -> int:
+    """The most paragraphs a pattern can run over."""
+    breaks = 0
+    for piece in pieces:
+        breaks += piece.joint == "\n"
+        if piece.kind == "optional":
+            breaks += _span(list(piece.pieces)) - 1
+    return breaks + 1
+
+
+def _plural(template: str, word: str) -> bool:
+    """The word is the template's word with its "(s)" chosen one way or the other."""
+    if not _PLURAL.search(template):
+        return False
+    pattern = re.escape(template).replace(r"\(s\)", "s?").replace(r"\(S\)", "S?")
+    return re.fullmatch(pattern, word) is not None
+
+
+def _optionals(pieces: list[_Piece]) -> int:
+    return sum(1 + _optionals(list(p.pieces)) for p in pieces if p.kind == "optional")
+
+
+def _rendered(pieces: list[_Piece], choose: tuple[bool, ...], counter: list[int]) -> str:
+    out: list[str] = []
+    for piece in pieces:
+        if piece.kind == "text":
+            out.append(piece.joint + piece.text)
+        elif piece.kind == "fill":
+            out.append(piece.joint + "\u2026")
+        else:
+            index = counter[0]
+            counter[0] += 1
+            if choose[index]:
+                out.append(piece.joint + _rendered(list(piece.pieces), choose, counter))
+    return "".join(out)
+
+
+def _references(pieces: list[_Piece]) -> list[list[str]]:
+    """The statement as words, each fill-in an ellipsis, for every choice of its optional
+    segments when it has at most ``CHOICES_LIMIT`` of them, else for four: all present, none,
+    and every other one either way."""
+    count = _optionals(pieces)
+    if count <= CHOICES_LIMIT:
+        choices = list(itertools.product((True, False), repeat=count))
+    else:
+        choices = [
+            (True,) * count,
+            (False,) * count,
+            tuple(k % 2 == 0 for k in range(count)),
+            tuple(k % 2 == 1 for k in range(count)),
+        ]
+    out: list[list[str]] = []
+    for choice in choices:
+        words = _rendered(pieces, choice, [0]).split()
+        if words not in out:
+            out.append(words)
+    return out
 
 
 _NOTE_MARKER = re.compile(r"\*+")
@@ -230,26 +362,6 @@ def _without_notes(tokens: list[Token]) -> list[Token]:
         else:
             out.append(token)
     return out
-
-
-def _render(tokens: list[Token], optional: bool) -> str:
-    out: list[str] = []
-    for token in tokens:
-        value = token["value"]
-        if token["kind"] == "text":
-            out.append(str(value))
-        elif token["kind"] == "fill":
-            out.append("\u2026")
-        elif token["kind"] == "optional" and optional:
-            assert isinstance(value, list)
-            out.append(_render(value, optional))
-    return "".join(out)
-
-
-def _reference(tokens: list[Token], optional: bool) -> list[str]:
-    """The statement as words, with every optional segment present or every one absent, and
-    each fill-in shown as an ellipsis."""
-    return collapse(_render(tokens, optional)).split()
 
 
 def _content(item_pattern: list[Token]) -> list[Token]:
@@ -279,19 +391,6 @@ def _joined(tokens: list[Token]) -> list[Token]:
         else:
             out.append(token)
     return out
-
-
-def _parts(tokens: list[Token]) -> int:
-    """How many paragraphs a pattern spans (the registry joins them with a line feed)."""
-    count = 1
-    for token in tokens:
-        value = token["value"]
-        if token["kind"] == "optional":
-            assert isinstance(value, list)
-            count += _parts(value) - 1
-        else:
-            count += str(value).count("\n")
-    return count
 
 
 # --- the text of a section ------------------------------------------------------------------
@@ -354,8 +453,9 @@ def _lines(section: Section, own: set[str], paths: dict[int, str]) -> tuple[list
 
 
 def _windows(lines: list[_Line], size: int) -> list[_Window]:
+    """From each line, it and up to ``size - 1`` lines after it, joined by line feeds."""
     out: list[_Window] = []
-    for start in range(len(lines) - size + 1):
+    for start in range(len(lines)):
         run = lines[start : start + size]
         text: list[str] = []
         origin: list[tuple[int, int] | None] = []
@@ -412,16 +512,25 @@ class _Match:
         return out
 
 
-def _search(tokens: list[Token], lines: list[_Line]) -> _Match | None:
-    literals = _literals(tokens)
-    anchor = max(literals, key=len) if literals else ""
-    compiled = re.compile(_regex(tokens))
-    for window in _windows(lines, _parts(tokens)):
+def _search(pieces: list[_Piece], lines: list[_Line]) -> _Match | None:
+    # The longest stretch of required text, cut at each "(s)", must be in the window.
+    stretches = [part for run in _required(pieces) for part in _PLURAL.split(run)]
+    anchor = max(stretches, key=len) if stretches else ""
+    compiled = re.compile(_regex(pieces))
+    for window in _windows(lines, _span(pieces)):
         if anchor and anchor not in window.text:
             continue
         match = compiled.search(window.text)
-        if match is not None and match.end() > match.start():
-            return _Match(window, match.start(), match.end())
+        if match is None:
+            continue
+        start, end = match.start(), match.end()
+        # A match never starts or ends on the line feed that joins two paragraphs.
+        while start < end and window.origin[start] is None:
+            start += 1
+        while end > start and window.origin[end - 1] is None:
+            end -= 1
+        if end > start:
+            return _Match(window, start, end)
     return None
 
 
@@ -472,7 +581,15 @@ def _differences(reference: list[str], words: list[str], start: int) -> list[dic
     out: list[dict[str, str]] = []
     matcher = difflib.SequenceMatcher(None, reference, stretch, autojunk=False)
     for operation, a1, a2, b1, b2 in matcher.get_opcodes():
-        if operation == "replace" and set(reference[a1:a2]) == {"\u2026"}:
+        if (
+            operation == "replace"
+            and set(reference[a1:a2]) == {"\u2026"}
+            and HIDDEN_WORD not in stretch[b1:b2]
+        ) or (
+            operation == "replace"
+            and a2 - a1 == b2 - b1
+            and all(_plural(t, w) for t, w in zip(reference[a1:a2], stretch[b1:b2], strict=True))
+        ):
             # Text in the place of a fill-in is what was filled in, not a difference.
             continue
         if operation != "equal":
@@ -532,10 +649,11 @@ def _exact(report: _Report, job: _Job, taken: _Taken) -> bool:
             if not item["optional"]:
                 report.finding("missing-subheading", id=job.identifier, text=wanted)
         return True
-    if sum(len(text) for text in _literals(tokens)) < MIN_LITERAL:
+    pieces = _pieces(tokens)[0]
+    if sum(len(run) for run in _required(pieces)) < MIN_LITERAL:
         report.statements.append({"id": job.identifier, "status": "not-checkable"})
         return True
-    match = _search(tokens, job.lines)
+    match = _search(pieces, job.lines)
     if match is None:
         return False
     group = taken.setdefault(job.group, {})
@@ -547,12 +665,12 @@ def _exact(report: _Report, job: _Job, taken: _Taken) -> bool:
 
 def _near(report: _Report, job: _Job, taken: _Taken) -> None:
     item = job.item
-    tokens = _content(item["pattern"])
+    pieces = _pieces(_content(item["pattern"]))[0]
     lines = _mask(job.lines, taken.get(job.group, {}))
-    # The statement with all of its optional segments and with none; the closer one counts.
+    # The statement as each choice of its optional segments writes it; the closest one counts.
     best: tuple[float, _Window, list[str], int, list[str]] | None = None
-    for reference in (_reference(tokens, True), _reference(tokens, False)):
-        closest = _closest(reference, lines, _parts(tokens)) if len(reference) >= 4 else None
+    for reference in _references(pieces):
+        closest = _closest(reference, lines, _span(pieces)) if len(reference) >= 4 else None
         if closest is not None and (best is None or closest[0] > best[0]):
             best = (*closest, reference)
     differences = _differences(best[4], best[2], best[3]) if best is not None else []

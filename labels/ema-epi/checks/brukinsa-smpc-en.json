@@ -20,18 +20,18 @@
   },
   "summary": {
     "findings": {
-      "deviation": 1,
+      "deviation": 2,
       "document-quirk": 1,
-      "formatting": 4,
+      "formatting": 3,
       "heading-text": 2,
       "refused-section": 1
     },
     "statements": {
-      "absent": 58,
-      "deviation": 1,
+      "absent": 56,
+      "deviation": 2,
       "not-checkable": 8,
       "not-checked": 34,
-      "used": 22
+      "used": 23
     }
   },
   "findings": [
@@ -51,13 +51,6 @@
       "paragraph": 0,
       "mark": "shading-lightgrey",
       "text": "the national reporting system listed in Appendix V"
-    },
-    {
-      "kind": "formatting",
-      "section": "5.1 Pharmacodynamic properties",
-      "paragraph": 325,
-      "mark": "shading-#e6e6e6",
-      "text": "P valueb"
     },
     {
       "kind": "formatting",
@@ -86,6 +79,20 @@
       "code": "200000029842",
       "expected": "6.6 Special precautions for disposal and other handling",
       "found": "6.6 Special precautions for disposal <and other handling>"
+    },
+    {
+      "kind": "deviation",
+      "id": "smpc.4.7#0",
+      "similarity": 0.857,
+      "in": "4.7 Effects on ability to drive and use machines",
+      "paragraph": 0,
+      "differences": [
+        {
+          "change": "replace",
+          "template": "on",
+          "label": "in"
+        }
+      ]
     },
     {
       "kind": "deviation",
@@ -176,7 +183,11 @@
     },
     {
       "id": "smpc.4.3#0",
-      "status": "absent"
+      "status": "used",
+      "in": "4.3 Contraindications",
+      "paragraph": 0,
+      "start": 0,
+      "end": 91
     },
     {
       "id": "smpc.4.4#0",
@@ -215,7 +226,7 @@
     },
     {
       "id": "smpc.4.7#0",
-      "status": "absent"
+      "status": "deviation"
     },
     {
       "id": "smpc.4.7#1",
@@ -248,7 +259,7 @@
       "in": "5.1 Pharmacodynamic properties",
       "paragraph": 0,
       "start": 0,
-      "end": 98
+      "end": 105
     },
     {
       "id": "smpc.5.1#1",

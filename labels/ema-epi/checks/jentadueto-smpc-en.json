@@ -28,10 +28,10 @@
       "xhtml-defect": 7
     },
     "statements": {
-      "absent": 77,
+      "absent": 76,
       "deviation": 1,
       "not-checkable": 8,
-      "used": 37
+      "used": 38
     }
   },
   "findings": [
@@ -195,7 +195,11 @@
     },
     {
       "id": "smpc.4.3#0",
-      "status": "absent"
+      "status": "used",
+      "in": "4.3 Contraindications",
+      "paragraph": 0,
+      "start": 0,
+      "end": 92
     },
     {
       "id": "smpc.4.4#0",
@@ -276,7 +280,7 @@
       "in": "5.1 Pharmacodynamic properties",
       "paragraph": 0,
       "start": 0,
-      "end": 113
+      "end": 119
     },
     {
       "id": "smpc.5.1#1",

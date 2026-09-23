@@ -26,11 +26,11 @@
       "refused-section": 1
     },
     "statements": {
-      "absent": 81,
+      "absent": 80,
       "deviation": 3,
       "not-checkable": 8,
       "not-checked": 1,
-      "used": 30
+      "used": 31
     }
   },
   "findings": [
@@ -177,7 +177,11 @@
     },
     {
       "id": "smpc.4.3#0",
-      "status": "absent"
+      "status": "used",
+      "in": "4.3 Contraindications",
+      "paragraph": 1,
+      "start": 0,
+      "end": 91
     },
     {
       "id": "smpc.4.4#0",
@@ -255,7 +259,7 @@
       "in": "5.1 Pharmacodynamic properties",
       "paragraph": 1,
       "start": 0,
-      "end": 64
+      "end": 70
     },
     {
       "id": "smpc.5.1#1",

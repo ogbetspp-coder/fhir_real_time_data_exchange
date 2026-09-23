@@ -59,13 +59,16 @@ EMA writes "GFR < 60 mL/min" that way in Jentadueto.
   section must carry that code's heading: for a numbered section one of the forms the registry
   allows (`zone_a/qrd/headings.py`), for a named subsection the mapping's title.
 - **Statements.** The registry's patterns are matched against the text of their section,
-  after whitespace is collapsed: literal text exactly, every space included (a space next to
-  an optional segment belongs to it), a fill-in as any text within one paragraph, an optional
-  segment present or absent, guidance and footnote markers dropped. A
+  after whitespace is collapsed: literal text word for word, with the template's spaces and
+  paragraph breaks (the space or break before an optional segment belongs to it), a fill-in as
+  any text within one paragraph, an optional segment present or absent, "(s)" as singular or
+  plural, guidance and footnote markers dropped. A test writes every statement out the ways a
+  person would (optional segments all in, none, every other one) and checks each is found. A
   statement over two paragraphs ("Traceability" and the sentence under it) is matched against
   consecutive paragraphs. Struck-through and faint text never counts as a match.
 - **Deviations.** A statement that does not match but resembles a paragraph of its section
-  (difflib's word-level ratio of at least 0.85) is reported with the word-level differences,
+  (difflib's word-level ratio of at least 0.85, against the closest choice of its optional
+  segments) is reported with the word-level differences,
   up to the end of the sentence; text in the place of a fill-in is not a difference, and
   struck or faint words show as "[struck or faint text]". Text that an exact match of a sibling
   statement explains is not compared again; the rest of the paragraph is. 0.85 is a proposal
@@ -106,6 +109,8 @@ Every finding below was confirmed by reading the source div.
     4.8. That is common for vaccines, and a person should confirm it.
   - Nuvaxovid writes the paediatric deferral statement in 5.1 with a comma where the template
     has brackets.
+  - Brukinsa writes "no or negligible influence in the ability to drive and use machines"; the
+    template has "on".
 - **Formatting.** Blue text (an email address and the EMA link) and grey table shading in
   Brukinsa, besides the template's intended grey shading of "the national reporting system
   listed in Appendix V" in all three. Red, yellow and other colours in the source fall only on

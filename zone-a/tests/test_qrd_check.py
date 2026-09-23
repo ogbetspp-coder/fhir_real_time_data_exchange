@@ -253,6 +253,9 @@ def test_brukinsa() -> None:
         ("4.8 Undesirable effects", "embedded-comment")
     ]
     assert status(result, "document#0") == "used"
+    assert _deviation(result, "smpc.4.7#0")["differences"] == [
+        {"change": "replace", "template": "on", "label": "in"}
+    ]
 
 
 def test_jentadueto() -> None:
@@ -419,3 +422,87 @@ def test_a_title_is_collapsed_as_the_heading_check_collapses_it(title: str) -> N
     edited = replace(root, sections=(*root.sections[:3], new_four, *root.sections[4:]))
     result = check(replace(document(), sections=(edited,)), REGISTRY, MAPPING)
     assert status(result, f"smpc.4.2#{_item_index('smpc.4.2', 'Posology')}") == "used"
+
+
+# --- review round 3 -----------------------------------------------------------------------
+
+
+def _statements() -> list[tuple[str, list[Any]]]:
+    out: list[tuple[str, list[Any]]] = []
+    for section in REGISTRY["sections"]:
+        for number, item in enumerate(section["items"]):
+            if item["kind"] == "statement" and item.get("pattern"):
+                out.append((f"{section['key']}#{number}", item["pattern"]))
+    out += [(f"document#{n}", i["pattern"]) for n, i in enumerate(REGISTRY["documentStatements"])]
+    appendices = REGISTRY["appendices"]
+    out += [(f"I#{e['id']}", e["pattern"]) for e in appendices["I"]["entries"] if e["pattern"]]
+    out += [(f"III#{n}", i["pattern"]) for n, i in enumerate(appendices["III"]["items"])]
+    return out
+
+
+def _render(pieces: list[Any], choose: Any, counter: list[int]) -> str:
+    out: list[str] = []
+    for piece in pieces:
+        if piece.kind == "text":
+            out.append(piece.joint + piece.text.replace("(s)", "s").replace("(S)", "S"))
+        elif piece.kind == "fill":
+            out.append(piece.joint + "Zeta")
+        else:
+            counter[0] += 1
+            if choose(counter[0]):
+                out.append(piece.joint + _render(list(piece.pieces), choose, counter))
+    return "".join(out)
+
+
+def test_every_statement_matches_the_ways_a_person_writes_it() -> None:
+    """Each statement, written with its optional segments all present, all absent, or every
+    other one, and its fill-ins filled, one paragraph per line, is found in that text."""
+    from zone_a.qrd import check as module
+
+    for identifier, pattern in _statements():
+        pieces = module._pieces(module._content(pattern))[0]
+        if sum(len(run) for run in module._required(pieces)) < module.MIN_LITERAL:
+            continue
+        for choose in (lambda _: True, lambda _: False, lambda k: k % 2 == 0, lambda k: k % 2):
+            text = _render(pieces, choose, [0]).strip()
+            lines = []
+            for number, paragraph in enumerate(text.split("\n")):
+                collapsed, positions = module._collapse(paragraph)
+                if collapsed:
+                    lines.append(module._Line("x", number, collapsed, positions, (0, number)))
+            assert module._search(pieces, lines) is not None, (identifier, text[:80])
+
+
+def test_a_statement_opening_with_an_optional_paragraph_does_not_break_the_check() -> None:
+    paragraphs = _paragraphs("Pregnancy", "Zeta can be used during pregnancy.")
+    result = check(document(smpc_4_6=paragraphs), REGISTRY, MAPPING)
+    assert status(result, "appendix-I#pregnancy.9") == "used"
+
+
+def test_optional_segments_written_together_are_separated_by_a_space() -> None:
+    identifier = (
+        f"smpc.5.1#{_item_index('smpc.5.1', '<This medicinal product has been authorised under')}"
+    )
+    text = (
+        "This medicinal product has been authorised under \u2018exceptional circumstances\u2019. "
+        "This means that for scientific reasons it has not been possible to obtain complete "
+        "information on this medicinal product."
+    )
+    result = check(document(smpc_5_1=_paragraphs(text)), REGISTRY, MAPPING)
+    assert status(result, identifier) != "deviation"
+
+
+def test_a_fill_in_followed_only_by_optional_text_takes_the_rest_of_the_line() -> None:
+    result = RESULTS["jentadueto-smpc-en.json"]
+    used = next(s for s in result["statements"] if s["id"] == "smpc.5.1#0")
+    assert used["end"] - used["start"] > len("Pharmacotherapeutic group: X, ATC code: A")
+
+
+def test_struck_text_in_the_place_of_a_fill_in_is_a_difference() -> None:
+    text = "Keep the bottle tightly closed in order to protect from light."
+    start = text.index("bottle")
+    paragraph = Paragraph(text, None, None, None, marks=(Mark(start, start + 6, "strike"),))
+    result = check(document(smpc_6_4=(paragraph,)), REGISTRY, MAPPING)
+    assert "deviation" in {
+        s["status"] for s in result["statements"] if s["id"].startswith("appendix-III")
+    }

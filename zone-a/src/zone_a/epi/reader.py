@@ -114,7 +114,8 @@ _LAYOUT = re.compile(
     r"|font-family|font-weight|font-style|layout-grid-mode|mso-[a-z-]+"
 )
 _BLACK = {"black", "windowtext", "#000000", "auto", "initial"}
-_WHITE = {"white", "#ffffff", "transparent", "none"}
+_WHITE = {"white", "#ffffff", "transparent"}
+_KEYWORDS = {"none", "auto", "inherit", "initial", "currentcolor", "transparent"}
 # A margin or indent further left than one inch moves text off the page, not to its edge.
 _OFF_SCREEN_POINTS = 72.0
 _POINTS = {"pt": 1.0, "px": 0.75, "pc": 12.0, "in": 72.0, "cm": 72 / 2.54, "mm": 72 / 25.4}
@@ -231,9 +232,9 @@ def _channels(colour: str) -> tuple[int, int, int] | None:
 
 
 def _light(colour: str) -> bool:
-    """Nearly white: hard to see on the page."""
+    """Nearly white: hard to see on the page (Word's light theme colours included)."""
     channels = _channels(colour)
-    return channels is not None and min(channels) >= 0xF0
+    return channels is not None and min(channels) >= 0xE0
 
 
 def _dark(colour: str) -> bool:
@@ -276,7 +277,8 @@ def _style(style: str) -> set[str]:
                 raise _RefusedError("unsupported-style", f"visibility: {value}")
         elif name == "color":
             colour = _colour(value)
-            if colour in ("inherit", "currentcolor"):
+            if colour in _KEYWORDS - {"transparent"}:
+                # Not a colour of its own: a browser keeps the colour the text already has.
                 continue
             if colour in _WHITE or _light(colour):
                 kinds.add("faint")
@@ -284,7 +286,7 @@ def _style(style: str) -> set[str]:
                 kinds.add(f"color-{colour}")
         elif name in ("background", "background-color"):
             colour = _colour(value)
-            if colour not in _WHITE and colour not in ("inherit", "initial"):
+            if colour not in _WHITE and colour not in _KEYWORDS and not _light(colour):
                 kinds.add(f"shading-{colour}")
         elif name == "font-size":
             points = _points(value)
