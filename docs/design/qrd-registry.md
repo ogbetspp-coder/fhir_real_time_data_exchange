@@ -75,13 +75,16 @@ module docstring lists every rule and every refusal. What the EMA files and the 
    additional-monitoring statement is a picture in the template; a U+FFFC typed as text is
    refused.
 3. **Fields.** A field keeps its stored result and drops its instruction, however deeply
-   nested; a paragraph that ends inside an instruction is refused, and so is a field with no
-   stored result (a form checkbox, a SYMBOL field without a result, an empty simple field) or
-   one marked for update, because what Word shows for those is computed.
+   nested; a paragraph that ends inside an instruction is refused. Only HYPERLINK, REF,
+   NOTEREF and DOCPROPERTY results are read, because Word shows those as stored; PAGE, DATE,
+   SEQ, IF and every other field Word recomputes on display or print are refused, and so is a
+   field with no stored result (a form checkbox, a SYMBOL field without a result, an empty
+   simple field) or one marked for update.
 4. **Styles and hidden text.** Run properties are looked up on the run, its character style,
-   its paragraph style and its table style (each through its `basedOn` chain, falling back to
-   the document's default style of that kind when the id is absent or unknown, as Word does),
-   then the document defaults. A run with text that any of these levels hides is refused
+   its paragraph style and, inside a table, its table style (each through its `basedOn` chain,
+   falling back to the document's last default style of that kind when the id is absent or
+   unknown, as Word does), then the document defaults; a style reference naming a style of
+   another kind is refused. A run with text that any of these levels hides is refused
    unless the run itself says it is visible. A hidden paragraph mark, direct or through the
    paragraph's style, is reported (`mark_hidden`): Word shows such a paragraph run on into the
    next. A table whose effective style has conditional formatting (first row, banded rows) is
@@ -133,10 +136,12 @@ and compared byte for byte with a fresh build in `zone-a/tests/test_qrd_registry
   holds a fill-in, ends in sentence punctuation, contains ". " or spans paragraphs; otherwise a
   subheading. Trailing footnote markers (`…>*`, `…Appendix V.*`) and Appendix III's " or"
   between alternatives are split off into `note` and `connector`, with the exact characters in
-  `trailer`. The template's light-grey highlight and its shading, which mean "not in the
-  printed material", are kept as `marks` (`highlight-lightGray`, `shading`). Any other mark on a
-  source paragraph the build reads is refused (capitals only where they change a letter), and so
-  is a hidden paragraph mark on a paragraph with text;
+  `trailer`. The template's light-grey highlight and light-grey (D9D9D9) shading, which mean
+  "not in the printed material", are kept on items as `marks` (`highlight-lightGray`,
+  `shading-D9D9D9`). Any other mark on a source paragraph the build reads is refused (capitals
+  only where they change a letter), so is a grey mark where the registry does not store marks
+  (headings, appendix entries, footnotes), a numbered or bulleted paragraph (Word shows a
+  number the text does not hold), and a hidden paragraph mark on a paragraph with text;
 - **documentStatements**: the additional-monitoring statement before section 1 and the
   "Detailed information on this medicinal product is available on the website…" statement at
   the end;
@@ -144,7 +149,8 @@ and compared byte for byte with a fresh build in `zone-a/tests/test_qrd_registry
   `lactation.1`–`lactation.3`), Appendix II's rows by the EMA's own codes (`001`–`006` for
   frequency, `007`–`033` for system organ classes), and Appendix III's twelve SmPC storage
   statements with their five footnotes, each attached to the section it serves (4.6, 4.8, 6.4).
-  Appendix II must be a single table of two cells per row under a "Ref | EN" header.
+  Appendix II must be a single table whose first row is the "Ref | EN" header and whose every
+  row has exactly two cells.
 
 `zone-a/src/zone_a/qrd/headings.py` recognises an SmPC heading in a line of label text that is
 already known to be Annex I (the labelling and the leaflet reuse lines such as "1. NAME OF THE

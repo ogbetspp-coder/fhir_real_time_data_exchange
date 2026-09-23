@@ -158,7 +158,7 @@ def test_a_complex_field_keeps_its_result_and_drops_its_instruction() -> None:
 def test_text_inside_a_field_instruction_is_dropped() -> None:
     body = p(
         r('<w:fldChar w:fldCharType="begin"/>')
-        + r("<w:t>not shown</w:t><w:tab/>")
+        + r("<w:instrText>REF </w:instrText><w:t>not_shown</w:t><w:tab/>")
         + r('<w:fldChar w:fldCharType="separate"/>')
         + r("<w:t>shown</w:t>")
         + r('<w:fldChar w:fldCharType="end"/>')
@@ -168,7 +168,7 @@ def test_text_inside_a_field_instruction_is_dropped() -> None:
 
 def test_simple_fields_hyperlinks_and_content_controls_are_read_through() -> None:
     body = p(
-        '<w:fldSimple w:instr="PAGE">' + r("<w:t>1</w:t>") + "</w:fldSimple>"
+        '<w:fldSimple w:instr=" REF x ">' + r("<w:t>1</w:t>") + "</w:fldSimple>"
         '<w:hyperlink w:anchor="x">' + r("<w:t>2</w:t>") + "</w:hyperlink>"
         "<w:sdt><w:sdtContent>" + r("<w:t>3</w:t>") + "</w:sdtContent></w:sdt>"
     )
@@ -198,8 +198,15 @@ def test_hidden_text_is_refused_directly_and_through_styles() -> None:
         '<w:style w:styleId="Derived"><w:basedOn w:val="Base"/></w:style>'
     )
     assert refusal(p(r("<w:t>x</w:t>"), '<w:pStyle w:val="Derived"/>'), styles) == "hidden-text"
-    styles_run = '<w:style w:styleId="H"><w:rPr><w:vanish/></w:rPr></w:style>'
+    styles_run = '<w:style w:type="character" w:styleId="H"><w:rPr><w:vanish/></w:rPr></w:style>'
     assert refusal(p(r("<w:t>x</w:t>", '<w:rStyle w:val="H"/>')), styles_run) == "hidden-text"
+    # A paragraph style named as a run style, or the reverse, is refused, not guessed at.
+    assert (
+        refusal(p(r("<w:t>x</w:t>", '<w:rStyle w:val="Base"/>')), styles) == "unsupported-element"
+    )
+    assert (
+        refusal(p(r("<w:t>x</w:t>"), '<w:pStyle w:val="H"/>'), styles_run) == "unsupported-element"
+    )
 
 
 def test_visible_text_and_hidden_paragraph_marks_are_read() -> None:
@@ -272,18 +279,38 @@ def test_a_package_without_a_document_is_refused() -> None:
 def test_a_field_nested_in_an_instruction_does_not_leak_its_result() -> None:
     body = p(
         r('<w:fldChar w:fldCharType="begin"/>')
-        + r("<w:instrText>IF </w:instrText>")
+        + r('<w:instrText xml:space="preserve">HYPERLINK "</w:instrText>')
         + r('<w:fldChar w:fldCharType="begin"/>')
         + r("<w:instrText>MERGEFIELD G</w:instrText>")
         + r('<w:fldChar w:fldCharType="separate"/>')
         + r("<w:t>F</w:t>")
         + r('<w:fldChar w:fldCharType="end"/>')
-        + r('<w:instrText> = "F" "she" "he"</w:instrText>')
+        + r('<w:instrText>"</w:instrText>')
         + r('<w:fldChar w:fldCharType="separate"/>')
         + r("<w:t>she</w:t>")
         + r('<w:fldChar w:fldCharType="end"/>')
     )
     assert text_of(body) == ["she"]
+    # The same shape with IF, whose result Word recomputes, is refused.
+    assert refusal(body.replace("HYPERLINK", "IF")) == "computed-field"
+
+
+@pytest.mark.parametrize("code", ["PAGE", ' DATE \\@ "d MMMM yyyy"', "SEQ Table", "NUMPAGES", ""])
+def test_fields_word_recomputes_are_refused(code: str) -> None:
+    complex_field = p(
+        r('<w:fldChar w:fldCharType="begin"/>')
+        + r(f'<w:instrText xml:space="preserve">{code}</w:instrText>')
+        + r('<w:fldChar w:fldCharType="separate"/>')
+        + r("<w:t>1</w:t>")
+        + r('<w:fldChar w:fldCharType="end"/>')
+    )
+    assert refusal(complex_field) == "computed-field"
+    simple = p(
+        f'<w:fldSimple w:instr="{code.replace(chr(34), "&quot;")}">'
+        + r("<w:t>1</w:t>")
+        + "</w:fldSimple>"
+    )
+    assert refusal(simple) == "computed-field"
 
 
 def test_a_paragraph_that_ends_inside_a_field_instruction_is_refused() -> None:
@@ -323,7 +350,7 @@ def test_capitals_strike_highlight_and_shading_are_marked() -> None:
         (0, 2, "caps"),
         (2, 6, "strike"),
         (6, 10, "highlight-lightGray"),
-        (10, 15, "shading"),
+        (10, 15, "shading-D9D9D9"),
         (15, 17, "position"),
     ]
 
@@ -629,9 +656,9 @@ def test_a_font_the_font_table_declares_symbol_encoded_is_refused() -> None:
             ),
             "stale-field",
         ),
-        (p('<w:fldSimple w:instr="PAGE"/>'), "field-without-result"),
+        (p('<w:fldSimple w:instr="REF x"/>'), "field-without-result"),
         (
-            p('<w:fldSimple w:instr="PAGE" w:dirty="1">' + r("<w:t>1</w:t>") + "</w:fldSimple>"),
+            p('<w:fldSimple w:instr="REF x" w:dirty="1">' + r("<w:t>1</w:t>") + "</w:fldSimple>"),
             "stale-field",
         ),
     ],
@@ -684,17 +711,19 @@ def test_highlight_carries_its_colour_and_pattern_shading_is_marked() -> None:
         + r("<w:t>s</w:t>", '<w:shd w:val="pct50" w:color="000000" w:fill="auto"/>')
         + r("<w:t>n</w:t>", '<w:shd w:val="clear" w:fill="auto"/>')
     )
-    assert _kinds(body) == [(0, 1, "highlight-yellow"), (1, 2, "shading")]
+    assert _kinds(body) == [(0, 1, "highlight-yellow"), (1, 2, "shading-pct50-000000-AUTO")]
 
 
 def test_paragraph_shading_and_right_to_left_cover_the_paragraph() -> None:
     body = p(r("<w:t>abc</w:t>"), '<w:shd w:val="clear" w:fill="D9D9D9"/><w:bidi/>')
-    assert _kinds(body) == [(0, 3, "rtl"), (0, 3, "shading")]
+    assert _kinds(body) == [(0, 3, "rtl"), (0, 3, "shading-D9D9D9")]
     styles = (
         '<w:style w:type="paragraph" w:styleId="Grey"><w:pPr>'
         '<w:shd w:val="clear" w:fill="D9D9D9"/></w:pPr></w:style>'
     )
-    assert _kinds(p(r("<w:t>ab</w:t>"), '<w:pStyle w:val="Grey"/>'), styles) == [(0, 2, "shading")]
+    assert _kinds(p(r("<w:t>ab</w:t>"), '<w:pStyle w:val="Grey"/>'), styles) == [
+        (0, 2, "shading-D9D9D9")
+    ]
     assert _kinds(p('<w:bdo w:val="rtl">' + r("<w:t>ab</w:t>") + "</w:bdo>")) == [(0, 2, "rtl")]
     assert _kinds(p(r("<w:t>ab</w:t>", "<w:rtl/>"))) == [(0, 2, "rtl")]
 
@@ -733,6 +762,104 @@ def test_part_names_that_differ_only_in_case_are_refused() -> None:
         package.writestr("_rels/.rels", ROOT_RELS.format(target="word/document.xml"))
         package.writestr("word/document.xml", document_xml(p(r("<w:t>x</w:t>"))))
         package.writestr("Word/Document.xml", document_xml(p(r("<w:t>y</w:t>"))))
+    with pytest.raises(DocxRefusedError) as caught:
+        read_docx(buffer.getvalue())
+    assert caught.value.code == "invalid-package"
+
+
+# --- third review -------------------------------------------------------------------------
+
+
+def test_the_default_table_style_applies_only_inside_a_table() -> None:
+    styles = (
+        "<w:docDefaults><w:rPrDefault><w:rPr>"
+        '<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/></w:rPr></w:rPrDefault></w:docDefaults>'
+        '<w:style w:type="table" w:default="1" w:styleId="TN"><w:rPr>'
+        '<w:rFonts w:ascii="Arial" w:hAnsi="Arial"/></w:rPr></w:style>'
+    )
+    assert text_of(p(r("<w:t>a</w:t>")), styles) == ["\u03b1"]
+    table = "<w:tbl><w:tr><w:tc>" + p(r("<w:t>a</w:t>")) + "</w:tc></w:tr></w:tbl>"
+    assert text_of(table, styles) == ["a"]
+
+
+def test_the_last_of_two_default_styles_is_used() -> None:
+    styles = (
+        '<w:style w:type="paragraph" w:default="1" w:styleId="A"/>'
+        '<w:style w:type="paragraph" w:default="1" w:styleId="B"><w:rPr><w:vanish/></w:rPr>'
+        "</w:style>"
+    )
+    assert refusal(p(r("<w:t>abc</w:t>")), styles) == "hidden-text"
+
+
+@pytest.mark.parametrize("block", [True, False])
+def test_a_content_control_bound_in_the_word_2013_namespace_is_refused(block: bool) -> None:
+    control = (
+        '<w:sdt xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml"><w:sdtPr>'
+        '<w15:dataBinding w:xpath="/a" w:storeItemID="{1}"/></w:sdtPr><w:sdtContent>'
+        + (p(r("<w:t>cached</w:t>")) if block else r("<w:t>cached</w:t>"))
+        + "</w:sdtContent></w:sdt>"
+    )
+    assert refusal(control if block else p(control)) == "unsupported-element"
+
+
+@pytest.mark.parametrize(
+    "props",
+    [
+        '<w:color w:val="000000" w:themeColor="background1"/>',
+        '<w:sz w:val="1pt"/>',
+        '<w:sz w:val="0.5mm"/>',
+        '<w:w w:val="10%"/>',
+        '<w:sz w:val="big"/>',
+    ],
+)
+def test_faint_text_is_found_in_every_form_word_writes(props: str) -> None:
+    assert _kinds(p(r("<w:t>ab</w:t>", props))) == [(0, 2, "faint")]
+
+
+def test_normal_sizes_and_scales_are_not_faint() -> None:
+    for props in ('<w:sz w:val="22"/>', '<w:sz w:val="11pt"/>', '<w:w w:val="90%"/>'):
+        assert _kinds(p(r("<w:t>ab</w:t>", props))) == []
+
+
+def test_paragraph_defaults_and_table_style_paragraph_properties_are_marked() -> None:
+    defaults = (
+        '<w:docDefaults><w:pPrDefault><w:pPr><w:shd w:val="clear" w:fill="D9D9D9"/><w:bidi/>'
+        "</w:pPr></w:pPrDefault></w:docDefaults>"
+    )
+    assert _kinds(p(r("<w:t>ab</w:t>")), defaults) == [(0, 2, "rtl"), (0, 2, "shading-D9D9D9")]
+    table_style = (
+        '<w:style w:type="table" w:styleId="T"><w:pPr><w:shd w:val="clear" w:fill="FFFF00"/>'
+        "</w:pPr></w:style>"
+    )
+    table = (
+        '<w:tbl><w:tblPr><w:tblStyle w:val="T"/></w:tblPr><w:tr><w:tc>'
+        + p(r("<w:t>ab</w:t>"))
+        + "</w:tc></w:tr></w:tbl>"
+    )
+    assert _kinds(table, table_style) == [(0, 2, "shading-FFFF00")]
+
+
+def test_malformed_input_is_refused_not_raised() -> None:
+    good = docx(p(r("<w:t>x</w:t>")))
+    at = good.index(b"<w:t>x")
+    corrupt = good[:at] + b"<w:t>y" + good[at + 6 :]
+    for data in (corrupt,):
+        with pytest.raises(DocxRefusedError) as caught:
+            read_docx(data)
+        assert caught.value.code == "invalid-package"
+    number = p(r("<w:t>x</w:t>"), '<w:numPr><w:numId w:val="x"/></w:numPr>')
+    assert refusal(number) == "invalid-package"
+
+
+def test_a_part_that_declares_another_encoding_is_refused() -> None:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as package:
+        package.writestr("_rels/.rels", ROOT_RELS.format(target="word/document.xml"))
+        package.writestr(
+            "word/document.xml",
+            '<?xml version="1.0" encoding="windows-1252"?>'
+            + document_xml(p(r("<w:t>caf\u00e9</w:t>"))),
+        )
     with pytest.raises(DocxRefusedError) as caught:
         read_docx(buffer.getvalue())
     assert caught.value.code == "invalid-package"

@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from zone_a.docx.reader import Mark, Paragraph
+from zone_a.docx.reader import Mark, Numbering, Paragraph
 from zone_a.qrd.headings import index, match_heading
 from zone_a.qrd.pattern import UnbalancedTemplateError, parse, render
 from zone_a.qrd.registry import (
@@ -317,9 +317,11 @@ def _paragraph(text: str, *marks: Mark, table: tuple[int, int, int] | None = Non
         (_paragraph("gone", Mark(0, 4, "strike")), True),
         (_paragraph("Text", Mark(0, 4, "caps")), True),
         (_paragraph("TEXT", Mark(0, 4, "caps")), False),
-        (_paragraph("grey", Mark(0, 4, "highlight-lightGray")), False),
         (_paragraph("yellow", Mark(0, 6, "highlight-yellow")), True),
-        (_paragraph("shade", Mark(0, 5, "shading")), False),
+        (_paragraph("shade", Mark(0, 5, "shading-FFFF00")), True),
+        (_paragraph("shade", Mark(0, 5, "shading-solid-auto-000000")), True),
+        (Paragraph("x", None, Numbering(3, 0), None), True),
+        (Paragraph("x", None, Numbering(0, 0), None), False),
         (_paragraph("abc", Mark(0, 3, "rtl")), True),
         (_paragraph("abc", Mark(0, 3, "faint")), True),
         (Paragraph("run on", None, None, None, mark_hidden=True), True),
@@ -334,6 +336,15 @@ def test_a_source_paragraph_with_a_mark_that_changes_it_is_refused(
             _check(paragraph, "test")
     else:
         _check(paragraph, "test")
+
+
+def test_grey_marks_are_kept_on_items_and_refused_where_the_registry_drops_marks() -> None:
+    for kind in ("highlight-lightGray", "shading-D9D9D9"):
+        grey = _paragraph("<grey>", Mark(0, 6, kind))
+        _check(grey, "item", keeps_marks=True)
+        with pytest.raises(RegistryError):
+            _check(grey, "heading")
+        assert _items([grey], "test")[0]["marks"] == [{"start": 0, "end": 6, "kind": kind}]
 
 
 def test_a_literal_greater_than_sign_is_refused_at_any_depth() -> None:
@@ -394,6 +405,9 @@ def test_appendix_ii_reads_a_well_formed_table() -> None:
         [("Ref", "EN"), ("001", "Very common")],
         [("Ref", "EN"), ("", "[Frequency]"), ("002", "Common"), ("001", "Very common")],
         [("Ref", "EN"), ("", "[Frequency]"), ("1", "Very common")],
+        [("", "[Frequency]"), ("001", "Very common")],
+        [("Ref", "EN"), ("", "[Frequency]"), ("001",)],
+        [("Ref", "EN"), ("Ref", "EN"), ("", "[Frequency]"), ("001", "Very common")],
     ],
 )
 def test_appendix_ii_refuses_a_table_of_another_shape(rows: list[tuple[str, ...]]) -> None:

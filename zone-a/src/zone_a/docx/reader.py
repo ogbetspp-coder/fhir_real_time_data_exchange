@@ -16,12 +16,13 @@ What a paragraph carries:
   ``<w:noBreakHyphen/>`` is U+2011, ``<w:softHyphen/>`` U+00AD, and a picture is U+FFFC OBJECT
   REPLACEMENT CHARACTER at the place it stands.
 - ``marks``: ranges of ``text`` whose appearance changes what a reader sees or means, set on
-  the run, its styles or the document defaults: superscript, subscript, raised or lowered
-  text, capitals and small capitals, single and double strike-through, highlight (with its
-  colour), shading (a fill or a pattern, on the run or the paragraph), right-to-left, and faint
-  text (white, under two points, or scaled under a fifth). ``text`` alone flattens "10" with a
-  superscript "9" to "109"; a caller that uses ``text`` must look at ``marks``. Other
-  appearance (colour other than white, font size, underline, bold, italic, borders) is not
+  the run, its styles or the document defaults (``Mark`` lists the kinds): superscript,
+  subscript, raised or lowered text, capitals and small capitals, single and double
+  strike-through, highlight with its colour, shading with its fill (or its pattern, colour and
+  fill) on the run or the paragraph, right-to-left, and faint text (white or a light theme
+  colour, under two points in any unit, or scaled under a fifth). ``text`` alone flattens
+  "10" with a superscript "9" to "109"; a caller that uses ``text`` must look at ``marks``.
+  Other appearance (other colours, font size, underline, bold, italic, borders) is not
   reported.
 - ``mark_hidden``: the paragraph mark is hidden (``vanish`` or ``specVanish``, directly or
   through the paragraph's styles), so Word shows this paragraph run on into the next one.
@@ -32,10 +33,13 @@ What a paragraph carries:
   grid columns.
 
 Styles. Run properties are looked up on the run, then its character style, its paragraph
-style, its table style (each with its ``basedOn`` chain; an absent or unknown style id falls
-back to the document's default style of that kind, as Word does) and the document defaults. A
-table whose effective table style has conditional formatting (``tblStylePr`` for the first row,
-banded rows and so on) is refused, because the reader does not apply it.
+style, its table style (inside a table only) and the document defaults, each style with its
+``basedOn`` chain. An absent or unknown style id falls back to the document's default style of
+that kind (the last one marked default), as Word does; a reference to a style of another kind
+is refused. Paragraph shading and right-to-left are looked up the same way through the
+paragraph properties. A table whose effective table style has conditional formatting
+(``tblStylePr`` for the first row, banded rows and so on) is refused, because the reader does
+not apply it.
 
 Symbol fonts. A run whose effective ``ascii`` and ``hAnsi`` fonts (set directly, by a style, by
 the document defaults or through the theme) are both Symbol, with no complex-script or
@@ -47,9 +51,12 @@ font (Wingdings, Webdings, Zapf Dingbats, Marlett, MT Extra), or any font the do
 table declares symbol-encoded (charset 02), is refused.
 
 Fields keep their stored result and drop their instruction, however deeply nested, so
-``DOCPROPERTY ... MERGEFORMAT`` never reaches the text. A field with no stored result (no
-``separate``, such as a form checkbox or a SYMBOL field, or an empty ``fldSimple``), a form
-field and a field marked for update are refused: what Word shows for them is computed.
+``DOCPROPERTY ... MERGEFORMAT`` never reaches the text. Only fields whose stored result is what
+Word shows are read: HYPERLINK, REF, NOTEREF and DOCPROPERTY. Any other field whose result
+would be shown (PAGE, DATE, SEQ, IF, a formula...) is refused, because Word recomputes it on
+display or print. So are a field with no stored result (no ``separate``, such as a form
+checkbox or a SYMBOL field, or an empty ``fldSimple``), a form field and a field marked for
+update.
 
 What it refuses (``DocxRefusedError.code``):
 
@@ -68,15 +75,17 @@ What it refuses (``DocxRefusedError.code``):
   (Word writes those as elements).
 - ``unbalanced-field``: a paragraph that ends inside a field instruction.
 - ``field-without-result``: a field with no stored result.
+- ``computed-field``: a shown field whose value Word computes rather than stores.
 - ``stale-field``: a field marked for update.
 - ``unsupported-element``: anything that can carry text and is not read above, and any element
   the reader does not know: text boxes, footnote and endnote references, embedded objects,
   charts and other non-picture drawings, alternate content, math, ``altChunk``, form fields,
-  content controls bound to data, conditional table formatting, and text in a vertically
-  merged-away cell.
+  content controls bound to data (in any namespace), conditional table formatting, text in a
+  vertically merged-away cell, and a style reference that names a style of another kind.
 - ``invalid-package``: not a readable .docx, no main document relationship, a part name that
-  occurs twice (ignoring case), a related part that is missing or duplicated, a part that is
-  not UTF-8, a DTD, or a part over the size cap.
+  occurs twice (ignoring case), a related part that is missing or duplicated, a part that
+  cannot be read (bad checksum, truncated, encrypted), a part that is not UTF-8 or declares
+  another encoding, a DTD, a part over the size cap, or a list number that is not a number.
 
 Headers, footers, footnotes, comments and the glossary are separate parts and are not read.
 """
@@ -88,6 +97,7 @@ import posixpath
 import re
 import xml.etree.ElementTree as ET
 import zipfile
+import zlib
 from dataclasses import dataclass, field
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -233,7 +243,8 @@ class Mark:
     """``text[start:end]`` is shown as ``kind``.
 
     One of superscript, subscript, position, caps, smallCaps, strike, dstrike,
-    ``highlight-<colour>`` (Word's colour name, e.g. ``highlight-lightGray``), shading, rtl
+    ``highlight-<colour>`` (Word's colour name, e.g. ``highlight-lightGray``),
+    ``shading-<FILL>`` (e.g. ``shading-D9D9D9``) or ``shading-<pattern>-<COLOUR>-<FILL>``, rtl
     (right-to-left) and faint (white, under two points, or scaled under a fifth). Marks of one
     kind that touch are merged; marks of different kinds may overlap.
     """
@@ -270,6 +281,13 @@ def _decode(name: str, data: bytes) -> bytes:
     lowered = text.lower()
     if "<!doctype" in lowered or "<!entity" in lowered:
         raise DocxRefusedError("invalid-package", f"{name} declares a DTD")
+    declared = re.match(r"\s*<\?xml[^>]*?encoding\s*=\s*[\"']([^\"']*)[\"']", text)
+    if declared is not None and declared.group(1).lower().replace("_", "-") not in (
+        "utf-8",
+        "utf8",
+    ):
+        # The parser would honour the declaration and decode the UTF-8 bytes as something else.
+        raise DocxRefusedError("invalid-package", f"{name} declares {declared.group(1)}")
     return text.encode("utf-8")
 
 
@@ -292,7 +310,18 @@ class _Package:
         if info.file_size > MAX_PART_BYTES:
             raise DocxRefusedError("invalid-package", f"{name} is over {MAX_PART_BYTES} bytes")
         try:
-            return ET.fromstring(_decode(name, self.zip.read(name)))
+            data = self.zip.read(name)
+        except (
+            zipfile.BadZipFile,
+            zlib.error,
+            EOFError,
+            RuntimeError,
+            NotImplementedError,
+        ) as error:
+            # A bad checksum, a truncated or encrypted entry, or an unsupported compression.
+            raise DocxRefusedError("invalid-package", f"{name} cannot be read") from error
+        try:
+            return ET.fromstring(_decode(name, data))
         except ET.ParseError as error:
             raise DocxRefusedError("invalid-package", f"{name} is not well-formed") from error
 
@@ -329,18 +358,25 @@ class _Style:
 class _Styles:
     styles: dict[str, _Style] = field(default_factory=dict)
     default_rpr: ET.Element | None = None
+    default_ppr: ET.Element | None = None
     defaults: dict[str, str] = field(default_factory=dict)
     theme_fonts: dict[str, str] = field(default_factory=dict)
     has_theme: bool = False
     # Fonts the font table declares symbol-encoded (charset 02), other than Symbol itself.
     symbol_encoded: set[str] = field(default_factory=set)
 
-    def resolve(self, style_id: str | None, kind: str) -> list[_Style]:
-        """The chain of ``style_id``, or of the default style of ``kind`` when it is absent or
-        unknown, as Word falls back."""
+    def effective(self, style_id: str | None, kind: str) -> str | None:
+        """``style_id``, or the default style of ``kind`` when it is absent or unknown, as Word
+        falls back. A reference to a style of another kind is refused: what Word does with it
+        is not documented."""
         if style_id is None or style_id not in self.styles:
-            style_id = self.defaults.get(kind)
-        return self.chain(style_id)
+            return self.defaults.get(kind)
+        if self.styles[style_id].kind != kind:
+            raise DocxRefusedError("unsupported-element", f"{kind} style {style_id!r} is not one")
+        return style_id
+
+    def resolve(self, style_id: str | None, kind: str) -> list[_Style]:
+        return self.chain(self.effective(style_id, kind))
 
     def chain(self, style_id: str | None) -> list[_Style]:
         out: list[_Style] = []
@@ -375,6 +411,7 @@ def _styles(root: ET.Element | None, theme: ET.Element | None, fonts: ET.Element
     if root is None:
         return styles
     styles.default_rpr = root.find(f"{_w('docDefaults')}/{_w('rPrDefault')}/{_w('rPr')}")
+    styles.default_ppr = root.find(f"{_w('docDefaults')}/{_w('pPrDefault')}/{_w('pPr')}")
     for style in root.findall(_w("style")):
         style_id = style.get(_w("styleId"))
         if style_id is None:
@@ -392,7 +429,8 @@ def _styles(root: ET.Element | None, theme: ET.Element | None, fonts: ET.Element
             ),
         )
         if style.get(_w("default")) in ("1", "true", "on"):
-            styles.defaults.setdefault(kind, style_id)
+            # With more than one default of a kind, the last one is used (ECMA-376 17.7.4.17).
+            styles.defaults[kind] = style_id
     return styles
 
 
@@ -422,7 +460,8 @@ class _Properties:
         levels: list[ET.Element | None] = []
         levels += [style.rpr for style in styles.resolve(run_style, "character")]
         levels += [style.rpr for style in styles.resolve(paragraph_style, "paragraph")]
-        levels += [style.rpr for style in styles.resolve(table_style, "table")]
+        # ``table_style`` is already resolved: None outside a table, where no table style applies.
+        levels += [style.rpr for style in styles.chain(table_style)]
         levels.append(styles.default_rpr)
         self.inherited = [level for level in levels if level is not None]
 
@@ -440,6 +479,13 @@ class _Properties:
             element = level.find(_w(name))
             if element is not None and element.get(_w(attribute)) is not None:
                 return element.get(_w(attribute))
+        return None
+
+    def element(self, name: str) -> ET.Element | None:
+        """The nearest level's ``name`` element, whole, so its attributes stay together."""
+        for level in [self.direct, *self.inherited]:
+            if level is not None and (found := level.find(_w(name))) is not None:
+                return found
         return None
 
     def font(self, slot: str) -> str | None:
@@ -527,6 +573,8 @@ class _ParagraphReader:
         self.marks: list[Mark] = []
         # One entry per open field: True while in its instruction, False once in its result.
         self.fields: list[bool] = []
+        # The instruction text of each open field, collected while in its instruction.
+        self.instructions: list[list[str]] = []
         self.rtl = 0
 
     def _font(self, name: str | None) -> str:
@@ -546,6 +594,8 @@ class _ParagraphReader:
             elif tag == _w("fldSimple"):
                 if child.get(_w("dirty")) in ("1", "true", "on"):
                     raise DocxRefusedError("stale-field", "a field marked for update")
+                if not self.in_instruction():
+                    _check_field(child.get(_w("instr"), ""))
                 before = self.length
                 self.container(child)
                 if self.length == before:
@@ -592,7 +642,11 @@ class _ParagraphReader:
             if tag == _w("fldChar"):
                 self._field(child)
                 continue
-            if tag == _w("instrText") or tag in _RUN_SILENT:
+            if tag == _w("instrText"):
+                if self.fields and self.fields[-1]:
+                    self.instructions[-1].append(child.text or "")
+                continue
+            if tag in _RUN_SILENT:
                 continue
             if tag == _w("t"):
                 text = child.text or ""
@@ -602,6 +656,8 @@ class _ParagraphReader:
                 produced = self._special(child)
             if not self.in_instruction():
                 emitted.append(produced)
+            elif self.fields[-1]:
+                self.instructions[-1].append(produced)
         text = "".join(emitted)
         if not text:
             return
@@ -622,13 +678,18 @@ class _ParagraphReader:
         kind = child.get(_w("fldCharType"))
         if kind == "begin":
             self.fields.append(True)
+            self.instructions.append([])
         elif kind == "separate" and self.fields:
+            if not any(self.fields[:-1]):
+                # The result is shown, so it must be one Word shows as stored.
+                _check_field("".join(self.instructions[-1]))
             self.fields[-1] = False
         elif kind == "end" and self.fields:
             if self.fields[-1]:
                 # No separate: the field stores no result, and what Word shows is computed.
                 raise DocxRefusedError("field-without-result", "a field with no stored result")
             self.fields.pop()
+            self.instructions.pop()
 
     def _special(self, child: ET.Element) -> str:
         tag = child.tag
@@ -680,8 +741,9 @@ class _ParagraphReader:
         highlight = properties.value("highlight")
         if highlight not in (None, "none"):
             kinds.append(f"highlight-{highlight}")
-        if _shaded(properties.value("shd"), properties.value("shd", "fill")):
-            kinds.append("shading")
+        shading = _shading(properties.element("shd"))
+        if shading is not None:
+            kinds.append(shading)
         if self.rtl or properties.toggle("rtl"):
             kinds.append("rtl")
         if _faint(properties):
@@ -694,22 +756,65 @@ class _ParagraphReader:
                 self.marks.append(Mark(start, end, kind))
 
 
-def _shaded(pattern: str | None, fill: str | None) -> bool:
+def _shading(element: ET.Element | None) -> str | None:
+    """``shading-<fill>`` for a plain fill, ``shading-<pattern>-<colour>-<fill>`` for a pattern,
+    None for no shading or a white one."""
+    if element is None:
+        return None
+    pattern = element.get(_w("val"))
+    fill = (element.get(_w("fill")) or "auto").upper()
+    if element.get(_w("themeFill")) is not None:
+        fill = "THEME-" + (element.get(_w("themeFill")) or "")
     if pattern not in (None, "clear", "nil"):
-        return True
-    return fill is not None and fill.lower() not in ("auto", "ffffff")
+        return f"shading-{pattern}-{(element.get(_w('color')) or 'auto').upper()}-{fill}"
+    if fill in ("AUTO", "FFFFFF"):
+        return None
+    return f"shading-{fill}"
+
+
+_POINTS = {"pt": 1.0, "pc": 12.0, "pi": 12.0, "in": 72.0, "cm": 72 / 2.54, "mm": 72 / 25.4}
 
 
 def _faint(properties: _Properties) -> bool:
-    """White text, text under two points, or text scaled under a fifth: easy not to see."""
-    color = properties.value("color")
-    if color is not None and color.lower() in ("ffffff", "white"):
-        return True
+    """White text (or a light theme colour), text under two points, or text scaled under a
+    fifth: easy not to see. A size or scale the reader cannot parse counts as faint."""
+    color = properties.element("color")
+    if color is not None:
+        theme = (color.get(_w("themeColor")) or "").lower()
+        if theme.startswith(("background", "light", "bg")):
+            return True
+        if (color.get(_w("val")) or "").lower() in ("ffffff", "white"):
+            return True
     size = properties.value("sz")
-    if size is not None and size.isdigit() and int(size) < 4:
-        return True
+    if size is not None:
+        match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)(pt|pc|pi|in|cm|mm)?", size)
+        if match is None:
+            return True
+        points = (
+            float(match.group(1)) * _POINTS[match.group(2)]
+            if match.group(2)
+            else float(match.group(1)) / 2
+        )
+        if points < 2:
+            return True
     scale = properties.value("w")
-    return scale is not None and scale.isdigit() and int(scale) < 20
+    if scale is not None:
+        match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)%?", scale)
+        return match is None or float(match.group(1)) < 20
+    return False
+
+
+# Fields whose stored result is what Word shows until someone updates them by hand. Word
+# recomputes others when it lays out or prints the page (PAGE, NUMPAGES, DATE, TIME, SEQ,
+# AUTONUM, LISTNUM, IF, formulas...), so their stored result may not be what a reader sees.
+_STORED_FIELDS = {"HYPERLINK", "REF", "NOTEREF", "DOCPROPERTY"}
+
+
+def _check_field(instruction: str) -> None:
+    words = instruction.split()
+    code = words[0].upper() if words else ""
+    if code not in _STORED_FIELDS:
+        raise DocxRefusedError("computed-field", f"a {code or 'blank'} field")
 
 
 def _check_whitespace(element: ET.Element, text: str) -> None:
@@ -722,9 +827,15 @@ def _check_whitespace(element: ET.Element, text: str) -> None:
 
 def _content_control(element: ET.Element) -> None:
     properties = element.find(_w("sdtPr"))
-    if properties is not None and properties.find(_w("dataBinding")) is not None:
+    if properties is not None and any(_local(c.tag) == "dataBinding" for c in properties):
         # The stored content is a cache; Word shows the bound data.
         raise DocxRefusedError("unsupported-element", "content control bound to data")
+
+
+def _int(value: str, where: str) -> int:
+    if not re.fullmatch(r"-?[0-9]{1,9}", value):
+        raise DocxRefusedError("invalid-package", f"{where} is not a number: {value!r}")
+    return int(value)
 
 
 def _numbering(ppr: ET.Element | None, style_chain: list[_Style]) -> Numbering | None:
@@ -737,7 +848,7 @@ def _numbering(ppr: ET.Element | None, style_chain: list[_Style]) -> Numbering |
         for name in ("numId", "ilvl"):
             element = numpr.find(_w(name))
             if name not in found and element is not None:
-                found[name] = int(element.get(_w("val"), "0"))
+                found[name] = _int(element.get(_w("val"), "0"), name)
     if not found:
         return None
     return Numbering(num_id=found.get("numId", 0), level=found.get("ilvl", 0))
@@ -765,7 +876,15 @@ def _paragraph(
         style=style,
         numbering=_numbering(ppr, styles.resolve(style, "paragraph")),
         table=table,
-        marks=_paragraph_marks(reader, [ppr, *(s.ppr for s in styles.resolve(style, "paragraph"))]),
+        marks=_paragraph_marks(
+            reader,
+            [
+                ppr,
+                *(s.ppr for s in styles.resolve(style, "paragraph")),
+                *(s.ppr for s in styles.chain(table_style)),
+                styles.default_ppr,
+            ],
+        ),
         mark_hidden=mark_hidden,
     )
 
@@ -785,13 +904,9 @@ def _paragraph_marks(reader: _ParagraphReader, levels: list[ET.Element | None]) 
             None,
         )
 
-    shading = nearest("shd")
-    if (
-        reader.length
-        and shading is not None
-        and _shaded(shading.get(_w("val")), shading.get(_w("fill")))
-    ):
-        marks.append(Mark(0, reader.length, "shading"))
+    shading = _shading(nearest("shd"))
+    if reader.length and shading is not None:
+        marks.append(Mark(0, reader.length, shading))
     if reader.length and _on(nearest("bidi")):
         marks.append(Mark(0, reader.length, "rtl"))
     return tuple(sorted(set(marks), key=lambda m: (m.start, m.end, m.kind)))
@@ -831,8 +946,10 @@ class _Body:
         index = self.tables
         self.tables += 1
         style_element = element.find(f"{_w('tblPr')}/{_w('tblStyle')}")
-        table_style = style_element.get(_w("val")) if style_element is not None else None
-        if any(style.conditional for style in self.styles.resolve(table_style, "table")):
+        table_style = self.styles.effective(
+            style_element.get(_w("val")) if style_element is not None else None, "table"
+        )
+        if any(style.conditional for style in self.styles.chain(table_style)):
             # Formatting for the first row, banded rows and the like; the reader does not apply
             # it, so it could hide or change text unseen.
             raise DocxRefusedError("unsupported-element", "conditional table formatting")

@@ -145,21 +145,27 @@ def _optional(tokens: list[Token]) -> bool:
     )
 
 
-# Marks kept in the registry: the template's grey highlight and shading mean "not in the printed
-# material" (the annotated template, "Text which will not appear in the final printed material
-# is to be presented as grey-shaded text"). The registry is built from text alone, so every
-# other mark in a source paragraph is refused rather than flattened, except capitals over text
-# that is already in capitals, which change nothing.
-_KEPT = {"highlight-lightGray", "shading"}
+# Marks kept on items: the template's light-grey highlight and light-grey (D9D9D9) shading mean
+# "not in the printed material" (the annotated template, "Text which will not appear in the
+# final printed material is to be presented as grey-shaded text"). The registry is built from
+# text alone, so every other mark is refused rather than flattened, and so is a kept mark where
+# the registry does not store marks (headings, appendix entries, notes). Capitals over text
+# that is already in capitals change nothing and are allowed.
+_KEPT = {"highlight-lightGray", "shading-D9D9D9"}
 _CASE = {"caps", "smallCaps"}
 
 
-def _check(paragraph: Paragraph, where: str) -> None:
+def _check(paragraph: Paragraph, where: str, keeps_marks: bool = False) -> None:
     if paragraph.mark_hidden and paragraph.text.strip():
         raise RegistryError(f"{where}: a paragraph with text has a hidden paragraph mark")
+    if paragraph.numbering is not None and paragraph.numbering.num_id != 0:
+        # Word shows a number or bullet the text does not hold.
+        raise RegistryError(f"{where}: a numbered or bulleted paragraph")
     for mark in paragraph.marks:
         covered = paragraph.text[mark.start : mark.end]
-        if mark.kind in _KEPT or (mark.kind in _CASE and covered == covered.upper()):
+        if (keeps_marks and mark.kind in _KEPT) or (
+            mark.kind in _CASE and covered == covered.upper()
+        ):
             continue
         raise RegistryError(f"{where}: {mark.kind} changes what the text shows")
 
@@ -200,7 +206,7 @@ def _items(paragraphs: list[Paragraph], where: str) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     pending: list[Paragraph] = []
     for paragraph in paragraphs:
-        _check(paragraph, where)
+        _check(paragraph, where, keeps_marks=True)
         if not pending and not paragraph.text.strip():
             continue
         pending.append(paragraph)
@@ -402,16 +408,20 @@ def build_appendix_ii(source: Source) -> dict[str, list[dict[str, str]]]:
         rows[(table, row)][cell] = (
             paragraph.text if previous is None else previous + "\n" + paragraph.text
         )
+    keys = sorted(rows)
+    if not keys or [rows[keys[0]].get(0, "").strip(), rows[keys[0]].get(1, "").strip()] != [
+        "Ref",
+        "EN",
+    ]:
+        raise RegistryError("Appendix II: the first row is not the 'Ref | EN' header")
     groups: dict[str, list[dict[str, str]]] = {}
     group: str | None = None
-    for key in sorted(rows):
+    for key in keys[1:]:
         cells = rows[key]
-        code = cells.get(0, "").strip()
-        text = cells.get(1, "")
-        if code == "Ref":
-            if key != min(rows) or text.strip() != "EN":
-                raise RegistryError(f"Appendix II: unexpected header row {key}")
-            continue
+        if set(cells) != {0, 1}:
+            raise RegistryError(f"Appendix II: row {key} does not have exactly two cells")
+        code = cells[0].strip()
+        text = cells[1]
         if not code and text.strip().startswith("[") and text.strip().endswith("]"):
             group = text.strip()[1:-1]
             groups[group] = []
