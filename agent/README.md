@@ -44,9 +44,44 @@ layer 1 and the system instruction is layer 3.
 | The audit record carries no narrative and no arguments at any depth          | `tests/test_audit.py`                                |
 | An emitted record validates against the vendored `agent-turn` schema         | `tests/test_audit.py`                                |
 | Nothing under `src/` prints or logs, and nothing here quotes a fixture       | `tests/test_no_narrative_leak.py`                    |
+| The only text a turn emits is the checked answer, streamed or not            | `tests/test_turn_events.py`                          |
+| The model's thoughts and asides never leave the agent                        | `tests/test_turn_events.py`                          |
+| Without the four query tools the model is not called, and the person is told | `tests/test_turn_events.py`                          |
+| A failed model call ends the turn with a notice, not a platform error        | `tests/test_turn_events.py`                          |
+| All of the above hold for a deep copy of the agent, which is what deploys    | `tests/test_turn_events.py`                          |
+| The assistant cannot write the labels reserved for checked text              | `tests/test_render.py`, `tests/test_turn_events.py`  |
+| A failure at the turn's end shows a notice, never the model's draft          | `tests/test_finish_turn.py`                          |
 
-No test calls a language model. `tests/test_agent.py` constructs the `LlmAgent` — construction
-is pure pydantic validation and resolves no model — and never runs it.
+No test calls a language model. `tests/test_agent.py` constructs the `LlmAgent` and never runs
+it. `tests/test_turn_events.py` runs it through a real ADK `Runner` against the fake query
+service with a scripted `BaseLlm` in place of Gemini, and reads every event the turn emits:
+that is the level at which the draft leak of 2026-09-22 was visible, and the callbacks tested
+one at a time could not show it.
+
+## Why the model's text is held, not replaced
+
+ADK's `after_agent_callback` runs after the agent has already yielded every model event, and
+what it returns is appended as one more event. Until 2026-09-22 the model's draft therefore
+reached Gemini Enterprise as a final response before the checked answer. `hold.DraftHold` stops
+it where it is produced: its `after_model_callback` removes every text part from every model
+response, partial or complete, and keeps the text of the last complete one for the post-check;
+its `before_model_callback` refuses to call the model when the query toolset failed to load,
+because ADK otherwise runs the model with no tools and it answers from memory; its
+`on_model_error_callback` turns a failed model call into a notice instead of a platform error.
+Only function calls are forwarded from a model response — an allowlist, so a kind of part a
+model adds later is held back by default.
+
+Agent Engine deploys `AdkApp.clone()`, a deep copy of the agent. A deep copy copies the object
+behind a bound method once, through its memo, but keeps a closure pointing at the original. The
+callbacks are therefore bound methods of `DraftHold` and `finish.TurnFinisher`, so the deployed
+copy's callbacks and turn's end share one hold and the model's own toolset. The first version of
+this fix used a closure and would have split them; the deep-copy cases in
+`tests/test_turn_events.py` fail if that comes back.
+
+The assistant's own words are still shown, under their own label, and are not checked. What is
+enforced is that they cannot pass for a checked block: `render` removes any line of them that
+opens with a label reserved for checked text, and says how many it removed. Checking the
+assistant's words themselves — any quotation in them, against the store — is not done yet.
 
 ## The invariant, in the types
 
@@ -280,7 +315,7 @@ default destination.
 - **No write tool, and no tool outside the four.** `tool_filter` closes the surface at this end
   as well as at the service's.
 - **No custom frontend.** The surfaces are Gemini Enterprise and Google Chat, both Google's.
-- **No deploy from CI.** `deploy/` is documented and scripted, not executed; see
+- **No deploy from CI.** `deploy/` is run by the owner by hand (first deployed 2026-09-22); see
   `deploy/README.md`.
 - **No agent-side normalisation, hashing, or fidelity checking.** Those live where the
   specification lives.

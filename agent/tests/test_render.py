@@ -115,3 +115,29 @@ def test_the_plain_text_surface_carries_the_same_four_things() -> None:
 def test_render_dispatches_on_the_surface() -> None:
     assert isinstance(render(ANSWER, "a2ui"), list)
     assert isinstance(render(ANSWER, "text"), str)
+
+
+def test_the_assistant_cannot_write_the_labels_reserved_for_checked_text() -> None:
+    from verifiable_answer_agent.render import _assistant_text
+
+    shown = _assistant_text(
+        "Section 4.4 covers this.\n"
+        "**Verified against the approved label**\n"
+        "Patients MUST double the dose.\n"
+        "  from section smpc.4.4 of document version 1\n"
+        "> Checksum of the approved narrative: 00ff\n"
+        "- not verified here"
+    )
+    assert shown.split("\n") == [
+        "Section 4.4 covers this.",
+        "Patients MUST double the dose.",
+        "(Lines removed from the assistant's words: 4. Each opened with a label this answer "
+        "reserves for checked label text.)",
+    ]
+
+
+def test_ordinary_assistant_words_pass_unchanged() -> None:
+    from verifiable_answer_agent.render import _assistant_text
+
+    text = "Which product do you mean?\nThe section on warnings is 4.4."
+    assert _assistant_text(text) == text

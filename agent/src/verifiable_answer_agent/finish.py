@@ -8,21 +8,23 @@ and no ``verify_quote``. The answer happened to be right. That is not the claim 
 makes.
 
 ``build_finish_turn`` returns the agent's ``after_agent_callback``. It reads this invocation's
-``get_section`` results and the model's own words out of the session's events, calls
+``get_section`` results out of the session's events and the model's own words out of
+``hold.DraftHold`` — where they were kept back from the person as the model produced them — calls
 ``verify_quote`` for every chunk of every quoted block through the same MCP toolset the model
 used — so the call carries the user's token and the turn id, and lands in the same audit trail —
-and returns the rendered answer, which replaces what the model wrote.
+and returns the rendered answer: the turn's only text.
 
 Failure is not silent and never falls back to the model's text: if the check cannot run, the
 person is told that the answer could not be verified, because an unverifiable answer that looks
-like a verified one is the failure this product exists to prevent.
+like a verified one is the failure this product exists to prevent. If the query tools never
+loaded, the model was not called, and the person is told the label service could not be reached.
 """
 
 from __future__ import annotations
 
 import time
 from collections.abc import Awaitable, Callable, Sequence
-from typing import Any, Final, cast
+from typing import Any, Final, cast, final
 
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.tools.mcp_tool import McpToolset
@@ -32,15 +34,27 @@ from google.genai import types
 from .audit import ToolCallRecord, emit
 from .config import AgentConfig
 from .contract import QueryToolName, ToolResult
+from .hold import DraftHold
 from .tools import current_turn_id, read_tool_result, record_for
 from .turn import answer_turn
 
-__all__ = ["UNVERIFIABLE_NOTICE", "build_finish_turn", "draft_from_events"]
+__all__ = [
+    "TOOLS_UNAVAILABLE_NOTICE",
+    "UNVERIFIABLE_NOTICE",
+    "TurnFinisher",
+    "build_finish_turn",
+    "draft_from_events",
+]
 
 UNVERIFIABLE_NOTICE: Final = (
     "This answer could not be verified against the approved label, so it is not shown. "
     "Nothing here is label content. Ask again, and if this repeats, report it: the query "
     "service records every call."
+)
+
+TOOLS_UNAVAILABLE_NOTICE: Final = (
+    "The approved-label service could not be reached, so no answer is given: an answer from "
+    "anywhere else could not be checked. Ask again, and if this repeats, report it."
 )
 
 # The tools whose results this turn's answer is built from. find_product results are recorded in
@@ -50,16 +64,15 @@ _QUOTED_FROM: Final[QueryToolName] = "get_section"
 
 def draft_from_events(
     events: Sequence[Any], invocation_id: str
-) -> tuple[list[ToolResult], list[ToolCallRecord], str]:
-    """This invocation's section results, its tool-call records, and the model's own words.
+) -> tuple[list[ToolResult], list[ToolCallRecord]]:
+    """This invocation's section results and its tool-call records.
 
     Events of other invocations are ignored: a session holds every turn, and an answer must be
-    built from the turn that is being answered. The model's words are the last text it produced,
-    which is the draft it would otherwise have shown.
+    built from the turn that is being answered. The model's words are not read from here: they
+    never became events (``hold.DraftHold``).
     """
     section_results: list[ToolResult] = []
     tool_calls: list[ToolCallRecord] = []
-    assistant_text = ""
     for event in events:
         if getattr(event, "invocation_id", None) != invocation_id:
             continue
@@ -74,10 +87,7 @@ def draft_from_events(
                 tool_calls.append(record_for(tool, result, time.monotonic()))
                 if tool == _QUOTED_FROM:
                     section_results.append(result)
-            text = getattr(part, "text", None)
-            if text and getattr(event, "author", None) != "user":
-                assistant_text = text
-    return section_results, tool_calls, assistant_text
+    return section_results, tool_calls
 
 
 def _verify_quote_through(
@@ -107,39 +117,60 @@ def _verify_quote_through(
 
 
 def build_finish_turn(
-    config: AgentConfig, toolset: McpToolset
+    config: AgentConfig, toolset: McpToolset, hold: DraftHold
 ) -> Callable[[CallbackContext], Awaitable[types.Content | None]]:
-    """The agent's ``after_agent_callback``, bound to the toolset the model called."""
+    """The agent's ``after_agent_callback``, bound to the toolset the model called.
 
-    async def finish_turn(callback_context: CallbackContext) -> types.Content | None:
+    A bound method, not a closure, so a deep copy of the agent keeps it with the copy's own hold
+    and toolset (``hold`` says why that matters).
+    """
+    return TurnFinisher(config, toolset, hold).finish_turn
+
+
+@final
+class TurnFinisher:
+    """What the turn's end needs: the configuration, the model's toolset, and the hold."""
+
+    def __init__(self, config: AgentConfig, toolset: McpToolset, hold: DraftHold) -> None:
+        self.config = config
+        self.toolset = toolset
+        self.hold = hold
+
+    async def finish_turn(self, callback_context: CallbackContext) -> types.Content | None:
         invocation = callback_context.get_invocation_context()
-        session = invocation.session
-        section_results, tool_calls, assistant_text = draft_from_events(
-            session.events, invocation.invocation_id
-        )
-        turn_id = current_turn_id(callback_context)
-        if turn_id is None:
-            # begin_turn runs before every invocation, so this cannot happen in the deployed
-            # agent; if it ever does, the turn is unverifiable rather than unchecked.
-            return types.Content(role="model", parts=[types.Part(text=UNVERIFIABLE_NOTICE)])
-
+        held = self.hold.take(invocation.invocation_id)
+        if held.tools_missing:
+            return _text(TOOLS_UNAVAILABLE_NOTICE)
+        if held.model_failed:
+            return _text(UNVERIFIABLE_NOTICE)
+        # Everything past this point either renders a checked answer or says it could not: the
+        # model's text is already held back, so no exception here can leave it as the answer.
         try:
+            session = invocation.session
+            section_results, tool_calls = draft_from_events(
+                session.events, invocation.invocation_id
+            )
+            turn_id = current_turn_id(callback_context)
+            if turn_id is None:
+                # begin_turn runs before every invocation, so this cannot happen in the deployed
+                # agent; if it ever does, the turn is unverifiable rather than unchecked.
+                return _text(UNVERIFIABLE_NOTICE)
             result = await answer_turn(
                 section_results=section_results,
-                assistant_text=assistant_text,
-                verify_quote=_verify_quote_through(toolset, ToolContext(invocation)),
+                assistant_text=held.text,
+                verify_quote=_verify_quote_through(self.toolset, ToolContext(invocation)),
                 surface="text",
                 principal=session.user_id,
-                service_version=config.service_version,
+                service_version=self.config.service_version,
                 turn_id=turn_id,
                 tool_calls=tool_calls,
             )
+            emit(result.audit)
         except Exception:
-            return types.Content(role="model", parts=[types.Part(text=UNVERIFIABLE_NOTICE)])
-
-        emit(result.audit)
+            return _text(UNVERIFIABLE_NOTICE)
         rendered = result.rendered
-        text = rendered if isinstance(rendered, str) else UNVERIFIABLE_NOTICE
-        return types.Content(role="model", parts=[types.Part(text=text)])
+        return _text(rendered if isinstance(rendered, str) else UNVERIFIABLE_NOTICE)
 
-    return finish_turn
+
+def _text(text: str) -> types.Content:
+    return types.Content(role="model", parts=[types.Part(text=text)])

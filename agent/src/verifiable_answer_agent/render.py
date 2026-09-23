@@ -122,7 +122,13 @@ def render_a2ui(
         {"id": "assistant_label", "component": "Text", "variant": "h5", "text": ASSISTANT_LABEL}
     )
     children.append("assistant_text")
-    components.append({"id": "assistant_text", "component": "Text", "text": answer.assistant.text})
+    components.append(
+        {
+            "id": "assistant_text",
+            "component": "Text",
+            "text": _assistant_text(answer.assistant.text),
+        }
+    )
 
     # "One of the components in one of the component lists MUST have an id of root."
     components.insert(0, {"id": "root", "component": "Column", "children": children})
@@ -155,8 +161,43 @@ def render_text(answer: CheckedAnswer) -> str:
         lines.extend(_reading_lines(block))
         lines.append("")
     lines.append(f"[{ASSISTANT_LABEL}]")
-    lines.append(answer.assistant.text)
+    lines.append(_assistant_text(answer.assistant.text))
     return "\n".join(lines)
+
+
+# The lines this module writes to say what is checked label content. The assistant may not write
+# them: a draft that opens with the verified label and closes with a citation line reads, on a
+# plain-text surface, exactly like a checked block (review of 2026-09-22).
+_RESERVED_OPENINGS: Final = tuple(
+    opening.casefold()
+    for opening in (
+        VERIFIED_LABEL,
+        UNVERIFIED_LABEL,
+        ASSISTANT_LABEL,
+        "From section ",
+        "Checksum of the approved narrative",
+    )
+)
+# Markdown a surface would render away before a reader saw the words.
+_DECORATION: Final = "*_#>`[ \t-"
+
+
+def _assistant_text(text: str) -> str:
+    """The assistant's words, less any line that opens with a label reserved for checked text."""
+    kept: list[str] = []
+    removed = 0
+    for line in text.split("\n"):
+        opening = line.strip().lstrip(_DECORATION).casefold()
+        if opening.startswith(_RESERVED_OPENINGS):
+            removed += 1
+        else:
+            kept.append(line)
+    if removed:
+        kept.append(
+            f"(Lines removed from the assistant's words: {removed}. Each opened with a label this "
+            "answer reserves for checked label text.)"
+        )
+    return "\n".join(kept)
 
 
 def _status_line(block: CheckedBlock) -> str:
