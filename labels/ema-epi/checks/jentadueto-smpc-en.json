@@ -1,0 +1,768 @@
+{
+  "source": {
+    "file": "jentadueto-smpc-en.json",
+    "sha256": "544b2f24e69f410d3e792a80f3ee82c00ef60afcdf913526308e799db54a1ee4"
+  },
+  "reader": "epi-reader/1.0.0",
+  "checker": "qrd-check/1.0.0",
+  "template": {
+    "family": "EMA QRD product-information template, centralised procedure",
+    "version": "10.4",
+    "status": "adopted",
+    "annex": "I",
+    "document": "Summary of product characteristics",
+    "language": "en"
+  },
+  "registryVersion": "1.0.0",
+  "document": {
+    "title": "Jentadueto",
+    "date": "2024-04-22"
+  },
+  "summary": {
+    "findings": {
+      "deviation": 2,
+      "document-quirk": 1,
+      "formatting": 1,
+      "heading-text": 2,
+      "unmapped-code": 3,
+      "xhtml-defect": 7
+    },
+    "statements": {
+      "absent": 70,
+      "deviation": 2,
+      "not-checkable": 8,
+      "used": 43
+    }
+  },
+  "findings": [
+    {
+      "kind": "document-quirk",
+      "detail": "Composition.resourceType is 0, not 'Composition'"
+    },
+    {
+      "kind": "xhtml-defect",
+      "section": "4.2 Posology and method of administration > Special populations > Renal impairment",
+      "detail": "2 unescaped '<' read as text (invalid XHTML)"
+    },
+    {
+      "kind": "xhtml-defect",
+      "section": "4.3 Contraindications",
+      "detail": "1 unescaped '<' read as text (invalid XHTML)"
+    },
+    {
+      "kind": "xhtml-defect",
+      "section": "4.4 Special warnings and precautions for use > Lactic acidosis",
+      "detail": "1 unescaped '<' read as text (invalid XHTML)"
+    },
+    {
+      "kind": "xhtml-defect",
+      "section": "4.4 Special warnings and precautions for use > Renal function",
+      "detail": "1 unescaped '<' read as text (invalid XHTML)"
+    },
+    {
+      "kind": "xhtml-defect",
+      "section": "4.8 Undesirable effects > Summary of the safety profile > Tabulated list of adverse reactions",
+      "detail": "4 unescaped '<' read as text (invalid XHTML)"
+    },
+    {
+      "kind": "formatting",
+      "section": "4.8 Undesirable effects > Reporting of suspected adverse reactions",
+      "paragraph": 0,
+      "mark": "shading-lightgrey",
+      "text": "the national reporting system listed in Appendix V"
+    },
+    {
+      "kind": "xhtml-defect",
+      "section": "5.1 Pharmacodynamic properties > Metformin > Clinical efficacy and safety",
+      "detail": "8 unescaped '<' read as text (invalid XHTML)"
+    },
+    {
+      "kind": "xhtml-defect",
+      "section": "5.2 Pharmacokinetic properties > Linagliptin > Paediatric population",
+      "detail": "1 unescaped '<' read as text (invalid XHTML)"
+    },
+    {
+      "kind": "heading-text",
+      "key": "smpc.4.2.administration",
+      "code": "200000029803",
+      "expected": "Method of administration",
+      "found": "Special populations"
+    },
+    {
+      "kind": "unmapped-code",
+      "section": "4.6 Fertility, pregnancy and lactation > Pregnancy",
+      "code": "200000029812"
+    },
+    {
+      "kind": "unmapped-code",
+      "section": "4.6 Fertility, pregnancy and lactation > Breast-feeding",
+      "code": "200000029813"
+    },
+    {
+      "kind": "unmapped-code",
+      "section": "4.6 Fertility, pregnancy and lactation > Fertility",
+      "code": "200000029814"
+    },
+    {
+      "kind": "heading-text",
+      "key": "smpc.4.8.reporting",
+      "code": "200000029818",
+      "expected": "Reporting of suspected adverse reactions",
+      "found": "Summary of the safety profile"
+    },
+    {
+      "kind": "deviation",
+      "id": "document#1",
+      "similarity": 0.931,
+      "in": "10. DATE OF REVISION OF THE TEXT",
+      "paragraph": 0,
+      "differences": [
+        {
+          "change": "replace",
+          "template": "https",
+          "label": "http"
+        },
+        {
+          "change": "insert",
+          "template": "",
+          "label": "/"
+        }
+      ]
+    },
+    {
+      "kind": "deviation",
+      "id": "appendix-II#006",
+      "similarity": 0.917,
+      "in": "4.8 Undesirable effects > Summary of the safety profile > Tabulated list of adverse reactions",
+      "paragraph": 2,
+      "differences": [
+        {
+          "change": "delete",
+          "template": "frequency",
+          "label": ""
+        }
+      ]
+    }
+  ],
+  "statements": [
+    {
+      "id": "smpc.3#0",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.3#1",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.3#2",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.4.1#0",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.4.1#1",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.4.2#0",
+      "status": "used",
+      "in": "4.2 Posology and method of administration > Posology"
+    },
+    {
+      "id": "smpc.4.2#1",
+      "status": "used",
+      "in": "4.2 Posology and method of administration > Paediatric population"
+    },
+    {
+      "id": "smpc.4.2#2",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.4.2#3",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.4.2#4",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.4.2#5",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.4.2#6",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.4.2#7",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.4.2#8",
+      "status": "used",
+      "in": "4.2 Posology and method of administration > Method of administration"
+    },
+    {
+      "id": "smpc.4.2#9",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.4.2#10",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.4.3#0",
+      "status": "used",
+      "in": "4.3 Contraindications",
+      "paragraph": 0,
+      "start": 0,
+      "end": 92
+    },
+    {
+      "id": "smpc.4.4#0",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.4.4#1",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.4.5#0",
+      "status": "used",
+      "in": "4.5 Interaction with other medicinal products and other forms of interaction",
+      "paragraph": 0,
+      "start": 0,
+      "end": 43
+    },
+    {
+      "id": "smpc.4.5#1",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.4.5#2",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.4.6#0",
+      "status": "used",
+      "in": "4.6 Fertility, pregnancy and lactation > Pregnancy"
+    },
+    {
+      "id": "smpc.4.6#1",
+      "status": "used",
+      "in": "4.6 Fertility, pregnancy and lactation > Breast-feeding"
+    },
+    {
+      "id": "smpc.4.6#2",
+      "status": "used",
+      "in": "4.6 Fertility, pregnancy and lactation > Fertility"
+    },
+    {
+      "id": "smpc.4.7#0",
+      "status": "used",
+      "in": "4.7 Effects on ability to drive and use machines",
+      "paragraph": 0,
+      "start": 0,
+      "end": 83
+    },
+    {
+      "id": "smpc.4.7#1",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.4.8#0",
+      "status": "used",
+      "in": "4.8 Undesirable effects > Paediatric population"
+    },
+    {
+      "id": "smpc.4.8#1",
+      "status": "used",
+      "in": "4.8 Undesirable effects > Reporting of suspected adverse reactions"
+    },
+    {
+      "id": "smpc.4.8#2",
+      "status": "used",
+      "in": "4.8 Undesirable effects > Reporting of suspected adverse reactions",
+      "paragraph": 0,
+      "start": 0,
+      "end": 314
+    },
+    {
+      "id": "smpc.4.9#0",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.5.1#0",
+      "status": "used",
+      "in": "5.1 Pharmacodynamic properties",
+      "paragraph": 0,
+      "start": 0,
+      "end": 119
+    },
+    {
+      "id": "smpc.5.1#1",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.5.1#2",
+      "status": "used",
+      "in": "5.1 Pharmacodynamic properties > Linagliptin > Mechanism of action"
+    },
+    {
+      "id": "smpc.5.1#3",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.5.1#4",
+      "status": "used",
+      "in": "5.1 Pharmacodynamic properties > Metformin > Clinical efficacy and safety"
+    },
+    {
+      "id": "smpc.5.1#5",
+      "status": "used",
+      "in": "5.1 Pharmacodynamic properties > Paediatric population"
+    },
+    {
+      "id": "smpc.5.1#6",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.5.1#7",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.5.1#8",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.5.1#9",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.5.1#10",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.5.2#0",
+      "status": "used",
+      "in": "5.2 Pharmacokinetic properties > Linagliptin > Absorption"
+    },
+    {
+      "id": "smpc.5.2#1",
+      "status": "used",
+      "in": "5.2 Pharmacokinetic properties > Linagliptin > Distribution"
+    },
+    {
+      "id": "smpc.5.2#2",
+      "status": "used",
+      "in": "5.2 Pharmacokinetic properties > Linagliptin > Biotransformation"
+    },
+    {
+      "id": "smpc.5.2#3",
+      "status": "used",
+      "in": "5.2 Pharmacokinetic properties > Linagliptin > Elimination"
+    },
+    {
+      "id": "smpc.5.2#4",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.5.2#5",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.5.3#0",
+      "status": "used",
+      "in": "5.3 Preclinical safety data > Metformin",
+      "paragraph": 0,
+      "start": 0,
+      "end": 211
+    },
+    {
+      "id": "smpc.5.3#1",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.5.3#2",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.5.3#3",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.6.1#0",
+      "status": "not-checkable"
+    },
+    {
+      "id": "smpc.6.2#0",
+      "status": "used",
+      "in": "6.2 Incompatibilities",
+      "paragraph": 0,
+      "start": 0,
+      "end": 15
+    },
+    {
+      "id": "smpc.6.2#1",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.6.2#2",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.6.3#0",
+      "status": "not-checkable"
+    },
+    {
+      "id": "smpc.6.4#0",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.6.5#0",
+      "status": "used",
+      "in": "6.5 Nature and contents of container",
+      "paragraph": 4,
+      "start": 0,
+      "end": 35
+    },
+    {
+      "id": "smpc.6.6#0",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.6.6#1",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.6.6#2",
+      "status": "used",
+      "in": "6.6 Special precautions for disposal",
+      "paragraph": 0,
+      "start": 0,
+      "end": 107
+    },
+    {
+      "id": "smpc.9#0",
+      "status": "used",
+      "in": "9. DATE OF FIRST AUTHORISATION/RENEWAL OF THE AUTHORISATION",
+      "paragraph": 0,
+      "start": 0,
+      "end": 41
+    },
+    {
+      "id": "smpc.9#1",
+      "status": "used",
+      "in": "9. DATE OF FIRST AUTHORISATION/RENEWAL OF THE AUTHORISATION",
+      "paragraph": 1,
+      "start": 0,
+      "end": 37
+    },
+    {
+      "id": "document#0",
+      "status": "absent"
+    },
+    {
+      "id": "document#1",
+      "status": "deviation"
+    },
+    {
+      "id": "appendix-I#pregnancy.1",
+      "status": "not-checkable"
+    },
+    {
+      "id": "appendix-I#pregnancy.2",
+      "status": "not-checkable"
+    },
+    {
+      "id": "appendix-I#pregnancy.3",
+      "status": "not-checkable"
+    },
+    {
+      "id": "appendix-I#pregnancy.4",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-I#pregnancy.5",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-I#pregnancy.6",
+      "status": "not-checkable"
+    },
+    {
+      "id": "appendix-I#pregnancy.7",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-I#pregnancy.8",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-I#pregnancy.9",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-I#lactation.1",
+      "status": "not-checkable"
+    },
+    {
+      "id": "appendix-I#lactation.2",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-I#lactation.3",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-III#0",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-III#1",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-III#2",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-III#3",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-III#4",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-III#5",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-III#6",
+      "status": "not-checkable"
+    },
+    {
+      "id": "appendix-III#7",
+      "status": "used",
+      "in": "6.4 Special precautions for storage > Blister",
+      "paragraph": 0,
+      "start": 0,
+      "end": 64
+    },
+    {
+      "id": "appendix-III#8",
+      "status": "used",
+      "in": "6.4 Special precautions for storage > Bottle",
+      "paragraph": 0,
+      "start": 0,
+      "end": 65
+    },
+    {
+      "id": "appendix-III#9",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-III#10",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-III#11",
+      "status": "used",
+      "in": "6.4 Special precautions for storage",
+      "paragraph": 0,
+      "start": 0,
+      "end": 83
+    },
+    {
+      "id": "appendix-II#001",
+      "status": "used",
+      "in": "4.8 Undesirable effects > Summary of the safety profile > Tabulated list of adverse reactions",
+      "paragraph": 2,
+      "start": 106,
+      "end": 126
+    },
+    {
+      "id": "appendix-II#002",
+      "status": "used",
+      "in": "4.8 Undesirable effects > Summary of the safety profile > Tabulated list of adverse reactions",
+      "paragraph": 2,
+      "start": 128,
+      "end": 154
+    },
+    {
+      "id": "appendix-II#003",
+      "status": "used",
+      "in": "4.8 Undesirable effects > Summary of the safety profile > Tabulated list of adverse reactions",
+      "paragraph": 2,
+      "start": 156,
+      "end": 187
+    },
+    {
+      "id": "appendix-II#004",
+      "status": "used",
+      "in": "4.8 Undesirable effects > Summary of the safety profile > Tabulated list of adverse reactions",
+      "paragraph": 2,
+      "start": 189,
+      "end": 219
+    },
+    {
+      "id": "appendix-II#005",
+      "status": "used",
+      "in": "4.8 Undesirable effects > Summary of the safety profile > Tabulated list of adverse reactions",
+      "paragraph": 2,
+      "start": 224,
+      "end": 246
+    },
+    {
+      "id": "appendix-II#006",
+      "status": "deviation"
+    },
+    {
+      "id": "appendix-II#007",
+      "status": "used",
+      "in": "4.8 Undesirable effects > Summary of the safety profile > Tabulated list of adverse reactions",
+      "paragraph": 9,
+      "start": 0,
+      "end": 27
+    },
+    {
+      "id": "appendix-II#008",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-II#009",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-II#010",
+      "status": "used",
+      "in": "4.8 Undesirable effects > Summary of the safety profile > Tabulated list of adverse reactions",
+      "paragraph": 13,
+      "start": 0,
+      "end": 23
+    },
+    {
+      "id": "appendix-II#011",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-II#012",
+      "status": "used",
+      "in": "4.8 Undesirable effects > Summary of the safety profile > Tabulated list of adverse reactions",
+      "paragraph": 18,
+      "start": 0,
+      "end": 34
+    },
+    {
+      "id": "appendix-II#013",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-II#014",
+      "status": "used",
+      "in": "4.8 Undesirable effects > Summary of the safety profile > Tabulated list of adverse reactions",
+      "paragraph": 26,
+      "start": 0,
+      "end": 24
+    },
+    {
+      "id": "appendix-II#015",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-II#016",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-II#017",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-II#018",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-II#019",
+      "status": "used",
+      "in": "4.8 Undesirable effects > Summary of the safety profile > Tabulated list of adverse reactions",
+      "paragraph": 30,
+      "start": 0,
+      "end": 47
+    },
+    {
+      "id": "appendix-II#020",
+      "status": "used",
+      "in": "4.8 Undesirable effects > Summary of the safety profile > Tabulated list of adverse reactions",
+      "paragraph": 34,
+      "start": 0,
+      "end": 26
+    },
+    {
+      "id": "appendix-II#021",
+      "status": "used",
+      "in": "4.8 Undesirable effects > Summary of the safety profile > Tabulated list of adverse reactions",
+      "paragraph": 50,
+      "start": 0,
+      "end": 23
+    },
+    {
+      "id": "appendix-II#022",
+      "status": "used",
+      "in": "4.8 Undesirable effects > Summary of the safety profile > Tabulated list of adverse reactions",
+      "paragraph": 56,
+      "start": 0,
+      "end": 38
+    },
+    {
+      "id": "appendix-II#023",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-II#024",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-II#025",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-II#026",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-II#027",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-II#028",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-II#029",
+      "status": "used",
+      "in": "4.8 Undesirable effects > Summary of the safety profile > Tabulated list of adverse reactions",
+      "paragraph": 70,
+      "start": 0,
+      "end": 14
+    },
+    {
+      "id": "appendix-II#030",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-II#031",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-II#032",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-II#033",
+      "status": "absent"
+    }
+  ]
+}

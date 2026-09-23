@@ -57,6 +57,8 @@ describe("the deploy trigger", () => {
       "agent/src/a.py",
       "qrd/registry/cap-smpc-en-10.4.json",
       "qrd/sources.lock.json",
+      "labels/ema-epi/sources/brukinsa-smpc-en.json",
+      "labels/ema-epi/checks/brukinsa-smpc-en.json",
       ".claude/settings.json",
       ".claude/hooks/shell_guard.py",
       ".cursor/hooks.json",

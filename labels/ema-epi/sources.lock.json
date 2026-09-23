@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "1.0.0",
+  "api": "https://epi.ema.europa.eu/consuming/api/fhir",
+  "retrieved": "2026-09-23",
+  "source": "European Medicines Agency (EMA), electronic product information (ePI) published through the EMA ePI API",
+  "disclaimer": "The EMA publishes these ePIs for pilot purposes only; they may not be up to date and are not to be used as medicines information. The current product information is on each product's EPAR page.",
+  "note": "Byte copies of the EMA's authority-published ePI, reproduced with acknowledgement of the source as the EMA's legal notice permits, and used only to test the QRD conformance check (AGENTS.md). zone-a/tests/test_qrd_check.py checks the hashes offline; zone-a/scripts/check_label_sources.py compares them with the live API on demand.",
+  "sources": [
+    {
+      "product": "Jentadueto",
+      "activeSubstance": "linagliptin / metformin hydrochloride",
+      "kind": "small molecule",
+      "document": "Summary of product characteristics (English)",
+      "file": "jentadueto-smpc-en.json",
+      "url": "https://epi.ema.europa.eu/consuming/api/fhir/Bundle/6301d093-9501-4e2e-a500-794dd263f9a2",
+      "sha256": "544b2f24e69f410d3e792a80f3ee82c00ef60afcdf913526308e799db54a1ee4",
+      "bytes": 207105,
+      "list": "https://epi.ema.europa.eu/consuming/api/fhir/List/8ad60505-f0c0-4579-aef4-c92cba6d3cfb",
+      "epiId": "EPI/23/1047",
+      "procedureNumber": "EMEA/H/C/002279/II/0070",
+      "marketingAuthorisationHolder": "Boehringer Ingelheim International GmbH",
+      "compositionDate": "2024-04-22",
+      "epar": "https://www.ema.europa.eu/en/medicines/human/EPAR/jentadueto"
+    },
+    {
+      "product": "Nuvaxovid",
+      "activeSubstance": "COVID-19 vaccine (recombinant, adjuvanted)",
+      "kind": "biological medicine (vaccine) under additional monitoring",
+      "document": "Summary of product characteristics (English)",
+      "file": "nuvaxovid-smpc-en.json",
+      "url": "https://epi.ema.europa.eu/consuming/api/fhir/Bundle/d9035011-78f2-ee11-904c-000d3aaa0e40",
+      "sha256": "3256838d8d4a270581a4b41e9bf302b4cd2e073a9c3ad75f999563b731f73828",
+      "bytes": 170219,
+      "list": "https://epi.ema.europa.eu/consuming/api/fhir/List/e56e360c-78f2-ee11-a73d-000d3a29e2b1",
+      "epiId": "EPI/24/17",
+      "procedureNumber": "EMEA/H/C/005808/IAIN/0074",
+      "marketingAuthorisationHolder": "Novavax CZ a.s.",
+      "compositionDate": "2024-06-14",
+      "epar": "https://www.ema.europa.eu/en/medicines/human/EPAR/nuvaxovid"
+    },
+    {
+      "product": "Brukinsa",
+      "activeSubstance": "zanubrutinib",
+      "kind": "small molecule under additional monitoring",
+      "document": "Summary of product characteristics (English)",
+      "file": "brukinsa-smpc-en.json",
+      "url": "https://epi.ema.europa.eu/consuming/api/fhir/Bundle/190d79ed-bd29-4d13-a764-2e11a69b0bd3",
+      "sha256": "d16e72035623a42023d271a76e0ac124c41970af4b1131d0a18479224f4dea5e",
+      "bytes": 1003942,
+      "list": "https://epi.ema.europa.eu/consuming/api/fhir/List/ee564333-c248-4a5a-aafb-fb8170c07a28",
+      "epiId": "EPI/23/1009",
+      "procedureNumber": "EMEA/H/C/004978/II/0014",
+      "marketingAuthorisationHolder": "BeiGene Ireland Limited",
+      "compositionDate": "2024-04-08",
+      "epar": "https://www.ema.europa.eu/en/medicines/human/EPAR/brukinsa"
+    }
+  ]
+}
