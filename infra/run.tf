@@ -139,7 +139,8 @@ resource "google_cloud_run_v2_service" "worker" {
         value = google_bigquery_table.transformation_runs.table_id
       }
       # The key VERSION, not the key: Cloud KMS refuses an AsymmetricSign whose name stops at the
-      # crypto key (see infra/security.tf for why the version is named rather than looked up).
+      # crypto key (see var.kms_manifest_key_version in infra/variables.tf for why the version is
+      # named rather than looked up).
       env {
         name  = "KMS_MANIFEST_KEY"
         value = "${google_kms_crypto_key.manifest_signing_hsm.id}/cryptoKeyVersions/${var.kms_manifest_key_version}"
@@ -202,30 +203,9 @@ resource "google_cloud_run_v2_service_iam_member" "workflow_invoker" {
   member   = "serviceAccount:${google_service_account.workflow.email}"
 }
 
-# The deployer service account, which the post-apply smoke run authenticates as. It is
-# bootstrapped outside this configuration (README.md), so it is named by the deploy rather than
-# declared here: scripts/gcp/deploy.sh phase_apply passes the active gcloud account, and passes
-# it only when that account is a service account. Declared next to its only use. Empty (the
-# default) declares no binding.
-#
-# A human's account is deliberately not accepted. gcloud refuses `print-identity-token
-# --audiences=` for user credentials, so a person cannot present a token this binding would
-# authorise, and granting one would leave a standing privilege on the worker that no documented
-# path can exercise. A local operator supplies WORKER_ID_TOKEN instead, minted by impersonating
-# a service account that already holds run.invoker.
-variable "deployer_account" {
-  description = "E-mail of the service account running the deploy, granted roles/run.invoker on the worker so the post-apply smoke run (scripts/gcp/deploy.sh phase_smoke) can call it. Empty declares no binding."
-  type        = string
-  default     = ""
-
-  validation {
-    condition     = var.deployer_account == "" || endswith(var.deployer_account, ".gserviceaccount.com")
-    error_message = "deployer_account must be a service account e-mail or empty: a user account cannot mint an ID token for the worker's audience, so a binding for one would never be usable."
-  }
-}
-
 # roles/run.invoker on the worker for the deployer, and nothing else: the smoke run POSTs one
-# fixture run and reads the answer.
+# fixture run and reads the answer. Keyed on var.deployer_account (infra/variables.tf, which says
+# why only a service account is accepted).
 #
 # Today this binding authorises nothing new. The deployer holds roles/run.admin at project
 # level, which already contains run.routes.invoke — the permission Cloud Run's edge checks — so

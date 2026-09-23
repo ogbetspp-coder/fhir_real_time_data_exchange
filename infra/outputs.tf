@@ -1,33 +1,41 @@
 output "region" {
-  value = var.region
+  description = "Region of every regional resource; read by scripts/gcp/bootstrap.sh and reconcile-fhir-stores.sh."
+  value       = var.region
 }
 
 output "healthcare_dataset_id" {
-  value = google_healthcare_dataset.record.name
+  description = "Name of the CMEK-encrypted Healthcare dataset that holds the source and target FHIR stores."
+  value       = google_healthcare_dataset.record.name
 }
 
 output "source_fhir_store_id" {
-  value = local.source_fhir_store_id
+  description = "ID of the R5 FHIR store holding Type 2 source bundles (created by scripts/gcp/reconcile-fhir-stores.sh, not Terraform)."
+  value       = local.source_fhir_store_id
 }
 
 output "target_fhir_store_id" {
-  value = local.target_fhir_store_id
+  description = "ID of the validated R5 FHIR store the worker writes EMA ePI resources to (created by scripts/gcp/reconcile-fhir-stores.sh, not Terraform)."
+  value       = local.target_fhir_store_id
 }
 
 output "fhir_analytics_dataset" {
-  value = google_bigquery_dataset.fhir_analytics.dataset_id
+  description = "BigQuery dataset receiving the target store's native ANALYTICS_V2 stream."
+  value       = google_bigquery_dataset.fhir_analytics.dataset_id
 }
 
 output "transformation_ledger_dataset" {
-  value = google_bigquery_dataset.ledger.dataset_id
+  description = "BigQuery dataset holding the transformation ledger (one row per run)."
+  value       = google_bigquery_dataset.ledger.dataset_id
 }
 
 output "evidence_bucket" {
-  value = google_storage_bucket.evidence.name
+  description = "Bucket holding each run's evidence under runs/<runId>/ and the deploy's effective-IAM exports under deploy-evidence/."
+  value       = google_storage_bucket.evidence.name
 }
 
 output "profile_staging_bucket" {
-  value = google_storage_bucket.profiles.name
+  description = "Bucket the deploy stages checksum-pinned FHIR profiles in before importing them into the target store."
+  value       = google_storage_bucket.profiles.name
 }
 
 output "submission_bucket" {
@@ -36,11 +44,13 @@ output "submission_bucket" {
 }
 
 output "fhir_changes_topic" {
-  value = google_pubsub_topic.fhir_changes.id
+  description = "Pub/Sub topic the target store publishes change notifications to (full resource id)."
+  value       = google_pubsub_topic.fhir_changes.id
 }
 
 output "cloud_run_service_uri" {
-  value = google_cloud_run_v2_service.worker.uri
+  description = "URL of the worker Cloud Run service; called by Workflows and by the deploy's smoke run."
+  value       = google_cloud_run_v2_service.worker.uri
 }
 
 # The three query outputs below describe two different hostnames. Cloud Run serves the service
@@ -70,13 +80,16 @@ output "query_caller_service_account" {
 }
 
 output "workflow_name" {
-  value = google_workflows_workflow.epi.name
+  description = "Name of the Cloud Workflows pipeline that runs a document end to end."
+  value       = google_workflows_workflow.epi.name
 }
 
 output "workflow_console_url" {
-  value = "https://console.cloud.google.com/workflows/workflow/${var.region}/${google_workflows_workflow.epi.name}/executions?project=${var.project_id}"
+  description = "Cloud console link to the pipeline workflow's executions."
+  value       = "https://console.cloud.google.com/workflows/workflow/${var.region}/${google_workflows_workflow.epi.name}/executions?project=${var.project_id}"
 }
 
 output "bigquery_console_url" {
-  value = "https://console.cloud.google.com/bigquery?project=${var.project_id}&ws=!1m4!1m3!3m2!1s${var.project_id}!2s${google_bigquery_dataset.fhir_analytics.dataset_id}"
+  description = "Cloud console link to the FHIR analytics dataset in BigQuery."
+  value       = "https://console.cloud.google.com/bigquery?project=${var.project_id}&ws=!1m4!1m3!3m2!1s${var.project_id}!2s${google_bigquery_dataset.fhir_analytics.dataset_id}"
 }

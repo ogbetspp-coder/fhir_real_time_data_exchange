@@ -64,27 +64,8 @@ resource "google_kms_crypto_key" "manifest_signing" {
   }
 }
 
-# Cloud KMS signs with a crypto key VERSION, not a crypto key: AsymmetricSign's `name` must end
-# in /cryptoKeyVersions/<n>. `google_kms_crypto_key.manifest_signing.id` stops at the key, so
-# passing it to the worker meant every signing call was refused and no run ever produced a signed
-# manifest.
-#
-# The version is named here rather than read with a `google_kms_crypto_key_version` data source,
-# because that data source fetches the version's PUBLIC KEY and so requires
-# `cloudkms.cryptoKeyVersions.viewPublicKey`. The deploy identity does not hold it, and granting
-# it would widen the deployer's reach into key material to obtain a string that is already known.
-# Cloud KMS does not rotate asymmetric signing keys automatically, so this only changes when a
-# person deliberately creates a version — a configuration change, which is what this is.
-variable "kms_manifest_key_version" {
-  description = "Version of manifest-signing-hsm (keys.tf) the worker signs with. Cloud KMS does not rotate asymmetric signing keys automatically, so this changes only when a new version is created by hand."
-  type        = string
-  default     = "1"
-
-  validation {
-    condition     = can(regex("^[1-9][0-9]*$", var.kms_manifest_key_version))
-    error_message = "kms_manifest_key_version must be a positive integer, as Cloud KMS numbers crypto key versions from 1."
-  }
-}
+# The worker signs with a named crypto key VERSION, var.kms_manifest_key_version
+# (infra/variables.tf, which says why it is named rather than looked up).
 
 data "google_storage_project_service_account" "gcs" {
   project = var.project_id
