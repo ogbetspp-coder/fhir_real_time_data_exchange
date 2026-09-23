@@ -44,6 +44,10 @@ describe("the Node runtime ADR 0003 pins", () => {
     for (const [name, version] of versions) expect([name, version]).toEqual([name, pinned]);
   });
 
+  it("is the version .nvmrc selects for local development", () => {
+    expect(readFileSync(".nvmrc", "utf8").trim()).toBe(pinned);
+  });
+
   it("is never moved by the update bot, which may only refresh its digest", () => {
     const dependabot = readFileSync(".github/dependabot.yml", "utf8");
     const node = /-\s*dependency-name:\s*"node"\s*\n\s*update-types:\s*\n?\s*\[([^\]]*)\]/.exec(

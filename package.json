@@ -24,7 +24,6 @@
     "differential": "tsx scripts/fidelity/differential.ts",
     "differential:smoke": "tsx scripts/fidelity/differential.ts --seed 20260920 --count 18 --out zone-a/tests/fixtures/differential-smoke.jsonl",
     "vectors:generate": "tsx scripts/fidelity/generate-vectors.ts",
-    "fixtures:export": "tsx scripts/fhir/export-validation-set.ts",
     "dev": "tsx watch src/server.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -36,7 +35,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "validate:official": "node scripts/ci/official-validate.mjs",
-    "demo": "tsx scripts/run-demo.ts"
+    "demo": "tsx scripts/dev/run-demo.ts"
   },
   "repository": {
     "type": "git",

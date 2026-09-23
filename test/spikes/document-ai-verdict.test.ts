@@ -24,8 +24,8 @@ import {
 // PDF is generated locally, and the text layer is read by pdf.js.
 //
 // Assertion messages carry source keys, counts, category names, and hashes only (AGENTS.md; spike
-// design, "Constraints"). The hand-authored fixture and test/spikes/document-ai-adapter.test.ts
-// are unchanged and still cover the adapter's rules on a response nobody recorded.
+// design, "Constraints"). test/spikes/document-ai-adapter.test.ts covers the adapter's own rules
+// on this same recording (the hand-authored response it once used has been removed).
 
 const RECORDED_RESPONSE_PATH = "test/fixtures/spikes/document-ai-layout-response.recorded.json";
 const ADAPTER_VERSION = "1.0.0";

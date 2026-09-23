@@ -18,11 +18,12 @@ import { createSyntheticType2Bundle } from "../../src/fixtures/synthetic.js";
 //
 // The set is built the way src/app.ts and src/pipeline.ts build it: the fixture is
 // `createSyntheticType2Bundle(mapping, { product: SMOKE_PRODUCT_ID })` — the smoke product, which
-// is what a `fixture` run actually sends, and not the published-Type-2 variant that
-// scripts/fhir/export-validation-set.ts uses), the target is `transformType2ToEma`, and the
-// Composition is `documentBundle.entry[0]`. The two structural preflights run first for the
-// same reason they run first in the worker: a fixture that fails them never reaches official
-// validation there, so an emitted set would validate something the worker would never send.
+// is what a `fixture` run actually sends, and not the published-Type-2 variant that the removed
+// hand-run exporter scripts/fhir/export-validation-set.ts used; this script supersedes it), the
+// target is `transformType2ToEma`, and the Composition is `documentBundle.entry[0]`. The two
+// structural preflights run first for the same reason they run first in the worker: a fixture
+// that fails them never reaches official validation there, so an emitted set would validate
+// something the worker would never send.
 //
 // usage: tsx scripts/ci/emit-validation-set.ts OUTPUT_DIR
 

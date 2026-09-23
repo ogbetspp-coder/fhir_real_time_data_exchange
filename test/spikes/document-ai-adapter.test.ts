@@ -23,10 +23,14 @@ import {
 } from "../../scripts/spikes/document-ai/report.js";
 
 // Network-free half of the extractor spike (docs/design/extractor-spike.md, Part A): the
-// hand-authored Layout Parser response goes through the adapter and the real fidelity check.
-// Assertion messages here carry keys, counts, and rule names only — never narrative.
+// recorded Layout Parser response (the regression fixture test/spikes/document-ai-verdict.test.ts
+// replays against the PDF's text layer) goes through the adapter and the real fidelity check.
+// This file covers the adapter's own rules; the verdict test covers the verdict's numbers. A
+// response Document AI never returns — a kept ligature, a hyphen the recurrence rule resolves —
+// is built inline below from synthetic words. Assertion messages here carry keys, counts, and
+// rule names only — never narrative.
 
-const FIXTURE_PATH = "test/fixtures/spikes/document-ai-layout-response.json";
+const FIXTURE_PATH = "test/fixtures/spikes/document-ai-layout-response.recorded.json";
 const ADAPTER_VERSION = "1.0.0";
 
 type LayoutDocument = protos.google.cloud.documentai.v1.IDocument;
@@ -96,7 +100,8 @@ describe("Document AI adapter, Part A round trip", () => {
 
   it("pins the extractor identity to the processor version and the adapter version", () => {
     expect(source.extractorVersion.endsWith(`+adapter/${ADAPTER_VERSION}`)).toBe(true);
-    expect(report.processorVersionId).toBe("hand-authored-layout-v1");
+    // The recorded response carries no revision, so the identity falls back to the placeholder.
+    expect(report.processorVersionId).toBe("unknown-processor-version");
   });
 });
 
@@ -152,24 +157,43 @@ describe("character faithfulness", () => {
   it("leaves line-end hyphens alone and counts them instead", () => {
     const joined = source.pages.map(({ text }) => text).join("");
     expect(joined.includes("­")).toBe(false);
-    expect(counters.lineEndHyphens).toBe(2);
-    expect(counters.lineEndHyphensResolvableByRecurrence).toBe(1);
+    expect(counters.lineEndHyphens).toBe(1);
+    expect(counters.lineEndHyphensResolvableByRecurrence).toBe(0);
   });
 
-  it("keeps the ligature glyph and reports it", () => {
-    expect(counters.ligatureGlyphs).toBe(1);
+  // Document AI expanded the fixture's one ligature before the adapter saw it (the verdict), so
+  // the keep-and-count rule is exercised on an inline response that still carries the glyph.
+  it("keeps a ligature glyph and resolvable hyphen as received, and counts them", () => {
+    const paragraph = (text: string) => ({
+      pageSpan: { pageStart: 1, pageEnd: 1 },
+      textBlock: { type: "paragraph", text, blocks: [] },
+    });
+    const inline: LayoutDocument = {
+      documentLayout: {
+        blocks: [paragraph("A synthetic \uFB01le, well-"), paragraph("known and wellknown.")],
+      },
+    };
+    const adapted = adapt(inline, ADAPTER_VERSION);
+    expect(adapted.counters.ligatureGlyphs).toBe(1);
+    expect(adapted.counters.lineEndHyphens).toBe(1);
+    expect(adapted.counters.lineEndHyphensResolvableByRecurrence).toBe(1);
+    expect(adapted.counters.forbiddenCharacters).toBe(0);
+    expect(adapted.source.pages.map(({ text }) => text).join("")).toBe(
+      "A synthetic \uFB01le, well-\nknown and wellknown.\n",
+    );
+    expect(counters.ligatureGlyphs).toBe(0);
     expect(counters.forbiddenCharacters).toBe(0);
   });
 
   it("serialises the table row-major from its row and cell structure", () => {
     expect(counters.tableBlocks).toBe(1);
-    expect(counters.tableRows).toBe(3);
-    expect(counters.tableCells).toBe(6);
-    expect(counters.tabsAdded).toBe(3);
+    expect(counters.tableRows).toBe(4);
+    expect(counters.tableCells).toBe(8);
+    expect(counters.tabsAdded).toBe(4);
     const page = source.pages[1];
     if (page === undefined) throw new Error("expected page 2");
     const rows = page.text.split(LF).filter((line) => line.includes(TAB));
-    expect(rows).toHaveLength(3);
+    expect(rows).toHaveLength(4);
     expect(rows.every((row) => row.split(TAB).length === 2)).toBe(true);
   });
 });
@@ -188,7 +212,7 @@ describe("counters", () => {
     expect(blockTypes.table).toBe(1);
     expect(pageFacts.map(({ hasHeader }) => hasHeader)).toEqual([true, true, true]);
     expect(pageFacts.map(({ hasFooter }) => hasFooter)).toEqual([true, true, true]);
-    expect(pageFacts.reduce((total, { tableCells }) => total + tableCells, 0)).toBe(6);
+    expect(pageFacts.reduce((total, { tableCells }) => total + tableCells, 0)).toBe(8);
   });
 });
 

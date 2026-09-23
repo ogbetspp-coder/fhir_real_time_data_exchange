@@ -9,9 +9,7 @@ export default tseslint.config(
       "dist/**",
       "coverage/**",
       "fhir/vendor/**",
-      "agent-tools/**",
       ".cache/**",
-      "artifacts/**",
       ".claude/worktrees/**",
       // Zone A's two Python virtualenvs. They are not committed and they are not TypeScript, but
       // a dependency can vendor a stray `.js` (pip vendors one), and the project service then

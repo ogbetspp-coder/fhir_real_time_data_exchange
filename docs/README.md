@@ -1,0 +1,29 @@
+# Documentation index
+
+Start with the vision, then the architecture. `AGENTS.md` at the repository root holds the
+working rules.
+
+| Document                                                     | What it is                                                                                    |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| [Vision](vision.md)                                          | The north star: one canonical, proved record under every product statement.                   |
+| [Roadmap](roadmap.md)                                        | The technical roadmap, each item judged against the vision.                                   |
+| [Architecture](architecture.md)                              | How the pipeline, trust zones, services and Google Cloud components fit together.             |
+| [Foundations](foundations.md)                                | The foundations review of 2026-09-21: what must hold before features, and each item's status. |
+| [Fidelity normalisation](fidelity-normalization.md)          | The normative `fidelity-norm` specification the TypeScript and Python checks implement.       |
+| [Validation](validation/README.md)                           | Validation lifecycle: traceability matrix, official validation gate, runs of record.          |
+| [Change records](validation/README.md#change-records)        | One file per controlled change under [`validation/changes/`](validation/changes/).            |
+| [Design: approval](design/approval.md)                       | Roadmap item 2: a named person signs, and only approved text answers.                         |
+| [Design: CMEK rollout](design/cmek-rollout.md)               | Customer-managed keys on the record, and how the rollout was proven.                          |
+| [Design: ePI query service](design/epi-mcp-query-service.md) | The Model Context Protocol query service over the record.                                     |
+| [Design: extractor spike](design/extractor-spike.md)         | Document AI as an extractor: the spike and its verdict.                                       |
+| [Design: verifiable answers](design/verifiable-answers.md)   | Verifiable answers on Google-native surfaces (proposed).                                      |
+| [Demo: the verifiable label](demo/verifiable-label.md)       | The demonstration script.                                                                     |
+
+## Architecture decision records
+
+| ADR                                                          | Title                                                | Status                 |
+| ------------------------------------------------------------ | ---------------------------------------------------- | ---------------------- |
+| [0001](adr/0001-global-type2-canonical.md)                   | Global ePI Type 2 as interchange baseline            | Accepted for prototype |
+| [0002](adr/0002-two-trust-zones-and-canonical-submission.md) | Two trust zones and the CanonicalSubmission contract | Accepted for prototype |
+| [0003](adr/0003-mechanical-narrative-fidelity.md)            | Mechanical narrative fidelity                        | Accepted for prototype |
+| [0004](adr/0004-service-boundaries-and-shared-code.md)       | Service boundaries and shared code                   | Accepted for prototype |

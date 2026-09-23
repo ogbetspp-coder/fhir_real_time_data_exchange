@@ -308,10 +308,6 @@ export function syntheticProduct(
   return found;
 }
 
-export function isSyntheticProductId(value: string): value is SyntheticProductId {
-  return SYNTHETIC_PRODUCT_IDS.some((id) => id === value);
-}
-
 function qualifier(product: SyntheticProduct): string {
   return product.namedInNarrative ? ` of ${product.productName}` : "";
 }
