@@ -86,7 +86,16 @@ The transformer accepts two authoritative source categories:
 
 It does not infer clinical narrative from ingredients or product properties. Every output
 field is classified as copied, code-mapped, structurally moved, deterministically defaulted,
-or rejected. Missing and duplicate required sections are errors.
+or rejected. Missing and duplicate required sections are errors. So is anything the mapping
+manifest would otherwise drop or quietly repair: a section coded in the manifest's source code
+system that no rule maps, at any depth; a section without such a code that carries narrative; a
+mapped section that is not directly under the section its parent rule maps (the manifest's top
+rule at the top level); a mandatory leaf section without narrative (a section with child rules
+may be a bare heading); and a source Composition or Bundle that declares a language other than
+English, since the manifest is the English template and the output is always `en`. The manifest
+loader rejects a manifest in which two rules share a `sourceKey` or a `targetCode`, and lineage
+names the mapping by the version the loaded manifest declares, the same `mappingVersion` the run
+manifest records.
 
 ## Validation model
 
@@ -94,8 +103,10 @@ Validation is deliberately redundant:
 
 0. for document sources, `docs/fidelity-normalization.md` defines the mechanical narrative
    fidelity check that gates ingress before any transformation (ADR 0003);
-1. application preflight verifies graph completeness, uniqueness, expected profiles, and exact
-   section hierarchy;
+1. application checks verify graph completeness, uniqueness, and expected profiles
+   (`src/fhir/preflight.ts`), and the crosswalk (`transformType2ToEma`) refuses a source whose
+   section tree is not exactly the manifest's hierarchy, as described above; the EMA preflight
+   then checks every target section's code and title at its position;
 2. the official HL7 Java validator evaluates the pinned packages, FHIRPath, slicing, and
    profile chain;
 3. Cloud Healthcare API `$validate?profile=` verifies each profile as deployed in the target

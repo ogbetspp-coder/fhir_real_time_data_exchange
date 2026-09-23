@@ -10,6 +10,9 @@ export type LineageRecord = {
   runId: string;
   startedAt: string;
   completedAt: string;
+  // The mapping manifest the run used, as `mappingReference` names it (`<id>#<mappingVersion>`),
+  // so lineage and the run manifest name the same version.
+  mapping: string;
   sourceFqn: string;
   targetFhirFqn: string;
   targetBigQueryFqn: string;
@@ -33,7 +36,7 @@ export class GcpLineagePublisher {
       process: {
         displayName: "HL7 Global ePI Type 2 to EMA EU ePI",
         attributes: {
-          mapping: { stringValue: "cap-smpc-en#1.0.0" },
+          mapping: { stringValue: record.mapping },
         },
         origin: {
           sourceType: "CUSTOM",
