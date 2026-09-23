@@ -117,14 +117,13 @@ const BULLET = CHARS(
   0x25e6,
 );
 const NEAR_BULLET = CHARS(0x2024, 0x25a2, 0x25cc, 0x00b7, 0x2027);
+// Section 3 step 5. U+000B, U+000C and U+0085 left the list in fidelity-norm/2.0.0: section 2
+// rejects them, and they are in FORBIDDEN_2_0_0 below.
 const WHITESPACE = CHARS(
   0x0009,
   0x000a,
-  0x000b,
-  0x000c,
   0x000d,
   0x0020,
-  0x0085,
   0x00a0,
   0x1680,
   0x2000,
@@ -162,6 +161,38 @@ const FORBIDDEN: readonly string[] = [
   String.fromCharCode(0xdc00),
   String.fromCharCode(0xdfff),
 ];
+// What fidelity-norm/2.0.0 added to section 2: U+000B, U+000C, the C1 controls (U+0092 and
+// U+0096 are what a text layer decoded as Latin-1 carries), and the bidirectional controls.
+const FORBIDDEN_2_0_0: readonly string[] = CHARS(
+  0x000b,
+  0x000c,
+  0x0080,
+  0x0085,
+  0x0092,
+  0x0096,
+  0x009f,
+  0x061c,
+  0x200e,
+  0x200f,
+  0x202a,
+  0x202c,
+  0x202e,
+  0x2066,
+  0x2068,
+  0x2069,
+);
+// The accepted neighbours of each range fidelity-norm/2.0.0 rejects.
+const NEAR_FORBIDDEN = CHARS(
+  0x007e,
+  0x00a0,
+  0x00a1,
+  0x061b,
+  0x061d,
+  0x200d,
+  0x2029,
+  0x202f,
+  0x206a,
+);
 const PUNCTUATION: readonly string[] = [
   ...CHARS(0x002d, 0x2010, 0x2011, 0x2013, 0x2014, 0x2212),
   ...CHARS(0x0027, 0x0022, 0x2018, 0x2019, 0x201c, 0x201d),
@@ -233,6 +264,12 @@ const FRAGMENTS: readonly Fragment[] = [
   { weight: 5, className: "punctuation", make: (random) => pick(random, PUNCTUATION) },
   { weight: 2, className: "superscript", make: (random) => pick(random, SUPERSCRIPT) },
   { weight: 2, className: "joiner", make: (random) => pick(random, JOINER) },
+  { weight: 2, className: "near-forbidden", make: (random) => pick(random, NEAR_FORBIDDEN) },
+  {
+    weight: 2,
+    className: "soft-hyphen-space",
+    make: (random) => `${word(random)}${SOFT_HYPHEN}${SPACE}${word(random)}`,
+  },
 ];
 
 const TOTAL_WEIGHT = FRAGMENTS.reduce((sum, item) => sum + item.weight, 0);
@@ -270,8 +307,10 @@ function normalizeCase(random: Random, seed: number, index: number): CorpusCase 
   if (chance(random, 0.125)) {
     const at = between(random, 0, Array.from(input).length);
     const points = Array.from(input);
-    input = [...points.slice(0, at), pick(random, FORBIDDEN), ...points.slice(at)].join("");
-    classes.add("forbidden-character");
+    const added = chance(random, 0.5);
+    const forbidden = pick(random, added ? FORBIDDEN_2_0_0 : FORBIDDEN);
+    input = [...points.slice(0, at), forbidden, ...points.slice(at)].join("");
+    classes.add(added ? "forbidden-character-2-0-0" : "forbidden-character");
   }
   if (chance(random, 0.1)) {
     input = `${pick(random, WHITESPACE)}${input}${pick(random, WHITESPACE)}`;
@@ -301,16 +340,27 @@ function normalizeCase(random: Random, seed: number, index: number): CorpusCase 
 // as the accepting paths.
 
 const XMLNS = `xmlns="http://www.w3.org/1999/xhtml"`;
-const BLOCK_WRAPPERS = ["p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "pre", "blockquote"];
-const INLINE_WRAPPERS = ["span", "b", "i", "u", "em", "strong", "sup", "sub", "small", "abbr"];
+// `pre` left the allowed elements in fidelity-norm/2.0.0 (it is a violation below); `sup` and
+// `sub` hold text only and have their own generator.
+const BLOCK_WRAPPERS = ["p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote"];
+const INLINE_WRAPPERS = ["span", "b", "i", "u", "em", "strong", "small", "abbr"];
 
 // Text that is safe inside markup: its own `<`, `&`, `>` and quotes are stripped, and entities
 // are added back explicitly so every accepted entity form appears.
 const MARKUP_UNSAFE = new RegExp(`[${CP(0x003c)}${CP(0x0026)}${CP(0x003e)}"']`, "gu");
+// U+00AD before a line break rejects in narrative text (fidelity-norm/2.0.0). The passage
+// alphabet makes one often; most are turned into U+00AD U+0020, which is accepted, so the
+// rejection is reached without drowning the accepting paths.
+const SOFT_HYPHEN_BREAK = new RegExp(`${SOFT_HYPHEN}${CR}?${LF}`, "u");
+const SOFT_HYPHEN_BREAKS = new RegExp(`${SOFT_HYPHEN}${CR}?${LF}`, "gu");
 
 function markupText(random: Random): Passage {
   const { text, classes } = passage(random, between(random, 1, 5));
   let safe = text.replace(MARKUP_UNSAFE, "");
+  if (SOFT_HYPHEN_BREAK.test(safe)) {
+    if (chance(random, 0.8)) safe = safe.replace(SOFT_HYPHEN_BREAKS, `${SOFT_HYPHEN}${SPACE}`);
+    else classes.add("soft-hyphen-before-break");
+  }
   if (chance(random, 0.25)) {
     safe += pick(random, [
       "&amp;",
@@ -324,40 +374,33 @@ function markupText(random: Random): Passage {
       "&#x2014;",
       "&#x2019;",
       "&#1114111;",
+      "&#x7E;",
+      "&#xA0;",
+      "&#x1D6FC;",
     ]);
     classes.add("entity");
+  }
+  if (chance(random, 0.04)) {
+    safe += CP(0x1d6fc);
+    classes.add("supplementary-character");
   }
   return { text: safe, classes };
 }
 
 type Markup = { markup: string; classes: Set<string> };
 
-function attributes(random: Random, element: string): Markup {
+// Only what fidelity-norm/2.0.0 allows: a language tag on the root, an `https://` link on `a`,
+// `scope` on `th`. Everything else is a violation below.
+function attributes(random: Random, element: string, isRoot = false): Markup {
   const classes = new Set<string>();
   let markup = "";
-  if (chance(random, 0.25)) {
-    markup += ` id="${word(random).slice(0, 8)}"`;
-    classes.add("attribute-id");
-  }
-  if (chance(random, 0.2)) {
-    const names: string[] = [];
-    for (let position = 0; position < between(random, 1, 3); position += 1) {
-      names.push(word(random).slice(0, 6));
-    }
-    markup += ` class="${names.join(SPACE)}"`;
-    classes.add("attribute-class");
-  }
-  if (chance(random, 0.12)) {
+  if (isRoot && chance(random, 0.2)) {
     markup += ` ${pick(random, ["lang", "xml:lang"])}="${pick(random, ["en", "en-GB", "de"])}"`;
     classes.add("attribute-lang");
   }
   if (element === "a" && chance(random, 0.6)) {
-    markup += ` href="${pick(random, ["#x", "https://example.org/a/b", "https://example.org/"])}"`;
+    markup += ` href="${pick(random, ["https://example.org/a/b", "https://example.org/"])}"`;
     classes.add("attribute-href");
-  }
-  if ((element === "td" || element === "th") && chance(random, 0.3)) {
-    markup += ` ${pick(random, ["colspan", "rowspan"])}="${between(random, 1, 999)}"`;
-    classes.add("attribute-span");
   }
   if (element === "th" && chance(random, 0.3)) {
     markup += ` scope="${pick(random, ["row", "col"])}"`;
@@ -372,23 +415,100 @@ function markupTextNode(random: Random): Markup {
   return { markup: text, classes };
 }
 
+// Text inside `sup` or `sub`: the digits and signs that fold, the letters and marks that are
+// kept, the script digits that are kept, and the numbers and signs that have no script form.
+const SCRIPT_PIECES: readonly { className: string; pool: readonly string[] }[] = [
+  { className: "script-ascii-digit", pool: Array.from("0123456789") },
+  { className: "script-ascii-sign", pool: Array.from("+-=()") },
+  {
+    className: "script-dash",
+    pool: CHARS(
+      0x2010,
+      0x2011,
+      0x2012,
+      0x2013,
+      0x2014,
+      0x2015,
+      0x2212,
+      0xfe62,
+      0xfe63,
+      0xff0b,
+      0xff0d,
+    ),
+  },
+  {
+    className: "script-letter",
+    pool: [...Array.from("anmaxif"), ...CHARS(0x00ae, 0x002a, 0x002f)],
+  },
+  { className: "script-code-point", pool: CHARS(0x00b2, 0x00b3, 0x2070, 0x2082, 0x2089, 0x207b) },
+  { className: "script-reference", pool: ["&#x2212;", "&#54;", "&#x2B;", "&#8315;", "&#x2082;"] },
+  { className: "script-space", pool: [SPACE, TAB] },
+];
+// Drawn rarely, so the folding paths are not drowned by `unmappable-script`.
+const SCRIPT_UNMAPPABLE = {
+  className: "script-unmappable",
+  pool: [
+    ...CHARS(0x00b1, 0x2213, 0x0663, 0xff12, 0x00bd, 0x2163, 0x1d7ce, 0x0966),
+    "&#xB1;",
+    "&#x1D7CE;",
+  ],
+};
+
+function scriptText(random: Random, classes: Set<string>): string {
+  let text = "";
+  for (let position = 0; position < between(random, 1, 4); position += 1) {
+    const piece = chance(random, 0.05) ? SCRIPT_UNMAPPABLE : pick(random, SCRIPT_PIECES);
+    classes.add(piece.className);
+    text += pick(random, piece.pool);
+  }
+  return text;
+}
+
+function scriptElement(random: Random): Markup {
+  const classes = new Set<string>(["script-element"]);
+  const element = pick(random, ["sup", "sub"]);
+  let inner = scriptText(random, classes);
+  // An element inside `sup` or `sub` is `script-content`.
+  if (chance(random, 0.08)) {
+    inner += pick(random, ["<b>2</b>", "<sup>2</sup>", "<br/>", "<sub>n</sub>"]);
+    classes.add("script-child-element");
+  }
+  return { markup: `<${element}>${inner}</${element}>`, classes };
+}
+
+// Whitespace a table container may hold between its parts.
+function tableWhitespace(random: Random, classes: Set<string>): string {
+  if (!chance(random, 0.15)) return "";
+  classes.add("table-whitespace");
+  return pick(random, [SPACE, LF, TAB, `${CR}${LF}`, `${LF}${SPACE}${SPACE}`]);
+}
+
 function table(random: Random, depth: number): Markup {
   const classes = new Set<string>(["table"]);
+  // One width per table: every row has the same number of cells (fidelity-norm/2.0.0). A row of
+  // another width is the `table-shape` violation.
+  const width = between(random, 0, 3);
+  if (width === 0) classes.add("table-empty-rows");
   const row = (cell: "td" | "th"): string => {
+    let count = width;
+    if (chance(random, 0.06)) {
+      count = width === 0 ? 1 : width - 1 + 2 * between(random, 0, 1);
+      classes.add("table-uneven-row");
+    }
     let cells = "";
-    for (let position = 0; position < between(random, 1, 3); position += 1) {
+    for (let position = 0; position < count; position += 1) {
       const attribute = attributes(random, cell);
       for (const name of attribute.classes) classes.add(name);
-      if (chance(random, 0.08)) {
-        cells += `<${cell}${attribute.markup}/>`;
-        classes.add("self-closing-cell");
-        continue;
-      }
       const inner = node(random, depth + 1);
       for (const name of inner.classes) classes.add(name);
-      cells += `<${cell}${attribute.markup}>${inner.markup}</${cell}>`;
+      cells += `${tableWhitespace(random, classes)}<${cell}${attribute.markup}>${inner.markup}</${cell}>`;
     }
-    return `<tr>${cells}</tr>`;
+    // Content a renderer would move out of the table (`table-content`).
+    if (chance(random, 0.03)) {
+      cells += pick(random, ["x", "&#32;", "<span>x</span>", CP(0x00a0), "<br/>"]);
+      classes.add("table-stray-content");
+    }
+    return `<tr>${cells}${tableWhitespace(random, classes)}</tr>`;
   };
   let markup = "";
   if (chance(random, 0.25)) {
@@ -397,39 +517,50 @@ function table(random: Random, depth: number): Markup {
     markup += `<caption>${caption.text}</caption>`;
     classes.add("table-caption");
   }
-  if (chance(random, 0.5)) {
+  if (chance(random, 0.05)) {
+    classes.add("table-no-rows");
+  } else if (chance(random, 0.5)) {
     // Sections, in the one document order that renders as written.
     if (chance(random, 0.7)) {
-      markup += `<thead>${row("th")}</thead>`;
+      markup += `${tableWhitespace(random, classes)}<thead>${row("th")}</thead>`;
       classes.add("table-thead");
     }
     for (let position = 0; position < between(random, 1, 2); position += 1) {
-      markup += `<tbody>${row("td")}</tbody>`;
+      markup += `${tableWhitespace(random, classes)}<tbody>${row("td")}</tbody>`;
       classes.add("table-tbody");
     }
     if (chance(random, 0.4)) {
-      markup += `<tfoot>${row("td")}</tfoot>`;
+      markup += `<tfoot>${row("td")}${tableWhitespace(random, classes)}</tfoot>`;
       classes.add("table-tfoot");
     }
   } else {
     for (let position = 0; position < between(random, 1, 3); position += 1) markup += row("td");
     classes.add("table-bare-rows");
   }
-  return { markup: `<table>${markup}</table>`, classes };
+  if (chance(random, 0.03)) {
+    markup = `${pick(random, ["Dose", "&#65;", "<p>x</p>"])}${markup}`;
+    classes.add("table-stray-content");
+  }
+  return { markup: `<table>${markup}${tableWhitespace(random, classes)}</table>`, classes };
 }
 
 function node(random: Random, depth: number): Markup {
   const classes = new Set<string>();
   if (depth > 3) return markupTextNode(random);
   const kind = random();
-  if (kind < 0.34) return markupTextNode(random);
-  if (kind < 0.48) {
+  if (kind < 0.3) return markupTextNode(random);
+  if (kind < 0.4) {
     const element = pick(random, INLINE_WRAPPERS);
-    const attribute = attributes(random, element);
     const inner = node(random, depth + 1);
-    for (const name of [...attribute.classes, ...inner.classes]) classes.add(name);
+    for (const name of inner.classes) classes.add(name);
     classes.add("inline-element");
-    return { markup: `<${element}${attribute.markup}>${inner.markup}</${element}>`, classes };
+    return { markup: `<${element}>${inner.markup}</${element}>`, classes };
+  }
+  if (kind < 0.48) {
+    const before = markupTextNode(random);
+    const script = scriptElement(random);
+    for (const name of [...before.classes, ...script.classes]) classes.add(name);
+    return { markup: `${before.markup}${script.markup}`, classes };
   }
   if (kind < 0.54) {
     const element = pick(random, ["cite", "code"]);
@@ -447,11 +578,10 @@ function node(random: Random, depth: number): Markup {
   }
   if (kind < 0.74) {
     const element = pick(random, BLOCK_WRAPPERS);
-    const attribute = attributes(random, element);
     const inner = node(random, depth + 1);
-    for (const name of [...attribute.classes, ...inner.classes]) classes.add(name);
+    for (const name of inner.classes) classes.add(name);
     classes.add("block-element");
-    return { markup: `<${element}${attribute.markup}>${inner.markup}</${element}>`, classes };
+    return { markup: `<${element}>${inner.markup}</${element}>`, classes };
   }
   if (kind < 0.8) {
     let items = "";
@@ -482,7 +612,10 @@ function node(random: Random, depth: number): Markup {
   const inner = markupTextNode(random);
   for (const name of inner.classes) classes.add(name);
   classes.add("line-break");
-  return { markup: `${inner.markup}<br/>${inner.markup}`, classes };
+  return {
+    markup: `${inner.markup}${pick(random, ["<br/>", `<br${SPACE}/>`])}${inner.markup}`,
+    classes,
+  };
 }
 
 // A single deliberate violation, applied to an otherwise well-formed document. Each names the
@@ -503,14 +636,34 @@ const VIOLATIONS: readonly Violation[] = [
   {
     className: "unknown-element",
     apply: (body, attrs, random) => {
-      const element = pick(random, ["ol", "q", "img", "style", "script", "del", "s", "math"]);
+      const element = pick(random, [
+        "ol",
+        "q",
+        "img",
+        "style",
+        "script",
+        "del",
+        "s",
+        "math",
+        "pre",
+      ]);
       return root(`${body}<${element}>x</${element}>`, attrs);
     },
   },
   {
     className: "forbidden-attribute-name",
     apply: (body, attrs, random) => {
-      const attribute = pick(random, [`style="x"`, `hidden="hidden"`, `title="t"`, `href="#x"`]);
+      const attribute = pick(random, [
+        `style="x"`,
+        `hidden="hidden"`,
+        `title="t"`,
+        `href="https://example.org/"`,
+        `class="c"`,
+        `id="s1"`,
+        `lang="en"`,
+        `xml:lang="en"`,
+        `scope="row"`,
+      ]);
       return root(`${body}<p ${attribute}>x</p>`, attrs);
     },
   },
@@ -518,33 +671,43 @@ const VIOLATIONS: readonly Violation[] = [
     className: "forbidden-attribute-value",
     apply: (body, attrs, random) => {
       const attribute = pick(random, [
-        `id="a${LF}"`,
-        `id="a${CR}${LF}"`,
-        `id="a b"`,
-        `class="a${LF}hidden"`,
-        `class="a b c d"`,
-        `lang="${"x".repeat(33)}"`,
         `href="https://example.org/a?q=1"`,
         `href="javascript:x"`,
-        `id=""`,
-        `scope="row col"`,
+        `href="#x"`,
+        `href="https://example.org/a${LF}"`,
+        `href=""`,
       ]);
-      return root(`${body}<p ${attribute}>x</p>`, attrs);
+      return root(`${body}<p><a ${attribute}>x</a></p>`, attrs);
+    },
+  },
+  {
+    className: "forbidden-root-attribute",
+    apply: (body, attrs, random) => {
+      const attribute = pick(random, [
+        ` id="s1"`,
+        ` class="c"`,
+        ` lang="${"x".repeat(33)}"`,
+        ` lang="en${LF}"`,
+        ` lang="en" lang="de"`,
+      ]);
+      return root(body, `${attrs}${attribute}`);
     },
   },
   {
     className: "duplicate-attribute",
-    apply: (body, attrs) => root(`${body}<p id="a" id="b">x</p>`, attrs),
+    apply: (body, attrs) =>
+      root(`${body}<p><a href="https://example.org/" href="https://example.org/">a</a></p>`, attrs),
   },
   {
     className: "nested-xmlns",
     apply: (body, attrs) => root(`${body}<p ${XMLNS}>x</p>`, attrs),
   },
   {
-    className: "span-value-out-of-range",
+    className: "spanned-cell",
     apply: (body, attrs, random) => {
-      const value = pick(random, ["0", "1000", "01", "-1", "1.0"]);
-      return root(`${body}<table><tr><td colspan="${value}">x</td></tr></table>`, attrs);
+      const attribute = pick(random, ["colspan", "rowspan", "scope"]);
+      const value = pick(random, ["2", "1", "row"]);
+      return root(`${body}<table><tr><td ${attribute}="${value}">x</td></tr></table>`, attrs);
     },
   },
   {
@@ -637,10 +800,69 @@ const VIOLATIONS: readonly Violation[] = [
         "<p><tr><td>a</td></tr></p>",
         "<table><tbody><td>a</td></tbody></table>",
         "<ul><caption>c</caption></ul>",
+        "<table><tr><caption>c</caption></tr></table>",
       ]);
       return root(`${body}${inner}`, attrs);
     },
   },
+  {
+    className: "table-content",
+    apply: (body, attrs, random) => {
+      const inner = pick(random, [
+        "<table>x<tr><td>a</td></tr></table>",
+        "<table><tbody>&#65;<tr><td>a</td></tr></tbody></table>",
+        "<table><tr><td>a</td>&#32;</tr></table>",
+        "<table><tr><span>a</span></tr></table>",
+        "<table><thead><p>a</p></thead></table>",
+        "<table><tr><table></table></tr></table>",
+        `<table><tr>${CP(0x00a0)}<td>a</td></tr></table>`,
+        "<table>&#133;</table>",
+      ]);
+      return root(`${body}${inner}`, attrs);
+    },
+  },
+  {
+    className: "table-shape",
+    apply: (body, attrs, random) => {
+      const inner = pick(random, [
+        "<table><tr><td>a</td></tr><tr><td>b</td><td>c</td></tr></table>",
+        "<table><thead><tr><th>h</th><th>i</th></tr></thead><tbody><tr><td>a</td></tr></tbody></table>",
+        "<table><tr></tr><tr><td>a</td></tr></table>",
+        "<table><tr><td><table><tr><td>a</td></tr><tr></tr></table></td></tr></table>",
+      ]);
+      return root(`${body}${inner}`, attrs);
+    },
+  },
+  {
+    className: "void-element",
+    apply: (body, attrs, random) => {
+      const inner = pick(random, [
+        "<p>10<sup/>6 mg</p>",
+        '<p><a href="https://example.org/"/>text</p>',
+        "<p>Do<br>not</br> take</p>",
+        "<p>a</p><hr><p>b</p>",
+        "<hr></hr>",
+        "<table><tr><td/></tr></table>",
+        "<ul><li/></ul>",
+        "<p/>",
+      ]);
+      return root(`${body}${inner}`, attrs);
+    },
+  },
+  {
+    // Two violations at one start tag: `void-element` is decided before the parent check.
+    className: "void-element-and-parent",
+    apply: (body, attrs, random) => {
+      const inner = pick(random, [
+        "<table><br></table>",
+        "<p><sup><hr></sup></p>",
+        "<table><tr><span/></tr></table>",
+        "<ul><li><sub><td/></sub></li></ul>",
+      ]);
+      return root(`${body}${inner}`, attrs);
+    },
+  },
+  { className: "self-closing-root", apply: (_body, attrs) => `<div ${XMLNS}${attrs}/>` },
   {
     className: "soft-hyphen-at-boundary",
     apply: (body, attrs, random) => {
@@ -648,15 +870,87 @@ const VIOLATIONS: readonly Violation[] = [
         `<p>a${SOFT_HYPHEN}</p>`,
         `<p>a${SOFT_HYPHEN}<br/>b</p>`,
         `<p>a${SOFT_HYPHEN}<hr/></p>`,
+        `<p>a${SOFT_HYPHEN}${LF}b</p>`,
+        `<p>a${SOFT_HYPHEN}${CR}${LF}b</p>`,
+        "<p>a&#173;&#10;b</p>",
+        "<p>a&#173;&#13;<br/>b</p>",
+        "<p>a&#173;&#13;&#10;b</p>",
       ]);
       return root(`${body}${inner}`, attrs);
+    },
+  },
+  {
+    className: "soft-hyphen-accepted",
+    apply: (body, attrs, random) => {
+      const inner = pick(random, [
+        `<p>a${SOFT_HYPHEN}${SPACE}b</p>`,
+        "<p>a&#173;&#13;b</p>",
+        `<p>a${SOFT_HYPHEN}${CR}b</p>`,
+        "<p>a&#173;b</p>",
+      ]);
+      return root(`${body}${inner}`, attrs);
+    },
+  },
+  {
+    className: "surrogate-split-markup",
+    apply: (body, attrs, random) => {
+      const high = String.fromCharCode(0xd835);
+      const low = String.fromCharCode(0xdefc);
+      const inner = pick(random, [
+        `<p>${high}<b></b>${low}</p>`,
+        `<p>${high}</p><p>${low}</p>`,
+        `<p>${high}&#65;${low}</p>`,
+      ]);
+      return root(`${body}${inner}`, attrs);
+    },
+  },
+  {
+    className: "surrogate-by-reference",
+    apply: (body, attrs, random) => {
+      const inner = pick(random, [
+        "<p>&#xD835;&#xDEFC;</p>",
+        "<p>&#55349;&#57084;</p>",
+        `<p>&#xD835;${String.fromCharCode(0xdefc)}</p>`,
+        "<p>&#xDEFC;</p>",
+      ]);
+      return root(`${body}${inner}`, attrs);
+    },
+  },
+  {
+    className: "forbidden-reference",
+    apply: (body, attrs, random) => {
+      const reference = pick(random, [
+        "&#133;",
+        "&#x85;",
+        "&#x92;",
+        "&#11;",
+        "&#xC;",
+        "&#x202E;",
+        "&#8206;",
+        "&#x61C;",
+        "&#x2066;",
+        "&#0;",
+        "&#x7F;",
+      ]);
+      return root(`${body}<p>a${reference}b</p>`, attrs);
+    },
+  },
+  {
+    className: "forbidden-raw-character",
+    apply: (body, attrs, random) => {
+      const forbidden = pick(random, FORBIDDEN_2_0_0);
+      const where = between(random, 0, 3);
+      if (where === 0) return root(`${body}<p>a${forbidden}b</p>`, attrs);
+      if (where === 1) return `${forbidden}${root(body, attrs)}`;
+      if (where === 2) return root(`${body}<p${forbidden}>a</p>`, attrs);
+      return root(body, `${attrs} lang="en${forbidden}"`);
     },
   },
 ];
 
 function xhtmlCase(random: Random, seed: number, index: number): CorpusCase {
   const classes = new Set<string>();
-  const attribute = attributes(random, "div");
+  const attribute = attributes(random, "div", true);
   for (const name of attribute.classes) classes.add(name);
   let body = "";
   for (let position = 0; position < between(random, 1, 4); position += 1) {
@@ -705,35 +999,54 @@ type VerifySection = { sourceKey: string; div: string; spans: SourceSpanLike[] }
 
 // A sentence must carry no line terminator of its own: the line structure of a page is exactly
 // what the body-boundary rules are about, so it is built here rather than drawn.
-const LINE_TERMINATORS = new RegExp(
-  `[${CP(0x000a)}${CP(0x000d)}${CP(0x000b)}${CP(0x000c)}${CP(0x0085)}${CP(0x2028)}${CP(0x2029)}]`,
-  "gu",
-);
+const LINE_TERMINATORS = new RegExp(`[${CP(0x000a)}${CP(0x000d)}${CP(0x2028)}${CP(0x2029)}]`, "gu");
 
-function buildPage(random: Random, number: number): BuiltPage {
+// How a page's body is laid out around its sentences. `blank-head` starts the body with an
+// empty line; `hyphen-end` ends it with a word continued on the next page (U+00AD before the
+// final line feed); `no-final-lf` leaves the final line feed out before the footer, and
+// `no-final-lf-at-end` leaves it out at the very end of the page, where fidelity-norm/1.1.1 still
+// accepted it.
+type PageShape = "plain" | "blank-head" | "hyphen-end" | "no-final-lf" | "no-final-lf-at-end";
+
+function pageShape(random: Random): PageShape {
+  const roll = random();
+  if (roll < 0.1) return "blank-head";
+  if (roll < 0.2) return "hyphen-end";
+  if (roll < 0.24) return "no-final-lf";
+  if (roll < 0.28) return "no-final-lf-at-end";
+  return "plain";
+}
+
+function buildPage(random: Random, number: number, shape: PageShape): BuiltPage {
   const header = `HEADER ${word(random)}${LF}`;
+  const headerLength = Array.from(header).length;
   const sentences: { start: number; end: number }[] = [];
-  let body = "";
+  let body = shape === "blank-head" ? LF : "";
   for (let position = 0; position < between(random, 2, 4); position += 1) {
     const { text } = passage(random, between(random, 3, 8));
     const sentence = text.replace(LINE_TERMINATORS, SPACE).trim();
     if (sentence.length === 0) continue;
-    const start = Array.from(header).length + Array.from(body).length;
+    const start = headerLength + Array.from(body).length;
     body += `${sentence}${LF}`;
     sentences.push({ start, end: start + Array.from(sentence).length });
   }
-  if (body.length === 0) {
+  if (sentences.length === 0) {
     const filler = word(random);
-    sentences.push({
-      start: Array.from(header).length,
-      end: Array.from(header).length + filler.length,
-    });
-    body = `${filler}${LF}`;
+    const start = headerLength + Array.from(body).length;
+    sentences.push({ start, end: start + filler.length });
+    body += `${filler}${LF}`;
   }
-  const text = `${header}${body}Page ${number}`;
-  const bodyStart = Array.from(header).length;
+  if (shape === "hyphen-end") body = `${body.slice(0, -1)}${SOFT_HYPHEN}${LF}`;
+  if (shape === "no-final-lf" || shape === "no-final-lf-at-end") body = body.slice(0, -1);
+  const footer = shape === "no-final-lf-at-end" ? "" : `Page ${number}`;
+  const text = `${header}${body}${footer}`;
   return {
-    page: { page: number, text, bodyStart, bodyEnd: bodyStart + Array.from(body).length },
+    page: {
+      page: number,
+      text,
+      bodyStart: headerLength,
+      bodyEnd: headerLength + Array.from(body).length,
+    },
     sentences,
   };
 }
@@ -871,6 +1184,66 @@ const SPAN_LAYOUTS: readonly SpanLayout[] = [
     },
   },
   {
+    // A section that begins at the first sentence of a later page: the start rule reads back
+    // through that page's blank head and into the previous page's body.
+    className: "span-page-start",
+    build: (pages, random) => {
+      const later = pages.slice(1);
+      if (later.length === 0) return sentenceSection(pages, random, 0);
+      const built = pick(random, later);
+      const sentence = built.sentences[0];
+      if (sentence === undefined) return sentenceSection(pages, random, 0);
+      return {
+        sourceKey: "k",
+        div: narrativeFor(sliceOf(built.page, sentence.start, sentence.end)),
+        spans: [spanOver(built.page, sentence.start, sentence.end)],
+      };
+    },
+  },
+  {
+    // A section that ends on a page's last sentence, which may be followed by U+00AD (a word
+    // continued on the next page) or by nothing at all.
+    className: "span-page-end",
+    build: (pages, random) => {
+      const built = pick(random, pages);
+      const sentence = built.sentences[built.sentences.length - 1];
+      if (sentence === undefined) return sentenceSection(pages, random, 0);
+      const end = chance(random, 0.5) ? built.page.bodyEnd : sentence.end;
+      // The narrative is the sentence alone, as an extractor would give it: a narrative that
+      // carried the page's U+00AD U+000A would be refused before the span edges are looked at.
+      return {
+        sourceKey: "k",
+        div: narrativeFor(sliceOf(built.page, sentence.start, sentence.end)),
+        spans: [spanOver(built.page, sentence.start, end)],
+      };
+    },
+  },
+  {
+    // A section whose last span ends just after U+00AD and whitespace inside the body: the end
+    // rule reads through the whitespace to the soft hyphen.
+    className: "span-ends-after-soft-hyphen-space",
+    build: (pages, random) => {
+      const built = pick(random, pages);
+      const points = Array.from(built.page.text);
+      const candidates: number[] = [];
+      for (let at = built.page.bodyStart; at + 1 < built.page.bodyEnd; at += 1) {
+        const next = points[at + 1] ?? "";
+        if (points[at] === SOFT_HYPHEN && next !== LF && WHITESPACE.includes(next)) {
+          candidates.push(at + 2);
+        }
+      }
+      if (candidates.length === 0) return sentenceSection(pages, random, 0);
+      const end = pick(random, candidates);
+      const start = built.sentences.find((sentence) => sentence.end >= end)?.start;
+      if (start === undefined || start >= end) return sentenceSection(pages, random, 0);
+      return {
+        sourceKey: "k",
+        div: narrativeFor(sliceOf(built.page, start, end)),
+        spans: [spanOver(built.page, start, end)],
+      };
+    },
+  },
+  {
     className: "span-page-not-found",
     build: (pages, random) => {
       const section = sentenceSection(pages, random, 0);
@@ -892,7 +1265,11 @@ function verifyCase(random: Random, seed: number, index: number): CorpusCase {
   const classes = new Set<string>();
   const pages: BuiltPage[] = [];
   const pageCount = between(random, 1, 3);
-  for (let number = 1; number <= pageCount; number += 1) pages.push(buildPage(random, number));
+  for (let number = 1; number <= pageCount; number += 1) {
+    const shape = pageShape(random);
+    if (shape !== "plain") classes.add(`page-${shape}`);
+    pages.push(buildPage(random, number, shape));
+  }
   classes.add(`pages-${pageCount}`);
 
   const sections: { sourceKey: string; path: string; div: string }[] = [];
@@ -983,6 +1360,21 @@ function verifyCase(random: Random, seed: number, index: number): CorpusCase {
   } else if (chance(random, 0.04)) {
     classes.add("no-narrative-sections");
     structural = [];
+  }
+  // Pages are numbered 1..N in array order (fidelity-norm/2.0.0): a missing page, pages out of
+  // order and a numbering that does not start at 1 are all structural.
+  if (chance(random, 0.05) && sourcePages.length > 1) {
+    const variant = between(random, 0, 2);
+    if (variant === 0) {
+      classes.add("page-missing");
+      sourcePages = sourcePages.filter((_, position) => position !== 0);
+    } else if (variant === 1) {
+      classes.add("page-misnumbered");
+      sourcePages = [...sourcePages].reverse();
+    } else {
+      classes.add("page-misnumbered");
+      sourcePages = sourcePages.map((page) => ({ ...page, page: page.page + 1 }));
+    }
   }
 
   const input: FidelityInput = {

@@ -14,6 +14,7 @@ worth keeping true by construction rather than by the luck of the input being fa
 from __future__ import annotations
 
 import hashlib
+import json
 from typing import Any
 
 import pytest
@@ -116,3 +117,24 @@ def test_every_vector_family_is_covered() -> None:
     assert len(_VECTORS["normalization"]) > 0
     assert len(_VECTORS["xhtml"]) > 0
     assert len(_VECTORS["verify"]) > 0
+
+
+def _div_from_json(inner_json: str) -> str:
+    """A narrative root decoded from JSON text, with ``inner_json`` spliced in as escapes."""
+    opening = json.dumps('<div xmlns="http://www.w3.org/1999/xhtml"><p>')
+    return str(json.loads(opening[:-1] + inner_json + '</p></div>"'))
+
+
+def test_an_escaped_surrogate_pair_in_json_is_one_code_point() -> None:
+    """Section 2 applies to the div as decoded from JSON (RFC 8259, fidelity-norm/2.0.0).
+
+    The golden vectors are written by ``JSON.stringify``, which never escapes a valid pair, so
+    the escaped form is pinned here: ``\\ud835\\udefc`` is one code point and is accepted, while
+    the same two halves split by markup, or a reference to either half, reject.
+    """
+    letter = chr(0x1D6FC)
+    assert xhtml_to_text(_div_from_json("\\ud835\\udefc")) == f"\n\n{letter}\n\n"
+    for rejected in ("\\ud835<b></b>\\udefc", "&#xD835;&#xDEFC;", "\\ud835"):
+        with pytest.raises(XhtmlError) as raised:
+            xhtml_to_text(_div_from_json(rejected))
+        assert raised.value.code == "forbidden-character"

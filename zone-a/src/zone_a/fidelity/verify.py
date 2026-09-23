@@ -32,6 +32,7 @@ from .normalize import (
     NormalizationError,
     count_words,
     find_forbidden_character,
+    is_whitespace,
     is_word_character,
     normalize_text,
 )
@@ -131,7 +132,9 @@ def _body_issue_for(text: str, body_start: int, body_end: int) -> str | None:
         _at(text, body_start - 1) != "\n" or _soft_hyphen_break_before(text, body_start)
     ):
         return "body-boundary"
-    if body_end != len(text) and _at(text, body_end - 1) != "\n":
+    # A non-empty body always ends with its own line terminator, even at the end of the page:
+    # otherwise the last word of one page and the first word of the next would read as one.
+    if body_end != body_start and _at(text, body_end - 1) != "\n":
         return "body-boundary"
     if len(text) - (body_end - body_start) > MAX_EXCLUDED_CODE_POINTS_PER_PAGE:
         return "excluded-text"
@@ -142,7 +145,7 @@ def index_pages(source: Json) -> tuple[dict[int, PageIndex], list[str]]:
     pages: dict[int, PageIndex] = {}
     structural: list[str] = []
     issues: list[str] = []
-    for page in source["pages"]:
+    for position, page in enumerate(source["pages"], start=1):
         text = page["text"]
         # `Number.isInteger`, not `isinstance(..., int)`: a JSON `1.0` is the same number as `1`
         # on the Zone B side, and the issue strings are inside `reportHash`, so the number is
@@ -152,6 +155,10 @@ def index_pages(source: Json) -> tuple[dict[int, PageIndex], list[str]]:
         body_end = _as_integer(page["bodyEnd"])
         if number is not None and number in pages:
             structural.append(f"Duplicate page number {_number_text(page['page'])}")
+        # Pages are numbered 1..N in array order, so no page can be left out of the document and
+        # the text before a section's first span is always the text the document puts there.
+        if number != position:
+            structural.append(f"Page {_number_text(page['page'])} at position {position}")
         if (
             number is None
             or number < 1
@@ -186,6 +193,49 @@ def _is_blank_slice(index: PageIndex, start: int, end: int) -> bool:
         return normalize_text(index.text[start:end]) == ""
     except NormalizationError:
         return False
+
+
+def _start_cuts_word(pages: dict[int, PageIndex], span: Json) -> bool:
+    """Section 6 start rule: does the section begin inside a word?
+
+    Reads backwards from the code point before the first span, through its page's body and then
+    the bodies of the pages before it (as declared, whether or not they pass section 1 or 2),
+    skipping section 3 whitespace. The first other code point cuts a word if it is U+00AD, or if
+    it is a word character and nothing was skipped. Reading past page 1 is no cut.
+    """
+    skipped = False
+    page_number = span["page"]
+    position = span["startOffset"] - 1
+    index = pages.get(page_number)
+    while index is not None:
+        while position >= index.body_start:
+            character = index.text[position]
+            if is_whitespace(ord(character)):
+                skipped = True
+                position -= 1
+                continue
+            return character == SOFT_HYPHEN or (not skipped and is_word_character(character))
+        page_number -= 1
+        index = pages.get(page_number)
+        if index is not None:
+            position = index.body_end - 1
+    return False
+
+
+def _end_cuts_word(index: PageIndex, span: Json) -> bool:
+    """Section 6 end rule: does the section end inside a word?
+
+    It does if the last span, without trailing section 3 whitespace, ends in U+00AD, or if the
+    code point at its end offset is a word character inside the body.
+    """
+    start, end = span["startOffset"], span["endOffset"]
+    trimmed = end
+    while trimmed > start and is_whitespace(ord(index.text[trimmed - 1])):
+        trimmed -= 1
+    if trimmed > start and index.text[trimmed - 1] == SOFT_HYPHEN:
+        return True
+    after = _at(index.text, end)
+    return end < index.body_end and after is not None and is_word_character(after)
 
 
 def _resolve_spans(spans: list[Json], pages: dict[int, PageIndex]) -> list[str] | tuple[str, str]:
@@ -242,25 +292,12 @@ def _resolve_spans(spans: list[Json], pages: dict[int, PageIndex]) -> list[str] 
 
     # The outer edges of a section must fall on word boundaries: a section may omit words, but
     # it may not begin or end inside one (spec section 6).
-    if pieces:
-        first, last = pieces[0], pieces[-1]
-        head = first.index.text
-        before = _at(head, first.start - 1)
-        if (
-            first.start > first.index.body_start
-            and before is not None
-            and (is_word_character(before) or _soft_hyphen_break_before(head, first.start))
-        ):
-            return ("invalid-provenance", "word-cut")
-        tail = last.index.text
-        after = _at(tail, last.end)
-        cuts_after = _at(tail, last.end - 1) == SOFT_HYPHEN or (
-            (after is not None and is_word_character(after))
-            if last.end < last.index.body_end
-            else _soft_hyphen_break_before(tail, last.end)
-        )
-        if cuts_after:
-            return ("invalid-provenance", "word-cut")
+    if (
+        pieces
+        and spans
+        and (_start_cuts_word(pages, spans[0]) or _end_cuts_word(pieces[-1].index, spans[-1]))
+    ):
+        return ("invalid-provenance", "word-cut")
 
     return [piece.index.text[piece.start : piece.end] for piece in pieces]
 

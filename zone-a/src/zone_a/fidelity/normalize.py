@@ -16,7 +16,7 @@ from __future__ import annotations
 import unicodedata
 from typing import Final
 
-NORMALIZATION_VERSION: Final = "fidelity-norm/1.1.1"
+NORMALIZATION_VERSION: Final = "fidelity-norm/2.0.0"
 
 # ADR 0003: NFC output depends on the Unicode Character Database of the runtime, so the UCD is
 # pinned as tightly as the code. Zone B runs node:22.22.0 (ICU 77.1, Unicode 16.0).
@@ -37,24 +37,10 @@ BULLET_GLYPHS: Final = frozenset(
     {0x2022, 0x2023, 0x2043, 0x2219, 0x25A0, 0x25A1, 0x25AA, 0x25AB, 0x25CB, 0x25CF, 0x25E6}
 )
 
-# Closed list, section 3 step 5. U+2000-U+200A is a range, handled in is_whitespace().
+# Closed list, section 3 step 5. U+2000-U+200A is a range, handled in is_whitespace(). U+000B,
+# U+000C and U+0085 are not here: since fidelity-norm/2.0.0 section 2 rejects them.
 WHITESPACE: Final = frozenset(
-    {
-        0x0009,
-        0x000A,
-        0x000B,
-        0x000C,
-        0x000D,
-        0x0020,
-        0x0085,
-        0x00A0,
-        0x1680,
-        0x2028,
-        0x2029,
-        0x202F,
-        0x205F,
-        0x3000,
-    }
+    {0x0009, 0x000A, 0x000D, 0x0020, 0x00A0, 0x1680, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000}
 )
 
 SOFT_HYPHEN: Final = chr(0x00AD)
@@ -92,13 +78,24 @@ def is_word_character(character: str) -> bool:
 
 
 def is_forbidden(code_point: int) -> bool:
-    """Section 2's closed rejection list."""
-    if code_point in (0xFFFD, 0xFFFE, 0xFFFF, 0x007F):
+    """Section 2's closed rejection list.
+
+    C1 controls (U+0080-U+009F) because a renderer remaps them through windows-1252; U+000B and
+    U+000C because they are not XML characters; the bidirectional controls because their reach
+    differs between a narrative block and page text.
+    """
+    if code_point in (0xFFFD, 0xFFFE, 0xFFFF):
+        return True
+    if 0x007F <= code_point <= 0x009F:
         return True
     if 0xD800 <= code_point <= 0xDFFF:
         return True
+    if code_point in (0x061C, 0x200E, 0x200F):
+        return True
+    if 0x202A <= code_point <= 0x202E or 0x2066 <= code_point <= 0x2069:
+        return True
     if code_point < 0x0020:
-        return code_point not in (0x0009, 0x000A, 0x000B, 0x000C, 0x000D)
+        return code_point not in (0x0009, 0x000A, 0x000D)
     return False
 
 
