@@ -1,6 +1,7 @@
 node_modules/
 dist/
 coverage/
+.coverage
 .env
 .env.*
 !.env.example
@@ -17,9 +18,13 @@ gha-creds-*.json
 # responses, generated PDFs, reports); already covered by .cache/ above.
 __pycache__/
 *.pyc
-agent-tools/
 fhir/vendor/
-artifacts/
 
 # Agent worktrees (Claude Code); each is its own checkout, never committed from here.
 .claude/worktrees/
+# Per-user Claude Code settings; the shared ones are .claude/settings.json.
+.claude/settings.local.json
+
+# The full differential corpus CI writes at the root (the committed smoke corpus lives in
+# zone-a/tests/fixtures/).
+differential.jsonl

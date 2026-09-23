@@ -22,10 +22,11 @@ on:
     branches: [main]
     types: [opened, synchronize, reopened, labeled, unlabeled]
 
-permissions:
-  contents: read
-  id-token: write
-  pull-requests: write
+# Nothing at the workflow level: the one job below names what it needs. A grant here would reach
+# every job this workflow ever gains, and id-token: write lets any process in a job ask for the
+# OIDC token the planner's pool exchanges (test/ci/deploy-permissions.test.ts). The job installs
+# no npm packages; if it ever must, it installs with npm_config_ignore_scripts, as the deploy does.
+permissions: {}
 
 concurrency:
   group: plan-${{ github.event.pull_request.number }}
@@ -36,6 +37,10 @@ jobs:
     name: Plan
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
     defaults:
       run:
         shell: bash --noprofile --norc -eo pipefail {0}

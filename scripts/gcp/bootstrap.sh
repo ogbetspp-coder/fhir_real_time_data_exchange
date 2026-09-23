@@ -169,7 +169,7 @@ fi
 # fetch-standards.mjs writes it with no suffix at all: no literal "-" to
 # anchor on here (unlike the other, packaged vendor files below).
 TYPE2_EXAMPLE=(fhir/vendor/HL7_Global_ePI_Type_2_DrugX_example*.json)
-node_modules/.bin/tsx scripts/export-fixture.ts "$TMP/synthetic-type2.json" "${TYPE2_EXAMPLE[0]}"
+node_modules/.bin/tsx scripts/fhir/export-fixture.ts "$TMP/synthetic-type2.json" "${TYPE2_EXAMPLE[0]}"
 TOKEN="$(ema_flow_access_token)"
 FHIR_BASE="https://healthcare.googleapis.com/v1/projects/${PROJECT_ID}/locations/${REGION}/datasets/${DATASET}/fhirStores/${SOURCE_STORE}/fhir"
 if ! curl --fail-with-body --silent --show-error \

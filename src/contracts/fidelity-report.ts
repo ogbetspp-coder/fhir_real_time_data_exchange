@@ -84,5 +84,3 @@ export const FidelityReportSchema = z
     reportHash: Sha256Hex,
   })
   .meta({ id: "FidelityReport" });
-
-export type FidelityReportWire = z.infer<typeof FidelityReportSchema>;

@@ -650,6 +650,165 @@ PY
   esac
 }
 
+# The query service after a deploy: up, this commit's revision, and walled at both layers. No
+# tool is called; the authenticated get_section / verify_quote smoke is still to come.
+#
+#   1. Cloud Run reports the service Ready and serving the revision it created last: the
+#      revision this deploy made passed its startup probe (/healthz, inside the container).
+#   2. Anonymous, with no credential at all, POST /mcp and GET /readyz are both refused, 401 or
+#      403. The service has no allUsers invoker (infra/query.tf), so this is Cloud Run's IAM edge
+#      answering: nothing about the service is public, and a missing service would be 404.
+#   3. With QUERY_EDGE_ID_TOKEN — an ID token for the service URL, of an identity that may invoke
+#      it, carried in X-Serverless-Authorization the way Gemini Enterprise carries its own — the
+#      request passes the edge and reaches the container, with no Authorization header:
+#        POST /mcp must be the container's own `401 {"error":"unauthenticated"}`: the service is
+#        up, and its Bearer check refuses a caller that passed Cloud Run's;
+#        GET /readyz must be 200 with status ok, service ema-flow-query, and version equal to
+#        this deploy's SERVICE_VERSION: the revision answering is the one just deployed.
+#      Without the token, step 3 is skipped with a notice (a local run as a user account).
+#
+# Only status codes and closed fields of a JSON body (error, status, service, version) are
+# printed. A request that fails these checks never reaches a tool, so no answer (000) and a
+# frontend 502/503/504 — a cold start — are retried; nothing else is.
+query_smoke_request() {
+  local method="$1" path="$2" edge_token="${3:-}" body_file attempt
+  body_file="$(mktemp)"
+  for attempt in 1 2 3; do
+    local args=(--silent --output "$body_file" --write-out '%{http_code}' --max-time 30
+      --request "$method")
+    if [[ -n "$edge_token" ]]; then
+      args+=(--header "X-Serverless-Authorization: Bearer ${edge_token}")
+    fi
+    if [[ "$method" == "POST" ]]; then
+      args+=(--header 'Content-Type: application/json'
+        --header 'Accept: application/json, text/event-stream'
+        --data '{"jsonrpc":"2.0","id":1,"method":"tools/list"}')
+    fi
+    QS_CODE="$(curl "${args[@]}" "${QUERY_SMOKE_URL}${path}" || true)"
+    case "$QS_CODE" in
+      000 | 502 | 503 | 504)
+        if [[ "$attempt" -lt 3 ]]; then
+          echo "${method} ${path} answered ${QS_CODE} (attempt ${attempt}/3); retrying in ${QUERY_SMOKE_RETRY_SECONDS:-10}s." >&2
+          sleep "${QUERY_SMOKE_RETRY_SECONDS:-10}"
+          continue
+        fi
+        ;;
+    esac
+    break
+  done
+  QS_FIELDS="$(python3 - "$body_file" <<'PY'
+import json
+import re
+import sys
+
+try:
+    with open(sys.argv[1], encoding="utf-8") as handle:
+        body = json.load(handle)
+except Exception:
+    body = None
+if not isinstance(body, dict):
+    body = {}
+
+
+def closed(key):
+    value = body.get(key)
+    if isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9._:-]{1,64}", value):
+        return value
+    return "-"
+
+
+print(" ".join(f"{key}={closed(key)}" for key in ("error", "status", "service", "version")))
+PY
+)"
+  rm -f "$body_file"
+}
+
+# Fails unless the last request was refused at the edge (401 or 403), saying which way it was not.
+query_smoke_expect_refused() {
+  local label="$1"
+  case "$QS_CODE" in
+    401 | 403) return 0 ;;
+    2??)
+      echo "::error title=Query smoke failed::${label} answered ${QS_CODE} to a caller with no credential. The query service must refuse every unauthenticated request." >&2
+      ;;
+    404)
+      echo "::error title=Query smoke failed::${label} answered 404: no service answers at ${QUERY_SMOKE_URL}." >&2
+      ;;
+    *)
+      echo "::error title=Query smoke failed::${label} answered ${QS_CODE}, not the 401 or 403 refusal expected of an unauthenticated request." >&2
+      ;;
+  esac
+  return 1
+}
+
+phase_query_smoke() {
+  echo "=== query-smoke: the deployed query service is up, current, and walled ==="
+  local query_service="ema-flow-${ENVIRONMENT}-query" describe_file failed=0 expected
+  QUERY_SMOKE_URL="$(terraform -chdir=infra output -raw query_service_url 2>/dev/null || true)"
+  if [[ -z "$QUERY_SMOKE_URL" ]]; then
+    echo "::error title=Query smoke::terraform output query_service_url was empty; nothing to call." >&2
+    return 1
+  fi
+  echo "query=${QUERY_SMOKE_URL}"
+
+  describe_file="$(mktemp)"
+  if ! gcloud --quiet run services describe "$query_service" --region="$REGION" --format=json >"$describe_file"; then
+    rm -f "$describe_file"
+    echo "::error title=Query smoke::could not describe Cloud Run service ${query_service}." >&2
+    return 1
+  fi
+  if ! python3 - "$describe_file" <<'PY'; then
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    status = (json.load(handle) or {}).get("status") or {}
+ready = [c for c in status.get("conditions") or [] if c.get("type") == "Ready"]
+created = status.get("latestCreatedRevisionName")
+serving = status.get("latestReadyRevisionName")
+if not ready or ready[0].get("status") != "True":
+    print("::error title=Query smoke failed::Cloud Run does not report the query service Ready.")
+    sys.exit(1)
+if not created or created != serving:
+    print(f"::error title=Query smoke failed::the latest created revision {created!r} is not the latest ready one {serving!r}: this deploy's revision did not start.")
+    sys.exit(1)
+print(f"query service Ready, serving {serving}")
+PY
+    rm -f "$describe_file"
+    return 1
+  fi
+  rm -f "$describe_file"
+
+  query_smoke_request POST /mcp
+  echo "anonymous POST /mcp: HTTP ${QS_CODE} ${QS_FIELDS}"
+  query_smoke_expect_refused "anonymous POST /mcp" || failed=1
+  query_smoke_request GET /readyz
+  echo "anonymous GET /readyz: HTTP ${QS_CODE} ${QS_FIELDS}"
+  query_smoke_expect_refused "anonymous GET /readyz" || failed=1
+
+  # The token itself is never printed; only whether there was one.
+  if [[ -z "${QUERY_EDGE_ID_TOKEN:-}" ]]; then
+    echo "::notice title=Query smoke::QUERY_EDGE_ID_TOKEN is not set, so the container's own checks (its 401 on /mcp, its /readyz version) were skipped."
+    return "$failed"
+  fi
+
+  query_smoke_request POST /mcp "$QUERY_EDGE_ID_TOKEN"
+  echo "POST /mcp past the edge, no Bearer: HTTP ${QS_CODE} ${QS_FIELDS}"
+  if [[ "$QS_CODE" != "401" || "$QS_FIELDS" != "error=unauthenticated "* ]]; then
+    echo "::error title=Query smoke failed::POST /mcp with no Bearer, past Cloud Run's edge, answered HTTP ${QS_CODE} (${QS_FIELDS}), not the service's own 401 unauthenticated. A non-JSON 401 or a 403 is the edge refusing QUERY_EDGE_ID_TOKEN; a 2xx is the service admitting a caller it could not identify." >&2
+    failed=1
+  fi
+
+  query_smoke_request GET /readyz "$QUERY_EDGE_ID_TOKEN"
+  echo "GET /readyz past the edge: HTTP ${QS_CODE} ${QS_FIELDS}"
+  expected="error=- status=ok service=ema-flow-query version=${SERVICE_VERSION}"
+  if [[ "$QS_CODE" != "200" || "$QS_FIELDS" != "$expected" ]]; then
+    echo "::error title=Query smoke failed::GET /readyz answered HTTP ${QS_CODE} (${QS_FIELDS}), not 200 from ema-flow-query at version ${SERVICE_VERSION}: the revision answering is not this deploy's." >&2
+    failed=1
+  fi
+  return "$failed"
+}
+
 case "$PHASE" in
   preflight) phase_preflight ;;
   deps) phase_deps ;;
@@ -661,6 +820,7 @@ case "$PHASE" in
   record-readers) bash scripts/gcp/record-readers.sh ;;
   bootstrap) phase_bootstrap ;;
   smoke) phase_smoke ;;
+  query-smoke) phase_query_smoke ;;
   all)
     phase_preflight
     phase_deps
@@ -671,6 +831,7 @@ case "$PHASE" in
     bash scripts/gcp/record-readers.sh
     phase_bootstrap
     phase_smoke
+    phase_query_smoke
     ;;
   *)
     echo "Unknown deploy phase: ${PHASE}" >&2
