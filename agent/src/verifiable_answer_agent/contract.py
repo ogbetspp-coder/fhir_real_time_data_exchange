@@ -30,6 +30,8 @@ from typing import Any, Final, Literal, NotRequired, TypedDict, final
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 
+from .quote_edge import edge_after, edge_before
+
 __all__ = [
     "AGENT_TURN_RESOURCE",
     "CONTRACT_RESOURCE",
@@ -46,6 +48,7 @@ __all__ = [
     "load_agent_turn_schema",
     "load_schema",
     "split_for_verification",
+    "utf16_length",
     "validate_tool_output",
 ]
 
@@ -189,7 +192,8 @@ def validate_tool_output(tool: QueryToolName, payload: object) -> ToolResult:
     return ToolResult(tool=tool, value=dict(payload), reason=None)
 
 
-def _utf16_length(text: str) -> int:
+def utf16_length(text: str) -> int:
+    """A string's length as TypeScript counts it: UTF-16 code units."""
     return len(text.encode("utf-16-le")) // 2
 
 
@@ -205,31 +209,76 @@ contract ambiguity rather than resolved by guessing.
 
 
 def split_for_verification(text: str, limit: int = VERIFY_QUOTE_MAX_UTF16) -> tuple[str, ...]:
-    """Split a block into contiguous substrings each short enough to pass to ``verify_quote``.
+    """Split a block into contiguous substrings that ``verify_quote`` can each confirm.
 
     Deterministic, and every chunk is a contiguous substring of ``text``, so ``verify_quote``
-    can find each one in the stored section. Cuts fall on a U+0020 where one exists inside the
-    window — the separator is dropped rather than carried into either chunk, because a leading
-    or trailing space is exactly what normalisation would remove — and at the hard limit when a
-    single token is longer than the whole window.
+    can find each one in the stored section. Cuts fall only on a U+0020 where the service's
+    quote-edge rule (``quote_edge``) holds on both sides: the chunk before it must end on a
+    boundary and the chunk after it must begin on one. So a cut never falls between the groups
+    of a space-grouped number ("1 000" | "000 IU") or after a comparator or sign set off by a
+    space ("CrCl ≥" | "30 ml/min"), either of which the service answers ``no-match`` although
+    the block is the label's own text. The separator is dropped rather than carried into either
+    chunk, because a leading or trailing space is exactly what normalisation would remove.
+
+    Within a window of ``limit`` UTF-16 units the last acceptable cut is taken. The bound: a
+    chunk is longer than ``limit`` only when its first ``limit`` units hold no acceptable cut at
+    all — a single token longer than the window, or an unbroken run of space-grouped digits —
+    and it then ends at the first acceptable cut after the window, or at the end of the block.
+    A cut the rule refuses would be a certain ``no-match``, presented as a finding about the
+    text; a chunk over the bound is not sent (``postcheck.run_post_check``) and the block is
+    flagged ``verification-unavailable``. Either way the block is not verified; only the second
+    says why truthfully.
     """
     if limit < 1:
         raise ValueError("limit must be at least one UTF-16 code unit")
     remainder = text.strip(" ")
     chunks: list[str] = []
     while remainder:
-        if _utf16_length(remainder) <= limit:
+        if utf16_length(remainder) <= limit:
             chunks.append(remainder)
             break
-        window = _window(remainder, limit)
-        cut = window.rfind(" ")
-        if cut <= 0:
-            chunks.append(window)
-            remainder = remainder[len(window) :].lstrip(" ")
-            continue
-        chunks.append(window[:cut])
+        fits = len(_window(remainder, limit))
+        cut = _last_cut(remainder, fits)
+        if cut is None:
+            cut = _first_cut(remainder, fits)
+        if cut is None:
+            chunks.append(remainder)
+            break
+        chunks.append(remainder[:cut])
         remainder = remainder[cut:].lstrip(" ")
-    return tuple(chunk for chunk in chunks if chunk)
+    return tuple(chunks)
+
+
+def _acceptable_cut(text: str, index: int) -> bool:
+    """A cut at the run of spaces starting at ``index``, leaving both new edges on a boundary."""
+    if index <= 0 or text[index] != " " or text[index - 1] == " ":
+        return False
+    resume = index
+    while resume < len(text) and text[resume] == " ":
+        resume += 1
+    if resume == len(text):
+        return False
+    return edge_after(text, index, text[index - 1]) and edge_before(text, resume, text[resume])
+
+
+def _last_cut(text: str, fits: int) -> int | None:
+    """The last acceptable cut whose chunk before it is at most ``fits`` code points long."""
+    index = text.rfind(" ", 0, fits + 1)
+    while index > 0:
+        if _acceptable_cut(text, index):
+            return index
+        index = text.rfind(" ", 0, index)
+    return None
+
+
+def _first_cut(text: str, fits: int) -> int | None:
+    """The first acceptable cut after the window: where a chunk that cannot fit ends."""
+    index = text.find(" ", fits + 1)
+    while index >= 0:
+        if _acceptable_cut(text, index):
+            return index
+        index = text.find(" ", index + 1)
+    return None
 
 
 def _window(text: str, limit: int) -> str:

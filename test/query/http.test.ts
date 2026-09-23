@@ -673,19 +673,42 @@ describe("query service HTTP surface", () => {
 });
 
 // A store read that never returns, which is what makes the transport's JSON response — which
-// the SDK resolves only once every request id in the body has a response — never resolve.
+// the SDK resolves only once every request id in the body has a response — never resolve. Each
+// read first reports that a tool has reached the store, so a test acts at that moment rather
+// than after a sleep it hopes is long enough.
+let storeReached: () => void = () => undefined;
+function nextStoreRead(): Promise<void> {
+  return new Promise((resolve) => {
+    storeReached = resolve;
+  });
+}
+function hang(): Promise<never> {
+  storeReached();
+  return new Promise<never>(() => undefined);
+}
 const hangingReader: FhirReader = {
-  readBundle: () => new Promise<never>(() => undefined),
-  readBundleVersion: () => new Promise<never>(() => undefined),
-  findProvenanceForBundle: () => new Promise<never>(() => undefined),
+  readBundle: hang,
+  readBundleVersion: hang,
+  findProvenanceForBundle: hang,
 };
 
 const DEADLINE_MS = 250;
+
+// The stalled server's clock: real time, with every reading it gives recorded in order, so a
+// test can say which reading an audit record carries instead of bounding it with a tolerance.
+const clockReadings: number[] = [];
+function recordingClock(): number {
+  const reading = Date.now();
+  clockReadings.push(reading);
+  return reading;
+}
 
 describe("a request the transport never answers", () => {
   let stalled: Server;
   let stalledOrigin: string;
   const stalledAudits: QueryAuditRecord[] = [];
+  // How many clock readings had been taken when each record was written.
+  const readingsAtAudit: number[] = [];
 
   beforeAll(async () => {
     stalled = createQueryServer({
@@ -694,8 +717,12 @@ describe("a request the transport never answers", () => {
       serviceVersion: SERVICE_VERSION,
       verifier,
       entitlements: entitlementDirectory(store),
-      audit: (record) => stalledAudits.push(record),
+      audit: (record) => {
+        stalledAudits.push(record);
+        readingsAtAudit.push(clockReadings.length);
+      },
       requestDeadlineMs: DEADLINE_MS,
+      now: recordingClock,
     });
     await new Promise<void>((resolve) => {
       stalled.listen(0, "127.0.0.1", resolve);
@@ -714,6 +741,7 @@ describe("a request the transport never answers", () => {
 
   it("answers at the deadline instead of holding the request open, and audits the call once", async () => {
     const before = stalledAudits.length;
+    const firstReading = clockReadings.length;
     const startedAt = Date.now();
 
     const response = await fetch(`${stalledOrigin}/mcp`, {
@@ -749,10 +777,19 @@ describe("a request the transport never answers", () => {
     });
 
     // The record is of a call that occupied the whole deadline, so `at` is when the request
-    // began and `durationMs` is how long it ran — not the instant the wait was given up.
+    // began and `durationMs` is how long it ran — not the instant the wait was given up. The
+    // request's first clock reading is its arrival; the last one before the record was written
+    // is when the wait was given up. `at` is exactly the first, and `durationMs` exactly the
+    // distance between the two.
+    const arrival = clockReadings[firstReading];
+    const gaveUp = clockReadings[(readingsAtAudit[before] ?? 0) - 1];
+    if (arrival === undefined || gaveUp === undefined) throw new Error("the clock was not read");
+    expect(record.at).toBe(new Date(arrival).toISOString());
+    expect(record.durationMs).toBe(gaveUp - arrival);
     expect(record.durationMs).toBeGreaterThanOrEqual(DEADLINE_MS);
-    expect(record.durationMs).toBeLessThan(elapsed + 1_000);
-    expect(Date.parse(record.at)).toBeLessThan(startedAt + elapsed - DEADLINE_MS + 250);
+    // Both readings fall inside the client's own view of the request.
+    expect(arrival).toBeGreaterThanOrEqual(startedAt);
+    expect(record.durationMs).toBeLessThanOrEqual(elapsed);
   });
 
   it("stops waiting when the client disconnects, and says so on one warning line", async () => {
@@ -768,6 +805,7 @@ describe("a request the transport never answers", () => {
 
     try {
       const controller = new AbortController();
+      const reached = nextStoreRead();
       const pending = fetch(`${stalledOrigin}/mcp`, {
         method: "POST",
         headers: {
@@ -779,8 +817,9 @@ describe("a request the transport never answers", () => {
         signal: controller.signal,
       }).catch(() => undefined);
 
-      // Long enough for the request to reach the tool, short enough to be inside the deadline.
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      // Disconnect once the tool is waiting on the store: the request has been dispatched, and
+      // the deadline is still ahead of it.
+      await reached;
       controller.abort();
       await pending;
 

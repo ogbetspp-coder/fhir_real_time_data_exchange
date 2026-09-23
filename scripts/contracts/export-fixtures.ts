@@ -49,9 +49,13 @@ for (const [file, value] of Object.entries(files)) {
   );
 }
 
+// Written into the same directory by another generator (scripts/contracts/
+// export-quote-edge-cases.ts), so not this one's to remove.
+const ownedElsewhere = new Set(["quote-edge-cases.json"]);
+
 // A removed fixture must not leave its old file behind for a re-implementation to read.
 for (const name of await readdir(output)) {
-  if (name.endsWith(".json") && files[name] === undefined) {
+  if (name.endsWith(".json") && files[name] === undefined && !ownedElsewhere.has(name)) {
     await unlink(path.join(output, name));
   }
 }

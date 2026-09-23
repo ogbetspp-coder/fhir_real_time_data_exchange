@@ -21,7 +21,13 @@ from dataclasses import dataclass
 from typing import Literal, cast, final
 
 from .answer import AssistantPart, Citation, DraftAnswer, QuotedBlock
-from .contract import QuoteVerification, ToolResult, split_for_verification
+from .contract import (
+    VERIFY_QUOTE_MAX_UTF16,
+    QuoteVerification,
+    ToolResult,
+    split_for_verification,
+    utf16_length,
+)
 
 __all__ = [
     "CheckedAnswer",
@@ -177,6 +183,11 @@ async def run_post_check(draft: DraftAnswer, verify_quote: VerifyQuote) -> Check
     for block in draft.blocks:
         chunk_checks: list[ChunkCheck] = []
         for index, chunk in enumerate(split_for_verification(block.text)):
+            if utf16_length(chunk) > VERIFY_QUOTE_MAX_UTF16:
+                # The splitter found no cut the quote-edge rule accepts inside the bound, and the
+                # contract refuses a longer quote: unavailable, and nothing is sent.
+                chunk_checks.append(ChunkCheck(index=index, verification=None))
+                continue
             result = await verify_quote(
                 block.citation.bundle_id,
                 block.citation.version_id,

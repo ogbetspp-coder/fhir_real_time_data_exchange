@@ -34,6 +34,8 @@ jobs:
       - name: Install Node dependencies
         run: npm ci --no-audit --no-fund
 
+      # The test step of `npm run check` is `npm run test:coverage`: the suite under v8 coverage
+      # with per-directory floors (vitest.config.ts), so a drop below a floor fails this job.
       - name: Run checks
         run: npm run check
 
@@ -202,5 +204,6 @@ jobs:
 
       # Hermetic: the tests stand up the four tools on a real MCP streamable-HTTP server on an
       # ephemeral loopback port and connect the real ADK toolset to it. No model is called.
+      # Under line coverage, with the floor in agent/pyproject.toml [tool.coverage.report].
       - name: Test
-        run: uv run --frozen pytest
+        run: uv run --frozen pytest --cov

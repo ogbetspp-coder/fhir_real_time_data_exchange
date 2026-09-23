@@ -22,7 +22,8 @@ Google Cloud Healthcare API and observe their native near-real-time BigQuery str
 
 - Bootstrap: `npm ci`
 - Format: `npm run format`
-- Full local gate: `npm run check`
+- Full local gate: `npm run check` (its test step is `npm run test:coverage`: the suite under v8
+  coverage with per-directory floors in `vitest.config.ts`; raise a floor when coverage rises)
 - Every CI gate (Node, Zone A, Agent; not the official HL7 validator): `scripts/check-all.sh`.
   Needs Python 3.14 and uv 0.12.17 (`agent/.uv-bootstrap`, `zone-a/.uv-bootstrap`, `$UV` or
   `PATH`); `test/ci/check-all.test.ts` keeps it in step with `.github/workflows/ci.yml`.
