@@ -25,19 +25,76 @@ on:
       - "osv-scanner.toml"
   workflow_dispatch:
 
-permissions:
-  contents: read
-  id-token: write
-  issues: write
+# Nothing at the workflow level: each job names what it needs. A job granted id-token: write
+# can ask GitHub for an OIDC token that Workload Identity Federation exchanges for the deployer,
+# and every process in that job can make the request (ACTIONS_ID_TOKEN_REQUEST_URL and _TOKEN
+# are in its environment) whether or not an auth step has run yet. So the quality gate, which
+# installs the whole dependency tree with its install scripts and runs every test, lint and
+# build tool in it, runs in a job that cannot ask (repository review, 2026-09-22).
+permissions: {}
 
 concurrency:
   group: deploy-google-cloud
   cancel-in-progress: false
 
 jobs:
+  gate:
+    name: Quality gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash --noprofile --norc -eo pipefail {0}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 22.14.0
+          package-manager-cache: false
+      # npm ci directly, not deploy.sh deps: the script resolves a project id before any phase,
+      # and this job has neither the project variables nor a gcloud configuration.
+      - name: Install Node dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Quality gate
+        run: npm run check
+
+  # A failed gate leaves the same kind of issue a failed deploy does (foundations C11), from a
+  # job that checks nothing out, installs nothing and holds only the right to open an issue.
+  gate-failure:
+    name: Report a failed quality gate
+    needs: gate
+    if: failure()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: Open a deploy-failure issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          gh issue create \
+            --title "deploy-failure ${{ github.run_id }}" \
+            --body "Actions run: ${run_url}
+
+          The quality gate failed, so nothing was deployed. The job log has the failing check."
+
   deploy:
     name: Deploy
+    needs: gate
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      issues: write
     timeout-minutes: 90
     defaults:
       run:
@@ -95,15 +152,14 @@ jobs:
           node-version: 22.14.0
           package-manager-cache: false
 
-      - name: Install Node dependencies
+      # The deploy still runs Node: bootstrap.sh fetches the pinned standards and exports the
+      # fixture with tsx. It needs the packages, not their install scripts, and in this job an
+      # install script could ask for the deployer's token. The gate job above has already run
+      # the same lock file with scripts on and proved the tree works.
+      - name: Install Node dependencies without install scripts
+        env:
+          npm_config_ignore_scripts: "true"
         run: bash scripts/gcp/deploy.sh deps 2>&1 | tee -a deploy-run.log
-
-      # Runs before any cloud credential exists on the runner: npm scripts and tests never
-      # execute with a Google Cloud credential file in the workspace. Not tee'd into
-      # deploy-run.log either, because a failing test prints fixture diffs and that log is
-      # published into an issue on failure.
-      - name: Quality gate
-        run: npm run check
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
