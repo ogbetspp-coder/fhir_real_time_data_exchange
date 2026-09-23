@@ -70,7 +70,7 @@ EMA writes "GFR < 60 mL/min" that way in Jentadueto.
   reported with its differences, as a proposal for a person to judge. Resemblance is an
   alignment of the statement with the text, token by token (words and single punctuation
   marks): a fill-in takes any run of words, an optional segment is taken or skipped, and each
-  substituted, missing or inserted token costs one. A deviation needs at least 85% of matched
+  substituted, missing or inserted token costs one (a word for a punctuation mark, or the reverse, costs two). A deviation needs at least 85% of matched
   tokens against matched tokens plus changes, and either six matched words or every word the
   statement requires. The differences are exact ("https" against "http", "," against ";"); the
   same tokens with other spaces or paragraph breaks, fewer or more, are a `layout` difference

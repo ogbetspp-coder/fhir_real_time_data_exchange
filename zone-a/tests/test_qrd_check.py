@@ -812,3 +812,31 @@ def test_a_break_inside_an_optional_segment_is_kept() -> None:
     nodes = module._nodes(module._statement(parse("a b c <{x}\nKeep it> d e f")))
     keep = next(node for node in nodes if node.text == "Keep")
     assert keep.brk
+
+
+# --- review round 8 -----------------------------------------------------------------------
+
+
+def test_a_joint_before_nested_segments_reaches_the_first_token() -> None:
+    from zone_a.qrd import check as module
+    from zone_a.qrd.check import _Piece
+
+    pieces = [
+        _Piece("", "text", "Store below"),
+        _Piece(" ", "fill"),
+        _Piece(
+            "\n", "optional", pieces=(_Piece("", "optional", pieces=(_Piece("", "text", "Keep"),)),)
+        ),
+    ]
+    keep = next(node for node in module._nodes(pieces) if node.text == "Keep")
+    assert keep.brk
+    assert keep.space
+
+
+def test_a_fill_in_does_not_start_a_paragraph_the_template_does_not_break() -> None:
+    text = REPORTING.replace("Appendix V.", "Appendix")
+    paragraphs = _paragraphs(text, "V and more.", "Next paragraph.")
+    result = check(document(smpc_4_8_reporting=paragraphs), REGISTRY, MAPPING)
+    for finding in findings(result, "deviation"):
+        for difference in finding["differences"]:
+            assert "Next paragraph" not in difference["label"]

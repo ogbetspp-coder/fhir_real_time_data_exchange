@@ -44,20 +44,21 @@ resembles a stretch of its section is a ``deviation`` finding, a proposal for a 
 Resemblance is an alignment of the statement with the text, token by token (words, a word with
 "(s)", and single punctuation marks): a token matches an equal one, a fill-in takes any run of
 tokens within one paragraph, an optional segment is taken or skipped, and each substituted,
-missing or inserted token costs one. The score is matched tokens over matched tokens plus cost,
-and a deviation needs at least ``SIMILARITY`` and either ``MIN_MATCHED`` matched words or every
-word outside the optional segments. The differences are the alignment's runs of changes, the
-label's side as its text reads; where the statement's last tokens are missing, the label's words
-to the end of that sentence stand in their place. The same tokens with other spaces or paragraph
-breaks are a ``layout`` difference; the search takes in up to two paragraphs more than the
-statement spans, so a statement set out over more paragraphs is found. Struck or faint text is
-one token, ``HIDDEN_WORD``, that nothing matches and no fill-in takes. Characters that an exact
-match of another statement of the same section or appendix explains are not compared again, and
-where two resemblances of one section or appendix overlap, only the closer is reported. A
-resemblance in the readable part of a section is reported even when another part was refused. A
-statement with no required literal text of at least ``MIN_LITERAL`` characters is
-``not-checkable`` (too little to tell). A non-optional statement or subheading that is absent is
-a ``missing-statement`` or ``missing-subheading`` finding.
+missing or inserted token costs one (a word for a punctuation mark, or the reverse, costs two).
+The score is matched tokens over matched tokens plus cost, and a deviation needs at least
+``SIMILARITY`` and either ``MIN_MATCHED`` matched words or every word outside the optional
+segments. The differences are the alignment's runs of changes, the label's side as its text
+reads; where the statement's last tokens are missing, the label's words to the end of that
+sentence stand in their place. The same tokens with other spaces or paragraph breaks are a
+``layout`` difference; the search takes in up to two paragraphs more than the statement spans,
+so a statement set out over more paragraphs is found. Struck or faint text is one token,
+``HIDDEN_WORD``, that nothing matches and no fill-in takes. Characters that an exact match of
+another statement of the same section or appendix explains are not compared again, and where two
+resemblances of one section or appendix overlap, only the closer is reported. A resemblance in
+the readable part of a section is reported even when another part was refused. A statement with
+no required literal text of at least ``MIN_LITERAL`` characters is ``not-checkable`` (too little
+to tell). A non-optional statement or subheading that is absent is a ``missing-statement`` or
+``missing-subheading`` finding.
 
 Sections the reader refused are ``refused-section`` findings. A statement not found in a section
 with a refused part is ``not-checked``, not ``absent``: it may be in the part that could not be
@@ -578,9 +579,15 @@ def _nodes(pieces: list[_Piece]) -> list[_Node]:
                 )
                 for n in _nodes(list(piece.pieces))
             ]
-            if inner and piece.joint:
-                first = inner[0]
-                inner[0] = _Node(first.kind, first.text, True, first.end, piece.joint == "\n")
+            if piece.joint:
+                # The joint before the segment belongs to its first token or fill-in, however
+                # deeply nested.
+                for at, node in enumerate(inner):
+                    if node.kind in ("token", "fill"):
+                        inner[at] = _Node(
+                            node.kind, node.text, True, node.end, piece.joint == "\n", node.depth
+                        )
+                        break
             out += inner
             out.append(_Node("close"))
             out[start] = _Node("open", end=len(out) - 1)
@@ -645,13 +652,14 @@ def _align(nodes: list[_Node], tokens: list[_Token]) -> _Alignment | None:
 
     Edit distance over tokens, with the statement's structure: a token matches an equal token
     (cost 0) or is substituted, deleted or has a token inserted before it (cost 1 each; a word
-    substituted for a punctuation mark, or the reverse, costs 2); a
-    fill-in takes one or more tokens of one paragraph, at most ``FILL_LIMIT`` characters, never
-    struck or faint text, and never a whole paragraph unless the template has a break next
-    (cost 0), or is missing (cost 1); an optional segment, nested or not, is taken or skipped (cost
-    0). Of two alignments that cost the same, the one with more matched tokens is kept. The
-    stretch may start and end anywhere, but not on a substitution: a first or last token the
-    label does not match is missing, not replaced by the word beside the stretch."""
+    substituted for a punctuation mark, or the reverse, costs 2); a fill-in takes one or more
+    tokens of one paragraph, at most ``FILL_LIMIT`` characters, never struck or faint text,
+    starts a paragraph only where the template has a break before it (or it opens the
+    statement), and never takes a whole paragraph unless the template has a break next (cost 0),
+    or is missing (cost 1); an optional segment, nested or not, is taken or skipped (cost 0). Of
+    two alignments that cost the same, the one with more matched tokens is kept. The stretch may
+    start and end anywhere, but not on a substitution: a first or last token the label does not
+    match is missing, not replaced by the word beside the stretch."""
     rows, columns = len(nodes) + 1, len(tokens) + 1
     # The first token of the statement, whose capital a label may drop mid-sentence.
     opening = next((n for n, node in enumerate(nodes) if node.kind == "token"), -1)
@@ -659,13 +667,17 @@ def _align(nodes: list[_Node], tokens: list[_Token]) -> _Alignment | None:
     hits = [[0] * columns for _ in range(rows)]
     back: list[list[tuple[str, int, int] | None]] = [[None] * columns for _ in range(rows)]
     cost[0] = [0] * columns
-    # Whether a paragraph break may follow each fill-in: only where the template has one next,
-    # or where nothing follows; otherwise a fill-in would take a whole inserted paragraph.
+    # Whether a fill-in may take a whole paragraph: only where the template has a break next,
+    # or nothing follows. Whether it may start a paragraph: only where the template has a break
+    # before it, or nothing comes before it.
     breaks = {}
+    starts = {}
     for position, node in enumerate(nodes):
         if node.kind == "fill":
             after = next((n for n in nodes[position + 1 :] if n.kind in ("token", "fill")), None)
             breaks[position] = after is None or after.brk
+            before = any(n.kind in ("token", "fill") for n in nodes[:position])
+            starts[position] = node.brk or not before
 
     def relax(row: int, column: int, value: int, found: int, step: tuple[str, int, int]) -> None:
         # Of two alignments that cost the same, the one with more matched tokens is kept.
@@ -738,7 +750,7 @@ def _align(nodes: list[_Node], tokens: list[_Token]) -> _Alignment | None:
                 if origin == 0 or tokens[origin - 1].line != token.line:
                     queue.clear()
                     low = line_start = origin
-                if current[origin] < _INFINITE:
+                if current[origin] < _INFINITE and (origin != line_start or starts[row]):
                     key = (current[origin], -found[origin])
                     while queue and (current[queue[-1]], -found[queue[-1]]) >= key:
                         queue.pop()
@@ -758,6 +770,7 @@ def _align(nodes: list[_Node], tokens: list[_Token]) -> _Alignment | None:
                         for at in range(max(low, line_start + 1), column)
                         if current[at] < _INFINITE
                     ]
+                    # (Starting at the paragraph's first token would take all of it.)
                     if options:
                         pick = min(options, key=lambda at: (current[at], -found[at], -at))
                         relax(row + 1, column, current[pick], found[pick], ("fill", row, pick))
