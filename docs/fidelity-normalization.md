@@ -361,8 +361,10 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   markers U+FDD0–U+FDD5 draws nothing, and is `malformed-narrative` with reason
   `empty-narrative` (a table of empty cells is empty; a list number or a picture is drawn). The
   scanner itself never produces that reason. The crosswalk (`src/fhir/transform.ts`) decides
-  whether a mandatory section carries narrative by a stricter rule of its own: it also ignores
-  invisible characters (U+200B, U+200C, U+200D, U+2060, U+00AD) and pictures, because a picture
+  whether a mandatory section carries narrative by a rule of its own: it ignores whitespace and
+  invisible characters (U+200B, U+200C, U+200D, U+2060, U+FEFF, U+00AD) and, for a mandatory
+  section, pictures, but not a lone list bullet (which the fidelity check then reads as
+  `empty-narrative`), because a picture
   can draw nothing and what one shows is never read.
 
 Because block boundaries become U+000A or U+0009 and the whitespace step collapses them,
@@ -622,10 +624,16 @@ extractor is a controlled component: its name and version are recorded in
   it. A header or footer row the document repeats on the new page, and a continuation label
   such as "Table 2 (continued)", is emitted once, where the table first has it (a label, not
   at all); the repeated copy is drawn text that is excluded from the body like a running header,
-  and counts in `pageCodePoints` and against the page's 240 excluded code points (section 1). A cell that continues across the break is one cell, and the text that continues
-  a row after the break begins with U+0009, unless the body before the break ends with U+00AD
+  and counts in `pageCodePoints` and against the page's 240 excluded code points (section 1). A row's text is always emitted in slot order, each cell's text whole. When a row
+  breaks across a page, the earlier page holds the row's text up to the break in its first
+  continued cell; everything after that point (the rest of that cell, and every later slot of
+  the row, including text the earlier page draws beside it, and the overflow of a cell that
+  spans rows) is emitted on the later page. An extractor that cannot do this must refuse the
+  document: text drawn beside a continued cell and written on the earlier page would read as
+  if it stood before the continuation, in another cell. A cell that continues across the break
+  is one cell, and the text that continues a row after the break begins with U+0009, unless the body before the break ends with U+00AD
   U+000A (a word continued): then it begins with the rest of the word, which section 3 step 1
-  joins to the row's line. After step 1, every line of a table's text from its first U+FDD2 to
+  joins to the row's line. After step 1, every line of a table's body text from its first U+FDD2 to
   the line before its U+FDD1 that holds anything but whitespace holds U+0009 or U+FDD2, so section 3 step 4
   reads a bullet in a cell as content on a continuation line too (a page body ends with a line
   feed, section 1, so the rest of the cell opens a new line). The verifier does not check this,
@@ -652,11 +660,12 @@ extractor is a controlled component: its name and version are recorded in
   pictures must refuse a document that has them. An extractor whose text layer itself contains
   U+FFFC or a code point in U+FDD0–U+FDEF must refuse the document (section 2);
 - put every block on its own line, as the scanner does: U+FDD0, a caption, each U+FDD2 and
-  U+FDD1 each start a line, and a paragraph, heading or list item starts one. A title printed
+  U+FDD1 each start a line, and outside a table cell a paragraph, heading or list item starts one
+  (inside a cell it stays on the cell's line, section 5). A title printed
   above a table is a caption only where the document marks it as one (a Word caption bound to
   the table, a tagged PDF's `Caption` structure element); otherwise, as in an untagged PDF, it
-  is a paragraph before U+FDD0. A `ul` item's bullet is emitted as section 3 step 4
-  removes it, or not at all;
+  is a paragraph before U+FDD0. Outside a table cell, a `ul` item's bullet is emitted as section 3 step 4 removes it, or
+  not at all; inside a cell, not at all (step 4 removes nothing on a cell's line);
 - for a structured source (an authority's published FHIR ePI, ADR 0005), emit one page per
   source section, in source order, with the whole page as its body, holding the section
   narrative as a renderer draws it under the rules of this section, beginning with U+000A and

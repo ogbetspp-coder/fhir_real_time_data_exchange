@@ -1,8 +1,8 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and three reviews of
-the implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md` (3.0.0) is the normative text; where this note and
-it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
+_Proposal, 2026-09-23, amended after two independent design reviews and four reviews of the
+implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
+(3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
 cells spanning columns, five spanning rows and two pictures, and every real summary of product
 characteristics has some of each. 2.0.0 refuses all four._
@@ -243,10 +243,12 @@ The contract replaces the 2.0.0 table and list rules:
 
 - **Line layout.** Every block is on its own line, as the scanner writes it: ⟦table⟧, a caption,
   each ⟦row⟧ and ⟦/table⟧ each start a line, and so does a paragraph, heading or list item. A
-  title printed above a table in a PDF is a paragraph before ⟦table⟧ (a PDF has no captions). A
+  title printed above a table in a PDF is a paragraph before ⟦table⟧ (a PDF has no captions unless it is tagged with a `Caption` element; the spec's §7 is the
+  full text). A
   `ul` item's bullet is emitted as §3 step 4 removes it, or not at all.
 - **Page breaks.** A table, and a cell, that continue across a page break stay one table and one
-  cell; the continuation of a row begins with U+0009, or with the rest of a word hyphenated at the
+  cell; a row's text is emitted in slot order, each cell's text whole, so the text after the
+  break in a row's first continued cell, and every later slot of the row, go on the later page; the continuation of a row begins with U+0009, or with the rest of a word hyphenated at the
   break; a repeated header or footer row and a continuation label are emitted once (the spec's §7
   is the full text).
 - **Structured sources.** An extractor over a structured source (an authority's FHIR ePI, ADR 0005) emits one page per source section, in source order, with the whole page as the body,
@@ -277,7 +279,7 @@ The contract replaces the 2.0.0 table and list rules:
   catalogue, in its order: `reserved-character` after `forbidden-character`, `list-content`
   after `void-element`, `table-size` after `table-shape`. A narrative whose normalised text is
   only U+0020 and grid markers is `empty-narrative` (a table of empty cells draws nothing), and
-  `transform.ts` uses the same rule for whether a narrative is present. The §5 precedence
+  `transform.ts` decides whether a narrative is present by a rule of its own (§5). The §5 precedence
   statement is extended:
   - At a start tag, the parent check has four steps, in this order:
     1. `script-content`;
@@ -484,3 +486,26 @@ rules.
    wording in ADR 0003 and the validation README. Fixed. §3 step 4's and §6's table-row examples
    predate the grid; they describe the U+0009-line rule, which still applies, and a 3.0.0 table
    row additionally starts with U+FDD2.
+
+## Sixth review (2026-09-23, of the implementation): findings and what changed
+
+The sixth review ran 67 cases over 22 page-break scenarios through both verifiers (identical
+report hashes), fuzzed 30 000 narratives against the §7 line invariant (no violation), and
+compared the agent's test double with the service over every code point.
+
+1. **High.** §7 gave no conforming output for a row broken across a page in more than one cell
+   (Word's default lets rows break): a per-page extractor wrote "10 mg" on page 1 and the rest of
+   "Adults with renal / impairment" on page 2, and a narrative moving "impairment" into the "10
+   mg" cell verified. Fixed in §7: a row's text is emitted in slot order, each cell whole; the
+   text after the break in the row's first continued cell, and every later slot, go on the later
+   page, or the extractor refuses the document. Two verify vectors pin it.
+2. **Medium.** The agent's test double accepted quotes the service refuses because they normalise
+   to nothing (a soft hyphen, U+200B, U+2060, U+FEFF, a line-start bullet). Fixed, and checked
+   against the service's normalisation on all 11 110 strings of up to four characters drawn from
+   those classes.
+3. **Medium.** `zone-a/README.md` still named 2.0.0 and 411 vectors. Fixed.
+4. **Low.** Wording: a tagged PDF's captions in this note, the crosswalk's rule in §5 ("its own",
+   not "stricter"; U+FEFF named), the §7 invariant limited to body text, and the line-layout and
+   `ul`-bullet rules limited to text outside a table cell. Fixed. The review also noted that ADR
+   0003's Unicode-version bullet reads more strongly than its amended Decision; that wording is on
+   `main` already and is left for the next change to that ADR.

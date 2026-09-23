@@ -185,18 +185,20 @@ defaults are wrong:
 
 ## Vector results
 
-All 411 golden vectors of `fidelity-norm/2.0.0` pass, byte for byte, including every error case:
+All 497 golden vectors of `fidelity-norm/3.0.0` pass, byte for byte, including every error case:
 
 | Module                         | Result          |
 | ------------------------------ | --------------- |
-| `zone_a/fidelity/normalize.py` | normalize 62/62 |
-| `zone_a/fidelity/xhtml.py`     | xhtml 214/214   |
-| `zone_a/fidelity/verify.py`    | verify 135/135  |
+| `zone_a/fidelity/normalize.py` | normalize 63/63 |
+| `zone_a/fidelity/xhtml.py`     | xhtml 282/282   |
+| `zone_a/fidelity/verify.py`    | verify 152/152  |
 
 Under `fidelity-norm/1.1.1` there were 137 (25, 60 and 52). Seven of those were added by the
 first round of this port: six XHTML cases and one verify case, each of them pinning a divergence
 the existing 130 could not see. The 274 added by `fidelity-norm/2.0.0` pin its rules and both
-sides of every boundary (`docs/validation/changes/2026-09-23-fidelity-norm-2-0-0.md`). They are defined in
+sides of every boundary (`docs/validation/changes/2026-09-23-fidelity-norm-2-0-0.md`). The 86
+added by `fidelity-norm/3.0.0` pin numbered lists, table grids, pictures and the reserved code
+points (`docs/validation/changes/2026-09-23-fidelity-norm-3-0-0.md`). They are defined in
 `test/fixtures/fidelity/cases.ts` on the Zone B side, where the TypeScript defines the expected
 behaviour, and regenerated with `npm run vectors:generate`.
 
@@ -547,10 +549,10 @@ all of item 16 — it now states the `\udXXX` escape and that a hashed number su
 integer 1. The entries are kept as the record of what a port had to discover for itself, and
 because one part of item 15 is still open: `sha256Utf8` is not `JSON.stringify`, and the
 replacement Node's UTF-8 encoder performs on an unpaired surrogate is not written down anywhere.
-This port is on `fidelity-norm/2.0.0`, in step with `NORMALIZATION_VERSION` in
+This port is on `fidelity-norm/3.0.0`, in step with `NORMALIZATION_VERSION` in
 `src/fidelity/normalize.ts`; whenever that constant moves, the Python constant, the vectors, and
-every recorded hash move with it. (It moved from `fidelity-norm/1.1.1` on 2026-09-23, in the
-same change as the TypeScript and by the same author; that is why the seeded differential run,
+every recorded hash move with it. (It moved from `fidelity-norm/1.1.1` to 2.0.0, and then to 3.0.0,
+on 2026-09-23, each time in the same change as the TypeScript and by the same author; that is why the seeded differential run,
 not the vectors, is the evidence that the two agree.)
 
 **15. "`JSON.stringify` string formatting" is a normative reference to a JavaScript function,

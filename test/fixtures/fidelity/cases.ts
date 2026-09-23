@@ -418,6 +418,16 @@ const cellWordAcrossPagesSpans = (): SourceSpan[] =>
   CELL_WORD_ACROSS_PAGES.map((body, index) =>
     spanFor(CELL_WORD_ACROSS_PAGES_SOURCE, index + 1, body),
   );
+// A row broken across a page in two cells (section 7): the earlier page holds the row up to the
+// break in its first continued cell; the rest of that cell and every later slot, including "Oral",
+// which the earlier page draws, are on the later page.
+const ROW_ACROSS_PAGES = [
+  "\ufdd0\n\ufdd2\t\ufdd3\tDose\t\ufdd3\tAdults with renal",
+  "\timpairment\t\ufdd3\t10 mg once daily\t\ufdd3\tOral\n\ufdd1",
+];
+const ROW_ACROSS_PAGES_SOURCE = customSource(ROW_ACROSS_PAGES);
+const rowAcrossPagesSpans = (): SourceSpan[] =>
+  ROW_ACROSS_PAGES.map((body, index) => spanFor(ROW_ACROSS_PAGES_SOURCE, index + 1, body));
 const SPANNED_DOSE_TABLE =
   '<table><tr><td>Adults</td><td rowspan="3">10 mg</td></tr><tr><td>Children</td></tr><tr><td>Elderly</td></tr></table>';
 const MID_LINE_BULLET = "Take 2 \u2022 10 mg daily.";
@@ -2282,6 +2292,35 @@ export const verifyCases: VerifyCase[] = [
           "<table><tr><td>Dose</td><td>Adults with renal impair ment</td><td>10 mg</td></tr></table>",
         ),
         cellWordAcrossPagesSpans(),
+      ),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  // Review round 6: a row broken across a page keeps each cell's text whole and in slot order.
+  {
+    name: "row-broken-across-page-keeps-its-cells",
+    input: toInput(
+      ROW_ACROSS_PAGES_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div(
+          "<table><tr><td>Dose</td><td>Adults with renal impairment</td><td>10 mg once daily</td><td>Oral</td></tr></table>",
+        ),
+        rowAcrossPagesSpans(),
+      ),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "row-broken-across-page-with-a-word-in-the-next-cell-mismatches",
+    input: toInput(
+      ROW_ACROSS_PAGES_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div(
+          "<table><tr><td>Dose</td><td>Adults with renal</td><td>impairment 10 mg once daily</td><td>Oral</td></tr></table>",
+        ),
+        rowAcrossPagesSpans(),
       ),
     ),
     expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },

@@ -119,7 +119,38 @@ def test_the_fake_refuses_the_quotes_the_service_refuses() -> None:
     picture's U+FFFC: such a quote could join two rows, or quote nothing a reader sees.
     """
     table = "Dose table \ufdd0 \ufdd2 \ufdd3 Adults \ufdd3 10 mg \ufdd1 end."
-    for refused in (table, "\ufdd3", "a \ufffc b", "dose\x00 is", "dose\u202e is", "   "):
-        assert quote_is_refused(refused), repr(refused)
-    for accepted in ("Adults", "10 mg", "\ufdcf x", "\ufdf0", "Take 2 \u2022 10 mg"):
-        assert not quote_is_refused(accepted), repr(accepted)
+    refused = (
+        table,
+        "\ufdd3",
+        "a \ufffc b",
+        "dose\x00 is",
+        "dose\u202e is",
+        "   ",
+        # Quotes that normalise to nothing: invisible characters, and a line-start bullet.
+        "\u00ad",
+        "\u200b",
+        "\u2060",
+        "\ufeff",
+        " \u00ad ",
+        "\u200b  ",
+        "\u00ad\n",
+        "\u00ad\r\n",
+        "\n\u2022 ",
+        "\n\u2022 \u25cf ",
+        "\n\u2022\n",
+    )
+    for quote in refused:
+        assert quote_is_refused(quote), repr(quote)
+    accepted = (
+        "Adults",
+        "10 mg",
+        "\ufdcf x",
+        "\ufdf0",
+        "Take 2 \u2022 10 mg",
+        # A bullet that step 4 keeps: at the start of the text, at the end, or on a tab line.
+        "\n\u2022",
+        "\u2022 ",
+        "\n\u2022\t",
+    )
+    for quote in accepted:
+        assert not quote_is_refused(quote), repr(quote)

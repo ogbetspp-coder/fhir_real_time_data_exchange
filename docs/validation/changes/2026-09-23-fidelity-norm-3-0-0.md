@@ -48,12 +48,16 @@ value sits on inside a multi-line cell). Each was fixed before this change, or, 
 stated. A third review, of the implementation, found rows and columns a renderer draws at
 zero size (a false pass the second review had called a false failure), a scan whose cost grew
 with rows × table width, and three untested precedence rules; each was fixed. The design note
-lists all five reviews' findings and what changed. A fourth review found a cell continued
+lists all six reviews' findings and what changed. A fourth review found a cell continued
 across a page break losing a leading bullet on the page side (fixed in section 7, with two verify
 vectors), and quotes carrying grid markers matching across rows (now `invalid-request`). A fifth found that rule stopping a word hyphenated across the break
 inside a cell from joining (fixed in section 7: the continuation then begins with the rest of
 the word; two verify vectors), and the agent's test double answering `match` where the
-service now refuses (fixed).
+service now refuses (fixed). A sixth found no conforming output for a row broken across a
+page in more than one cell (section 7 now keeps each cell's text whole, in slot order, on the
+later page; two verify vectors), and the test double still accepting quotes that normalise to
+nothing through invisible characters or a line-start bullet (fixed; it now agrees with the
+service on all 11 110 strings of up to four characters from those classes).
 
 **Impact assessment (step 0).** Importers of `src/fidelity/`:
 
@@ -118,7 +122,7 @@ service now refuses (fixed).
 **Steps 1–6.** 1: `NORMALIZATION_VERSION` is `fidelity-norm/3.0.0` on both sides. 2:
 `npm run contracts:generate` (no drift), `npm run vectors:generate`, `npm run contracts:fixtures`,
 `npm run contracts:quote-edge` and `npm run differential:smoke` regenerated
-`test/fixtures/fidelity/vectors.json` (411 → 495 vectors: normalisation 62 → 63, XHTML 214 → 282, verify 135 → 150), the four contract fixtures and the smoke corpus. 3: every changed vector,
+`test/fixtures/fidelity/vectors.json` (411 → 497 vectors: normalisation 62 → 63, XHTML 214 → 282, verify 135 → 152), the four contract fixtures and the smoke corpus. 3: every changed vector,
 below. 4: the new vectors: every case the design names, both sides of every boundary (counter
 styles at 26/27, 703, 3999/4000 (702 in the differential), −1/0/1; `start` at `-0`, `007`, `9999`, `10000`; spans at
 0, `02`, 1000, 1001; each `src` form and each refused form; U+FFFC, U+FDD0 and U+FDEF by reference,
@@ -130,7 +134,8 @@ hole, a ragged row, a row span to its group's end, covered slots before, after a
 cells), and verification cases (a list number against another number and another style, a row
 span against empty cells and the reverse, a value moved to another column, a picture against
 other bytes and against none, an empty table as `empty-narrative`, a cell continued across a page break with and without its
-bullet, a word in a cell hyphenated across a page break joined and split). 5: ADR 0003 amended (Consequences), ADR 0001 amended for
+bullet, a word in a cell hyphenated across a page break joined and split, a row broken across a page
+in two cells with each cell kept whole and with a word moved to the next cell). 5: ADR 0003 amended (Consequences), ADR 0001 amended for
 ADR 0005's Type 1 record, ADR 0005 added, `AGENTS.md`'s "Preserve supplied XHTML" reworded to
 the owner's decision of 2026-09-23. 6: UR-09 and UR-22 updated.
 

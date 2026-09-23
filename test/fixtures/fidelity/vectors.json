@@ -13629,6 +13629,174 @@
         },
         "reportHash": "4a90721d16395460c87b133ca36b14cf31c96d3500efa0c321119d4449892e2e"
       }
+    },
+    {
+      "name": "row-broken-across-page-keeps-its-cells",
+      "input": {
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n﷐\n﷒\t﷓\tDose\t﷓\tAdults with renal\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 66
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\n\timpairment\t﷓\t10 mg once daily\t﷓\tOral\n﷑\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 75
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>Dose</td><td>Adults with renal impairment</td><td>10 mg once daily</td><td>Oral</td></tr></table></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 65,
+                "textSha256": "63958d18937612c687e117bb192246396b5441684cb6cb22314f98e98753a6fe"
+              },
+              {
+                "page": 2,
+                "startOffset": 35,
+                "endOffset": 74,
+                "textSha256": "caff418238b54428f347e13a281aa599b3ef283b3dcb31091b0b40b8c7ce8b92"
+              }
+            ],
+            "narrativeDivSha256": "2bc2c1a74b979193a2bac3bc5daca441013aec18b52df39e79ce5f9c94a817f2",
+            "normalizedTextSha256": "4c7b88b0a44a0e8526831540c6f8f66aef285d881264023b66a259638d031d18"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "extractedTextSha256": "ef079b0d0732b98ac9309facbd2377257a16cf454a296256f40eae492c867ae7",
+        "narrativeBindingSha256": "39ec9e0f7cb23d7f86924e67bc1bd1f4b25934628e21af97306cfcd109b247ed",
+        "status": "passed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "verified",
+            "spanCount": 2,
+            "normalizedTextSha256": "4c7b88b0a44a0e8526831540c6f8f66aef285d881264023b66a259638d031d18"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 1
+        },
+        "coverage": {
+          "pageCodePoints": 163,
+          "bodyCodePoints": 71,
+          "coveredCodePoints": 69,
+          "uncoveredGaps": 0
+        },
+        "reportHash": "0f3a89ac987d504a7e8f6b8df92c1644ced1dcf91fd1110d106001358d22bc7e"
+      }
+    },
+    {
+      "name": "row-broken-across-page-with-a-word-in-the-next-cell-mismatches",
+      "input": {
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n﷐\n﷒\t﷓\tDose\t﷓\tAdults with renal\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 66
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\n\timpairment\t﷓\t10 mg once daily\t﷓\tOral\n﷑\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 75
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>Dose</td><td>Adults with renal</td><td>impairment 10 mg once daily</td><td>Oral</td></tr></table></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 65,
+                "textSha256": "63958d18937612c687e117bb192246396b5441684cb6cb22314f98e98753a6fe"
+              },
+              {
+                "page": 2,
+                "startOffset": 35,
+                "endOffset": 74,
+                "textSha256": "caff418238b54428f347e13a281aa599b3ef283b3dcb31091b0b40b8c7ce8b92"
+              }
+            ],
+            "narrativeDivSha256": "5160032d6a93afa37e89d82a76b062d1ebc1b9d410ff328a011031f510b5bf42",
+            "normalizedTextSha256": "25d285168772f11f501cc5e53b54e035055170318ac6363c33d919786365de46"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "extractedTextSha256": "ef079b0d0732b98ac9309facbd2377257a16cf454a296256f40eae492c867ae7",
+        "narrativeBindingSha256": "7baf827fccf02e65489ba59ddb1b5fc7086240bb3d3d5993ead8961065d067eb",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 2,
+            "details": {
+              "expectedLength": 69,
+              "actualLength": 69,
+              "firstDifferingOffset": 31,
+              "commonSuffixLength": 26,
+              "expectedWordCount": 17,
+              "actualWordCount": 17,
+              "expectedSha256": "4c7b88b0a44a0e8526831540c6f8f66aef285d881264023b66a259638d031d18",
+              "actualSha256": "25d285168772f11f501cc5e53b54e035055170318ac6363c33d919786365de46"
+            },
+            "normalizedTextSha256": "25d285168772f11f501cc5e53b54e035055170318ac6363c33d919786365de46"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 163,
+          "bodyCodePoints": 71,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 2
+        },
+        "reportHash": "8598a8d409cc1ad4677a0bd50a86897ab17a7598958ceb0714e1dbbd1be822f1"
+      }
     }
   ]
 }
