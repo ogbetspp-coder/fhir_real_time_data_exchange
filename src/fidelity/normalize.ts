@@ -96,7 +96,13 @@ function linesWithTab(points: readonly string[]): boolean[] {
   return result;
 }
 
-export function normalizeText(text: string): string {
+// `lastLineHasTab`: the text is a slice of page text whose last line continues past the slice
+// in the page, and the whole page line contains U+0009 (section 6). Step 4 then treats the last
+// line as a line with U+0009, so cutting a table row before its U+0009 cannot turn a bullet
+// in its first cell into a list item.
+export type NormalizeOptions = { lastLineHasTab?: boolean };
+
+export function normalizeText(text: string, options: NormalizeOptions = {}): string {
   const forbidden = findForbiddenCharacter(text);
   if (forbidden !== undefined) throw new NormalizationError("forbidden-character", forbidden);
 
@@ -131,6 +137,12 @@ export function normalizeText(text: string): string {
   const output: string[] = [];
   const composed = Array.from(expanded.join("").normalize("NFC"));
   const onTabLine = linesWithTab(composed);
+  if (options.lastLineHasTab === true) {
+    for (let position = composed.length - 1; position >= 0; position -= 1) {
+      if (composed[position] === "\n") break;
+      onTabLine[position] = true;
+    }
+  }
   let atLineStart = false;
   for (let position = 0; position < composed.length; position += 1) {
     const character = composed[position] ?? "";

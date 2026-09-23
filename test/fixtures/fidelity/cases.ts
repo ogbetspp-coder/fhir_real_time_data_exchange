@@ -354,6 +354,16 @@ const GROUPED_NBSP_SOURCE = customSource([GROUPED("\u00a0")]);
 const GROUPED_NNBSP_SOURCE = customSource([GROUPED("\u202f")]);
 const GROUPED_THIN_SOURCE = customSource([GROUPED("\u2009")]);
 const GROUPED_FIGURE_SOURCE = customSource([GROUPED("\u2007")]);
+// Review round 3: groups separated by two code points of whitespace.
+const GROUPED_DOUBLE_SPACE_SOURCE = customSource([GROUPED("  ")]);
+const GROUPED_THIN_THEN_SPACE_SOURCE = customSource([GROUPED("\u2009 ")]);
+const GROUPED_NNBSP_THEN_SPACE_SOURCE = customSource([GROUPED("\u202f ")]);
+const INTRO_THEN_ROW = "Intro text\n\u2022 Adults\t10 mg";
+const INTRO_THEN_ROW_SOURCE = customSource([INTRO_THEN_ROW]);
+const LIST_TAB_ITEM = "\u2022\tAdults: 10 mg";
+const LIST_TAB_ITEM_SOURCE = customSource([LIST_TAB_ITEM]);
+const LIST_SPACE_ITEM = "\u2022 Adults: 10 mg";
+const LIST_SPACE_ITEM_SOURCE = customSource([LIST_SPACE_ITEM]);
 const NUMBER_AT_LINE_END = "Take 2\n10 mg is the daily dose.";
 const NUMBER_AT_LINE_END_SOURCE = customSource([NUMBER_AT_LINE_END]);
 const ROW = "2\t10";
@@ -1932,6 +1942,121 @@ export const verifyCases: VerifyCase[] = [
       ]),
     ),
     expect: { status: "passed", sections: { "smpc.6.4": "verified" } },
+  },
+  // Review round 3, fix 1: the digit-group rule reads the span's first and last code points that
+  // are not edge whitespace, so a span ending or starting in the whitespace between two groups
+  // still cuts the number.
+  {
+    name: "span-ends-with-space-inside-double-spaced-number",
+    input: toInput(
+      GROUPED_DOUBLE_SPACE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("The maximum dose is 10"), [
+        spanFor(GROUPED_DOUBLE_SPACE_SOURCE, 1, "The maximum dose is 10 "),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
+    },
+  },
+  {
+    name: "span-ends-with-thin-space-inside-number",
+    input: toInput(
+      GROUPED_THIN_THEN_SPACE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("The maximum dose is 10"), [
+        spanFor(GROUPED_THIN_THEN_SPACE_SOURCE, 1, "The maximum dose is 10\u2009"),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
+    },
+  },
+  {
+    // The inner code point skips every section 3 whitespace code point, the joiners too: a span
+    // ending in U+202F before a space still ends inside the number.
+    name: "span-ends-with-narrow-no-break-space-inside-number",
+    input: toInput(
+      GROUPED_NNBSP_THEN_SPACE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("The maximum dose is 10"), [
+        spanFor(GROUPED_NNBSP_THEN_SPACE_SOURCE, 1, "The maximum dose is 10\u202f"),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
+    },
+  },
+  {
+    name: "span-starts-with-space-inside-double-spaced-number",
+    input: toInput(
+      GROUPED_DOUBLE_SPACE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("000 IU daily."), [
+        spanFor(GROUPED_DOUBLE_SPACE_SOURCE, 1, " 000 IU daily."),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
+    },
+  },
+  // Fix 2: the U+0009 status of a slice's last line is that of the whole page line, so a span
+  // that stops before a row's U+0009 still keeps a bullet in its first cell as content.
+  {
+    name: "row-cut-before-tab-bullet-kept",
+    input: toInput(
+      INTRO_THEN_ROW_SOURCE,
+      single("smpc.4.2.posology", paragraphs("Intro text", "Adults"), [
+        spanFor(INTRO_THEN_ROW_SOURCE, 1, "Intro text\n\u2022 Adults"),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "row-cell-cut-before-tab-bullet-kept",
+    input: toInput(
+      INTRO_THEN_ROW_SOURCE,
+      single("smpc.4.2.posology", paragraphs("Adults"), [
+        spanFor(INTRO_THEN_ROW_SOURCE, 1, "\u2022 Adults"),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "row-cell-cut-before-tab-against-cell",
+    input: toInput(
+      INTRO_THEN_ROW_SOURCE,
+      single("smpc.4.2.posology", div("<table><tr><td>\u2022 Adults</td></tr></table>"), [
+        spanFor(INTRO_THEN_ROW_SOURCE, 1, "\u2022 Adults"),
+      ]),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  // Fix 3 (section 7): a list bullet must be followed by U+0020, not U+0009; with U+0009 the
+  // line reads as a table row and a list narrative fails (safe, a false failure).
+  {
+    name: "list-bullet-then-tab-against-list",
+    input: toInput(
+      LIST_TAB_ITEM_SOURCE,
+      single("smpc.4.2.posology", div("<ul><li>Adults: 10 mg</li></ul>"), [
+        spanFor(LIST_TAB_ITEM_SOURCE, 1, LIST_TAB_ITEM),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "list-bullet-then-space-against-list",
+    input: toInput(
+      LIST_SPACE_ITEM_SOURCE,
+      single("smpc.4.2.posology", div("<ul><li>Adults: 10 mg</li></ul>"), [
+        spanFor(LIST_SPACE_ITEM_SOURCE, 1, LIST_SPACE_ITEM),
+      ]),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
   },
 ];
 

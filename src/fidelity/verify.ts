@@ -208,10 +208,24 @@ function fromLineStart(index: PageIndex, start: number): number {
   return index.codePoints[position - 1] === "\n" ? position - 1 : start;
 }
 
+// Whether the page line that a slice ending at `end` ends on — the whole line in the body, from
+// the U+000A before it to the next U+000A, not only its part inside the slice — contains U+0009.
+// A slice that ends with U+000A ends on no partial line.
+function lastLineHasTab(index: PageIndex, end: number): boolean {
+  const { bodyStart, bodyEnd } = index.page;
+  if (end <= bodyStart || index.codePoints[end - 1] === "\n") return false;
+  let lineStart = end - 1;
+  while (lineStart > bodyStart && index.codePoints[lineStart - 1] !== "\n") lineStart -= 1;
+  let lineEnd = end;
+  while (lineEnd < bodyEnd && index.codePoints[lineEnd] !== "\n") lineEnd += 1;
+  return index.codePoints.slice(lineStart, lineEnd).includes("\t");
+}
+
 function isBlankSlice(index: PageIndex, start: number, end: number): boolean {
   if (end <= start) return true;
   try {
-    return normalizeText(slice(index, fromLineStart(index, start), end)) === "";
+    const text = slice(index, fromLineStart(index, start), end);
+    return normalizeText(text, { lastLineHasTab: lastLineHasTab(index, end) }) === "";
   } catch {
     return false;
   }
@@ -225,7 +239,7 @@ type SpanPiece = { index: PageIndex; start: number; end: number };
 function resolveSpans(
   spans: SourceSpan[],
   pages: Map<number, PageIndex>,
-): { raw: string[] } | { status: SectionStatus; reason: string } {
+): { raw: string[]; lastLineHasTab: boolean } | { status: SectionStatus; reason: string } {
   const pieces: SpanPiece[] = [];
   let previous: SourceSpan | undefined;
 
@@ -290,7 +304,10 @@ function resolveSpans(
     }
   }
 
-  return { raw: pieces.map((piece) => slice(piece.index, piece.start, piece.end)) };
+  return {
+    raw: pieces.map((piece) => slice(piece.index, piece.start, piece.end)),
+    lastLineHasTab: last === undefined ? false : lastLineHasTab(last.index, last.end),
+  };
 }
 
 // Whitespace for the edge rules: section 3 step 5's list without U+00A0, U+2007 and U+202F,
@@ -300,6 +317,11 @@ const NUMBER_JOINERS = new Set([0x00a0, 0x2007, 0x202f]);
 function isEdgeWhitespace(character: string | undefined): boolean {
   const codePoint = character?.codePointAt(0);
   return codePoint !== undefined && isWhitespace(codePoint) && !NUMBER_JOINERS.has(codePoint);
+}
+
+function isSpace(character: string | undefined): boolean {
+  const codePoint = character?.codePointAt(0);
+  return codePoint !== undefined && isWhitespace(codePoint);
 }
 
 const DECIMAL_DIGIT = /^\p{Nd}$/u;
@@ -331,12 +353,16 @@ function cutsDigitGroup(index: PageIndex, inner: number, beyond: number, step: 1
 // skipping edge whitespace. The section starts inside a token if nothing was skipped before the
 // first other code point, whatever that code point is (a letter, a digit, `.` of `0.5`, `−` of
 // `−20`, U+00A0 of `10 000`), or if that code point is U+00AD. Reading past page 1 is no cut. It
-// also starts inside a number when its first code point is a digit and the first non-whitespace
-// code point before it on the same line is a digit too.
+// also starts inside a number when its first code point that is not edge whitespace is a digit
+// and the first non-whitespace code point before that on the same line is a digit too.
 function startCutsWord(pages: Map<number, PageIndex>, span: SourceSpan): boolean {
   const first = pages.get(span.page);
-  if (first !== undefined && cutsDigitGroup(first, span.startOffset, span.startOffset - 1, -1)) {
-    return true;
+  if (first !== undefined) {
+    // The inner code point is the span's first that is not section 3 whitespace (a joiner
+    // such as U+202F is skipped here too: `\u202f 000` is inside the number).
+    let inner = span.startOffset;
+    while (inner < span.endOffset && isSpace(first.codePoints[inner])) inner += 1;
+    if (inner < span.endOffset && cutsDigitGroup(first, inner, inner - 1, -1)) return true;
   }
   let skipped = false;
   let pageNumber = span.page;
@@ -361,15 +387,20 @@ function startCutsWord(pages: Map<number, PageIndex>, span: SourceSpan): boolean
 // The section ends inside a token if its last span, without trailing edge whitespace, ends in
 // U+00AD; or unless the code point at its end offset is edge whitespace or the end offset is at
 // or past `bodyEnd` (whose code point before is U+000A, section 1). `1` of `1.5` is a cut: the
-// `.` after it is not a boundary. It also ends inside a number when its last code point is a
-// digit and the first non-whitespace code point after it on the same line is a digit too.
+// `.` after it is not a boundary. It also ends inside a number when its last code point that is
+// not edge whitespace is a digit and the first non-whitespace code point after that on the same
+// line is a digit too (a span ending "10 " of "10  000" still cuts the number).
 function endCutsWord(index: PageIndex, span: SourceSpan): boolean {
   let end = span.endOffset;
   while (end > span.startOffset && isEdgeWhitespace(index.codePoints[end - 1])) end -= 1;
   if (end > span.startOffset && index.codePoints[end - 1] === SOFT_HYPHEN) return true;
   if (span.endOffset >= index.page.bodyEnd) return false;
   if (!isEdgeWhitespace(index.codePoints[span.endOffset])) return true;
-  return cutsDigitGroup(index, span.endOffset - 1, span.endOffset, 1);
+  // The inner code point is the span's last that is not section 3 whitespace (`10\u202f`
+  // before ` 000` ends inside the number).
+  let inner = end;
+  while (inner > span.startOffset && isSpace(index.codePoints[inner - 1])) inner -= 1;
+  return inner > span.startOffset && cutsDigitGroup(index, inner - 1, inner, 1);
 }
 
 // Pieces from consecutive pages are concatenated verbatim: a page body ends with its own line
@@ -574,7 +605,9 @@ export function verifyNarrativeFidelity(input: FidelityInput): FidelityReport {
       });
       continue;
     }
-    const expected = normalizeText(joinPieces(resolved.raw));
+    const expected = normalizeText(joinPieces(resolved.raw), {
+      lastLineHasTab: resolved.lastLineHasTab,
+    });
     if (expected !== normalized.text) {
       results.push({
         ...base,
