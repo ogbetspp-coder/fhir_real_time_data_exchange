@@ -40,7 +40,7 @@ function processorName(): { name: string; location: string } {
   if (name === "") {
     throw new SpikeError(
       "DOCUMENT_AI_PROCESSOR is not set",
-      'export DOCUMENT_AI_PROCESSOR="$(terraform -chdir=infra output -raw document_ai_processor)"',
+      'export DOCUMENT_AI_PROCESSOR="projects/<project>/locations/eu/processors/<id>" (no processor is deployed; see scripts/spikes/document-ai/README.md, "Infrastructure")',
     );
   }
   const matched = PROCESSOR_PATTERN.exec(name);
