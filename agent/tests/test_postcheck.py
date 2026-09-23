@@ -174,3 +174,24 @@ async def test_the_driver_treats_an_unavailable_verification_as_unverified() -> 
     answer = await run_post_check(DRAFT, verify)
     assert answer.blocks[0].status == "unverified"
     assert "verification-unavailable" in answer.blocks[0].flags
+
+
+async def test_a_chunk_over_the_quote_bound_is_not_sent_and_the_block_is_unavailable() -> None:
+    # 2,500 units with no cut the quote-edge rule accepts: the splitter keeps the run whole
+    # rather than cut it where the service would answer no-match, and the contract refuses a
+    # quote that long, so nothing is asked about it and the block says why it is not verified.
+    asked: list[str] = []
+
+    async def verify(bundle_id: str, version_id: str, source_key: str, quote: str) -> ToolResult:
+        del bundle_id, version_id, source_key
+        asked.append(quote)
+        return ToolResult(tool="verify_quote", value=dict(verification()), reason=None)
+
+    block = QuotedBlock(block_id="block-01", citation=CITATION, text=f"Take {'x' * 2500} daily.")
+    draft = DraftAnswer(blocks=(block,), assistant=AssistantPart(text=""))
+    answer = await run_post_check(draft, verify)
+    assert asked == ["Take", "daily."]
+    (checked,) = answer.blocks
+    assert checked.status == "unverified"
+    assert checked.flags == ("verification-unavailable",)
+    assert checked.chunks_checked == 3

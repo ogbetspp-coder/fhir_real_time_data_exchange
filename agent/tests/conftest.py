@@ -16,6 +16,20 @@ TEST_PRINCIPAL = "urn:reviewer:synthetic-01"
 TEST_TOKEN = "synthetic-end-user-token"
 
 
+@pytest.fixture(autouse=True)
+def _no_edge_credential(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No test mints Cloud Run's edge token from the runtime's credentials.
+
+    Looking for one on a machine that holds none waits on the GCE metadata server — about 3.4 s
+    per MCP request, most of the suite's run time before 2026-09-22 — and on a machine signed in
+    to Google Cloud it would be a real network call. The edge header and the minting itself have
+    their own tests (``test_tools_edge_auth.py``), which patch what they need explicitly.
+    """
+    from verifiable_answer_agent import tools
+
+    monkeypatch.setattr(tools, "edge_auth_token", lambda _audience: None)
+
+
 @pytest.fixture
 def query_service() -> Iterator[FakeQueryService]:
     with running_query_service() as service:

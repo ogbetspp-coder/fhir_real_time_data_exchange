@@ -29,7 +29,6 @@ from google.adk.sessions import InMemorySessionService
 from google.genai import types
 from pydantic import Field
 
-from verifiable_answer_agent import tools
 from verifiable_answer_agent.agent import build_agent
 from verifiable_answer_agent.finish import TOOLS_UNAVAILABLE_NOTICE, UNVERIFIABLE_NOTICE
 from verifiable_answer_agent.render import ASSISTANT_LABEL, VERIFIED_LABEL
@@ -48,13 +47,8 @@ DRAFT = (
     "From section smpc.4.4 of document version 1 (synthetic-smpc)"
 )
 THOUGHT = "Working: the user wants 4.4."
-
-
-@pytest.fixture(autouse=True)
-def _no_edge_credential(monkeypatch: pytest.MonkeyPatch) -> None:
-    # A laptop holds no runtime identity to mint Cloud Run's edge token from; looking for one
-    # waits on the metadata server. The edge header has its own tests (test_tools_edge_auth.py).
-    monkeypatch.setattr(tools, "edge_auth_token", lambda _audience: None)
+# A thought in the final, complete response: the one whose text the hold keeps.
+FINAL_THOUGHT = "Working: now write it up."
 
 
 class ScriptedModel(BaseLlm):
@@ -100,7 +94,10 @@ class ScriptedModel(BaseLlm):
                     partial=True,
                 )
         yield LlmResponse(
-            content=types.Content(role="model", parts=[types.Part(text=DRAFT)]),
+            content=types.Content(
+                role="model",
+                parts=[types.Part(text=FINAL_THOUGHT, thought=True), types.Part(text=DRAFT)],
+            ),
             finish_reason=types.FinishReason.STOP,
         )
 
@@ -158,6 +155,8 @@ async def test_the_only_text_that_leaves_the_agent_is_the_checked_answer(
     event, shown = texts[0]
     assert event is events[-1]
     assert event.is_final_response()
+    # A thought in the final response never reaches the held text the assistant part is made of.
+    assert FINAL_THOUGHT not in shown
     # The checked answer: the store's text under the verified label, the model's words after it,
     # under their own label.
     stored = query_service.sections[SECTION_KEY].text
