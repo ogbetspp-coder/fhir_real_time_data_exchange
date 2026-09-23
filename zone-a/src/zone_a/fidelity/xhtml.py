@@ -9,9 +9,9 @@ agree on the *syntax* and disagree on the *meaning*, which is exactly the kind o
 golden vector the TypeScript author wrote will never catch:
 
 * JavaScript's ``\\s`` and Python's ``\\s`` are different sets. JavaScript includes U+FEFF and
-  excludes U+001C-U+001F and U+0085; Python is the reverse. Every ``\\s`` in the TypeScript
-  regexes is therefore spelled out as ``_WS`` below, so the scanner accepts and rejects exactly
-  what the TypeScript does.
+  excludes U+001C-U+001F and U+0085; Python is the reverse. Neither is used: since
+  fidelity-norm/2.0.0 whitespace inside a tag is ``[\\t\\n\\r ]`` on both sides (``_WS`` below),
+  because an HTML parser reads any other code point as part of the tag name.
 * JavaScript's ``\\d`` is ASCII ``[0-9]`` unless the ``v``/``u`` flag is combined with a Unicode
   property escape; Python's ``\\d`` on a ``str`` pattern matches every Unicode decimal digit,
   so a numeric character reference written with U+FF10-U+FF19 FULLWIDTH DIGIT would be decoded
@@ -117,51 +117,61 @@ SUPERSCRIPT_DIGITS: Final = (
     0x2079,
 )
 SUBSCRIPT_DIGITS: Final = tuple(range(0x2080, 0x208A))
-PLUS_SIGNS: Final = (0x002B, 0xFE62, 0xFF0B)
-MINUS_SIGNS: Final = (0x002D, 0x2212, 0x2010, 0x2011, 0x2012, 0x2013, 0x2014, 0xFE63, 0xFF0D)
+SUPERSCRIPT_SIGNS: Final = (0x207A, 0x207B, 0x207C, 0x207D, 0x207E)
+SUBSCRIPT_SIGNS: Final = (0x208A, 0x208B, 0x208C, 0x208D, 0x208E)
+PLUS_SIGNS: Final = (0x002B, 0xFE62, 0xFF0B, 0x2795)
+MINUS_SIGNS: Final = (
+    0x002D,
+    0x2212,
+    0x2010,
+    0x2011,
+    0x2012,
+    0x2013,
+    0x2014,
+    0x2015,
+    0x02D7,
+    0xFE58,
+    0xFE63,
+    0xFF0D,
+    0x2796,
+)
 
 
-def _script_table(
-    digits: tuple[int, ...], plus: int, minus: int, equals: int, open_: int, close: int
-) -> dict[int, int]:
-    table = {0x0030 + digit: target for digit, target in enumerate(digits)}
-    table.update(dict.fromkeys(PLUS_SIGNS, plus))
-    table.update(dict.fromkeys(MINUS_SIGNS, minus))
-    table[0x003D] = equals
-    table[0x0028] = open_
-    table[0x0029] = close
-    return table
+class _ScriptRule:
+    """Folding table, the element's own script digits, and the other script's digits and signs."""
+
+    __slots__ = ("folding", "foreign", "own")
+
+    def __init__(
+        self, digits: tuple[int, ...], signs: tuple[int, ...], foreign: tuple[int, ...]
+    ) -> None:
+        plus, minus, equals, open_, close = signs
+        folding = {0x0030 + digit: target for digit, target in enumerate(digits)}
+        folding.update(dict.fromkeys(PLUS_SIGNS, plus))
+        folding.update(dict.fromkeys(MINUS_SIGNS, minus))
+        folding[0x003D] = equals
+        folding[0x0028] = open_
+        folding[0x0029] = close
+        self.folding: dict[int, int] = folding
+        self.own: frozenset[int] = frozenset(digits)
+        self.foreign: frozenset[int] = frozenset(foreign)
 
 
-SCRIPT_FOLDING: Final[dict[str, dict[int, int]]] = {
-    "sup": _script_table(SUPERSCRIPT_DIGITS, 0x207A, 0x207B, 0x207C, 0x207D, 0x207E),
-    "sub": _script_table(SUBSCRIPT_DIGITS, 0x208A, 0x208B, 0x208C, 0x208D, 0x208E),
+SCRIPT_RULES: Final[dict[str, _ScriptRule]] = {
+    "sup": _ScriptRule(SUPERSCRIPT_DIGITS, SUPERSCRIPT_SIGNS, SUBSCRIPT_DIGITS + SUBSCRIPT_SIGNS),
+    "sub": _ScriptRule(SUBSCRIPT_DIGITS, SUBSCRIPT_SIGNS, SUPERSCRIPT_DIGITS + SUPERSCRIPT_SIGNS),
 }
 
-# Numbers already written as script digits are kept; every other number (general category N:
-# a non-ASCII digit, a fraction, a numeral) and a plus-minus sign has no script form and rejects.
-SCRIPT_DIGIT_TARGETS: Final = frozenset(SUPERSCRIPT_DIGITS + SUBSCRIPT_DIGITS)
+# The element's own script digits are kept; the other script's digits and signs, every other
+# number (general category N: a non-ASCII digit, a fraction, a numeral) and a plus-minus sign
+# have no script form there and reject.
 UNMAPPABLE_SIGNS: Final = frozenset({0x00B1, 0x2213})
 
-# JavaScript's \s, written out. See the module docstring. The class is assembled from code
-# points rather than typed as literals, so no invisible character hides in this file.
-_JS_WHITESPACE: Final = (
-    0x0009,
-    0x000A,
-    0x000B,
-    0x000C,
-    0x000D,
-    0x0020,
-    0x00A0,
-    0x1680,
-    0x2028,
-    0x2029,
-    0x202F,
-    0x205F,
-    0x3000,
-    0xFEFF,
-)
-_WS: Final = "[" + "".join(map(chr, _JS_WHITESPACE)) + chr(0x2000) + "-" + chr(0x200A) + "]"
+# Whitespace inside a tag: U+0009, U+000A, U+000D and U+0020, and nothing else. Neither
+# language's `\s` is used: an HTML parser reads any other code point (U+00A0, U+3000, U+FEFF)
+# as part of the tag name, so `sup` followed by U+00A0 is an unknown element to a renderer and
+# must be `malformed-tag` here. See the module docstring.
+_WS: Final = r"[\t\n\r ]"
 
 END_TAG: Final = re.compile(rf"</([A-Za-z][A-Za-z0-9]*){_WS}*>")
 START_TAG: Final = re.compile(
@@ -344,14 +354,16 @@ def _emit_text(
             raise XhtmlError("table-content", offset)
         output.append(character)
         return
-    folding = SCRIPT_FOLDING.get(parent) if parent is not None else None
-    if folding is not None:
-        folded = folding.get(code_point)
+    rule = SCRIPT_RULES.get(parent) if parent is not None else None
+    if rule is not None:
+        folded = rule.folding.get(code_point)
         if folded is not None:
             output.append(chr(folded))
             return
-        if code_point in UNMAPPABLE_SIGNS or (
-            unicodedata.category(character)[0] == "N" and code_point not in SCRIPT_DIGIT_TARGETS
+        if (
+            code_point in UNMAPPABLE_SIGNS
+            or code_point in rule.foreign
+            or (unicodedata.category(character)[0] == "N" and code_point not in rule.own)
         ):
             raise XhtmlError("unmappable-script", offset)
     output.append(character)

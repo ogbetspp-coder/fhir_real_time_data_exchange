@@ -103,20 +103,9 @@ const LIGATURE = CHARS(0xfb00, 0xfb01, 0xfb02, 0xfb03, 0xfb04, 0xfb06);
 // U+FB05 is the other long-s ligature and is NOT in the closed list; the rest decompose under
 // NFKC, which section 3 deliberately does not use.
 const NEAR_LIGATURE = CHARS(0xfb05, 0xfb13, 0x0132, 0x01c4);
-const BULLET = CHARS(
-  0x2022,
-  0x2023,
-  0x2043,
-  0x2219,
-  0x25a0,
-  0x25a1,
-  0x25aa,
-  0x25ab,
-  0x25cb,
-  0x25cf,
-  0x25e6,
-);
-const NEAR_BULLET = CHARS(0x2024, 0x25a2, 0x25cc, 0x00b7, 0x2027);
+const BULLET = CHARS(0x2022, 0x2023, 0x25a0, 0x25a1, 0x25aa, 0x25ab, 0x25cb, 0x25cf, 0x25e6);
+// U+2043 and U+2219 were bullets until the review of fidelity-norm/2.0.0 made them content.
+const NEAR_BULLET = CHARS(0x2024, 0x25a2, 0x25cc, 0x00b7, 0x2027, 0x2043, 0x2219);
 // Section 3 step 5. U+000B, U+000C and U+0085 left the list in fidelity-norm/2.0.0: section 2
 // rejects them, and they are in FORBIDDEN_2_0_0 below.
 const WHITESPACE = CHARS(
@@ -249,6 +238,27 @@ const FRAGMENTS: readonly Fragment[] = [
   { weight: 2, className: "near-ligature", make: (random) => pick(random, NEAR_LIGATURE) },
   { weight: 5, className: "bullet", make: (random) => pick(random, BULLET) },
   { weight: 2, className: "near-bullet", make: (random) => pick(random, NEAR_BULLET) },
+  // Step 4 replaces a bullet only at the start of a line and before whitespace.
+  {
+    weight: 3,
+    className: "bullet-line-start",
+    make: (random) =>
+      `${LF}${pick(random, ["", SPACE, TAB])}${pick(random, [...BULLET, ...CHARS(0x2219, 0x2043)])}${pick(random, WHITESPACE)}${word(random)}`,
+  },
+  {
+    weight: 3,
+    className: "bullet-mid-line",
+    make: (random) =>
+      `${word(random)}${pick(random, ["", SPACE])}${pick(random, [...BULLET, ...NEAR_BULLET])}${pick(random, ["", SPACE])}${word(random)}`,
+  },
+  // A number with punctuation inside it: the span-edge rule must not treat `.`, `,` or `−` as a
+  // word boundary.
+  {
+    weight: 3,
+    className: "number-with-punctuation",
+    make: (random) =>
+      `${pick(random, ["", CP(0x2212), "-"])}${between(random, 0, 99)}${pick(random, [".", ",", "/"])}${between(random, 0, 999)}`,
+  },
   { weight: 4, className: "nfc-singleton", make: (random) => pick(random, NFC_SINGLETON) },
   {
     weight: 4,
@@ -335,9 +345,9 @@ function normalizeCase(random: Random, seed: number, index: number): CorpusCase 
 }
 
 // ----------------------------------------------------------------------------------------------
-// Family (b): the XHTML scanner. Documents are assembled from the allowed grammar; one case in
-// three then carries a single deliberate violation, so the error codes are reached as densely
-// as the accepting paths.
+// Family (b): the XHTML scanner. Documents are assembled from the allowed grammar; two cases in
+// five then carry a single deliberate violation, so the error codes are reached as densely as
+// the accepting paths.
 
 const XMLNS = `xmlns="http://www.w3.org/1999/xhtml"`;
 // `pre` left the allowed elements in fidelity-norm/2.0.0 (it is a violation below); `sup` and
@@ -436,11 +446,18 @@ const SCRIPT_PIECES: readonly { className: string; pool: readonly string[] }[] =
       0xff0d,
     ),
   },
+  // The fold forms the review added (U+02D7, U+FE58, U+2795, U+2796), drawn on their own so
+  // each is reached.
+  { className: "script-dash-review", pool: CHARS(0x02d7, 0xfe58, 0x2795, 0x2796, 0x2015) },
   {
     className: "script-letter",
     pool: [...Array.from("anmaxif"), ...CHARS(0x00ae, 0x002a, 0x002f)],
   },
-  { className: "script-code-point", pool: CHARS(0x00b2, 0x00b3, 0x2070, 0x2082, 0x2089, 0x207b) },
+  // Script digits and signs of both scripts: an element's own are kept, the other's reject.
+  {
+    className: "script-code-point",
+    pool: CHARS(0x00b2, 0x00b3, 0x2070, 0x2082, 0x2089, 0x207b, 0x208a, 0x207e),
+  },
   { className: "script-reference", pool: ["&#x2212;", "&#54;", "&#x2B;", "&#8315;", "&#x2082;"] },
   { className: "script-space", pool: [SPACE, TAB] },
 ];
@@ -504,8 +521,8 @@ function table(random: Random, depth: number): Markup {
       cells += `${tableWhitespace(random, classes)}<${cell}${attribute.markup}>${inner.markup}</${cell}>`;
     }
     // Content a renderer would move out of the table (`table-content`).
-    if (chance(random, 0.03)) {
-      cells += pick(random, ["x", "&#32;", "<span>x</span>", CP(0x00a0), "<br/>"]);
+    if (chance(random, 0.05)) {
+      cells += pick(random, ["x", "&#32;", "&#10;", "<span>x</span>", CP(0x00a0), "<br/>"]);
       classes.add("table-stray-content");
     }
     return `<tr>${cells}${tableWhitespace(random, classes)}</tr>`;
@@ -581,7 +598,23 @@ function node(random: Random, depth: number): Markup {
     const inner = node(random, depth + 1);
     for (const name of inner.classes) classes.add(name);
     classes.add("block-element");
-    return { markup: `<${element}>${inner.markup}</${element}>`, classes };
+    // Whitespace inside a tag is TAB, LF, CR or SPACE, and those are accepted; one tag in
+    // twenty carries whitespace that is only `\s` (U+00A0, U+3000, ...), which is malformed.
+    const tagSpace = (): string => {
+      if (chance(random, 0.05)) {
+        classes.add("tag-non-ascii-whitespace");
+        return pick(random, NON_TAG_WHITESPACE);
+      }
+      if (chance(random, 0.15)) {
+        classes.add("tag-ascii-whitespace");
+        return pick(random, TAG_WHITESPACE);
+      }
+      return "";
+    };
+    return {
+      markup: `<${element}${tagSpace()}>${inner.markup}</${element}${tagSpace()}>`,
+      classes,
+    };
   }
   if (kind < 0.8) {
     let items = "";
@@ -624,6 +657,22 @@ type Violation = {
   className: string;
   apply: (body: string, rootAttributes: string, random: Random) => string;
 };
+
+const TAG_WHITESPACE: readonly string[] = [SPACE, TAB, LF, CR, `${CR}${LF}`, `${SPACE}${TAB}`];
+// Whitespace to `\s` but not inside a tag: an HTML parser reads it as part of the tag name.
+const NON_TAG_WHITESPACE = CHARS(
+  0x00a0,
+  0x1680,
+  0x2000,
+  0x2003,
+  0x200a,
+  0x2028,
+  0x2029,
+  0x202f,
+  0x205f,
+  0x3000,
+  0xfeff,
+);
 
 const root = (body: string, rootAttributes: string): string =>
   `<div ${XMLNS}${rootAttributes}>${body}</div>`;
@@ -936,6 +985,22 @@ const VIOLATIONS: readonly Violation[] = [
     },
   },
   {
+    className: "tag-non-ascii-whitespace",
+    apply: (body, attrs, random) => {
+      const space = pick(random, NON_TAG_WHITESPACE);
+      const inner = pick(random, [
+        `<p>10<sup${space}>6</sup></p>`,
+        `<p>10<sup>6</sup${space}></p>`,
+        `<p>a<br${space}/>b</p>`,
+        `<table${space}><tr><td>a</td></tr></table>`,
+        `<table><tr><td${space}>a</td></tr></table>`,
+        `<p><a${space}href="https://example.org/">a</a></p>`,
+        `<p><a href${space}="https://example.org/">a</a></p>`,
+      ]);
+      return root(`${body}${inner}`, attrs);
+    },
+  },
+  {
     className: "forbidden-raw-character",
     apply: (body, attrs, random) => {
       const forbidden = pick(random, FORBIDDEN_2_0_0);
@@ -959,7 +1024,7 @@ function xhtmlCase(random: Random, seed: number, index: number): CorpusCase {
     body += child.markup;
   }
   let input: string;
-  if (chance(random, 0.34)) {
+  if (chance(random, 0.4)) {
     const violation = pick(random, VIOLATIONS);
     classes.add(violation.className);
     input = violation.apply(body, attribute.markup, random);
@@ -1244,6 +1309,36 @@ const SPAN_LAYOUTS: readonly SpanLayout[] = [
     },
   },
   {
+    // A section whose first or last edge falls inside a token next to punctuation (`1|.5`,
+    // `−|20`, `0.|5`): not a boundary, so a word cut.
+    className: "span-punctuation-edge",
+    build: (pages, random) => {
+      const built = pick(random, pages);
+      const points = Array.from(built.page.text);
+      const isSpace = (character: string | undefined): boolean =>
+        character === undefined || WHITESPACE.includes(character);
+      const candidates: { sentence: { start: number; end: number }; at: number }[] = [];
+      for (const sentence of built.sentences) {
+        for (let at = sentence.start + 1; at < sentence.end; at += 1) {
+          const before = points[at - 1];
+          const after = points[at];
+          if (isSpace(before) || isSpace(after)) continue;
+          if (PUNCTUATION.includes(before ?? "") || PUNCTUATION.includes(after ?? "")) {
+            candidates.push({ sentence, at });
+          }
+        }
+      }
+      if (candidates.length === 0) return sentenceSection(pages, random, 0);
+      const { sentence, at } = pick(random, candidates);
+      const [start, end] = chance(random, 0.5) ? [at, sentence.end] : [sentence.start, at];
+      return {
+        sourceKey: "k",
+        div: narrativeFor(sliceOf(built.page, start, end)),
+        spans: [spanOver(built.page, start, end)],
+      };
+    },
+  },
+  {
     className: "span-page-not-found",
     build: (pages, random) => {
       const section = sentenceSection(pages, random, 0);
@@ -1377,6 +1472,23 @@ function verifyCase(random: Random, seed: number, index: number): CorpusCase {
     }
   }
 
+  // A span field that is not an integer, or a page number that is a boolean, is structural
+  // (review L2). Python reads `true` as 1, so these are exactly where a port can diverge.
+  let typeViolation = false;
+  const firstEntry = provenance[0];
+  const firstSpan = firstEntry?.spans[0];
+  if (chance(random, 0.03) && firstEntry !== undefined && firstSpan !== undefined) {
+    classes.add("span-non-integer");
+    typeViolation = true;
+    const field = pick(random, ["page", "startOffset", "endOffset"] as const);
+    const value: unknown = pick(random, [true, false, 0.5, firstSpan[field] + 0.5, null]);
+    provenance[0] = { ...firstEntry, spans: [{ ...firstSpan, [field]: value }] };
+  } else if (chance(random, 0.02) && sourcePages[0] !== undefined) {
+    classes.add("page-number-boolean");
+    typeViolation = true;
+    sourcePages = [{ ...sourcePages[0], page: true as unknown as number }, ...sourcePages.slice(1)];
+  }
+
   const input: FidelityInput = {
     normalizationVersion: NORMALIZATION_VERSION,
     source: { extractorVersion: "differential-extractor/1.0.0", pages: sourcePages },
@@ -1402,7 +1514,8 @@ function verifyCase(random: Random, seed: number, index: number): CorpusCase {
     expected = { error: "FidelityError", issues: error.issues };
   }
 
-  const floatOffsets = chance(random, 0.1);
+  // The Python reader rewrites every offset as `float(value)`, which would turn `true` into 1.0.
+  const floatOffsets = chance(random, 0.1) && !typeViolation;
   if (floatOffsets) classes.add("integral-float-offsets");
   return {
     family: "verify",

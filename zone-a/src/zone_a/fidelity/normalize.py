@@ -33,8 +33,10 @@ LIGATURES: Final[dict[int, str]] = {
     0xFB06: "st",
 }
 
+# U+2219 BULLET OPERATOR and U+2043 HYPHEN BULLET are not here: one is a multiplication sign and
+# the other a dash, so they are always content.
 BULLET_GLYPHS: Final = frozenset(
-    {0x2022, 0x2023, 0x2043, 0x2219, 0x25A0, 0x25A1, 0x25AA, 0x25AB, 0x25CB, 0x25CF, 0x25E6}
+    {0x2022, 0x2023, 0x25A0, 0x25A1, 0x25AA, 0x25AB, 0x25CB, 0x25CF, 0x25E6}
 )
 
 # Closed list, section 3 step 5. U+2000-U+200A is a range, handled in is_whitespace(). U+000B,
@@ -136,13 +138,27 @@ def normalize_text(text: str) -> str:
 
     # Steps 4 and 5, with the space collapse folded into the same pass: a space is emitted only
     # when the previous emitted character was not one, which drops runs and the leading space.
+    # Step 4: a bullet glyph is list structure only at the start of a line (the text start or
+    # U+000A, then optional whitespace) and followed by whitespace; anywhere else it is content.
+    # A bullet replaced here counts as whitespace for the bullet after it (idempotence).
     output: list[str] = []
-    for character in unicodedata.normalize("NFC", "".join(expanded)):
+    composed = unicodedata.normalize("NFC", "".join(expanded))
+    at_line_start = True
+    for position, character in enumerate(composed):
         code_point = ord(character)
-        if code_point in BULLET_GLYPHS or is_whitespace(code_point):
+        replaced_bullet = (
+            code_point in BULLET_GLYPHS
+            and at_line_start
+            and position + 1 < len(composed)
+            and is_whitespace(ord(composed[position + 1]))
+        )
+        if is_whitespace(code_point) or replaced_bullet:
+            if code_point == 0x000A:
+                at_line_start = True
             if output and output[-1] != " ":
                 output.append(" ")
             continue
+        at_line_start = False
         output.append(character)
     if output and output[-1] == " ":
         output.pop()

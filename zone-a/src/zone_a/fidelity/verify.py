@@ -33,7 +33,6 @@ from .normalize import (
     count_words,
     find_forbidden_character,
     is_whitespace,
-    is_word_character,
     normalize_text,
 )
 from .xhtml import SOFT_HYPHEN, XhtmlError, xhtml_to_text
@@ -104,7 +103,15 @@ def _normalized_span(span: Json) -> dict[str, Json]:
 
 
 def _number_text(value: Json) -> str:
-    """A number as JavaScript writes it into an issue string: ``1.0`` is ``1``, not ``1.0``."""
+    """A value as a JavaScript template literal writes it into an issue string.
+
+    ``1.0`` is ``1``, not ``1.0``; a boolean is ``true``/``false``, not ``True``/``False`` (tested
+    before the integer case, because ``bool`` is a subclass of ``int``); ``None`` is ``null``.
+    """
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if value is None:
+        return "null"
     integral = _as_integer(value)
     return str(value) if integral is None else str(integral)
 
@@ -200,8 +207,9 @@ def _start_cuts_word(pages: dict[int, PageIndex], span: Json) -> bool:
 
     Reads backwards from the code point before the first span, through its page's body and then
     the bodies of the pages before it (as declared, whether or not they pass section 1 or 2),
-    skipping section 3 whitespace. The first other code point cuts a word if it is U+00AD, or if
-    it is a word character and nothing was skipped. Reading past page 1 is no cut.
+    skipping section 3 whitespace. The first other code point cuts a word if nothing was skipped
+    before it, whatever it is (a letter, a digit, the ``.`` of ``0.5``, the minus of ``-20``), or
+    if it is U+00AD. Reading past page 1 is no cut.
     """
     skipped = False
     page_number = span["page"]
@@ -214,7 +222,7 @@ def _start_cuts_word(pages: dict[int, PageIndex], span: Json) -> bool:
                 skipped = True
                 position -= 1
                 continue
-            return character == SOFT_HYPHEN or (not skipped and is_word_character(character))
+            return character == SOFT_HYPHEN or not skipped
         page_number -= 1
         index = pages.get(page_number)
         if index is not None:
@@ -225,8 +233,9 @@ def _start_cuts_word(pages: dict[int, PageIndex], span: Json) -> bool:
 def _end_cuts_word(index: PageIndex, span: Json) -> bool:
     """Section 6 end rule: does the section end inside a word?
 
-    It does if the last span, without trailing section 3 whitespace, ends in U+00AD, or if the
-    code point at its end offset is a word character inside the body.
+    It does if the last span, without trailing section 3 whitespace, ends in U+00AD; otherwise it
+    does unless the code point at its end offset is section 3 whitespace or the end offset is at
+    or past ``bodyEnd``. The ``1`` of ``1.5`` is a cut: the ``.`` after it is no boundary.
     """
     start, end = span["startOffset"], span["endOffset"]
     trimmed = end
@@ -234,8 +243,10 @@ def _end_cuts_word(index: PageIndex, span: Json) -> bool:
         trimmed -= 1
     if trimmed > start and index.text[trimmed - 1] == SOFT_HYPHEN:
         return True
+    if end >= index.body_end:
+        return False
     after = _at(index.text, end)
-    return end < index.body_end and after is not None and is_word_character(after)
+    return after is None or not is_whitespace(ord(after))
 
 
 def _resolve_spans(spans: list[Json], pages: dict[int, PageIndex]) -> list[str] | tuple[str, str]:
@@ -382,6 +393,22 @@ def _coverage(pages: dict[int, PageIndex], verified_spans: list[Json]) -> dict[s
     }
 
 
+def _assert_integer_spans(provenance: list[Json]) -> None:
+    """Every span's page and offsets are integers (``Number.isInteger``; ``1.0`` is one).
+
+    A boolean is refused explicitly: ``True`` is an ``int`` to Python and would be read as page 1,
+    where JavaScript reads it as no page at all. A structural error, never a status.
+    """
+    invalid = [
+        f"Invalid span in provenance {entry['sourceKey']}"
+        for entry in provenance
+        for span in entry["spans"]
+        if any(_as_integer(span.get(key)) is None for key in ("page", "startOffset", "endOffset"))
+    ]
+    if invalid:
+        raise FidelityError("Provenance span is invalid", invalid)
+
+
 def _assert_unique_keys(keys: list[str], what: str) -> None:
     seen: set[str] = set()
     duplicates: list[str] = []
@@ -402,6 +429,7 @@ def verify_narrative_fidelity(payload: Json) -> dict[str, Json]:
         )
     _assert_unique_keys([s["sourceKey"] for s in payload["sections"]], "source section")
     _assert_unique_keys([e["sourceKey"] for e in payload["provenance"]], "provenance entry")
+    _assert_integer_spans(payload["provenance"])
     pages, issues = index_pages(payload["source"])
     provenance = {entry["sourceKey"]: entry for entry in payload["provenance"]}
     section_keys = {section["sourceKey"] for section in payload["sections"]}

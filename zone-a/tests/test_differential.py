@@ -251,5 +251,15 @@ def test_the_corpus_exercises_the_classes_the_review_named() -> None:
         "span-page-start",
         "span-page-end",
         "span-ends-after-soft-hyphen-space",
+        # The review findings folded into fidelity-norm/2.0.0 (C1-C3, L2).
+        "tag-non-ascii-whitespace",
+        "tag-ascii-whitespace",
+        "span-punctuation-edge",
+        "number-with-punctuation",
+        "bullet-line-start",
+        "bullet-mid-line",
+        "script-dash-review",
+        "span-non-integer",
+        "page-number-boolean",
     }
     assert required <= seen, sorted(required - seen)
