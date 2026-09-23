@@ -35,8 +35,16 @@ import { ApproverRole } from "./ingestion-provenance.js";
 // assistant turn the call belonged to. Major, not minor, because required fields were added
 // and a member left a returnable enum (ADR 0002, "Versioning"); nothing was deployed under
 // 1.0.0.
+//
+// 2.0.1: descriptions only, no shape. `match` from verify_quote now means the quote's edges
+// hold under the quote-edge rule (docs/design/epi-mcp-query-service.md), where under 2.0.0 it
+// meant any contiguous slice, including one cut inside a word or a number; and an approval —
+// get_provenance's answer, get_section's `provenanceResourceId` — is given for a document's
+// current version only. Patch, not minor, because no field, enum member or bound changed
+// (ADR 0002, "Versioning"); a `match` recorded under 2.0.0 was decided by the looser rule, and
+// the version on the record is what tells the two apart.
 
-export const QUERY_TOOLS_VERSION = "2.0.0";
+export const QUERY_TOOLS_VERSION = "2.0.1";
 
 // The digest of the container image that answered, as Cloud Run reports it (ADR 0004: a
 // service's evidence names its image).
@@ -150,14 +158,15 @@ export const SectionContentSchema = z
     normalizedTextSha256: Sha256Hex,
     normalizationVersion: NormalizationVersion,
     // Given for the document's current version only: nothing yet binds an earlier version to
-    // its own approval, and the newest approval is not it.
+    // its own approval, and the most recently written approval — the only one the service can
+    // find — is not it.
     provenanceResourceId: Uuid.optional(),
     contentNotice: ContentNotice,
   })
   .meta({
     id: "SectionContent",
     description:
-      "One QRD section, verbatim. `div` is the stored XHTML; `text` is its normalised plain text; the hashes are recomputable from `div` by anyone.",
+      "One QRD section, verbatim. `div` is the stored XHTML; `text` is its normalised plain text; the hashes are recomputable from `div` by anyone. `provenanceResourceId` is given for the document's current version only.",
   });
 
 // --- get_provenance ----------------------------------------------------------------------------
@@ -191,7 +200,7 @@ export const ProvenanceDetailSchema = z
   .meta({
     id: "ProvenanceDetail",
     description:
-      "Who and what put this document in the store: source document hash, extractor and model identities, fidelity report hash, approver and approval content hash, all from the persisted Provenance resource; per-section hashes recomputed live.",
+      "Who and what put this document in the store: source document hash, extractor and model identities, fidelity report hash, approver and approval content hash, all from the persisted Provenance resource; per-section hashes recomputed live. Answered for the document's current version only; a named earlier version is `unavailable`.",
   });
 
 // --- verify_quote ------------------------------------------------------------------------------
@@ -212,11 +221,13 @@ export const QuoteVerificationSchema = z
     document: DocumentRefSchema,
     // `match`: the normalised quote is a contiguous slice of a section's normalised text under
     // the same normalisation the publishing gate uses — so case, quotation marks, dashes, and
-    // superscripts all still have to agree — and the slice neither begins nor ends inside a
-    // word, by the gate's own rule for span edges (docs/fidelity-normalization.md section 6), so
-    // "max 10" is not confirmed by "max 100 mg". Anything else is `no-match`; the service does
-    // not guess at near misses, because a near miss is exactly what a reviewer must see for
-    // themselves.
+    // superscripts all still have to agree — and both of its edges hold under the quote-edge
+    // rule (src/query/tools.ts), which is stricter than the gate's span-edge rule: the slice may
+    // not begin or end inside a word, nor stop at punctuation that still binds a number or a
+    // word to it ("Take 2" of "Take 2.5 mg", "20 °C" of "-20 °C"). It does not promise that
+    // nothing follows: "Take 5" still matches "Take 5 mg daily". Anything else is `no-match`;
+    // the service does not guess at near misses, because a near miss is exactly what a
+    // reviewer must see for themselves.
     result: z.enum(["match", "no-match"]),
     normalizationVersion: NormalizationVersion,
     quoteSha256: Sha256Hex,
@@ -233,7 +244,7 @@ export const QuoteVerificationSchema = z
   .meta({
     id: "QuoteVerification",
     description:
-      "Mechanical answer to 'is this quote what the label says?': match with the section and code-point offsets, or no-match. Never a paraphrase, never a suggestion.",
+      "Mechanical answer to 'is this quote what the label says?': match with the section and code-point offsets, or no-match. A match is a contiguous slice of the normalised section text whose edges fall on boundaries: never inside a word, never at punctuation joined to a number or word (a decimal point, a slash, a sign, an apostrophe). It proves the words the quote contains, not that nothing follows them. Never a paraphrase, never a suggestion.",
   });
 
 // --- errors and audit --------------------------------------------------------------------------

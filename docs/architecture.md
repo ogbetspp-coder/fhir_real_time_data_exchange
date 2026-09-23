@@ -207,7 +207,7 @@ to a project, so every infrastructure statement below has been checked by `terra
 only.
 
 - **Intended use.** A read-only Model Context Protocol endpoint (four tools: `find_product`,
-  `get_section`, `get_provenance`, `verify_quote`; contract `query-tools` 2.0.0) that lets an
+  `get_section`, `get_provenance`, `verify_quote`; contract `query-tools` 2.0.1) that lets an
   AI assistant answer questions about product information with verifiable answers: every
   result names the FHIR resource and version it came from and carries the hashes needed to
   check it against the store without trusting the service.

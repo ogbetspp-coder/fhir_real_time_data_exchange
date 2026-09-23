@@ -319,7 +319,7 @@ export function createMcpServer(deps: McpServerDeps): McpServer {
     "verify_quote",
     {
       title: "Is this quote what the label says?",
-      description: `Compare a quote with the stored narrative under the same normalisation the publishing gate uses, and answer match — with the section and code-point offsets — or no-match. A quote matches only as whole words: one that begins or ends inside a word of the section ("5 mg/m" against "5 mg/m²") is no-match. Never a paraphrase, never a suggested correction. ${CONTENT_WARNING}`,
+      description: `Compare a quote with the stored narrative under the same normalisation the publishing gate uses, and answer match — with the section and code-point offsets — or no-match. A quote's edges must fall on boundaries (the quote-edge rule): each side must be the start or end of the section, a space, or opening or closing punctuation that itself meets a space. A quote that begins or ends inside a word, or at punctuation joined to a number or word — "Take 2" against "Take 2.5 mg", "20 °C" against "-20 °C", "see section 4" against "(see section 4.4)" — is no-match. A match proves the words the quote contains, not that nothing follows them. Never a paraphrase, never a suggested correction. ${CONTENT_WARNING}`,
       inputSchema: VerifyQuoteInputSchema.shape,
       outputSchema: QuoteVerificationSchema.shape,
       annotations: READ_ONLY,

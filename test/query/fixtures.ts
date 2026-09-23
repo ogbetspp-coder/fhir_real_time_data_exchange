@@ -339,11 +339,14 @@ export async function connectHarness(options: {
   // request; a harness is one connection over which a test makes several calls, so the default
   // here is large enough that only a test that sets it small meets the exhausted path.
   readBudget?: number;
+  // Lets a test change what one kind of read answers — a store whose plain read of a document
+  // disagrees with its history, say — while the read log still records every read.
+  wrapReader?: (reader: FhirReader) => FhirReader;
 }): Promise<Harness> {
   const audits: QueryAuditRecord[] = [];
   const { reader, log } = createFakeReader(options.documents ?? options.store.documents);
   const server = createMcpServer({
-    reader,
+    reader: options.wrapReader === undefined ? reader : options.wrapReader(reader),
     mapping: options.store.mapping,
     serviceVersion: SERVICE_VERSION,
     identity: options.identity ?? testIdentity(options.principal),

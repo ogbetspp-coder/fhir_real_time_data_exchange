@@ -19,6 +19,7 @@ import { isComposition } from "../../src/fhir/types.js";
 import { APPROVAL_CONTENT_EXTENSION_URL, APPROVER_ROLE_SYSTEM } from "../../src/fhir/provenance.js";
 import { sha256, sha256Utf8, stableUuid } from "../../src/lib/hash.js";
 import type { EntitlementDirectory } from "../../src/query/entitlements.js";
+import type { FhirReader } from "../../src/query/fhir-reader.js";
 import { FIND_PRODUCT_CONCURRENCY, FIND_PRODUCT_SCAN_HORIZON } from "../../src/query/tools.js";
 import {
   INJECTED_SECTION_KEY,
@@ -28,7 +29,6 @@ import {
   PRINCIPAL_B,
   SECTION_KEY,
   SERVICE_VERSION,
-  TYPOGRAPHY_DIV,
   TYPOGRAPHY_SECTION_KEY,
   VERSION_ID,
   allNarratives,
@@ -301,72 +301,140 @@ describe("ePI query service, phase 1", () => {
     }
   });
 
-  // The publishing gate lets a span omit words but never begin or end inside one
-  // (docs/fidelity-normalization.md section 6), and verify_quote claims the gate's rules. A
-  // quote cut inside a word is therefore no-match, even though its characters are a slice of
-  // the section: a truncated number or unit is exactly the near miss a reviewer must see.
-  it("a quote matches as whole words only", async () => {
-    const verifyIn = async (
-      harness: Harness,
-      quote: string,
-      sourceKey: string | undefined,
-    ): Promise<QuoteVerification> => {
-      const answer = await callTool(harness, "verify_quote", {
-        bundleId: store.bundleIdTypography,
-        ...(sourceKey === undefined ? {} : { sourceKey }),
-        quote,
-      });
-      expect(answer.isError).toBe(false);
-      return QuoteVerificationSchema.parse(answer.structured);
-    };
-
-    // The label says "The sponsor\u2019s first dose is 5 mg/m\u00b2 daily."
-    const label = await harnessFor(PRINCIPAL_A);
-    try {
-      const text = normalizeText(xhtmlToText(TYPOGRAPHY_DIV));
-
-      // Each of these is a slice of it that begins or ends inside a word — a unit cut before
-      // its superscript, a lone letter, a fragment straddling two words, and a unit cut at the
-      // slash — and none is confirmed.
-      for (const cut of ["first dose is 5 mg/m", "e", "s first d", "5 mg/"]) {
-        expect(text.includes(cut)).toBe(true);
-        const answer = await verifyIn(label, cut, TYPOGRAPHY_SECTION_KEY);
-        expect([cut, answer.result]).toEqual([cut, "no-match"]);
-        expect(answer.match).toBeUndefined();
-      }
-
-      // Whole words match: in the middle of the section, at its very start, at its very end,
-      // and ending just before punctuation — whether it closes a word or a sentence.
-      for (const whole of [
-        "first dose is 5 mg/m\u00b2",
-        "The sponsor",
-        "daily.",
-        "5 mg/m\u00b2 daily",
-        "sponsor",
-      ]) {
-        const answer = await verifyIn(label, whole, TYPOGRAPHY_SECTION_KEY);
-        expect([whole, answer.result]).toEqual([whole, "match"]);
-        expect([whole, answer.match?.startOffset]).toEqual([whole, text.indexOf(whole)]);
-      }
-      const start = await verifyIn(label, "The sponsor", TYPOGRAPHY_SECTION_KEY);
-      expect(start.match?.startOffset).toBe(0);
-      const end = await verifyIn(label, "daily.", TYPOGRAPHY_SECTION_KEY);
-      expect(end.match?.endOffset).toBe(Array.from(text).length);
-
-      // One audit record per call, as always.
-      expect(label.audits).toHaveLength(11);
-    } finally {
-      await label.close();
-    }
-
-    // Wording the synthetic submission does not carry: a dose limit in one section, and in a
-    // later section a quote whose first occurrence is inside a longer number and whose second
-    // is whole. The mathematical bold capital A is a letter outside the Basic Multilingual
-    // Plane, so a word boundary has to be judged on a code point, not on half of a surrogate
-    // pair.
+  // A quote is checked against the stored text and nothing checks it afterwards, so its edges
+  // follow the quote-edge rule (src/query/tools.ts), stricter than the publishing gate's
+  // span-edge rule: a quote cut inside a word, or cut at punctuation that still binds what
+  // follows or precedes it, is no-match even though its characters are a slice of the section.
+  it("a quote matches only between the quote-edge boundaries", async () => {
     const seeded = store.documents.get(store.bundleIdTypography);
     if (seeded === undefined) throw new Error("expected a seeded document");
-    const limits = "Adults: max 100 mg daily. Children: max 10 mg daily. Code \u{1D400}5 mg.";
+
+    // Each text becomes the whole narrative of one section; `cut` must answer no-match and
+    // `whole` must answer match at the offsets the text itself gives.
+    const cases: { text: string; cut: string[]; whole: string[] }[] = [
+      {
+        // The typography fixture's own sentence.
+        text: "The sponsor’s first dose is 5 mg/m² daily.",
+        // A unit cut before its superscript, a lone letter, a fragment straddling two words, a
+        // unit cut at the slash, a word with its possessive cut off.
+        cut: ["first dose is 5 mg/m", "e", "s first d", "5 mg/", "The sponsor"],
+        whole: [
+          "sponsor’s first dose is 5 mg/m²",
+          "The sponsor’s",
+          "5 mg/m² daily",
+          "daily.",
+          "The sponsor’s first dose is 5 mg/m² daily.",
+        ],
+      },
+      {
+        text: "The dose is 5 mg/m². The dose is 5 mg/kg body weight.",
+        cut: ["The dose is 5 mg", "The dose is 5 mg/m", "The dose is 5 mg/"],
+        whole: ["The dose is 5 mg/m²", "The dose is 5 mg/m².", "5 mg/kg body weight"],
+      },
+      {
+        text: "Take 2.5 mg daily, with water. Take 10,5 mg at night.",
+        cut: ["Take 2", "Take 10", "Take 2.", "5 mg daily"],
+        whole: ["Take 2.5 mg daily", "with water", "Take 10,5 mg at night"],
+      },
+      {
+        text: "Adjust the dose (see section 4.4) when needed; stop (see section 4.8).",
+        cut: ["see section 4", "(see section 4", "4) when needed"],
+        whole: ["see section 4.4", "(see section 4.4)", "see section 4.8", "Adjust the dose"],
+      },
+      {
+        // A hyphen-minus and a minus sign (U+2212) before the number.
+        text: "Store at -20 °C. Ship at −20 °C.",
+        cut: ["20 °C", "20 °C. Ship"],
+        whole: ["-20 °C", "−20 °C", "Store at -20 °C."],
+      },
+      {
+        // An unsigned temperature in its own document is quoted as it stands.
+        text: "Keep at 20 °C.",
+        cut: [],
+        whole: ["Keep at 20 °C", "20 °C", "20 °C."],
+      },
+      {
+        text: "Give <10 mg per day or ≥10 mg per day. Creatinine clearance ≥ 30 ml/min.",
+        cut: ["10 mg per day", "30 ml/min"],
+        whole: ["<10 mg per day", "≥10 mg per day", "≥ 30 ml/min"],
+      },
+      {
+        text: "Treat non-diabetic patients first. Don't take with food. Don’t crush.",
+        cut: ["diabetic patients", "t take with food", "t crush", "Don"],
+        whole: ["non-diabetic patients", "Don't take with food", "Don’t crush"],
+      },
+      {
+        text: 'Warning: take "one tablet" daily. Up to 1 000 000 IU daily.',
+        cut: ["Up to 1 000", "000 IU daily", "Up to 1"],
+        whole: ["Warning", "one tablet", '"one tablet"', "Up to 1 000 000 IU daily"],
+      },
+      {
+        // Letters outside the Basic Multilingual Plane, before and after a quote, and before a
+        // match, so that offsets are counted in code points, not in UTF-16 units.
+        text: "Code \u{1D400}5 mg. Take 5 mg\u{1D400} now. Code \u{1D400} then \u{1D401} dose.",
+        cut: ["5 mg"],
+        whole: ["\u{1D401} dose", "then \u{1D401} dose."],
+      },
+    ];
+
+    for (const { text, cut, whole } of cases) {
+      const bundle = withNarratives(seeded.bundle, {
+        [TYPOGRAPHY_SECTION_KEY]: `<div xmlns="http://www.w3.org/1999/xhtml"><p>${text
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")}</p></div>`,
+      });
+      const harness = await harnessFor(
+        PRINCIPAL_A,
+        new Map([[store.bundleIdTypography, { ...seeded, bundle }]]),
+      );
+      try {
+        const normalized = normalizeText(text);
+        const points = Array.from(normalized);
+        for (const quote of [...cut, ...whole]) {
+          // Every quote is a slice of the text: what decides the answer is where it stops.
+          expect([quote, normalized.includes(quote)]).toEqual([quote, true]);
+          const answer = await callTool(harness, "verify_quote", {
+            bundleId: store.bundleIdTypography,
+            sourceKey: TYPOGRAPHY_SECTION_KEY,
+            quote,
+          });
+          expect(answer.isError).toBe(false);
+          const verification = QuoteVerificationSchema.parse(answer.structured);
+          if (cut.includes(quote)) {
+            expect.soft([quote, verification.result]).toEqual([quote, "no-match"]);
+            expect.soft(verification.match).toBeUndefined();
+            continue;
+          }
+          expect.soft([quote, verification.result]).toEqual([quote, "match"]);
+          // The offsets are code points, recomputed here from the text itself.
+          const unit = normalized.indexOf(quote);
+          const start = Array.from(normalized.slice(0, unit)).length;
+          const end = start + Array.from(quote).length;
+          expect
+            .soft([quote, verification.match?.startOffset, verification.match?.endOffset])
+            .toEqual([quote, start, end]);
+          expect(points.slice(start, end).join("")).toBe(quote);
+        }
+        // One audit record per call, as always.
+        expect(harness.audits).toHaveLength(cut.length + whole.length);
+      } finally {
+        await harness.close();
+      }
+    }
+
+    // The offsets case really is the one it claims to be: UTF-16 and code-point offsets differ.
+    const astral = normalizeText(
+      "Code \u{1D400}5 mg. Take 5 mg\u{1D400} now. Code \u{1D400} then \u{1D401} dose.",
+    );
+    expect(astral.indexOf("\u{1D401} dose")).not.toBe(
+      Array.from(astral.slice(0, astral.indexOf("\u{1D401} dose"))).length,
+    );
+
+    // A cut occurrence does not end the search. In one section, the first "max 10" is inside
+    // "max 100" and the later one is whole; with no section named, the earlier section holds
+    // only a cut occurrence and the later one the whole one.
+    const limits = "Adults: max 100 mg daily. Children: max 10 mg daily.";
     const bundle = withNarratives(seeded.bundle, {
       [TYPOGRAPHY_SECTION_KEY]:
         '<div xmlns="http://www.w3.org/1999/xhtml"><p>Do not exceed max 100 mg daily.</p></div>',
@@ -387,33 +455,30 @@ describe("ePI query service, phase 1", () => {
       PRINCIPAL_A,
       new Map([[store.bundleIdTypography, { ...seeded, bundle }]]),
     );
+    const verify = async (quote: string, sourceKey?: string): Promise<QuoteVerification> =>
+      QuoteVerificationSchema.parse(
+        (
+          await callTool(harness, "verify_quote", {
+            bundleId: store.bundleIdTypography,
+            ...(sourceKey === undefined ? {} : { sourceKey }),
+            quote,
+          })
+        ).structured,
+      );
     try {
-      // A truncated number: "max 10" is a slice of "max 100 mg" and is not what it says.
-      const truncated = await verifyIn(harness, "max 10", TYPOGRAPHY_SECTION_KEY);
-      expect(truncated.result).toBe("no-match");
-      expect(truncated.match).toBeUndefined();
+      expect((await verify("max 10", TYPOGRAPHY_SECTION_KEY)).result).toBe("no-match");
 
-      // Within one section: the first occurrence is inside "max 100", the later one is whole,
-      // and the later one is the match, at its own code-point offset.
       const whole = limits.lastIndexOf("max 10");
       expect(limits.indexOf("max 10")).toBeLessThan(whole);
-      const later = await verifyIn(harness, "max 10", SECTION_KEY);
+      const later = await verify("max 10", SECTION_KEY);
       expect(later.result).toBe("match");
       expect(later.match?.startOffset).toBe(whole);
       expect(later.match?.endOffset).toBe(whole + "max 10".length);
 
-      // Across sections: with no section named, the cut occurrence in the earlier section does
-      // not end the search, and the whole one in the later section answers.
-      const anywhere = await verifyIn(harness, "max 10", undefined);
+      const anywhere = await verify("max 10");
       expect(anywhere.result).toBe("match");
       expect(anywhere.match?.sourceKey).toBe(SECTION_KEY);
       expect(anywhere.match?.startOffset).toBe(whole);
-
-      // A letter outside the Basic Multilingual Plane is still a letter: "5 mg" after it begins
-      // inside a word.
-      expect((await verifyIn(harness, "5 mg", SECTION_KEY)).result).toBe("no-match");
-
-      expect(harness.audits).toHaveLength(4);
     } finally {
       await harness.close();
     }
@@ -538,6 +603,48 @@ describe("ePI query service, phase 1", () => {
       expect(onlyAudit(budgeted.audits).outcome).toBe("unavailable");
     } finally {
       await budgeted.close();
+    }
+
+    // A current version the store cannot state is not the named one. When the plain read of the
+    // document answers nothing, or a Bundle that carries no version, version 2 — although its
+    // history read answers — is not shown to be current, and gets no approval.
+    const unstated: ((reader: FhirReader) => FhirReader)[] = [
+      (reader) => ({ ...reader, readBundle: () => Promise.resolve(undefined) }),
+      (reader) => ({
+        ...reader,
+        readBundle: async (bundleId) => {
+          const bundle = await reader.readBundle(bundleId);
+          if (bundle?.meta !== undefined) delete bundle.meta.versionId;
+          return bundle;
+        },
+      }),
+    ];
+    for (const wrapReader of unstated) {
+      const harness = await connectHarness({
+        store,
+        principal: PRINCIPAL_A,
+        entitlements: directory.entitlementsFor(PRINCIPAL_A),
+        documents,
+        wrapReader,
+      });
+      try {
+        const provenance = await callTool(harness, "get_provenance", {
+          bundleId: store.bundleIdA,
+          versionId: "2",
+        });
+        expect(provenance.structured).toEqual({ tool: "get_provenance", error: "unavailable" });
+        const section = await callTool(harness, "get_section", {
+          bundleId: store.bundleIdA,
+          versionId: "2",
+          sourceKey: SECTION_KEY,
+        });
+        expect(section.isError).toBe(false);
+        expect("provenanceResourceId" in section.structured).toBe(false);
+        expect(harness.log.provenance).toEqual([]);
+        expect(harness.audits.map(({ outcome }) => outcome)).toEqual(["unavailable", "ok"]);
+      } finally {
+        await harness.close();
+      }
     }
   });
 

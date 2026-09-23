@@ -34,27 +34,34 @@ function isBundle(resource: FhirResource): resource is FhirBundle {
   return resource.resourceType === "Bundle" && Array.isArray(resource.entry);
 }
 
-// Bounded, because a page is not a scan: the store is asked for the newest first, so the answer
-// is on the first page unless a document has more approvals than this. A document gains one
-// Provenance per approved version, so twenty is a wide margin, and the bound is what stops a
-// pathological document turning one tool call into an unbounded read.
+// Bounded, because a page is not a scan. The page holds every Provenance of a document unless it
+// has more approvals than this, and only then does the page's own order decide what is on it. A
+// document gains one Provenance per approved version, so twenty is a wide margin, and the bound
+// is what stops a pathological document turning one tool call into an unbounded read.
 export const PROVENANCE_PAGE_SIZE = 20;
 
-// Sorts as a number so that two `recorded` values written with different UTC offsets compare by
-// the instant they name and not by their spelling. A resource whose `recorded` is missing or
-// unparseable is not an error — it is simply ranked after every dated one, which keeps the
-// order total rather than throwing away the only answer available.
-function recordedAt(resource: FhirResource): number {
-  const recorded: unknown = resource.recorded;
-  if (typeof recorded !== "string") return Number.NEGATIVE_INFINITY;
-  const instant = Date.parse(recorded);
+// When the store wrote the resource: `meta.lastUpdated`, which the store sets on every write and
+// the writer cannot choose. Sorts as a number so that two values written with different UTC
+// offsets compare by the instant they name and not by their spelling. A resource whose
+// `meta.lastUpdated` is missing or unparseable is not an error — it is simply ranked after
+// every dated one, which keeps the order total rather than throwing away the only answer
+// available.
+function writtenAt(resource: FhirResource): number {
+  const lastUpdated: unknown = resource.meta?.lastUpdated;
+  if (typeof lastUpdated !== "string") return Number.NEGATIVE_INFINITY;
+  const instant = Date.parse(lastUpdated);
   return Number.isNaN(instant) ? Number.NEGATIVE_INFINITY : instant;
 }
 
-// A total order over Provenance resources: most recently recorded first, ties broken by the
-// resource id, which is stable and unique within a store. Exported because the property that
-// matters — the same set always yields the same resource — is a property of this function, and
-// is tested directly rather than inferred from a search response.
+// A total order over Provenance resources: most recently written first, ties broken by the
+// resource id, which is stable and unique within a store. Written, not `recorded`: `recorded` is
+// the approval's own date (`approval.approvedAt` from the submission), so a version approved
+// earlier but published later — version 1 republished after version 2 — would otherwise lose
+// to an approval that is no longer the current version's. The worker writes a version and its
+// Provenance in one transaction, so the most recently written approval is the one written with
+// the current version whenever that version came through the gate. Exported because the
+// property that matters — the same set always yields the same resource — is a property of this
+// function, and is tested directly rather than inferred from a search response.
 export function latestProvenance(resources: readonly FhirResource[]): FhirResource | undefined {
   let best: FhirResource | undefined;
   for (const candidate of resources) {
@@ -62,11 +69,11 @@ export function latestProvenance(resources: readonly FhirResource[]): FhirResour
       best = candidate;
       continue;
     }
-    // Compared, not subtracted: two resources that both lack a usable `recorded` are both
+    // Compared, not subtracted: two resources that both lack a usable `meta.lastUpdated` are both
     // NEGATIVE_INFINITY, and subtracting those gives NaN, which is greater than nothing and
     // equal to nothing — the tie-break would never run and the order would not be total.
-    const candidateInstant = recordedAt(candidate);
-    const bestInstant = recordedAt(best);
+    const candidateInstant = writtenAt(candidate);
+    const bestInstant = writtenAt(best);
     if (candidateInstant > bestInstant) {
       best = candidate;
       continue;
@@ -147,10 +154,15 @@ export class HealthcareFhirReader implements FhirReader {
   // writes a second, and the demonstration set deliberately does exactly that. The previous
   // search asked for `_count=1` in no stated order, so which of them came back was decided by
   // the store rather than by this code, and two identical calls could disagree after a
-  // re-seed. The search now asks for `recorded` descending — verified honoured by the
-  // Healthcare API on 2026-09-21 by reversing it and watching the two paracetamol records swap
-  // — over a bounded page, and the winner is chosen here under a total order so that ties the
-  // store does not break are still decided the same way every time.
+  // re-seed. The search asks for `recorded` descending — verified honoured by the Healthcare
+  // API on 2026-09-21 by reversing it and watching the two paracetamol records swap — over a
+  // bounded page, and the winner is chosen here by write order (latestProvenance), so that a
+  // version approved earlier but published later still gets its own approval and ties are
+  // decided the same way every time. The page is still ordered by `recorded`: asking the store
+  // for `-_lastUpdated` instead would put the newest-written first on the page too, but it has
+  // not been checked against the Healthcare API the way `-recorded` was, and a sort the store
+  // refused would make every lookup fail. Until it is, the write order is exact for a document
+  // with at most PROVENANCE_PAGE_SIZE approvals.
   public async findProvenanceForBundle(bundleId: string): Promise<FhirResource | undefined> {
     const query = new URLSearchParams({
       target: `Bundle/${bundleId}`,

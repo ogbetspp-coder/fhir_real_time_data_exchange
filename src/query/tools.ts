@@ -213,23 +213,124 @@ function codePointAtIndex(text: string, index: number): string | undefined {
   return codePoint === undefined ? undefined : String.fromCodePoint(codePoint);
 }
 
-// Where `quote` occurs in `text` without beginning or ending inside a word, as a UTF-16 index,
-// or -1. This is the publishing gate's rule for a section's span edges (docs/fidelity-
-// normalization.md section 6: a span "may omit words but never begin or end inside one"),
-// under the gate's own definition of a word character: the code point before the occurrence
-// and the code point after it must each be absent or not a word character. So "5 mg/m"
-// against "5 mg/m² daily", "max 10" against "max 100 mg", and "5 mg/" against "5 mg/m²" are
-// all refused — a truncated number or unit is exactly the near miss this tool exists to catch.
-// An occurrence that cuts a word does not end the search: a later whole-word occurrence of the
-// same text still matches. The soft-hyphen clauses of the gate's rule have nothing to act on
-// here, because normalisation has already removed every U+00AD.
-function findWholeWordOccurrence(text: string, quote: string): number {
+// --- the quote-edge rule ---------------------------------------------------------------------
+
+// A quote is checked against the stored text and nothing checks it afterwards, so where it may
+// begin and end is stricter here than the publishing gate's span-edge rule
+// (docs/fidelity-normalization.md section 6). The gate only has to stop a span cutting a word,
+// because it then requires the whole section to equal the approved narrative; a quote has no
+// such second check, and a quote that stops at punctuation can still change what the label
+// says — "Take 2" out of "Take 2.5 mg", "see section 4" out of "(see section 4.4)", "20 °C"
+// out of "-20 °C", "diabetic patients" out of "non-diabetic patients". The rule, for quotes
+// only (the gate is unchanged):
+//
+// - Left edge. The code point before the quote is absent or a space, or it is a run of
+//   opening punctuation (QUOTE_OPENERS) that is itself preceded by a space or the start of the
+//   text. Anything else is a cut: a letter or digit, a sign or comparator ("-20", "<10",
+//   "≥10"), an apostrophe joined to a word ("Don't"), a slash, a decimal point.
+// - Right edge. The code point after the quote is absent or a space, or it is a run of closing
+//   punctuation (QUOTE_CLOSERS) that is itself followed by a space or the end of the text. So a
+//   quote may end before a sentence's full stop, a comma, a colon or a closing parenthesis
+//   followed by a space, and not before "." or "," or "/" followed by a digit or a letter.
+// - Across a space. A quote that begins with a digit after a space preceded by a digit, or ends
+//   with a digit before a space followed by a digit, has cut a space-grouped number ("1 000"
+//   out of "1 000 000 IU"); a quote preceded by a comparator or sign and a space
+//   (SPACED_SIGNS: "≥ 30 ml/min") has lost it. Both are cuts.
+//
+// It is never looser than the gate: a word character on either side is a cut before any of the
+// above is consulted, under the fidelity library's own isWordCharacter. It is not a grammar,
+// and it does not make a quote complete: a quote may still stop before any following word, so
+// "Take 5" matches "Take 5 mg daily" — a match proves the words a quote contains, not that
+// nothing follows them. Normalised text holds no whitespace but U+0020 (spec section 3) and no
+// U+00AD (step 1), so neither needs a case here.
+
+const QUOTE_OPENERS = new Set(["(", "[", "{", '"', "'", "‘", "“", "„", "«", "‹", "¿", "¡"]);
+
+const QUOTE_CLOSERS = new Set([
+  ".",
+  ",",
+  ";",
+  ":",
+  "!",
+  "?",
+  ")",
+  "]",
+  "}",
+  '"',
+  "'",
+  "’",
+  "”",
+  "»",
+  "›",
+  "…",
+]);
+
+// Signs and comparators that still bind a number across a space. Hyphens and dashes are not
+// here: set off by spaces they are far more often separators than signs.
+const SPACED_SIGNS = new Set([
+  "<",
+  ">",
+  "~",
+  "±",
+  "−",
+  "∓",
+  "∼",
+  "≈",
+  "≤",
+  "≥",
+  "≦",
+  "≧",
+  "⩽",
+  "⩾",
+]);
+
+const DECIMAL_DIGIT = /^\p{Nd}$/u;
+
+function isDigit(character: string | undefined): boolean {
+  return character !== undefined && DECIMAL_DIGIT.test(character);
+}
+
+function edgeBefore(text: string, start: number, quote: string): boolean {
+  let before = codePointBefore(text, start);
+  if (before === undefined) return true;
+  if (isWordCharacter(before)) return false;
+  if (before === " ") {
+    const beyond = codePointBefore(text, start - 1);
+    if (beyond !== undefined && SPACED_SIGNS.has(beyond)) return false;
+    return !(isDigit(beyond) && isDigit(codePointAtIndex(quote, 0)));
+  }
+  let index = start;
+  while (before !== undefined && QUOTE_OPENERS.has(before)) {
+    index -= before.length;
+    before = codePointBefore(text, index);
+  }
+  return index < start && (before === undefined || before === " ");
+}
+
+function edgeAfter(text: string, end: number, quote: string): boolean {
+  let after = codePointAtIndex(text, end);
+  if (after === undefined) return true;
+  if (isWordCharacter(after)) return false;
+  if (after === " ") {
+    const beyond = codePointAtIndex(text, end + 1);
+    return !(isDigit(beyond) && isDigit(codePointBefore(quote, quote.length)));
+  }
+  let index = end;
+  while (after !== undefined && QUOTE_CLOSERS.has(after)) {
+    index += after.length;
+    after = codePointAtIndex(text, index);
+  }
+  return index > end && (after === undefined || after === " ");
+}
+
+// Where `quote` occurs in `text` with both edges on a boundary under the quote-edge rule, as a
+// UTF-16 index, or -1. An occurrence that is cut does not end the search: a later occurrence
+// whose edges hold still matches.
+function findQuoteOccurrence(text: string, quote: string): number {
   for (let found = text.indexOf(quote); found >= 0; found = text.indexOf(quote, found + 1)) {
-    const before = codePointBefore(text, found);
-    const after = codePointAtIndex(text, found + quote.length);
-    const cutsBefore = before !== undefined && isWordCharacter(before);
-    const cutsAfter = after !== undefined && isWordCharacter(after);
-    if (!cutsBefore && !cutsAfter) return found;
+    if (edgeBefore(text, found, quote) && edgeAfter(text, found + quote.length, quote)) {
+      return found;
+    }
   }
   return -1;
 }
@@ -314,20 +415,23 @@ function resolved(loaded: LoadedDocument): Resolved {
 
 // Nothing in the store yet binds a stored version to its own approval: the Provenance target
 // is `Bundle/<id>`, unversioned, and the stored Bundle does not point at its Provenance. The
-// newest approval of a document is the current version's only because the worker writes an
-// approved version and its approval in one transaction. For any earlier version it is another
-// version's approval — a request for version 1 of a document that has a version 2 would be
-// answered with version 2's approver and approved-content hash. Until the approval design binds
-// a version to its approval (docs/vision.md, "The order", item 2), an approval is attached only
-// to the version the store currently serves as the document; for any other the service says
-// nothing about approval rather than the wrong thing. (The converse — a current version
-// written without an approval, by a run source that bypasses the gate, under an older
-// version's approval — is not closed by this; see the design note.)
+// reader answers with the most recently *written* Provenance (latestProvenance, by the store's
+// `meta.lastUpdated`), and the worker writes an approved version and its Provenance in one
+// transaction, so that approval is the current version's whenever the current version came
+// through the gate — an inference from write order, not a recorded link. For any earlier
+// version it is another version's approval: a request for version 1 of a document that has a
+// version 2 would be answered with version 2's approver and approved-content hash. Until the
+// approval design binds a version to its approval (docs/vision.md, "The order", item 2), an
+// approval is attached only to the version the store currently serves as the document; for
+// any other the service says nothing about approval rather than the wrong thing. Not closed by
+// this, and stated in the design note: a current version written without an approval, by a run
+// source that bypasses the gate, is answered with the last approval written; and a version
+// written between this read and the Provenance search can be answered with its approval.
 //
 // `current`: no version was named (loadDocument read the current one), or the named version is
-// the current one. `superseded`: the store's current version is a different one, or the
-// document no longer answers a plain read. `out-of-budget`: finding out would have taken a
-// read the request no longer has.
+// the current one. `superseded`: the store's current version is a different one, or the plain
+// read answers nothing or a Bundle that does not say its version. `out-of-budget`: finding out
+// would have taken a read the request no longer has.
 type VersionStanding = "current" | "superseded" | "out-of-budget";
 
 async function versionStanding(
@@ -597,12 +701,12 @@ export async function verifyQuote(
   // not the search stopped early: it describes the scope of the answer, not the work done.
   const sectionsSearched = candidates.length;
 
-  // The search normalises each section's text and stops at the first whole-word match; only
-  // the matched section's text is hashed.
+  // The search normalises each section's text and stops at the first occurrence the
+  // quote-edge rule accepts; only the matched section's text is hashed.
   let match: QuoteVerification["match"];
   for (const candidate of candidates) {
     const text = normalizeText(xhtmlToText(candidate.div));
-    const found = findWholeWordOccurrence(text, normalizedQuote);
+    const found = findQuoteOccurrence(text, normalizedQuote);
     if (found < 0) continue;
     // Offsets are code points in the section's normalised text, as every offset in this
     // repository is (ADR 0002), not UTF-16 indices.
