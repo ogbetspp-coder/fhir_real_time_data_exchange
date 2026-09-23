@@ -9,6 +9,7 @@ import {
 } from "../src/contracts/index.js";
 import type { EmaMapping } from "../src/fhir/mapping.js";
 import { loadEmaMapping } from "../src/fhir/mapping.js";
+import { TransformationError } from "../src/fhir/transform.js";
 import type { FhirComposition } from "../src/fhir/types.js";
 import { createSyntheticSubmission } from "../src/fixtures/synthetic-submission.js";
 import { createSyntheticType2Bundle } from "../src/fixtures/synthetic.js";
@@ -170,6 +171,38 @@ describe("pipeline", () => {
 
     expect(error.issues).toContain("Bundle narratives do not match the fidelity report binding");
     expect(error.issues).toContain("narrativeDivSha256 does not match section smpc");
+  });
+
+  it("fails closed in the transform after a document passes the ingress gate", async () => {
+    // A language tag is not narrative, so the gate, the fidelity binding and every recomputed
+    // hash accept it; the crosswalk's own check is what stops the run. (A section moved to another
+    // parent does not get this far: the re-executed fidelity report binds section paths.)
+    const { submission, fidelityReport, sourceText } = createSyntheticSubmission(mapping);
+    const altered = structuredClone(submission);
+    composition(altered).language = "fr";
+    altered.bundleSha256 = sha256(altered.bundle);
+    altered.approval.approvedContentSha256 = sha256(approvedContent(altered));
+
+    const error: unknown = await runPipeline(
+      {
+        runId: DOCUMENT_RUN_ID,
+        sourceKind: "document",
+        submission: altered,
+        fidelityReport,
+        sourceText,
+        sourceResource: "document:synthetic-smpc",
+      },
+      mapping,
+      config,
+    ).then(
+      () => undefined,
+      (cause: unknown) => cause,
+    );
+
+    expect(error).toBeInstanceOf(TransformationError);
+    expect((error as TransformationError).issues).toEqual([
+      "Source Composition.language fr is not English; the mapping is English-only",
+    ]);
   });
 
   it("rejects a fidelity report whose hash no longer recomputes", async () => {

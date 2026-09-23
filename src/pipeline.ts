@@ -20,7 +20,7 @@ import {
 } from "./fhir/preflight.js";
 import { toProvenanceResource, withEmaTarget } from "./fhir/provenance.js";
 import { transformType2ToEma } from "./fhir/transform.js";
-import type { EmaMapping } from "./fhir/mapping.js";
+import { mappingReference, type EmaMapping } from "./fhir/mapping.js";
 import type { FhirBundle, FhirResource, OperationOutcome } from "./fhir/types.js";
 import { GcpEvidenceStore, type RunManifest, type SignedManifest } from "./gcp/evidence.js";
 import { HealthcareApiClient } from "./gcp/healthcare.js";
@@ -363,6 +363,7 @@ export async function runPipeline(
       runId,
       startedAt,
       completedAt,
+      mapping: mappingReference(mapping),
       sourceFqn,
       targetFhirFqn: `healthcare:${project}.${config.GCP_LOCATION}.${dataset}.${targetStore}.Bundle.${transformed.documentBundle.id ?? "unknown"}`,
       targetBigQueryFqn: `bigquery:${project}.${config.FHIR_ANALYTICS_DATASET ?? "unknown"}.Bundle`,

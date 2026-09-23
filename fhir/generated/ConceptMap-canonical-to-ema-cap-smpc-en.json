@@ -2,7 +2,7 @@
   "resourceType": "ConceptMap",
   "id": "canonical-to-ema-cap-smpc-en",
   "url": "https://khs.dev/fhir/ConceptMap/canonical-to-ema-cap-smpc-en",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "name": "CanonicalToEmaCapSmpcEnglish",
   "title": "Canonical SmPC sections to EMA CAP SmPC English QRD sections",
   "status": "active",
