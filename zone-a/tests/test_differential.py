@@ -273,6 +273,7 @@ def test_the_corpus_exercises_the_classes_the_review_named() -> None:
         # fidelity-norm/3.1.0: ½ and ∞ inside `sub`.
         "script-kept-in-subscript",
         "script-lowered-half",
+        "script-lowered-half-cross",
         # fidelity-norm/3.0.0: numbered lists, table grids and pictures.
         "ordered-list",
         "ordered-list-type",

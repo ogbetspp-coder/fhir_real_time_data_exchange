@@ -520,7 +520,7 @@ const SCRIPT_PIECES: readonly { className: string; pool: readonly string[] }[] =
   // that still reject in both.
   {
     className: "script-kept-in-subscript",
-    pool: [...CHARS(0x00bd, 0x221e, 0x00bc, 0x29dc), "&#189;", "&#x221E;"],
+    pool: [...CHARS(0x00bd, 0x221e, 0x00bc, 0x29dc), "&#189;", "&#x221E;", "&#188;", "&#x29DC;"],
   },
 ];
 // Drawn rarely, so the folding paths are not drowned by `unmappable-script`.
@@ -553,18 +553,30 @@ function scriptText(random: Random, classes: Set<string>): string {
 
 // fidelity-norm/3.1.0: a lowered ½ is kept only as a `sub`'s whole content after a letter and
 // before no number or script sign; each part is drawn from forms on both sides of that rule.
+const HALF_BEFORE = [
+  ...["t", "T", "x", "(t", "<em>t</em>", "<b>t</b>", "\u00e9", "t&#x2060;", "", "1", "-", " "],
+  ...["&#x2082;", "log\u2099", "log<sub>n</sub>", "t<sup>2</sup>", "&#x1878;", "2\u02b9"],
+  ...["1\u00aa", "\u4e8c", "&#x1D4C9;", "</p><p>t"],
+];
+const HALF_CONTENT = ["½", "&#189;", "&#xBD;", "½ ", "2½", "½½", "-½"];
+const HALF_AFTER = [
+  ...["", " x", ")", ".", ",", ";", ":", "x", "2", "&#x2060;2", "<sub>2</sub>", "<sup>+</sup>"],
+  ...["<sub>n</sub>", "\u207f", "&#x200A;<sub>2</sub>", "&#x2800;2", "&#x301;", " t<sub>½</sub>"],
+  "</p><p>2",
+];
+const LOWERED_HALF_CROSS = HALF_BEFORE.flatMap((before) =>
+  HALF_CONTENT.flatMap((half) => HALF_AFTER.map((after) => `${before}<sub>${half}</sub>${after}`)),
+);
+
 function scriptLoweredHalf(random: Random): Markup {
-  const before = pick(random, ["t", "x", "t&#x2060;", "<em>t</em>", "1", "-", " ", "&#x2082;"]);
-  const half = pick(random, ["½", "&#189;", "&#xBD;", "½ ", "2½", "½½", "-½"]);
-  const after = pick(random, ["", " x", "x", "2", "&#x2060;2", "<sub>2</sub>", "<sup>+</sup>"]);
   return {
-    markup: `${before}<sub>${half}</sub>${after}`,
+    markup: `${pick(random, HALF_BEFORE)}<sub>${pick(random, HALF_CONTENT)}</sub>${pick(random, HALF_AFTER)}`,
     classes: new Set(["script-element", "script-lowered-half"]),
   };
 }
 
 function scriptElement(random: Random): Markup {
-  if (chance(random, 0.05)) return scriptLoweredHalf(random);
+  if (chance(random, 0.1)) return scriptLoweredHalf(random);
   const classes = new Set<string>(["script-element"]);
   const element = pick(random, ["sup", "sub"]);
   let inner = scriptText(random, classes);
@@ -2227,6 +2239,33 @@ for (let index = 0; index < count; index += 1) {
         ? xhtmlCase(random, seed, index)
         : verifyCase(random, seed, index);
   lines.push(JSON.stringify(generated));
+}
+
+// fidelity-norm/3.1.0: every lowered ½ between every neighbour on both sides of the rule, in an
+// otherwise clean paragraph, since the random documents rarely reach the rule clean. Appended to
+// a full corpus only (the smoke corpus stays small); it draws nothing from `random`.
+if (count >= 500) {
+  for (const markup of LOWERED_HALF_CROSS) {
+    const input = root(`<p>${markup}</p>`, "");
+    let expected: XhtmlExpectation;
+    try {
+      expected = { text: xhtmlToText(input) };
+    } catch (error) {
+      if (!(error instanceof XhtmlError)) throw error;
+      expected = { error: error.code };
+    }
+    lines.push(
+      JSON.stringify({
+        family: "xhtml",
+        index: lines.length,
+        seed,
+        tag: "error" in expected ? `xhtml/${expected.error}` : "xhtml/accepted",
+        classes: ["script-lowered-half-cross"],
+        input,
+        expected,
+      }),
+    );
+  }
 }
 
 const corpus = lines.length === 0 ? "" : `${lines.join(LF)}${LF}`;

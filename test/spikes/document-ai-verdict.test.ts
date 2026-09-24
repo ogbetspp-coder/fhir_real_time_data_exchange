@@ -37,7 +37,8 @@ const LIGATURE = "ﬁ";
 // `fidelity-norm/2.0.0`, `fidelity-norm/3.0.0` and `fidelity-norm/3.1.0` changes no section,
 // status or figure, and the hash moves only because the report carries the version (the
 // recording's one table lies outside every section;
-// docs/validation/changes/2026-09-23-fidelity-norm-3-0-0.md).
+// docs/validation/changes/2026-09-23-fidelity-norm-3-0-0.md and
+// docs/validation/changes/2026-09-24-fidelity-norm-3-1-0.md).
 const VERDICT_FIDELITY_REPORT_HASH =
   "e8bf05805f8f28d7a24926bc23a2dfb4519f87a9fc3bd73b74cf66786f767ddf";
 

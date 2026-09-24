@@ -1084,9 +1084,14 @@
       "expected": "\n\nAUC₍₀₋∞₎ and AUC₀₋∞\n\n"
     },
     {
-      "name": "sub-half-after-markup-and-joiner-kept",
-      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><em>t</em><sub>½</sub> and t&#x2060;<sub>½</sub>x and t<sub>½</sub> 2</p></div>",
-      "expected": "\n\nt½ and t⁠½x and t½ 2\n\n"
+      "name": "sub-half-between-letter-and-break-kept",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><em>t</em><sub>½</sub> 2, (t<sub>½</sub>) and t<sub>½</sub>.</p></div>",
+      "expected": "\n\nt½ 2, (t½) and t½.\n\n"
+    },
+    {
+      "name": "sub-half-at-cell-end-kept",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>t<sub>½</sub></td></tr></table></div>",
+      "expected": "\n\n﷐\n﷒\t﷓\tt½\t\n\n﷑\n\n"
     },
     {
       "name": "rejects-sub-half-after-digit",
@@ -1147,6 +1152,97 @@
     {
       "name": "rejects-sub-half-before-superscript-sign",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>t<sub>½</sub><sup>+</sup></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-half-after-joiner",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>t&#x2060;<sub>½</sub></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-half-after-subscript-letter",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>logₙ<sub>½</sub></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-half-after-lowered-letter",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>log<sub>n</sub><sub>½</sub></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-half-before-lowered-letter",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x<sub>½</sub><sub>n</sub></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-half-before-superscript-letter",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>t<sub>½</sub>ⁿ</p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-half-before-thin-space",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>t<sub>½</sub>&#x200A;<sub>2</sub></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-half-before-braille-blank",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>t<sub>½</sub>&#x2800;2</p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-half-after-blank-glyph-letter",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>log<sub>2</sub>&#x1878;<sub>½</sub></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-half-after-modifier-letter",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>2ʹ<sub>½</sub></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-half-after-ordinal",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>1ª<sub>½</sub></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-half-after-ideograph-numeral",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>二<sub>½</sub></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-half-after-mathematical-letter",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>&#x1D4C9;<sub>½</sub></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-half-before-mark",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>t<sub>½</sub>&#x301;</p></div>",
       "expected": {
         "error": "unmappable-script"
       }

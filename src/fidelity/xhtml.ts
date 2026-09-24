@@ -223,18 +223,6 @@ const SPLITTING_INLINE = new Set([
 const COMPOSE_WINDOW = 64;
 const MARK = /^\p{M}$/u;
 
-// The first code point at or after `from` that is not a Default_Ignorable code point other than
-// a mark: a word joiner or a zero-width joiner between the tag and a mark is drawn as nothing,
-// and the mark after it is still drawn apart from the letter before the tag.
-function firstDrawnAfter(points: readonly string[], from: number): string {
-  let position = from;
-  for (; position < points.length; position += 1) {
-    const point = points[position] ?? "";
-    if (MARK.test(point) || !isDefaultIgnorable(point.codePointAt(0) ?? 0)) break;
-  }
-  return points[position] ?? "";
-}
-
 // Output positions (array indexes) to code point offsets in the joined text, for positions
 // asked in increasing order.
 function pointOffsets(output: readonly string[]): (position: number) => number {
@@ -246,39 +234,36 @@ function pointOffsets(output: readonly string[]): (position: number) => number {
   };
 }
 
-// A `sub` holding ½, by output positions (array indexes) of its content, and the offset of its
-// first ½ in the div.
+// A `sub` holding ½, by output positions (array indexes) of its content, and the offset in the div
+// of its first ½ (the character or its reference).
 type LoweredHalf = { start: number; end: number; offset: number };
-const LETTER = /^\p{L}$/u;
-const NUMBER_OR_SCRIPT_SIGN = /^[\p{N}\u207a-\u207e\u208a-\u208e]$/u;
+// What may stand right before and right after a kept lowered ½ (section 5): an ASCII letter
+// before; after, a line or cell break, a space, closing punctuation, or nothing.
+const BEFORE_HALF = /^[A-Za-z]$/u;
+const AFTER_HALF = new Set(["\n", "\t", " ", ")", ".", ",", ";", ":"]);
 
-// The first code point before `from` that is not a Default_Ignorable code point other than a
-// mark (firstDrawnAfter, read backwards).
-function firstDrawnBefore(points: readonly string[], from: number): string {
-  let position = from - 1;
-  for (; position >= 0; position -= 1) {
-    const point = points[position] ?? "";
-    if (MARK.test(point) || !isDefaultIgnorable(point.codePointAt(0) ?? 0)) break;
-  }
-  return points[position] ?? "";
-}
-
-// A lowered ½ is kept only as a `sub`'s whole content, after a letter and before no number or
-// script sign (section 5): `t<sub>½</sub>`. Anywhere else it can join a number, and the text
-// cannot say which: `log<sub>2½</sub>` and `log<sub>2</sub>½` both read `log₂½`.
+// A lowered ½ is kept only as a `sub`'s whole content, right after an ASCII letter drawn on the
+// line and right before a break, a space, closing punctuation or the end (section 5):
+// `t<sub>½</sub>`. Anywhere else it can join a number or an index, and the text cannot say which:
+// `log<sub>2½</sub>` and `log<sub>2</sub>½` both read `log₂½`. Nothing is read past; each
+// neighbour is the adjacent emitted code point, and one emitted inside `sup` or `sub` refuses.
 function checkLoweredHalves(
-  points: readonly string[],
+  output: readonly string[],
   halves: readonly LoweredHalf[],
-  pointOffset: (piece: number) => number,
+  scriptPieces: ReadonlySet<number>,
 ): void {
   for (const { start, end, offset } of halves) {
-    const from = pointOffset(start);
-    const to = pointOffset(end);
+    let before = start - 1;
+    while (before >= 0 && output[before] === "") before -= 1;
+    let after = end;
+    while (after < output.length && output[after] === "") after += 1;
+    const previous = Array.from(output[before] ?? "").pop() ?? "";
+    const next = Array.from(output[after] ?? "")[0];
     if (
-      to - from !== 1 ||
-      points[from] !== String.fromCodePoint(HALF) ||
-      !LETTER.test(firstDrawnBefore(points, from)) ||
-      NUMBER_OR_SCRIPT_SIGN.test(firstDrawnAfter(points, to))
+      output.slice(start, end).join("") !== String.fromCodePoint(HALF) ||
+      scriptPieces.has(before) ||
+      !BEFORE_HALF.test(previous) ||
+      (next !== undefined && (scriptPieces.has(after) || !AFTER_HALF.has(next)))
     ) {
       throw new XhtmlError("unmappable-script", offset);
     }
@@ -287,8 +272,20 @@ function checkLoweredHalves(
 
 function checkComposition(text: string, boundaries: readonly number[]): void {
   const points = Array.from(text);
+  // For each position, the first code point at or after it that is not a Default_Ignorable code
+  // point other than a mark: a word joiner or a zero-width joiner between the tag and a mark is
+  // drawn as nothing, and the mark after it is still drawn apart from the letter before the tag.
+  // Computed once from the end, so a long run of ignorables after many tags is read once.
+  const drawn: string[] = new Array<string>(points.length + 1).fill("");
+  for (let position = points.length - 1; position >= 0; position -= 1) {
+    const point = points[position] ?? "";
+    drawn[position] =
+      MARK.test(point) || !isDefaultIgnorable(point.codePointAt(0) ?? 0)
+        ? point
+        : (drawn[position + 1] ?? "");
+  }
   for (const boundary of boundaries) {
-    if (MARK.test(firstDrawnAfter(points, boundary))) {
+    if (MARK.test(drawn[boundary] ?? "")) {
       throw new XhtmlError("combining-across-markup", boundary);
     }
     const before = points.slice(Math.max(0, boundary - COMPOSE_WINDOW), boundary).join("");
@@ -821,6 +818,8 @@ export function xhtmlToText(div: string): string {
   // Each `sub` holding ½, checked after the scan; and the one open now.
   const halves: LoweredHalf[] = [];
   let lowered: LoweredHalf | undefined;
+  // The output positions of code points emitted inside `sup` or `sub`.
+  const scriptPieces = new Set<number>();
   const stack: string[] = [];
   const tables: TableState[] = [];
   const lists: ListState[] = [];
@@ -959,7 +958,9 @@ export function xhtmlToText(div: string): string {
       if (entity === null) throw new XhtmlError("stray-amp", index);
       if (stack.length === 0) throw new XhtmlError("text-outside-root", index);
       const codePoint = decodeEntity(entity, index);
-      emitText(codePoint, stack[stack.length - 1], output, index, true);
+      const parent = stack[stack.length - 1];
+      emitText(codePoint, parent, output, index, true);
+      if (parent === "sup" || parent === "sub") scriptPieces.add(output.length - 1);
       if (codePoint === HALF && lowered !== undefined && lowered.offset < 0) lowered.offset = index;
       index = ENTITY.lastIndex;
       continue;
@@ -982,6 +983,7 @@ export function xhtmlToText(div: string): string {
         throw new XhtmlError("cdata", index);
       }
       emitText(codePoint, parent, output, index, false);
+      if (parent === "sup" || parent === "sub") scriptPieces.add(output.length - 1);
       if (codePoint === HALF && lowered !== undefined && lowered.offset < 0) lowered.offset = index;
     }
     index += point.length;
@@ -992,7 +994,7 @@ export function xhtmlToText(div: string): string {
   const text = output.join("");
   // A combining mark after an inline tag is drawn in its own run, apart from the letter before
   // the tag, while NFC would join them ("<" and U+0338 across `b` is drawn "</", read "≮").
-  if (halves.length > 0) checkLoweredHalves(Array.from(text), halves, pointOffsets(output));
+  if (halves.length > 0) checkLoweredHalves(output, halves, scriptPieces);
   checkComposition(text, splits.map(pointOffsets(output)));
   return text;
 }
