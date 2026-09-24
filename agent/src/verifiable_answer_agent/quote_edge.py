@@ -22,6 +22,7 @@ than Node's ICU — a difference only for characters assigned between the two.
 from __future__ import annotations
 
 import unicodedata
+from dataclasses import dataclass, field
 from typing import Final
 
 __all__ = [
@@ -115,139 +116,168 @@ def _at(text: str, index: int) -> str | None:
 
 # --- across table cells ------------------------------------------------------------------------
 #
-# ``src/query/tools.ts``, "across table cells": a renderer draws a row's cells side by side with a
-# gap about as wide as a space, so a number or a sign split across cells reads as one, also with
-# an empty cell between or beside a cell spanning rows. The grid is rebuilt from the markers the
-# scanner writes (fidelity-norm/3.0.0 section 5), and a quote beginning or ending at a cell's edge
-# is held to the digit and sign rules against the nearest cell with text on that side, in every
-# row its cell covers.
+# ``src/query/tools.ts``, "across table cells": a renderer draws a row's cells side by side about a
+# space apart and centres each cell's lines, so any line of a cell can sit level with any line of
+# another cell in the row. A quote beginning at a word boundary inside a cell is held to the digit
+# and sign rules against every word of every cell to its left, and one ending at a word boundary
+# inside a cell against every word of every cell to its right, in each row its cell covers. A word
+# is a run of code points that are not gaps. The grid is read once per search.
 
-_TABLE_START: Final = "\ufdd0"
-_TABLE_END: Final = "\ufdd1"
-_ROW_START: Final = "\ufdd2"
-_CELL_START: Final = "\ufdd3"
-_COVERED_LEFT: Final = "\ufdd4"
-_COVERED_ABOVE: Final = "\ufdd5"
+_TABLE_START: Final = "﷐"
+_TABLE_END: Final = "﷑"
+_ROW_START: Final = "﷒"
+_CELL_START: Final = "﷓"
+_COVERED_LEFT: Final = "﷔"
+_COVERED_ABOVE: Final = "﷕"
 _SLOT_MARKERS: Final = frozenset((_CELL_START, _COVERED_LEFT, _COVERED_ABOVE))
-_CELL_EDGE_MARKERS: Final = _SLOT_MARKERS | {_ROW_START, _TABLE_END}
+
+_ENDS_SIGN: Final = 1
+_ENDS_DIGIT: Final = 2
+_STARTS_DIGIT: Final = 4
 
 
-# A row is a list of slots: (marker, start, end), the slot's text being ``text[start:end]``.
-def _table_rows(text: str, open_at: int) -> list[list[tuple[str, int, int]]]:
+@dataclass
+class _Tables:
+    """For each index inside a cell's text, the cell's number; per cell, per row it covers, the
+    bits of every cell to its left and to its right."""
+
+    cell_at: list[int]
+    left: list[list[int]] = field(default_factory=list)
+    right: list[list[int]] = field(default_factory=list)
+
+
+def _word_bits(text: str) -> int:
+    bits = 0
+    for word in _words(text):
+        if _is_digit(word[0]):
+            bits |= _STARTS_DIGIT
+        if _is_digit(word[-1]):
+            bits |= _ENDS_DIGIT
+        if word[-1] in SPACED_SIGNS:
+            bits |= _ENDS_SIGN
+    return bits
+
+
+def _words(text: str) -> list[str]:
+    words: list[str] = []
+    current: list[str] = []
+    for character in text:
+        if is_gap(character):
+            if current:
+                words.append("".join(current))
+            current = []
+        else:
+            current.append(character)
+    if current:
+        words.append("".join(current))
+    return words
+
+
+def _index_table(text: str, open_at: int, tables: _Tables) -> int:
+    close = text.find(_TABLE_END, open_at)
+    stop = len(text) if close < 0 else close
     rows: list[list[tuple[str, int, int]]] = []
     current: tuple[str, int] | None = None
-    for index in range(open_at + 1, len(text)):
-        point = text[index]
-        is_marker = point in (_TABLE_END, _ROW_START) or point in _SLOT_MARKERS
-        if is_marker and current is not None:
-            rows[-1].append((current[0], current[1], index))
+    for at in range(open_at + 1, stop + 1):
+        point = text[at] if at < stop else ""
+        if (at == stop or point == _ROW_START or point in _SLOT_MARKERS) and current is not None:
+            rows[-1].append((current[0], current[1], at))
             current = None
-        if point == _TABLE_END:
+        if at == stop:
             break
         if point == _ROW_START:
             rows.append([])
         elif point in _SLOT_MARKERS and rows:
-            current = (point, index + 1)
-    return rows
-
-
-def _slot(rows: list[list[tuple[str, int, int]]], row: int, column: int) -> tuple[str, int, int]:
-    if 0 <= row < len(rows) and 0 <= column < len(rows[row]):
-        return rows[row][column]
-    return ("", 0, 0)
-
-
-def _owning_cell(
-    rows: list[list[tuple[str, int, int]]], row: int, column: int
-) -> tuple[int, int] | None:
-    while _slot(rows, row, column)[0] == _COVERED_ABOVE:
-        row -= 1
-    while _slot(rows, row, column)[0] == _COVERED_LEFT:
-        column -= 1
-    return (row, column) if _slot(rows, row, column)[0] == _CELL_START else None
-
-
-def _cell_span(rows: list[list[tuple[str, int, int]]], row: int, column: int) -> tuple[int, int]:
-    columns = 1
-    while _slot(rows, row, column + columns)[0] == _COVERED_LEFT:
-        columns += 1
-    spanned = 1
-    while _slot(rows, row + spanned, column)[0] == _COVERED_ABOVE:
-        spanned += 1
-    return columns, spanned
-
-
-def _drawn_edge(text: str, start: int, end: int, last: bool) -> str | None:
-    indices = range(end - 1, start - 1, -1) if last else range(start, end)
-    return next((text[i] for i in indices if not is_gap(text[i])), None)
-
-
-def _neighbour(
-    text: str, rows: list[list[tuple[str, int, int]]], row: int, column: int, step: int
-) -> str | None:
-    width = len(rows[row]) if 0 <= row < len(rows) else 0
-    while 0 <= column < width:
-        cell = _owning_cell(rows, row, column)
-        if cell is None:
-            return None
-        _, start, end = _slot(rows, *cell)
-        edge = _drawn_edge(text, start, end, step < 0)
-        if edge is not None:
-            return edge
-        column = cell[1] - 1 if step < 0 else cell[1] + _cell_span(rows, *cell)[0]
-    return None
-
-
-def _cell_at(
-    text: str, at: int
-) -> tuple[list[list[tuple[str, int, int]]], int, int, tuple[int, int]] | None:
-    marker = at - 1
-    while marker >= 0 and text[marker] != _CELL_START:
-        if text[marker] in (_TABLE_START, _TABLE_END, _ROW_START, _COVERED_LEFT, _COVERED_ABOVE):
-            return None
-        marker -= 1
-    open_at = marker
-    while open_at >= 0 and text[open_at] != _TABLE_START:
-        open_at -= 1
-    if marker < 0 or open_at < 0:
-        return None
-    rows = _table_rows(text, open_at)
+            current = (point, at + 1)
+    owner: list[list[int]] = [[] for _ in rows]
+    placed: list[tuple[int, int, int, int, int]] = []  # row, column, columns, rows, bits
     for row, slots in enumerate(rows):
-        for column, (_, start, _end) in enumerate(slots):
-            if start == marker + 1:
-                return rows, row, column, _cell_span(rows, row, column)
-    return None
+        for column, (marker, start, end) in enumerate(slots):
+            if marker == _CELL_START:
+                cell = len(placed)
+                columns = 1
+                while _marker(rows, row, column + columns) == _COVERED_LEFT:
+                    columns += 1
+                spanned = 1
+                while _marker(rows, row + spanned, column) == _COVERED_ABOVE:
+                    spanned += 1
+                placed.append((row, column, columns, spanned, _word_bits(text[start:end])))
+                for at in range(start, end):
+                    tables.cell_at[at] = len(tables.left) + cell
+            elif marker == _COVERED_LEFT:
+                cell = owner[row][column - 1] if column > 0 else -1
+            else:
+                above = owner[row - 1] if row > 0 else []
+                cell = above[column] if column < len(above) else -1
+            owner[row].append(cell)
+    before: list[list[int]] = []
+    after: list[list[int]] = []
+    for ids in owner:
+        running = [0]
+        for cell in ids:
+            running.append(running[-1] | (placed[cell][4] if cell >= 0 else 0))
+        before.append(running)
+        trailing = [0] * (len(ids) + 1)
+        for column in range(len(ids) - 1, -1, -1):
+            cell = ids[column]
+            trailing[column] = trailing[column + 1] | (placed[cell][4] if cell >= 0 else 0)
+        after.append(trailing)
+    for row, column, columns, spanned, _ in placed:
+        covered = range(row, min(row + spanned, len(rows)))
+        tables.left.append([_bits_at(before[r], column) for r in covered])
+        tables.right.append([_bits_at(after[r], column + columns) for r in covered])
+    return stop
 
 
-def _cut_across_cell_before(text: str, start: int, first: str | None) -> bool:
-    if non_gap(text, start - 1, -1) != _CELL_START:
-        return False
-    cell = _cell_at(text, start)
-    if cell is None:
-        return False
-    rows, row, column, (_, spanned) = cell
-    for current in range(row, row + spanned):
-        edge = _neighbour(text, rows, current, column - 1, -1)
-        if edge is not None and (edge in SPACED_SIGNS or (_is_digit(edge) and _is_digit(first))):
-            return True
-    return False
+def _marker(rows: list[list[tuple[str, int, int]]], row: int, column: int) -> str:
+    if 0 <= row < len(rows) and 0 <= column < len(rows[row]):
+        return rows[row][column][0]
+    return ""
 
 
-def _cut_across_cell_after(text: str, end: int, last: str | None) -> bool:
-    following = non_gap(text, end, 1)
-    if following is None or following not in _CELL_EDGE_MARKERS or not _is_digit(last):
+def _bits_at(bits: list[int], column: int) -> int:
+    return bits[column] if 0 <= column < len(bits) else 0
+
+
+def _index_tables(text: str) -> _Tables | None:
+    open_at = text.find(_TABLE_START)
+    if open_at < 0:
+        return None
+    tables = _Tables(cell_at=[-1] * (len(text) + 1))
+    while open_at >= 0:
+        stop = _index_table(text, open_at, tables)
+        open_at = text.find(_TABLE_START, stop)
+    return tables
+
+
+def _cut_across_cell_before(tables: _Tables | None, start: int, first: str | None) -> bool:
+    if tables is None or tables.cell_at[start] < 0:
         return False
-    cell = _cell_at(text, end)
-    if cell is None:
-        return False
-    rows, row, column, (columns, spanned) = cell
     return any(
-        _is_digit(_neighbour(text, rows, current, column + columns, 1))
-        for current in range(row, row + spanned)
+        bits & _ENDS_SIGN or (bits & _ENDS_DIGIT and _is_digit(first))
+        for bits in tables.left[tables.cell_at[start]]
     )
 
 
-def edge_before(text: str, start: int, first: str | None) -> bool:
+def _cut_across_cell_after(tables: _Tables | None, end: int, last: str | None) -> bool:
+    if tables is None or tables.cell_at[end] < 0 or not _is_digit(last):
+        return False
+    return any(bits & _STARTS_DIGIT for bits in tables.right[tables.cell_at[end]])
+
+
+def _cut_after_space(
+    text: str, space: int, start: int, first: str | None, tables: _Tables | None
+) -> bool:
+    """``cutAfterSpace``: a sign before the space, read past gaps; a grouped number; a table."""
+    beyond = non_gap(text, space - 1, -1)
+    if beyond is not None and beyond in SPACED_SIGNS:
+        return True
+    if _is_digit(beyond) and _is_digit(first):
+        return True
+    return _cut_across_cell_before(tables, start, first)
+
+
+def edge_before(text: str, start: int, first: str | None, tables: _Tables | None = None) -> bool:
     """Does a quote whose first character is ``first`` begin on a boundary at ``start``?"""
     before = _at(text, start - 1)
     if before is None:
@@ -255,20 +285,19 @@ def edge_before(text: str, start: int, first: str | None) -> bool:
     if is_word_character(before):
         return False
     if before == " ":
-        beyond = _at(text, start - 2)
-        if beyond is not None and beyond in SPACED_SIGNS:
-            return False
-        if _is_digit(non_gap(text, start - 2, -1)) and _is_digit(first):
-            return False
-        return not _cut_across_cell_before(text, start, first)
+        return not _cut_after_space(text, start - 1, start, first, tables)
     index = start
     while before is not None and before in QUOTE_OPENERS:
         index -= 1
         before = _at(text, index - 1)
-    return index < start and (before is None or before == " ")
+    if index == start:
+        return False
+    if before is None:
+        return True
+    return before == " " and not _cut_after_space(text, index - 1, start, first, tables)
 
 
-def edge_after(text: str, end: int, last: str | None) -> bool:
+def edge_after(text: str, end: int, last: str | None, tables: _Tables | None = None) -> bool:
     """Does a quote whose last character is ``last`` end on a boundary at ``end``?"""
     after = _at(text, end)
     if after is None:
@@ -278,7 +307,7 @@ def edge_after(text: str, end: int, last: str | None) -> bool:
     if after == " ":
         if _is_digit(non_gap(text, end + 1, 1)) and _is_digit(last):
             return False
-        return not _cut_across_cell_after(text, end, last)
+        return not _cut_across_cell_after(tables, end, last)
     index = end
     while after is not None and after in QUOTE_CLOSERS:
         index += 1
@@ -294,11 +323,14 @@ def find_quote_occurrence(text: str, quote: str) -> int:
     """
     if not quote:
         return -1
+    tables = _index_tables(text)
+    first = non_gap(quote, 0, 1)
+    last = non_gap(quote, len(quote) - 1, -1)
     found = text.find(quote)
     while found >= 0:
-        first = non_gap(quote, 0, 1)
-        last = non_gap(quote, len(quote) - 1, -1)
-        if edge_before(text, found, first) and edge_after(text, found + len(quote), last):
+        if edge_before(text, found, first, tables) and edge_after(
+            text, found + len(quote), last, tables
+        ):
             return found
         found = text.find(quote, found + 1)
     return -1

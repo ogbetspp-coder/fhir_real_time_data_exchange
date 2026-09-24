@@ -336,7 +336,9 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
   Section lookup is by canonical `sourceKey`; the pinned mapping manifest translates to the
   store's coding where needed. No narrative and no result is cached across requests.
 - **`find_product`** has no search against the store in phase 1: it reads the caller's entitled
-  documents one by one and inspects each. The reads run through a pool of at most 8 in flight,
+  documents one by one and inspects each. A stored product name the normalisation refuses (a
+  section 2 character) matches nothing by name, and its identifiers still match; it does not
+  make the whole search `unavailable`. The reads run through a pool of at most 8 in flight,
   cover at most the first 200 entitled ids in entitlement order (`FIND_PRODUCT_SCAN_HORIZON`),
   stop being launched once `limit` matches are in hand, and stop when the request's read budget
   is spent. `truncated` covers both ways an answer can be shorter than what the entitlement
@@ -378,18 +380,27 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
     ends with a digit before a space followed by a digit, has cut a space-grouped number; the
     digit on each side is read past every gap (from `fidelity-norm/3.0.0`, the specification's
     section 6), so "10" U+2009 " 000" and "5" U+2063 " 000" are one number, and a quote may
-    neither end with "10" or "10" U+2009 nor begin with "000" there; a quote
-    preceded by a comparator or sign and a space (`<`, `>`, `≤`, `≥`, `±`, `∓`, `−`, `~`, `≈`
-    and their variants) has lost it. Both are cuts;
+    neither end with "10" or "10" U+2009 nor begin with "000" there. A quote, or the opening
+    punctuation before it, preceded by a comparator or sign and a space (`<`, `>`, `≤`, `≥`,
+    `±`, `∓`, `−`, `~`, `≈` and their variants), the sign read past every gap too, has lost it:
+    "30 ml/min" is cut after "CrCl <" U+2063 " " and inside "CrCl < (30 ml/min)". Both are cuts;
   - **across table cells** (from `fidelity-norm/3.0.0`): a renderer draws a row's cells side by
-    side with a gap about as wide as a space, so "10" | "000 IU" reads "10 000 IU", "<" | "5 mg"
-    reads "< 5 mg", and so do they with an empty cell between or beside a cell spanning rows
-    (drawn level with any of them). The normalised text carries the grid (U+FDD0 table, U+FDD1
-    end, U+FDD2 row, U+FDD3 cell, U+FDD4 and U+FDD5 slots covered from the left and from above),
-    so a quote that begins or ends at the edge of a cell's text is held to the two rules above
-    against the nearest cell with text on that side — found by rebuilding the grid, through
-    spans, skipping empty cells — in every row its cell covers. So neither "10" nor "000 IU"
-    matches there, nor "5 mg" after the "<" cell, while "10 mg" alone in a cell still does;
+    side with a gap about as wide as a space and centres each cell's lines vertically, so any
+    line of a cell can sit level with any line of another cell in the row, wherever the viewer's
+    width wraps them: "10" | "000 IU" reads "10 000 IU", "<" | "5 mg" reads "< 5 mg", and "Up to
+    10" | "once" / "000 IU" / "weekly" draws "Up to 10 000 IU" on one line. The normalised text
+    carries the grid (U+FDD0 table, U+FDD1 end, U+FDD2 row, U+FDD3 cell, U+FDD4 and U+FDD5 slots
+    covered from the left and from above) but not which line a word is on, so a quote that
+    begins at a word boundary inside a cell is held to the two rules above against every word
+    of every cell to its left, and one that ends at a word boundary inside a cell against every
+    word of every cell to its right, in every row its cell covers (a word being a run of code
+    points that are not gaps; the grid is rebuilt once per search, through spans). So neither
+    "10" nor "000 IU" matches there, nor "5 mg" after the "<" cell, while "10 mg" in a row whose
+    other cells hold no number still does. The price is a false failure: a number in a cell
+    beside another cell holding a number ("≥ 50" | "10 mg") cannot be quoted up to the cell
+    edge between them. Rows, captions and whole tables are separate lines, as a paragraph break
+    is: the normalised text reads a block's line break as a space only because section 3 does,
+    and the rule treats U+FDD2, U+FDD0 and U+FDD1 as ending a line;
   - and a word character on either side (the fidelity library's own `isWordCharacter`) is a cut
     before any of this is consulted, so the rule is never looser than the gate's.
 

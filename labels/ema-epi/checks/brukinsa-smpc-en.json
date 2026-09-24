@@ -3,7 +3,7 @@
     "file": "brukinsa-smpc-en.json",
     "sha256": "d16e72035623a42023d271a76e0ac124c41970af4b1131d0a18479224f4dea5e"
   },
-  "reader": "epi-reader/1.0.0",
+  "reader": "epi-reader/1.1.0",
   "checker": "qrd-check/1.0.0",
   "template": {
     "family": "EMA QRD product-information template, centralised procedure",
@@ -22,7 +22,7 @@
     "findings": {
       "deviation": 4,
       "document-quirk": 1,
-      "formatting": 3,
+      "formatting": 6,
       "heading-text": 2,
       "refused-section": 1
     },
@@ -51,6 +51,27 @@
       "paragraph": 0,
       "mark": "shading-lightgrey",
       "text": "the national reporting system listed in Appendix V"
+    },
+    {
+      "kind": "formatting",
+      "section": "5.1 Pharmacodynamic properties",
+      "paragraph": 307,
+      "mark": "underline",
+      "text": ">"
+    },
+    {
+      "kind": "formatting",
+      "section": "5.1 Pharmacodynamic properties",
+      "paragraph": 307,
+      "mark": "underline",
+      "text": ">"
+    },
+    {
+      "kind": "formatting",
+      "section": "5.1 Pharmacodynamic properties",
+      "paragraph": 308,
+      "mark": "underline",
+      "text": ">"
     },
     {
       "kind": "formatting",

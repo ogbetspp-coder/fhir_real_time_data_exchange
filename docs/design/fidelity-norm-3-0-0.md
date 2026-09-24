@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and seventeen reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and eighteen reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -856,3 +856,32 @@ Each fix is pinned by vectors on both sides, and a break of each is caught by th
    unavailable by one refused stored name (now a non-match); stale comments in the Python port
    and ADR 0003; the sweep's zero-width criterion, and the platform the renderer claims were
    checked on (Chrome on macOS; stated in §5).
+
+## Eighteenth review (2026-09-23): findings and what changed
+
+1. **High.** A renderer centres a cell's lines, so any line of a multi-line cell can sit level
+   with a line of the next cell: "Up to 10" | "once" / "000 IU" / "weekly" draws "Up to 10 000
+   IU", and "if" / "CrCl <" / "then" | "30 ml/min" draws "CrCl < 30 ml/min". The round-17 rule
+   read only the nearest cell's edge. Fixed: a quote at a word boundary inside a cell is held to
+   the digit and sign rules against every word of every cell on its side, in each row its cell
+   covers. The text cannot say which line a word is on, so this refuses more than a reader
+   would (a number beside another cell's number cannot be quoted up to the cell edge), a false
+   failure the query design states.
+2. **High.** The sign rule read only the code point before the space, so "CrCl <" U+2063 " 30
+   ml/min" (drawn exactly as "CrCl < 30 ml/min") and "CrCl < (30 ml/min)" let "30 ml/min"
+   match. Fixed: the sign is read past every gap, and after an opening bracket too.
+3. **Medium.** The round-17 grid was rebuilt per occurrence: a 50 000-slot table took minutes,
+   inside a synchronous call. Fixed: once per search, with a timing test (tens of
+   milliseconds).
+4. **Medium.** No vector pinned the `hr` rule's place after the parent check. Fixed: two
+   vectors, and a mutation row.
+5. **Medium.** The QRD check ignored underline marks; the ePI reader missed a border on inline
+   text (drawn as an underline); the registry judged an underline only inside its text. Fixed:
+   one rule (`zone_a.underline`, ADR 0005's allowlist, judged on the drawn text) used by the
+   registry and the check, which now reports an underline over what it can change; the reader
+   marks inline borders; both readers' versions moved to 1.1.0. The check finds three such
+   underlines in Brukinsa (">1", ">5", ">2", drawn "≥") and one in Jentadueto.
+6. **Medium.** Two rows of the changed-vectors table were stale. Fixed.
+7. and 8. **Low.** Rows, captions and tables are separate lines to the quote rule, now stated;
+   "nearest cell with text" wording, the adjacent-number refusal and `find_product`'s handling
+   of a refused stored name are stated in the query design.

@@ -65,7 +65,8 @@ with a refused part is ``not-checked``, not ``absent``: it may be in the part th
 read, and the checker never guesses around it. Defects the reader read through by a stated rule
 are ``xhtml-defect`` findings. Colour, shading, strike-through and faint marks over text are
 ``formatting`` findings: coloured, highlighted or struck text in a published SmPC is usually a
-left-over from review.
+left-over from review. So is an underline over text it can change (``zone_a.underline``: an
+underlined "<" is drawn "≤"), which the text alone reads as the plain sign.
 """
 
 from __future__ import annotations
@@ -82,6 +83,7 @@ from zone_a.docx.reader import Paragraph
 from zone_a.epi.reader import READER_VERSION, Document, Section, read_epi, walk
 from zone_a.qrd.headings import collapse, index, match_heading
 from zone_a.qrd.pattern import Token, parse
+from zone_a.underline import underline_changes
 
 CHECKER_VERSION = "qrd-check/1.0.0"
 SIMILARITY = 0.85
@@ -1231,9 +1233,26 @@ def check(document: Document, registry: dict[str, Any], mapping: dict[str, Any])
     }
 
 
+_PICTURE = frozenset("\ufffc")
+
+
 def _formatting(report: _Report, section: str, number: int, paragraph: Paragraph) -> None:
     for mark in paragraph.marks:
         covered = paragraph.text[mark.start : mark.end]
+        if mark.kind == "underline":
+            # A sign alone under a line is the case that matters ("≥" typed as an underlined
+            # ">"); a picture under a link's line changes nothing.
+            if underline_changes(
+                paragraph.text, mark.start, mark.end, also=_PICTURE, hyphens_in_words=True
+            ):
+                report.finding(
+                    "formatting",
+                    section=section,
+                    paragraph=number,
+                    mark=mark.kind,
+                    text=_excerpt(covered),
+                )
+            continue
         if not any(c.isalnum() for c in covered):
             # A coloured picture or shaded space shows no text differently.
             continue

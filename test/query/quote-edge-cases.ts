@@ -118,6 +118,22 @@ export const quoteEdgeCases: QuoteEdgeCase[] = [
     whole: ["Adults", "daily", "Dose", "20 mg"],
   },
   {
+    // Review round 18: a cell's lines are centred, so any of them can sit level with a line of
+    // the next cell ("Up to 10 000 IU", "CrCl < 30 ml/min"); every word of every cell on that
+    // side counts.
+    markup:
+      "<table><tr><td>Up to 10</td><td>once<br/>000 IU<br/>weekly</td></tr><tr><td>if<br/>CrCl &lt;<br/>then</td><td>30 ml/min</td></tr></table>",
+    cut: ["Up to 10", "000 IU", "000 IU weekly", "30 ml/min"],
+    whole: ["once", "weekly", "if", "Up to"],
+  },
+  {
+    // A sign binds across a gap drawn as nothing or as a thin space, and across an opening
+    // bracket.
+    text: "CrCl <\u2063 30 ml/min. Age >\u2009 65 years. CrCl < (15 ml/min). See (section 4.4).",
+    cut: ["30 ml/min.", "65 years.", "(15 ml/min).", "15 ml/min"],
+    whole: ["(section 4.4).", "section 4.4", "CrCl"],
+  },
+  {
     // Review round 16: a Mongolian or Yi letter the default serif face draws as a blank.
     text: "Take 10\u1878 000 IU daily. Up to 5\ua4c5 000 IU weekly.",
     cut: ["Take 10", "000 IU daily.", "Up to 5\ua4c5", "000 IU weekly."],

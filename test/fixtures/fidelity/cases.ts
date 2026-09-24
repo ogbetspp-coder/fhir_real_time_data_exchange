@@ -4726,6 +4726,17 @@ export const xhtmlCases: XhtmlCase[] = [
     expected: { error: "table-content" },
   },
   {
+    // The rule is decided after the parent check (review round 18).
+    name: "list-content-before-rule-in-cell",
+    input: div("<table><tr><td><ul><hr/></ul></td></tr></table>"),
+    expected: { error: "list-content" },
+  },
+  {
+    name: "script-content-before-rule-in-cell",
+    input: div("<table><tr><td><sup><hr/></sup></td></tr></table>"),
+    expected: { error: "script-content" },
+  },
+  {
     name: "accepts-rule-after-table",
     input: div("<table><tr><td>1</td></tr></table><hr/><p>2</p>"),
     expected: "\n\n\ufdd0\n\ufdd2\t\ufdd3\t1\t\n\n\ufdd1\n\n\n\n2\n\n",

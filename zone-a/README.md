@@ -185,19 +185,19 @@ defaults are wrong:
 
 ## Vector results
 
-All 589 golden vectors of `fidelity-norm/3.0.0` pass, byte for byte, including every error case:
+All 591 golden vectors of `fidelity-norm/3.0.0` pass, byte for byte, including every error case:
 
 | Module                         | Result          |
 | ------------------------------ | --------------- |
 | `zone_a/fidelity/normalize.py` | normalize 71/71 |
-| `zone_a/fidelity/xhtml.py`     | xhtml 338/338   |
+| `zone_a/fidelity/xhtml.py`     | xhtml 340/340   |
 | `zone_a/fidelity/verify.py`    | verify 180/180  |
 
 Under `fidelity-norm/1.1.1` there were 137 (25, 60 and 52). Seven of those were added by the
 first round of this port: six XHTML cases and one verify case, each of them pinning a divergence
 the existing 130 could not see. The 274 added by `fidelity-norm/2.0.0` pin its rules and both
-sides of every boundary (`docs/validation/changes/2026-09-23-fidelity-norm-2-0-0.md`). The 188 added by
-`fidelity-norm/3.0.0` (10 of 2.0.0 replaced or renamed, so 178 more) pin numbered lists, table
+sides of every boundary (`docs/validation/changes/2026-09-23-fidelity-norm-2-0-0.md`). The 190 added by
+`fidelity-norm/3.0.0` (10 of 2.0.0 replaced or renamed, so 180 more) pin numbered lists, table
 grids, pictures, the reserved and invisible code points, the nesting bounds, combining marks
 across markup, the refusal of underlines and links, and the thin spaces and other gaps (`docs/validation/changes/2026-09-23-fidelity-norm-3-0-0.md`). They are defined in
 `test/fixtures/fidelity/cases.ts` on the Zone B side, where the TypeScript defines the expected

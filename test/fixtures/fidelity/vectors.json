@@ -2511,6 +2511,20 @@
       }
     },
     {
+      "name": "list-content-before-rule-in-cell",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td><ul><hr/></ul></td></tr></table></div>",
+      "expected": {
+        "error": "list-content"
+      }
+    },
+    {
+      "name": "script-content-before-rule-in-cell",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td><sup><hr/></sup></td></tr></table></div>",
+      "expected": {
+        "error": "script-content"
+      }
+    },
+    {
       "name": "accepts-rule-after-table",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>1</td></tr></table><hr/><p>2</p></div>",
       "expected": "\n\n﷐\n﷒\t﷓\t1\t\n\n﷑\n\n\n\n2\n\n"

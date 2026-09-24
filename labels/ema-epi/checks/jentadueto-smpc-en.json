@@ -3,7 +3,7 @@
     "file": "jentadueto-smpc-en.json",
     "sha256": "544b2f24e69f410d3e792a80f3ee82c00ef60afcdf913526308e799db54a1ee4"
   },
-  "reader": "epi-reader/1.0.0",
+  "reader": "epi-reader/1.1.0",
   "checker": "qrd-check/1.0.0",
   "template": {
     "family": "EMA QRD product-information template, centralised procedure",
@@ -22,7 +22,7 @@
     "findings": {
       "deviation": 2,
       "document-quirk": 1,
-      "formatting": 1,
+      "formatting": 2,
       "heading-text": 2,
       "unmapped-code": 3,
       "xhtml-defect": 7
@@ -75,6 +75,13 @@
       "kind": "xhtml-defect",
       "section": "5.1 Pharmacodynamic properties > Metformin > Clinical efficacy and safety",
       "detail": "8 unescaped '<' read as text (invalid XHTML)"
+    },
+    {
+      "kind": "formatting",
+      "section": "5.1 Pharmacodynamic properties > Metformin > Clinical efficacy and safety",
+      "paragraph": 126,
+      "mark": "underline",
+      "text": "Linagliptin as add-on therapy in elderly (age ≥ 70 years) with type 2 diabetes"
     },
     {
       "kind": "xhtml-defect",

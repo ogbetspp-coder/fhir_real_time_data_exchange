@@ -321,193 +321,229 @@ function nonGapFrom(text: string, index: number): string | undefined {
 
 // --- across table cells ---------------------------------------------------------------------
 //
-// A renderer draws a row's cells side by side with a gap about as wide as a space, so a number
-// or a sign split across cells ("10" | "000 IU", "<" | "5 mg") reads as one, and so does one
-// with an empty cell between, or one beside a cell that spans rows (drawn level with any of
-// them). The normalised text carries the grid (fidelity-norm/3.0.0 section 5: U+FDD0 table,
-// U+FDD1 end, U+FDD2 row, U+FDD3 cell, U+FDD4 and U+FDD5 slots covered from the left and from
-// above), so the grid is rebuilt and a quote that begins or ends at a cell's edge is held to the
-// same two rules against the nearest cell with text on that side, in every row its cell covers.
+// A renderer draws a row's cells side by side with a gap about as wide as a space, and centres
+// each cell's lines vertically, so any line of a cell can sit level with any line of another
+// cell in the same row: "Up to 10" | "once" / "000 IU" / "weekly" is drawn with "Up to 10 000
+// IU" on one line, and "<" | "5 mg" reads "< 5 mg". Where a cell's lines fall depends on the
+// viewer's width, which the text cannot say. So a quote that begins at a word boundary inside a
+// cell is held to the digit and sign rules against every word of every cell to its left, and one
+// that ends at a word boundary inside a cell against every word of every cell to its right, in
+// each row its cell covers (fidelity-norm/3.0.0 section 5 writes the grid: U+FDD0 table, U+FDD1
+// end, U+FDD2 row, U+FDD3 cell, U+FDD4 and U+FDD5 slots covered from the left and from above).
+// A word is a run of code points that are not gaps. The grid of every table in a section is
+// read once per search.
 
-const TABLE_START = "\ufdd0";
-const TABLE_END = "\ufdd1";
-const ROW_START = "\ufdd2";
-const CELL_START = "\ufdd3";
-const COVERED_LEFT = "\ufdd4";
-const COVERED_ABOVE = "\ufdd5";
+const TABLE_START = "﷐";
+const TABLE_END = "﷑";
+const ROW_START = "﷒";
+const CELL_START = "﷓";
+const COVERED_LEFT = "﷔";
+const COVERED_ABOVE = "﷕";
 const SLOT_MARKERS = new Set([CELL_START, COVERED_LEFT, COVERED_ABOVE]);
-const CELL_EDGE_MARKERS = new Set([...SLOT_MARKERS, ROW_START, TABLE_END]);
 
-// One slot of a row: its marker and its text, as code-point indices [start, end).
-type Slot = {
-  marker: string;
-  start: number;
-  end: number;
+// What a cell's words hold, as bits: a word ending in a spaced sign, a word ending in a digit,
+// a word beginning with a digit.
+const ENDS_SIGN = 1;
+const ENDS_DIGIT = 2;
+const STARTS_DIGIT = 4;
+
+type Cell = {
+  // For each row the cell covers, from its first: the bits of every cell to its left in that
+  // row, and of every cell to its right.
+  left: number[];
+  right: number[];
 };
 
-// The rows of the table whose marker U+FDD0 is at code-point index `open`.
-function tableRows(points: readonly string[], open: number): Slot[][] {
+type TableIndex = {
+  // For each UTF-16 index inside a cell's text, the cell's number; -1 elsewhere.
+  cellAt: Int32Array;
+  cells: Cell[];
+};
+
+function wordBits(text: string, start: number, end: number): number {
+  let bits = 0;
+  let previous: string | undefined;
+  let inWord = false;
+  for (const point of text.slice(start, end)) {
+    if (isGapPoint(point)) {
+      if (inWord) {
+        if (isDigit(previous)) bits |= ENDS_DIGIT;
+        if (previous !== undefined && SPACED_SIGNS.has(previous)) bits |= ENDS_SIGN;
+      }
+      inWord = false;
+    } else {
+      if (!inWord && isDigit(point)) bits |= STARTS_DIGIT;
+      inWord = true;
+    }
+    previous = point;
+  }
+  if (inWord) {
+    if (isDigit(previous)) bits |= ENDS_DIGIT;
+    if (previous !== undefined && SPACED_SIGNS.has(previous)) bits |= ENDS_SIGN;
+  }
+  return bits;
+}
+
+type Slot = { marker: string; start: number; end: number };
+
+function indexTable(text: string, open: number, index: TableIndex): number {
+  const close = text.indexOf(TABLE_END, open);
+  const stop = close < 0 ? text.length : close;
   const rows: Slot[][] = [];
   let slot: Slot | undefined;
-  for (let index = open + 1; index < points.length; index += 1) {
-    const point = points[index] ?? "";
-    const isMarker = point === TABLE_END || point === ROW_START || SLOT_MARKERS.has(point);
+  // Grid markers are single UTF-16 units, so the text is walked by unit here.
+  for (let at = open + 1; at <= stop; at += 1) {
+    const unit = text[at] ?? "";
+    const isMarker = at === stop || unit === ROW_START || SLOT_MARKERS.has(unit);
     if (isMarker && slot !== undefined) {
-      slot.end = index;
+      slot.end = at;
       slot = undefined;
     }
-    if (point === TABLE_END) break;
-    if (point === ROW_START) rows.push([]);
-    else if (SLOT_MARKERS.has(point)) {
-      slot = { marker: point, start: index + 1, end: index + 1 };
+    if (at === stop) break;
+    if (unit === ROW_START) rows.push([]);
+    else if (SLOT_MARKERS.has(unit)) {
+      slot = { marker: unit, start: at + 1, end: at + 1 };
       rows[rows.length - 1]?.push(slot);
     }
   }
-  return rows;
-}
-
-// The cell a slot belongs to: up through slots covered from above, then left through slots
-// covered from the left.
-function owningCell(rows: Slot[][], row: number, column: number): [number, number] | undefined {
-  let r = row;
-  while (rows[r]?.[column]?.marker === COVERED_ABOVE) r -= 1;
-  let c = column;
-  while (rows[r]?.[c]?.marker === COVERED_LEFT) c -= 1;
-  return rows[r]?.[c]?.marker === CELL_START ? [r, c] : undefined;
-}
-
-// How many columns and rows the cell starting at [row, column] covers.
-function cellSpan(rows: Slot[][], row: number, column: number): [number, number] {
-  let columns = 1;
-  while (rows[row]?.[column + columns]?.marker === COVERED_LEFT) columns += 1;
-  let spanned = 1;
-  while (rows[row + spanned]?.[column]?.marker === COVERED_ABOVE) spanned += 1;
-  return [columns, spanned];
-}
-
-function drawnEdge(points: readonly string[], slot: Slot, last: boolean): string | undefined {
-  const step = last ? -1 : 1;
-  for (let index = last ? slot.end - 1 : slot.start; index >= slot.start && index < slot.end;) {
-    const point = points[index];
-    if (!isGapPoint(point)) return point;
-    index += step;
-  }
-  return undefined;
-}
-
-// The drawn code point nearest to column `column` of row `row` on side `step` (-1 left, +1
-// right): the last (left) or first (right) code point that is not a gap of the nearest cell on
-// that side holding one; empty cells are skipped, as a reader skips their blank.
-function neighbour(
-  points: readonly string[],
-  rows: Slot[][],
-  row: number,
-  column: number,
-  step: -1 | 1,
-): string | undefined {
-  let c = column;
-  while (c >= 0 && c < (rows[row]?.length ?? 0)) {
-    const cell = owningCell(rows, row, c);
-    if (cell === undefined) return undefined;
-    const [r0, c0] = cell;
-    const slot = rows[r0]?.[c0];
-    if (slot === undefined) return undefined;
-    const edge = drawnEdge(points, slot, step < 0);
-    if (edge !== undefined) return edge;
-    c = step < 0 ? c0 - 1 : c0 + cellSpan(rows, r0, c0)[0];
-  }
-  return undefined;
-}
-
-// The table cell whose text holds code-point index `at`, found by the last U+FDD3 before it:
-// the grid, the cell's row and column, and its span; undefined outside a table.
-function cellAt(
-  points: readonly string[],
-  at: number,
-): { rows: Slot[][]; row: number; column: number; span: [number, number] } | undefined {
-  let marker = at - 1;
-  while (marker >= 0 && points[marker] !== CELL_START) {
-    const point = points[marker];
-    if (point === TABLE_START || point === TABLE_END || point === ROW_START) return undefined;
-    if (point === COVERED_LEFT || point === COVERED_ABOVE) return undefined;
-    marker -= 1;
-  }
-  let open = marker;
-  while (open >= 0 && points[open] !== TABLE_START) open -= 1;
-  if (marker < 0 || open < 0) return undefined;
-  const rows = tableRows(points, open);
-  for (const [row, slots] of rows.entries()) {
-    const column = slots.findIndex((slot) => slot.start === marker + 1);
-    if (column >= 0) return { rows, row, column, span: cellSpan(rows, row, column) };
-  }
-  return undefined;
-}
-
-// Whether a quote beginning at UTF-16 index `start`, at the start of a cell's text, has cut a
-// number or lost a sign drawn in a cell to its left.
-function cutAcrossCellBefore(text: string, start: number, quote: string): boolean {
-  if (nonGapBefore(text, start) !== CELL_START) return false;
-  const points = Array.from(text);
-  const at = codePointLength(text.slice(0, start));
-  const cell = cellAt(points, at);
-  if (cell === undefined) return false;
-  const first = nonGapFrom(quote, 0);
-  for (let row = cell.row; row < cell.row + cell.span[1]; row += 1) {
-    const edge = neighbour(points, cell.rows, row, cell.column - 1, -1);
-    if (edge !== undefined && (SPACED_SIGNS.has(edge) || (isDigit(edge) && isDigit(first)))) {
-      return true;
+  // Which cell owns each slot, and each cell's position and bits.
+  const owner: number[][] = rows.map(() => []);
+  const placed: { row: number; column: number; columns: number; rows: number; bits: number }[] = [];
+  rows.forEach((slots, row) => {
+    slots.forEach((current, column) => {
+      let id: number;
+      if (current.marker === CELL_START) {
+        id = placed.length;
+        placed.push({ row, column, columns: 1, rows: 1, bits: 0 });
+        const entry = placed[id];
+        if (entry !== undefined) {
+          entry.bits = wordBits(text, current.start, current.end);
+          while (rows[row]?.[column + entry.columns]?.marker === COVERED_LEFT) entry.columns += 1;
+          while (rows[row + entry.rows]?.[column]?.marker === COVERED_ABOVE) entry.rows += 1;
+        }
+        index.cellAt.fill(index.cells.length + id, current.start, current.end);
+      } else if (current.marker === COVERED_LEFT) {
+        id = owner[row]?.[column - 1] ?? -1;
+      } else {
+        id = owner[row - 1]?.[column] ?? -1;
+      }
+      owner[row]?.push(id);
+    });
+  });
+  // For each row, the bits of the cells before each column and from each column on.
+  const before = owner.map((ids) => {
+    const out = [0];
+    for (const id of ids) out.push((out[out.length - 1] ?? 0) | (placed[id]?.bits ?? 0));
+    return out;
+  });
+  const after = owner.map((ids) => {
+    const out = Array<number>(ids.length + 1).fill(0);
+    for (let column = ids.length - 1; column >= 0; column -= 1) {
+      out[column] = (out[column + 1] ?? 0) | (placed[ids[column] ?? -1]?.bits ?? 0);
     }
+    return out;
+  });
+  for (const entry of placed) {
+    const left: number[] = [];
+    const right: number[] = [];
+    for (let row = entry.row; row < entry.row + entry.rows; row += 1) {
+      left.push(before[row]?.[entry.column] ?? 0);
+      right.push(after[row]?.[entry.column + entry.columns] ?? 0);
+    }
+    index.cells.push({ left, right });
   }
-  return false;
+  return stop;
 }
 
-// Whether a quote ending at UTF-16 index `end`, at the end of a cell's text, has cut a number
-// drawn on in a cell to its right.
-function cutAcrossCellAfter(text: string, end: number, quote: string): boolean {
-  const next = nonGapFrom(text, end);
-  if (next === undefined || !CELL_EDGE_MARKERS.has(next)) return false;
-  const last = nonGapBefore(quote, quote.length);
-  if (!isDigit(last)) return false;
-  const points = Array.from(text);
-  const cell = cellAt(points, codePointLength(text.slice(0, end)));
+// Every table of a normalised section text, or undefined when it holds none.
+function indexTables(text: string): TableIndex | undefined {
+  let open = text.indexOf(TABLE_START);
+  if (open < 0) return undefined;
+  const index: TableIndex = { cellAt: new Int32Array(text.length + 1).fill(-1), cells: [] };
+  while (open >= 0) {
+    const stop = indexTable(text, open, index);
+    open = text.indexOf(TABLE_START, stop);
+  }
+  return index;
+}
+
+// Whether a quote beginning at UTF-16 index `start` inside a cell, whose first code point that
+// is not a gap is `first`, has lost a sign or cut a number drawn in a cell to its left.
+function cutAcrossCellBefore(
+  tables: TableIndex | undefined,
+  start: number,
+  first: string | undefined,
+): boolean {
+  const cell = tables?.cells[tables.cellAt[start] ?? -1];
   if (cell === undefined) return false;
-  const [columns, spanned] = cell.span;
-  for (let row = cell.row; row < cell.row + spanned; row += 1) {
-    if (isDigit(neighbour(points, cell.rows, row, cell.column + columns, 1))) return true;
-  }
-  return false;
+  return cell.left.some(
+    (bits) => (bits & ENDS_SIGN) !== 0 || ((bits & ENDS_DIGIT) !== 0 && isDigit(first)),
+  );
 }
 
-// A digit on both sides of a space, read past every gap, is one number grouped with spaces
-// ("10 000", "10" U+2009 " 000"): the quote may not begin or end between its groups. Nor may it
-// between two table cells drawn side by side (above).
-function edgeBefore(text: string, start: number, quote: string): boolean {
+// Whether a quote ending at UTF-16 index `end` inside a cell, whose last code point that is not
+// a gap is `last`, has cut a number drawn on in a cell to its right.
+function cutAcrossCellAfter(
+  tables: TableIndex | undefined,
+  end: number,
+  last: string | undefined,
+): boolean {
+  const cell = tables?.cells[tables.cellAt[end] ?? -1];
+  if (cell === undefined || !isDigit(last)) return false;
+  return cell.right.some((bits) => (bits & STARTS_DIGIT) !== 0);
+}
+
+// Whether a quote beginning at `start` (or its opening punctuation) set off by the space ending
+// at UTF-16 index `space` is cut: a sign before the space, read past every gap, binds the number
+// after it ("≥ 30", "<" U+2063 " 30"); a digit before it and a digit first in the quote are one
+// number grouped with spaces ("10 000", "10" U+2009 " 000"); and so across table cells (above).
+function cutAfterSpace(
+  text: string,
+  space: number,
+  start: number,
+  first: string | undefined,
+  tables: TableIndex | undefined,
+): boolean {
+  const beyond = nonGapBefore(text, space);
+  if (beyond !== undefined && SPACED_SIGNS.has(beyond)) return true;
+  if (isDigit(beyond) && isDigit(first)) return true;
+  return cutAcrossCellBefore(tables, start, first);
+}
+
+function edgeBefore(
+  text: string,
+  start: number,
+  quote: string,
+  tables: TableIndex | undefined,
+): boolean {
   let before = codePointBefore(text, start);
   if (before === undefined) return true;
   if (isWordCharacter(before)) return false;
-  if (before === " ") {
-    const beyond = codePointBefore(text, start - 1);
-    if (beyond !== undefined && SPACED_SIGNS.has(beyond)) return false;
-    if (isDigit(nonGapBefore(text, start - 1)) && isDigit(nonGapFrom(quote, 0))) return false;
-    return !cutAcrossCellBefore(text, start, quote);
-  }
+  const first = nonGapFrom(quote, 0);
+  if (before === " ") return !cutAfterSpace(text, start - 1, start, first, tables);
   let index = start;
   while (before !== undefined && QUOTE_OPENERS.has(before)) {
     index -= before.length;
     before = codePointBefore(text, index);
   }
-  return index < start && (before === undefined || before === " ");
+  if (index === start) return false;
+  if (before === undefined) return true;
+  return before === " " && !cutAfterSpace(text, index - 1, start, first, tables);
 }
 
-function edgeAfter(text: string, end: number, quote: string): boolean {
+function edgeAfter(
+  text: string,
+  end: number,
+  quote: string,
+  tables: TableIndex | undefined,
+): boolean {
   let after = codePointAtIndex(text, end);
   if (after === undefined) return true;
   if (isWordCharacter(after)) return false;
   if (after === " ") {
-    if (isDigit(nonGapFrom(text, end + 1)) && isDigit(nonGapBefore(quote, quote.length))) {
-      return false;
-    }
-    return !cutAcrossCellAfter(text, end, quote);
+    const last = nonGapBefore(quote, quote.length);
+    if (isDigit(nonGapFrom(text, end + 1)) && isDigit(last)) return false;
+    return !cutAcrossCellAfter(tables, end, last);
   }
   let index = end;
   while (after !== undefined && QUOTE_CLOSERS.has(after)) {
@@ -521,8 +557,12 @@ function edgeAfter(text: string, end: number, quote: string): boolean {
 // UTF-16 index, or -1. An occurrence that is cut does not end the search: a later occurrence
 // whose edges hold still matches.
 function findQuoteOccurrence(text: string, quote: string): number {
+  const tables = indexTables(text);
   for (let found = text.indexOf(quote); found >= 0; found = text.indexOf(quote, found + 1)) {
-    if (edgeBefore(text, found, quote) && edgeAfter(text, found + quote.length, quote)) {
+    if (
+      edgeBefore(text, found, quote, tables) &&
+      edgeAfter(text, found + quote.length, quote, tables)
+    ) {
       return found;
     }
   }

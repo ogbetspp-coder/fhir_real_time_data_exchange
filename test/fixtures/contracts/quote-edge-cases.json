@@ -502,6 +502,90 @@
       ]
     },
     {
+      "text": "﷐ ﷒ ﷓ Up to 10 ﷓ once 000 IU weekly ﷒ ﷓ if CrCl < then ﷓ 30 ml/min ﷑",
+      "quotes": [
+        {
+          "quote": "Up to 10",
+          "result": "no-match"
+        },
+        {
+          "quote": "000 IU",
+          "result": "no-match"
+        },
+        {
+          "quote": "000 IU weekly",
+          "result": "no-match"
+        },
+        {
+          "quote": "30 ml/min",
+          "result": "no-match"
+        },
+        {
+          "quote": "once",
+          "result": "match",
+          "startOffset": 17,
+          "endOffset": 21
+        },
+        {
+          "quote": "weekly",
+          "result": "match",
+          "startOffset": 29,
+          "endOffset": 35
+        },
+        {
+          "quote": "if",
+          "result": "match",
+          "startOffset": 40,
+          "endOffset": 42
+        },
+        {
+          "quote": "Up to",
+          "result": "match",
+          "startOffset": 6,
+          "endOffset": 11
+        }
+      ]
+    },
+    {
+      "text": "CrCl <⁣ 30 ml/min. Age >  65 years. CrCl < (15 ml/min). See (section 4.4).",
+      "quotes": [
+        {
+          "quote": "30 ml/min.",
+          "result": "no-match"
+        },
+        {
+          "quote": "65 years.",
+          "result": "no-match"
+        },
+        {
+          "quote": "(15 ml/min).",
+          "result": "no-match"
+        },
+        {
+          "quote": "15 ml/min",
+          "result": "no-match"
+        },
+        {
+          "quote": "(section 4.4).",
+          "result": "match",
+          "startOffset": 60,
+          "endOffset": 74
+        },
+        {
+          "quote": "section 4.4",
+          "result": "match",
+          "startOffset": 61,
+          "endOffset": 72
+        },
+        {
+          "quote": "CrCl",
+          "result": "match",
+          "startOffset": 0,
+          "endOffset": 4
+        }
+      ]
+    },
+    {
       "text": "Take 10ᡸ 000 IU daily. Up to 5꓅ 000 IU weekly.",
       "quotes": [
         {

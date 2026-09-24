@@ -30,15 +30,15 @@ What a section's text is:
   the HTML tokenizer reads it ("tag open state"); the EMA writes "GFR < 60" that way. Each
   section where this happened says so in ``Section.notes``, because it is not valid XHTML.
 
-What is marked (``Paragraph.marks``, the Word reader's kinds): ``sup`` and ``vertical-align:
-super`` as superscript, ``sub`` and ``vertical-align: sub`` as subscript, ``s``, ``strike`` and
-``text-decoration: line-through`` as strike, a background other than white as
-``shading-<colour>``, a text colour other than black as ``color-<colour>`` (white or a
-nearly white colour as faint instead, a nearly black one as nothing; ``#abc`` and ``rgb()`` are
-written as ``#aabbcc``, and any other colour notation refuses the section), a font size
-under two points as faint, and ``u``, ``a`` with an ``href`` and ``text-decoration: underline``
-as underline (an underline turns a sign into another: "<" underlined is drawn "≤", and "1"
-with an underlined "a" reads "1ª"). Bold, italic, font family and every layout property are
+What is marked (``Paragraph.marks``, the Word reader's kinds): ``sup`` and ``vertical-align: super``
+as superscript, ``sub`` and ``vertical-align: sub`` as subscript, ``s``, ``strike`` and
+``text-decoration: line-through`` as strike, a background other than white as ``shading-<colour>``,
+a text colour other than black as ``color-<colour>`` (white or a nearly white colour as faint
+instead, a nearly black one as nothing; ``#abc`` and ``rgb()`` are written as ``#aabbcc``, and any
+other colour notation refuses the section), a font size under two points as faint, and ``u``, ``a``
+with an ``href``, ``text-decoration: underline`` and a border on an inline element (drawn as a line
+along the text) as underline (an underline turns a sign into another: "<" underlined is drawn "≤",
+and "1" with an underlined "a" reads "1ª"). Bold, italic, font family and every layout property are
 not reported.
 
 What refuses a section (``SectionRefusal.code``):
@@ -74,11 +74,11 @@ import re
 import unicodedata
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Final
 
 from zone_a.docx.reader import Mark, Numbering, Paragraph
 
-READER_VERSION = "epi-reader/1.0.0"
+READER_VERSION = "epi-reader/1.1.0"
 XHTML = "http://www.w3.org/1999/xhtml"
 OBJECT = "\ufffc"
 _COLLAPSIBLE = " \t\n\r\f"
@@ -266,6 +266,21 @@ def _points(value: str) -> float | None:
     return float(match.group(1)) * _POINTS[match.group(2)] if match else None
 
 
+_NO_BORDER: Final = frozenset({"none", "hidden", "0", "0pt", "0px", "0cm", "0mm", "0in"})
+
+
+def _inline_border(style: str) -> bool:
+    """Whether a style draws a border; on an inline element it is a line along the text."""
+    for name, value in _declarations(style):
+        if not name.startswith("border") or name in ("border-collapse", "border-spacing"):
+            continue
+        if name.endswith(("-color", "-colour")):
+            continue
+        if not set(value.split()) & _NO_BORDER:
+            return True
+    return False
+
+
 def _style(style: str) -> set[str]:
     """The mark kinds a style attribute asks for, or a refusal."""
     kinds: set[str] = set()
@@ -429,6 +444,8 @@ def _walk(element: ET.Element, builder: _Builder, marks: frozenset[str], depth: 
     elif name in ("s", "strike"):
         kinds.add("strike")
     elif name == "u" or (name == "a" and element.get("href") is not None):
+        kinds.add("underline")
+    if name in _INLINE and _inline_border(element.get("style", "")):
         kinds.add("underline")
     here = frozenset(kinds)
     if name == "br":

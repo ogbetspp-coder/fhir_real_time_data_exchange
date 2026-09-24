@@ -15,16 +15,16 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from zone_a.docx.reader import Paragraph, read_docx
 from zone_a.qrd.pattern import Token, UnbalancedTemplateError, is_balanced, parse
+from zone_a.underline import underline_changes
 
 REGISTRY_VERSION = "1.0.0"
-READER_VERSION = "docx-reader/1.0.0"
+READER_VERSION = "docx-reader/1.1.0"
 
 TEMPLATE_FILE = "qrd-product-information-template-version-104_en.docx"
 APPENDIX_I_FILE = (
@@ -154,23 +154,10 @@ def _optional(tokens: list[Token]) -> bool:
 # that is already in capitals change nothing and are allowed.
 _KEPT = {"highlight-lightGray", "shading-D9D9D9"}
 _CASE = {"caps", "smallCaps"}
-# An underline changes a sign ("<" underlined reads "≤", and "-" between digits reads "="), not
-# letters, digits, quotation marks or a hyphen inside a word, which is all the template
-# underlines (its links and headings: "Breast-feeding", "With Respect to “Pregnancy”"); nor the
-# template's own brackets, which the registry reads as markup, never as text ("<Traceability>").
+# An underline is accepted only where it changes nothing (zone_a.underline, ADR 0005): over
+# letters, digits, plain punctuation, a hyphen inside a word ("Breast-feeding") and the template's
+# own brackets, which the registry reads as markup, never as text ("<Traceability>").
 _TEMPLATE_BRACKETS = frozenset("<>[]{}")
-
-
-def _underline_safe(covered: str) -> bool:
-    for index, character in enumerate(covered):
-        category = unicodedata.category(character)
-        if category == "Sm" and character not in _TEMPLATE_BRACKETS:
-            return False
-        if category == "Pd":
-            around = covered[max(0, index - 1) : index + 2]
-            if any(c.isdigit() for c in around):
-                return False
-    return True
 
 
 def _check(paragraph: Paragraph, where: str, keeps_marks: bool = False) -> None:
@@ -184,7 +171,16 @@ def _check(paragraph: Paragraph, where: str, keeps_marks: bool = False) -> None:
         if (
             (keeps_marks and mark.kind in _KEPT)
             or (mark.kind in _CASE and covered == covered.upper())
-            or (mark.kind == "underline" and _underline_safe(covered))
+            or (
+                mark.kind == "underline"
+                and not underline_changes(
+                    paragraph.text,
+                    mark.start,
+                    mark.end,
+                    also=_TEMPLATE_BRACKETS,
+                    hyphens_in_words=True,
+                )
+            )
         ):
             continue
         raise RegistryError(f"{where}: {mark.kind} changes what the text shows")

@@ -71,14 +71,16 @@ Three facts about that source meet three rules of the record:
      Unwrapping, or deleting the declaration, would keep the "<" and lose the "≤" a reader sees.
      So wherever the authority's div draws an underline, from any of these sources, T removes it
      only when every code point it covers is on a closed allowlist PR 3 sets against the
-     renderer, and anything else refuses the section. The allowlist starts from: letters and
-     decimal digits of the Latin, Greek and Cyrillic scripts; U+0020; and the punctuation
-     `. , ; : ( ) / ' " %` and the curly quotation marks; never a code point of category Sm
-     (mathematical symbols) or Pd (dashes), a modifier letter, or a symbol. Adjacency is judged
-     on the drawn text, the underlined run's neighbours outside the element included: an
-     underlined run of one or two letters with a digit directly before or after it on the drawn
-     line (`1<u>a</u>`, `2<u>nd</u>`) refuses, since an underline under a letter after a
-     number draws an ordinal indicator.
+     renderer, and anything else refuses the section. The allowlist starts from
+     `zone_a.underline`, the rule the QRD check reports by: letters and decimal digits of the
+     Latin, Greek and Cyrillic scripts; spaces; the punctuation `. , ; : ( ) [ ] / ' " % @ _ &
+     # ! ? *` and the curly quotation marks; a hyphen only between two letters; never another
+     code point of category Sm (mathematical symbols) or Pd (dashes), a modifier letter, or a
+     symbol. Adjacency is judged on the drawn text, the underlined run's neighbours outside the
+     element included: a lone underlined "a" or "o" directly after a digit (`1<u>a</u>`)
+     refuses, since it is drawn as the ordinal indicator "ª" or "º". The QRD check already
+     finds the case in a pinned label: Brukinsa's 5.1 writes ">1" with the ">" underlined,
+     which the EMA's viewer draws as "≥1".
    - **Closed CSS list, by property and value, that can neither hide nor overprint text.** Font
      families only from a closed list of Unicode text fonts, every family in the list on it
      (symbol-encoded fonts such as Symbol and Wingdings refuse); font sizes in absolute units

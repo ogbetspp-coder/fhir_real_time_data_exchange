@@ -237,6 +237,24 @@ def test_colour_shading_and_faint_marks_are_formatting_findings(mark: str, repor
     assert len(findings(result, "formatting")) == (1 if reported else 0)
 
 
+@pytest.mark.parametrize(
+    ("text", "start", "end", "reported"),
+    [
+        # "≥ 1" typed as an underlined ">": the text reads ">", the viewer shows "≥".
+        ("defined as >1 target", 11, 12, True),
+        ("see section 4.4", 4, 15, False),
+        ("1a dose", 1, 2, True),
+        ("Strong CYP3A inhibitors", 0, 23, False),
+    ],
+)
+def test_an_underline_over_what_it_changes_is_a_formatting_finding(
+    text: str, start: int, end: int, reported: bool
+) -> None:
+    paragraph = Paragraph(text, None, None, None, marks=(Mark(start, end, "underline"),))
+    result = check(document(smpc_1=(paragraph,)), REGISTRY, MAPPING)
+    assert len(findings(result, "formatting")) == (1 if reported else 0)
+
+
 # --- what the check finds in the three EMA ePIs ---------------------------------------------------
 
 

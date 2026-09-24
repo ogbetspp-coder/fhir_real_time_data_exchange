@@ -3,7 +3,7 @@
     "file": "nuvaxovid-smpc-en.json",
     "sha256": "3256838d8d4a270581a4b41e9bf302b4cd2e073a9c3ad75f999563b731f73828"
   },
-  "reader": "epi-reader/1.0.0",
+  "reader": "epi-reader/1.1.0",
   "checker": "qrd-check/1.0.0",
   "template": {
     "family": "EMA QRD product-information template, centralised procedure",

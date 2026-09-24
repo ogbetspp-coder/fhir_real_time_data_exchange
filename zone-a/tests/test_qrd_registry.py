@@ -331,6 +331,10 @@ def _paragraph(text: str, *marks: Mark, table: tuple[int, int, int] | None = Non
         (_paragraph("CrCl ≤ 30", Mark(5, 6, "underline")), True),
         (_paragraph("+", Mark(0, 1, "underline")), True),
         (_paragraph("2-3", Mark(0, 3, "underline")), True),
+        # Judged on the drawn text: a dash between digits, a look-alike of "<", an ordinal.
+        (_paragraph("2-3", Mark(1, 2, "underline")), True),
+        (_paragraph("\u02c2 30", Mark(0, 1, "underline")), True),
+        (_paragraph("1a", Mark(1, 2, "underline")), True),
         (Paragraph("run on", None, None, None, mark_hidden=True), True),
         (Paragraph("", None, None, None, mark_hidden=True), False),
     ],
