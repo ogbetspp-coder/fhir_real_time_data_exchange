@@ -64,26 +64,31 @@ What refuses a section (``SectionRefusal.code``):
   zero-width characters, bidirectional controls), which a browser hides or which reorders
   what it shows.
 
-Also refused as ``malformed-xhtml``: a root that is not a ``div``, a ``br`` or ``img`` with content,
-elements nested deeper than 128 (a table's row group and row counted; a section deep in the Bundle
-can be refused as nested too deeply to read within that bound, a false failure), and a CDATA section
-(an XML parser reads it as text, an HTML parser as a comment). As ``unsupported-element``: text
-between the parts of a table, which a browser moves out of the table. As ``unsupported-style``: a
-margin or indent more than an inch to the left, text drawn more than 12pt left of its container's
-start (the blocks' margins and the indent inherited through blocks, inline elements and table rows
-summed, each read as the most negative value any of its declarations names; a table cell starts
-again from the table's own offset), which moves it off the page or over what lies there, or a margin
-or indent in a unit the reader does not know (``%``, ``vw``, ``calc()``...); layout that draws one
-text over another (a negative margin on inline text or at a block's top or bottom, vertical padding
-on inline text and any padding on it over a background, a border on it wider than a hairline, a
-height outside table parts and pictures, a line height below 12pt, 100% or 1em, a font above 14pt);
-a font outside a closed list of Unicode text fonts (a symbol font draws other glyphs); and a border
-value a browser would not accept whole, or one inherited from the parent.
+Also refused as ``malformed-xhtml``: a root that is not a ``div``, a ``br``, ``img`` or ``hr`` with
+content, markup an HTML parser rebuilds (a block in an open ``p``, an ``li`` in an ``li``, an ``a``
+in an ``a``), elements nested deeper than 128 (a table's row group and row counted; a section deep
+in the Bundle can be refused as nested too deeply to read within that bound, a false failure), and a
+CDATA section (an XML parser reads it as text, an HTML parser as a comment). As
+``unsupported-element``: text between the parts of a table, which a browser moves out of the table.
+As ``unsupported-style``: a margin or indent more than an inch to the left, text drawn more than
+12pt left of its container's start (the blocks' margins and the indent inherited through blocks,
+inline elements and table rows summed, each read as the most negative value any of its declarations
+names; a table cell starts again from the table's own offset), which moves it off the page or over
+what lies there, or a margin or indent in a unit the reader does not know (``%``, ``vw``,
+``calc()``...); layout that draws one text over another (a negative margin on inline text or at a
+block's top or bottom, vertical padding on inline text and any padding on it over a background, a
+border on it wider than a hairline, a height outside table parts and pictures, a line height below
+12pt, 100% or 1em, a font above 14pt); a font outside a closed list of Unicode text fonts (a symbol
+font draws other glyphs); a border value on inline text a browser would not accept whole, or one
+inherited from the parent; a style CSS would split otherwise than the reader (a quote outside a font
+family name, a comment, an escape, a bracket outside ``rgb()``, a character outside plain ASCII
+punctuation); and a margin or indent with a value a browser drops (the wrong number of values,
+``text-indent: auto``).
 
 What refuses the document (``EpiRefusedError``): not UTF-8 JSON, not a document Bundle, not the
-shape of one (a section, code, text or entry of the wrong JSON type), not exactly one entry with
-sections, a resource with sections that is not a Composition, a section without a title, or nesting
-too deep to read.
+shape of one (a section, code, text, div or entry of the wrong JSON type), not exactly one entry
+with sections, a resource with sections that is not a Composition, a section without a title, or
+nesting too deep to read.
 """
 
 from __future__ import annotations
@@ -187,7 +192,15 @@ class _RefusedError(Exception):
 # --- styles ---------------------------------------------------------------------------------
 
 
+_STYLE_CHARS = re.compile(r"[A-Za-z0-9 \t\n\r\f#%!.,:;'\"()-]*")
+_QUOTED_FAMILY = re.compile(r"'[^'\";]*'|\"[^'\";]*\"|[^'\";]*")
+
+
 def _declarations(style: str) -> list[tuple[str, str]]:
+    if not _STYLE_CHARS.fullmatch(style) or "/*" in style:
+        raise _RefusedError("unsupported-style", "a character CSS tokenizes other than the reader")
+    if "(" in style.replace("rgb(", "") or ")" in re.sub(r"rgb\([0-9 ,]*\)", "", style):
+        raise _RefusedError("unsupported-style", "a function or block")
     out: list[tuple[str, str]] = []
     for part in style.split(";"):
         if not part.strip():
@@ -195,6 +208,11 @@ def _declarations(style: str) -> list[tuple[str, str]]:
         name, colon, value = part.partition(":")
         if not colon:
             raise _RefusedError("unsupported-style", f"not a declaration: {part.strip()!r}")
+        if ("'" in value or '"' in value) and not (
+            name.strip().lower() == "font-family"
+            and all(_QUOTED_FAMILY.fullmatch(f.strip()) for f in value.split(","))
+        ):
+            raise _RefusedError("unsupported-style", f"a quote in {name.strip()!r}")
         out.append((name.strip().lower(), value.strip().lower().removesuffix("!important").strip()))
     return out
 
@@ -527,6 +545,10 @@ class _Builder:
     indent: float | None = None
     nesting: int = 0
     part_indent: float | None = None
+    # What an HTML parser would close or move: an open p, li or a.
+    open_p: bool = False
+    open_li: bool = False
+    open_a: bool = False
 
     def text(self, text: str, marks: frozenset[str]) -> None:
         for character in text:
@@ -711,6 +733,8 @@ def _offset_points(value: str) -> float:
     if match is None:
         return 0.0
     unit = match.group(3)
+    if unit == "em" and not match.group(1):
+        return 0.0  # the element's font may be as small as 0pt: no credit to the right
     size = float(match.group(2)) * (_LARGEST_FONT_POINTS if unit == "em" else _POINTS[unit])
     return -size if match.group(1) else size
 
@@ -721,6 +745,12 @@ def _left_offsets(style: str) -> tuple[float, float | None]:
     indents: list[float] = []
     for key, value in _declarations(style):
         tokens = value.split()
+        if (
+            (key in ("margin-left", "text-indent") and len(tokens) != 1)
+            or (key == "margin" and not 1 <= len(tokens) <= 4)
+            or (key == "text-indent" and "auto" in tokens)
+        ):
+            raise _RefusedError("unsupported-style", f"{key}: {value} (a browser drops it)")
         if key == "margin":
             if tokens:
                 margins.append(_offset_points(_per_side(tokens).get("left", "0")))
@@ -735,11 +765,13 @@ def _left_offsets(style: str) -> tuple[float, float | None]:
 def _walk(element: ET.Element, builder: _Builder, marks: frozenset[str], depth: int) -> None:
     builder.nesting += 1
     saved_left, saved_indent = builder.left, builder.indent
+    saved_open = builder.open_p, builder.open_li, builder.open_a
     try:
         _walk_element(element, builder, marks, depth)
     finally:
         builder.nesting -= 1
         builder.left, builder.indent = saved_left, saved_indent
+        builder.open_p, builder.open_li, builder.open_a = saved_open
 
 
 def _enter_block(name: str, style: str, builder: _Builder) -> None:
@@ -771,6 +803,22 @@ def _walk_element(
         raise _RefusedError("unsupported-element", name)
     if name not in _BLOCKS and name not in _INLINE and name not in ("img", "br"):
         raise _RefusedError("unsupported-element", name)
+    if builder.open_p and name in ("div", "p", "ul", "ol", "table", "hr", "li"):
+        raise _RefusedError("malformed-xhtml", f"{name} in a p, which an HTML parser closes")
+    if name == "li" and builder.open_li:
+        raise _RefusedError("malformed-xhtml", "li in an li, which an HTML parser closes")
+    if name == "a" and builder.open_a:
+        raise _RefusedError("malformed-xhtml", "a in an a, which an HTML parser closes")
+    if name in ("td", "th"):
+        builder.open_p = builder.open_li = builder.open_a = False
+    elif name == "p":
+        builder.open_p = True
+    elif name in ("ul", "ol"):
+        builder.open_li = False
+    elif name == "li":
+        builder.open_li = True
+    elif name == "a":
+        builder.open_a = True
     kinds = set(marks) | _check_attributes(element, name)
     if name == "sup":
         kinds.add("superscript")
@@ -789,6 +837,8 @@ def _walk_element(
         _, own = _left_offsets(element.get("style", ""))
         if own is not None:
             builder.indent = own
+    if name == "hr" and (len(element) or (element.text or "").strip()):
+        raise _RefusedError("malformed-xhtml", "hr with content")
     if name == "br":
         builder.line_break(here)
     elif name == "img":
@@ -920,7 +970,11 @@ def _section(raw: dict[str, Any]) -> Section:
         raise EpiRefusedError("invalid-bundle", "a section without a title")
     codings = raw.get("code", {}).get("coding", [])
     code = codings[0].get("code") if codings else None
+    if code is not None and not isinstance(code, str):
+        raise EpiRefusedError("invalid-bundle", "a section code that is not a string")
     div = raw.get("text", {}).get("div")
+    if div is not None and not isinstance(div, str):
+        raise EpiRefusedError("invalid-bundle", "a section text that is not a string")
     paragraphs, refusal, notes = read_div(div) if isinstance(div, str) else ((), None, ())
     children = tuple(_section(child) for child in raw.get("section", []))
     return Section(

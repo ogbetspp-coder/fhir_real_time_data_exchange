@@ -175,23 +175,29 @@ describe("structured source (section 7)", () => {
   });
 
   // The other direction: a narrative verifies against another's structured page if and only if
-  // the two read the same after normalisation.
-  it("verifies a narrative against another's page only when both read the same", () => {
-    for (const page of accepted) {
-      const input = structuredSource([page]);
-      const expected = normalizeText(xhtmlToText(page));
-      for (const narrative of accepted) {
-        const section = input.sections[0];
-        if (section === undefined) throw new Error("fixture");
-        const report = verifyNarrativeFidelity({
-          ...input,
-          sections: [{ ...section, div: narrative }],
-        });
-        const same = normalizeText(xhtmlToText(narrative)) === expected;
-        expect(report.status === "passed", `${narrative} against ${page}`).toBe(same);
+  // the two read the same after normalisation. Every pair of accepted vectors is verified (tens
+  // of thousands of runs), so the test has a timeout of its own: on a loaded machine or runner it
+  // takes longer than the default five seconds.
+  it(
+    "verifies a narrative against another's page only when both read the same",
+    { timeout: 60_000 },
+    () => {
+      for (const page of accepted) {
+        const input = structuredSource([page]);
+        const expected = normalizeText(xhtmlToText(page));
+        for (const narrative of accepted) {
+          const section = input.sections[0];
+          if (section === undefined) throw new Error("fixture");
+          const report = verifyNarrativeFidelity({
+            ...input,
+            sections: [{ ...section, div: narrative }],
+          });
+          const same = normalizeText(xhtmlToText(narrative)) === expected;
+          expect(report.status === "passed", `${narrative} against ${page}`).toBe(same);
+        }
       }
-    }
-  });
+    },
+  );
 
   it("verifies every accepted vector together, one page per section", () => {
     const report = verifyNarrativeFidelity(structuredSource(accepted));

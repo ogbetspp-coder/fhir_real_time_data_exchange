@@ -510,7 +510,9 @@ def test_sections_nested_too_deep_to_read_refuse_the_document() -> None:
 @pytest.mark.parametrize(
     "sections",
     [[1], ["s"], [{"title": "x", "code": "x"}], [{"title": "x", "text": "x"}],
-     [{"title": "x", "section": {"title": "y"}}], [{"title": "x", "code": {"coding": [1]}}]],
+     [{"title": "x", "section": {"title": "y"}}], [{"title": "x", "code": {"coding": [1]}}],
+     [{"title": "x", "code": {"coding": [{"code": ["x"]}]}}],
+     [{"title": "x", "text": {"div": 5}}]],
 )  # fmt: skip
 def test_a_bundle_of_the_wrong_shape_refuses_the_document(sections: list[Any]) -> None:
     with pytest.raises(EpiRefusedError):
@@ -529,3 +531,35 @@ def test_nesting_the_interpreter_cannot_follow_refuses_the_section() -> None:
         sys.setrecursionlimit(limit)
     assert refusal is not None
     assert refusal.detail == "nested too deeply to read"
+
+
+@pytest.mark.parametrize(
+    ("inner", "code"),
+    [
+        # Review round 28: a positive em gives no credit to the right (the font can be tiny).
+        (
+            '<div style="font-size:2pt;margin-left:5em">'
+            '<p style="font-size:12pt;margin-left:-70pt">Do not take</p></div>',
+            "unsupported-style",
+        ),
+        # A value a browser drops as invalid refuses instead of counting.
+        ('<div style="margin-left:72pt 72pt"><p style="margin-left:-72pt">x</p></div>',
+         "unsupported-style"),
+        ('<p style="text-indent:auto">x</p>', "unsupported-style"),
+        # A style CSS tokenizes other than a split on ";" does: a quote, a comment, an escape.
+        ('<p><span style="border-bottom:1px solid black;font-family:\'arial;border-bottom:none">'
+         "&lt;</span> 30</p>", "unsupported-style"),
+        ('<p><span style="mso-a:/*;border-bottom:none;mso-b:*/">x</span></p>', "unsupported-style"),
+        ('<p><span style="mso-a:x\\;border-bottom:none">x</span></p>', "unsupported-style"),
+        ('<p style="mso-a:f(;margin-left:72pt;mso-b:)">x</p>', "unsupported-style"),
+        # Where an HTML parser rebuilds the tree, the reader refuses.
+        ('<p style="margin-left:72pt"><p style="margin-left:-72pt">x</p></p>', "malformed-xhtml"),
+        ('<ul><li>a<li>b</li></li></ul>', "malformed-xhtml"),
+        ('<p><a>x<a>y</a></a></p>', "malformed-xhtml"),
+        ('<hr><p>x</p></hr>', "malformed-xhtml"),
+    ],
+)  # fmt: skip
+def test_what_a_browser_reads_otherwise_refuses(inner: str, code: str) -> None:
+    _, refusal, _ = read_div(div(inner))
+    assert refusal is not None
+    assert refusal.code == code

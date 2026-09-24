@@ -443,7 +443,10 @@ restored.
   twenty-seventh review found the offset sum short of the cascade (`!important`, invalid values,
   an indent on a table row or through an inline element): each offset is now the most negative
   value any declaration names and is carried through rows and inline elements; and a Bundle of
-  the wrong shape, which raised an error, is refused.
+  the wrong shape, which raised an error, is refused. A twenty-eighth review found the reader
+  crediting a positive em at 14pt, counting values a browser drops, splitting a style where CSS
+  would not (a quote, a comment, an escape) and following the XML tree where an HTML parser
+  rebuilds it: each is now refused, and a section code or div of the wrong type too.
 
 - **Every submission carrying 2.0.0 is refused by the worker gate** from the moment this change
   deploys. Nothing in the repository produces a 2.0.0 submission after it.

@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and twenty-seven reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and twenty-eight reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -1094,3 +1094,26 @@ scanner's ports identical over 12 000 divs) and the round-26 offset sum short of
    change record's TypeScript timing is stated as measured.
 
 With the fix, a differential of 1 800 random nested cases against Chrome gave no false pass.
+
+## Twenty-eighth review (2026-09-24): findings and what changed
+
+The review found the quote-edge rule and the fidelity contract clean (fresh fuzz, 0 differences)
+and the reader-against-Chrome offset differential at 0 false passes over 2 400 cases; its findings,
+found by hand, were in the reader:
+
+1. **High.** A positive margin in em was credited at 14pt although the element's font may be far
+   smaller. Fixed: a positive em counts nothing.
+2. **High.** Values a browser drops as invalid still counted (`margin-left: 72pt 72pt`,
+   `text-indent: auto`). Fixed: refused.
+3. **High.** The style was split on ";" alone, so a quote, a comment, an escape or a bracket let
+   the reader read a declaration the browser absorbs or drops (a border kept under "<", drawn
+   "≤"). Fixed: a style outside plain ASCII punctuation, with a comment, a bracket outside
+   `rgb()` or a quote outside a font family name refuses; the pinned labels use none of these.
+4. **High.** The reader follows the XML tree where an HTML parser rebuilds it (a block in an
+   open `p`, an `li` in an `li`, an `a` in an `a`, content in `hr`), so moved text kept an offset
+   it no longer has. Fixed: refused as `malformed-xhtml`.
+5. **High (a crash).** A section code that is a list or an object crashed the check. Fixed:
+   refused, and so is a div that is not a string.
+6. **Low.** The docstring's border refusal is on inline text; said so.
+
+The fix was prototyped by the reviewer and checked to leave the committed QRD checks unchanged.
