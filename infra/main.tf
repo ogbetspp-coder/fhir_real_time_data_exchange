@@ -188,9 +188,9 @@ resource "google_bigquery_table" "transformation_runs" {
     { name = "manifest_json", type = "JSON", mode = "REQUIRED" },
     { name = "source_kind", type = "STRING", mode = "NULLABLE", description = "fixture, healthcare-api, or document" },
     { name = "contract_version", type = "STRING", mode = "NULLABLE", description = "CanonicalSubmission version; null outside document runs" },
-    { name = "ingestion_source_hash", type = "STRING", mode = "NULLABLE", description = "SHA-256 of the approved source document" },
+    { name = "ingestion_source_hash", type = "STRING", mode = "NULLABLE", description = "SHA-256 of the source document: a drawn document, or the authority's pinned document" },
     { name = "fidelity_status", type = "STRING", mode = "NULLABLE", description = "Narrative fidelity outcome; only passed can be persisted" },
-    { name = "approval_hash", type = "STRING", mode = "NULLABLE", description = "SHA-256 of the content a human approved" },
+    { name = "approval_hash", type = "STRING", mode = "NULLABLE", description = "SHA-256 of the approved content: approved by a person, or an authority's publication imported at a person's request" },
   ])
 
   # Never destroyed by an apply (docs/foundations.md; docs/design/cmek-rollout.md, step 0).

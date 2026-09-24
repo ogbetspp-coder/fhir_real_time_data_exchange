@@ -32,6 +32,7 @@ export default defineConfig({
         "src/fhir/**": { lines: 92, statements: 91, functions: 91, branches: 84 },
         "src/gcp/**": { lines: 90, statements: 87, functions: 90, branches: 80 },
         "src/lib/**": { lines: 90, statements: 90, functions: 100, branches: 90 },
+        "src/authority/**": { lines: 93, statements: 91, functions: 92, branches: 85 },
       },
     },
   },

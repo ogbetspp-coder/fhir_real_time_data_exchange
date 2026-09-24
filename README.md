@@ -58,17 +58,20 @@ and [docs/roadmap.md](docs/roadmap.md) for what is built and what is planned.
 
 Structuring a label document into the Type 2 graph is a separate, probabilistic Zone A
 service; this repository (Zone B) accepts only an approved `CanonicalSubmission`, passed by
-reference, and re-verifies it before running the frozen transform and validation pipeline.
+reference, and re-verifies it before running the deterministic transform and validation
+pipeline.
 A submission is named, never inlined: `POST /v1/runs` takes `{uri, sha256}` into the submission
 bucket, and the submission itself names its fidelity report and extracted text. Status: the
 contract, the ingress gate, the reference resolver, the `document` route, and the Workflows
-`document` branch exist; no Zone A service produces submissions yet, so in practice the only
-producer is `src/fixtures/synthetic-submission.ts`. The `fixture` and `healthcare-api` sources
-are pre-existing trusted inputs guarded by IAM, not by this gate; the worker's run-source
-allowlist (`ENABLED_RUN_SOURCES`, Terraform `enabled_run_sources`, default all three; set
-`["document"]` where Zone A is the only producer) disables them. That allowlist is built,
-tested (`test/run-sources.test.ts`) and merged into this tree; the Terraform default is still
-all three sources, so nothing narrows until an operator sets the variable. See
+`document` branch exist; no Zone A service produces submissions yet. The producers are
+`src/fixtures/synthetic-submission.ts` (synthetic) and, for an authority's published ePI,
+`scripts/authority/import.ts`, whose output the worker recomputes from the authority's own files
+before accepting it (ADR 0005; `docs/design/authority-import-contract.md`; dry run only for
+now). The `fixture` and `healthcare-api` sources are pre-existing trusted inputs guarded by IAM,
+not by this gate. The worker's run-source allowlist (`ENABLED_RUN_SOURCES`, Terraform
+`enabled_run_sources`) follows `ALLOW_SYNTHETIC_SOURCES`, which is off by default: then only
+`document` is enabled and enabling either ungated source fails startup. The `dev` deploy turns
+it on. See
 [docs/adr/0002-two-trust-zones-and-canonical-submission.md](docs/adr/0002-two-trust-zones-and-canonical-submission.md)
 and
 [docs/adr/0003-mechanical-narrative-fidelity.md](docs/adr/0003-mechanical-narrative-fidelity.md)
@@ -92,10 +95,11 @@ npm run demo
 It executes deterministic mapping and local structural gates. Production mode additionally
 requires the official validator sidecar and Healthcare API validation.
 
-Start the HTTP service in dry-run mode:
+Start the HTTP service in dry-run mode, accepting synthetic content (without the flag only the
+`document` source is enabled):
 
 ```bash
-npm run dev
+ALLOW_SYNTHETIC_SOURCES=true npm run dev
 curl -X POST http://127.0.0.1:8080/v1/runs \
   -H 'content-type: application/json' \
   -d '{"source":"fixture"}'
@@ -568,12 +572,15 @@ version; a request naming an earlier version gets no approval. Why it is write o
 the approval date, and what that does not prove, is in `docs/design/epi-mcp-query-service.md`
 ("An approval is stated only for the current version").
 
-**Do not re-seed without rebuilding the store.** Re-running `scripts/demo/seed.ts` publishes
-the same content again as further versions, and adds a second `Provenance` per document rather
-than replacing the first, because its id derives from the submission id
-(`stableUuid("ingestion-provenance", submissionId)`). Nothing here is a data migration: a
-`Provenance` already written is never rewritten, and this repository has no tool that would
-rewrite one. The recipe below is for a rebuilt store or a new environment.
+**Do not re-seed without rebuilding the store.** Re-running `scripts/demo/seed.ts` publishes the
+same content again as further versions, and adds a second `Provenance` per document rather than
+replacing the first, because its id derives from the submission id
+(`stableUuid("ingestion-provenance", identifierValue + ":" + submissionId)`). The first re-seed
+after `CanonicalSubmission` 2.0.0 also writes each product-graph resource under a new id derived
+from the Bundle identifier, beside the old one
+(`docs/validation/changes/2026-09-24-authority-import-contract.md`). Nothing here is a data
+migration: a `Provenance` already written is never rewritten, and this repository has no tool that
+would rewrite one. The recipe below is for a rebuilt store or a new environment.
 
 #### Re-ingesting with `scripts/demo/seed.ts`
 

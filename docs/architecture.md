@@ -3,7 +3,8 @@
 ## Strategic decision
 
 The enterprise interchange baseline is the published HL7 Global ePI 1.0.0 profile plus a
-Type 2 product graph. EMA EU ePI is a jurisdictional output contract. Neither preview or
+Type 2 product graph; an authority's published ePI enters as a Type 1 record (ADR 0001's
+amendment, ADR 0005). EMA EU ePI is a jurisdictional output contract. Neither preview or
 trial-use profile is treated as a permanent internal master-data schema.
 
 EMA-only organizations could author directly against EMA profiles. This architecture retains
@@ -23,21 +24,30 @@ words, and every code it assigns must cite a terminology lookup. Its output is a
 submission is written to the submission bucket and named to `POST /v1/runs` as
 `{uri, sha256}`; `src/gcp/submission-reader.ts` resolves that pointer and the two it contains
 (fidelity report, extracted text), reading only from the configured bucket, capping object
-size, and hash-checking every part. Status: the contract, the ingress gate, the reader, the
-`document` route, and the Workflows `document` branch exist; no Zone A service produces
-submissions yet, so in practice the only producer is `src/fixtures/synthetic-submission.ts`.
+size, and hash-checking every part. Status: the contract (`CanonicalSubmission` 2.0.0), the
+ingress gate, the reader, the `document` route, and the Workflows `document` branch exist; no
+Zone A service produces submissions yet. The producers are `src/fixtures/synthetic-submission.ts`
+(a synthetic drawn document) and, for an authority's published ePI,
+`scripts/authority/import.ts` (below). No drawn-document extractor is qualified
+(`docs/fidelity-normalization.md` §7), so the gate accepts a drawn submission only as a
+synthetic one, where the deployment sets `ALLOW_SYNTHETIC_SOURCES`.
+
 The `fixture` and `healthcare-api` sources are pre-existing trusted inputs guarded by IAM, not
-by this gate; the worker's run-source allowlist (`ENABLED_RUN_SOURCES`, Terraform
-`enabled_run_sources`, default all three sources; a request for a source outside it answers
-`422 source-disabled` before any reader, fixture, or client is touched) is how a deployment
-where Zone A is the only producer disables them, by setting `["document"]`. That allowlist is
-built, tested (`test/run-sources.test.ts`) and merged into this tree; the Terraform default is
-still all three sources, so nothing narrows until an operator sets the variable. Zone B (this
-repository, deterministic) accepts only an approved `CanonicalSubmission`, re-verifies hash,
-approval, bijection, and terminology invariants at ingress, and only then runs the unchanged
-transform, validation, persistence, and evidence pipeline. `src/fhir/transform.ts`, the
-mapping manifest, and the generated artifacts are not touched by this boundary; their
-determinism and hashes stay frozen.
+by this gate. The worker's run-source allowlist (`ENABLED_RUN_SOURCES`, Terraform
+`enabled_run_sources`; a request for a source outside it answers `422 source-disabled` before
+any reader, fixture, or client is touched) follows `ALLOW_SYNTHETIC_SOURCES` (default false in
+`src/config.ts` and in Terraform): with the flag off, only `document` is enabled and enabling
+either ungated source fails startup (Terraform refuses the two variables disagreeing); with it
+on, all three are enabled unless the allowlist says otherwise. The `dev` deploy sets the flag.
+Either way the ungated sources cannot write into an authority import's resources: every id a run
+persists derives from its source Bundle's identifier value, and only the importer may use the
+reserved `authority-import:` namespace (`test/namespace.test.ts`). Zone B (this repository,
+deterministic) accepts only an approved `CanonicalSubmission`, re-verifies hash, approval,
+bijection, and terminology invariants at ingress, and only then runs the transform, validation,
+persistence, and evidence pipeline. The transform and preflights changed once for authority
+imports (ADR 0002's amendment: re-identified entries, the Type 1 preflight, permitted headings,
+the List's product identity); they remain deterministic, and the mapping and generated
+artifacts are versioned as before.
 
 The engine that will produce submissions from real labels (roadmap item 8) has its first
 component in `zone-a/`: a Word reader that refuses what it cannot read exactly, and the QRD
@@ -56,6 +66,34 @@ a passing fidelity check; the `fixture` and `healthcare-api` routes are not cove
 gate and rest on IAM and the run-source allowlist instead. UR-09 through UR-16 in
 `docs/validation/README.md` trace these controls to tests. See ADR 0002 and ADR 0003 for the
 full invariant list and versioning rules.
+
+### Authority imports
+
+An authority's published ePI (ADR 0005; `docs/design/authority-import-contract.md`) takes its
+own path to the same gate. A person requests the import, naming the authority, the document, the
+List that indexes it and the language: that request is the human decision for an import. The
+producer, `scripts/authority/import.ts`, fetches the document Bundle and the List, runs the
+importer (`src/authority/`, shared pure TypeScript, ADR 0004's amendment) and writes the
+submission, its page text (one page per section) and its fidelity report. The producer's
+identity is not trusted: for a submission whose source is an `authority-publication`, the worker
+fetches both files itself (for the EMA, a fixed URL template on `epi.ema.europa.eu`, one `Accept`
+header, no redirect, HTTP 200 only, 30 seconds, 4 MiB), requires the pinned hash and length, runs
+the importer its own build contains on those bytes, and accepts only the identical submission,
+page text and report before the ordinary gate runs.
+
+The record is a Global ePI Type 1 graph: one Composition, MedicinalProductDefinition,
+Organization and RegulatedAuthorization, every value from the document or the List or a stated
+rule; packs, ingredients and substances are declared not supplied. Its approval is
+`authority-publication`: the publication it names, with `authorityStatus: pilot`, and who
+requested the import (`requestedBy`, a placeholder until roadmap item 2). A synthetic authority,
+in the EMA's live form with ids in a reserved block, is built by `src/authority/synthetic.ts`
+and served only where synthetic sources are allowed.
+
+Until roadmap 3a PR 5 an import runs only as a dry run: the gate refuses an authority import when
+`DRY_RUN` is false, so nothing it makes is persisted, entitled to the query service or seen by
+the agent. PR 2's importer carries no picture and removes no presentation (ADR 0005's
+amendment), so each of the four real labels pinned in `labels/ema-epi/` is refused at a recorded
+stage (`test/fixtures/authority/vectors.json`).
 
 ## Deterministic data flow
 
@@ -85,10 +123,33 @@ sequenceDiagram
   WF-->>WF: Record observed stream lag
 ```
 
+An authority import (dry run only until roadmap 3a PR 5) reaches the same worker with one more
+step at the gate:
+
+```mermaid
+sequenceDiagram
+  participant P as Producer (scripts/authority/import.ts)
+  participant AU as Authority ePI API
+  participant APP as Cloud Run worker
+
+  P->>AU: GET document Bundle and List
+  P->>P: Import: request + bytes to submission, pages, report
+  P->>APP: CanonicalSubmission by reference
+  APP->>AU: GET the same two files (fixed template, no redirect)
+  APP->>APP: Require pinned hashes; re-run the importer; require the same submission
+  APP->>APP: Ingress gate, Type 1 preflight, crosswalk, EMA preflight
+  APP-->>APP: validated, nothing persisted (DRY_RUN)
+```
+
 The transformer accepts two authoritative source categories:
 
-- the structured product graph; and
+- the structured product graph (Type 2, or for an authority import the Type 1 record); and
 - an authored canonical SmPC Composition with stable section identifiers.
+
+The source preflight is `validateCanonicalPreflight(bundle, graphType)`: Type 2 as strict as
+ever, Type 1 exactly one Composition, MedicinalProductDefinition, Organization and
+RegulatedAuthorization, linked, named and identified. The graph type is the submission's, and
+the ungated sources are always Type 2.
 
 It does not infer clinical narrative from ingredients or product properties. Every output
 field is classified as copied, code-mapped, structurally moved, deterministically defaulted,
@@ -108,15 +169,36 @@ drop from or rearrange:
   (4.8, whose own text sits above its reporting subsection), without narrative that the
   scanner can read and that shows some text;
 - a source Composition or Bundle whose `language` is missing or is not an English BCP 47 tag
-  (`en`, optionally `-Latn`, optionally a region).
+  (`en`, optionally `-Latn`, optionally a region);
+- a source Bundle without `identifier.value`, and a reference in any entry that names no entry
+  of the Bundle (relative, versioned, `#contained` or external); a reference by identifier alone
+  is kept.
 
-Some things it still does without asking, by design: every mapped section takes its rule's
-title as its heading and a new id (the source title is not compared); only the target coding
-is kept; Composition.language and Bundle.language are written as `en`; and a section without a
-source code and without narrative — an empty container — is dropped, title included. The
-`xml:lang` of a narrative `div` is not checked yet. The manifest loader rejects a manifest in
-which two rules share a `sourceKey` or a `targetCode`, and lineage names the mapping by the
-version the loaded manifest declares, the same `mappingVersion` the run manifest records.
+Every id the run persists derives from the source Bundle's identifier value: the EMA List,
+Bundle and Composition as before, and each copied entry
+`stableUuid("ema-entry:" + resourceType, identifierValue + ":" + position)` with a `urn:uuid`
+fullUrl, its references rewritten to match; a reference naming no entry refuses, and so does
+a source Bundle or entry element the crosswalk does not carry (a signature, an entry's request),
+a `meta` element on any resource but `versionId`, `lastUpdated` and `profile` (an extension, a
+tag, a source), and a contained resource or implicit rules on any resource; the output's `meta`
+is its profile alone. A run therefore writes only into its own namespace, and every
+`Reference.reference` it persists names its own output, whatever ids its source chose
+(`test/namespace.test.ts`). Other address-like values a source writes (a Composition's `url`, an
+extension's `valueUri`) are carried as written, a stated residual: no route that is not synthetic
+can reach the crosswalk with one today, since a drawn source must be synthetic and an import
+builds its own record.
+
+Some things it still does without asking, by design: every mapped section takes a new id and, as its
+heading, the source's heading when the rule permits it (the rule's `title` or one of its
+`alternativeTitles`, the QRD template's forms without optional wording, mapping 1.3.0) and otherwise
+the rule's `title`; only the target coding is kept; the EMA List is titled by the product's name
+(the document's title only where the graph names no product) and carries the holder, regulatory
+agency and procedure number the graph states in their identifier systems, never a value it does not;
+Composition.language and Bundle.language are written as `en`; and a section without a source code
+and without narrative — an empty container — is dropped, title included. The `xml:lang` of a
+narrative `div` is not checked yet. The manifest loader rejects a manifest in which two rules share
+a `sourceKey` or a `targetCode`, and lineage names the mapping by the version the loaded manifest
+declares, the same `mappingVersion` the run manifest records.
 
 ## Validation model
 
@@ -124,10 +206,11 @@ Validation is deliberately redundant:
 
 0. for document sources, `docs/fidelity-normalization.md` defines the mechanical narrative
    fidelity check that gates ingress before any transformation (ADR 0003);
-1. application checks verify graph completeness, uniqueness, and expected profiles
-   (`src/fhir/preflight.ts`), and the crosswalk (`transformType2ToEma`) refuses a source whose
-   coded sections are not in the manifest's hierarchy and order, as listed above; the EMA
-   preflight then checks every target section's code and title at its position;
+1. application checks verify graph completeness, uniqueness, and expected profiles for the
+   submission's graph type (`src/fhir/preflight.ts`), and the crosswalk (`transformType2ToEma`)
+   refuses a source whose coded sections are not in the manifest's hierarchy and order, as
+   listed above; the EMA preflight then checks every target section's code and permitted title
+   at its position;
 2. the official HL7 Java validator evaluates the pinned packages, FHIRPath, slicing, and
    profile chain;
 3. Cloud Healthcare API `$validate?profile=` verifies each profile as deployed in the target
@@ -177,11 +260,24 @@ Every run writes the following objects under `runs/<runId>/` in the evidence buc
 `source-type2`, `ema-list`, `ema-document-bundle`, `mapping-decisions`, `validation-outcomes`,
 `signed-manifest`, `lineage-resources`, and, for document sources,
 `canonical-submission`, `ingestion-provenance`, `fidelity-report`, and `provenance-resource`.
-`source-type2`, `ema-list` (it carries the document title only), `ema-document-bundle`, and
+`source-type2`, `ema-list` (it carries the product name and identifiers, no narrative),
+`ema-document-bundle`, and
 `canonical-submission` contain the narrative XHTML — the evidence bucket, the submission
 bucket, and the FHIR store are the only places narrative rests — while `fidelity-report`,
 `ingestion-provenance`, `provenance-resource`, the signed manifest, and the BigQuery ledger row
 never do. FHIR payloads and narrative are not written to Cloud Logging.
+
+The signed manifest is `RunManifest` 2.0.0 (1.0.0 and 1.1.0 stay readable). A `document` run's
+ingestion block records the source kind (`drawn` or `authority-publication`), the graph type,
+whether the deployment accepted synthetic content (`allowSyntheticSources`), the approval as
+either union member, and, for an authority import, the importer version and each file the gate
+fetched (URL, SHA-256, length, fetch time). The FHIR Provenance's id derives from the source
+identifier value and the submission id, one per approval; its targets are the record's
+identifier and the output's `Composition/<id>` and `Bundle/<id>`. An import's Provenance has
+activity `authority-import`, the authority as agent of its source files, the requester as
+`enterer`, and `recorded` at the gate's fetch time. While imports run dry none of this is
+written for one; the design keeps the fetched bytes as evidence and re-verifies a recorded import
+from them (`scripts/authority/verify-import.ts`, which reads no network) once imports persist.
 
 The signed manifest's `runtime` block ties a run to what produced it: `sourceCommit` is the
 deployed git commit (`GIT_COMMIT`, the same `service_version` the query service records),
@@ -354,6 +450,10 @@ profiles, evidence schemas, or validation rules.
 - Terminology validation runs offline in the validator sidecar (`-tx n/a`) for reproducibility;
   required external terminology checks need an approved, versioned terminology service.
 - Human content approval and regulated electronic signature are future control boundaries.
+- An authority import trusts the authority's HTTPS server at gate time (it serves no
+  signature); the EMA calls its ePI service a pilot, so an import carries `authorityStatus:
+pilot` and an EMA outage refuses the run. Imports are dry-run only until roadmap 3a PR 5
+  (`docs/design/authority-import-contract.md`, "Stated residuals").
 - The FHIR store’s stream does not backfill resources written before streaming was enabled.
 - This repository cannot establish organizational SOPs, training, supplier qualification, or
   validated state by itself.

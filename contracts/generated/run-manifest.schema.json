@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://khs.dev/contracts/run-manifest/1.1.0/schema.json",
+  "$id": "https://khs.dev/contracts/run-manifest/2.0.0/schema.json",
   "$ref": "#/$defs/RunManifest",
   "$defs": {
     "RunManifest": {
@@ -8,7 +8,7 @@
       "properties": {
         "schemaVersion": {
           "type": "string",
-          "const": "1.1.0"
+          "const": "2.0.0"
         },
         "source": {
           "type": "object",
@@ -238,7 +238,17 @@
         },
         "contractVersion": {
           "type": "string",
-          "const": "1.0.0"
+          "const": "2.0.0"
+        },
+        "sourceKind": {
+          "type": "string",
+          "enum": ["drawn", "authority-publication"]
+        },
+        "graphType": {
+          "$ref": "#/$defs/GraphType"
+        },
+        "allowSyntheticSources": {
+          "type": "boolean"
         },
         "sourceDocumentSha256": {
           "$ref": "#/$defs/Sha256Hex"
@@ -326,39 +336,10 @@
           "additionalProperties": false
         },
         "approval": {
-          "type": "object",
-          "properties": {
-            "approverId": {
-              "$ref": "#/$defs/PrincipalId"
-            },
-            "approverRole": {
-              "$ref": "#/$defs/ApproverRole"
-            },
-            "approvedAt": {
-              "$ref": "#/$defs/IsoDateTime"
-            },
-            "method": {
-              "$ref": "#/$defs/ApprovalMethod"
-            },
-            "meaning": {
-              "$ref": "#/$defs/ApprovalMeaning"
-            },
-            "approvedContentSha256": {
-              "$ref": "#/$defs/Sha256Hex"
-            },
-            "recordRef": {
-              "$ref": "#/$defs/RecordRef"
-            }
-          },
-          "required": [
-            "approverId",
-            "approverRole",
-            "approvedAt",
-            "method",
-            "meaning",
-            "approvedContentSha256"
-          ],
-          "additionalProperties": false
+          "$ref": "#/$defs/Approval"
+        },
+        "authority": {
+          "$ref": "#/$defs/AuthorityFetch"
         },
         "provenanceResourceId": {
           "$ref": "#/$defs/Uuid"
@@ -367,6 +348,9 @@
       "required": [
         "submissionId",
         "contractVersion",
+        "sourceKind",
+        "graphType",
+        "allowSyntheticSources",
         "sourceDocumentSha256",
         "extractionRunId",
         "parser",
@@ -376,6 +360,10 @@
       ],
       "additionalProperties": false,
       "description": "Hashes, counts, enumerations, and identifiers only; never narrative."
+    },
+    "GraphType": {
+      "type": "string",
+      "enum": ["type1", "type2"]
     },
     "Token": {
       "type": "string",
@@ -387,6 +375,51 @@
       "pattern": "^fidelity-norm\\/\\d+\\.\\d+\\.\\d+$",
       "description": "Version of docs/fidelity-normalization.md the hashes were computed under."
     },
+    "Approval": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/AttestedApproval"
+        },
+        {
+          "$ref": "#/$defs/AuthorityApproval"
+        }
+      ]
+    },
+    "AttestedApproval": {
+      "type": "object",
+      "properties": {
+        "approverId": {
+          "$ref": "#/$defs/PrincipalId"
+        },
+        "approverRole": {
+          "$ref": "#/$defs/ApproverRole"
+        },
+        "approvedAt": {
+          "$ref": "#/$defs/IsoDateTime"
+        },
+        "method": {
+          "$ref": "#/$defs/AttestationMethod"
+        },
+        "meaning": {
+          "$ref": "#/$defs/ApprovalMeaning"
+        },
+        "approvedContentSha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        },
+        "recordRef": {
+          "$ref": "#/$defs/RecordRef"
+        }
+      },
+      "required": [
+        "approverId",
+        "approverRole",
+        "approvedAt",
+        "method",
+        "meaning",
+        "approvedContentSha256"
+      ],
+      "additionalProperties": false
+    },
     "PrincipalId": {
       "type": "string",
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
@@ -395,7 +428,7 @@
       "type": "string",
       "enum": ["content-reviewer", "qa-reviewer"]
     },
-    "ApprovalMethod": {
+    "AttestationMethod": {
       "type": "string",
       "enum": ["api-attestation", "manual-record"],
       "description": "Attestation placeholders. Electronic signature is a future control boundary."
@@ -407,6 +440,131 @@
     "RecordRef": {
       "type": "string",
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/#?=&%+-]{0,511}$"
+    },
+    "AuthorityApproval": {
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "const": "authority-publication"
+        },
+        "meaning": {
+          "type": "string",
+          "const": "authority-publication-imported"
+        },
+        "authority": {
+          "$ref": "#/$defs/Authority"
+        },
+        "authorityStatus": {
+          "$ref": "#/$defs/AuthorityStatus"
+        },
+        "publication": {
+          "type": "object",
+          "properties": {
+            "epiId": {
+              "$ref": "#/$defs/Token"
+            },
+            "documentId": {
+              "$ref": "#/$defs/AuthorityId"
+            },
+            "indexId": {
+              "$ref": "#/$defs/AuthorityId"
+            },
+            "versionNumber": {
+              "$ref": "#/$defs/Token"
+            },
+            "procedureNumber": {
+              "$ref": "#/$defs/Token"
+            },
+            "authorityTimestamp": {
+              "$ref": "#/$defs/IsoDateTime"
+            }
+          },
+          "required": [
+            "epiId",
+            "documentId",
+            "indexId",
+            "versionNumber",
+            "procedureNumber",
+            "authorityTimestamp"
+          ],
+          "additionalProperties": false
+        },
+        "requestedBy": {
+          "$ref": "#/$defs/PrincipalId"
+        },
+        "requestedAt": {
+          "$ref": "#/$defs/IsoDateTime"
+        },
+        "approvedContentSha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        }
+      },
+      "required": [
+        "method",
+        "meaning",
+        "authority",
+        "authorityStatus",
+        "publication",
+        "requestedBy",
+        "requestedAt",
+        "approvedContentSha256"
+      ],
+      "additionalProperties": false,
+      "description": "The approval is the authority's publication; the person named requested the import (docs/design/authority-import-contract.md, D2, D8)."
+    },
+    "Authority": {
+      "type": "string",
+      "enum": ["EMA", "synthetic"]
+    },
+    "AuthorityStatus": {
+      "type": "string",
+      "enum": ["pilot"]
+    },
+    "AuthorityId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$",
+      "description": "A lower-case GUID."
+    },
+    "AuthorityFetch": {
+      "type": "object",
+      "properties": {
+        "importerVersion": {
+          "$ref": "#/$defs/Token"
+        },
+        "fetched": {
+          "minItems": 2,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "$ref": "#/$defs/HttpUrl"
+              },
+              "sha256": {
+                "$ref": "#/$defs/Sha256Hex"
+              },
+              "byteLength": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "fetchedAt": {
+                "$ref": "#/$defs/IsoDateTime"
+              },
+              "evidenceUri": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              }
+            },
+            "required": ["url", "sha256", "byteLength", "fetchedAt"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["importerVersion", "fetched"],
+      "additionalProperties": false
     }
   }
 }

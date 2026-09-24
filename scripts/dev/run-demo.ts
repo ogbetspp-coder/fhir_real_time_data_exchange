@@ -4,7 +4,12 @@ import { createSyntheticType2Bundle } from "../../src/fixtures/synthetic.js";
 import { runPipeline } from "../../src/pipeline.js";
 
 const mapping = await loadEmaMapping();
-const config = loadConfig({ ...process.env, DRY_RUN: "true", NODE_ENV: "development" });
+const config = loadConfig({
+  ...process.env,
+  DRY_RUN: "true",
+  NODE_ENV: "development",
+  ALLOW_SYNTHETIC_SOURCES: "true",
+});
 const source = createSyntheticType2Bundle(mapping);
 const result = await runPipeline(
   {

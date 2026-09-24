@@ -60,6 +60,7 @@ beforeAll(async () => {
 describe("lineage", () => {
   it("names the mapping version the loaded manifest declares, as the run manifest does", async () => {
     const config = loadConfig({
+      ALLOW_SYNTHETIC_SOURCES: "true",
       NODE_ENV: "test",
       DRY_RUN: "false",
       GOOGLE_CLOUD_PROJECT: "synthetic-project",

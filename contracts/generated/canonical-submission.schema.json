@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://khs.dev/contracts/canonical-submission/1.0.0/schema.json",
+  "$id": "https://khs.dev/contracts/canonical-submission/2.0.0/schema.json",
   "$ref": "#/$defs/CanonicalSubmission",
   "$defs": {
     "CanonicalSubmission": {
@@ -8,7 +8,7 @@
       "properties": {
         "schemaVersion": {
           "type": "string",
-          "const": "1.0.0"
+          "const": "2.0.0"
         },
         "submissionId": {
           "$ref": "#/$defs/Uuid"
@@ -16,8 +16,11 @@
         "createdAt": {
           "$ref": "#/$defs/IsoDateTime"
         },
+        "graphType": {
+          "$ref": "#/$defs/GraphType"
+        },
         "bundle": {
-          "$ref": "#/$defs/Type2Bundle"
+          "$ref": "#/$defs/CanonicalBundle"
         },
         "bundleSha256": {
           "$ref": "#/$defs/Sha256Hex"
@@ -33,6 +36,7 @@
         "schemaVersion",
         "submissionId",
         "createdAt",
+        "graphType",
         "bundle",
         "bundleSha256",
         "provenance",
@@ -52,7 +56,11 @@
       "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
       "description": "RFC 3339 timestamp with Z or a numeric offset."
     },
-    "Type2Bundle": {
+    "GraphType": {
+      "type": "string",
+      "enum": ["type1", "type2"]
+    },
+    "CanonicalBundle": {
       "type": "object",
       "properties": {
         "resourceType": {
@@ -79,6 +87,7 @@
               "pattern": "^[A-Za-z0-9._:-]{1,128}$"
             }
           },
+          "required": ["value"],
           "additionalProperties": false
         },
         "timestamp": {
@@ -119,7 +128,7 @@
       },
       "required": ["resourceType", "type", "identifier", "timestamp", "entry"],
       "additionalProperties": {},
-      "description": "HL7 Global ePI Type 2 document Bundle (FHIR R5). Structural validation happens in Zone B preflight and the HL7 validator."
+      "description": "HL7 Global ePI document Bundle (FHIR R5), Type 2 or, for an authority import, Type 1. Structural validation happens in Zone B preflight and the HL7 validator."
     },
     "CanonicalUri": {
       "type": "string",
@@ -162,8 +171,22 @@
       "additionalProperties": false
     },
     "SourceDocument": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/DrawnSourceDocument"
+        },
+        {
+          "$ref": "#/$defs/AuthoritySourceDocument"
+        }
+      ]
+    },
+    "DrawnSourceDocument": {
       "type": "object",
       "properties": {
+        "kind": {
+          "type": "string",
+          "const": "drawn"
+        },
         "sha256": {
           "$ref": "#/$defs/Sha256Hex"
         },
@@ -194,7 +217,7 @@
           "$ref": "#/$defs/ExtractedTextRef"
         }
       },
-      "required": ["sha256", "byteLength", "mediaType", "filename", "extractedText"],
+      "required": ["kind", "sha256", "byteLength", "mediaType", "filename", "extractedText"],
       "additionalProperties": false
     },
     "MediaType": {
@@ -248,6 +271,222 @@
       "required": ["uri", "sha256", "extractorVersion"],
       "additionalProperties": false,
       "description": "Reference to the extractor's page text (a SourceDocumentText object). It contains narrative and is never inlined."
+    },
+    "AuthoritySourceDocument": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "authority-publication"
+        },
+        "mediaType": {
+          "type": "string",
+          "const": "application/fhir+json"
+        },
+        "authority": {
+          "$ref": "#/$defs/Authority"
+        },
+        "request": {
+          "$ref": "#/$defs/ImportRequest"
+        },
+        "document": {
+          "$ref": "#/$defs/PinnedFile"
+        },
+        "index": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/AuthorityId"
+            },
+            "sha256": {
+              "$ref": "#/$defs/Sha256Hex"
+            },
+            "byteLength": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "epiId": {
+              "$ref": "#/$defs/Token"
+            },
+            "versionNumber": {
+              "$ref": "#/$defs/Token"
+            },
+            "metaVersionId": {
+              "$ref": "#/$defs/Token"
+            },
+            "status": {
+              "type": "string",
+              "const": "current"
+            }
+          },
+          "required": [
+            "id",
+            "sha256",
+            "byteLength",
+            "epiId",
+            "versionNumber",
+            "metaVersionId",
+            "status"
+          ],
+          "additionalProperties": false
+        },
+        "pictures": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Picture"
+          }
+        },
+        "sectionPages": {
+          "minItems": 1,
+          "maxItems": 2000,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "path": {
+                "$ref": "#/$defs/SectionPath"
+              },
+              "code": {
+                "$ref": "#/$defs/Token"
+              }
+            },
+            "required": ["page", "path", "code"],
+            "additionalProperties": false
+          }
+        },
+        "extractedText": {
+          "$ref": "#/$defs/ExtractedTextRef"
+        }
+      },
+      "required": [
+        "kind",
+        "mediaType",
+        "authority",
+        "request",
+        "document",
+        "index",
+        "pictures",
+        "sectionPages",
+        "extractedText"
+      ],
+      "additionalProperties": false,
+      "description": "An authority's published ePI, which Zone B fetches itself and re-imports (docs/design/authority-import-contract.md)."
+    },
+    "Authority": {
+      "type": "string",
+      "enum": ["EMA", "synthetic"]
+    },
+    "ImportRequest": {
+      "type": "object",
+      "properties": {
+        "authority": {
+          "$ref": "#/$defs/Authority"
+        },
+        "documentId": {
+          "$ref": "#/$defs/AuthorityId"
+        },
+        "indexId": {
+          "$ref": "#/$defs/AuthorityId"
+        },
+        "language": {
+          "type": "string",
+          "const": "en"
+        }
+      },
+      "required": ["authority", "documentId", "indexId", "language"],
+      "additionalProperties": false,
+      "description": "What a person asked to import: an input to the import, part of the approved content."
+    },
+    "AuthorityId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$",
+      "description": "A lower-case GUID."
+    },
+    "PinnedFile": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/AuthorityId"
+        },
+        "sha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        },
+        "byteLength": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": ["id", "sha256", "byteLength"],
+      "additionalProperties": false,
+      "description": "Bytes as served, after HTTP content decoding."
+    },
+    "Picture": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "fetched"
+            },
+            "reference": {
+              "$ref": "#/$defs/PictureReference"
+            },
+            "url": {
+              "$ref": "#/$defs/HttpUrl"
+            },
+            "sha256": {
+              "$ref": "#/$defs/Sha256Hex"
+            },
+            "byteLength": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": ["kind", "reference", "url", "sha256", "byteLength"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "not-drawn"
+            },
+            "reference": {
+              "$ref": "#/$defs/PictureReference"
+            },
+            "evidence": {
+              "$ref": "#/$defs/Token"
+            }
+          },
+          "required": ["kind", "reference", "evidence"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "PictureReference": {
+      "type": "string",
+      "pattern": "^~\\/_entity\\/annotation\\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$"
+    },
+    "HttpUrl": {
+      "type": "string",
+      "maxLength": 256,
+      "pattern": "^https?:\\/\\/[A-Za-z0-9.-]{1,253}(?::\\d{1,5})?(?:[/?#][A-Za-z0-9._~:/?#@!$&'()*+,;=%|-]*)?$",
+      "description": "http(s) URL without whitespace; may carry |version."
+    },
+    "SectionPath": {
+      "type": "string",
+      "pattern": "^Composition(?:\\.section\\[\\d{1,4}\\]){1,16}$"
     },
     "ExtractionTooling": {
       "type": "object",
@@ -395,6 +634,9 @@
         "sourceKey": {
           "$ref": "#/$defs/SourceKey"
         },
+        "sourceField": {
+          "$ref": "#/$defs/SourcePath"
+        },
         "action": {
           "$ref": "#/$defs/DecisionAction"
         },
@@ -419,6 +661,11 @@
       "maxLength": 256,
       "pattern": "^[A-Za-z][A-Za-z0-9]*(?:\\[\\d+\\])?(?:\\.[A-Za-z][A-Za-z0-9]*(?:\\[\\d+\\])?)*$"
     },
+    "SourcePath": {
+      "type": "string",
+      "maxLength": 256,
+      "pattern": "^(?:List|Bundle|Composition)(?:\\.[A-Za-z][A-Za-z0-9]*(?:\\[(?:\\d{1,4}|[A-Za-z][A-Za-z0-9]*)\\])?)*$"
+    },
     "DecisionAction": {
       "type": "string",
       "enum": ["extracted-verbatim", "code-mapped", "defaulted-by-rule", "human-edited", "rejected"]
@@ -442,12 +689,6 @@
       "required": ["system", "code", "lookupId"],
       "additionalProperties": false,
       "description": "Receipt of the terminology lookup that produced a code."
-    },
-    "HttpUrl": {
-      "type": "string",
-      "maxLength": 256,
-      "pattern": "^https?:\\/\\/[A-Za-z0-9.-]{1,253}(?::\\d{1,5})?(?:[/?#][A-Za-z0-9._~:/?#@!$&'()*+,;=%|-]*)?$",
-      "description": "http(s) URL without whitespace; may carry |version."
     },
     "DecisionReason": {
       "type": "string",
@@ -510,6 +751,16 @@
       "enum": ["passed", "failed"]
     },
     "Approval": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/AttestedApproval"
+        },
+        {
+          "$ref": "#/$defs/AuthorityApproval"
+        }
+      ]
+    },
+    "AttestedApproval": {
       "type": "object",
       "properties": {
         "approverId": {
@@ -522,7 +773,7 @@
           "$ref": "#/$defs/IsoDateTime"
         },
         "method": {
-          "$ref": "#/$defs/ApprovalMethod"
+          "$ref": "#/$defs/AttestationMethod"
         },
         "meaning": {
           "$ref": "#/$defs/ApprovalMeaning"
@@ -552,7 +803,7 @@
       "type": "string",
       "enum": ["content-reviewer", "qa-reviewer"]
     },
-    "ApprovalMethod": {
+    "AttestationMethod": {
       "type": "string",
       "enum": ["api-attestation", "manual-record"],
       "description": "Attestation placeholders. Electronic signature is a future control boundary."
@@ -564,6 +815,82 @@
     "RecordRef": {
       "type": "string",
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/#?=&%+-]{0,511}$"
+    },
+    "AuthorityApproval": {
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "const": "authority-publication"
+        },
+        "meaning": {
+          "type": "string",
+          "const": "authority-publication-imported"
+        },
+        "authority": {
+          "$ref": "#/$defs/Authority"
+        },
+        "authorityStatus": {
+          "$ref": "#/$defs/AuthorityStatus"
+        },
+        "publication": {
+          "type": "object",
+          "properties": {
+            "epiId": {
+              "$ref": "#/$defs/Token"
+            },
+            "documentId": {
+              "$ref": "#/$defs/AuthorityId"
+            },
+            "indexId": {
+              "$ref": "#/$defs/AuthorityId"
+            },
+            "versionNumber": {
+              "$ref": "#/$defs/Token"
+            },
+            "procedureNumber": {
+              "$ref": "#/$defs/Token"
+            },
+            "authorityTimestamp": {
+              "$ref": "#/$defs/IsoDateTime"
+            }
+          },
+          "required": [
+            "epiId",
+            "documentId",
+            "indexId",
+            "versionNumber",
+            "procedureNumber",
+            "authorityTimestamp"
+          ],
+          "additionalProperties": false
+        },
+        "requestedBy": {
+          "$ref": "#/$defs/PrincipalId"
+        },
+        "requestedAt": {
+          "$ref": "#/$defs/IsoDateTime"
+        },
+        "approvedContentSha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        }
+      },
+      "required": [
+        "method",
+        "meaning",
+        "authority",
+        "authorityStatus",
+        "publication",
+        "requestedBy",
+        "requestedAt",
+        "approvedContentSha256"
+      ],
+      "additionalProperties": false,
+      "description": "The approval is the authority's publication; the person named requested the import (docs/design/authority-import-contract.md, D2, D8)."
+    },
+    "AuthorityStatus": {
+      "type": "string",
+      "enum": ["pilot"]
     }
   }
 }

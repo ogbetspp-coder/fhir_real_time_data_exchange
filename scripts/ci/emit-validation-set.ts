@@ -2,13 +2,15 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { loadEmaMapping } from "../../src/fhir/mapping.js";
+import { importPublication } from "../../src/authority/import.js";
+import { syntheticPublication } from "../../src/authority/synthetic.js";
 import {
   hasValidationErrors,
+  validateCanonicalPreflight,
   validateEmaPreflight,
-  validateType2Preflight,
 } from "../../src/fhir/preflight.js";
 import { transformType2ToEma } from "../../src/fhir/transform.js";
-import type { FhirResource } from "../../src/fhir/types.js";
+import type { FhirBundle, FhirResource } from "../../src/fhir/types.js";
 import { SMOKE_PRODUCT_ID } from "../../src/fixtures/synthetic-products.js";
 import { createSyntheticType2Bundle } from "../../src/fixtures/synthetic.js";
 
@@ -24,6 +26,9 @@ import { createSyntheticType2Bundle } from "../../src/fixtures/synthetic.js";
 // structural preflights run first for the same reason they run first in the worker: a fixture
 // that fails them never reaches official validation there, so an emitted set would validate
 // something the worker would never send.
+//
+// A second case is an authority import's Type 1 record (docs/design/authority-import-contract.md,
+// D12): the synthetic publication as the importer makes it, and its EMA output.
 //
 // usage: tsx scripts/ci/emit-validation-set.ts OUTPUT_DIR
 
@@ -43,29 +48,57 @@ if (!destinationArg) {
 }
 
 const mapping = await loadEmaMapping();
-const source = createSyntheticType2Bundle(mapping, { product: SMOKE_PRODUCT_ID });
 
-const sourcePreflight = validateType2Preflight(source);
-if (hasValidationErrors(sourcePreflight)) {
-  throw new Error(
-    `Canonical Type 2 preflight failed (${sourcePreflight.issue.length} issues); the worker would refuse this fixture before official validation`,
-  );
-}
-const target = transformType2ToEma(source, mapping);
-const emaPreflight = validateEmaPreflight(target.list, target.documentBundle, mapping);
-if (hasValidationErrors(emaPreflight)) {
-  throw new Error(
-    `EMA structural preflight failed (${emaPreflight.issue.length} issues); the worker would refuse this transform before official validation`,
-  );
-}
-const composition = target.documentBundle.entry[0]?.resource;
-if (composition === undefined) throw new Error("Transformed Composition is missing");
+type SetEntry = { file: string; resource: FhirResource; profiles: string[] };
 
-const set: { file: string; resource: FhirResource; profiles: string[] }[] = [
-  { file: "source-type2.json", resource: source, profiles: [GLOBAL_TYPE2_PROFILE] },
-  { file: "ema-list.json", resource: target.list, profiles: [mapping.profiles.list] },
-  { file: "ema-bundle.json", resource: target.documentBundle, profiles: [mapping.profiles.bundle] },
-  { file: "ema-composition.json", resource: composition, profiles: mapping.profiles.composition },
+// The resources a run of `source` sends to the validator, after the preflights the worker runs.
+function caseOf(source: FhirBundle, graphType: "type1" | "type2", suffix: string): SetEntry[] {
+  const sourcePreflight = validateCanonicalPreflight(source, graphType);
+  if (hasValidationErrors(sourcePreflight)) {
+    throw new Error(
+      `Canonical ${graphType} preflight failed (${sourcePreflight.issue.length} issues); the worker would refuse this source before official validation`,
+    );
+  }
+  const target = transformType2ToEma(source, mapping);
+  const emaPreflight = validateEmaPreflight(target.list, target.documentBundle, mapping);
+  if (hasValidationErrors(emaPreflight)) {
+    throw new Error(
+      `EMA structural preflight failed (${emaPreflight.issue.length} issues); the worker would refuse this transform before official validation`,
+    );
+  }
+  const composition = target.documentBundle.entry[0]?.resource;
+  if (composition === undefined) throw new Error("Transformed Composition is missing");
+  return [
+    { file: `source-${graphType}.json`, resource: source, profiles: [GLOBAL_TYPE2_PROFILE] },
+    { file: `ema-list${suffix}.json`, resource: target.list, profiles: [mapping.profiles.list] },
+    {
+      file: `ema-bundle${suffix}.json`,
+      resource: target.documentBundle,
+      profiles: [mapping.profiles.bundle],
+    },
+    {
+      file: `ema-composition${suffix}.json`,
+      resource: composition,
+      profiles: mapping.profiles.composition,
+    },
+  ];
+}
+
+const publication = syntheticPublication(mapping);
+const imported = importPublication(publication.request, publication, mapping, {
+  submissionId: "00000000-0000-4000-8000-000000000001",
+  createdAt: "2026-09-24T12:00:00Z",
+  extractionRunId: "00000000-0000-4000-8000-000000000002",
+  serviceVersion: "validation-set",
+  requestedBy: "urn:requester:validation-set",
+  requestedAt: "2026-09-24T12:00:00Z",
+  sourceTextUri: "gs://validation-set/import.pages.json",
+  fidelityReportUri: "gs://validation-set/import.fidelity-report.json",
+});
+
+const set: SetEntry[] = [
+  ...caseOf(createSyntheticType2Bundle(mapping, { product: SMOKE_PRODUCT_ID }), "type2", ""),
+  ...caseOf(imported.submission.bundle as unknown as FhirBundle, "type1", "-type1"),
 ];
 
 const destination = path.resolve(destinationArg);

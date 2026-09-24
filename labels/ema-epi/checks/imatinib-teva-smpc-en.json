@@ -1,0 +1,792 @@
+{
+  "source": {
+    "file": "imatinib-teva-smpc-en.json",
+    "sha256": "b266a38b3a06e07f272b56da08d178198025d8d47761b70187b2c389b9f7e5e7"
+  },
+  "reader": "epi-reader/1.1.0",
+  "checker": "qrd-check/1.1.0",
+  "template": {
+    "family": "EMA QRD product-information template, centralised procedure",
+    "version": "10.4",
+    "status": "adopted",
+    "annex": "I",
+    "document": "Summary of product characteristics",
+    "language": "en"
+  },
+  "registryVersion": "1.0.0",
+  "document": {
+    "title": "Imatinib Teva",
+    "date": "2025-02-06"
+  },
+  "summary": {
+    "findings": {
+      "deviation": 7,
+      "document-quirk": 1,
+      "formatting": 3,
+      "refused-section": 2
+    },
+    "statements": {
+      "absent": 49,
+      "deviation": 7,
+      "not-checkable": 8,
+      "not-checked": 20,
+      "used": 39
+    }
+  },
+  "findings": [
+    {
+      "kind": "document-quirk",
+      "detail": "Composition.resourceType is 0, not 'Composition'"
+    },
+    {
+      "kind": "refused-section",
+      "section": "4.2 Posology and method of administration > Posology",
+      "code": "unsupported-style",
+      "detail": "position: relative"
+    },
+    {
+      "kind": "formatting",
+      "section": "4.8 Undesirable effects > Reporting of suspected adverse reactions",
+      "paragraph": 0,
+      "mark": "shading-lightgrey",
+      "text": "via the national reporting system listed in"
+    },
+    {
+      "kind": "formatting",
+      "section": "4.8 Undesirable effects > Reporting of suspected adverse reactions",
+      "paragraph": 0,
+      "mark": "shading-#ced4d9",
+      "text": "n Appendix V."
+    },
+    {
+      "kind": "refused-section",
+      "section": "5.1 Pharmacodynamic properties",
+      "code": "unsupported-style",
+      "detail": "position: relative"
+    },
+    {
+      "kind": "formatting",
+      "section": "10. DATE OF REVISION OF THE TEXT",
+      "paragraph": 1,
+      "mark": "color-blue",
+      "text": "https://www.ema.europa.eu"
+    },
+    {
+      "kind": "deviation",
+      "id": "document#1",
+      "similarity": 0.964,
+      "in": "10. DATE OF REVISION OF THE TEXT",
+      "paragraph": 1,
+      "differences": [
+        {
+          "change": "delete",
+          "template": ".",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "kind": "deviation",
+      "id": "appendix-II#001",
+      "similarity": 1.0,
+      "in": "4.8 Undesirable effects",
+      "paragraph": 12,
+      "differences": [
+        {
+          "change": "layout",
+          "template": "",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "kind": "deviation",
+      "id": "appendix-II#002",
+      "similarity": 1.0,
+      "in": "4.8 Undesirable effects",
+      "paragraph": 12,
+      "differences": [
+        {
+          "change": "layout",
+          "template": "",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "kind": "deviation",
+      "id": "appendix-II#003",
+      "similarity": 0.929,
+      "in": "4.8 Undesirable effects",
+      "paragraph": 12,
+      "differences": [
+        {
+          "change": "insert",
+          "template": "",
+          "label": ","
+        }
+      ]
+    },
+    {
+      "kind": "deviation",
+      "id": "appendix-II#004",
+      "similarity": 0.875,
+      "in": "4.8 Undesirable effects",
+      "paragraph": 12,
+      "differences": [
+        {
+          "change": "insert",
+          "template": "",
+          "label": ","
+        },
+        {
+          "change": "insert",
+          "template": "",
+          "label": ","
+        }
+      ]
+    },
+    {
+      "kind": "deviation",
+      "id": "appendix-II#005",
+      "similarity": 0.9,
+      "in": "4.8 Undesirable effects",
+      "paragraph": 12,
+      "differences": [
+        {
+          "change": "insert",
+          "template": "",
+          "label": ","
+        }
+      ]
+    },
+    {
+      "kind": "deviation",
+      "id": "appendix-II#006",
+      "similarity": 0.917,
+      "in": "4.8 Undesirable effects",
+      "paragraph": 12,
+      "differences": [
+        {
+          "change": "delete",
+          "template": "frequency",
+          "label": ""
+        }
+      ]
+    }
+  ],
+  "statements": [
+    {
+      "id": "smpc.3#0",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.3#1",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.3#2",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.4.1#0",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.4.1#1",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.4.2#0",
+      "status": "used",
+      "in": "4.2 Posology and method of administration > Posology"
+    },
+    {
+      "id": "smpc.4.2#1",
+      "status": "not-checked"
+    },
+    {
+      "id": "smpc.4.2#2",
+      "status": "not-checked"
+    },
+    {
+      "id": "smpc.4.2#3",
+      "status": "not-checked"
+    },
+    {
+      "id": "smpc.4.2#4",
+      "status": "not-checked"
+    },
+    {
+      "id": "smpc.4.2#5",
+      "status": "not-checked"
+    },
+    {
+      "id": "smpc.4.2#6",
+      "status": "not-checked"
+    },
+    {
+      "id": "smpc.4.2#7",
+      "status": "not-checked"
+    },
+    {
+      "id": "smpc.4.2#8",
+      "status": "used",
+      "in": "4.2 Posology and method of administration > Method of administration"
+    },
+    {
+      "id": "smpc.4.2#9",
+      "status": "not-checked"
+    },
+    {
+      "id": "smpc.4.2#10",
+      "status": "not-checked"
+    },
+    {
+      "id": "smpc.4.3#0",
+      "status": "used",
+      "in": "4.3 Contraindications",
+      "paragraph": 0,
+      "start": 0,
+      "end": 91
+    },
+    {
+      "id": "smpc.4.4#0",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.4.4#1",
+      "status": "used",
+      "in": "4.4 Special warnings and precautions for use"
+    },
+    {
+      "id": "smpc.4.5#0",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.4.5#1",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.4.5#2",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.4.6#0",
+      "status": "used",
+      "in": "4.6 Fertility, pregnancy and lactation"
+    },
+    {
+      "id": "smpc.4.6#1",
+      "status": "used",
+      "in": "4.6 Fertility, pregnancy and lactation"
+    },
+    {
+      "id": "smpc.4.6#2",
+      "status": "used",
+      "in": "4.6 Fertility, pregnancy and lactation"
+    },
+    {
+      "id": "smpc.4.7#0",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.4.7#1",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.4.8#0",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.4.8#1",
+      "status": "used",
+      "in": "4.8 Undesirable effects > Reporting of suspected adverse reactions"
+    },
+    {
+      "id": "smpc.4.8#2",
+      "status": "used",
+      "in": "4.8 Undesirable effects > Reporting of suspected adverse reactions",
+      "paragraph": 0,
+      "start": 0,
+      "end": 314
+    },
+    {
+      "id": "smpc.4.9#0",
+      "status": "used",
+      "in": "4.9 Overdose"
+    },
+    {
+      "id": "smpc.5.1#0",
+      "status": "not-checked"
+    },
+    {
+      "id": "smpc.5.1#1",
+      "status": "not-checked"
+    },
+    {
+      "id": "smpc.5.1#2",
+      "status": "not-checked"
+    },
+    {
+      "id": "smpc.5.1#3",
+      "status": "not-checked"
+    },
+    {
+      "id": "smpc.5.1#4",
+      "status": "not-checked"
+    },
+    {
+      "id": "smpc.5.1#5",
+      "status": "not-checked"
+    },
+    {
+      "id": "smpc.5.1#6",
+      "status": "not-checked"
+    },
+    {
+      "id": "smpc.5.1#7",
+      "status": "not-checked"
+    },
+    {
+      "id": "smpc.5.1#8",
+      "status": "not-checked"
+    },
+    {
+      "id": "smpc.5.1#9",
+      "status": "not-checked"
+    },
+    {
+      "id": "smpc.5.1#10",
+      "status": "not-checked"
+    },
+    {
+      "id": "smpc.5.2#0",
+      "status": "used",
+      "in": "5.2 Pharmacokinetic properties"
+    },
+    {
+      "id": "smpc.5.2#1",
+      "status": "used",
+      "in": "5.2 Pharmacokinetic properties"
+    },
+    {
+      "id": "smpc.5.2#2",
+      "status": "used",
+      "in": "5.2 Pharmacokinetic properties"
+    },
+    {
+      "id": "smpc.5.2#3",
+      "status": "used",
+      "in": "5.2 Pharmacokinetic properties"
+    },
+    {
+      "id": "smpc.5.2#4",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.5.2#5",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.5.3#0",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.5.3#1",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.5.3#2",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.5.3#3",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.6.1#0",
+      "status": "not-checkable"
+    },
+    {
+      "id": "smpc.6.2#0",
+      "status": "used",
+      "in": "6.2 Incompatibilities",
+      "paragraph": 0,
+      "start": 0,
+      "end": 15
+    },
+    {
+      "id": "smpc.6.2#1",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.6.2#2",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.6.3#0",
+      "status": "not-checkable"
+    },
+    {
+      "id": "smpc.6.4#0",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.6.5#0",
+      "status": "used",
+      "in": "6.5 Nature and contents of container",
+      "paragraph": 11,
+      "start": 0,
+      "end": 35
+    },
+    {
+      "id": "smpc.6.6#0",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.6.6#1",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.6.6#2",
+      "status": "used",
+      "in": "6.6 Special precautions for disposal",
+      "paragraph": 0,
+      "start": 0,
+      "end": 107
+    },
+    {
+      "id": "smpc.9#0",
+      "status": "used",
+      "in": "9. DATE OF FIRST AUTHORISATION/RENEWAL OF THE AUTHORISATION",
+      "paragraph": 0,
+      "start": 0,
+      "end": 44
+    },
+    {
+      "id": "smpc.9#1",
+      "status": "used",
+      "in": "9. DATE OF FIRST AUTHORISATION/RENEWAL OF THE AUTHORISATION",
+      "paragraph": 1,
+      "start": 0,
+      "end": 41
+    },
+    {
+      "id": "document#0",
+      "status": "absent"
+    },
+    {
+      "id": "document#1",
+      "status": "deviation"
+    },
+    {
+      "id": "appendix-I#pregnancy.1",
+      "status": "not-checkable"
+    },
+    {
+      "id": "appendix-I#pregnancy.2",
+      "status": "not-checkable"
+    },
+    {
+      "id": "appendix-I#pregnancy.3",
+      "status": "not-checkable"
+    },
+    {
+      "id": "appendix-I#pregnancy.4",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-I#pregnancy.5",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-I#pregnancy.6",
+      "status": "not-checkable"
+    },
+    {
+      "id": "appendix-I#pregnancy.7",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-I#pregnancy.8",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-I#pregnancy.9",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-I#lactation.1",
+      "status": "not-checkable"
+    },
+    {
+      "id": "appendix-I#lactation.2",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-I#lactation.3",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-III#0",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-III#1",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-III#2",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-III#3",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-III#4",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-III#5",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-III#6",
+      "status": "not-checkable"
+    },
+    {
+      "id": "appendix-III#7",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-III#8",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-III#9",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-III#10",
+      "status": "used",
+      "in": "6.4 Special precautions for storage",
+      "paragraph": 0,
+      "start": 0,
+      "end": 71
+    },
+    {
+      "id": "appendix-III#11",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-II#001",
+      "status": "deviation"
+    },
+    {
+      "id": "appendix-II#002",
+      "status": "deviation"
+    },
+    {
+      "id": "appendix-II#003",
+      "status": "deviation"
+    },
+    {
+      "id": "appendix-II#004",
+      "status": "deviation"
+    },
+    {
+      "id": "appendix-II#005",
+      "status": "deviation"
+    },
+    {
+      "id": "appendix-II#006",
+      "status": "deviation"
+    },
+    {
+      "id": "appendix-II#007",
+      "status": "used",
+      "in": "4.8 Undesirable effects",
+      "paragraph": 20,
+      "start": 0,
+      "end": 27
+    },
+    {
+      "id": "appendix-II#008",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-II#009",
+      "status": "used",
+      "in": "4.8 Undesirable effects",
+      "paragraph": 35,
+      "start": 0,
+      "end": 36
+    },
+    {
+      "id": "appendix-II#010",
+      "status": "used",
+      "in": "4.8 Undesirable effects",
+      "paragraph": 32,
+      "start": 0,
+      "end": 23
+    },
+    {
+      "id": "appendix-II#011",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-II#012",
+      "status": "used",
+      "in": "4.8 Undesirable effects",
+      "paragraph": 44,
+      "start": 0,
+      "end": 34
+    },
+    {
+      "id": "appendix-II#013",
+      "status": "used",
+      "in": "4.8 Undesirable effects",
+      "paragraph": 51,
+      "start": 0,
+      "end": 21
+    },
+    {
+      "id": "appendix-II#014",
+      "status": "used",
+      "in": "4.8 Undesirable effects",
+      "paragraph": 58,
+      "start": 0,
+      "end": 24
+    },
+    {
+      "id": "appendix-II#015",
+      "status": "used",
+      "in": "4.8 Undesirable effects",
+      "paragraph": 69,
+      "start": 0,
+      "end": 13
+    },
+    {
+      "id": "appendix-II#016",
+      "status": "used",
+      "in": "4.8 Undesirable effects",
+      "paragraph": 78,
+      "start": 0,
+      "end": 27
+    },
+    {
+      "id": "appendix-II#017",
+      "status": "used",
+      "in": "4.8 Undesirable effects",
+      "paragraph": 81,
+      "start": 0,
+      "end": 17
+    },
+    {
+      "id": "appendix-II#018",
+      "status": "used",
+      "in": "4.8 Undesirable effects",
+      "paragraph": 88,
+      "start": 0,
+      "end": 18
+    },
+    {
+      "id": "appendix-II#019",
+      "status": "used",
+      "in": "4.8 Undesirable effects",
+      "paragraph": 95,
+      "start": 0,
+      "end": 47
+    },
+    {
+      "id": "appendix-II#020",
+      "status": "used",
+      "in": "4.8 Undesirable effects",
+      "paragraph": 104,
+      "start": 0,
+      "end": 26
+    },
+    {
+      "id": "appendix-II#021",
+      "status": "used",
+      "in": "4.8 Undesirable effects",
+      "paragraph": 115,
+      "start": 0,
+      "end": 23
+    },
+    {
+      "id": "appendix-II#022",
+      "status": "used",
+      "in": "4.8 Undesirable effects",
+      "paragraph": 122,
+      "start": 0,
+      "end": 38
+    },
+    {
+      "id": "appendix-II#023",
+      "status": "used",
+      "in": "4.8 Undesirable effects",
+      "paragraph": 133,
+      "start": 0,
+      "end": 47
+    },
+    {
+      "id": "appendix-II#024",
+      "status": "used",
+      "in": "4.8 Undesirable effects",
+      "paragraph": 144,
+      "start": 0,
+      "end": 27
+    },
+    {
+      "id": "appendix-II#025",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-II#026",
+      "status": "used",
+      "in": "4.8 Undesirable effects",
+      "paragraph": 149,
+      "start": 0,
+      "end": 40
+    },
+    {
+      "id": "appendix-II#027",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-II#028",
+      "status": "used",
+      "in": "4.8 Undesirable effects",
+      "paragraph": 154,
+      "start": 0,
+      "end": 52
+    },
+    {
+      "id": "appendix-II#029",
+      "status": "used",
+      "in": "4.8 Undesirable effects",
+      "paragraph": 161,
+      "start": 0,
+      "end": 14
+    },
+    {
+      "id": "appendix-II#030",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-II#031",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-II#032",
+      "status": "absent"
+    },
+    {
+      "id": "appendix-II#033",
+      "status": "absent"
+    }
+  ]
+}

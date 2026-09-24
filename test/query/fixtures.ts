@@ -23,6 +23,7 @@ import {
 import type { FhirReader } from "../../src/query/fhir-reader.js";
 import { createReadBudget } from "../../src/query/tools.js";
 import { stableUuid } from "../../src/lib/hash.js";
+import { SYNTHETIC, attested, drawn } from "../support/submission.js";
 
 // The store these tests query is built by the real pipeline, not written by hand: the synthetic
 // submission goes through the ingress gate and the EMA transform, and the Provenance is the
@@ -181,15 +182,21 @@ export function buildQueryStore(mapping: EmaMapping): QueryStore {
   const gate = verifyDocumentSubmission(
     { submission, fidelityReport, sourceText },
     mapping.sourceCodeSystem,
+    SYNTHETIC,
   );
   const ema = transformType2ToEma(gate.bundle, mapping);
   const bundleIdA = ema.documentBundle.id;
   if (bundleIdA === undefined) throw new Error("EMA document Bundle requires an id");
 
-  // The Provenance exactly as the worker persists it (src/pipeline.ts): the projection, with
-  // the EMA Bundle appended as a target.
-  const provenanceA = withEmaTarget(toProvenanceResource(gate.submission, gate.report), bundleIdA);
-  const approverRole = gate.submission.approval.approverRole;
+  // The Provenance exactly as the worker persists it (src/pipeline.ts): targeting the EMA
+  // Composition and Bundle the run wrote.
+  const compositionIdA = ema.documentBundle.entry[0]?.resource.id;
+  if (compositionIdA === undefined) throw new Error("EMA Composition requires an id");
+  const provenanceA = toProvenanceResource(gate.submission, gate.report, {
+    bundleId: bundleIdA,
+    compositionId: compositionIdA,
+  });
+  const approverRole = attested(gate.submission).approverRole;
   const provenanceWithoutRole = withoutApproverRole(provenanceA);
 
   const bundleA = stored(ema.documentBundle);
@@ -236,13 +243,13 @@ export function buildQueryStore(mapping: EmaMapping): QueryStore {
     productNameTypography,
     productNameB,
     provenanceWithoutRole,
-    approverId: gate.submission.approval.approverId,
+    approverId: attested(gate.submission).approverId,
     approverRole,
-    sourceDocumentSha256: gate.submission.provenance.sourceDocument.sha256,
+    sourceDocumentSha256: drawn(gate.submission).sha256,
     fidelityReportSha256: gate.report.reportHash,
     approvedContentSha256: gate.submission.approval.approvedContentSha256,
     extractor: { name: parser.name, version: parser.version },
-    recorded: gate.submission.approval.approvedAt,
+    recorded: attested(gate.submission).approvedAt,
   };
 }
 

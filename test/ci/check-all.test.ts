@@ -11,7 +11,13 @@ const script = readFileSync("scripts/check-all.sh", "utf8");
 
 // Installing Node dependencies is the caller's `npm ci`; the official HL7 validator needs Java
 // and ~200 MB of downloads and stays its own CI job (the script's header says so).
-const NOT_RUN_LOCALLY = new Set(["npm ci --no-audit --no-fund", "npm run validate:official"]);
+// A local checkout already has origin/main; CI's shallow checkout fetches the importer lock's
+// base.
+const NOT_RUN_LOCALLY = new Set([
+  "npm ci --no-audit --no-fund",
+  "npm run validate:official",
+  "bash scripts/ci/lock-base.sh",
+]);
 
 const commands = [...workflow.matchAll(/^[ \t]+run:[ \t]*(\S.*)$/gm)].map((match) =>
   (match[1] ?? "").trim(),

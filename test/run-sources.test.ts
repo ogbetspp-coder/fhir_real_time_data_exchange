@@ -35,7 +35,12 @@ afterEach(() => {
   vi.mocked(createSyntheticType2Bundle).mockClear();
 });
 
-const BASE_ENVIRONMENT = { NODE_ENV: "test", DRY_RUN: "true", GCP_LOCATION: "europe-west4" };
+const BASE_ENVIRONMENT = {
+  NODE_ENV: "test",
+  DRY_RUN: "true",
+  GCP_LOCATION: "europe-west4",
+  ALLOW_SYNTHETIC_SOURCES: "true",
+};
 
 function configFor(overrides: Record<string, string> = {}): AppConfig {
   return loadConfig({ ...BASE_ENVIRONMENT, ...overrides });
@@ -75,8 +80,28 @@ describe("ENABLED_RUN_SOURCES parsing", () => {
     expect([...RUN_SOURCES].sort()).toEqual([...contractSources].sort());
   });
 
-  it("enables every source when unset", () => {
+  it("enables every source when unset, where synthetic sources are allowed", () => {
     expect(configFor().ENABLED_RUN_SOURCES).toEqual(["fixture", "healthcare-api", "document"]);
+  });
+
+  it("enables only the gated document source when unset and synthetic sources are not allowed", () => {
+    expect(configFor({ ALLOW_SYNTHETIC_SOURCES: "false" }).ENABLED_RUN_SOURCES).toEqual([
+      "document",
+    ]);
+    // The default of the flag itself is off.
+    expect(loadConfig({ NODE_ENV: "test", DRY_RUN: "true" }).ALLOW_SYNTHETIC_SOURCES).toBe(false);
+  });
+
+  it("refuses to start with a gate-bypassing source where synthetic sources are not allowed", () => {
+    for (const sources of ["fixture", "healthcare-api", "document,fixture"]) {
+      expect(() =>
+        configFor({ ALLOW_SYNTHETIC_SOURCES: "false", ENABLED_RUN_SOURCES: sources }),
+      ).toThrow(/bypass the document gate/);
+    }
+    expect(
+      configFor({ ALLOW_SYNTHETIC_SOURCES: "false", ENABLED_RUN_SOURCES: "document" })
+        .ENABLED_RUN_SOURCES,
+    ).toEqual(["document"]);
   });
 
   it("accepts a comma-separated subset, trimming and de-duplicating entries", () => {

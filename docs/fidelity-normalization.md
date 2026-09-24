@@ -789,8 +789,9 @@ An extractor must:
   lists, or where the div's text, character references decoded, holds U+00AD or another
   section 3 step 1 invisible character, the extractor refuses the section. A section draws nothing when section 5's `empty-narrative` test holds for
   its text; it gets its page and no narrative, and every page without a span must normalise to
-  nothing (the importer and the gate refuse otherwise, ADR 0005). The narrative section's span covers that page's
-  body, and sections 1 and 6 apply unchanged. The drawn-document rules of this section (line
+  nothing (the importer and the gate refuse otherwise, ADR 0005). A section without `text` has
+  the empty page: its text is `""`, and `bodyStart` and `bodyEnd` are 0. The narrative
+  section's span covers that page's body, and sections 1 and 6 apply unchanged. The drawn-document rules of this section (line
   layout, continuation lines, discretionary hyphens, tables across page breaks, body ranges) do
   not apply;
 - in a raised or lowered glyph run, emit every digit and sign of section 5's folding tables as
@@ -852,6 +853,14 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   changes, and narratives with `li` outside a list or non-`li` content in a `ul`, accepted by
   2.0.0, now reject. The changed vectors are listed with their reasons in
   `docs/validation/changes/2026-09-23-fidelity-norm-3-0-0.md`.
+
+  Amended 2026-09-24 without a new version: section 7 now says that a structured source's
+  section without `text` has the empty page (`""`, body [0, 0)), where it was silent
+  (`docs/design/authority-import-contract.md`, D4). That is documentation of existing behaviour:
+  section 1 already admits an empty body, on which no span can lie, no rule of sections 2–6
+  changes, and no vector, normalised text or hash moves. It invalidates nothing in the
+  extractor contract, so under section 8 it is not a new `NORMALIZATION_VERSION`, and nothing
+  approved under 3.0.0 needs re-approval.
 
 - `fidelity-norm/2.0.0` (major) — markup may not change what a reader sees without the check
   seeing it (`docs/design/fidelity-norm-2-0-0.md`, as amended by its independent re-review).

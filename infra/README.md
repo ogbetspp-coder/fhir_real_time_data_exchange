@@ -52,31 +52,32 @@ each Cloud Run service.
 
 Set by `deploy.sh` on every plan and apply unless marked "default".
 
-| Name                              | Set by                        | Purpose                                                                                |
-| --------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------- |
-| `project_id`                      | `GCP_PROJECT_ID`              | Project for this environment                                                           |
-| `region`                          | `GCP_REGION` (`europe-west4`) | Region of every regional resource                                                      |
-| `environment`                     | `EMA_FLOW_ENVIRONMENT`        | `dev`, `validation` or `prod`; used in names and labels                                |
-| `worker_image`                    | built image, by digest        | Worker container; its digest becomes `IMAGE_DIGEST` in every signed run manifest       |
-| `validator_image`                 | built image, by digest        | HL7 validator sidecar container                                                        |
-| `query_image`                     | built image, by digest        | Query service container; its digest becomes `IMAGE_DIGEST` in every audit record       |
-| `service_version`                 | the deployed commit SHA       | `QUERY_SERVICE_VERSION` on the query service and `GIT_COMMIT` on the worker            |
-| `deployer_account`                | the active service account    | Granted run.invoker on the worker (smoke run), actAs on the build account, FHIR editor |
-| `query_invokers`                  | `QUERY_INVOKERS`              | Members granted run.invoker on the query service                                       |
-| `query_token_creators`            | `QUERY_TOKEN_CREATORS`        | Members who may impersonate the caller service account                                 |
-| `query_entitlements_json`         | `QUERY_ENTITLEMENTS_JSON`     | Entitlement map: principal to the bundles it may read                                  |
-| `query_oauth_client_ids`          | `QUERY_OAUTH_CLIENT_IDS`      | OAuth client ids whose access tokens the query service accepts                         |
-| `alert_notification_email`        | `ALERT_NOTIFICATION_EMAIL`    | Recipient of the entitlement-denial alert; empty creates no alert                      |
-| `query_log_rejection_reason`      | `QUERY_LOG_REJECTION_REASON`  | Log the category of a refused credential (dev only)                                    |
-| `query_audience`                  | default (empty)               | Override for the query service's OIDC audience                                         |
-| `enabled_run_sources`             | default (all three)           | Run sources the worker accepts; `["document"]` for anything beyond synthetic content   |
-| `evidence_retention_days`         | default (2555)                | Retention policy on the evidence bucket                                                |
-| `submission_retention_days`       | default (0, none)             | Retention policy on the submission bucket                                              |
-| `deletion_protection`             | default (`true`)              | Deletion protection on the ledger table, the services and the workflow                 |
-| `enforce_binary_authorization`    | default (`false`)             | Binary Authorization on the worker service (the query service has none yet)            |
-| `alert_notification_channels`     | default (empty)               | Existing notification channels for the operational and key alerts                      |
-| `lock_regulated_audit_log_bucket` | default (`false`)             | Bucket Lock on the regulated audit log bucket; irreversible                            |
-| `kms_manifest_key_version`        | default (`1`)                 | Version of `manifest-signing-hsm` the worker signs with                                |
+| Name                              | Set by                                                                                    | Purpose                                                                                                                    |
+| --------------------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `project_id`                      | `GCP_PROJECT_ID`                                                                          | Project for this environment                                                                                               |
+| `region`                          | `GCP_REGION` (`europe-west4`)                                                             | Region of every regional resource                                                                                          |
+| `environment`                     | `EMA_FLOW_ENVIRONMENT`                                                                    | `dev`, `validation` or `prod`; used in names and labels                                                                    |
+| `worker_image`                    | built image, by digest                                                                    | Worker container; its digest becomes `IMAGE_DIGEST` in every signed run manifest                                           |
+| `validator_image`                 | built image, by digest                                                                    | HL7 validator sidecar container                                                                                            |
+| `query_image`                     | built image, by digest                                                                    | Query service container; its digest becomes `IMAGE_DIGEST` in every audit record                                           |
+| `service_version`                 | the deployed commit SHA                                                                   | `QUERY_SERVICE_VERSION` on the query service and `GIT_COMMIT` on the worker                                                |
+| `deployer_account`                | the active service account                                                                | Granted run.invoker on the worker (smoke run), actAs on the build account, FHIR editor                                     |
+| `query_invokers`                  | `QUERY_INVOKERS`                                                                          | Members granted run.invoker on the query service                                                                           |
+| `query_token_creators`            | `QUERY_TOKEN_CREATORS`                                                                    | Members who may impersonate the caller service account                                                                     |
+| `query_entitlements_json`         | `QUERY_ENTITLEMENTS_JSON`                                                                 | Entitlement map: principal to the bundles it may read                                                                      |
+| `query_oauth_client_ids`          | `QUERY_OAUTH_CLIENT_IDS`                                                                  | OAuth client ids whose access tokens the query service accepts                                                             |
+| `alert_notification_email`        | `ALERT_NOTIFICATION_EMAIL`                                                                | Recipient of the entitlement-denial alert; empty creates no alert                                                          |
+| `query_log_rejection_reason`      | `QUERY_LOG_REJECTION_REASON`                                                              | Log the category of a refused credential (dev only)                                                                        |
+| `query_audience`                  | default (empty)                                                                           | Override for the query service's OIDC audience                                                                             |
+| `allow_synthetic_sources`         | default `false`; the dev deploy sets `true`                                               | Whether the worker accepts synthetic content and the gate-bypassing sources (docs/design/authority-import-contract.md, D7) |
+| `enabled_run_sources`             | default (null): every source where synthetic content is allowed, otherwise `["document"]` | Run sources the worker accepts; fixture and healthcare-api need `allow_synthetic_sources`                                  |
+| `evidence_retention_days`         | default (2555)                                                                            | Retention policy on the evidence bucket                                                                                    |
+| `submission_retention_days`       | default (0, none)                                                                         | Retention policy on the submission bucket                                                                                  |
+| `deletion_protection`             | default (`true`)                                                                          | Deletion protection on the ledger table, the services and the workflow                                                     |
+| `enforce_binary_authorization`    | default (`false`)                                                                         | Binary Authorization on the worker service (the query service has none yet)                                                |
+| `alert_notification_channels`     | default (empty)                                                                           | Existing notification channels for the operational and key alerts                                                          |
+| `lock_regulated_audit_log_bucket` | default (`false`)                                                                         | Bucket Lock on the regulated audit log bucket; irreversible                                                                |
+| `kms_manifest_key_version`        | default (`1`)                                                                             | Version of `manifest-signing-hsm` the worker signs with                                                                    |
 
 Each variable's full description, validation and reasoning are in `variables.tf`.
 

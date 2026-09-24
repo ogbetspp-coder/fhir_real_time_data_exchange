@@ -31,7 +31,12 @@ let config: AppConfig;
 
 beforeAll(async () => {
   mapping = await loadEmaMapping();
-  config = loadConfig({ NODE_ENV: "test", DRY_RUN: "true", GCP_LOCATION: "europe-west4" });
+  config = loadConfig({
+    ALLOW_SYNTHETIC_SOURCES: "true",
+    NODE_ENV: "test",
+    DRY_RUN: "true",
+    GCP_LOCATION: "europe-west4",
+  });
 });
 
 type NarrativeWindow = { sourceKey: string; offset: number; text: string };
@@ -121,7 +126,12 @@ describe("document path narrative containment", () => {
       ["evidence", JSON.stringify(result.evidence)],
       ["fidelityReport", JSON.stringify(fidelityReport)],
       ["ingestionProvenance", JSON.stringify(submission.provenance)],
-      ["provenanceResource", JSON.stringify(toProvenanceResource(submission, fidelityReport))],
+      [
+        "provenanceResource",
+        JSON.stringify(
+          toProvenanceResource(submission, fidelityReport, { bundleId: "b", compositionId: "c" }),
+        ),
+      ],
       ["logs", capture.lines.join("\n")],
     ];
     for (const [name, haystack] of scanned) {

@@ -122,6 +122,9 @@ tf_deploy_vars() {
     -var="alert_notification_email=${alert_notification_email}"
     # Dev logs why a credential was refused (a category, never the token); production does not.
     -var="query_log_rejection_reason=${QUERY_LOG_REJECTION_REASON:-false}"
+    # Whether the worker accepts synthetic content, and with it the gate-bypassing sources
+    # (docs/design/authority-import-contract.md, D7). Unset is the Terraform default, false.
+    -var="allow_synthetic_sources=${ALLOW_SYNTHETIC_SOURCES:-false}"
   )
 }
 

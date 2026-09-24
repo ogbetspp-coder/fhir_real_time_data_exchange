@@ -1,7 +1,12 @@
 import { sha256, stableUuid } from "../lib/hash.js";
 import { isGap } from "../fidelity/normalize.js";
 import { isGridMarker, xhtmlToText } from "../fidelity/xhtml.js";
-import { duplicateRuleIssues, type EmaMapping, type SectionRule } from "./mapping.js";
+import {
+  duplicateRuleIssues,
+  permittedTitles,
+  type EmaMapping,
+  type SectionRule,
+} from "./mapping.js";
 import {
   isComposition,
   type BundleEntry,
@@ -76,6 +81,22 @@ const ENGLISH_LANGUAGE = /^en(?:-latn)?(?:-(?:[a-z]{2}|\d{3}))?$/i;
 // and section (walked). Any other element — entry, extension, emptyReason, author, focus,
 // orderedBy, mode — would be dropped, so a section carrying one is refused instead.
 const CARRIED_SECTION_ELEMENTS = new Set(["id", "title", "code", "text", "section"]);
+
+const CARRIED_META_ELEMENTS = new Set(["versionId", "lastUpdated", "profile"]);
+
+// The elements of a source Bundle the crosswalk carries or replaces; any other is refused
+// (docs/design/authority-import-contract.md, D7: every reference a run persists derives from its
+// identifier value).
+const CARRIED_BUNDLE_ELEMENTS = new Set([
+  "resourceType",
+  "id",
+  "meta",
+  "language",
+  "identifier",
+  "type",
+  "timestamp",
+  "entry",
+]);
 
 // What a reader sees inked, by the rule section 5 uses for `empty-narrative`: not a gap (section
 // 6: whitespace, a thin space, a blank glyph, a code point Unicode says to ignore) and not one of
@@ -302,9 +323,16 @@ function mapSection(
     )
     .filter((child): child is CompositionSection => child !== undefined);
 
+  const heading: unknown = (match.section as { title?: unknown }).title;
+  const sourceTitle = typeof heading === "string" ? heading : undefined;
   const target: CompositionSection = {
     id: stableUuid("ema-qrd-section", rule.sourceKey),
-    title: rule.title,
+    // The heading the source carries when the QRD template permits it (a label may omit a
+    // heading's optional wording); otherwise the manifest's.
+    title:
+      sourceTitle !== undefined && permittedTitles(rule).includes(sourceTitle)
+        ? sourceTitle
+        : rule.title,
     code: {
       coding: [
         {
@@ -342,16 +370,115 @@ function findComposition(bundle: FhirBundle): { composition: FhirComposition; en
   return { composition: firstEntry.resource, entry: firstEntry };
 }
 
+const EXTENSION_BASE = "http://ema.europa.eu/fhir/StructureDefinition/";
+const SPOR_ORGANISATIONS = "https://spor.ema.europa.eu/v1/organisations/";
+export const PROCEDURE_NUMBER_SYSTEM = "http://ema.europa.eu/fhir/procedureIdentifierNumber";
+
+type Identifier = { system?: unknown; value?: unknown };
+
+function identifiersIn(value: unknown): Identifier[] {
+  if (Array.isArray(value)) return value as Identifier[];
+  return value === undefined || value === null ? [] : [value];
+}
+
+// The one identifier in `system`, or none; two are ambiguous and refused.
+function identifierInSystem(value: unknown, system: string, where: string): string | undefined {
+  const matches = identifiersIn(value).filter(
+    (identifier) => identifier.system === system && typeof identifier.value === "string",
+  );
+  if (matches.length > 1) {
+    throw new TransformationError("Product identity is ambiguous", [
+      `${where} has more than one identifier in ${system}`,
+    ]);
+  }
+  return matches[0]?.value as string | undefined;
+}
+
+type ListExtension = { url: string } & Record<string, unknown>;
+type ListIdentity = { productName: string | undefined; extensions: ListExtension[] };
+
+// What the EMA List states about the product (EUEpiList extensions and title), selected from
+// the graph by path and identifier system, and nothing it does not state
+// (docs/design/authority-import-contract.md, D11). The synthetic Type 2 graph has no value in
+// these systems, so it gets no extension.
+function listIdentity(sourceBundle: FhirBundle): ListIdentity {
+  const resources = sourceBundle.entry;
+  const byUrl = new Map(resources.map((entry) => [entry.fullUrl, entry.resource]));
+  const authorisations = resources.filter(
+    ({ resource }) => resource.resourceType === "RegulatedAuthorization",
+  );
+  if (authorisations.length > 1) {
+    throw new TransformationError("Product identity is ambiguous", [
+      "The graph has more than one RegulatedAuthorization",
+    ]);
+  }
+  const products = resources.filter(
+    ({ resource }) => resource.resourceType === "MedicinalProductDefinition",
+  );
+  const names: unknown = products.length === 1 ? products[0]?.resource.name : undefined;
+  if (Array.isArray(names) && names.length > 1) {
+    throw new TransformationError("Product identity is ambiguous", [
+      "The product has more than one name",
+    ]);
+  }
+  const productName = Array.isArray(names)
+    ? ((names[0] as { productName?: unknown } | undefined)?.productName as string | undefined)
+    : undefined;
+
+  const extensions: ListExtension[] = [];
+  const authorisation = authorisations[0]?.resource;
+  if (authorisation === undefined) return { productName, extensions };
+  const add = (name: string, value: Record<string, unknown>): void => {
+    extensions.push({ url: `${EXTENSION_BASE}${name}`, ...value });
+  };
+
+  const holderUrl = (authorisation.holder as { reference?: unknown } | undefined)?.reference;
+  const holder = typeof holderUrl === "string" ? byUrl.get(holderUrl) : undefined;
+  const holderId = identifierInSystem(holder?.identifier, SPOR_ORGANISATIONS, "The holder");
+  if (holderId !== undefined) {
+    add("ext-epi-marketing-authorisation-holder", {
+      valueIdentifier: { system: SPOR_ORGANISATIONS, value: holderId },
+    });
+    if (typeof holder?.name === "string") {
+      add("ext-epi-marketing-authorisation-holder-display", { valueString: holder.name });
+    }
+  }
+  const regulator = authorisation.regulator as
+    { identifier?: unknown; display?: unknown } | undefined;
+  const agencyId = identifierInSystem(regulator?.identifier, SPOR_ORGANISATIONS, "The regulator");
+  if (agencyId !== undefined) {
+    add("ext-epi-regulatory-agency", {
+      valueIdentifier: { system: SPOR_ORGANISATIONS, value: agencyId },
+    });
+    if (typeof regulator?.display === "string") {
+      add("ext-epi-regulatory-agency-display", { valueString: regulator.display });
+    }
+  }
+  const procedure = identifierInSystem(
+    (authorisation.case as { identifier?: unknown } | undefined)?.identifier,
+    PROCEDURE_NUMBER_SYSTEM,
+    "The authorisation's procedure",
+  );
+  if (procedure !== undefined) {
+    add("ext-epi-procedure-number", {
+      valueIdentifier: { system: PROCEDURE_NUMBER_SYSTEM, value: procedure },
+    });
+  }
+  return { productName, extensions };
+}
+
 function createEmaList(
   mapping: EmaMapping,
   packageId: string,
   documentFullUrl: string,
   title: string,
+  identity: ListIdentity,
 ): FhirResource {
   return {
     resourceType: "List",
     id: stableUuid("ema-epi-list", packageId),
     meta: { profile: [mapping.profiles.list] },
+    ...(identity.extensions.length === 0 ? {} : { extension: identity.extensions }),
     identifier: [
       {
         system: "https://khs.dev/fhir/identifier/epi-package",
@@ -360,7 +487,9 @@ function createEmaList(
     ],
     status: "current",
     mode: "working",
-    title: `${title} — EMA ePI document index`,
+    // The product's name, as the EMA's own Lists are titled; the document's title where the
+    // graph names no product.
+    title: identity.productName ?? `${title} — EMA ePI document index`,
     code: {
       coding: [
         {
@@ -379,6 +508,83 @@ function createEmaList(
       },
     ],
   };
+}
+
+// The source Bundle's identifier value, the one key every persisted id derives from. Required:
+// a source without one is refused rather than keyed by something its producer chose less visibly.
+export function sourceIdentifierValue(sourceBundle: FhirBundle): string {
+  const value: unknown = (sourceBundle.identifier as { value?: unknown } | undefined)?.value;
+  if (typeof value !== "string" || value.length === 0) {
+    throw new TransformationError("Source Bundle has no identifier value", [
+      "Bundle.identifier.value is required: every persisted id derives from it",
+    ]);
+  }
+  return value;
+}
+
+type Reidentified = { entries: BundleEntry[]; fullUrls: Map<string, string> };
+
+// Gives every entry after the Composition a new id and `urn:uuid` fullUrl derived from the source
+// identifier value and its position, and rewrites the references between them. An entry keeps no
+// id or fullUrl its source chose, so a run cannot PUT into another run's resources.
+function reidentifiedEntries(
+  sourceBundle: FhirBundle,
+  sourceIdentifier: string,
+  compositionFullUrl: string,
+): Reidentified {
+  const fullUrls = new Map<string, string>();
+  const composition = sourceBundle.entry[0];
+  if (composition !== undefined) fullUrls.set(composition.fullUrl, compositionFullUrl);
+  const planned = sourceBundle.entry.slice(1).map((entry, offset) => {
+    const id = stableUuid(
+      `ema-entry:${entry.resource.resourceType}`,
+      `${sourceIdentifier}:${offset + 1}`,
+    );
+    const fullUrl = `urn:uuid:${id}`;
+    if (fullUrls.has(entry.fullUrl)) {
+      throw new TransformationError("Source Bundle entries are ambiguous", [
+        `Two entries share the fullUrl at Bundle.entry[${offset + 1}]`,
+      ]);
+    }
+    fullUrls.set(entry.fullUrl, fullUrl);
+    return { entry, id, fullUrl, position: offset + 1 };
+  });
+  const entries = planned.map(({ entry, id, fullUrl, position }) => ({
+    ...structuredClone(entry),
+    fullUrl,
+    resource: {
+      ...rewriteReferences(structuredClone(entry.resource), fullUrls, `Bundle.entry[${position}]`),
+      id,
+    },
+  }));
+  return { entries, fullUrls };
+}
+
+// Rewrites every string-valued `reference` to the new fullUrl of the entry it names. A reference
+// that names no entry of the Bundle (relative, versioned, `#contained`, external) is refused: it
+// could point into another run's resources. A Reference by identifier alone carries no
+// `reference` and is kept.
+function rewriteReferences<T>(value: T, fullUrls: Map<string, string>, at: string): T {
+  const walk = (node: unknown, path: string): unknown => {
+    if (Array.isArray(node)) return node.map((item, index) => walk(item, `${path}[${index}]`));
+    if (node === null || typeof node !== "object") return node;
+    const out: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(node as Record<string, unknown>)) {
+      if (key === "reference" && typeof child === "string") {
+        const target = fullUrls.get(child);
+        if (target === undefined) {
+          throw new TransformationError("Source reference names no entry of the Bundle", [
+            `${path}.reference names no entry of the Bundle`,
+          ]);
+        }
+        out[key] = target;
+      } else {
+        out[key] = walk(child, `${path}.${key}`);
+      }
+    }
+    return out;
+  };
+  return walk(value, at) as T;
 }
 
 export function transformType2ToEma(
@@ -420,22 +626,31 @@ export function transformType2ToEma(
     ]);
   }
 
-  const sourceIdentifier =
-    sourceBundle.identifier.value ?? sourceBundle.id ?? sha256(sourceBundle).slice(0, 24);
+  // Every id the run persists derives from this one checked value, so a run writes only into its
+  // own namespace (docs/design/authority-import-contract.md, D7): no fallback to Bundle.id.
+  const sourceIdentifier = sourceIdentifierValue(sourceBundle);
   const packageId = `ema-${sourceIdentifier}`;
   const compositionId = stableUuid("ema-composition", sourceIdentifier);
   const bundleId = stableUuid("ema-bundle", sourceIdentifier);
   const compositionFullUrl = `urn:uuid:${compositionId}`;
   const bundleFullUrl = `urn:uuid:${bundleId}`;
+  const copied = reidentifiedEntries(sourceBundle, sourceIdentifier, compositionFullUrl);
 
+  // The Composition with its references rewritten; everything below is built from this, never
+  // from the source, so no source reference reaches the output unrewritten.
+  const rewritten = rewriteReferences(
+    structuredClone(sourceComposition),
+    copied.fullUrls,
+    "Composition",
+  );
   const targetComposition: FhirComposition = {
-    ...structuredClone(sourceComposition),
+    ...rewritten,
     id: compositionId,
-    meta: { ...sourceComposition.meta, profile: mapping.profiles.composition },
+    meta: { profile: mapping.profiles.composition },
     // Always English: a source declaring any other language, or none, has already failed above.
     language: "en",
     extension: [
-      ...((sourceComposition.extension as unknown[] | undefined) ?? []).filter(
+      ...((rewritten.extension as unknown[] | undefined) ?? []).filter(
         (extension) => (extension as { url?: string }).url !== QRD_TEMPLATE_EXTENSION,
       ),
       {
@@ -461,10 +676,53 @@ export function transformType2ToEma(
     section: [root],
   };
 
+  // The output Bundle carries only these elements; any other the source has (a signature, a link,
+  // an entry's request or search) is refused, not dropped and not copied: it could carry a
+  // reference or a URL outside the run's namespace.
+  // A source's meta may carry what the store manages (versionId, lastUpdated) and the profiles
+  // the crosswalk replaces; anything else (an extension, a tag, a source URI) is refused, since
+  // it could carry a reference outside the run's namespace. The output's meta is the profile.
+  const metaIssues = [
+    ...Object.keys((sourceBundle.meta as Record<string, unknown> | undefined) ?? {})
+      .filter((key) => !CARRIED_META_ELEMENTS.has(key))
+      .map((key) => `Source Bundle.meta carries ${key}, which the crosswalk does not carry`),
+    // Every resource the run persists, the Composition and each copied entry: its meta is
+    // limited alike, and it holds no contained resource and no implicit rules, which could carry
+    // what the rewrite does not reach.
+    ...sourceBundle.entry.flatMap(({ resource }, position) => {
+      const where = position === 0 ? "Composition" : `Bundle.entry[${position}]`;
+      const meta = (resource.meta as Record<string, unknown> | undefined) ?? {};
+      return [
+        ...Object.keys(meta)
+          .filter((key) => !CARRIED_META_ELEMENTS.has(key))
+          .map((key) => `Source ${where}.meta carries ${key}, which the crosswalk does not carry`),
+        ...["contained", "implicitRules"]
+          .filter((key) => resource[key] !== undefined)
+          .map((key) => `Source ${where} carries ${key}, which the crosswalk does not carry`),
+      ];
+    }),
+  ];
+  const bundleIssues = [
+    ...metaIssues,
+    ...Object.keys(sourceBundle)
+      .filter((key) => !CARRIED_BUNDLE_ELEMENTS.has(key))
+      .map((key) => `Source Bundle carries ${key}, which the crosswalk does not carry`),
+    ...sourceBundle.entry.flatMap((entry, position) =>
+      Object.keys(entry)
+        .filter((key) => key !== "fullUrl" && key !== "resource")
+        .map(
+          (key) =>
+            `Source Bundle.entry[${position}] carries ${key}, which the crosswalk does not carry`,
+        ),
+    ),
+  ];
+  if (bundleIssues.length > 0) {
+    throw new TransformationError("Source Bundle carries what the crosswalk refuses", bundleIssues);
+  }
   const targetBundle: FhirBundle = {
-    ...structuredClone(sourceBundle),
+    resourceType: "Bundle",
     id: bundleId,
-    meta: { ...sourceBundle.meta, profile: [mapping.profiles.bundle] },
+    meta: { profile: [mapping.profiles.bundle] },
     // The source declared an English tag in some spelling ("EN", "en-GB"); the output says "en",
     // as the Composition does.
     language: "en",
@@ -472,14 +730,18 @@ export function transformType2ToEma(
       system: "https://khs.dev/fhir/identifier/ema-document",
       value: bundleId,
     },
+    type: "document",
     timestamp: sourceBundle.timestamp,
-    entry: [
-      { fullUrl: compositionFullUrl, resource: targetComposition },
-      ...sourceBundle.entry.slice(1).map((entry) => structuredClone(entry)),
-    ],
+    entry: [{ fullUrl: compositionFullUrl, resource: targetComposition }, ...copied.entries],
   };
 
-  const list = createEmaList(mapping, packageId, bundleFullUrl, targetComposition.title);
+  const list = createEmaList(
+    mapping,
+    packageId,
+    bundleFullUrl,
+    targetComposition.title,
+    listIdentity(sourceBundle),
+  );
   const inputHash = sha256(sourceBundle);
   const outputHash = sha256({ list, documentBundle: targetBundle });
 

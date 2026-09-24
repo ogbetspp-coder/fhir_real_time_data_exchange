@@ -1,4 +1,4 @@
-import type { EmaMapping, SectionRule } from "./mapping.js";
+import { permittedTitles, type EmaMapping, type SectionRule } from "./mapping.js";
 import {
   isComposition,
   type CompositionSection,
@@ -32,6 +32,142 @@ function issue(
     diagnostics,
     ...(expression === undefined ? {} : { expression: [expression] }),
   };
+}
+
+// A Type 1 record, an authority import's (docs/design/authority-import-contract.md, D9): the
+// Composition, the product scope, its holder and its authorisation, exactly one of each and
+// nothing else. Packs, items, ingredients and substances are declared not supplied by their
+// absence; none may be inferred.
+const TYPE1_RESOURCES = [
+  "Composition",
+  "MedicinalProductDefinition",
+  "Organization",
+  "RegulatedAuthorization",
+] as const;
+
+type GraphType = "type1" | "type2";
+
+function referenceOf(value: unknown): string | undefined {
+  const reference = (value as { reference?: unknown } | undefined)?.reference;
+  return typeof reference === "string" ? reference : undefined;
+}
+
+// The one reference a Type 1 link has: a list of exactly one, or a single Reference.
+function onlyReference(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return referenceOf(value);
+  return value.length === 1 ? referenceOf(value[0]) : undefined;
+}
+
+function hasIdentifier(resource: FhirResource): boolean {
+  const identifiers: unknown = resource.identifier;
+  return (
+    Array.isArray(identifiers) &&
+    identifiers.some((entry: unknown) => {
+      const { system, value } = (entry ?? {}) as { system?: unknown; value?: unknown };
+      return typeof system === "string" && typeof value === "string" && value.length > 0;
+    })
+  );
+}
+
+function type1GraphIssues(bundle: FhirBundle): OperationOutcomeIssue[] {
+  const issues: OperationOutcomeIssue[] = [];
+  const byType = new Map<string, { fullUrl: string; resource: FhirResource }[]>();
+  for (const entry of bundle.entry) {
+    const list = byType.get(entry.resource.resourceType) ?? [];
+    list.push(entry);
+    byType.set(entry.resource.resourceType, list);
+  }
+  for (const [resourceType, entries] of byType) {
+    if (!(TYPE1_RESOURCES as readonly string[]).includes(resourceType)) {
+      issues.push(
+        issue("error", "structure", `A Type 1 record carries no ${resourceType}`, "Bundle.entry"),
+      );
+    } else if (entries.length !== 1) {
+      issues.push(
+        issue("error", "structure", `A Type 1 record has one ${resourceType}`, "Bundle.entry"),
+      );
+    }
+  }
+  const one = (type: (typeof TYPE1_RESOURCES)[number]) => {
+    const entries = byType.get(type);
+    if (entries === undefined) {
+      issues.push(issue("error", "required", `Type 1 record is missing ${type}`, "Bundle.entry"));
+    }
+    return entries?.length === 1 ? entries[0] : undefined;
+  };
+  const composition = one("Composition");
+  const product = one("MedicinalProductDefinition");
+  const holder = one("Organization");
+  const authorisation = one("RegulatedAuthorization");
+  if (composition === undefined || product === undefined || holder === undefined) return issues;
+  if (authorisation === undefined) return issues;
+
+  const expectLink = (actual: string | undefined, expected: string, where: string): void => {
+    if (actual !== expected) {
+      issues.push(issue("error", "value", `${where} must reference its Type 1 target`, where));
+    }
+  };
+  expectLink(onlyReference(composition.resource.subject), product.fullUrl, "Composition.subject");
+  expectLink(onlyReference(composition.resource.author), holder.fullUrl, "Composition.author");
+  expectLink(
+    onlyReference(authorisation.resource.subject),
+    product.fullUrl,
+    "RegulatedAuthorization.subject",
+  );
+  expectLink(
+    referenceOf(authorisation.resource.holder),
+    holder.fullUrl,
+    "RegulatedAuthorization.holder",
+  );
+  const names: unknown = product.resource.name;
+  if (
+    !Array.isArray(names) ||
+    names.length !== 1 ||
+    typeof (names[0] as { productName?: unknown }).productName !== "string"
+  ) {
+    issues.push(
+      issue("error", "required", "The product has one name", "MedicinalProductDefinition.name"),
+    );
+  }
+  for (const [resource, where] of [
+    [product.resource, "MedicinalProductDefinition.identifier"],
+    [holder.resource, "Organization.identifier"],
+    [authorisation.resource, "RegulatedAuthorization.identifier"],
+  ] as const) {
+    if (!hasIdentifier(resource)) {
+      issues.push(issue("error", "required", `${where} is required`, where));
+    }
+  }
+  return issues;
+}
+
+// The canonical record's preflight: Type 2 exactly as strict as ever, Type 1 for an authority
+// import only (the gate ties the graph type to the source).
+export function validateCanonicalPreflight(
+  bundle: FhirBundle,
+  graphType: GraphType,
+): OperationOutcome {
+  if (graphType === "type2") return validateType2Preflight(bundle);
+  const issues: OperationOutcomeIssue[] = [];
+  if (bundle.type !== "document") {
+    issues.push(issue("error", "value", "An ePI must use Bundle.type=document", "Bundle.type"));
+  }
+  const first = bundle.entry[0]?.resource;
+  if (first === undefined || !isComposition(first)) {
+    issues.push(
+      issue(
+        "error",
+        "structure",
+        "A document Bundle must have Composition as its first entry",
+        "Bundle.entry[0]",
+      ),
+    );
+  }
+  issues.push(...type1GraphIssues(bundle));
+  if (issues.length === 0) {
+    issues.push(issue("success", "informational", "Canonical Type 1 preflight passed"));
+  }
+  return { resourceType: "OperationOutcome", issue: issues };
 }
 
 export function validateType2Preflight(bundle: FhirBundle): OperationOutcome {
@@ -102,7 +238,7 @@ function validateTargetSection(
       ),
     );
   }
-  if (section.title !== rule.title) {
+  if (!permittedTitles(rule).includes(section.title)) {
     issues.push(issue("error", "value", `Expected title "${rule.title}"`, `${path}.title`));
   }
 

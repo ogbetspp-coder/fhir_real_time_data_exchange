@@ -17,6 +17,7 @@ import {
 import { createSyntheticSubmission } from "../src/fixtures/synthetic-submission.js";
 import { createSyntheticType2Bundle } from "../src/fixtures/synthetic.js";
 import { canonicalJson, sha256 } from "../src/lib/hash.js";
+import { SYNTHETIC, drawn } from "./support/submission.js";
 
 const CONTRAINDICATIONS_KEY = "smpc.4.3";
 
@@ -98,6 +99,7 @@ describe("the demonstration set", () => {
               sourceText: fixture.sourceText,
             },
             mapping.sourceCodeSystem,
+            SYNTHETIC,
           ),
         ).not.toThrow();
       }
@@ -114,10 +116,8 @@ describe("the demonstration set", () => {
     expect(new Set(values(({ submissionId }) => submissionId)).size).toBe(submissions.length);
     expect(new Set(values(({ bundleSha256 }) => bundleSha256)).size).toBe(submissions.length);
     expect(new Set(values(({ bundle }) => String(bundle.id))).size).toBe(submissions.length);
-    expect(new Set(values(({ bundle }) => String(bundle.identifier.value))).size).toBe(
-      submissions.length,
-    );
-    expect(new Set(values(({ provenance }) => provenance.sourceDocument.filename)).size).toBe(
+    expect(new Set(values(({ bundle }) => bundle.identifier.value)).size).toBe(submissions.length);
+    expect(new Set(values((submission) => drawn(submission).filename)).size).toBe(
       submissions.length,
     );
   });

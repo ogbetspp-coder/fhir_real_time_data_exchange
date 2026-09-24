@@ -20,6 +20,7 @@ import {
   type SubmissionReadReason,
 } from "../src/gcp/submission-reader.js";
 import { sha256 } from "../src/lib/hash.js";
+import { SYNTHETIC } from "./support/submission.js";
 
 let mapping: EmaMapping;
 let fixture: SyntheticSubmission;
@@ -58,6 +59,7 @@ function storeFor(submission: unknown, indent = 2): Objects {
 
 function configFor(overrides: Record<string, string> = {}): AppConfig {
   return loadConfig({
+    ALLOW_SYNTHETIC_SOURCES: "true",
     NODE_ENV: "test",
     DRY_RUN: "true",
     GOOGLE_CLOUD_PROJECT: "test-project",
@@ -103,7 +105,9 @@ describe("by-reference submission reader", () => {
     expect(sha256(input.submission)).toBe(sha256(fixture.submission));
     expect(sha256(input.fidelityReport)).toBe(sha256(fixture.fidelityReport));
     expect(sha256(input.sourceText)).toBe(sha256(fixture.sourceText));
-    expect(() => verifyDocumentSubmission(input, mapping.sourceCodeSystem)).not.toThrow();
+    expect(() =>
+      verifyDocumentSubmission(input, mapping.sourceCodeSystem, SYNTHETIC),
+    ).not.toThrow();
   });
 
   // The pinned hash covers the JSON value, so re-serialising an object must not invalidate it
@@ -236,7 +240,12 @@ describe("by-reference submission reader", () => {
     expect(
       () =>
         new GcsSubmissionReader(
-          loadConfig({ NODE_ENV: "test", DRY_RUN: "true", GOOGLE_CLOUD_PROJECT: "p" }),
+          loadConfig({
+            ALLOW_SYNTHETIC_SOURCES: "true",
+            NODE_ENV: "test",
+            DRY_RUN: "true",
+            GOOGLE_CLOUD_PROJECT: "p",
+          }),
           fetcherFor(new Map()),
         ),
     ).toThrow("SUBMISSION_BUCKET is required");
@@ -255,7 +264,7 @@ describe("by-reference submission reader", () => {
       RUN_ID,
     );
 
-    expect(() => verifyDocumentSubmission(input, mapping.sourceCodeSystem)).toThrow(
+    expect(() => verifyDocumentSubmission(input, mapping.sourceCodeSystem, SYNTHETIC)).toThrow(
       "Document submission rejected",
     );
   });

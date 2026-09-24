@@ -132,8 +132,8 @@ Two things were needed to make that reproducible, and both are worth knowing:
 `tests/test_contracts_strictness.py` proves it per model instead of trusting it: it counts the
 closed and open object schemas in each JSON Schema, counts the models that actually reject and
 actually accept an unknown field, and requires the counts to match. It also names the three
-models that are allowed to be open — `Type2Bundle`, `EntryItem`, `Resource`, the FHIR objects
-that `src/contracts/type2-bundle.ts` models with `z.looseObject` — and proves that an open model
+models that are allowed to be open — `CanonicalBundle`, `EntryItem`, `Resource`, the FHIR objects
+that `src/contracts/canonical-bundle.ts` models with `z.looseObject` — and proves that an open model
 _preserves_ the unknown field rather than merely tolerating it, which is what the Bundle hash
 depends on.
 

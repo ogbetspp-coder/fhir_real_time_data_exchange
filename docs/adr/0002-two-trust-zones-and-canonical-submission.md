@@ -137,3 +137,109 @@ value for the difference to matter today; it is recorded so that it is never a s
   editor ids, `approverId`, `Bundle.identifier.system`, `fullUrl`) are token- or grammar-limited
   so that a manifest, ledger row, or Provenance resource can never carry prose; `recordRef` is a
   single URL-safe locator.
+
+## Amendment (2026-09-24, ADR 0005: authority imports)
+
+Roadmap item 3a lets an authority's published ePI enter the record (ADR 0005). The design is
+`docs/design/authority-import-contract.md` (D1–D14); this section states what it changes here.
+The decision above is otherwise unchanged, and so are the `drawn` path's invariants 1 to 6.
+
+**The contract is `CanonicalSubmission` 2.0.0.** Every 1.0.0 submission is refused.
+
+- `graphType` (`type1` | `type2`) is part of the submission and of the approved content:
+  `approvedContentSha256` is the hash of `{ schemaVersion, graphType, bundle, provenance }`.
+  `type1` goes only with an authority publication, and an authority publication is always
+  `type1` in 2.0.0 (D9). The Bundle definition `Type2Bundle` is renamed `CanonicalBundle`.
+- `provenance.sourceDocument` is a union on `kind`: `drawn` (the fields above, PDF or Word) or
+  `authority-publication` (`application/fhir+json`; the authority, `EMA` or `synthetic`; the
+  import request; the document and its List pinned by id, SHA-256 and length; the List's ePI id,
+  version number, `meta.versionId` and status; the pictures the document references; one page
+  per section, `sectionPages`; the extracted-text reference) (D3).
+- `approval` is a union on `method`: an attestation (`api-attestation` | `manual-record`, the
+  fields above) or `authority-publication` (meaning `authority-publication-imported`, the
+  authority, `authorityStatus: pilot`, the publication it names, `requestedBy`, `requestedAt`,
+  `approvedContentSha256`) (D8).
+- `Bundle.identifier.value` is required for every source; a structuring decision may name the
+  field it read (`sourceField`, a grammar-limited `SourcePath`).
+
+**New ingress invariants**, after the six above:
+
+7. Source, graph, approval and extractor fit together: a `drawn` source carries a `type2` graph
+   and an attestation; an `authority-publication` source carries a `type1` graph, an
+   `authority-publication` approval, the extractor `authority-import` and no model or prompt
+   template, and its request, source and approval name the same authority, document, List, ePI
+   and version. The extracted text's `extractorVersion` is the parser's `name/version`.
+8. **For an authority import, Zone B fetches the authority's bytes itself and recomputes the
+   import** (D1). It builds each URL from the submission's ids by a fixed template for the
+   authority, on an allowlisted host, with one `Accept` header, no redirect followed, HTTP 200
+   only, a 30-second timeout and a 4 MiB limit; requires the pinned SHA-256 and length; runs the
+   importer this build contains (`src/authority/`) on those bytes with the submission's free
+   fields; and accepts only the very submission, page text and fidelity report it makes. The
+   ordinary gate then accepts an authority import only with that proof bound to the submission's
+   hash (`GateOptions.recomputedImport`, set only by `src/authority/gate.ts`). An import requested
+   after the gate fetched the files refuses. Until roadmap 3a PR 5 an authority import runs only
+   as a dry run: the gate refuses one when `DRY_RUN` is false, so nothing it makes is persisted.
+9. **The raw-bytes exception.** The authority's files are hashed as the raw bytes served (after
+   HTTP content decoding), never as a re-serialised JSON value: the one exception to this ADR's
+   hash-the-JSON-value convention. They are decoded as strict UTF-8 (an invalid byte or a
+   byte-order mark refuses) and parsed with a parser that refuses a duplicate key.
+10. **Synthetic content only where `ALLOW_SYNTHETIC_SOURCES`** (D7). A synthetic submission
+    carries every mark of one and a non-synthetic one none: for a `drawn` source a `synthetic-*`
+    extractor, terminology service (if any) and identifier value; for an import the `synthetic`
+    authority and the identifier value `authority-import:synthetic:<id>`; for both, the marker
+    "not for clinical use" in every narrative that carries text. With the flag off, any mark
+    refuses.
+11. **No drawn-document extractor is qualified** (`docs/fidelity-normalization.md` §7): a `drawn`
+    submission is accepted only as a synthetic one, where the flag is on.
+12. **A structured source's pages.** An authority import's page text has one page per section,
+    each wholly body, and every page without a span is blank: the re-executed report's
+    `coverage.uncoveredGaps` is 0 (D4).
+13. **The reserved namespace.** An identifier value beginning `authority-import:` is written only
+    by the importer, and every other route (the `drawn` gate, and the `fixture` and
+    `healthcare-api` sources in the pipeline) refuses a source Bundle that has one (D7).
+
+**The human decision for an import is its request** (D2): which publication to import, in which
+language. The request is an input to the import and part of the approved content, and the
+approval names who made it (`requestedBy`, a placeholder like `approverId` until roadmap item 2).
+Whether the words are right is what invariant 8 proves, not what a person attests.
+
+**The transform and the preflights change for this purpose.** The decision above said
+`src/fhir/transform.ts`, `src/fhir/preflight.ts`, the mapping manifest and the generated
+artefacts are not modified and their hashes are frozen. For authority imports they are, and stay
+deterministic:
+
+- the crosswalk derives every persisted id from the checked identifier value: each entry after
+  the Composition gets `stableUuid("ema-entry:" + resourceType, identifierValue + ":" + position)`
+  and a `urn:uuid` fullUrl, references between entries are rewritten, a reference that names no
+  entry of the Bundle refuses, and the fallback to `Bundle.id` or a hash is gone (D7);
+- `validateType2Preflight` is called through `validateCanonicalPreflight(bundle, graphType)`,
+  whose Type 1 set is exactly one Composition, MedicinalProductDefinition, Organization and
+  RegulatedAuthorization, linked, named and identified; Type 2 is unchanged (D9);
+- the mapping (`cap-smpc-en` 1.3.0) lists the headings the QRD template permits without their
+  optional wording (6.5, 6.6) and the SPOR alias of its code system; the crosswalk keeps a
+  permitted source heading and the EMA preflight accepts any (D4);
+- the EMA List carries the holder, regulatory agency and procedure number the graph states in
+  their identifier systems, and is titled by the product's name (D11).
+
+**Run sources.** The consequence below that a deployment handling anything but synthetic content
+runs `document` only is amended. `ENABLED_RUN_SOURCES` now follows `ALLOW_SYNTHETIC_SOURCES`
+(default false in `src/config.ts` and Terraform): with the flag off it defaults to `document`,
+and enabling `fixture` or `healthcare-api` is a startup failure (Terraform refuses the two
+variables disagreeing). With the flag on, the ungated sources may run beside public authority
+imports, which they cannot reach: every id a run persists, and every reference in it, derives
+from its checked identifier value, and no route but the importer's may use the
+`authority-import:` namespace (D7). The `dev` deploy sets the flag. A deployment that holds a
+client's content leaves it off.
+
+**Evidence.** `RunManifest` moves to 2.0.0; 1.0.0 and 1.1.0 stay readable. Its ingestion block
+records the source kind, the graph type, whether synthetic content was allowed, the approval as
+either union member, and for an import the importer version and each fetched file's URL,
+SHA-256, length and fetch time (D12). The FHIR Provenance id is
+`stableUuid("ingestion-provenance", identifierValue + ":" + submissionId)`, and its targets are
+the record's identifier and the output's `Composition/<id>` and `Bundle/<id>`, never a fullUrl
+the submission chose. An import's Provenance has activity `authority-import`, the authority as
+agent of its source files (each named by the authority's id and by hash), the requester as
+`enterer`, and `recorded` at the gate's fetch time.
+
+**Status.** Producers are `src/fixtures/synthetic-submission.ts` and, for authority imports,
+`scripts/authority/import.ts`, whose identity is not trusted (invariant 8).

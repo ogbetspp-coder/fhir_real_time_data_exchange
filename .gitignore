@@ -28,3 +28,7 @@ fhir/vendor/
 # The full differential corpus CI writes at the root (the committed smoke corpus lives in
 # zone-a/tests/fixtures/).
 differential.jsonl
+
+# The owner's local copy of the EMA's IG downloads (hundreds of MB); each file is pinned by URL
+# and hash in fhir/standards.lock.json instead.
+/context*/

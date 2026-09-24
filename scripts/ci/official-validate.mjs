@@ -23,8 +23,9 @@ import {
 } from "./validator-pins.mjs";
 
 // Runs the official HL7 FHIR validator — the same validator_cli.jar and the same four
-// implementation-guide packages the worker's sidecar runs, at the same pins — over the four
-// resources a `{"source":"fixture"}` run sends it, against the same profiles. `npm run check`
+// implementation-guide packages the worker's sidecar runs, at the same pins — over the
+// resources a `{"source":"fixture"}` run sends it, and an authority import's Type 1 record with
+// its EMA output (scripts/ci/emit-validation-set.ts), against the same profiles. `npm run check`
 // runs only the local structural preflights; official validation otherwise happens solely
 // inside the deployed pipeline, which is how a fixture that fails it stayed invisible until a
 // run was attempted. This is the CI gate that makes that class of defect visible on the pull
@@ -52,7 +53,7 @@ import {
 //
 // usage: node scripts/ci/official-validate.mjs [options]
 //   --validator-dir DIR   where the jar and packages are cached (default .cache/official-validator)
-//   --set-dir DIR         where the four resources are emitted (default: a temporary directory)
+//   --set-dir DIR         where the resources are emitted (default: a temporary directory)
 //   --no-emit             validate what --set-dir already holds instead of emitting it
 //   --offline             never download: a missing or checksum-mismatched artefact fails
 //   --dockerfile FILE     the sidecar Dockerfile to read pins from (default Dockerfile.validator)

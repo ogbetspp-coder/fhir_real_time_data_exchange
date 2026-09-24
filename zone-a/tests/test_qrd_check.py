@@ -46,6 +46,13 @@ def test_every_pinned_label_matches_its_lock_entry_and_nothing_else_is_there() -
         assert hashlib.sha256(data).hexdigest() == entry["sha256"], entry["file"]
         assert len(data) == entry["bytes"], entry["file"]
         assert entry["url"].startswith("https://epi.ema.europa.eu/consuming/api/fhir/Bundle/")
+    lists = {path.name for path in (LABELS / "lists").iterdir()}
+    assert lists == {entry["listFile"] for entry in LOCK["sources"]}
+    for entry in LOCK["sources"]:
+        data = (LABELS / "lists" / entry["listFile"]).read_bytes()
+        assert hashlib.sha256(data).hexdigest() == entry["listSha256"], entry["listFile"]
+        assert len(data) == entry["listBytes"], entry["listFile"]
+        assert entry["list"].startswith("https://epi.ema.europa.eu/consuming/api/fhir/List/")
 
 
 def test_the_committed_results_are_what_the_sources_give() -> None:
@@ -314,14 +321,24 @@ def test_nuvaxovid() -> None:
     ]
 
 
+# The three labels pinned for the QRD check link to the EMA's old address; Imatinib Teva, pinned
+# later for the authority importer, links to the new one and only lacks the closing full stop.
+OLD_ADDRESS_LABELS = ("brukinsa-smpc-en.json", "jentadueto-smpc-en.json", "nuvaxovid-smpc-en.json")
+
+
 def test_every_label_links_to_the_old_ema_address() -> None:
     for name, result in RESULTS.items():
         (closing,) = [f for f in findings(result, "deviation") if f["id"] == "document#1"]
-        assert closing["differences"][0] == {
-            "change": "replace",
-            "template": "https",
-            "label": "http",
-        }, name
+        if name in OLD_ADDRESS_LABELS:
+            assert closing["differences"][0] == {
+                "change": "replace",
+                "template": "https",
+                "label": "http",
+            }, name
+        else:
+            assert closing["differences"] == [{"change": "delete", "template": ".", "label": ""}], (
+                name
+            )
 
 
 # --- review round 1 -----------------------------------------------------------------------
@@ -684,8 +701,13 @@ def test_an_optional_fill_in_in_the_same_paragraph_is_matched() -> None:
     for name, result in RESULTS.items():
         used = next(s for s in result["statements"] if s["id"] == "smpc.5.1#0")
         source = LABELS / "sources" / name
-        assert used["status"] == "used", name
         assert source.exists()
+        if name == "imatinib-teva-smpc-en.json":
+            # Its 5.1 draws text with `position: relative`, which the reader refuses (roadmap 3a,
+            # PR 3), so nothing in 5.1 is checked.
+            assert used["status"] == "not-checked", name
+            continue
+        assert used["status"] == "used", name
     text = "Pharmacotherapeutic group: Vaccines, ATC code: J07BN04"
     result = check(document(smpc_5_1=_paragraphs(text)), REGISTRY, MAPPING)
     used = next(s for s in result["statements"] if s["id"] == "smpc.5.1#0")

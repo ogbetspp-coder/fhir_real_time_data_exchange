@@ -41,3 +41,4 @@ agent/src/verifiable_answer_agent/contracts/agent-turn.schema.json
 # Byte copies of the EMA's published ePI, pinned by hash in labels/ema-epi/sources.lock.json;
 # reformatting them would change the bytes the lock records.
 labels/ema-epi/sources/
+labels/ema-epi/lists/

@@ -14,6 +14,7 @@ const SectionRuleSchema: z.ZodType<SectionRule> = z.lazy(() =>
     sourceKey: z.string().min(1),
     targetCode: z.string().min(1),
     title: z.string().min(1),
+    alternativeTitles: z.array(z.string().min(1)).min(1).optional(),
     display: z.string().min(1).optional(),
     required: z.boolean(),
     narrative: z.literal("required").optional(),
@@ -25,6 +26,9 @@ const MappingSchema = z.object({
   mappingVersion: z.string().min(1),
   sourceCodeSystem: z.url(),
   targetCodeSystem: z.url(),
+  // Other URIs by which authorities write the same code system (the EMA's live ePIs use the SPOR
+  // list's URI): an authority import reads them as targetCodeSystem, and only there.
+  targetCodeSystemAliases: z.array(z.url()).optional(),
   profiles: z.object({
     list: z.url(),
     bundle: z.url(),
@@ -38,6 +42,10 @@ export type SectionRule = {
   targetCode: string;
   // The section heading the label carries (Composition.section.title).
   title: string;
+  // Headings the QRD template also permits: the heading without its optional wording ("6.5
+  // Nature and contents of container"). An authority import carries the heading its label has,
+  // one of these or `title`; the crosswalk and the EMA preflight accept any of them.
+  alternativeTitles?: string[] | undefined;
   // The target code system's own display string for `targetCode`, when it differs from the
   // heading. The validator rejects any other display on the coding; the heading is not bound.
   display?: string | undefined;
@@ -51,6 +59,11 @@ export type SectionRule = {
 };
 
 export type EmaMapping = z.infer<typeof MappingSchema>;
+
+// Every heading a rule permits: its title first, then the QRD template's shorter forms.
+export function permittedTitles(rule: SectionRule): string[] {
+  return [rule.title, ...(rule.alternativeTitles ?? [])];
+}
 
 // Every sourceKey and every targetCode may appear once in the whole rule tree. A repeated
 // sourceKey would publish one source section under two headings; a repeated targetCode would

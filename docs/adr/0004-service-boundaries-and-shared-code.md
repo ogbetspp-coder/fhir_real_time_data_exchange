@@ -71,3 +71,30 @@ Services are discrete in **identity and state**, never in code.
   audit records name the service and its image digest, as the worker's manifest already does.
 - What is _not_ done: no service mesh, no shared helper packages published to a registry, no
   per-service repositories, no splitting of the deterministic run.
+
+## Amendment (2026-09-24, ADR 0005: the authority importer)
+
+`src/authority/` joins decision 2's shared code (`docs/design/authority-import-contract.md`,
+D10), because it decides what text enters the record: the producer
+(`scripts/authority/import.ts`) and Zone B's gate run the same importer, and the gate accepts an
+import only as it recomputes it. The importer (`importPublication`) is pure: no clock, locale,
+`Intl` or network. Beside it are the gate's fetcher (`fetch.ts`, the network and the clock,
+injected into the gate) and the vector generator (`vectors.ts`, which reads the pinned labels);
+neither is on the importer's path.
+
+Its change control is its own, beside the procedure in `docs/validation/README.md`:
+
+- **Golden vectors.** `test/fixtures/authority/vectors.json` records what the importer makes of
+  the synthetic publication and where it refuses each pinned EMA label; `npm run contracts:check`
+  regenerates it (`npm run authority:vectors`) and fails on drift.
+- **The lock.** `src/authority/importer.lock.json` maps each `IMPORTER_VERSION` to the SHA-256 of
+  every file under `src/authority/` (code and data) and of the vectors.
+  `test/authority/lock.test.ts` fails when either changes while the recorded entry does not, and
+  when any entry ever released differs from its released form: CI reads every lock in the
+  first-parent history of the change's base (`scripts/ci/lock-base.sh`: main for a pull request,
+  the commit before the push for a push to main, from full history), so neither a second push
+  nor a manual run can pass a changed released entry, and a change of behaviour or data after
+  release must change the version. A rewritten history of main is a stated residual. `npm run authority:lock` writes the entry for a version not yet released.
+- The version is the importer's reviewed label. Its complete identity is the worker image digest
+  the run manifest records, which includes `src/fidelity/`, the hash library, the mapping and
+  the dependencies; the lock covers those only where the vectors exercise them.

@@ -15,6 +15,7 @@ import {
   type SyntheticSubmission,
 } from "../../src/fixtures/synthetic-submission.js";
 import { sha256 } from "../../src/lib/hash.js";
+import { SYNTHETIC, attested } from "../support/submission.js";
 
 let mapping: EmaMapping;
 let fixture: SyntheticSubmission;
@@ -50,6 +51,7 @@ function reject(
     verifyDocumentSubmission(
       { submission, fidelityReport: fixture.fidelityReport, sourceText },
       mapping.sourceCodeSystem,
+      SYNTHETIC,
     );
   } catch (error) {
     caught = error;
@@ -70,7 +72,7 @@ describe("canonical submission contract", () => {
     const parsed = CanonicalSubmissionSchema.safeParse(fixture.submission);
 
     expect(parsed.success).toBe(true);
-    expect(fixture.submission.schemaVersion).toBe("1.0.0");
+    expect(fixture.submission.schemaVersion).toBe("2.0.0");
     expect(fixture.submission.provenance.fidelity.status).toBe("passed");
     expect(() =>
       verifyDocumentSubmission(
@@ -80,6 +82,7 @@ describe("canonical submission contract", () => {
           sourceText: fixture.sourceText,
         },
         mapping.sourceCodeSystem,
+        SYNTHETIC,
       ),
     ).not.toThrow();
   });
@@ -211,7 +214,7 @@ describe("canonical submission contract", () => {
 
   it("rejects an approverId that looks like an e-mail address", () => {
     const submission = clone();
-    submission.approval.approverId = "reviewer@example.com";
+    attested(submission).approverId = "reviewer@example.com";
 
     rejectedByParse(
       submission,
@@ -290,14 +293,14 @@ describe("canonical submission contract", () => {
 
   it("rejects prose in approverId and recordRef", () => {
     const withApprover = clone();
-    withApprover.approval.approverId = "患者は本剤を一日二回服用すること";
+    attested(withApprover).approverId = "患者は本剤を一日二回服用すること";
     rejectedByParse(
       withApprover,
       "approval.approverId: approverId must be an opaque principal identifier, not an e-mail address",
     );
 
     const withRecord = clone();
-    withRecord.approval.recordRef = "take_one_tablet_twice_daily_with_food_<script>";
+    attested(withRecord).recordRef = "take_one_tablet_twice_daily_with_food_<script>";
     const parsed = CanonicalSubmissionSchema.safeParse(withRecord);
     expect(parsed.success).toBe(false);
     expect(reject(withRecord).issues.some((issue) => issue.startsWith("approval.recordRef"))).toBe(

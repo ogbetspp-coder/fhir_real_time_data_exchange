@@ -449,6 +449,8 @@ own (no divergence), drew 800 random span tables in Chrome, and applied its own 
 4. **Medium.** `get_section`'s contract caps a `div` at 200 000 code points, so a section with a
    large picture is `unavailable`. Recorded in the change record; the query contract changes in
    roadmap item 3a's publishing step, and the Imatinib Teva import carries no picture.
+   (Amended 2026-09-24: whether Imatinib Teva's two pictures are drawn is unsettled until PR 3
+   measures them in the EMA's viewer; `docs/design/authority-import-contract.md`, D6.)
 5. **Medium.** A picture alone satisfied a mandatory section. Fixed: the crosswalk ignores
    pictures when a mandatory section must carry text, and counts them when an uncoded section
    would otherwise be dropped.
@@ -638,6 +640,12 @@ held for every scanner output it tried, 1 685 TS/Python replays identical), conf
 deferring the gate's enforcement to PR 2 is safe (the only producer is the synthetic builder, and
 `AGENTS.md`'s synthetic-only rule bars real drawn content), and found:
 
+_Closed 2026-09-24 by roadmap 3a PR 2 (`docs/design/authority-import-contract.md`, D7): the gate
+refuses every `drawn` submission ("No drawn-document extractor is qualified") unless it is
+synthetic and the deployment sets `ALLOW_SYNTHETIC_SOURCES`, so no real drawn document's
+extracted text supports an approval (`src/contracts/canonical-submission.ts`, `syntheticIssues`;
+`test/contracts/authority-contract.test.ts`, "synthetic sources")._
+
 1. **High.** The structured-source rule read two ways ("the scanner's own reading" and "as a
    renderer draws it under the rules of this section"); under the second, a soft hyphen before a
    `br` or at a block end, and a typed bullet after a `br`, let a narrative verify that the source
@@ -707,7 +715,11 @@ The twelfth review found no TS/Python divergence (every probe gave identical rep
    superscript. Fixed: the total baseline shift per glyph, and the cross-check compares it.
 5. **Medium.** "Draws nothing" was undefined and an uncovered page could hold text. Fixed:
    §5's `empty-narrative` test on the page, and every page without a span must be blank
-   (importer and PR 2's gate).
+   (importer and PR 2's gate). _Closed 2026-09-24 by roadmap 3a PR 2
+   (`docs/design/authority-import-contract.md`, D4): the importer refuses
+   (`uncovered-page-not-blank`) and the gate refuses an authority import whose re-executed report
+   has `coverage.uncoveredGaps` other than 0 (`src/authority/import.ts`,
+   `src/contracts/canonical-submission.ts`); a section without `text` has the empty page (§7)._
 6. **Medium.** Picture sizes were unbounded. Fixed: a stated lower bound, and the cross-check
    compares each picture's drawn box.
 7. **Medium.** A picture that "cannot be fetched" depended on who fetched. Fixed: resolve against

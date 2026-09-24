@@ -184,7 +184,11 @@ if (args.source === "fixture") {
     submission,
     fidelityReport,
     sourceText,
-    sourceResource: `document:${submission.provenance.sourceDocument.sha256}`,
+    sourceResource: `document:${
+      submission.provenance.sourceDocument.kind === "drawn"
+        ? submission.provenance.sourceDocument.sha256
+        : submission.provenance.sourceDocument.document.sha256
+    }`,
   };
 }
 

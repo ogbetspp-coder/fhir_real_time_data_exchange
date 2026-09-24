@@ -60,6 +60,8 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
+          # Full history for the importer lock's test (scripts/ci/lock-base.sh).
+          fetch-depth: 0
           persist-credentials: false
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
@@ -70,6 +72,14 @@ jobs:
       # and this job has neither the project variables nor a gcloud configuration.
       - name: Install Node dependencies
         run: npm ci --no-audit --no-fund
+
+      # The importer lock's base (scripts/ci/lock-base.sh): the commit before this push, or main
+      # for a manual run, whose history test/authority/lock.test.ts reads as released.
+      - name: Name the importer lock's base
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+        run: bash scripts/ci/lock-base.sh
+
       - name: Quality gate
         run: npm run check
 
@@ -115,6 +125,10 @@ jobs:
       EMA_FLOW_ENVIRONMENT: dev
       # dev only: the query service logs the category of an authentication refusal
       QUERY_LOG_REJECTION_REASON: "true"
+      # dev only: the worker accepts synthetic content (the demo) beside the EMA's public labels,
+      # and keeps the fixture and healthcare-api sources
+      # (docs/design/authority-import-contract.md, D7)
+      ALLOW_SYNTHETIC_SOURCES: "true"
       CLOUDSDK_CORE_DISABLE_PROMPTS: "1"
       TF_IN_AUTOMATION: "true"
       TF_INPUT: "0"

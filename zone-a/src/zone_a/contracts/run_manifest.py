@@ -91,6 +91,11 @@ class ManifestRuntime(BaseModel):
     workflowRevision: Annotated[str, Field(max_length=1024, min_length=1)]
 
 
+class SourceKind(StrEnum):
+    drawn = "drawn"
+    authority_publication = "authority-publication"
+
+
 class Status(StrEnum):
     passed = "passed"
 
@@ -101,6 +106,11 @@ class Coverage(BaseModel):
     bodyCodePoints: Annotated[int, Field(ge=0, le=9007199254740991)]
     coveredCodePoints: Annotated[int, Field(ge=0, le=9007199254740991)]
     uncoveredGaps: Annotated[int, Field(ge=0, le=9007199254740991)]
+
+
+class GraphType(StrEnum):
+    type1 = "type1"
+    type2 = "type2"
 
 
 class Token(RootModel[str]):
@@ -132,7 +142,7 @@ class ApproverRole(StrEnum):
     qa_reviewer = "qa-reviewer"
 
 
-class ApprovalMethod(StrEnum):
+class AttestationMethod(StrEnum):
     api_attestation = "api-attestation"
     manual_record = "manual-record"
 
@@ -143,6 +153,40 @@ class ApprovalMeaning(StrEnum):
 
 class RecordRef(RootModel[str]):
     root: Annotated[str, Field(pattern="^[A-Za-z0-9][A-Za-z0-9._:/#?=&%+-]{0,511}$")]
+
+
+class Authority(StrEnum):
+    EMA = "EMA"
+    synthetic = "synthetic"
+
+
+class AuthorityStatus(StrEnum):
+    pilot = "pilot"
+
+
+class AuthorityId(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            description="A lower-case GUID.",
+            pattern="^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$",
+        ),
+    ]
+
+
+class FetchedItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    url: HttpUrl
+    sha256: Sha256Hex
+    byteLength: Annotated[int, Field(ge=0, le=9007199254740991)]
+    fetchedAt: IsoDateTime
+    evidenceUri: Annotated[str | None, Field(max_length=1024, min_length=1)] = None
+
+
+class AuthorityFetch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    importerVersion: Token
+    fetched: Annotated[list[FetchedItem], Field(min_length=2)]
 
 
 class Source(BaseModel):
@@ -173,21 +217,50 @@ class Fidelity(BaseModel):
     coverage: Coverage
 
 
-class Approval(BaseModel):
+class AttestedApproval(BaseModel):
     model_config = ConfigDict(extra="forbid")
     approverId: PrincipalId
     approverRole: ApproverRole
     approvedAt: IsoDateTime
-    method: ApprovalMethod
+    method: AttestationMethod
     meaning: ApprovalMeaning
     approvedContentSha256: Sha256Hex
     recordRef: RecordRef | None = None
 
 
+class Publication(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    epiId: Token
+    documentId: AuthorityId
+    indexId: AuthorityId
+    versionNumber: Token
+    procedureNumber: Token
+    authorityTimestamp: IsoDateTime
+
+
+class AuthorityApproval(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    method: Literal["authority-publication"]
+    meaning: Literal["authority-publication-imported"]
+    authority: Authority
+    authorityStatus: AuthorityStatus
+    publication: Publication
+    requestedBy: PrincipalId
+    requestedAt: IsoDateTime
+    approvedContentSha256: Sha256Hex
+
+
+class Approval(RootModel[AttestedApproval | AuthorityApproval]):
+    root: AttestedApproval | AuthorityApproval
+
+
 class IngestionEvidence(BaseModel):
     model_config = ConfigDict(extra="forbid")
     submissionId: Uuid
-    contractVersion: Literal["1.0.0"]
+    contractVersion: Literal["2.0.0"]
+    sourceKind: SourceKind
+    graphType: GraphType
+    allowSyntheticSources: bool
     sourceDocumentSha256: Sha256Hex
     extractionRunId: Uuid
     parser: Token
@@ -195,12 +268,13 @@ class IngestionEvidence(BaseModel):
     promptTemplateVersion: Token | None = None
     fidelity: Fidelity
     approval: Approval
+    authority: AuthorityFetch | None = None
     provenanceResourceId: Uuid
 
 
 class RunManifest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    schemaVersion: Literal["1.1.0"]
+    schemaVersion: Literal["2.0.0"]
     source: Source
     runId: Uuid
     startedAt: IsoDateTime

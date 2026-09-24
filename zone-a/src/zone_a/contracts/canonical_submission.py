@@ -32,6 +32,11 @@ class IsoDateTime(RootModel[str]):
     ]
 
 
+class GraphType(StrEnum):
+    type1 = "type1"
+    type2 = "type2"
+
+
 class Resource(BaseModel):
     model_config = ConfigDict(extra="allow")
     __pydantic_extra__: dict[str, Any]
@@ -90,6 +95,50 @@ class ExtractedTextRef(BaseModel):
     extractorVersion: Token
 
 
+class Authority(StrEnum):
+    EMA = "EMA"
+    synthetic = "synthetic"
+
+
+class AuthorityId(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            description="A lower-case GUID.",
+            pattern="^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$",
+        ),
+    ]
+
+
+class PinnedFile(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: AuthorityId
+    sha256: Sha256Hex
+    byteLength: Annotated[int, Field(gt=0, le=9007199254740991)]
+
+
+class PictureReference(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(pattern="^~\\/_entity\\/annotation\\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$"),
+    ]
+
+
+class HttpUrl(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            description="http(s) URL without whitespace; may carry |version.",
+            max_length=256,
+            pattern="^https?:\\/\\/[A-Za-z0-9.-]{1,253}(?::\\d{1,5})?(?:[/?#][A-Za-z0-9._~:/?#@!$&'()*+,;=%|-]*)?$",
+        ),
+    ]
+
+
+class SectionPath(RootModel[str]):
+    root: Annotated[str, Field(pattern="^Composition(?:\\.section\\[\\d{1,4}\\]){1,16}$")]
+
+
 class ToolVersion(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: Token
@@ -144,6 +193,16 @@ class TargetPath(RootModel[str]):
     ]
 
 
+class SourcePath(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            max_length=256,
+            pattern="^(?:List|Bundle|Composition)(?:\\.[A-Za-z][A-Za-z0-9]*(?:\\[(?:\\d{1,4}|[A-Za-z][A-Za-z0-9]*)\\])?)*$",
+        ),
+    ]
+
+
 class DecisionAction(StrEnum):
     extracted_verbatim = "extracted-verbatim"
     code_mapped = "code-mapped"
@@ -152,15 +211,12 @@ class DecisionAction(StrEnum):
     rejected = "rejected"
 
 
-class HttpUrl(RootModel[str]):
-    root: Annotated[
-        str,
-        Field(
-            description="http(s) URL without whitespace; may carry |version.",
-            max_length=256,
-            pattern="^https?:\\/\\/[A-Za-z0-9.-]{1,253}(?::\\d{1,5})?(?:[/?#][A-Za-z0-9._~:/?#@!$&'()*+,;=%|-]*)?$",
-        ),
-    ]
+class TerminologyRef(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    system: HttpUrl
+    code: Token
+    version: Token | None = None
+    lookupId: Token
 
 
 class DecisionReason(StrEnum):
@@ -197,7 +253,7 @@ class ApproverRole(StrEnum):
     qa_reviewer = "qa-reviewer"
 
 
-class ApprovalMethod(StrEnum):
+class AttestationMethod(StrEnum):
     api_attestation = "api-attestation"
     manual_record = "manual-record"
 
@@ -210,10 +266,24 @@ class RecordRef(RootModel[str]):
     root: Annotated[str, Field(pattern="^[A-Za-z0-9][A-Za-z0-9._:/#?=&%+-]{0,511}$")]
 
 
+class Publication(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    epiId: Token
+    documentId: AuthorityId
+    indexId: AuthorityId
+    versionNumber: Token
+    procedureNumber: Token
+    authorityTimestamp: IsoDateTime
+
+
+class AuthorityStatus(StrEnum):
+    pilot = "pilot"
+
+
 class Identifier(BaseModel):
     model_config = ConfigDict(extra="forbid")
     system: CanonicalUri | None = None
-    value: Annotated[str | None, Field(pattern="^[A-Za-z0-9._:-]{1,128}$")] = None
+    value: Annotated[str, Field(pattern="^[A-Za-z0-9._:-]{1,128}$")]
 
 
 class EntryItem(BaseModel):
@@ -223,7 +293,7 @@ class EntryItem(BaseModel):
     resource: Resource
 
 
-class Type2Bundle(BaseModel):
+class CanonicalBundle(BaseModel):
     model_config = ConfigDict(extra="allow")
     __pydantic_extra__: dict[str, Any]
     resourceType: Literal["Bundle"]
@@ -239,6 +309,52 @@ class SourceSystemRef(BaseModel):
     name: Token
     documentId: Token
     versionId: Token | None = None
+
+
+class Index(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: AuthorityId
+    sha256: Sha256Hex
+    byteLength: Annotated[int, Field(gt=0, le=9007199254740991)]
+    epiId: Token
+    versionNumber: Token
+    metaVersionId: Token
+    status: Literal["current"]
+
+
+class SectionPage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    page: Annotated[int, Field(gt=0, le=9007199254740991)]
+    path: SectionPath
+    code: Token
+
+
+class ImportRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    authority: Authority
+    documentId: AuthorityId
+    indexId: AuthorityId
+    language: Literal["en"]
+
+
+class Picture1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["fetched"]
+    reference: PictureReference
+    url: HttpUrl
+    sha256: Sha256Hex
+    byteLength: Annotated[int, Field(gt=0, le=9007199254740991)]
+
+
+class Picture2(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["not-drawn"]
+    reference: PictureReference
+    evidence: Token
+
+
+class Picture(RootModel[Picture1 | Picture2]):
+    root: Picture1 | Picture2
 
 
 class ExtractionTooling(BaseModel):
@@ -259,12 +375,16 @@ class SectionProvenance(BaseModel):
     normalizedTextSha256: Sha256Hex
 
 
-class TerminologyRef(BaseModel):
+class StructuringDecision(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    system: HttpUrl
-    code: Token
-    version: Token | None = None
-    lookupId: Token
+    target: TargetPath
+    sourceKey: SourceKey | None = None
+    sourceField: SourcePath | None = None
+    action: DecisionAction
+    ruleId: Token | None = None
+    terminologyRef: TerminologyRef | None = None
+    editorId: Token | None = None
+    reason: DecisionReason | None = None
 
 
 class FidelitySummary(BaseModel):
@@ -278,19 +398,32 @@ class FidelitySummary(BaseModel):
     reportUri: StorageUri | None = None
 
 
-class Approval(BaseModel):
+class AttestedApproval(BaseModel):
     model_config = ConfigDict(extra="forbid")
     approverId: PrincipalId
     approverRole: ApproverRole
     approvedAt: IsoDateTime
-    method: ApprovalMethod
+    method: AttestationMethod
     meaning: ApprovalMeaning
     approvedContentSha256: Sha256Hex
     recordRef: RecordRef | None = None
 
 
-class SourceDocument(BaseModel):
+class AuthorityApproval(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    method: Literal["authority-publication"]
+    meaning: Literal["authority-publication-imported"]
+    authority: Authority
+    authorityStatus: AuthorityStatus
+    publication: Publication
+    requestedBy: PrincipalId
+    requestedAt: IsoDateTime
+    approvedContentSha256: Sha256Hex
+
+
+class DrawnSourceDocument(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["drawn"]
     sha256: Sha256Hex
     byteLength: Annotated[int, Field(gt=0, le=9007199254740991)]
     mediaType: MediaType
@@ -301,15 +434,25 @@ class SourceDocument(BaseModel):
     extractedText: ExtractedTextRef
 
 
-class StructuringDecision(BaseModel):
+class AuthoritySourceDocument(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    target: TargetPath
-    sourceKey: SourceKey | None = None
-    action: DecisionAction
-    ruleId: Token | None = None
-    terminologyRef: TerminologyRef | None = None
-    editorId: Token | None = None
-    reason: DecisionReason | None = None
+    kind: Literal["authority-publication"]
+    mediaType: Literal["application/fhir+json"]
+    authority: Authority
+    request: ImportRequest
+    document: PinnedFile
+    index: Index
+    pictures: Annotated[list[Picture], Field(max_length=500)]
+    sectionPages: Annotated[list[SectionPage], Field(max_length=2000, min_length=1)]
+    extractedText: ExtractedTextRef
+
+
+class Approval(RootModel[AttestedApproval | AuthorityApproval]):
+    root: AttestedApproval | AuthorityApproval
+
+
+class SourceDocument(RootModel[DrawnSourceDocument | AuthoritySourceDocument]):
+    root: DrawnSourceDocument | AuthoritySourceDocument
 
 
 class IngestionProvenance(BaseModel):
@@ -323,10 +466,11 @@ class IngestionProvenance(BaseModel):
 
 class CanonicalSubmission(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    schemaVersion: Literal["1.0.0"]
+    schemaVersion: Literal["2.0.0"]
     submissionId: Uuid
     createdAt: IsoDateTime
-    bundle: Type2Bundle
+    graphType: GraphType
+    bundle: CanonicalBundle
     bundleSha256: Sha256Hex
     provenance: IngestionProvenance
     approval: Approval

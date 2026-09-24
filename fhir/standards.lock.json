@@ -9,6 +9,12 @@
       "status": "trial-use-published"
     },
     {
+      "name": "HL7 Global ePI Type 1 DrugX example",
+      "url": "https://hl7.org/fhir/uv/emedicinal-product-info/STU1/Bundle-bundlepackageleaflet75type1.json",
+      "sha256": "9d7e7b8919fb41092ecf7093ee92b56f80c1a2fa1ab61a07e508e183ac76cfa2",
+      "status": "non-normative-example"
+    },
+    {
       "name": "HL7 Global ePI Type 2 DrugX example",
       "url": "https://hl7.org/fhir/uv/emedicinal-product-info/STU1/Bundle-bundlepackageleaflet75type2.json",
       "sha256": "c07e53f4edb77b931ab474bfe650faa2443717cce5808ceaf77b30d1b0a2b457",
@@ -39,6 +45,24 @@
       "name": "EMA EPI-23-1022 English commented sample",
       "url": "https://epi.ema.europa.eu/fhirig/1.0.0/EPI-23-1022-sample-english.zip",
       "sha256": "69631b7887b136490cdee07b74075d849e4024064f3354e7b1c8bfcbee29e51d",
+      "status": "non-normative-example"
+    },
+    {
+      "name": "EMA EUePI profiles 1.0.0 (full profile set)",
+      "url": "https://epi.ema.europa.eu/fhirig/1.0.0/eu-epi-profiles-1.0.0.zip",
+      "sha256": "eb8026ead4f2df885d87f4884f39bdde38f2b9d47e0b895f071d182a8b6d2340",
+      "status": "reference"
+    },
+    {
+      "name": "EMA EPI-24-129 Spanish sample",
+      "url": "https://epi.ema.europa.eu/fhirig/1.0.0/epi-24-129-sample-spanish.zip",
+      "sha256": "a7b2f5e8acc3358b9c2a8d574b44ea1507813dc02a0d4c322c37bf0101c1190a",
+      "status": "non-normative-example"
+    },
+    {
+      "name": "EMA Kayfanda package leaflet sample, all languages",
+      "url": "https://epi.ema.europa.eu/fhirig/1.0.0/medicine-PL-sample-all-languages.zip",
+      "sha256": "2d19e11e3d3e3f3ef4d71f87598e97004d03a785f099753b24f6002c7fc328b1",
       "status": "non-normative-example"
     },
     {
