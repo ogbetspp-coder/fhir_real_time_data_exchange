@@ -153,6 +153,23 @@ describe("the EMA List's product identity", () => {
     expect(() => transformType2ToEma(twice, mapping)).toThrow(/ambiguous/);
   });
 
+  it("refuses a graph with two products, and accepts a single Reference as a link", () => {
+    const two = type1();
+    const product = two.entry.find(
+      ({ resource: candidate }) => candidate.resourceType === "MedicinalProductDefinition",
+    );
+    if (product === undefined) throw new Error("fixture has a product");
+    two.entry.push({ ...structuredClone(product), fullUrl: `${product.fullUrl}-2` });
+    expect(transformType2ToEma(two, mapping).list.title).not.toBe(
+      "Synthetic Paracetamol 500 mg tablets",
+    );
+
+    const single = type1();
+    const composition = resource(single, "Composition");
+    composition.subject = (composition.subject as unknown[])[0];
+    expect(refused(single)).toBe(false);
+  });
+
   it("refuses a holder with two identifiers in the SPOR system", () => {
     const bundle = type1();
     resource(bundle, "Organization").identifier = [

@@ -408,4 +408,105 @@ describe("each stated rule, on its own", () => {
       expect(targets.has(target), target).toBe(true);
     }
   });
+
+  it("refuses two authors, a List entry that is not a document's GUID, and each synthetic mark on a real publication", () => {
+    expect(
+      refusal(
+        mutated(mapping, (document) => {
+          const composition = only(document.entry).resource as Json;
+          composition.author = [
+            { identifier: { system: "http://www.test.com", value: "a" } },
+            { identifier: { system: "http://www.test.com", value: "b" } },
+          ];
+        }),
+      ),
+    ).toBe("shape: document-shape");
+    expect(
+      refusal(
+        mutated(mapping, (_, list) => {
+          (only(list.entry).item as Json).reference = `Bundle/${"-".repeat(36)}`;
+        }),
+      ),
+    ).toBe("shape: list-shape");
+    const real = { authority: "EMA" as const };
+    const realIds = (document: Json, list: Json) => {
+      document.id = "1286255d-f544-ef11-a317-000d3aaa05e0";
+      (document.identifier as Json).value = "1286255d-f544-ef11-a317-000d3aaa05e0";
+      list.id = "f2b36255-f544-ef11-b4ad-6045bd9c274b";
+      (only(list.entry).item as Json).reference = "Bundle/1286255d-f544-ef11-a317-000d3aaa05e0";
+    };
+    const request = {
+      ...syntheticPublication(mapping).request,
+      ...real,
+      documentId: "1286255d-f544-ef11-a317-000d3aaa05e0",
+      indexId: "f2b36255-f544-ef11-b4ad-6045bd9c274b",
+    };
+    // Real ids, synthetic values.
+    expect(refusal(mutated(mapping, realIds), request)).toBe(
+      "shape: real-publication-with-a-synthetic-value",
+    );
+    // Real values, one synthetic id.
+    const realValues = (document: Json, list: Json) => {
+      realIds(document, list);
+      (document.identifier as Json).value = "00000000-5979-4e74-8000-000000000003";
+      list.identifier = [{ system: "http://ema.europa.eu/fhir/epiId", value: "EPI/24/35" }];
+      for (const extension of (list.subject as Json).extension as Json[]) {
+        const valueCoding = extension.valueCoding as Json | undefined;
+        if (valueCoding !== undefined) valueCoding.code = "ORG-100001110";
+        const valueIdentifier = extension.valueIdentifier as Json | undefined;
+        if (valueIdentifier !== undefined) valueIdentifier.value = "EMEA/H/C/002585/IA/0056";
+      }
+    };
+    expect(refusal(mutated(mapping, realValues), request)).toBe(
+      "shape: real-publication-with-a-synthetic-value",
+    );
+  });
+
+  it("reads the language only from the closed display suffix", () => {
+    for (const display of [
+      "Summary of Product Characteristics (English) (Danish)",
+      "Summary of Product Characteristics(English)",
+    ]) {
+      expect(
+        refusal(
+          mutated(mapping, (document, list) => {
+            only(coding(document)).display = display;
+            (only(list.entry).item as Json).display = display;
+          }),
+        ),
+        display,
+      ).toBe("binding: language-differs-from-the-request");
+    }
+  });
+
+  it("carries a heading section that draws nothing without text, and its page blank", () => {
+    const publication = mutated(mapping, (document) => {
+      const [root] = sections(document) as [Json];
+      const [clinical] = (root.section as Json[]).filter((section) => section.id === "smpc.4") as [
+        Json,
+      ];
+      clinical.text = {
+        status: "generated",
+        div: '<div xmlns="http://www.w3.org/1999/xhtml"><p>&#160;</p></div>',
+      };
+    });
+    const { submission, sourceText } = importPublication(
+      publication.request,
+      publication,
+      mapping,
+      RUN,
+    );
+    const composition = submission.bundle.entry[0]?.resource as unknown as {
+      section: { section: { code: { coding: { code: string }[] }; text?: unknown }[] }[];
+    };
+    const clinical = composition.section[0]?.section.find(
+      (section) => section.code.coding[0]?.code === "smpc.4",
+    );
+    expect(clinical?.text).toBeUndefined();
+    const source = submission.provenance.sourceDocument;
+    if (source.kind !== "authority-publication") throw new Error("an import");
+    const page = source.sectionPages.find(({ code }) => code === "200000029798");
+    expect(page).toBeDefined();
+    expect(sourceText.pages[(page?.page ?? 0) - 1]?.text.trim().replace(/\u00a0/gu, "")).toBe("");
+  });
 });

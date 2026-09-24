@@ -195,4 +195,28 @@ describe("run namespaces", () => {
       ),
     ).rejects.toThrow("Source identifier is in the reserved authority-import namespace");
   });
+
+  it("refuses a meta element but the store's own and the profiles", () => {
+    const tagged = createSyntheticType2Bundle(mapping);
+    tagged.meta = {
+      ...tagged.meta,
+      extension: [{ url: "https://example.org/ext", valueReference: { reference: "Binary/x" } }],
+    } as never;
+    expect(issuesOf(() => transformType2ToEma(tagged, mapping))).toEqual([
+      "Source Bundle.meta carries extension, which the crosswalk does not carry",
+    ]);
+
+    const composed = createSyntheticType2Bundle(mapping);
+    const composition = composed.entry[0]?.resource;
+    if (composition === undefined) throw new Error("fixture has a Composition");
+    composition.meta = { ...composition.meta, source: "https://example.org/elsewhere" } as never;
+    expect(issuesOf(() => transformType2ToEma(composed, mapping))).toEqual([
+      "Source Composition.meta carries source, which the crosswalk does not carry",
+    ]);
+
+    const stored = createSyntheticType2Bundle(mapping);
+    stored.meta = { ...stored.meta, versionId: "3", lastUpdated: "2026-09-24T12:00:00Z" };
+    const ema = transformType2ToEma(stored, mapping);
+    expect(ema.documentBundle.meta).toEqual({ profile: [mapping.profiles.bundle] });
+  });
 });

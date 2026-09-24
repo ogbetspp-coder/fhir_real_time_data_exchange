@@ -26,7 +26,9 @@ reviews._
   imports run only as a dry run until roadmap 3a PR 5.
 - **The crosswalk and preflights** (stages A and C). Every persisted id derives from the source
   identifier value (copied entries re-identified, references rewritten, an unknown reference
-  refused, no fallback to `Bundle.id`); `validateCanonicalPreflight(bundle, graphType)` adds the
+  refused, no fallback to `Bundle.id`; a Bundle, entry or `meta` element the crosswalk does not
+  carry, such as a signature, an entry's request or a `meta` extension, refused, and the output's
+  `meta` the profile alone); `validateCanonicalPreflight(bundle, graphType)` adds the
   Type 1 set; the EMA List carries the holder, agency and procedure number the graph states and
   is titled by the product's name; a source heading the QRD template permits is kept.
 - **The mapping** `cap-smpc-en` moved from `1.2.0` to `1.3.0`: `alternativeTitles` on 6.5 and 6.6

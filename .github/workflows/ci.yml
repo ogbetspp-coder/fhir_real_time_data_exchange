@@ -34,11 +34,14 @@ jobs:
       - name: Install Node dependencies
         run: npm ci --no-audit --no-fund
 
-      # main's importer lock, which test/authority/lock.test.ts requires this change to keep:
-      # an importer version on main never changes its code, data or vectors
+      # The importer lock this change must keep (test/authority/lock.test.ts): main's for a pull
+      # request, the pre-push commit's for a push; an importer version never changes its code, data
+      # or vectors once released
       # (docs/design/authority-import-contract.md, D10).
-      - name: Fetch main's importer lock
-        run: git fetch --no-tags --depth=1 origin main:refs/remotes/origin/main
+      - name: Fetch the importer lock's base
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+        run: bash scripts/ci/fetch-lock-base.sh
 
       # The test step of `npm run check` is `npm run test:coverage`: the suite under v8 coverage
       # with per-directory floors (vitest.config.ts), so a drop below a floor fails this job.

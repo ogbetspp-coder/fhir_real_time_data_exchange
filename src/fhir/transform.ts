@@ -82,6 +82,8 @@ const ENGLISH_LANGUAGE = /^en(?:-latn)?(?:-(?:[a-z]{2}|\d{3}))?$/i;
 // orderedBy, mode — would be dropped, so a section carrying one is refused instead.
 const CARRIED_SECTION_ELEMENTS = new Set(["id", "title", "code", "text", "section"]);
 
+const CARRIED_META_ELEMENTS = new Set(["versionId", "lastUpdated", "profile"]);
+
 // The elements of a source Bundle the crosswalk carries or replaces; any other is refused
 // (docs/design/authority-import-contract.md, D7: every reference a run persists derives from its
 // identifier value).
@@ -644,7 +646,7 @@ export function transformType2ToEma(
   const targetComposition: FhirComposition = {
     ...rewritten,
     id: compositionId,
-    meta: { ...sourceComposition.meta, profile: mapping.profiles.composition },
+    meta: { profile: mapping.profiles.composition },
     // Always English: a source declaring any other language, or none, has already failed above.
     language: "en",
     extension: [
@@ -677,7 +679,21 @@ export function transformType2ToEma(
   // The output Bundle carries only these elements; any other the source has (a signature, a link,
   // an entry's request or search) is refused, not dropped and not copied: it could carry a
   // reference or a URL outside the run's namespace.
+  // A source's meta may carry what the store manages (versionId, lastUpdated) and the profiles
+  // the crosswalk replaces; anything else (an extension, a tag, a source URI) is refused, since
+  // it could carry a reference outside the run's namespace. The output's meta is the profile.
+  const metaIssues = (
+    [
+      ["Bundle", sourceBundle.meta],
+      ["Composition", sourceComposition.meta],
+    ] as const
+  ).flatMap(([where, meta]) =>
+    Object.keys((meta as Record<string, unknown> | undefined) ?? {})
+      .filter((key) => !CARRIED_META_ELEMENTS.has(key))
+      .map((key) => `Source ${where}.meta carries ${key}, which the crosswalk does not carry`),
+  );
   const bundleIssues = [
+    ...metaIssues,
     ...Object.keys(sourceBundle)
       .filter((key) => !CARRIED_BUNDLE_ELEMENTS.has(key))
       .map((key) => `Source Bundle carries ${key}, which the crosswalk does not carry`),
@@ -696,7 +712,7 @@ export function transformType2ToEma(
   const targetBundle: FhirBundle = {
     resourceType: "Bundle",
     id: bundleId,
-    meta: { ...sourceBundle.meta, profile: [mapping.profiles.bundle] },
+    meta: { profile: [mapping.profiles.bundle] },
     // The source declared an English tag in some spelling ("EN", "en-GB"); the output says "en",
     // as the Composition does.
     language: "en",

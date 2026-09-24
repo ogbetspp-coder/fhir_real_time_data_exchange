@@ -71,6 +71,15 @@ describe("the EMA fetcher", () => {
       { status: 200 },
     );
     expect(await reason(answering(broken)("EMA", DOCUMENT))).toBe("unreachable");
+    const slow = new Response(
+      new ReadableStream({
+        pull: (controller) => {
+          controller.error(new DOMException("timed out", "TimeoutError"));
+        },
+      }),
+      { status: 200 },
+    );
+    expect(await reason(answering(slow)("EMA", DOCUMENT))).toBe("timeout");
     expect(await reason(answering(new Response("x"))("synthetic", DOCUMENT))).toBe("not-the-ema");
     expect(
       await reason(answering(new Response("x"))("EMA", { kind: "document", id: "../x" })),

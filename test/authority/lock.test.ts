@@ -19,32 +19,34 @@ describe("the importer lock", () => {
     ).toEqual(lockHashes());
   });
 
-  it("keeps every entry main already has", () => {
-    let released: string;
-    try {
-      released = execFileSync("git", ["show", `origin/main:${LOCK}`], {
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "ignore"],
-      });
-    } catch {
-      // Without main's lock nothing is released yet, or the ref is missing: CI fetches it
-      // (.github/workflows/ci.yml), so there a missing ref fails rather than passes.
-      const mainExists = (() => {
-        try {
-          execFileSync("git", ["rev-parse", "--verify", "origin/main"], { stdio: "ignore" });
-          return true;
-        } catch {
-          return false;
-        }
-      })();
-      expect(mainExists || process.env.CI !== "true", "CI must fetch origin/main").toBe(true);
-      return;
+  it("keeps every entry already released", () => {
+    // What was released: LOCK_BASE in CI (scripts/ci/fetch-lock-base.sh: the pre-push commit for
+    // a push, so a push to main is compared with main before it; main otherwise, which for a
+    // manual run on main is this commit, already checked when it was pushed), origin/main
+    // locally.
+    const base = process.env.LOCK_BASE ?? "origin/main";
+    const git = (args: string[]): string | undefined => {
+      try {
+        return execFileSync("git", args, {
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "ignore"],
+        }).trim();
+      } catch {
+        return undefined;
+      }
+    };
+    const baseCommit = git(["rev-parse", "--verify", `${base}^{commit}`]);
+    if (process.env.CI === "true") {
+      expect(baseCommit, "CI must fetch the lock's base").toBeDefined();
     }
+    if (baseCommit === undefined) return;
+    const released = git(["show", `${baseCommit}:${LOCK}`]);
+    if (released === undefined) return; // nothing released before this lock existed
     const lock = JSON.parse(readFileSync(LOCK, "utf8")) as Record<string, LockEntry>;
     for (const [version, entry] of Object.entries(
       JSON.parse(released) as Record<string, LockEntry>,
     )) {
-      expect(lock[version], `importer ${version} is on main; change IMPORTER_VERSION`).toEqual(
+      expect(lock[version], `importer ${version} was released; change IMPORTER_VERSION`).toEqual(
         entry,
       );
     }

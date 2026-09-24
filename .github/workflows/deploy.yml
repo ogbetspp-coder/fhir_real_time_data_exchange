@@ -70,6 +70,14 @@ jobs:
       # and this job has neither the project variables nor a gcloud configuration.
       - name: Install Node dependencies
         run: npm ci --no-audit --no-fund
+
+      # The importer lock's base (scripts/ci/fetch-lock-base.sh): the commit before this push, or
+      # main for a manual run, so test/authority/lock.test.ts compares with what was released.
+      - name: Fetch the importer lock's base
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+        run: bash scripts/ci/fetch-lock-base.sh
+
       - name: Quality gate
         run: npm run check
 

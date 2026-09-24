@@ -177,8 +177,11 @@ drop from or rearrange:
 Every id the run persists derives from the source Bundle's identifier value: the EMA List,
 Bundle and Composition as before, and each copied entry
 `stableUuid("ema-entry:" + resourceType, identifierValue + ":" + position)` with a `urn:uuid`
-fullUrl, its references rewritten to match. A run therefore writes only into its own namespace,
-whatever ids its source chose (`test/namespace.test.ts`).
+fullUrl, its references rewritten to match; a reference naming no entry refuses, and so does
+a source Bundle, entry or `meta` element the crosswalk does not carry (a signature, an entry's
+request, a `meta` extension, tag or source), the output's `meta` being its profile alone. A run
+therefore writes, and points, only into its own namespace, whatever ids its source chose
+(`test/namespace.test.ts`).
 
 Some things it still does without asking, by design: every mapped section takes a new id and, as its
 heading, the source's heading when the rule permits it (the rule's `title` or one of its
