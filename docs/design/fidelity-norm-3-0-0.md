@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and thirty-four reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and thirty-five reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -1200,15 +1200,36 @@ mutants) now leaves only mutants that add refusals or change nothing.
 Scoped to this change, the review found no false pass, divergence, crash or refusal of a pinned
 label. Its five Medium findings were again reader rules no test pinned, found by a fresh mutation
 sweep: a table cell's own margin gives no credit to the text in it; an indent is read order-free
-under `!important`; a border shorthand resets the width it leaves out; margin and padding
-shorthands are read per side; a row's indent does not leak out of a nested table into the next
-cell. Each is now pinned, with a passing case beside each refusing one. Its Low findings are closed
-too: the per-declaration bound of an inch is pinned (a pull of 80pt under a 100pt margin refuses,
-72pt does not), each unit's size is pinned either side of the 12pt bound, the inline and padding
-rules are pinned on `b` and under the `background` shorthand, one line of dead code is removed, and
-the reader's comments and docstring say where an offset is measured from and name the integer past
-Python's digit limit. Every mutant of the review's three sweeps (182 in all, three of them written against code since removed) is now killed, except six
-that change nothing a reader can see: a check that another rule already covers (`max-height`,
-`del`, a declaration without a colon, the `MsoCommentReference` class, a quote in a font family the
-closed font list refuses anyway) or that cannot be reached (an `hr` has no content to hold an open
-paragraph).
+under `!important`; a border shorthand resets the width it leaves out; margin and padding shorthands
+are read per side; a row's indent does not leak out of a nested table into the next cell. Each is
+now pinned, with a passing case beside each refusing one. Its Low findings are closed too: the
+per-declaration bound of an inch is pinned (a pull of 80pt under a 100pt margin refuses, 72pt does
+not), each unit's size is pinned either side of the 12pt bound, the inline and padding rules are
+pinned on `b` and under the `background` shorthand, one line of dead code is removed, and the
+reader's comments and docstring say where an offset is measured from and name the integer past
+Python's digit limit. Every mutant of the review's three sweeps (182 in all, three of them written
+against code since removed) is now killed, except six that change nothing a reader can see: a check
+that another rule already covers (`max-height`, `del`, a declaration without a colon, the
+`MsoCommentReference` class, a quote in a font family the closed font list refuses anyway) or that
+cannot be reached (an `hr` has no content to hold an open paragraph).
+
+## Thirty-fifth review (2026-09-24): findings and what changed
+
+Scoped to this change, the review found no false pass, divergence or crash, and confirmed the
+round-34 mutation claim (the six survivors named there, every other mutant killed). Its two Medium
+findings were reader rules tested on one side only: the refusal of a reference to U+0080 to U+009F
+was tested at one code point, and the underline on an `a` whose `href` is empty had no test. Both
+are now pinned (C1 references at both edges, decimal and hexadecimal, either case; `href=""`
+underlined, an `a` without `href` not). Its Low findings are closed as well. One reason the
+round-34 record gives for a survivor was wrong: a quote inside a quoted font family is not refused
+by the font list (`'arial"'` would read as Arial) but names no installed font; the rule is now
+pinned by a test instead. U+007F and the C1 controls, literal or as `&#127;`, were a stated
+residual; they now refuse the section (`format-character`), since a browser draws them as a blank
+or a box. A `thead` after a table's body, which a browser draws at the top, now refuses the section
+instead of being read in source order. The table-part refusals (`tfoot`, `caption`, `colgroup`, a
+`p` or `div` in a row group or row), a space after a line break, the faint colour and font-size
+bounds and a `hidden` border are pinned. The committed label checks are unchanged. The review's own
+sweep's remaining survivors change nothing a reader can see or only add a refusal or a mark (an
+`rgb()` strip, quotes or `/` in other properties, `!important` kept in values, a first-line indent
+to the right, the width of `thin`, the doctype and bare `<!` checks, HTML's unmapped `&#129;`, `&#X96;`
+which XML refuses anyway).

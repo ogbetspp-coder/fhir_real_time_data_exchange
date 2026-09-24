@@ -805,6 +805,30 @@ def test_a_bundle_python_cannot_read_refuses_the_document(document: bytes) -> No
         ("<p>" + "<span>" * 127 + "x" + "</span>" * 127 + "</p>", "malformed-xhtml"),
         ('<p><span class="MSOCOMANCHOR">x</span></p>', "embedded-comment"),
         ('<p><span class="MsoCommentReference">x</span></p>', "embedded-comment"),
+        # Review round 35: each C1 reference a browser maps through windows-1252, at both
+        # edges and in both cases; a quote inside a quoted family; control characters; table
+        # parts a browser moves.
+        ("<p>10&#128;</p>", "malformed-xhtml"),
+        ("<p>Wait&#133;</p>", "malformed-xhtml"),
+        ("<p>&#159;</p>", "malformed-xhtml"),
+        ("<p>10&#x80;</p>", "malformed-xhtml"),
+        ("<p>&#x8A;</p>", "malformed-xhtml"),
+        ("<p>&#x9F;</p>", "malformed-xhtml"),
+        ("<p>&#x9a;</p>", "malformed-xhtml"),
+        ('<p><span style="font-family:\'arial&quot;\'">x</span></p>', "unsupported-style"),
+        ("<p>Take&#127;5</p>", "format-character"),
+        ("<p>Take\x7f5</p>", "format-character"),
+        ("<p>Take\x855</p>", "format-character"),
+        ("<table><tfoot><tr><td>x</td></tr></tfoot></table>", "unsupported-element"),
+        ("<table><caption><b>c</b></caption><tr><td>x</td></tr></table>", "unsupported-element"),
+        ("<table><colgroup></colgroup><tr><td>x</td></tr></table>", "unsupported-element"),
+        ("<table><tbody><p>x</p></tbody></table>", "unsupported-element"),
+        ("<table><tr><p>x</p></tr></table>", "unsupported-element"),
+        ("<table><tbody><div><td>x</td></div></tbody></table>", "unsupported-element"),
+        ("<table><tbody><tr><td>B</td></tr></tbody><thead><tr><td>A</td></tr></thead></table>",
+         "unsupported-element"),
+        ("<table><tr><td>B</td></tr><thead><tr><td>A</td></tr></thead></table>",
+         "unsupported-element"),
     ],
 )  # fmt: skip
 def test_each_rule_refuses_alone(inner: str, code: str) -> None:
@@ -834,6 +858,22 @@ def test_each_rule_refuses_alone(inner: str, code: str) -> None:
         # A line break swallows the space before it; a trailing one is dropped.
         ("<p>a <br/>b</p>", [("a\nb", None, None, [])]),
         ("<p>a<br/></p>", [("a", None, None, [])]),
+        ("<p>a<br/> b</p>", [("a\nb", None, None, [])]),
+        # Review round 35: an a with any href, even an empty one, is underlined; one without
+        # is not. U+00A0 is read as it is.
+        ('<p>eGFR <a href="">&lt;</a> 30</p>', [("eGFR < 30", None, None, ["underline"])]),
+        ('<p><a name="x">&lt;</a></p>', [("<", None, None, [])]),
+        ("<p>~&#160;x</p>", [("~\xa0x", None, None, [])]),
+        # The faint bounds at their edge, and a hidden border drawn as none.
+        ('<p style="color:#e0e0e0">x</p>', [("x", None, None, ["faint"])]),
+        ('<p style="color:#dfdfdf">x</p>', [("x", None, None, ["color-#dfdfdf"])]),
+        ('<p style="font-size:2pt">x</p>', [("x", None, None, [])]),
+        ('<p style="font-size:1.9pt">x</p>', [("x", None, None, ["faint"])]),
+        ('<p><span style="border-bottom:1px hidden">&lt;</span></p>', [("<", None, None, [])]),
+        (
+            "<table><thead><tr><td>A</td></tr></thead><thead><tr><td>B</td></tr></thead></table>",
+            [("A", (0, 0, 0), None, []), ("B", (0, 1, 0), None, [])],
+        ),
         ('<p style="color:rgb(255,0,0)">x</p>', [("x", None, None, ["color-#ff0000"])]),
         ('<p style="color:#303030">x</p>', [("x", None, None, ["color-#303030"])]),
         ('<p style="color:#202020">x</p>', [("x", None, None, [])]),

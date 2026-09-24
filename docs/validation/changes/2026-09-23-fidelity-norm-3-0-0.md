@@ -462,7 +462,10 @@ restored.
   the document. A thirty-third review found five more stated reader rules unpinned, now pinned,
   and a JSON integer past Python's digit limit, which now refuses the document. A thirty-fourth
   review found five more reader rules unpinned by a fresh mutation sweep; each is now pinned, and
-  every mutant of its three sweeps is killed but six that change nothing a reader can see.
+  every mutant of its three sweeps is killed but six that change nothing a reader can see. A
+  thirty-fifth review found two rules tested on one side only (C1 references, an empty `href`),
+  now pinned; U+007F and C1 control characters, and a `thead` after a table's body, now refuse
+  the section instead of being a stated residual.
 
 - **Every submission carrying 2.0.0 is refused by the worker gate** from the moment this change
   deploys. Nothing in the repository produces a 2.0.0 submission after it.
