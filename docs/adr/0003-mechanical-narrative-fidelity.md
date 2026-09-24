@@ -149,8 +149,8 @@ reader sees without the check seeing it._
   flattens a superscript is outside the check, because the narrative is derived from it (only
   the extractor can close that); a letter exponent (`2<sup>n</sup>` against `2n`) still
   verifies, and from `fidelity-norm/3.1.0` so do a lowered ∞, and a lowered ½ that is a `sub`'s
-  whole content right after an ASCII letter and right before a break, a space or closing
-  punctuation (section 5's lowered-half rule), against the same code point on the line
+  whole content in the half-life form `t<sub>½</sub>` (section 5's lowered-half rule), against the
+  same code point on the line
   (`t<sub>½</sub>` against `t½`; `docs/design/fidelity-norm-3-1-0.md`); strong right-to-left letters can reorder adjacent numbers, and no EU
   product-information language uses them; a viewer's own stylesheet or script can still act on
   the element names that remain.

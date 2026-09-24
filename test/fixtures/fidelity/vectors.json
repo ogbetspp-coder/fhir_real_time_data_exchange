@@ -1248,6 +1248,60 @@
       }
     },
     {
+      "name": "sub-half-before-other-breaks-kept",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>t<sub>½</sub>; t<sub>½</sub>: t<sub>½</sub><br/>t<sub>½</sub></p></div>",
+      "expected": "\n\nt½; t½: t½\nt½\n\n"
+    },
+    {
+      "name": "rejects-sub-half-before-digit",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>t<sub>½</sub>2</p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-half-after-operator-name",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>log<sub>½</sub> 8</p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-half-after-roman-numeral",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>VIII<sub>½</sub>.</p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-half-after-hex-digit",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>0xA<sub>½</sub></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-half-after-t-in-word",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>at<sub>½</sub></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-half-after-t-after-index",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>log<sub>2</sub>t<sub>½</sub></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-half-after-lowered-t",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><sub>t</sub><sub>½</sub></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
       "name": "scan-error-after-sub-half-first",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>1<sub>½</sub> &bogus;</p></div>",
       "expected": {
@@ -1257,6 +1311,13 @@
     {
       "name": "sub-half-before-combining-across-markup",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>1<sub>½</sub> q<b>&#x301;</b></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "sub-half-after-earlier-combining-across-markup",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>q<b>&#x301;</b> t<sub>½</sub>2</p></div>",
       "expected": {
         "error": "unmappable-script"
       }

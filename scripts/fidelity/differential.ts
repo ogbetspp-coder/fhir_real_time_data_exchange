@@ -557,12 +557,13 @@ const HALF_BEFORE = [
   ...["t", "T", "x", "(t", "<em>t</em>", "<b>t</b>", "\u00e9", "t&#x2060;", "", "1", "-", " "],
   ...["&#x2082;", "log\u2099", "log<sub>n</sub>", "t<sup>2</sup>", "&#x1878;", "2\u02b9"],
   ...["1\u00aa", "\u4e8c", "&#x1D4C9;", "</p><p>t"],
+  ...["log", "VIII", "0xA", "log<sub>2</sub>t", "2t", "at", "&#x74;", "<sub>t</sub>", "<br/>t"],
 ];
 const HALF_CONTENT = ["½", "&#189;", "&#xBD;", "½ ", "2½", "½½", "-½"];
 const HALF_AFTER = [
   ...["", " x", ")", ".", ",", ";", ":", "x", "2", "&#x2060;2", "<sub>2</sub>", "<sup>+</sup>"],
   ...["<sub>n</sub>", "\u207f", "&#x200A;<sub>2</sub>", "&#x2800;2", "&#x301;", " t<sub>½</sub>"],
-  "</p><p>2",
+  ...["</p><p>2", " <sub>2</sub>", ".<sub>5</sub>", "\t", "<br/>"],
 ];
 const LOWERED_HALF_CROSS = HALF_BEFORE.flatMap((before) =>
   HALF_CONTENT.flatMap((half) => HALF_AFTER.map((after) => `${before}<sub>${half}</sub>${after}`)),

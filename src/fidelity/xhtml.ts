@@ -237,33 +237,46 @@ function pointOffsets(output: readonly string[]): (position: number) => number {
 // A `sub` holding ½, by output positions (array indexes) of its content, and the offset in the div
 // of its first ½ (the character or its reference).
 type LoweredHalf = { start: number; end: number; offset: number };
-// What may stand right before and right after a kept lowered ½ (section 5): an ASCII letter
-// before; after, a line or cell break, a space, closing punctuation, or nothing.
-const BEFORE_HALF = /^[A-Za-z]$/u;
+// The neighbours of a kept lowered ½ (section 5): the half-life, `t<sub>½</sub>`, as a word.
+const BEFORE_HALF_LIFE = new Set(["\n", "\t", " ", "("]);
 const AFTER_HALF = new Set(["\n", "\t", " ", ")", ".", ",", ";", ":"]);
 
-// A lowered ½ is kept only as a `sub`'s whole content, right after an ASCII letter drawn on the
-// line and right before a break, a space, closing punctuation or the end (section 5):
-// `t<sub>½</sub>`. Anywhere else it can join a number or an index, and the text cannot say which:
-// `log<sub>2½</sub>` and `log<sub>2</sub>½` both read `log₂½`. Nothing is read past; each
-// neighbour is the adjacent emitted code point, and one emitted inside `sup` or `sub` refuses.
+// A lowered ½ is kept only as the half-life: a `sub`'s whole content, right after a `t` that
+// starts a word (after a break, a space, `(` or nothing), and right before a break, a space,
+// `) . , ; :` or nothing, every neighbour drawn on the line (section 5). Anywhere else it can join
+// a number or an index, and the text cannot say which: `log<sub>2½</sub>` and `log<sub>2</sub>½`
+// both read `log₂½`, and a letter before it can be a number or an operator (`VIII<sub>½</sub>`,
+// `log<sub>½</sub>`). Nothing is read past: each neighbour is the adjacent emitted code point.
 function checkLoweredHalves(
   output: readonly string[],
   halves: readonly LoweredHalf[],
   scriptPieces: ReadonlySet<number>,
 ): void {
+  // Code points of the text, and which of them were emitted inside `sup` or `sub` (a script
+  // element emits one code point per piece).
+  const points: string[] = [];
+  const pieceStart: number[] = [];
+  const inScript: boolean[] = [];
+  output.forEach((piece, position) => {
+    pieceStart.push(points.length);
+    for (const point of piece) {
+      points.push(point);
+      inScript.push(scriptPieces.has(position));
+    }
+  });
+  pieceStart.push(points.length);
+  const onLine = (at: number, allowed: ReadonlySet<string>): boolean =>
+    at < 0 || at >= points.length || (allowed.has(points[at] ?? "") && inScript[at] !== true);
   for (const { start, end, offset } of halves) {
-    let before = start - 1;
-    while (before >= 0 && output[before] === "") before -= 1;
-    let after = end;
-    while (after < output.length && output[after] === "") after += 1;
-    const previous = Array.from(output[before] ?? "").pop() ?? "";
-    const next = Array.from(output[after] ?? "")[0];
+    const from = pieceStart[start] ?? 0;
+    const to = pieceStart[end] ?? 0;
     if (
-      output.slice(start, end).join("") !== String.fromCodePoint(HALF) ||
-      scriptPieces.has(before) ||
-      !BEFORE_HALF.test(previous) ||
-      (next !== undefined && (scriptPieces.has(after) || !AFTER_HALF.has(next)))
+      to - from !== 1 ||
+      points[from] !== String.fromCodePoint(HALF) ||
+      points[from - 1] !== "t" ||
+      inScript[from - 1] === true ||
+      !onLine(from - 2, BEFORE_HALF_LIFE) ||
+      !onLine(to, AFTER_HALF)
     ) {
       throw new XhtmlError("unmappable-script", offset);
     }
@@ -423,10 +436,11 @@ const SCRIPT_RULES = new Map<string, ScriptRule>([
   ],
 ]);
 
-// The element's own script digits and signs are kept, and so are ½ and ∞ inside `sub`; the other
-// script's digits, signs and letters, every other number (a non-ASCII digit, a fraction, a numeral), a plus-minus sign, and
-// every other mathematical symbol, bracket or dash (general category Sm, Ps, Pe, Pd: `＝`, `﹙`,
-// `⸺`) have no script form here and reject.
+// The element's own script digits and signs are kept, and so is ∞ inside `sub` (and ½ there, as
+// the half-life only: checkLoweredHalves); the other script's digits, signs and letters, every
+// other number (a non-ASCII digit, another fraction, a numeral), a plus-minus sign, and every
+// other mathematical symbol, bracket or dash (general category Sm, Ps, Pe, Pd: `＝`, `﹙`, `⸺`)
+// have no script form here and reject.
 const UNMAPPABLE_SIGNS = new Set([0x00b1, 0x2213]);
 const NUMBER = /^\p{N}$/u;
 const SIGN_OR_BRACKET = /^[\p{Sm}\p{Ps}\p{Pe}\p{Pd}]$/u;

@@ -3679,6 +3679,46 @@ export const xhtmlCases: XhtmlCase[] = [
     input: div("<p>t<sub>½</sub>&#x301;</p>"),
     expected: { error: "unmappable-script" },
   },
+  {
+    name: "sub-half-before-other-breaks-kept",
+    input: div("<p>t<sub>½</sub>; t<sub>½</sub>: t<sub>½</sub><br/>t<sub>½</sub></p>"),
+    expected: "\n\nt½; t½: t½\nt½\n\n",
+  },
+  {
+    name: "rejects-sub-half-before-digit",
+    input: div("<p>t<sub>½</sub>2</p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-after-operator-name",
+    input: div("<p>log<sub>½</sub> 8</p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-after-roman-numeral",
+    input: div("<p>VIII<sub>½</sub>.</p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-after-hex-digit",
+    input: div("<p>0xA<sub>½</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-after-t-in-word",
+    input: div("<p>at<sub>½</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-after-t-after-index",
+    input: div("<p>log<sub>2</sub>t<sub>½</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-after-lowered-t",
+    input: div("<p><sub>t</sub><sub>½</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
   // Checked after the scan: an error the scan finds later wins, and it comes before
   // combining-across-markup.
   {
@@ -3689,6 +3729,11 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "sub-half-before-combining-across-markup",
     input: div("<p>1<sub>½</sub> q<b>&#x301;</b></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "sub-half-after-earlier-combining-across-markup",
+    input: div("<p>q<b>&#x301;</b> t<sub>½</sub>2</p>"),
     expected: { error: "unmappable-script" },
   },
   {

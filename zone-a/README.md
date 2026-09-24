@@ -185,12 +185,12 @@ defaults are wrong:
 
 ## Vector results
 
-All 625 golden vectors of `fidelity-norm/3.1.0` pass, byte for byte, including every error case:
+All 634 golden vectors of `fidelity-norm/3.1.0` pass, byte for byte, including every error case:
 
 | Module                         | Result          |
 | ------------------------------ | --------------- |
 | `zone_a/fidelity/normalize.py` | normalize 71/71 |
-| `zone_a/fidelity/xhtml.py`     | xhtml 374/374   |
+| `zone_a/fidelity/xhtml.py`     | xhtml 383/383   |
 | `zone_a/fidelity/verify.py`    | verify 180/180  |
 
 Under `fidelity-norm/1.1.1` there were 137 (25, 60 and 52). Seven of those were added by the
@@ -199,7 +199,7 @@ the existing 130 could not see. The 274 added by `fidelity-norm/2.0.0` pin its r
 sides of every boundary (`docs/validation/changes/2026-09-23-fidelity-norm-2-0-0.md`). The 190 added by
 `fidelity-norm/3.0.0` (10 of 2.0.0 replaced or renamed, so 180 more) pin numbered lists, table
 grids, pictures, the reserved and invisible code points, the nesting bounds, combining marks
-across markup, the refusal of underlines and links, and the thin spaces and other gaps (`docs/validation/changes/2026-09-23-fidelity-norm-3-0-0.md`). The 34 added by
+across markup, the refusal of underlines and links, and the thin spaces and other gaps (`docs/validation/changes/2026-09-23-fidelity-norm-3-0-0.md`). The 43 added by
 `fidelity-norm/3.1.0` pin ∞ kept inside `sub`, the lowered-half rule, and both still refused
 inside `sup`
 (`docs/validation/changes/2026-09-24-fidelity-norm-3-1-0.md`). They are defined in

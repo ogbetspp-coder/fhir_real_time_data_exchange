@@ -32,17 +32,19 @@ other script refusal: with this change its narrative stops refusing in 4.5 and 5
 
 Inside `sub` only, U+221E INFINITY is kept unchanged, as letters and marks already are:
 `AUC<sub>(0-∞)</sub>` reads `AUC₍₀₋∞₎` (the brackets, digit and hyphen fold as before). U+00BD
-VULGAR FRACTION ONE HALF is kept too, but only under the **lowered-half rule**, two closed lists
-that read past nothing:
+VULGAR FRACTION ONE HALF is kept too, but only as the half-life, under the **lowered-half
+rule**, closed lists of adjacent code points that read past nothing:
 
 - the `sub`'s whole emitted content is the one code point ½;
-- the code point emitted immediately before it is an ASCII letter, itself on the line (not
-  emitted inside `sup` or `sub`);
+- the code point emitted immediately before it is `t`, on the line (not emitted inside `sup` or
+  `sub`), and the one before that `t`, if any, is a line or cell break, a space or `(`, on the
+  line: the `t` starts a word;
 - the code point emitted immediately after it, if any, is a line or cell break (U+000A, U+0009),
-  a space (U+0020) or one of `) . , ; :`, itself on the line.
+  a space (U+0020) or one of `) . , ; :`, on the line.
 
-`t<sub>½</sub>`, `(t<sub>½</sub>)` and `t<sub>½</sub> 2` read `t½`, `(t½)` and `t½ 2`;
-`1<sub>½</sub>`, `log<sub>2½</sub>`, `logₙ<sub>½</sub>`, `log<sub>n</sub><sub>½</sub>`,
+`the t<sub>½</sub> was` and `(t<sub>½</sub>)` read `the t½ was` and `(t½)`; `1<sub>½</sub>`,
+`log<sub>2½</sub>`, `logₙ<sub>½</sub>`, `log<sub>n</sub><sub>½</sub>`, `log<sub>½</sub>`,
+`VIII<sub>½</sub>`, `at<sub>½</sub>`,
 `t<sub>½</sub>2`, `t<sub>½</sub>ⁿ` and `t<sub>½</sub>&#x200A;<sub>2</sub>` refuse
 (`unmappable-script`). The rule is checked after the scan, `sub` by `sub` in document order, and
 before `combining-across-markup`, so every error the scan finds wins over it, wherever it is.
@@ -84,14 +86,19 @@ or ∞ can make the check pass text a reader reads differently.
    `CaSO<sub>4·½</sub>H` and the hemihydrate `CaSO<sub>4</sub>·½H` both read `CaSO₄·½H`. The
    second found the same joining through an index that is a letter: `logₙ<sub>½</sub>` and
    `logₙ½`, `log<sub>n</sub><sub>½</sub>` and `log<sub>n</sub>½`, and through gaps the rule read
-   past (`t<sub>½</sub>&#x200A;<sub>2</sub>` draws like `t<sub>½2</sub>`). So the rule became two
-   closed allow-lists of adjacent code points, not a deny-list read past gaps: before, only an
-   ASCII letter on the line, which is never a number, an index or a gap; after, only a break, a
-   space or closing punctuation on the line, after which nothing can continue the lowered run or
-   join the half. Anything else, however harmless, refuses (a false failure). Between those
-   neighbours the text `t½` has one reading: a lowered half after a letter on the line, which in a
-   label is the half-life. Against a plain `t½` on the line it verifies, as `C<sub>max</sub>`
-   verifies against `Cmax` (section 5's stated residual for letters, ADR 0003).
+   past (`t<sub>½</sub>&#x200A;<sub>2</sub>` draws like `t<sub>½2</sub>`). The third found that
+   a letter before it can itself be a number or an operator: `VIII<sub>½</sub>` (a Roman numeral
+   with an index) and `VIII½` (eight and a half) both read `VIII½`, and `log<sub>½</sub> 8` (log
+   to the base ½) reads as `log½ 8`. So the rule is narrowed to the one form real labels use, the
+   half-life: `t` as a word of its own, then the lowered ½, then a break, a space or punctuation
+   that ends a phrase, every neighbour on the line and nothing read past. `t` standing alone is
+   neither a number nor an operator nor an index, and after the half nothing can join it to a
+   number. Anything else, however harmless, refuses (a false failure). Between those neighbours
+   the text `t½` has one reading, the half-life. Against a plain `t½` on the line it verifies, as
+   `C<sub>max</sub>` verifies against `Cmax` (section 5's stated residual for letters, ADR 0003).
+   A space or punctuation after the half may be followed by another lowered run
+   (`t<sub>½</sub> <sub>2</sub>`); that draws as its own text after a gap, the same as `t½ ₂`,
+   and joins no number to the half.
 4. **Every narrative 3.0.0 accepts reads the same.** The change only turns refusals into text; no
    accepted input's text, status or reason moves. The 591 vectors of 3.0.0 show it: none changes
    except in the version string and the hashes that embed it.
@@ -100,6 +107,8 @@ or ∞ can make the check pass text a reader reads differently.
 
 - **½ anywhere in `sub`** (this design's first draft). Refused by the first review: the joining
   above.
+- **Any ASCII letter before the half** (its third draft). Refused by the third review: a letter
+  can be a Roman numeral, a hexadecimal digit or the end of an operator name (`log<sub>½</sub>`).
 - **A deny-list read past ignorables** (its second draft: any letter before, no number or script
   sign after, reading past Default_Ignorable code points as the mark rule does). Refused by the
   second review: subscript and modifier letters, letters inside an adjacent `sub`, CJK numerals
@@ -117,20 +126,22 @@ or ∞ can make the check pass text a reader reads differently.
 ## Consequences
 
 - Minor version (section 8): inputs refused under 3.0.0 now give text, pinned by new vectors.
-  Thirty-four XHTML vectors are added (591 → 625): ½ kept (literal, decimal and hex reference,
-  after markup, before a space, `)`, `.` and `,`, at a cell's end) and refused on every side of
-  the rule (after a digit, a sign, a joiner, a subscript letter, a lowered letter, a modifier
-  letter, an ordinal, an ideographic numeral, a mathematical letter and a blank-drawn letter; at a
-  line start; joined to an index; in a formula; with a space in the element; before a digit, a
-  digit past a joiner, a subscript digit, a lowered letter, a superscript letter and sign, a thin
-  space, a braille blank and a mark), ∞ kept among folded signs, both refused inside `sup`, the
-  neighbours ¼, U+2189 and U+29DC refused inside `sub`, and the rule's place in the error order
-  (a later scan error wins; the rule precedes `combining-across-markup`). The differential
-  generator gains two random classes (the two code points and their neighbours in both scripts;
-  lowered halves between neighbours on both sides of the rule), and every full corpus ends with
-  the complete cross-product of 22 neighbours before, 7 contents and 19 after (2926 clean
-  paragraphs); all three are required. Linear-time tests pin the mark rule and the lowered-half
-  rule on 20 000 tags and 20 000 halves in both languages.
+  Forty-three XHTML vectors are added (591 → 634): ½ kept (literal, decimal and hex reference,
+  after markup, after a space, `(` and a line start, before a space, `)`, `.`, `,`, `;`, `:` and a
+  line break, at a cell's end) and refused on every side of the rule (after a digit, a sign, a
+  joiner, a subscript letter, a lowered letter, a lowered `t`, a modifier letter, an ordinal, an
+  ideographic numeral, a mathematical letter, a blank-drawn letter, an operator name, a Roman
+  numeral, a hexadecimal digit, a `t` inside a word and a `t` after an index; at a line start;
+  joined to an index; in a formula; with a space in the element; before a digit, a digit past a
+  joiner, a subscript digit, a lowered letter, a superscript letter and sign, a thin space, a
+  braille blank and a mark), ∞ kept among folded signs, both refused inside `sup`, the neighbours
+  ¼, U+2189 and U+29DC refused inside `sub`, and the rule's place in the error order (a later scan
+  error wins; the rule precedes `combining-across-markup`, whether that comes before or after it
+  in the document). The differential generator gains two random classes (the two code points and
+  their neighbours in both scripts; lowered halves between neighbours on both sides of the rule),
+  and every full corpus ends with the complete cross-product of 31 neighbours before, 7 contents
+  and 23 after (4991 clean paragraphs); all three are required. Linear-time tests pin the mark
+  rule and the lowered-half rule on 20 000 tags and 20 000 halves in both languages.
 - The authority importer's golden vectors embed the version, so its lock requires a new version:
   `IMPORTER_VERSION` 1.1.0 (it now also accepts the two forms).
 - Previously approved submissions need re-approval (section 8). The dev store's demonstration
@@ -161,3 +172,13 @@ or ∞ can make the check pass text a reader reads differently.
    did not say the rule's offset is in the div; the differential barely reached the rule clean;
    the ADRs' "before no number" omitted script signs; the spike test's comment cited one change
    record. Each fixed.
+3. **Third independent review** (2026-09-24). High: any ASCII letter before the half let through
+   letters that are numbers or operator names (`VIII<sub>½</sub>` against `VIII½`,
+   `log<sub>½</sub> 8`, `0xA<sub>½</sub>`, `log<sub>2</sub>t<sub>½</sub>` against
+   `log<sub>2t</sub>½`). Fixed: only `t` starting a word, the form of all six real occurrences.
+   Low: a space or punctuation after the half may precede another lowered run (the note's claim
+   reworded, above; it joins no number); no vector pinned `combining-across-markup` earlier in the
+   document than a failing half, `t<sub>½</sub>2`, or the accepted `; : <br/>`; the prose called
+   `. , ; :` "closing punctuation"; a code comment still named every fraction as refused. Each
+   fixed. The review also confirmed that the mark rule's refactor changes no result (every
+   div of six 6000-case corpora, 3.0.0 against this change) and that ∞ joins nothing.

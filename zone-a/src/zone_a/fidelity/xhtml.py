@@ -222,36 +222,46 @@ class _LoweredHalf:
         self.offset = -1
 
 
-# What may stand right before and right after a kept lowered ½ (section 5): an ASCII letter
-# before; after, a line or cell break, a space, closing punctuation, or nothing.
-_BEFORE_HALF: Final = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
+# The neighbours of a kept lowered ½ (section 5): the half-life, ``t<sub>½</sub>``, as a word.
+_BEFORE_HALF_LIFE: Final = frozenset({"\n", "\t", " ", "("})
 _AFTER_HALF: Final = frozenset({"\n", "\t", " ", ")", ".", ",", ";", ":"})
 
 
 def _check_lowered_halves(
     output: list[str], halves: list[_LoweredHalf], script_pieces: set[int]
 ) -> None:
-    """Keep a lowered ½ only as a ``sub``'s whole content, between an ASCII letter and a break.
+    """Keep a lowered ½ only as the half-life, ``t<sub>½</sub>`` with ``t`` starting a word.
 
-    Anywhere else it can join a number or an index, and the text cannot say which:
-    ``log<sub>2½</sub>`` and ``log<sub>2</sub>½`` both read ``log₂½`` (section 5). Nothing is read
-    past; each neighbour is the adjacent emitted code point, and one emitted inside ``sup`` or
-    ``sub`` refuses.
+    The ``sub``'s whole content is ½, right after a ``t`` that follows a break, a space, ``(`` or
+    nothing, and right before a break, a space, ``) . , ; :`` or nothing, every neighbour drawn on
+    the line (section 5). Anywhere else it can join a number or an index, and the text cannot say
+    which: ``log<sub>2½</sub>`` and ``log<sub>2</sub>½`` both read ``log₂½``, and a letter before
+    it can be a number or an operator (``VIII<sub>½</sub>``, ``log<sub>½</sub>``). Nothing is read
+    past: each neighbour is the adjacent emitted code point.
     """
+    points: list[str] = []
+    piece_start: list[int] = []
+    in_script: list[bool] = []
+    for position, piece in enumerate(output):
+        piece_start.append(len(points))
+        points.extend(piece)
+        in_script.extend([position in script_pieces] * len(piece))
+    piece_start.append(len(points))
+
+    def on_line(at: int, allowed: frozenset[str]) -> bool:
+        return at < 0 or at >= len(points) or (points[at] in allowed and not in_script[at])
+
     for half in halves:
-        before = half.start - 1
-        while before >= 0 and output[before] == "":
-            before -= 1
-        after = half.end
-        while after < len(output) and output[after] == "":
-            after += 1
-        previous = output[before][-1] if before >= 0 else ""
-        following = output[after][0] if after < len(output) else None
+        start = piece_start[half.start]
+        end = piece_start[half.end]
         if (
-            "".join(output[half.start : half.end]) != chr(HALF)
-            or before in script_pieces
-            or previous not in _BEFORE_HALF
-            or (following is not None and (after in script_pieces or following not in _AFTER_HALF))
+            end - start != 1
+            or start < 1
+            or points[start] != chr(HALF)
+            or points[start - 1] != "t"
+            or in_script[start - 1]
+            or not on_line(start - 2, _BEFORE_HALF_LIFE)
+            or not on_line(end, _AFTER_HALF)
         ):
             raise XhtmlError("unmappable-script", half.offset)
 
@@ -394,10 +404,10 @@ SCRIPT_RULES: Final[dict[str, _ScriptRule]] = {
     ),
 }
 
-# The element's own script digits and signs are kept, and so are ½ and ∞ inside ``sub``; the
-# other script's digits, signs and letters, every other number (general category N), a
-# plus-minus sign, and every other mathematical symbol, bracket or dash (general category Sm, Ps,
-# Pe, Pd) have no script form there and reject.
+# The element's own script digits and signs are kept, and so is ∞ inside ``sub`` (and ½ there,
+# as the half-life only: _check_lowered_halves); the other script's digits, signs and letters,
+# every other number (general category N), a plus-minus sign, and every other mathematical symbol,
+# bracket or dash (general category Sm, Ps, Pe, Pd) have no script form there and reject.
 UNMAPPABLE_SIGNS: Final = frozenset({0x00B1, 0x2213})
 UNMAPPABLE_CATEGORIES: Final = frozenset({"Sm", "Ps", "Pe", "Pd"})
 

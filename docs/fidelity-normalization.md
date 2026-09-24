@@ -373,27 +373,35 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   which then refuses the document and draws none of it.
 - The lowered-half rule (from 3.1.0). ½ is a number, and kept unfolded it can join a number or
   an index on either side without the text saying which: `log<sub>2½</sub>` (base 2½) and
-  `log<sub>2</sub>½` (log₂ of ½) would both read `log₂½`, and so would `logₙ<sub>½</sub>` and
-  `logₙ½`. So a `sub` whose content holds U+00BD is accepted only when all three hold, and
-  otherwise rejects (`unmappable-script`; its offset is that of the first U+00BD in the `sub`,
-  as the character or its reference, in the div, like every other `unmappable-script`):
+  `log<sub>2</sub>½` (log₂ of ½) would both read `log₂½`, `logₙ<sub>½</sub>` and `logₙ½` alike,
+  and a letter before it can itself be a number or an operator (`VIII<sub>½</sub>`, a Roman
+  numeral with an index, against `VIII½`, eight and a half; `log<sub>½</sub>`, log to the base
+  ½). So ½ is kept only as the half-life, `t<sub>½</sub>`: a `sub` whose content holds U+00BD is
+  accepted only when all four hold, and otherwise rejects (`unmappable-script`; its offset is
+  that of the first U+00BD in the `sub`, as the character or its reference, in the div, like
+  every other `unmappable-script`):
   - its emitted content is exactly the one code point U+00BD (so `<sub>½ </sub>`,
     `<sub>2½</sub>` and `<sub>-½</sub>` reject);
-  - the code point emitted immediately before that content is an ASCII letter (U+0041–U+005A,
-    U+0061–U+007A) emitted outside `sup` and `sub` (so `t<sub>½</sub>` and `<em>t</em><sub>½</sub>`
-    are accepted, and `1<sub>½</sub>`, `logₙ<sub>½</sub>`, `log<sub>n</sub><sub>½</sub>`, a
-    word joiner before the `sub`, or a `sub` at a line start or after a space, reject); and
-  - the code point emitted immediately after it, if there is one, is U+000A, U+0009, U+0020, `)`,
-    `.`, `,`, `;` or `:`, emitted outside `sup` and `sub` (so `t<sub>½</sub> 2` and `(t<sub>½</sub>)`
-    are accepted, and `t<sub>½</sub>2`, `t<sub>½</sub>ⁿ`, `t<sub>½</sub><sub>2</sub>`,
-    `t<sub>½</sub><sub> </sub>`, a thin space or a word joiner after the `sub`, reject).
+  - the code point emitted immediately before that content is `t` (U+0074), emitted outside `sup`
+    and `sub`;
+  - the code point emitted immediately before that `t`, if there is one, is U+000A, U+0009,
+    U+0020 or `(`, emitted outside `sup` and `sub` (so the `t` starts a word: `the t<sub>½</sub>`,
+    `(t<sub>½</sub>)`, `<em>t</em><sub>½</sub>` at a line start and `t<sub>½</sub>` in a cell are
+    accepted, and `1<sub>½</sub>`, `at<sub>½</sub>`, `log<sub>½</sub>`, `VIII<sub>½</sub>`,
+    `log<sub>2</sub>t<sub>½</sub>`, `<sub>t</sub><sub>½</sub>` and a word joiner before the `sub`
+    reject); and
+  - the code point emitted immediately after the `sub`'s content, if there is one, is U+000A,
+    U+0009, U+0020, `)`, `.`, `,`, `;` or `:`, emitted outside `sup` and `sub` (so
+    `t<sub>½</sub> was` and `(t<sub>½</sub>)` are accepted, and `t<sub>½</sub>2`,
+    `t<sub>½</sub>ⁿ`, `t<sub>½</sub><sub>2</sub>`, `t<sub>½</sub><sub> </sub>`, a thin space or a
+    word joiner after the `sub`, reject).
 
   "Emitted" means in the scanner's text, across any markup (a tag that emits nothing is not a
   neighbour; a block boundary's U+000A, a cell's U+0009, a grid marker or a list number is).
   Nothing is read past: the neighbours are the adjacent code points. The rule is checked after
   the scan, `sub` by `sub` in document order (the error order below). Every lowered ½ in the
-  EMA's published English labels (six, surveyed 2026-09-24) is `t<sub>½</sub>` followed by a
-  space or `)`.
+  EMA's published English labels (six, surveyed 2026-09-24) is `the t<sub>½</sub> was` or
+  `(t<sub>½</sub>)`.
 
 - A combining mark or a composition across inline markup rejects (`combining-across-markup`,
   from 3.0.0): at each start or end tag of `span`, `b`, `i`, `em`, `strong`, `sup`, `sub`,
@@ -867,15 +875,15 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
 
 - `fidelity-norm/3.1.0` (minor) — inside `sub`, U+221E INFINITY is kept unchanged instead of
   rejecting (`unmappable-script`), and U+00BD VULGAR FRACTION ONE HALF is kept under the
-  lowered-half rule: as a `sub`'s whole content, right after an ASCII letter and right before a
-  break, a space, closing punctuation or nothing, none of them raised or lowered. So the
-  half-life `t<sub>½</sub>` and `AUC<sub>(0-∞)</sub>`, which the EMA's published labels write,
+  lowered-half rule: only as the half-life, a `sub`'s whole content right after a `t` that starts
+  a word and right before a break, a space, `) . , ; :` or nothing, none of them raised or
+  lowered. So `t<sub>½</sub>` and `AUC<sub>(0-∞)</sub>`, which the EMA's published labels write,
   read `t½` and `AUC₍₀₋∞₎` (section 5; `docs/design/fidelity-norm-3-1-0.md`, ADR 0005). The
   lowered-half rule is checked after the scan, before `combining-across-markup`. Section 7 states
   that an extractor refuses a raised or lowered run holding what section 5 refuses in the
   corresponding element. Nothing else changes: every narrative 3.0.0 accepts reads the same,
   inside `sup` both still reject, and no text arises that a narrative could not already write
-  with the code points themselves. Thirty-four XHTML vectors are added, each an input whose
+  with the code points themselves. Forty-three XHTML vectors are added, each an input whose
   outcome under 3.0.0 differs or which pins the new rule's edges; the existing vectors change only
   in the version string and the hashes that embed it.
 - `fidelity-norm/3.0.0` (major) — numbered lists, table grids and pictures, seen as a reader

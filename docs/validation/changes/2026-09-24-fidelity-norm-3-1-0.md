@@ -8,11 +8,11 @@ evidenced libraries". The UR- rows it cites are in that file._
 In `docs/fidelity-normalization.md`, section 5 gains two rules and a place in the error order,
 section 7 one sentence, and section 9 an entry. Inside `sub` only, U+221E INFINITY is kept
 unchanged instead of rejecting (`unmappable-script`), and U+00BD VULGAR FRACTION ONE HALF is kept
-under the lowered-half rule: only as the `sub`'s whole content, right after an ASCII letter and
-right before a break, a space, `) . , ; :` or nothing, none of them raised or lowered, checked
-after the scan and before `combining-across-markup`. `t<sub>½</sub>` reads `t½` and
-`AUC<sub>(0-∞)</sub>` reads `AUC₍₀₋∞₎`; `log<sub>2½</sub>`, `logₙ<sub>½</sub>` and
-`1<sub>½</sub>` still reject. Inside `sup` both still reject. Section 7 now says an extractor
+under the lowered-half rule: only as the half-life, a `sub`'s whole content right after a `t`
+that starts a word and right before a break, a space, `) . , ; :` or nothing, none of them
+raised or lowered, checked after the scan and before `combining-across-markup`. `t<sub>½</sub>`
+reads `t½` and `AUC<sub>(0-∞)</sub>` reads `AUC₍₀₋∞₎`; `log<sub>2½</sub>`, `logₙ<sub>½</sub>`,
+`VIII<sub>½</sub>` and `1<sub>½</sub>` still reject. Inside `sup` both still reject. Section 7 now says an extractor
 refuses a raised or lowered run holding what section 5 refuses there. In code:
 `KEPT_IN_SUBSCRIPT` and `checkLoweredHalves` in `src/fidelity/xhtml.ts`, and the same in
 `zone-a/src/zone_a/fidelity/xhtml.py`; the mark rule's look past ignorables is now computed once
@@ -59,10 +59,10 @@ and none of it is re-evaluated.
 **Steps 1–6.** 1: `NORMALIZATION_VERSION` is `fidelity-norm/3.1.0` on both sides. 2:
 `npm run contracts:generate` (no drift), `npm run vectors:generate`, `npm run contracts:fixtures`,
 `npm run contracts:quote-edge`, `npm run differential:smoke` and `npm run authority:vectors`
-regenerated `test/fixtures/fidelity/vectors.json` (591 → 625: XHTML 340 → 374; normalisation 71
+regenerated `test/fixtures/fidelity/vectors.json` (591 → 634: XHTML 340 → 383; normalisation 71
 and verify 180 unchanged in number), the four contract fixtures, the quote-edge export, the
 smoke corpus and the importer's vectors; `npm run authority:lock` added importer 1.1.0. 3: below.
-4: thirty-four new XHTML vectors, listed in the design's "Consequences": ½ kept and refused on every
+4: forty-three new XHTML vectors, listed in the design's "Consequences": ½ kept and refused on every
 side of the lowered-half rule, ∞ kept, both refused in `sup`, the neighbouring fractions and
 symbol refused, and the rule's place in the error order; and linear-time tests of the mark rule
 and the lowered-half rule in `test/fidelity.test.ts` and `zone-a/tests/test_golden_vectors.py`. 5: ADR 0003's residuals name the
@@ -70,7 +70,7 @@ two forms; ADR 0005 amended (the two refusals of decision 1 settled, and the sur
 finding recorded for PR 3). 6: UR-09 names 3.1.0; `AGENTS.md` names 3.1.0.
 
 **Changed vectors (step 3).** Compared by name with the 3.0.0 vectors: no normalisation or XHTML
-vector changed and none was removed; the thirty-four above were added. All 180 verify vectors changed
+vector changed and none was removed; the forty-three above were added. All 180 verify vectors changed
 in exactly three fields and no other: `input.normalizationVersion`,
 `expected.normalizationVersion` and `expected.reportHash`. No status, reason, text or coverage
 figure moved.
@@ -80,12 +80,12 @@ fixed family, all three required in the full corpus (`zone-a/tests/test_differen
 `script-kept-in-subscript` draws ½, ∞, ¼ and U+29DC, literal and as references, inside `sup` and
 `sub`; `script-lowered-half` writes a `sub` holding ½ between neighbours drawn from both sides of
 the rule; and `script-lowered-half-cross`, appended to every corpus of at least 500 cases (the CI
-corpus included, the smoke corpus not), is the complete cross-product of 22 neighbours before, 7
-contents and 19 after, each in an otherwise clean paragraph (2926 cases: 189 accepted, 2737
-refused). ½ left the `script-unmappable` pool. TypeScript and Python agree on all 8926 cases at
-each of seeds 20260920, 1, 2, 3, 4 and 77 (53 556 cases). Counted as generated documents
+corpus included, the smoke corpus not), is the complete cross-product of 31 neighbours before, 7
+contents and 23 after, each in an otherwise clean paragraph (4991 cases: 273 accepted, 4718
+refused). ½ left the `script-unmappable` pool. TypeScript and Python agree on all 10 991 cases at
+each of seeds 20260920, 1, 2, 3, 4 and 77 (65 946 cases). Counted as generated documents
 carrying each random class, by the TypeScript's outcome, over those six seeds:
-`script-kept-in-subscript` 21 accepted and 755 refused, `script-lowered-half` 5 accepted and 423
+`script-kept-in-subscript` 21 accepted and 755 refused, `script-lowered-half` 2 accepted and 426
 refused (most refusals come from other generated errors in the same document, which is why the
 cross-product is there).
 
