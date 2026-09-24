@@ -428,6 +428,28 @@ const ROW_ACROSS_PAGES = [
 const ROW_ACROSS_PAGES_SOURCE = customSource(ROW_ACROSS_PAGES);
 const rowAcrossPagesSpans = (): SourceSpan[] =>
   ROW_ACROSS_PAGES.map((body, index) => spanFor(ROW_ACROSS_PAGES_SOURCE, index + 1, body));
+// Review round 7 (section 7, tables across a page break). A page footnote drawn between the table's
+// parts is written after the table.
+const FOOTNOTE_ACROSS_PAGES = [
+  "\ufdd0\n\ufdd2\t\ufdd3\tAdults\t\ufdd3\t10 mg\u00b9",
+  "\ufdd2\t\ufdd3\tChildren\t\ufdd3\t5 mg\n\ufdd1\n\u00b9 Not studied in hepatic impairment.",
+];
+const FOOTNOTE_ACROSS_PAGES_SOURCE = customSource(FOOTNOTE_ACROSS_PAGES);
+// A cell that spans rows, broken at the page: its text stays in its own slot, and the later row,
+// which the earlier page draws, follows it on the later page.
+const SPAN_ACROSS_PAGES = [
+  "\ufdd0\n\ufdd2\t\ufdd3\tAdults with renal",
+  "\timpairment\t\ufdd3\t10 mg\n\ufdd2\t\ufdd5\t\t\ufdd3\t5 mg\n\ufdd1",
+];
+const SPAN_ACROSS_PAGES_SOURCE = customSource(SPAN_ACROSS_PAGES);
+// A footer row repeated on every page is written where the table last has it.
+const FOOTER_ACROSS_PAGES = [
+  "\ufdd0\n\ufdd2\t\ufdd3\ta\t\ufdd3\t1",
+  "\ufdd2\t\ufdd3\tb\t\ufdd3\t1\n\ufdd2\t\ufdd3\tTotal\t\ufdd3\t2\n\ufdd1",
+];
+const FOOTER_ACROSS_PAGES_SOURCE = customSource(FOOTER_ACROSS_PAGES);
+const spansOf = (bodies: string[], source: SourceDocumentText): SourceSpan[] =>
+  bodies.map((body, index) => spanFor(source, index + 1, body));
 const SPANNED_DOSE_TABLE =
   '<table><tr><td>Adults</td><td rowspan="3">10 mg</td></tr><tr><td>Children</td></tr><tr><td>Elderly</td></tr></table>';
 const MID_LINE_BULLET = "Take 2 \u2022 10 mg daily.";
@@ -2321,6 +2343,91 @@ export const verifyCases: VerifyCase[] = [
           "<table><tr><td>Dose</td><td>Adults with renal</td><td>impairment 10 mg once daily</td><td>Oral</td></tr></table>",
         ),
         rowAcrossPagesSpans(),
+      ),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  // Review round 7: tables across a page break (section 7).
+  {
+    name: "page-footnote-between-table-parts-after-the-table",
+    input: toInput(
+      FOOTNOTE_ACROSS_PAGES_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div(
+          "<table><tr><td>Adults</td><td>10 mg\u00b9</td></tr><tr><td>Children</td><td>5 mg</td></tr></table><p>\u00b9 Not studied in hepatic impairment.</p>",
+        ),
+        spansOf(FOOTNOTE_ACROSS_PAGES, FOOTNOTE_ACROSS_PAGES_SOURCE),
+      ),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "page-footnote-moved-into-a-cell-mismatches",
+    input: toInput(
+      FOOTNOTE_ACROSS_PAGES_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div(
+          "<table><tr><td>Adults</td><td>10 mg\u00b9 \u00b9 Not studied in hepatic impairment.</td></tr><tr><td>Children</td><td>5 mg</td></tr></table>",
+        ),
+        spansOf(FOOTNOTE_ACROSS_PAGES, FOOTNOTE_ACROSS_PAGES_SOURCE),
+      ),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "row-span-broken-across-page-keeps-its-slot",
+    input: toInput(
+      SPAN_ACROSS_PAGES_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div(
+          '<table><tr><td rowspan="2">Adults with renal impairment</td><td>10 mg</td></tr><tr><td>5 mg</td></tr></table>',
+        ),
+        spansOf(SPAN_ACROSS_PAGES, SPAN_ACROSS_PAGES_SOURCE),
+      ),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "row-span-word-moved-to-the-next-row-mismatches",
+    input: toInput(
+      SPAN_ACROSS_PAGES_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div(
+          '<table><tr><td rowspan="2">Adults with renal</td><td>10 mg</td></tr><tr><td>impairment 5 mg</td></tr></table>',
+        ),
+        spansOf(SPAN_ACROSS_PAGES, SPAN_ACROSS_PAGES_SOURCE),
+      ),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "repeated-footer-row-where-the-table-last-has-it",
+    input: toInput(
+      FOOTER_ACROSS_PAGES_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div(
+          "<table><tbody><tr><td>a</td><td>1</td></tr><tr><td>b</td><td>1</td></tr></tbody><tfoot><tr><td>Total</td><td>2</td></tr></tfoot></table>",
+        ),
+        spansOf(FOOTER_ACROSS_PAGES, FOOTER_ACROSS_PAGES_SOURCE),
+      ),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "repeated-footer-row-mid-table-mismatches",
+    input: toInput(
+      FOOTER_ACROSS_PAGES_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div(
+          "<table><tr><td>a</td><td>1</td></tr><tr><td>Total</td><td>2</td></tr><tr><td>b</td><td>1</td></tr></table>",
+        ),
+        spansOf(FOOTER_ACROSS_PAGES, FOOTER_ACROSS_PAGES_SOURCE),
       ),
     ),
     expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },

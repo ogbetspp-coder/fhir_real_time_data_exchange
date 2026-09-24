@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and four reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and five reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -242,15 +242,20 @@ The contract replaces the 2.0.0 table and list rules:
   that cannot place pictures must refuse a document that has them.
 
 - **Line layout.** Every block is on its own line, as the scanner writes it: ⟦table⟧, a caption,
-  each ⟦row⟧ and ⟦/table⟧ each start a line, and so does a paragraph, heading or list item. A
-  title printed above a table in a PDF is a paragraph before ⟦table⟧ (a PDF has no captions unless it is tagged with a `Caption` element; the spec's §7 is the
-  full text). A
-  `ul` item's bullet is emitted as §3 step 4 removes it, or not at all.
-- **Page breaks.** A table, and a cell, that continue across a page break stay one table and one
-  cell; a row's text is emitted in slot order, each cell's text whole, so the text after the
-  break in a row's first continued cell, and every later slot of the row, go on the later page; the continuation of a row begins with U+0009, or with the rest of a word hyphenated at the
-  break; a repeated header or footer row and a continuation label are emitted once (the spec's §7
-  is the full text).
+  each ⟦row⟧ and ⟦/table⟧ each start a line, and outside a table cell so does a paragraph,
+  heading or list item (inside a cell they stay on the cell's line). A title printed above a
+  table is a paragraph before ⟦table⟧ unless the document marks it as a caption (a Word caption
+  bound to the table, a tagged PDF's `Caption` element). Outside a cell a `ul` item's bullet is
+  emitted as §3 step 4 removes it, or not at all; inside a cell, not at all.
+- **Page breaks.** A table that continues across a page break is written as its logical text:
+  one ⟦table⟧, the caption, the rows in order, each row's slots in order with each cell's text
+  whole (a cell spanning rows in the row it starts in), one ⟦/table⟧, and nothing else between
+  them. A repeated header row is written where the table first has it, a repeated footer row where
+  it last has it, a continuation label not at all, and a page footnote drawn between the table's
+  parts after ⟦/table⟧. The logical text is split once per break, at a cell or row boundary,
+  whitespace in a cell, or a hyphenated word; the later page then begins with U+0009, ⟦row⟧, or
+  the rest of the word. Any allowed split gives the same normalised text (the spec's §7 is the
+  full text; rounds 4 to 7 below found the cases this rule now covers).
 - **Structured sources.** An extractor over a structured source (an authority's FHIR ePI, ADR 0005) emits one page per source section, in source order, with the whole page as the body,
   beginning and ending with U+000A as the scanner's text does. Each page's text is the section
   narrative as a renderer draws it, following the rules above. The narrative section's span
@@ -509,3 +514,20 @@ compared the agent's test double with the service over every code point.
    `ul`-bullet rules limited to text outside a table cell. Fixed. The review also noted that ADR
    0003's Unicode-version bullet reads more strongly than its amended Decision; that wording is on
    `main` already and is left for the next change to that ADR.
+
+## Seventh review (2026-09-23, of the implementation): findings and what changed
+
+The seventh review ran 54 page-break cases through both verifiers (identical report hashes),
+compared the agent's test double with the service on 2 962 083 quotes (no divergence), and
+checked 120 004 list counters in both languages (identical).
+
+1. **High.** A page footnote drawn between a table's two parts read as the last cell's text, so a
+   narrative moving the footnote into that cell verified. 2. **Medium.** Where a spanning cell's
+   overflow goes was open to a page-by-page reading that let a word move into the next row. 3. **Medium.** A repeated footer row was to be written "where the table first has it", mid-table. 4. **Low.** "First continued cell" was undefined when that cell has no text on the earlier page.
+   Rounds 4 to 7 each found one more page-break case, so §7 was rewritten from a list of cases to
+   one rule: a table across pages is its logical text (slot order, each cell whole, a spanning
+   cell in the row it starts in, nothing else inside it; a repeated header where the table first
+   has it, a repeated footer where it last has it, a footnote after the table), split once per
+   break at a boundary, whitespace or a hyphenated word. Six verify vectors pin the three new
+   cases. 5. and 6. **Low.** The line-layout wording in this note, and the zone-a README's count
+   of added vectors. Fixed.

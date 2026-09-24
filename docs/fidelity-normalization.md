@@ -619,26 +619,37 @@ extractor is a controlled component: its name and version are recorded in
   U+0009 U+FDD5 U+0009; then U+000A U+FDD1. Every row has the same number of slots; a line break
   inside a cell is emitted as U+0020, except a discretionary hyphen, which is U+00AD U+000A. An
   extractor that cannot tell a merged slot from an empty cell, or cannot recover a table's grid,
-  must refuse the document rather than guess: the grid is compared (section 5). A table that
-  continues across a page break is one table: no U+FDD1 before the break and no U+FDD0 after
-  it. A header or footer row the document repeats on the new page, and a continuation label
-  such as "Table 2 (continued)", is emitted once, where the table first has it (a label, not
-  at all); the repeated copy is drawn text that is excluded from the body like a running header,
-  and counts in `pageCodePoints` and against the page's 240 excluded code points (section 1). A row's text is always emitted in slot order, each cell's text whole. When a row
-  breaks across a page, the earlier page holds the row's text up to the break in its first
-  continued cell; everything after that point (the rest of that cell, and every later slot of
-  the row, including text the earlier page draws beside it, and the overflow of a cell that
-  spans rows) is emitted on the later page. An extractor that cannot do this must refuse the
-  document: text drawn beside a continued cell and written on the earlier page would read as
-  if it stood before the continuation, in another cell. A cell that continues across the break
-  is one cell, and the text that continues a row after the break begins with U+0009, unless the body before the break ends with U+00AD
-  U+000A (a word continued): then it begins with the rest of the word, which section 3 step 1
-  joins to the row's line. After step 1, every line of a table's body text from its first U+FDD2 to
-  the line before its U+FDD1 that holds anything but whitespace holds U+0009 or U+FDD2, so section 3 step 4
-  reads a bullet in a cell as content on a continuation line too (a page body ends with a line
-  feed, section 1, so the rest of the cell opens a new line). The verifier does not check this,
-  as it checks no other duty of this section; an extractor that breaks it can make a bullet in
-  a cell's continuation vanish on the page side only;
+  must refuse the document rather than guess: the grid is compared (section 5);
+- write a table that continues across a page break as its logical text, split once per break.
+  The logical text is what the scanner would read from the table the document draws: one U+FDD0,
+  the caption, the rows in order, each row's slots in order with each cell's text whole (a cell
+  that spans rows belongs to the row it starts in, and all of its text stands in its own slot),
+  one U+FDD1. Nothing else stands between U+FDD0 and U+FDD1:
+  - a header row the document repeats on a new page is written where the table first has it, a
+    footer row it repeats where the table last has it, and a continuation label ("Table 2
+    (continued)") not at all; every other copy is drawn text excluded from its page's body like
+    a running header or footer, counted in `pageCodePoints` and against the page's 240 excluded
+    code points (section 1), and an extractor that cannot exclude a copy that way must refuse
+    the document;
+  - text the document draws between two parts of the table that is not a running header or
+    footer (a page footnote, a note at the page foot) is written after the table's U+FDD1, in
+    its reading order among whatever follows the table.
+
+  The earlier page's body then holds the logical text up to one split point and the later page's
+  the rest, which may therefore include text the earlier page draws (the rest of a row broken in
+  several cells, a spanning cell's overflow, the cells of later rows beside it). The split point
+  is a cell boundary, a row boundary, or whitespace inside a cell's text, and the later page's
+  text then begins with U+0009 or with U+FDD2 (or, for a split inside the caption, with the rest
+  of the caption); or it is inside a word the document hyphenates at
+  the break, and the earlier page's body ends with U+00AD U+000A and the later page's text begins
+  with the rest of the word, which section 3 step 1 joins. So, after step 1, every line of a
+  table's body text from its first U+FDD2 to the line before its U+FDD1 that holds anything but
+  whitespace holds U+0009 or U+FDD2, and section 3 step 4 reads a bullet in a cell as content on
+  a continuation line too. Any split point allowed here gives the same normalised text. An
+  extractor that cannot produce the logical text, or cannot tell which text belongs to the table,
+  must refuse the document. The verifier does not check this, as it checks no other duty of this
+  section; an extractor that breaks it can move text into or out of a cell on the page side only;
+
 - emit a list marker (a bullet glyph, section 3 step 4) followed by U+0020, never U+0009: the
   tab after a list marker is layout, not a cell boundary. A word processor's list (`•` U+0009
   `Adults: 10 mg`) extracted with its tab reads as a table row, its bullet as content, and a
