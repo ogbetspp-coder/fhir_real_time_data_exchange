@@ -55,7 +55,9 @@ Three facts about that source meet three rules of the record:
      particular `dir` other than `ltr` (`<p dir="rtl">10 mg or 20 mg</p>` draws "mg or 20 mg
      10"), `bgcolor`, `background`, `hidden`, `li@value`, `ol@reversed`, `type` outside a list,
      and `font@color`, `face` and `size`. No element is unwrapped or removed except a `span`
-     left with no attributes, and a link, whose text is kept and whose target is not drawn; any
+     left with no attributes, and a link, whose text is kept and whose target is not drawn (and
+     beyond unwrapping, T renames a raised or lowered run as `sup` or `sub` and deletes a picture
+     only as decision 3 allows); any
      other element the scanner refuses (`font`, `center`, `bdo`, `ruby`, `q`, `ins`, `del`, `s`)
      refuses the section.
    - **Closed CSS list, by property and value, that can neither hide nor overprint text.** Font
@@ -140,7 +142,11 @@ Three facts about that source meet three rules of the record:
    carried, the reader emits nothing for it, and the import records it, with its reference,
    section and the evidence, as a finding. That is not a repair: the record shows what every
    reader of the authority's publication sees. Any other failure to fetch a picture fails the
-   import, since it says nothing about what readers see.
+   import, since it says nothing about what readers see. A fetched picture is carried only if its
+   bytes are a PNG or JPEG file by signature, under the media type they are (anything else, a
+   GIF, SVG or WebP labelled as PNG included, refuses the section), and only if the authority
+   does not draw it much smaller than its own size (a large image drawn small would be carried
+   at full size once T drops `width` and `height`).
 
 4. **The approval is the authority's publication.** The submission's approval names the
    authority's publication (ePI identifier and procedure number), not an approval of ours.

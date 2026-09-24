@@ -6,8 +6,8 @@ evidenced libraries". The UR- rows it cites are in that file._
 **What changed.** `NORMALIZATION_VERSION` moved from `fidelity-norm/2.0.0` to
 `fidelity-norm/3.0.0` in `src/fidelity/normalize.ts` and `zone-a/src/zone_a/fidelity/normalize.py`,
 and `docs/fidelity-normalization.md` was updated to 3.0.0 (the preamble and sections 2, 4, 5, 7
-and 9, and section 3 step 5, which no longer counts U+1680 OGHAM SPACE MARK as whitespace;
-sections 1, 6 and 8 unchanged). The design is `docs/design/fidelity-norm-3-0-0.md` as
+and 9; section 3 step 5, which no longer counts U+1680, U+2006, U+2009, U+200A and U+202F as
+whitespace; and section 6's edge wording, which follows; sections 1 and 8 unchanged). The design is `docs/design/fidelity-norm-3-0-0.md` as
 amended by its independent reviews, prompted by roadmap item 3a and ADR 0005. In short:
 
 - `ol` is allowed with `type` (`1 a A i I`) and `start` (`0|-?[1-9][0-9]{0,3}`), and each of its
@@ -25,14 +25,21 @@ amended by its independent reviews, prompted by roadmap item 3a and ADR 0005. In
 - a narrative whose normalised text is only spaces and grid markers is `empty-narrative`, and
   the crosswalk ignores grid markers, and for a mandatory section pictures, when it decides
   whether a section carries narrative;
-- U+FFFC and U+FDD0–U+FDEF reject in narrative (`reserved-character`), the one rule applied to
-  one side only;
+- U+FFFC and U+FDD0–U+FDEF reject in narrative (`reserved-character`), and so do U+00AD and
+  U+200B (`invisible-character`, withdrawing `soft-hyphen-at-boundary`): the two rules applied
+  to one side only;
+- U+1680, U+2006, U+2009, U+200A and U+202F leave the section 3 whitespace list, since a renderer
+  draws them as a stroke or a pixel or two wide;
+- nesting is bounded (`nesting-depth`), `]]>` in text rejects (`cdata`), and a composition across
+  inline markup rejects (`combining-across-markup`);
 - the extractor contract writes tables with their grid (and a table across pages as its logical
   text, split once per break), numbered markers with a space, pictures with their hash, a
   continuation line that begins with a bullet glyph with a leading U+0009, and a structured
   source as one page per section.
 
-`XhtmlErrorCode` gains `list-content`, `reserved-character` and `table-size`.
+`XhtmlErrorCode` gains `list-content`, `reserved-character`, `table-size`,
+`invisible-character`, `nesting-depth` and `combining-across-markup`, and loses
+`soft-hyphen-at-boundary`.
 
 **Why.** Roadmap item 3a takes the EMA's own ePI for Imatinib Teva through the system. Its
 summary of product characteristics has six numbered lists, 46 cells spanning columns, five
@@ -137,7 +144,8 @@ closes the open items the reviews recorded (the blast radius below says why).
 **Steps 1–6.** 1: `NORMALIZATION_VERSION` is `fidelity-norm/3.0.0` on both sides. 2:
 `npm run contracts:generate` (no drift), `npm run vectors:generate`, `npm run contracts:fixtures`,
 `npm run contracts:quote-edge` and `npm run differential:smoke` regenerated
-`test/fixtures/fidelity/vectors.json` (411 → 522 vectors: normalisation 62 → 63 → 64, XHTML 214 → 291, verify 135 → 167), the four contract fixtures and the smoke corpus. 3: every changed vector,
+`test/fixtures/fidelity/vectors.json` (411 → 545 vectors: normalisation 62 → 69, XHTML 214 → 308, verify 135 → 168; 143 added,
+9 removed or renamed), the four contract fixtures and the smoke corpus. 3: every changed vector,
 below. 4: the new vectors: every case the design names, both sides of every boundary (counter
 styles at 26/27, 703, 3999/4000 (702 in the differential), −1/0/1; `start` at `-0`, `007`, `9999`, `10000`; spans at
 0, `02`, 1000, 1001; each `src` form and each refused form; U+FFFC, U+FDD0 and U+FDEF by reference,
@@ -162,19 +170,23 @@ now written with its grid, so every verify vector built on that source also move
 `extractedTextSha256` and its coverage figures, with no status or reason changed. The vectors
 whose outcome changed, each reviewed:
 
-| Vector (family)                                                                                                                                                                                                                                                                                                                                                           | 2.0.0                                         | 3.0.0                                                                                                                         | Reason                                                                                                                                |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `rejects-ol` → `accepts-ol` (xhtml)                                                                                                                                                                                                                                                                                                                                       | `unknown-element`                             | `1. a`                                                                                                                        | `ol` is allowed; its marker is text.                                                                                                  |
-| `rejects-colspan` → `accepts-colspan` (xhtml)                                                                                                                                                                                                                                                                                                                             | `forbidden-attribute`                         | grid with one covered-left slot (a row of single cells added, since a column no single cell starts in is drawn at zero width) | Spans are allowed and carried in the grid.                                                                                            |
-| `rejects-rowspan` → `rejects-rowspan-past-group` (xhtml)                                                                                                                                                                                                                                                                                                                  | `forbidden-attribute`                         | `table-shape`                                                                                                                 | A row span of 2 in a one-row table is clipped by a renderer.                                                                          |
-| `accepts-nested-table-in-cell` → `rejects-nested-table-in-cell` (xhtml)                                                                                                                                                                                                                                                                                                   | text                                          | `table-structure`                                                                                                             | Nested tables are refused, so grid text never nests.                                                                                  |
-| `rejects-uneven-nested-table` (xhtml)                                                                                                                                                                                                                                                                                                                                     | `table-shape`                                 | `table-structure`                                                                                                             | The nested table is refused before its shape is decided.                                                                              |
-| `empty-table-div` (verify, new)                                                                                                                                                                                                                                                                                                                                           | —                                             | `empty-narrative`                                                                                                             | Grid markers are not drawn text; a table of empty cells draws nothing.                                                                |
-| `rejects-unknown-element`, `soft-hyphen-decided-after-scan`, `rejects-unknown-before-root` (xhtml)                                                                                                                                                                                                                                                                        | `unknown-element`                             | `unknown-element`                                                                                                             | Input changed from `img` to `iframe`, since `img` is now known; the rule each pins is unchanged.                                      |
-| 12 accepted tables (`table`, `accepts-table-section-order`, `accepts-caption-first`, `accepts-scope-on-th`, `accepts-whitespace-in-table-parts`, `accepts-header-and-data-cells`, `accepts-empty-table`, `accepts-caption-only-table`, `accepts-empty-rows`, `accepts-ascii-whitespace-in-tags`, `cell-breaks-are-tabs`, `accepts-soft-hyphen-before-br-in-cell`) (xhtml) | text                                          | the same text with the grid markers                                                                                           | Every table's text carries its grid; nothing else moved.                                                                              |
-| `spanned-cell-rejected` → `spanned-cell-against-separate-cells` (verify)                                                                                                                                                                                                                                                                                                  | `malformed-narrative` / `forbidden-attribute` | `mismatch`                                                                                                                    | A span is allowed; drawing two source cells as one spanned cell is a different table.                                                 |
-| `row-cell-cut-before-tab-against-cell` (verify)                                                                                                                                                                                                                                                                                                                           | `verified`                                    | `mismatch`                                                                                                                    | A narrative table carries its grid and so verifies only against a page with the same grid; this 2.0.0-shaped row has none.            |
-| `bullet-in-*-cell-*`, `bullet-row-against-cells-without-bullet`, `bullet-in-cell-paragraph-against-row` (verify)                                                                                                                                                                                                                                                          | as before                                     | as before                                                                                                                     | The sources were rewritten in the 3.0.0 table form; each outcome, and the rule it pins (a bullet in a cell is content), is unchanged. |
+| Vector (family)                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | 2.0.0                                                | 3.0.0                                                                                                                         | Reason                                                                                                                                |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `rejects-ol` → `accepts-ol` (xhtml)                                                                                                                                                                                                                                                                                                                                                                                                                                                           | `unknown-element`                                    | `1. a`                                                                                                                        | `ol` is allowed; its marker is text.                                                                                                  |
+| `rejects-colspan` → `accepts-colspan` (xhtml)                                                                                                                                                                                                                                                                                                                                                                                                                                                 | `forbidden-attribute`                                | grid with one covered-left slot (a row of single cells added, since a column no single cell starts in is drawn at zero width) | Spans are allowed and carried in the grid.                                                                                            |
+| `rejects-rowspan` → `rejects-rowspan-past-group` (xhtml)                                                                                                                                                                                                                                                                                                                                                                                                                                      | `forbidden-attribute`                                | `table-shape`                                                                                                                 | A row span of 2 in a one-row table is clipped by a renderer.                                                                          |
+| `accepts-nested-table-in-cell` → `rejects-nested-table-in-cell` (xhtml)                                                                                                                                                                                                                                                                                                                                                                                                                       | text                                                 | `table-structure`                                                                                                             | Nested tables are refused, so grid text never nests.                                                                                  |
+| `rejects-uneven-nested-table` (xhtml)                                                                                                                                                                                                                                                                                                                                                                                                                                                         | `table-shape`                                        | `table-structure`                                                                                                             | The nested table is refused before its shape is decided.                                                                              |
+| 14 soft-hyphen vectors (`rejects-soft-hyphen-before-br`, `rejects-soft-hyphen-before-block-end`, `soft-hyphen-before-raw-lf-is-a-space`, `soft-hyphen-before-lf-reference-is-a-space`, `soft-hyphen-cr-then-br-is-a-space`, `raw-soft-hyphen-before-crlf-is-a-space`, `rejects-soft-hyphen-before-hr`, `soft-hyphen-decided-after-scan`, `unbalanced-before-soft-hyphen`, `rejects-soft-hyphen-before-caption-end`, and four `accepts-soft-hyphen-*` renamed `rejects-soft-hyphen-*`) (xhtml) | `soft-hyphen-at-boundary`, `unbalanced-tag`, or text | `invisible-character`                                                                                                         | Narrative holds no soft hyphen from 3.0.0.                                                                                            |
+| `soft-hyphen-entity-in-narrative`, `soft-hyphen-before-cr-and-br`, `soft-hyphen-before-raw-line-feed` and its two `-against-*` variants (verify)                                                                                                                                                                                                                                                                                                                                              | `verified` or `mismatch`                             | `malformed-narrative` / `invisible-character`                                                                                 | The same.                                                                                                                             |
+| `span-ends-with-thin-space-inside-number`, `span-ends-with-narrow-no-break-space-inside-number` (verify)                                                                                                                                                                                                                                                                                                                                                                                      | `invalid-provenance` / `word-cut`                    | `mismatch`                                                                                                                    | U+2009 and U+202F are content, so the narrative no longer reads a space there; still a failure.                                       |
+| `unicode-spaces`, `narrow-no-break-space-after-overrides` (normalisation)                                                                                                                                                                                                                                                                                                                                                                                                                     | U+202F → space                                       | U+202F kept                                                                                                                   | U+202F is content.                                                                                                                    |
+| `empty-table-div` (verify, new)                                                                                                                                                                                                                                                                                                                                                                                                                                                               | —                                                    | `empty-narrative`                                                                                                             | Grid markers are not drawn text; a table of empty cells draws nothing.                                                                |
+| `rejects-unknown-element`, `soft-hyphen-decided-after-scan`, `rejects-unknown-before-root` (xhtml)                                                                                                                                                                                                                                                                                                                                                                                            | `unknown-element`                                    | `unknown-element`                                                                                                             | Input changed from `img` to `iframe`, since `img` is now known; the rule each pins is unchanged.                                      |
+| 12 accepted tables (`table`, `accepts-table-section-order`, `accepts-caption-first`, `accepts-scope-on-th`, `accepts-whitespace-in-table-parts`, `accepts-header-and-data-cells`, `accepts-empty-table`, `accepts-caption-only-table`, `accepts-empty-rows`, `accepts-ascii-whitespace-in-tags`, `cell-breaks-are-tabs`, `accepts-soft-hyphen-before-br-in-cell`) (xhtml)                                                                                                                     | text                                                 | the same text with the grid markers                                                                                           | Every table's text carries its grid; nothing else moved.                                                                              |
+| `spanned-cell-rejected` → `spanned-cell-against-separate-cells` (verify)                                                                                                                                                                                                                                                                                                                                                                                                                      | `malformed-narrative` / `forbidden-attribute`        | `mismatch`                                                                                                                    | A span is allowed; drawing two source cells as one spanned cell is a different table.                                                 |
+| `row-cell-cut-before-tab-against-cell` (verify)                                                                                                                                                                                                                                                                                                                                                                                                                                               | `verified`                                           | `mismatch`                                                                                                                    | A narrative table carries its grid and so verifies only against a page with the same grid; this 2.0.0-shaped row has none.            |
+| `bullet-in-*-cell-*`, `bullet-row-against-cells-without-bullet`, `bullet-in-cell-paragraph-against-row` (verify)                                                                                                                                                                                                                                                                                                                                                                              | as before                                            | as before                                                                                                                     | The sources were rewritten in the 3.0.0 table form; each outcome, and the rule it pins (a bullet in a cell is content), is unchanged. |
 
 **Differential proof.** `scripts/fidelity/differential.ts` now generates ordered lists (every
 style, starts at the edges of each range, 28-item lists), grids with column and row spans
@@ -194,48 +206,56 @@ vectors):
 
 | Break                                                     | Differential    | Vectors |
 | --------------------------------------------------------- | --------------- | ------- |
-| alphabetic counter off by one                             | 10 / 10 / 9     | 3       |
-| roman range to 4000                                       | 1 / 3 / 4       | 1       |
-| ordinal not advanced                                      | 11 / 26 / 27    | 5       |
-| `li` allowed anywhere                                     | 114 / 130 / 134 | 22      |
-| an element allowed in a list                              | 1 / 2 / 1       | 1       |
-| text allowed in a list                                    | 2 / 1 / 2       | 2       |
-| overlap not checked                                       | 3 / 5 / 2       | 2       |
-| clipped row span not checked                              | 3 / 3 / 4       | 2       |
+| alphabetic counter off by one                             | 5 / 8 / 7       | 3       |
+| roman range to 4000                                       | 5 / 2 / 1       | 1       |
+| ordinal not advanced                                      | 17 / 20 / 24    | 5       |
+| `li` allowed anywhere                                     | 99 / 97 / 107   | 26      |
+| an element allowed in a list                              | 0 / 1 / 2       | 1       |
+| text allowed in a list                                    | 2 / 0 / 0       | 2       |
+| overlap not checked                                       | 6 / 2 / 6       | 2       |
+| clipped row span not checked                              | 2 / 3 / 0       | 2       |
 | a row with a hole not refused                             | 0 / 0 / 0       | 0       |
-| zero-height row not refused                               | 1 / 0 / 1       | 1       |
-| zero-width column not refused                             | 6 / 7 / 8       | 1       |
-| covered-left slots dropped                                | 12 / 8 / 8      | 4       |
-| covered-above slots before a cell dropped                 | 7 / 3 / 5       | 4       |
-| covered-above slots after a row dropped                   | 10 / 7 / 3      | 3       |
-| cell marker dropped                                       | 34 / 30 / 27    | 31      |
-| row marker dropped                                        | 44 / 46 / 38    | 32      |
-| end-of-table marker dropped                               | 46 / 51 / 44    | 34      |
-| nested table (in a cell or a caption) allowed             | 9 / 10 / 6      | 3       |
-| slot limit not checked                                    | 0 / 2 / 3       | 2       |
-| `table-size` decided before overlap                       | 0 / 0 / 1       | 1       |
-| picture hashed from another value                         | 19 / 18 / 21    | 4       |
-| picture token not closed                                  | 19 / 18 / 21    | 4       |
-| reference `src` accepted                                  | 5 / 7 / 5       | 6       |
-| reserved check of the whole `div` dropped                 | 3 / 2 / 2       | 1       |
-| `reserved-character` decided before `forbidden-character` | 3 / 2 / 2       | 1       |
-| reserved reference allowed                                | 4 / 4 / 3       | 4       |
-| reserved range narrowed to U+FDD0–U+FDD5                  | 3 / 1 / 1       | 1       |
-| span 1000 refused                                         | 4 / 6 / 7       | 4       |
-| `start="-0"` accepted                                     | 1 / 0 / 3       | 1       |
-| `data:` padding inside the body accepted                  | 3 / 5 / 1       | 1       |
-| `img` without `src` accepted                              | 2 / 4 / 5       | 2       |
-| `void-element` decided before a missing `src`             | 3 / 3 / 2       | 2       |
-| `img` not a void element                                  | 29 / 33 / 36    | 7       |
+| zero-height row not refused                               | 3 / 0 / 1       | 1       |
+| zero-width column not refused                             | 1 / 5 / 3       | 1       |
+| covered-left slots dropped                                | 5 / 3 / 9       | 4       |
+| covered-above slots before a cell dropped                 | 2 / 2 / 3       | 6       |
+| covered-above slots after a row dropped                   | 5 / 3 / 3       | 4       |
+| cell marker dropped                                       | 22 / 22 / 26    | 47      |
+| row marker dropped                                        | 32 / 41 / 35    | 48      |
+| end-of-table marker dropped                               | 35 / 44 / 38    | 50      |
+| nested table (in a cell or a caption) allowed             | 5 / 7 / 7       | 3       |
+| slot limit not checked                                    | 2 / 2 / 1       | 2       |
+| `table-size` decided before overlap                       | 2 / 0 / 0       | 1       |
+| picture hashed from another value                         | 15 / 20 / 15    | 4       |
+| picture token not closed                                  | 15 / 20 / 15    | 4       |
+| reference `src` accepted                                  | 4 / 3 / 1       | 6       |
+| reserved check of the whole `div` dropped                 | 3 / 3 / 4       | 1       |
+| `reserved-character` decided before `forbidden-character` | 0 / 0 / 0       | 1       |
+| reserved reference allowed                                | 4 / 3 / 2       | 4       |
+| reserved range narrowed to U+FDD0–U+FDD5                  | 2 / 2 / 4       | 1       |
+| span 1000 refused                                         | 6 / 3 / 2       | 4       |
+| `start="-0"` accepted                                     | 0 / 1 / 0       | 1       |
+| `data:` padding inside the body accepted                  | 3 / 2 / 0       | 1       |
+| `img` without `src` accepted                              | 3 / 4 / 5       | 2       |
+| `void-element` decided before a missing `src`             | 2 / 2 / 1       | 2       |
+| nesting depth not bounded                                 | 0 / 2 / 0       | 1       |
+| `small` inside `small` allowed                            | 0 / 0 / 0       | 1       |
+| indenting containers not bounded                          | 0 / 0 / 0       | 2       |
+| `]]>` in text accepted                                    | 0 / 1 / 0       | 1       |
+| composition across markup not checked                     | 2 / 1 / 1       | 4       |
+| invisible break in the `div` accepted                     | 421 / 373 / 400 | 3       |
+| invisible break by reference accepted                     | 3 / 3 / 4       | 19      |
+| `img` not a void element                                  | 25 / 35 / 29    | 9       |
 
-Every break but one is caught by the vectors, and every break but one by the differential on at
-least one seed; the rarest (a zero-height row, `table-size` before overlap, `start="-0"`, the
-slot limit) are drawn rarely enough, or masked often enough by an earlier error in the same
-generated document, to be missed at one or two seeds, and the vectors pin each. The hole check is
-never decisive on its own: a row with a hole always also covers fewer slots than the row its row
-span starts in (a cell takes the first uncovered slot, so the span's first row covers every slot
-up to the spanned column), so the unequal-width check already refuses it. It is kept because the
-specification states the rule directly. Each break was restored.
+Every break but one is caught by the vectors. The differential catches the frequent ones on all
+three seeds; the rarest (nesting and indent bounds, `small` inside `small`, `]]>`, the precedence
+of two pre-scan checks, `start="-0"`) are drawn rarely enough, or masked often enough by an
+earlier error in the same generated document, to be missed at some seeds, and the vectors pin
+each. The hole check is never decisive on its own: a row with a hole always also covers fewer
+slots than the row its row span starts in (a cell takes the first uncovered slot, so the span's
+first row covers every slot up to the spanned column), so the unequal-width check already
+refuses it. It is kept because the specification states the rule directly. Each break was
+restored.
 
 **Blast radius.**
 
@@ -273,7 +293,16 @@ specification states the rule directly. Each break was restored.
   bare spans unwrapped as a fourth operation of T, raised offsets summed per glyph, "draws
   nothing" defined and every uncovered page required to be blank, picture sizes bounded, a
   picture deleted only on pinned evidence that the authority's viewer draws nothing, and a
-  structured picture's token taken from `src` as T(div) holds it.
+  structured picture's token taken from `src` as T(div) holds it. A thirteenth review swept the
+  older rules against Chrome and found four false passes that predate 3.0.0: markup nested past
+  512 open elements, which an HTML parser rearranges (a bound of 32, `nesting-depth`, with
+  `small` inside `small`, a heading inside a heading and more than six indenting containers);
+  U+200A drawn about a pixel wide, and U+2006, U+2009 and U+202F barely wider (now content); a
+  combining mark after an inline tag, which NFC joins but a renderer draws apart
+  (`combining-across-markup`); and a soft hyphen or zero-width space inside a number, which a
+  narrow viewer breaks at (narrative now rejects both, `invisible-character`, which withdraws
+  `soft-hyphen-at-boundary`). It also found `]]>` in text accepted though an XML renderer then
+  draws nothing (`cdata`).
 
 - **Every submission carrying 2.0.0 is refused by the worker gate** from the moment this change
   deploys. Nothing in the repository produces a 2.0.0 submission after it.
@@ -285,6 +314,9 @@ specification states the rule directly. Each break was restored.
   table (the grid markers), a numbered list whose marker is followed by U+0009 or nothing, or a
   picture. An extractor that cannot recover a table's grid or place a picture must refuse the
   document.
+- **Narratives with a soft hyphen or a zero-width space** (from Word, for example) are now
+  `malformed-narrative` (`invisible-character`); a producer must drop them from the narrative,
+  and the page text of a drawn document keeps its line-end soft hyphens as before.
 - **Narratives.** A narrative with an `li` outside a direct `ol` or `ul` parent, anything but
   `li` directly in a `ul`, a table inside a table, a row drawn at zero height, a column drawn at
   zero width, U+FFFC or U+FDD0–U+FDEF is now

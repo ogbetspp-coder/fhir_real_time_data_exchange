@@ -7,9 +7,10 @@ This document is the language-neutral specification of the text normalisation an
 extraction used by the narrative fidelity check (ADR 0003). The TypeScript implementation in
 `src/fidelity/` and any re-implementation must produce identical results for the golden vectors
 in `test/fixtures/fidelity/`. Every rule below is applied identically to the extractor's page
-text and to the narrative text; nothing is applied to one side only, with one exception: the
-reserved code points (section 2) reject in narrative and are written by the extractor into page
-text, because they carry the table grids and pictures that section 5 emits.
+text and to the narrative text; nothing is applied to one side only, with two exceptions (section 2): the
+reserved code points reject in narrative and are written by the extractor into page text,
+because they carry the table grids and pictures that section 5 emits; and U+00AD and U+200B
+reject in narrative, while page text keeps U+00AD as the mark of a word hyphenated at a line end.
 
 ## 1. Text units
 
@@ -78,6 +79,15 @@ language needs them.
 Rejection applies to page text as well; a page containing these characters makes every span on
 it `span-not-found`.
 
+**Invisible breaks (narrative only).** A narrative `div` whose text holds U+00AD SOFT HYPHEN or
+U+200B ZERO WIDTH SPACE, raw or as a character reference, is `malformed-narrative` with reason
+`invisible-character` (from 3.0.0), decided after `reserved-character` for the whole `div` and
+for each decoded reference. Both are break opportunities a renderer takes at a narrow width,
+drawing "2-" / "10 mg" or "2" / "10 mg" where the check reads "210 mg". The rule is one-sided:
+page text keeps U+00AD as the extractor's mark for a word hyphenated at a line end (section 7),
+and step 1 still deletes both there. (Before 3.0.0 a narrative could hold U+00AD, and a rule
+refused it only before a block boundary; that rule, `soft-hyphen-at-boundary`, is withdrawn.)
+
 **Reserved code points (narrative only).** U+FFFC OBJECT REPLACEMENT CHARACTER and the
 noncharacters U+FDD0–U+FDEF are reserved: the scanner emits U+FFFC for a picture and U+FDD0–U+FDD5
 for a table's grid (section 5), so they never occur in narrative text itself. A narrative `div`
@@ -137,11 +147,13 @@ pair rejects even if the next reference completes it.
    so a list item at the start of a section is still a list item on both sides.
 
 5. Replace every whitespace-class code point with U+0020 — closed list: U+0009, U+000A,
-   U+000D, U+0020, U+00A0, U+2000–U+200A, U+2028, U+2029, U+202F, U+205F, U+3000.
+   U+000D, U+0020, U+00A0, U+2000–U+2005, U+2007, U+2008, U+2028, U+2029, U+205F, U+3000.
    Then collapse runs of U+0020 to a single U+0020 and remove leading and trailing U+0020.
    U+000B, U+000C and U+0085 are not in the list: section 2 rejects them. U+1680 OGHAM SPACE
    MARK is not in the list (from 3.0.0): a renderer draws it as a stroke, so "Take 2" U+1680
-   "10 mg" reads as a range, not as two numbers, and it is content.
+   "10 mg" reads as a range, not as two numbers, and it is content. Nor are U+2006, U+2009,
+   U+200A and U+202F (from 3.0.0): a renderer draws them one or two pixels wide, so "2" U+200A
+   "10" looks like "210"; they are content.
 
 The procedure is idempotent: applying it twice yields the first result (the golden vectors
 include the blocking cases that make step order matter, and step 4's rule that the start of the
@@ -258,7 +270,9 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   `⸺` U+2E3A, `︱` U+FE31, `~`, `<`, `[`), and U+00B1 and U+2213, reject (`unmappable-script`).
   The element's own script digits and signs (U+2070, U+00B9, U+00B2, U+00B3, U+2074–U+207E
   inside `sup`; U+2080–U+208E inside `sub`) are kept. Other code points (letters, footnote
-  marks, ®, `/`) are kept unchanged: raising a letter or a mark does not change what it says,
+  marks, ®, `/`) are kept unchanged. Raising a letter or a mark is taken not to change what it
+  says, which is not always so: `10<sup>n</sup>` reads "10n" and verifies against a plain "10n"
+  (a stated residual, as in ADR 0003),
   so `C<sub>max</sub>`, `<sup>a</sup>` and `<sup>®</sup>` are accepted, and `t<sub>1/2</sub>`
   is `t₁/₂`.
 - Tables contain only table parts. The only children of `table` are `caption`, `thead`,
@@ -323,14 +337,23 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   number), `tfoot` (at most one), never both forms in one table. `caption`, `thead`, `tbody`,
   `tfoot` must be direct children of `table`; `tr` of `table` or a section; `td` and `th` of
   `tr`. Violations reject (`table-structure`, `table-section-order`, or `misnested-tag`).
-- In the text the scanner emits, U+00AD followed by U+000A rejects
-  (`soft-hyphen-at-boundary`). That text has U+000A only from a block boundary or `br` outside a
-  table cell, and no U+000D at all: a line break in text is emitted as U+0020 (above), so U+00AD
-  before it is followed by a space, which step 1 does not join (`un` U+00AD U+000A `safe` in a
-  paragraph reads "un safe" and does not verify against a page's "unsafe"). In page text U+00AD
-  before a line break is the extractor's mark for a word broken across lines (section 7) and
-  step 1 joins it; in XHTML a block boundary or `br` is a visible new line, not a hyphenated
-  word.
+- Nesting is bounded (`nesting-depth`, from 3.0.0): at most 32 elements open below the root
+  (an HTML parser stops nesting at 512 open elements and moves what follows elsewhere, so a deeply
+  nested `sup` is drawn after the text that follows it); no `small` inside an open `small` and no
+  heading inside an open heading (each shrinks the text, towards illegible); and at most six of
+  `blockquote`, `ul`, `ol` and `dd` open at once, the new element included (each indents, and
+  more push the text off a narrow page).
+- The raw sequence `]]>` in text rejects (`cdata`): it ends a CDATA section to an XML parser,
+  which then refuses the document and draws none of it.
+- A composition across inline markup rejects (`combining-across-markup`, from 3.0.0): at each
+  start or end tag of `span`, `b`, `i`, `u`, `em`, `strong`, `sup`, `sub`, `small`, `a`, `abbr`,
+  `cite` or `code`, the 64 code points of the emitted text before it and the 64 after it must
+  give the same text through section 3 steps 1 to 3 together as separately. A renderer draws the
+  text on each side of such a tag in its own run, so a combining mark after the tag does not
+  join the letter before it: `CrCl &lt;<b>&#x338;</b> 30` is drawn "CrCl </ 30" while NFC reads
+  "≮", and `caf<b>e</b>&#x301;` is drawn with a separate accent.
+- A root language tag changes the font a renderer picks (`lang="ja"` draws Latin text, dashes
+  and ellipses in a Japanese font) but not the text; it is not compared.
 - Allowed attributes: `xmlns` (root), `xml:lang` and `lang` (root `div` only), `href` (`a`
   only, `https://` form only), `scope` (`th` only), `type` and `start` (`ol` only), `colspan`
   and `rowspan` (`td` and `th` only), `src` (`img` only, required there). Values must be double-
@@ -421,7 +444,7 @@ reason code is inside `reportHash`, so the order in which violations are decided
 - At a start tag: `malformed-tag`/`stray-lt`, then `uppercase-element`, then
   `unknown-element`, then `multiple-roots`/`root-not-div`, then attributes in document order
   (`forbidden-attribute`; root without xmlns = `root-not-div`; an `img` without `src` =
-  `forbidden-attribute`, after its attributes), then `void-element`, then the parent check, then
+  `forbidden-attribute`, after its attributes), then `void-element`, then `nesting-depth`, then the parent check, then
   `table-structure`, then `table-section-order`, then `table-shape` (an overlapping cell), then
   `table-size`. The
   parent check: `script-content` if the parent is `sup` or `sub`; else `misnested-tag` for a
@@ -434,22 +457,23 @@ reason code is inside `reportHash`, so the order in which violations are decided
   `</tbody>`, `</tfoot>` and `</table>`, a clipped row span, then at `</table>` the row widths,
   then a column drawn at zero width).
 - At `&`: `stray-amp`, then `text-outside-root`, then `unknown-entity`, then
-  `forbidden-character`, then `reserved-character`, then `table-content`, then `list-content`,
+  `forbidden-character`, then `reserved-character`, then `invisible-character`, then `table-content`, then `list-content`,
   then `unmappable-script`.
 - At a raw code point: `text-outside-root`, `table-content` or `list-content` (whichever the
-  parent makes applicable), then `unmappable-script`.
-- After a clean scan: `soft-hyphen-at-boundary`, then `empty-narrative`.
+  parent makes applicable), then `cdata` (the start of `]]>`), then `unmappable-script`.
+- After a clean scan: `combining-across-markup`, then `empty-narrative`.
 
 (So `<table><td>a</td></table>` is `misnested-tag`, `<iframe/>` is `unknown-element` and
 `<img/>` is `forbidden-attribute`.) The section 2 checks of the whole `div`, which precede the
-scan, decide `forbidden-character` and then `reserved-character` before any of these.
+scan, decide `forbidden-character`, then `reserved-character`, then `invisible-character` before any
+of these.
 
 The scanner's reason codes are, in the order of this section: `forbidden-character`,
-`reserved-character`, `root-not-div`, `multiple-roots`, `text-outside-root`,
+`reserved-character`, `invisible-character`, `root-not-div`, `multiple-roots`, `text-outside-root`,
 `uppercase-element`, `unknown-element`, `void-element`, `list-content`, `script-content`,
 `unmappable-script`, `table-content`, `table-shape`, `table-size`, `table-structure`,
 `table-section-order`,
-`misnested-tag`, `soft-hyphen-at-boundary`, `forbidden-attribute`, `comment`, `processing-instruction`,
+`misnested-tag`, `nesting-depth`, `combining-across-markup`, `forbidden-attribute`, `comment`, `processing-instruction`,
 `cdata`, `doctype`, `malformed-tag`, `stray-lt`, `stray-amp`, `unknown-entity`,
 `unbalanced-tag`.
 
@@ -484,9 +508,10 @@ The scanner's reason codes are, in the order of this section: `forbidden-charact
   is `invalid-provenance` with reason `word-cut`. The rule is about whitespace, not about
   letters: punctuation is not a boundary, because inside a number it is part of the number
   (`1.5`, `−20`, `0.5`, `1,000`) and inside a word it is part of the word (`non-steroidal`).
-  - Edge whitespace is the §3 step 5 whitespace list without U+00A0, U+2007 and U+202F. Those
-    three join the groups of a number (`10 000`), so for the edge rules they are not a
-    boundary between tokens.
+  - Edge whitespace is the §3 step 5 whitespace list without U+00A0 and U+2007. Those two join
+    the groups of a number (`10 000`), so for the edge rules they are not a boundary between
+    tokens. (U+2009 and U+202F, which also join groups, are content from 3.0.0, section 3, so no
+    edge falls inside them.)
   - Start. Read backwards from the code point before the first span's start offset through
     page n's body. On passing its bodyStart, continue from the last code point of page n−1's
     body, and so on through earlier pages. Only body text is read, and earlier pages are read
@@ -503,12 +528,11 @@ The scanner's reason codes are, in the order of this section: `forbidden-charact
     also Nd. The inner code point is the span's first code point that is not §3 step 5
     whitespace (at the start) or its last (at the end): a span that begins or ends with
     whitespace is judged by the digit inside it. So "…is 10" cannot be taken from "…is 10 000
-    IU", with a space, U+2009, U+00A0, U+202F or U+2007 between the groups or two of them ("10
-    ␠␠000", "10 U+2009␠000", "10 U+202F␠000"), even by a span that ends with the first space,
+    IU", with a space, U+00A0 or U+2007 between the groups or two of them ("10 ␠␠000"), even by a span that ends with the first space,
     nor "000 IU" after it by a span that starts with the second; a number at the end of one
     line and a number at the start of the next are separate. (The inner code point skips the
-    joiners U+00A0, U+2007 and U+202F as well, although they are not edge whitespace: a span
-    ending "10" U+202F before a space still ends inside the number.)
+    joiners U+00A0 and U+2007 as well, although they are not edge whitespace: a span ending "10"
+    U+00A0 before a space still ends inside the number.)
   - These rules apply together; any one of them makes a cut.
 
   So "Maximum dose is 1" cannot be taken from "Maximum dose is 1.5 mg", nor "20 °C." from
@@ -700,8 +724,9 @@ An extractor must:
   re-encode it. A picture is an embedded raster image drawn inline, including a logo
   or a decorative image; vector drawings, shapes and text boxes are not, and an extractor that
   meets one it cannot read as text must refuse the document. A structured source's picture that
-  is a reference is resolved to its bytes when they can be fetched and pinned, and otherwise
-  draws nothing and is emitted as nothing (ADR 0005 records it). An extractor that cannot place
+  is a reference is resolved against the authority's published base URL and carried as its
+  pinned bytes; it is emitted as nothing only on pinned evidence that the authority's own viewer
+  draws nothing for it, and any other failure to fetch it fails the import (ADR 0005). An extractor that cannot place
   pictures must refuse a document that has them. An extractor whose text layer itself contains
   U+FFFC or a code point in U+FDD0–U+FDEF must refuse the document (section 2);
 - put every block on its own line, as the scanner does: U+FDD0, a caption, each U+FDD2 and
@@ -719,7 +744,7 @@ An extractor must:
   lowered run as `sup` or `sub`, and replaces a referenced picture with its pinned `data:` URI or
   deletes it; it does nothing else. A picture's token is the hash of its `src` exactly as T(div)
   holds it, not re-encoded. Where the scanner refuses T(div) (any
-  section 5 reason, `soft-hyphen-at-boundary` included), where T meets anything not on its
+  section 5 reason), where T meets anything not on its
   lists, or where the div's text, character references decoded, holds U+00AD or another
   section 3 step 1 invisible character, the extractor refuses the section. A section draws nothing when section 5's `empty-narrative` test holds for
   its text; it gets its page and no narrative, and every page without a span must normalise to
@@ -778,7 +803,7 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   emits U+FFFC, the SHA-256 of its `src` and U+FFFC; the tables of a narrative cover at most
   50 000 slots (`table-size`); a narrative of only grid markers is `empty-narrative`. U+FFFC and
   U+FDD0–U+FDEF reject in narrative
-  (`reserved-character`, the one rule applied to one side only). U+1680 OGHAM SPACE MARK, drawn as a stroke, leaves the section 3 whitespace list and is content. Section 7 qualifies structured sources only;
+  (`reserved-character`, one of the two rules applied to one side only). U+1680 OGHAM SPACE MARK, drawn as a stroke, and U+2006, U+2009, U+200A and U+202F, drawn a pixel or two wide, leave the section 3 whitespace list and are content; narrative rejects U+00AD and U+200B (`invisible-character`, withdrawing `soft-hyphen-at-boundary`); nesting is bounded (`nesting-depth`); `]]>` in text rejects (`cdata`); and a composition across inline markup rejects (`combining-across-markup`). Section 7 qualifies structured sources only;
   drawn-document extraction is not qualified until a later version closes the open items the
   reviews recorded. The extractor contract (section 7) writes tables with their grid, numbered markers with a space, pictures with their hash, and
   a structured source as one page per section. Major under section 8: extractor output that

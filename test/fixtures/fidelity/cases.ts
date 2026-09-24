@@ -489,6 +489,9 @@ const OGHAM_LINE = "Take 2\u168010 mg daily.";
 const OGHAM_SOURCE = customSource([OGHAM_LINE]);
 const SPACE_LINE = "Take 2 10 mg daily.";
 const SPACE_SOURCE = customSource([SPACE_LINE]);
+// Review round 13: U+200A HAIR SPACE is drawn about a pixel wide, "210 mg", so it is content.
+const HAIR_LINE = "Take 2 10 mg tablets.";
+const HAIR_SOURCE = customSource([HAIR_LINE]);
 const SPANNED_DOSE_TABLE =
   '<table><tr><td>Adults</td><td rowspan="3">10 mg</td></tr><tr><td>Children</td></tr><tr><td>Elderly</td></tr></table>';
 const MID_LINE_BULLET = "Take 2 \u2022 10 mg daily.";
@@ -778,7 +781,11 @@ export const verifyCases: VerifyCase[] = [
         [spanFor(S, 1, INFUSION)],
       ),
     ),
-    expect: { status: "passed", sections: { "smpc.4.1": "verified" } },
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.1": "malformed-narrative" },
+      reasons: { "smpc.4.1": "invisible-character" },
+    },
   },
   // 2.0.0: digits inside `sup` and `sub` fold to script code points, so markup can no longer
   // raise a digit the source prints on the line.
@@ -1413,7 +1420,11 @@ export const verifyCases: VerifyCase[] = [
         spanFor(SMOKERS_SOURCE, 1, SMOKERS),
       ]),
     ),
-    expect: { status: "failed", sections: { "smpc.4.4": "mismatch" } },
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.4": "malformed-narrative" },
+      reasons: { "smpc.4.4": "invisible-character" },
+    },
   },
   {
     name: "soft-hyphen-before-raw-line-feed",
@@ -1423,7 +1434,11 @@ export const verifyCases: VerifyCase[] = [
         spanFor(SMOKERS_SOURCE, 1, SMOKERS),
       ]),
     ),
-    expect: { status: "failed", sections: { "smpc.4.4": "mismatch" } },
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.4": "malformed-narrative" },
+      reasons: { "smpc.4.4": "invisible-character" },
+    },
   },
   {
     name: "soft-hyphen-before-raw-line-feed-against-split-word",
@@ -1433,7 +1448,11 @@ export const verifyCases: VerifyCase[] = [
         spanFor(UNSAFE_SPLIT_SOURCE, 1, UNSAFE_SPLIT),
       ]),
     ),
-    expect: { status: "passed", sections: { "smpc.4.4": "verified" } },
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.4": "malformed-narrative" },
+      reasons: { "smpc.4.4": "invisible-character" },
+    },
   },
   {
     name: "soft-hyphen-before-raw-line-feed-against-joined-word",
@@ -1443,7 +1462,11 @@ export const verifyCases: VerifyCase[] = [
         spanFor(UNSAFE_SOURCE, 1, UNSAFE),
       ]),
     ),
-    expect: { status: "failed", sections: { "smpc.4.4": "mismatch" } },
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.4": "malformed-narrative" },
+      reasons: { "smpc.4.4": "invisible-character" },
+    },
   },
   // Row 5: section 2 on the div as received and on each reference as decoded.
   {
@@ -2099,11 +2122,7 @@ export const verifyCases: VerifyCase[] = [
         spanFor(GROUPED_THIN_THEN_SPACE_SOURCE, 1, "The maximum dose is 10\u2009"),
       ]),
     ),
-    expect: {
-      status: "failed",
-      sections: { "smpc.4.2.posology": "invalid-provenance" },
-      reasons: { "smpc.4.2.posology": "word-cut" },
-    },
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
   },
   {
     // The inner code point skips every section 3 whitespace code point, the joiners too: a span
@@ -2115,11 +2134,7 @@ export const verifyCases: VerifyCase[] = [
         spanFor(GROUPED_NNBSP_THEN_SPACE_SOURCE, 1, "The maximum dose is 10\u202f"),
       ]),
     ),
-    expect: {
-      status: "failed",
-      sections: { "smpc.4.2.posology": "invalid-provenance" },
-      reasons: { "smpc.4.2.posology": "word-cut" },
-    },
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
   },
   {
     name: "span-starts-with-space-inside-double-spaced-number",
@@ -2573,6 +2588,16 @@ export const verifyCases: VerifyCase[] = [
     ),
     expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
   },
+  {
+    name: "hair-space-against-a-space-mismatches",
+    input: toInput(
+      HAIR_SOURCE,
+      single("smpc.4.2.posology", paragraphs("Take 2&#x200A;10 mg tablets."), [
+        spanFor(HAIR_SOURCE, 1, HAIR_LINE),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
 ];
 
 export const throwCases: ThrowCase[] = [
@@ -2758,7 +2783,8 @@ const NORMALIZATION_CASES_2_0_0: NormalizationCase[] = [
     input: "a\u202eb",
     expected: { error: "forbidden-character" },
   },
-  { name: "narrow-no-break-space-after-overrides", input: "a\u202fb", expected: "a b" },
+  // Accepted next to the forbidden overrides; content from fidelity-norm/3.0.0, not a space.
+  { name: "narrow-no-break-space-after-overrides", input: "a\u202fb", expected: "a\u202fb" },
   {
     name: "rejects-bidi-isolate-first",
     input: "a\u2066b",
@@ -2780,6 +2806,13 @@ export const normalizationCases: NormalizationCase[] = [
   { name: "soft-hyphen-crlf", input: "intra­\r\nvenous", expected: "intravenous" },
   { name: "soft-hyphen-then-space-stays", input: "intra­ venous", expected: "intra venous" },
   { name: "ligature-then-combining", input: "ﬁ́", expected: "fí" },
+  // Spaces drawn one or two pixels wide are content (fidelity-norm/3.0.0): "2" U+200A "10" looks
+  // like "210".
+  { name: "hair-space-is-content", input: "Take 2\u200a10 mg", expected: "Take 2\u200a10 mg" },
+  { name: "thin-space-is-content", input: "10\u2009000 IU", expected: "10\u2009000 IU" },
+  { name: "six-per-em-space-is-content", input: "2\u200610", expected: "2\u200610" },
+  { name: "narrow-no-break-space-is-content", input: "10\u202f000", expected: "10\u202f000" },
+  { name: "four-per-em-space-is-still-a-space", input: "2\u200510", expected: "2 10" },
   // U+1680 OGHAM SPACE MARK is drawn as a stroke, so it is content (fidelity-norm/3.0.0).
   {
     name: "ogham-space-mark-is-content",
@@ -2798,7 +2831,8 @@ export const normalizationCases: NormalizationCase[] = [
     input: "  Take \t one\n\ntablet daily.  ",
     expected: "Take one tablet daily.",
   },
-  { name: "unicode-spaces", input: "a\u2003b\u202fc\u3000d\u2028e", expected: "a b c d e" },
+  // U+202F is content from fidelity-norm/3.0.0 (drawn a pixel or two wide); the others are spaces.
+  { name: "unicode-spaces", input: "a\u2003b\u202fc\u3000d\u2028e", expected: "a b\u202fc d e" },
   { name: "nfc", input: "café", expected: "café" },
   { name: "soft-hyphen", input: "intra­venous", expected: "intravenous" },
   { name: "zero-width", input: "a​b﻿c⁠d", expected: "abcd" },
@@ -2953,17 +2987,17 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "rejects-soft-hyphen-before-br",
     input: div("<p>intra&#173;<br/>venous</p>"),
-    expected: { error: "soft-hyphen-at-boundary" },
+    expected: { error: "invisible-character" },
   },
   {
     name: "rejects-soft-hyphen-before-block-end",
     input: div("<h2>intra&#173;</h2><p>venous</p>"),
-    expected: { error: "soft-hyphen-at-boundary" },
+    expected: { error: "invisible-character" },
   },
   {
-    name: "accepts-soft-hyphen-inside-text",
+    name: "rejects-soft-hyphen-inside-text",
     input: div("<p>intra&#173;venous</p>"),
-    expected: "\n\nintra­venous\n\n",
+    expected: { error: "invisible-character" },
   },
   {
     name: "rejects-javascript-href",
@@ -3362,47 +3396,47 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "soft-hyphen-before-raw-lf-is-a-space",
     input: div("<p>non&#173;\nsmokers</p>"),
-    expected: "\n\nnon\u00ad smokers\n\n",
+    expected: { error: "invisible-character" },
   },
   {
     name: "soft-hyphen-before-lf-reference-is-a-space",
     input: div("<p>non&#173;&#10;smokers</p>"),
-    expected: "\n\nnon\u00ad smokers\n\n",
+    expected: { error: "invisible-character" },
   },
   {
     name: "soft-hyphen-cr-then-br-is-a-space",
     input: div("<p>non&#173;&#13;<br/>smokers</p>"),
-    expected: "\n\nnon\u00ad \nsmokers\n\n",
+    expected: { error: "invisible-character" },
   },
   {
     name: "raw-soft-hyphen-before-crlf-is-a-space",
     input: div("<p>non\u00ad\r\nsmokers</p>"),
-    expected: "\n\nnon\u00ad  smokers\n\n",
+    expected: { error: "invisible-character" },
   },
   {
     name: "rejects-soft-hyphen-before-hr",
     input: div("<p>non\u00ad<hr/>smokers</p>"),
-    expected: { error: "soft-hyphen-at-boundary" },
+    expected: { error: "invisible-character" },
   },
   {
-    name: "accepts-soft-hyphen-before-cr-alone",
+    name: "rejects-soft-hyphen-before-cr-alone",
     input: div("<p>non&#173;&#13;smokers</p>"),
-    expected: "\n\nnon\u00ad smokers\n\n",
+    expected: { error: "invisible-character" },
   },
   {
-    name: "accepts-soft-hyphen-before-space",
+    name: "rejects-soft-hyphen-before-space",
     input: div("<p>non&#173; smokers</p>"),
-    expected: "\n\nnon\u00ad smokers\n\n",
+    expected: { error: "invisible-character" },
   },
   {
     name: "soft-hyphen-decided-after-scan",
     input: div("<p>non&#173;</p><iframe/>"),
-    expected: { error: "unknown-element" },
+    expected: { error: "invisible-character" },
   },
   {
     name: "unbalanced-before-soft-hyphen",
     input: `<div ${XHTML}><p>non&#173;</p>`,
-    expected: { error: "unbalanced-tag" },
+    expected: { error: "invisible-character" },
   },
   // Section 2 on the div as received, markup included, and on each reference as decoded.
   {
@@ -3809,14 +3843,14 @@ export const xhtmlCases: XhtmlCase[] = [
     expected: "\n\n\ufdd0\n\ufdd2\t\ufdd3\t\ta\tb\tc\t\t\t\n\n\ufdd1\n\n",
   },
   {
-    name: "accepts-soft-hyphen-before-br-in-cell",
+    name: "rejects-soft-hyphen-before-br-in-cell",
     input: div("<table><tr><td>intra&#173;<br/>venous</td></tr></table>"),
-    expected: "\n\n\ufdd0\n\ufdd2\t\ufdd3\tintra\u00ad\tvenous\t\n\n\ufdd1\n\n",
+    expected: { error: "invisible-character" },
   },
   {
     name: "rejects-soft-hyphen-before-caption-end",
     input: div("<table><caption>intra&#173;</caption></table>"),
-    expected: { error: "soft-hyphen-at-boundary" },
+    expected: { error: "invisible-character" },
   },
   // Item 4: the other kind of script letter, and any other symbol, bracket or dash, rejects.
   {
@@ -4314,5 +4348,101 @@ export const xhtmlCases: XhtmlCase[] = [
     name: "href-segment-of-33-rejected",
     input: div('<p><a href="https://example.org/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">x</a></p>'),
     expected: { error: "forbidden-attribute" },
+  },
+  // Review round 13: nesting, "]]>", composition across inline markup, invisible breaks.
+  {
+    name: "accepts-nesting-32-below-root",
+    input: div(
+      "<span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span>x</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span>",
+    ),
+    expected: "\nx\n",
+  },
+  {
+    name: "rejects-nesting-33-below-root",
+    input: div(
+      "<span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span>x</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span>",
+    ),
+    expected: { error: "nesting-depth" },
+  },
+  {
+    name: "rejects-small-inside-small",
+    input: div("<p>Do <small><small>not</small></small> exceed.</p>"),
+    expected: { error: "nesting-depth" },
+  },
+  {
+    name: "rejects-heading-inside-heading",
+    input: div("<h1>a<h2>b</h2></h1>"),
+    expected: { error: "nesting-depth" },
+  },
+  {
+    name: "accepts-six-indenting-containers",
+    input: div(
+      "<blockquote><blockquote><blockquote><blockquote><blockquote><blockquote><p>x</p></blockquote></blockquote></blockquote></blockquote></blockquote></blockquote>",
+    ),
+    expected: "\n\n\n\n\n\n\n\nx\n\n\n\n\n\n\n\n",
+  },
+  {
+    name: "rejects-seven-indenting-containers",
+    input: div(
+      "<blockquote><blockquote><blockquote><blockquote><blockquote><blockquote><blockquote><p>x</p></blockquote></blockquote></blockquote></blockquote></blockquote></blockquote></blockquote>",
+    ),
+    expected: { error: "nesting-depth" },
+  },
+  {
+    name: "rejects-seven-indents-mixing-lists",
+    input: div(
+      "<ul><li><ol><li><blockquote><ul><li><ol><li><dl><dd><blockquote>x</blockquote></dd></dl></li></ol></li></ul></blockquote></li></ol></li></ul>",
+    ),
+    expected: { error: "nesting-depth" },
+  },
+  {
+    name: "rejects-cdata-end-in-text",
+    input: div("<p>a[b[0]]> 5</p>"),
+    expected: { error: "cdata" },
+  },
+  {
+    name: "accepts-cdata-end-escaped",
+    input: div("<p>a[b[0]]&gt; 5</p>"),
+    expected: "\n\na[b[0]]> 5\n\n",
+  },
+  {
+    name: "rejects-not-less-than-across-bold",
+    input: div("<p>CrCl &lt;<b>&#x338;</b> 30 ml/min</p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "rejects-not-equal-across-sup",
+    input: div("<p>x =<sup>&#x338;</sup> y</p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "rejects-acute-across-bold",
+    input: div("<p>caf<b>e</b>&#x301;</p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "rejects-acute-after-ligature-across-bold",
+    input: div("<p>\ufb01<b>&#x301;</b></p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "accepts-acute-inside-one-run",
+    input: div("<p><b>cafe&#x301;</b></p>"),
+    expected: "\n\ncafe\u0301\n\n",
+  },
+  {
+    name: "rejects-zero-width-space",
+    input: div("<p>Take 2\u200b10 mg</p>"),
+    expected: { error: "invisible-character" },
+  },
+  {
+    name: "rejects-zero-width-space-reference",
+    input: div("<p>Take 2&#x200B;10 mg</p>"),
+    expected: { error: "invisible-character" },
+  },
+  {
+    name: "rejects-soft-hyphen-in-a-number",
+    input: div("<p>Take 2&#xAD;10 mg</p>"),
+    expected: { error: "invisible-character" },
   },
 ];

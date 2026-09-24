@@ -39,11 +39,30 @@ BULLET_GLYPHS: Final = frozenset(
     {0x2022, 0x2023, 0x25A0, 0x25A1, 0x25AA, 0x25AB, 0x25CB, 0x25CF, 0x25E6}
 )
 
-# Closed list, section 3 step 5. U+2000-U+200A is a range, handled in is_whitespace(). U+000B,
-# U+000C and U+0085 are not here: since fidelity-norm/2.0.0 section 2 rejects them. U+1680 OGHAM
-# SPACE MARK is not here either (fidelity-norm/3.0.0): a renderer draws it as a stroke.
+# Closed list, section 3 step 5. U+000B, U+000C and U+0085 are not here: since fidelity-norm/2.0.0
+# section 2 rejects them. Nor, from 3.0.0, are the spaces a renderer does not draw as a gap: U+1680
+# OGHAM SPACE MARK is drawn as a stroke, and U+2006, U+2009, U+200A and U+202F one or two pixels
+# wide, so "2" U+200A "10" looks like "210". They are content.
 WHITESPACE: Final = frozenset(
-    {0x0009, 0x000A, 0x000D, 0x0020, 0x00A0, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000}
+    {
+        0x0009,
+        0x000A,
+        0x000D,
+        0x0020,
+        0x00A0,
+        0x2000,
+        0x2001,
+        0x2002,
+        0x2003,
+        0x2004,
+        0x2005,
+        0x2007,
+        0x2008,
+        0x2028,
+        0x2029,
+        0x205F,
+        0x3000,
+    }
 )
 
 SOFT_HYPHEN: Final = chr(0x00AD)
@@ -60,7 +79,7 @@ class NormalizationError(ValueError):
 
 def is_whitespace(code_point: int) -> bool:
     """True for the closed whitespace list of section 3 step 5, and nothing else."""
-    return code_point in WHITESPACE or 0x2000 <= code_point <= 0x200A
+    return code_point in WHITESPACE
 
 
 def is_word_character(character: str) -> bool:
@@ -120,15 +139,14 @@ def _lines_with_tab(text: str) -> list[bool]:
     return result
 
 
-def normalize_text(text: str, *, last_line_has_tab: bool = False) -> str:
-    """Apply section 3's five ordered steps. Raises NormalizationError on a section 2 character."""
-    forbidden = find_forbidden_character(text)
-    if forbidden is not None:
-        raise NormalizationError("forbidden-character", forbidden)
+def compose_text(text: str) -> str:
+    """Steps 1 to 3.
 
-    # Steps 1 and 2 run before NFC so that a composition an invisible character or a ligature
-    # would otherwise block ("e" + ZWSP + combining acute) is applied in the first pass; that is
-    # what makes the whole procedure idempotent.
+    Steps 1 and 2 run before NFC so that a composition an invisible character or a ligature would
+    otherwise block ("e" + ZWSP + combining acute) is applied in the first pass; that is what makes
+    the whole procedure idempotent. The scanner uses it too, to refuse a composition across inline
+    markup (section 5).
+    """
     expanded: list[str] = []
     position = 0
     length = len(text)
@@ -146,6 +164,14 @@ def normalize_text(text: str, *, last_line_has_tab: bool = False) -> str:
             continue
         expanded.append(LIGATURES.get(code_point, character))
         position += 1
+    return unicodedata.normalize("NFC", "".join(expanded))
+
+
+def normalize_text(text: str, *, last_line_has_tab: bool = False) -> str:
+    """Apply section 3's five ordered steps. Raises NormalizationError on a section 2 character."""
+    forbidden = find_forbidden_character(text)
+    if forbidden is not None:
+        raise NormalizationError("forbidden-character", forbidden)
 
     # Steps 4 and 5, with the space collapse folded into the same pass: a space is emitted only
     # when the previous emitted character was not one, which drops runs and the leading space.
@@ -155,7 +181,7 @@ def normalize_text(text: str, *, last_line_has_tab: bool = False) -> str:
     # start, so normalising the result again (it has no U+000A) replaces nothing: idempotence. A
     # bullet replaced here counts as whitespace for the bullet after it.
     output: list[str] = []
-    composed = unicodedata.normalize("NFC", "".join(expanded))
+    composed = compose_text(text)
     on_tab_line = _lines_with_tab(composed)
     if last_line_has_tab:
         # A page slice whose last line continues past it on a page line with U+0009 (section 6).

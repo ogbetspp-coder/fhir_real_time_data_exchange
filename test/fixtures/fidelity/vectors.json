@@ -27,6 +27,31 @@
       "expected": "fí"
     },
     {
+      "name": "hair-space-is-content",
+      "input": "Take 2 10 mg",
+      "expected": "Take 2 10 mg"
+    },
+    {
+      "name": "thin-space-is-content",
+      "input": "10 000 IU",
+      "expected": "10 000 IU"
+    },
+    {
+      "name": "six-per-em-space-is-content",
+      "input": "2 10",
+      "expected": "2 10"
+    },
+    {
+      "name": "narrow-no-break-space-is-content",
+      "input": "10 000",
+      "expected": "10 000"
+    },
+    {
+      "name": "four-per-em-space-is-still-a-space",
+      "input": "2 10",
+      "expected": "2 10"
+    },
+    {
       "name": "ogham-space-mark-is-content",
       "input": "Take 2 10 mg",
       "expected": "Take 2 10 mg"
@@ -49,7 +74,7 @@
     {
       "name": "unicode-spaces",
       "input": "a b c　d e",
-      "expected": "a b c d e"
+      "expected": "a b c d e"
     },
     {
       "name": "nfc",
@@ -336,7 +361,7 @@
     {
       "name": "narrow-no-break-space-after-overrides",
       "input": "a b",
-      "expected": "a b"
+      "expected": "a b"
     },
     {
       "name": "rejects-bidi-isolate-first",
@@ -493,20 +518,22 @@
       "name": "rejects-soft-hyphen-before-br",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>intra&#173;<br/>venous</p></div>",
       "expected": {
-        "error": "soft-hyphen-at-boundary"
+        "error": "invisible-character"
       }
     },
     {
       "name": "rejects-soft-hyphen-before-block-end",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><h2>intra&#173;</h2><p>venous</p></div>",
       "expected": {
-        "error": "soft-hyphen-at-boundary"
+        "error": "invisible-character"
       }
     },
     {
-      "name": "accepts-soft-hyphen-inside-text",
+      "name": "rejects-soft-hyphen-inside-text",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>intra&#173;venous</p></div>",
-      "expected": "\n\nintra­venous\n\n"
+      "expected": {
+        "error": "invisible-character"
+      }
     },
     {
       "name": "rejects-javascript-href",
@@ -1079,52 +1106,64 @@
     {
       "name": "soft-hyphen-before-raw-lf-is-a-space",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>non&#173;\nsmokers</p></div>",
-      "expected": "\n\nnon­ smokers\n\n"
+      "expected": {
+        "error": "invisible-character"
+      }
     },
     {
       "name": "soft-hyphen-before-lf-reference-is-a-space",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>non&#173;&#10;smokers</p></div>",
-      "expected": "\n\nnon­ smokers\n\n"
+      "expected": {
+        "error": "invisible-character"
+      }
     },
     {
       "name": "soft-hyphen-cr-then-br-is-a-space",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>non&#173;&#13;<br/>smokers</p></div>",
-      "expected": "\n\nnon­ \nsmokers\n\n"
+      "expected": {
+        "error": "invisible-character"
+      }
     },
     {
       "name": "raw-soft-hyphen-before-crlf-is-a-space",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>non­\r\nsmokers</p></div>",
-      "expected": "\n\nnon­  smokers\n\n"
+      "expected": {
+        "error": "invisible-character"
+      }
     },
     {
       "name": "rejects-soft-hyphen-before-hr",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>non­<hr/>smokers</p></div>",
       "expected": {
-        "error": "soft-hyphen-at-boundary"
+        "error": "invisible-character"
       }
     },
     {
-      "name": "accepts-soft-hyphen-before-cr-alone",
+      "name": "rejects-soft-hyphen-before-cr-alone",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>non&#173;&#13;smokers</p></div>",
-      "expected": "\n\nnon­ smokers\n\n"
+      "expected": {
+        "error": "invisible-character"
+      }
     },
     {
-      "name": "accepts-soft-hyphen-before-space",
+      "name": "rejects-soft-hyphen-before-space",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>non&#173; smokers</p></div>",
-      "expected": "\n\nnon­ smokers\n\n"
+      "expected": {
+        "error": "invisible-character"
+      }
     },
     {
       "name": "soft-hyphen-decided-after-scan",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>non&#173;</p><iframe/></div>",
       "expected": {
-        "error": "unknown-element"
+        "error": "invisible-character"
       }
     },
     {
       "name": "unbalanced-before-soft-hyphen",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>non&#173;</p>",
       "expected": {
-        "error": "unbalanced-tag"
+        "error": "invisible-character"
       }
     },
     {
@@ -1636,15 +1675,17 @@
       "expected": "\n\n﷐\n﷒\t﷓\t\ta\tb\tc\t\t\t\n\n﷑\n\n"
     },
     {
-      "name": "accepts-soft-hyphen-before-br-in-cell",
+      "name": "rejects-soft-hyphen-before-br-in-cell",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>intra&#173;<br/>venous</td></tr></table></div>",
-      "expected": "\n\n﷐\n﷒\t﷓\tintra­\tvenous\t\n\n﷑\n\n"
+      "expected": {
+        "error": "invisible-character"
+      }
     },
     {
       "name": "rejects-soft-hyphen-before-caption-end",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><caption>intra&#173;</caption></table></div>",
       "expected": {
-        "error": "soft-hyphen-at-boundary"
+        "error": "invisible-character"
       }
     },
     {
@@ -2218,6 +2259,117 @@
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"https://example.org/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\">x</a></p></div>",
       "expected": {
         "error": "forbidden-attribute"
+      }
+    },
+    {
+      "name": "accepts-nesting-32-below-root",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span>x</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></div>",
+      "expected": "\nx\n"
+    },
+    {
+      "name": "rejects-nesting-33-below-root",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span>x</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></div>",
+      "expected": {
+        "error": "nesting-depth"
+      }
+    },
+    {
+      "name": "rejects-small-inside-small",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Do <small><small>not</small></small> exceed.</p></div>",
+      "expected": {
+        "error": "nesting-depth"
+      }
+    },
+    {
+      "name": "rejects-heading-inside-heading",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><h1>a<h2>b</h2></h1></div>",
+      "expected": {
+        "error": "nesting-depth"
+      }
+    },
+    {
+      "name": "accepts-six-indenting-containers",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><blockquote><blockquote><blockquote><blockquote><blockquote><blockquote><p>x</p></blockquote></blockquote></blockquote></blockquote></blockquote></blockquote></div>",
+      "expected": "\n\n\n\n\n\n\n\nx\n\n\n\n\n\n\n\n"
+    },
+    {
+      "name": "rejects-seven-indenting-containers",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><blockquote><blockquote><blockquote><blockquote><blockquote><blockquote><blockquote><p>x</p></blockquote></blockquote></blockquote></blockquote></blockquote></blockquote></blockquote></div>",
+      "expected": {
+        "error": "nesting-depth"
+      }
+    },
+    {
+      "name": "rejects-seven-indents-mixing-lists",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><ul><li><ol><li><blockquote><ul><li><ol><li><dl><dd><blockquote>x</blockquote></dd></dl></li></ol></li></ul></blockquote></li></ol></li></ul></div>",
+      "expected": {
+        "error": "nesting-depth"
+      }
+    },
+    {
+      "name": "rejects-cdata-end-in-text",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a[b[0]]> 5</p></div>",
+      "expected": {
+        "error": "cdata"
+      }
+    },
+    {
+      "name": "accepts-cdata-end-escaped",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a[b[0]]&gt; 5</p></div>",
+      "expected": "\n\na[b[0]]> 5\n\n"
+    },
+    {
+      "name": "rejects-not-less-than-across-bold",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>CrCl &lt;<b>&#x338;</b> 30 ml/min</p></div>",
+      "expected": {
+        "error": "combining-across-markup"
+      }
+    },
+    {
+      "name": "rejects-not-equal-across-sup",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x =<sup>&#x338;</sup> y</p></div>",
+      "expected": {
+        "error": "combining-across-markup"
+      }
+    },
+    {
+      "name": "rejects-acute-across-bold",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>caf<b>e</b>&#x301;</p></div>",
+      "expected": {
+        "error": "combining-across-markup"
+      }
+    },
+    {
+      "name": "rejects-acute-after-ligature-across-bold",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>ﬁ<b>&#x301;</b></p></div>",
+      "expected": {
+        "error": "combining-across-markup"
+      }
+    },
+    {
+      "name": "accepts-acute-inside-one-run",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><b>cafe&#x301;</b></p></div>",
+      "expected": "\n\ncafé\n\n"
+    },
+    {
+      "name": "rejects-zero-width-space",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Take 2​10 mg</p></div>",
+      "expected": {
+        "error": "invisible-character"
+      }
+    },
+    {
+      "name": "rejects-zero-width-space-reference",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Take 2&#x200B;10 mg</p></div>",
+      "expected": {
+        "error": "invisible-character"
+      }
+    },
+    {
+      "name": "rejects-soft-hyphen-in-a-number",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Take 2&#xAD;10 mg</p></div>",
+      "expected": {
+        "error": "invisible-character"
       }
     }
   ],
@@ -3968,7 +4120,7 @@
               }
             ],
             "narrativeDivSha256": "511ea4df9e870a65188c268b1a71bf4fd0c881c1296f761c7ab37c7af998ad9b",
-            "normalizedTextSha256": "fbb703200b72fac4c0193fe83c8c3de301c5b340316217152ecc35c87fd4265c"
+            "normalizedTextSha256": "0000000000000000000000000000000000000000000000000000000000000000"
           }
         ]
       },
@@ -3976,29 +4128,29 @@
         "reportVersion": "1.0.0",
         "normalizationVersion": "fidelity-norm/3.0.0",
         "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
-        "narrativeBindingSha256": "3d2db72e06e36105c4e4a3d5207e9d961c1de62e2765973cf871a0876229e42a",
-        "status": "passed",
+        "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
+        "status": "failed",
         "sections": [
           {
             "sourceKey": "smpc.4.1",
             "path": "Composition.section[0].section[0]",
-            "status": "verified",
+            "status": "malformed-narrative",
             "spanCount": 1,
-            "normalizedTextSha256": "fbb703200b72fac4c0193fe83c8c3de301c5b340316217152ecc35c87fd4265c"
+            "reason": "invisible-character"
           }
         ],
         "issues": [],
         "summary": {
           "total": 1,
-          "verified": 1
+          "verified": 0
         },
         "coverage": {
           "pageCodePoints": 851,
           "bodyCodePoints": 713,
-          "coveredCodePoints": 64,
-          "uncoveredGaps": 4
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
         },
-        "reportHash": "0eaecd9cf521c646eaa008d878700482a203068920487d6ae637040074fac9e2"
+        "reportHash": "5a22da85d81d05e75945c3617f4679ea2fb98960ebc7e1ac563cb13248671d4d"
       }
     },
     {
@@ -8161,7 +8313,7 @@
               }
             ],
             "narrativeDivSha256": "685e9ccdb621963b46b3ac0f9d2843ed5487bfda5127eb7b94cc40ab614afcf3",
-            "normalizedTextSha256": "ba9d7dc172716337d917e98a936e4abc1754a52ac90faff3e135b0f8484dd1af"
+            "normalizedTextSha256": "0000000000000000000000000000000000000000000000000000000000000000"
           }
         ]
       },
@@ -8169,25 +8321,15 @@
         "reportVersion": "1.0.0",
         "normalizationVersion": "fidelity-norm/3.0.0",
         "extractedTextSha256": "efece94cba1bfb50e7370bedfb066d3151e0d1b20215a53d20d0b717d08c30a9",
-        "narrativeBindingSha256": "7a341ddc366008274b77082154244779ed1ee4a1ae676cc354f8f36ac2f43c1e",
+        "narrativeBindingSha256": "8503b01e08b1d87de0cc2f67e44d4bd7ac0433e7d9e89851676497d66456e056",
         "status": "failed",
         "sections": [
           {
             "sourceKey": "smpc.4.4",
             "path": "Composition.section[0].section[0]",
-            "status": "mismatch",
+            "status": "malformed-narrative",
             "spanCount": 1,
-            "details": {
-              "expectedLength": 29,
-              "actualLength": 30,
-              "firstDifferingOffset": 16,
-              "commonSuffixLength": 13,
-              "expectedWordCount": 4,
-              "actualWordCount": 5,
-              "expectedSha256": "c0f3535f58dd2c88e32f8e835c1a73aaf3a7e3afe2500234ffa4a79d74f85531",
-              "actualSha256": "ba9d7dc172716337d917e98a936e4abc1754a52ac90faff3e135b0f8484dd1af"
-            },
-            "normalizedTextSha256": "ba9d7dc172716337d917e98a936e4abc1754a52ac90faff3e135b0f8484dd1af"
+            "reason": "invisible-character"
           }
         ],
         "issues": [],
@@ -8201,7 +8343,7 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "4980ccf1c8d6e4c2b8d6e18faf2ba877b1b28ef09c5e977219be3464a9691ed0"
+        "reportHash": "fe8623fdfa701508be7fc7a55152ead872a3c1d3b514169fb610a1e38ba26f7f"
       }
     },
     {
@@ -8238,7 +8380,7 @@
               }
             ],
             "narrativeDivSha256": "57dc33ddc9816e5fdd5b3cda62a7d7e92c95630d080215e866498eab44849360",
-            "normalizedTextSha256": "ba9d7dc172716337d917e98a936e4abc1754a52ac90faff3e135b0f8484dd1af"
+            "normalizedTextSha256": "0000000000000000000000000000000000000000000000000000000000000000"
           }
         ]
       },
@@ -8246,25 +8388,15 @@
         "reportVersion": "1.0.0",
         "normalizationVersion": "fidelity-norm/3.0.0",
         "extractedTextSha256": "efece94cba1bfb50e7370bedfb066d3151e0d1b20215a53d20d0b717d08c30a9",
-        "narrativeBindingSha256": "7a341ddc366008274b77082154244779ed1ee4a1ae676cc354f8f36ac2f43c1e",
+        "narrativeBindingSha256": "8503b01e08b1d87de0cc2f67e44d4bd7ac0433e7d9e89851676497d66456e056",
         "status": "failed",
         "sections": [
           {
             "sourceKey": "smpc.4.4",
             "path": "Composition.section[0].section[0]",
-            "status": "mismatch",
+            "status": "malformed-narrative",
             "spanCount": 1,
-            "details": {
-              "expectedLength": 29,
-              "actualLength": 30,
-              "firstDifferingOffset": 16,
-              "commonSuffixLength": 13,
-              "expectedWordCount": 4,
-              "actualWordCount": 5,
-              "expectedSha256": "c0f3535f58dd2c88e32f8e835c1a73aaf3a7e3afe2500234ffa4a79d74f85531",
-              "actualSha256": "ba9d7dc172716337d917e98a936e4abc1754a52ac90faff3e135b0f8484dd1af"
-            },
-            "normalizedTextSha256": "ba9d7dc172716337d917e98a936e4abc1754a52ac90faff3e135b0f8484dd1af"
+            "reason": "invisible-character"
           }
         ],
         "issues": [],
@@ -8278,7 +8410,7 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "4980ccf1c8d6e4c2b8d6e18faf2ba877b1b28ef09c5e977219be3464a9691ed0"
+        "reportHash": "fe8623fdfa701508be7fc7a55152ead872a3c1d3b514169fb610a1e38ba26f7f"
       }
     },
     {
@@ -8315,7 +8447,7 @@
               }
             ],
             "narrativeDivSha256": "123ec5d5a9f06197c71b5567a22fe9c8e3827c8e38dabd4f9a82a3c667ae9484",
-            "normalizedTextSha256": "b2615eea70763cc9d304f30c9b59e7d88becdb778da893bc56cd68f08aafec4a"
+            "normalizedTextSha256": "0000000000000000000000000000000000000000000000000000000000000000"
           }
         ]
       },
@@ -8323,29 +8455,29 @@
         "reportVersion": "1.0.0",
         "normalizationVersion": "fidelity-norm/3.0.0",
         "extractedTextSha256": "bb96fcc31d5f0231cef42d2ed9556ae82af0652378fa39830c14ce39970afef5",
-        "narrativeBindingSha256": "43489f618ee698d3efae07586a76eedd431a84ddc7432ee152e102ba30c61f78",
-        "status": "passed",
+        "narrativeBindingSha256": "8503b01e08b1d87de0cc2f67e44d4bd7ac0433e7d9e89851676497d66456e056",
+        "status": "failed",
         "sections": [
           {
             "sourceKey": "smpc.4.4",
             "path": "Composition.section[0].section[0]",
-            "status": "verified",
+            "status": "malformed-narrative",
             "spanCount": 1,
-            "normalizedTextSha256": "b2615eea70763cc9d304f30c9b59e7d88becdb778da893bc56cd68f08aafec4a"
+            "reason": "invisible-character"
           }
         ],
         "issues": [],
         "summary": {
           "total": 1,
-          "verified": 1
+          "verified": 0
         },
         "coverage": {
           "pageCodePoints": 65,
           "bodyCodePoints": 19,
-          "coveredCodePoints": 18,
-          "uncoveredGaps": 0
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
         },
-        "reportHash": "81d1f65b8dd239e9ed42b02a0b83c21b235ca952b712e040552b62a04bdf97f5"
+        "reportHash": "622d27590fb0b24e764117fdb86e75e98c98b718976e72498936ffe0c9832990"
       }
     },
     {
@@ -8382,7 +8514,7 @@
               }
             ],
             "narrativeDivSha256": "123ec5d5a9f06197c71b5567a22fe9c8e3827c8e38dabd4f9a82a3c667ae9484",
-            "normalizedTextSha256": "b2615eea70763cc9d304f30c9b59e7d88becdb778da893bc56cd68f08aafec4a"
+            "normalizedTextSha256": "0000000000000000000000000000000000000000000000000000000000000000"
           }
         ]
       },
@@ -8390,25 +8522,15 @@
         "reportVersion": "1.0.0",
         "normalizationVersion": "fidelity-norm/3.0.0",
         "extractedTextSha256": "6f938f4c76c2e5d9740737c29eb9f977b0fee02fd2a4f46b5b3c94e3d90ee8db",
-        "narrativeBindingSha256": "43489f618ee698d3efae07586a76eedd431a84ddc7432ee152e102ba30c61f78",
+        "narrativeBindingSha256": "8503b01e08b1d87de0cc2f67e44d4bd7ac0433e7d9e89851676497d66456e056",
         "status": "failed",
         "sections": [
           {
             "sourceKey": "smpc.4.4",
             "path": "Composition.section[0].section[0]",
-            "status": "mismatch",
+            "status": "malformed-narrative",
             "spanCount": 1,
-            "details": {
-              "expectedLength": 17,
-              "actualLength": 18,
-              "firstDifferingOffset": 12,
-              "commonSuffixLength": 5,
-              "expectedWordCount": 3,
-              "actualWordCount": 4,
-              "expectedSha256": "23757dee921b4da341bc877f36df2d3669d0d43a9f9682dee317e7722812b9fd",
-              "actualSha256": "b2615eea70763cc9d304f30c9b59e7d88becdb778da893bc56cd68f08aafec4a"
-            },
-            "normalizedTextSha256": "b2615eea70763cc9d304f30c9b59e7d88becdb778da893bc56cd68f08aafec4a"
+            "reason": "invisible-character"
           }
         ],
         "issues": [],
@@ -8422,7 +8544,7 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "4273f2621c14562142c6d9670a68ff952e1b02bdb8cc751991aa67b10c46539a"
+        "reportHash": "8bc6535036af0287d0ba8a97364434662c693f095fc1de01f348b9f783cd3bcb"
       }
     },
     {
@@ -12085,9 +12207,18 @@
           {
             "sourceKey": "smpc.4.2.posology",
             "path": "Composition.section[0].section[0]",
-            "status": "invalid-provenance",
+            "status": "mismatch",
             "spanCount": 1,
-            "reason": "word-cut",
+            "details": {
+              "expectedLength": 23,
+              "actualLength": 22,
+              "firstDifferingOffset": 22,
+              "commonSuffixLength": 0,
+              "expectedWordCount": 5,
+              "actualWordCount": 5,
+              "expectedSha256": "2e6b02ef9297fb7e8749e6632a3bdccbe9d148f6da153689f7620de921b4c9fb",
+              "actualSha256": "da700767eb4597f7ce966d1da2204d155fafa98bdae4a359b864595926a8c4f0"
+            },
             "normalizedTextSha256": "da700767eb4597f7ce966d1da2204d155fafa98bdae4a359b864595926a8c4f0"
           }
         ],
@@ -12102,7 +12233,7 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "7a5ba3812be2913503e2420d5f4279d8aa2eecb0e15efeb62fda9c68e8ab218b"
+        "reportHash": "2b467c53c1034ce5bb7d704eeecadeed36285c8a354f6659b562cbdf92fd463a"
       }
     },
     {
@@ -12153,9 +12284,18 @@
           {
             "sourceKey": "smpc.4.2.posology",
             "path": "Composition.section[0].section[0]",
-            "status": "invalid-provenance",
+            "status": "mismatch",
             "spanCount": 1,
-            "reason": "word-cut",
+            "details": {
+              "expectedLength": 23,
+              "actualLength": 22,
+              "firstDifferingOffset": 22,
+              "commonSuffixLength": 0,
+              "expectedWordCount": 5,
+              "actualWordCount": 5,
+              "expectedSha256": "f27b75a09766c1068d141c692f7da11599cfaf240ba5cd39c211cb8d922ae760",
+              "actualSha256": "da700767eb4597f7ce966d1da2204d155fafa98bdae4a359b864595926a8c4f0"
+            },
             "normalizedTextSha256": "da700767eb4597f7ce966d1da2204d155fafa98bdae4a359b864595926a8c4f0"
           }
         ],
@@ -12170,7 +12310,7 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "1c45581aa8e9e3896487970e4b8037b4d8c9c35c521f21e4de8ff86a3f6be527"
+        "reportHash": "37d08981e4574609764f19ce511b1b1acd9c22bc073ad82731f22dab256e28cb"
       }
     },
     {
@@ -15073,6 +15213,83 @@
           "uncoveredGaps": 1
         },
         "reportHash": "7eec701869fe35221a54e7112521db730ccb1b8f7bb0b33ea20013f45751b6ab"
+      }
+    },
+    {
+      "name": "hair-space-against-a-space-mismatches",
+      "input": {
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nTake 2 10 mg tablets.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 57
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Take 2&#x200A;10 mg tablets.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 56,
+                "textSha256": "1811032a0abd2de25f54c2c32768676097402303a187f971d8fe800b146a2381"
+              }
+            ],
+            "narrativeDivSha256": "349f74fc41112623f8b99a675b2bcae194a5ccc09c757ce2d28aa7c1a686920f",
+            "normalizedTextSha256": "f0f168a725507a360c789e8c3b6c2afe980ba1fbba577453e1bffeeb01a2439c"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "extractedTextSha256": "e6167a5dc6d5e15f2ee50fbf8056317729c2101694007bb76854cfd1fb995a1a",
+        "narrativeBindingSha256": "4e02374d7a57d2afe0ccec907b66fcefe1615121e08dfb02461dcd83b059d182",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 1,
+            "details": {
+              "expectedLength": 21,
+              "actualLength": 21,
+              "firstDifferingOffset": 6,
+              "commonSuffixLength": 14,
+              "expectedWordCount": 5,
+              "actualWordCount": 4,
+              "expectedSha256": "1811032a0abd2de25f54c2c32768676097402303a187f971d8fe800b146a2381",
+              "actualSha256": "f0f168a725507a360c789e8c3b6c2afe980ba1fbba577453e1bffeeb01a2439c"
+            },
+            "normalizedTextSha256": "f0f168a725507a360c789e8c3b6c2afe980ba1fbba577453e1bffeeb01a2439c"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 68,
+          "bodyCodePoints": 22,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "07b43f9112f8977c7d1efc90e1998295365d87cd1a57ef1c895c4917c6b2ce42"
       }
     }
   ]

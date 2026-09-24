@@ -77,9 +77,9 @@ def _composition(submission: Mapping[str, Any]) -> Mapping[str, Any]:
 # whitespace. NFC and the ligatures never turn text into nothing, so they are not needed here.
 _INVISIBLE: Final = frozenset("\u00ad\u200b\ufeff\u2060")
 _BULLETS: Final = frozenset("\u2022\u2023\u25a0\u25a1\u25aa\u25ab\u25cb\u25cf\u25e6")
+# From fidelity-norm/3.0.0 U+1680, U+2006, U+2009, U+200A and U+202F are content, not whitespace.
 _WHITESPACE: Final = frozenset(
-    "\t\n\r \u00a0\u2028\u2029\u202f\u205f\u3000"
-    + "".join(chr(point) for point in range(0x2000, 0x200B))
+    "\t\n\r \u00a0\u2000\u2001\u2002\u2003\u2004\u2005\u2007\u2008\u2028\u2029\u205f\u3000"
 )
 
 

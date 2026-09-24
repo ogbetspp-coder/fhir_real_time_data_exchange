@@ -399,6 +399,12 @@ const SOFT_HYPHEN_BREAKS = new RegExp(`${SOFT_HYPHEN}${CR}?${LF}`, "gu");
 function markupText(random: Random): Passage {
   const { text, classes } = passage(random, between(random, 1, 5));
   let safe = text.replace(MARKUP_UNSAFE, "");
+  // Narrative holds no soft hyphen or zero-width space (fidelity-norm/3.0.0); now and then one is
+  // kept, which is the `invisible-character` refusal.
+  if (/[\u00ad\u200b]/u.test(safe)) {
+    if (chance(random, 0.9)) safe = safe.replace(/[\u00ad\u200b]/gu, "");
+    else classes.add("invisible-in-narrative");
+  }
   if (SOFT_HYPHEN_BREAK.test(safe)) {
     if (chance(random, 0.8)) safe = safe.replace(SOFT_HYPHEN_BREAKS, `${SOFT_HYPHEN}${SPACE}`);
     else classes.add("soft-hyphen-before-break");
@@ -1056,6 +1062,45 @@ const VIOLATIONS: readonly Violation[] = [
         "<p><img></img></p>",
         "<p><img>x</img></p>",
         `${nearLimit}<table><tr><td>a</td><td rowspan="2">b</td></tr><tr><td colspan="1000">c</td></tr></table>`,
+      ]);
+      return root(`${body}${inner}`, attrs);
+    },
+  },
+  {
+    // Markup nested past section 5's bounds, and just inside them.
+    className: "nesting-bounds",
+    apply: (body, attrs, random) => {
+      const nest = (open: string, close: string, count: number, inner: string): string =>
+        `${open.repeat(count)}${inner}${close.repeat(count)}`;
+      const inner = pick(random, [
+        nest("<span>", "</span>", 32, "x"),
+        nest("<span>", "</span>", 33, "x"),
+        nest("<blockquote>", "</blockquote>", 6, "<p>x</p>"),
+        nest("<blockquote>", "</blockquote>", 7, "<p>x</p>"),
+        "<p>Do <small><small>not</small></small> exceed.</p>",
+        "<p>Do <small>not</small> exceed.</p>",
+        "<h1>a<h2>b</h2></h1>",
+      ]);
+      return root(`${body}${inner}`, attrs);
+    },
+  },
+  {
+    className: "cdata-end-in-text",
+    apply: (body, attrs, random) =>
+      root(`${body}<p>a[b[0]${pick(random, ["]]>", "]]&gt;", "] ]>"])} 5</p>`, attrs),
+  },
+  {
+    // A combining mark after an inline tag, which a renderer draws apart from the letter before.
+    className: "combining-across-markup",
+    apply: (body, attrs, random) => {
+      const inner = pick(random, [
+        "<p>CrCl &lt;<b>&#x338;</b> 30</p>",
+        "<p>x =<sup>&#x338;</sup> y</p>",
+        "<p>caf<b>e</b>&#x301;</p>",
+        `<p>${CP(0xfb01)}<i>&#x301;</i></p>`,
+        "<p><b>cafe&#x301;</b></p>",
+        "<p>a<b>b</b>c</p>",
+        `<p>e<span>${CP(0x0301)}</span></p>`,
       ]);
       return root(`${body}${inner}`, attrs);
     },

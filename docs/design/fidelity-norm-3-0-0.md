@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and ten reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and eleven reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -719,3 +719,34 @@ The twelfth review found no TS/Python divergence (every probe gave identical rep
    note's case 17. Fixed. The pairwise property test is a tautology for whole-page spans, as the
    review noted; its value is the pairing of narratives, and the refusal paths belong to the
    importer's tests (PR 3).
+
+## Thirteenth review (2026-09-23): findings and what changed
+
+The thirteenth review swept the whole specification, old rules and new, against Chrome 153 in
+HTML and XML modes, and found four false passes in rules older than 3.0.0:
+
+1. **High.** Past 512 open elements Chrome's HTML parser attaches new nodes elsewhere
+   ("Platelets 10/l⁹"). Fixed: at most 32 elements open below the root (`nesting-depth`).
+2. **High.** U+200A HAIR SPACE is drawn about a pixel wide, so "2" U+200A "10" looks like "210",
+   and U+2006, U+2009 and U+202F are barely wider. Fixed: all four are content, not whitespace;
+   §6's joiner wording follows.
+3. **High.** NFC joins a combining mark after an inline tag to the letter before it, while
+   Chrome draws them apart (`&lt;<b>&#x338;</b>` drawn "</", read "≮"). Fixed: a composition
+   across inline markup rejects (`combining-across-markup`), tested with the normaliser's own
+   steps 1 to 3 over a window on each side.
+4. **High.** A soft hyphen or zero-width space inside a number is a break a narrow viewer takes
+   ("2-" / "10 mg", or "2" / "10 mg"). Fixed: narrative rejects both (`invisible-character`, a
+   second one-sided rule), which withdraws `soft-hyphen-at-boundary`.
+5. **Medium.** `]]>` in text, which an XML renderer refuses, drawing nothing. Fixed: `cdata`.
+6. **Medium.** Nested `small`, and headings nested in XML mode, shrink text below legibility.
+   Fixed: `nesting-depth`.
+7. **Medium.** Nested indenting containers push text off a narrow page. Fixed: at most six.
+8. **Medium.** §5 claimed raising a letter does not change what it says; `10<sup>n</sup>` reads
+   "10n". Stated as a residual.
+9. **Medium.** §7 still said an unfetchable picture draws nothing. Fixed to match ADR 0005.
+10. to 12. **Low.** ADR 0005's wording on T's exceptions, a fetched picture's media type and size,
+    and the root language tag's font change (stated in §5). Fixed.
+
+Every new rule is pinned by vectors on both sides of its limit, and a break of each is caught by
+the vectors (the differential catches the frequent ones; the rare ones are masked at some seeds by
+an earlier error in the same generated document).

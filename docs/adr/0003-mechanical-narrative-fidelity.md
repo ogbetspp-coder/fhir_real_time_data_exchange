@@ -123,7 +123,8 @@ reader sees without the check seeing it._
   across pages (`docs/fidelity-normalization.md` section 6, reason `word-cut`). Punctuation is
   not a boundary, because inside a number it is part of the number (`1` of `1.5`, `20` of
   `−20`), and neither is a space between the groups of a number (`10` of `10 000`) or a
-  no-break space. A soft hyphen directly before a block boundary or `br` rejects, and a line
+  no-break space. A soft hyphen or a zero-width space in narrative rejects (from
+  `fidelity-norm/3.0.0`; before it, a soft hyphen before a block boundary or `br`), and a line
   feed in text is a space, so a token can be neither truncated at a section edge nor joined
   across markup. The rule proves that edges touch whitespace, not that
   they end a sentence or a clause: "Take 5" can still be taken from "Take 5 mg twice".

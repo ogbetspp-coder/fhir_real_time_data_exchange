@@ -49,7 +49,7 @@ import re
 import unicodedata
 from typing import Final
 
-from .normalize import find_forbidden_character, is_forbidden
+from .normalize import compose_text, find_forbidden_character, is_forbidden
 
 XHTML_NAMESPACE: Final = "http://www.w3.org/1999/xhtml"
 
@@ -156,6 +156,62 @@ def has_drawn_text(normalized: str) -> bool:
 # (`colspan="1000" rowspan="1000"` is a million slots, each a marker in the text), so the grid is
 # bounded, and a real table is far inside the bound (`table-size`).
 TABLE_SLOT_LIMIT: Final = 50_000
+
+
+def _is_invisible_break(code_point: int) -> bool:
+    """A soft hyphen or a zero-width space: a break a renderer may draw that the check never reads.
+
+    At a narrow width "2" U+00AD "10" is drawn "2-" / "10" and "2" U+200B "10" as "2" / "10", where
+    the check reads "210", so narrative holds neither (section 2; one-sided, since page text marks
+    a hyphenated line end with U+00AD).
+    """
+    return code_point in (0x00AD, 0x200B)
+
+
+def _find_invisible_break(text: str) -> int | None:
+    for offset, character in enumerate(text):
+        if _is_invisible_break(ord(character)):
+            return offset
+    return None
+
+
+# How deep markup may nest (section 5). An HTML parser stops nesting at 512 open elements and moves
+# what follows elsewhere; `small` inside `small` and a heading inside a heading shrink text towards
+# illegible; and every indenting container moves text further right, off a narrow page.
+MAX_DEPTH: Final = 32
+MAX_INDENTS: Final = 6
+HEADINGS: Final = frozenset({"h1", "h2", "h3", "h4", "h5", "h6"})
+INDENTING: Final = frozenset({"blockquote", "ul", "ol", "dd"})
+
+
+def _check_nesting(name: str, stack: list[str], offset: int) -> None:
+    if len(stack) > MAX_DEPTH:
+        raise XhtmlError("nesting-depth", offset)
+    if name == "small" and "small" in stack:
+        raise XhtmlError("nesting-depth", offset)
+    if name in HEADINGS and any(open_name in HEADINGS for open_name in stack):
+        raise XhtmlError("nesting-depth", offset)
+    if name in INDENTING:
+        indents = sum(1 for open_name in stack if open_name in INDENTING) + 1
+        if indents > MAX_INDENTS:
+            raise XhtmlError("nesting-depth", offset)
+
+
+# The inline elements whose tags split text without emitting anything: a renderer draws the text on
+# each side in its own run, so a mark after the tag does not combine with the letter before it.
+SPLITTING_INLINE: Final = frozenset(
+    {"span", "b", "i", "u", "em", "strong", "sup", "sub", "small", "a", "abbr", "cite", "code"}
+)
+# How far each side of such a tag is composed to find a composition across it.
+COMPOSE_WINDOW: Final = 64
+
+
+def _check_composition(text: str, boundaries: list[int]) -> None:
+    for boundary in boundaries:
+        before = text[max(0, boundary - COMPOSE_WINDOW) : boundary]
+        after = text[boundary : boundary + COMPOSE_WINDOW]
+        if compose_text(before + after) != compose_text(before) + compose_text(after):
+            raise XhtmlError("combining-across-markup", boundary)
 
 
 def is_reserved(code_point: int) -> bool:
@@ -291,9 +347,6 @@ PICTURE_DATA_LIMIT: Final = 1_398_104
 BASE64_ALPHABET: Final = re.compile(r"[A-Za-z0-9+/]*")
 
 SOFT_HYPHEN: Final = chr(0x00AD)
-# U+00AD followed by U+000A in the emitted text. The emitted text has U+000A only from a block
-# boundary or `br`, and no U+000D at all (text line breaks are emitted as U+0020).
-SOFT_HYPHEN_BEFORE_BREAK: Final = re.compile(SOFT_HYPHEN + "\n")
 
 
 def _structural_break(name: str, cell_depth: int) -> str:
@@ -449,6 +502,8 @@ def _decode_entity(match: re.Match[str], offset: int) -> int:
         raise XhtmlError("forbidden-character", offset)
     if is_reserved(code_point):
         raise XhtmlError("reserved-character", offset)
+    if _is_invisible_break(code_point):
+        raise XhtmlError("invisible-character", offset)
     return code_point
 
 
@@ -696,11 +751,16 @@ def xhtml_to_text(div: str) -> str:
     reserved = _find_reserved_character(div)
     if reserved is not None:
         raise XhtmlError("reserved-character", reserved)
+    invisible = _find_invisible_break(div)
+    if invisible is not None:
+        raise XhtmlError("invisible-character", invisible)
 
     output: list[str] = []
     stack: list[str] = []
     tables: list[_TableState] = []
     lists: list[_ListState] = []
+    # The output positions (list indexes) where an inline tag splits the text.
+    splits: list[int] = []
     # The slots every table so far covers, against TABLE_SLOT_LIMIT.
     grid = [0]
     root_seen = False
@@ -733,6 +793,8 @@ def xhtml_to_text(div: str) -> str:
                 open_name = stack.pop()
                 if open_name != name:
                     raise XhtmlError("misnested-tag", index)
+                if name in SPLITTING_INLINE:
+                    splits.append(len(output))
                 table = tables[-1] if tables else None
                 if table is not None and name in ROW_GROUPS:
                     _end_row_group(table, index)
@@ -779,8 +841,12 @@ def xhtml_to_text(div: str) -> str:
             self_closing = (start.group(3) or "") == "/"
             if (name in VOID_ELEMENTS) != self_closing:
                 raise XhtmlError("void-element", index)
+            if not is_root:
+                _check_nesting(name, stack, index)
             parent = stack[-1] if stack else None
             _check_parent(name, parent, index)
+            if name in SPLITTING_INLINE:
+                splits.append(len(output))
             table = tables[-1] if tables else None
             _enter_table_structure(name, parent, table, index)
             if name in ("td", "th") and table is not None:
@@ -848,7 +914,17 @@ def xhtml_to_text(div: str) -> str:
             if not _is_ascii_whitespace(character):
                 raise XhtmlError("text-outside-root", index)
         else:
-            _emit_text(ord(character), stack[-1], output, index, is_reference=False)
+            parent = stack[-1]
+            # "]]>" ends a CDATA section to an XML parser, which refuses the document: an XML
+            # renderer draws none of the narrative (text directly in a table or list part is
+            # refused first).
+            if (
+                div.startswith("]]>", index)
+                and parent not in TABLE_CONTAINERS
+                and parent not in LIST_CONTAINERS
+            ):
+                raise XhtmlError("cdata", index)
+            _emit_text(ord(character), parent, output, index, is_reference=False)
         index += 1
 
     if not root_seen:
@@ -856,7 +932,15 @@ def xhtml_to_text(div: str) -> str:
     if stack:
         raise XhtmlError("unbalanced-tag", len(div))
     text = "".join(output)
-    soft_hyphen = SOFT_HYPHEN_BEFORE_BREAK.search(text)
-    if soft_hyphen is not None:
-        raise XhtmlError("soft-hyphen-at-boundary", soft_hyphen.start())
+    # A combining mark after an inline tag is drawn in its own run, apart from the letter before
+    # the tag, while NFC would join them ("<" and U+0338 across `b` is drawn "</", read as "≮").
+    boundaries: list[int] = []
+    offset = 0
+    piece = 0
+    for split in splits:
+        while piece < split:
+            offset += len(output[piece])
+            piece += 1
+        boundaries.append(offset)
+    _check_composition(text, boundaries)
     return text

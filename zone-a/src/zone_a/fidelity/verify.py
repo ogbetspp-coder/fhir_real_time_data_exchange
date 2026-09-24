@@ -13,9 +13,9 @@ such read goes through ``_at()``.
 Numbers are the other trap. JSON has one number type and JavaScript has one number type, so
 ``1`` and ``1.0`` are the same value on the Zone B side and ``Number.isInteger`` accepts both;
 ``json.loads`` gives Python an ``int`` for the first and a ``float`` for the second, and
-``isinstance(x, int)`` accepts only the first. A page written ``"page": 1.0`` — which the
+``isinstance(x, int)`` accepts only the first. A page written ``"page": 1.0`` \u2014 which the
 contract's ``{"type": "integer"}`` permits, because JSON Schema defines an integer as a number
-with a zero fractional part — therefore verified in Zone B and was refused here. Every offset
+with a zero fractional part \u2014 therefore verified in Zone B and was refused here. Every offset
 read from the payload goes through ``_as_integer()``, which is ``Number.isInteger`` plus the
 normalisation to ``int`` that Python's slicing and arithmetic need afterwards.
 """
@@ -248,7 +248,7 @@ def _is_blank_slice(index: PageIndex, start: int, end: int) -> bool:
 
 # Whitespace for the edge rules: section 3 step 5's list without U+00A0, U+2007 and U+202F, which
 # join the groups of a number (`10 000`) and so are not a boundary between tokens.
-NUMBER_JOINERS: Final = frozenset({0x00A0, 0x2007, 0x202F})
+NUMBER_JOINERS: Final = frozenset({0x00A0, 0x2007})
 
 
 def _is_edge_whitespace(character: str | None) -> bool:
@@ -354,8 +354,8 @@ def _end_cuts_word(index: PageIndex, span: Json) -> bool:
 def _resolve_spans(spans: list[Json], pages: dict[int, PageIndex]) -> _Resolved | tuple[str, str]:
     """Locate and hash-check a section's spans.
 
-    Returns one contiguous raw slice per page — so the source's own characters, never
-    whitespace of ours, decide where words begin and end — or a ``(status, reason)`` pair.
+    Returns one contiguous raw slice per page \u2014 so the source's own characters, never
+    whitespace of ours, decide where words begin and end \u2014 or a ``(status, reason)`` pair.
     """
     pieces: list[_Piece] = []
     previous: Json = None

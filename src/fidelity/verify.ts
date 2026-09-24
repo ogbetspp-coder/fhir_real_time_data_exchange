@@ -312,7 +312,7 @@ function resolveSpans(
 
 // Whitespace for the edge rules: section 3 step 5's list without U+00A0, U+2007 and U+202F,
 // which join the groups of a number (`10 000`) and so are not a boundary between tokens.
-const NUMBER_JOINERS = new Set([0x00a0, 0x2007, 0x202f]);
+const NUMBER_JOINERS = new Set([0x00a0, 0x2007]);
 
 function isEdgeWhitespace(character: string | undefined): boolean {
   const codePoint = character?.codePointAt(0);

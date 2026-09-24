@@ -307,16 +307,19 @@ describe("deterministic Type 2 to EMA conversion", () => {
 
   it.each([
     ["a non-breaking space by number", "<p>&#160;</p>", "has no narrative"],
-    ["a zero-width space by number", "<p>&#x200B;</p>", "has no narrative"],
+    // fidelity-norm/3.0.0: narrative holds no zero-width space or soft hyphen, so the scanner
+    // refuses these; either way a mandatory section fails closed.
+    ["a zero-width space by number", "<p>&#x200B;</p>", "has unreadable narrative"],
+    ["a byte-order mark and a word joiner", "<p>&#xFEFF;&#x2060; </p>", "has no narrative"],
     [
       "a zero-width space as a character",
       `<p>${String.fromCodePoint(0x200b)}</p>`,
-      "has no narrative",
+      "has unreadable narrative",
     ],
     [
       "a byte-order mark, a word joiner and a soft hyphen",
       "<p>&#xFEFF;&#x2060;&#xAD; </p>",
-      "has no narrative",
+      "has unreadable narrative",
     ],
     ["a named entity the scanner does not know", "<p>&nbsp;</p>", "has unreadable narrative"],
     ["a comment holding a >", "<!-- a > b -->", "has unreadable narrative"],

@@ -31,15 +31,17 @@ const BULLET_GLYPHS = new Set([
   0x2022, 0x2023, 0x25a0, 0x25a1, 0x25aa, 0x25ab, 0x25cb, 0x25cf, 0x25e6,
 ]);
 
-// Section 3 step 5. U+000B, U+000C and U+0085 are not here: section 2 rejects them. U+1680
-// OGHAM SPACE MARK is not here either (fidelity-norm/3.0.0): a renderer draws it as a stroke, so
-// "Take 2" U+1680 "10 mg" reads as a range, and it is content.
+// Section 3 step 5. U+000B, U+000C and U+0085 are not here: section 2 rejects them. Nor, from
+// fidelity-norm/3.0.0, are the spaces a renderer does not draw as a gap: U+1680 OGHAM SPACE MARK
+// is drawn as a stroke ("Take 2" U+1680 "10 mg" reads as a range), and U+2006, U+2009, U+200A and
+// U+202F are drawn one or two pixels wide, so "2" U+200A "10" looks like "210". They are content.
 const WHITESPACE = new Set([
-  0x0009, 0x000a, 0x000d, 0x0020, 0x00a0, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000,
+  0x0009, 0x000a, 0x000d, 0x0020, 0x00a0, 0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2007,
+  0x2008, 0x2028, 0x2029, 0x205f, 0x3000,
 ]);
 
 export function isWhitespace(codePoint: number): boolean {
-  return WHITESPACE.has(codePoint) || (codePoint >= 0x2000 && codePoint <= 0x200a);
+  return WHITESPACE.has(codePoint);
 }
 
 const WORD_CHARACTER = /^[\p{L}\p{N}\p{M}]$/u;
@@ -104,13 +106,11 @@ function linesWithTab(points: readonly string[]): boolean[] {
 // in its first cell into a list item.
 export type NormalizeOptions = { lastLineHasTab?: boolean };
 
-export function normalizeText(text: string, options: NormalizeOptions = {}): string {
-  const forbidden = findForbiddenCharacter(text);
-  if (forbidden !== undefined) throw new NormalizationError("forbidden-character", forbidden);
-
-  // Invisible characters are removed and ligatures expanded BEFORE NFC so that a composition
-  // NFC would otherwise be blocked from (e.g. "e" + ZWSP + combining acute) is applied in the
-  // first pass; this is what makes the procedure idempotent.
+// Steps 1 to 3. Invisible characters are removed and ligatures expanded BEFORE NFC so that a
+// composition NFC would otherwise be blocked from (e.g. "e" + ZWSP + combining acute) is applied
+// in the first pass; this is what makes the procedure idempotent. The scanner uses it too, to
+// refuse a composition across inline markup (section 5).
+export function composeText(text: string): string {
   const expanded: string[] = [];
   const points = Array.from(text);
   for (let position = 0; position < points.length; position += 1) {
@@ -126,6 +126,12 @@ export function normalizeText(text: string, options: NormalizeOptions = {}): str
     }
     expanded.push(LIGATURES.get(codePoint) ?? character);
   }
+  return expanded.join("").normalize("NFC");
+}
+
+export function normalizeText(text: string, options: NormalizeOptions = {}): string {
+  const forbidden = findForbiddenCharacter(text);
+  if (forbidden !== undefined) throw new NormalizationError("forbidden-character", forbidden);
 
   // Step 4: a bullet glyph is list structure only where a list item starts — at the start of a
   // line (after U+000A, then optional whitespace), followed by whitespace, on a line that
@@ -137,7 +143,7 @@ export function normalizeText(text: string, options: NormalizeOptions = {}): str
   // table cell is always content. A bullet this step replaced counts as whitespace for the
   // bullet after it.
   const output: string[] = [];
-  const composed = Array.from(expanded.join("").normalize("NFC"));
+  const composed = Array.from(composeText(text));
   const onTabLine = linesWithTab(composed);
   if (options.lastLineHasTab === true) {
     for (let position = composed.length - 1; position >= 0; position -= 1) {

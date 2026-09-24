@@ -6,7 +6,7 @@
 // is either folded into the text or rejected.
 
 import { sha256Utf8 } from "../lib/hash.js";
-import { findForbiddenCharacter, isForbiddenCodePoint } from "./normalize.js";
+import { composeText, findForbiddenCharacter, isForbiddenCodePoint } from "./normalize.js";
 
 export type XhtmlErrorCode =
   | "forbidden-character"
@@ -32,11 +32,13 @@ export type XhtmlErrorCode =
   | "table-content"
   | "list-content"
   | "reserved-character"
+  | "invisible-character"
+  | "nesting-depth"
+  | "combining-across-markup"
   | "table-section-order"
   | "table-structure"
   | "table-shape"
-  | "table-size"
-  | "soft-hyphen-at-boundary";
+  | "table-size";
 
 export class XhtmlError extends Error {
   public constructor(
@@ -150,6 +152,74 @@ export function hasDrawnText(normalized: string): boolean {
 // (`colspan="1000" rowspan="1000"` is a million slots, each a marker in the text), so the grid is
 // bounded, and a real table is far inside the bound (`table-size`).
 export const TABLE_SLOT_LIMIT = 50_000;
+
+// A soft hyphen and a zero-width space are break opportunities a renderer may use at a narrow
+// width, drawing "2-" / "10 mg" or "2" / "10 mg" where the check reads "210 mg", so narrative
+// holds neither (section 2; one-sided, since page text marks a hyphenated line end with U+00AD).
+function isInvisibleBreak(codePoint: number): boolean {
+  return codePoint === 0x00ad || codePoint === 0x200b;
+}
+
+function findInvisibleBreak(text: string): number | undefined {
+  let offset = 0;
+  for (const character of text) {
+    if (isInvisibleBreak(character.codePointAt(0) ?? 0)) return offset;
+    offset += 1;
+  }
+  return undefined;
+}
+
+// How deep markup may nest (section 5). An HTML parser stops nesting at 512 open elements and
+// moves what follows elsewhere; `small` inside `small` and a heading inside a heading shrink text
+// towards illegible; and every indenting container moves text further right, off a narrow page.
+const MAX_DEPTH = 32;
+const MAX_INDENTS = 6;
+const HEADINGS = new Set(["h1", "h2", "h3", "h4", "h5", "h6"]);
+const INDENTING = new Set(["blockquote", "ul", "ol", "dd"]);
+
+function checkNesting(name: string, stack: readonly string[], offset: number): void {
+  if (stack.length > MAX_DEPTH) throw new XhtmlError("nesting-depth", offset);
+  if (name === "small" && stack.includes("small")) throw new XhtmlError("nesting-depth", offset);
+  if (HEADINGS.has(name) && stack.some((open) => HEADINGS.has(open))) {
+    throw new XhtmlError("nesting-depth", offset);
+  }
+  if (INDENTING.has(name)) {
+    const indents = stack.filter((open) => INDENTING.has(open)).length + 1;
+    if (indents > MAX_INDENTS) throw new XhtmlError("nesting-depth", offset);
+  }
+}
+
+// The inline elements whose tags split text without emitting anything: a renderer draws the text
+// on each side in its own run, so a mark after the tag does not combine with the letter before it.
+const SPLITTING_INLINE = new Set([
+  "span",
+  "b",
+  "i",
+  "u",
+  "em",
+  "strong",
+  "sup",
+  "sub",
+  "small",
+  "a",
+  "abbr",
+  "cite",
+  "code",
+]);
+// How far each side of such a tag is composed to find a composition across it: a combining
+// sequence longer than this is refused as nothing a label holds.
+const COMPOSE_WINDOW = 64;
+
+function checkComposition(text: string, boundaries: readonly number[]): void {
+  const points = Array.from(text);
+  for (const boundary of boundaries) {
+    const before = points.slice(Math.max(0, boundary - COMPOSE_WINDOW), boundary).join("");
+    const after = points.slice(boundary, boundary + COMPOSE_WINDOW).join("");
+    if (composeText(before + after) !== composeText(before) + composeText(after)) {
+      throw new XhtmlError("combining-across-markup", boundary);
+    }
+  }
+}
 
 export function isReservedCodePoint(codePoint: number): boolean {
   return codePoint === 0xfffc || (codePoint >= 0xfdd0 && codePoint <= 0xfdef);
@@ -382,6 +452,7 @@ function decodeEntity(match: RegExpExecArray, offset: number): number {
   }
   if (isForbiddenCodePoint(codePoint)) throw new XhtmlError("forbidden-character", offset);
   if (isReservedCodePoint(codePoint)) throw new XhtmlError("reserved-character", offset);
+  if (isInvisibleBreak(codePoint)) throw new XhtmlError("invisible-character", offset);
   return codePoint;
 }
 
@@ -635,11 +706,6 @@ function emitText(
   output.push(character);
 }
 
-// U+00AD followed by U+000A in the emitted text: section 3 step 1 would join a word across what
-// a renderer draws as a line break. The emitted text has U+000A only from a block boundary or
-// `br`, and no U+000D at all (text line breaks are emitted as U+0020).
-const SOFT_HYPHEN_BEFORE_BREAK = /\u00ad\n/u;
-
 // A structural break: U+000A, except that a table cell and everything inside one is on one line
 // of U+0009-separated text, as the extractor writes a table row (section 7). A bullet in a cell
 // is therefore on a line with U+0009 and is never read as a list item (section 3 step 4).
@@ -658,8 +724,12 @@ export function xhtmlToText(div: string): string {
   // The code points the scanner emits for grids and pictures never occur in the narrative itself.
   const reserved = findReservedCharacter(div);
   if (reserved !== undefined) throw new XhtmlError("reserved-character", reserved);
+  const invisible = findInvisibleBreak(div);
+  if (invisible !== undefined) throw new XhtmlError("invisible-character", invisible);
 
   const output: string[] = [];
+  // The output positions (array indexes) where an inline tag splits the text.
+  const splits: number[] = [];
   const stack: string[] = [];
   const tables: TableState[] = [];
   const lists: ListState[] = [];
@@ -687,6 +757,7 @@ export function xhtmlToText(div: string): string {
         const open = stack.pop();
         if (open === undefined) throw new XhtmlError("unbalanced-tag", index);
         if (open !== name) throw new XhtmlError("misnested-tag", index);
+        if (SPLITTING_INLINE.has(name)) splits.push(output.length);
         const table = tables[tables.length - 1];
         if (table !== undefined && ROW_GROUPS.has(name)) endRowGroup(table, index);
         if (name === "table" && table !== undefined) {
@@ -727,8 +798,10 @@ export function xhtmlToText(div: string): string {
       const attributes = checkAttributes(name, start[2] ?? "", isRoot, index);
       const selfClosing = (start[3] ?? "") === "/";
       if (VOID_ELEMENTS.has(name) !== selfClosing) throw new XhtmlError("void-element", index);
+      if (!isRoot) checkNesting(name, stack, index);
       const parent = stack[stack.length - 1];
       checkParent(name, parent, index);
+      if (SPLITTING_INLINE.has(name)) splits.push(output.length);
       const table = tables[tables.length - 1];
       enterTableStructure(name, parent, table, index);
       let slotsBefore = "";
@@ -796,7 +869,17 @@ export function xhtmlToText(div: string): string {
     if (stack.length === 0) {
       if (!isAsciiWhitespace(point)) throw new XhtmlError("text-outside-root", index);
     } else {
-      emitText(codePoint, stack[stack.length - 1], output, index, false);
+      const parent = stack[stack.length - 1] ?? "";
+      // "]]>" ends a CDATA section to an XML parser, which refuses the document: an XML renderer
+      // draws none of the narrative (text directly in a table or list part is refused first).
+      if (
+        div.startsWith("]]>", index) &&
+        !TABLE_CONTAINERS.has(parent) &&
+        !LIST_CONTAINERS.has(parent)
+      ) {
+        throw new XhtmlError("cdata", index);
+      }
+      emitText(codePoint, parent, output, index, false);
     }
     index += point.length;
   }
@@ -804,7 +887,15 @@ export function xhtmlToText(div: string): string {
   if (!rootSeen) throw new XhtmlError("root-not-div", 0);
   if (stack.length > 0) throw new XhtmlError("unbalanced-tag", div.length);
   const text = output.join("");
-  const softHyphen = SOFT_HYPHEN_BEFORE_BREAK.exec(text);
-  if (softHyphen !== null) throw new XhtmlError("soft-hyphen-at-boundary", softHyphen.index);
+  // A combining mark after an inline tag is drawn in its own run, apart from the letter before
+  // the tag, while NFC would join them ("<" and U+0338 across `b` is drawn "</", read "≮").
+  let offset = 0;
+  let piece = 0;
+  const boundaries: number[] = [];
+  for (const split of splits) {
+    for (; piece < split; piece += 1) offset += Array.from(output[piece] ?? "").length;
+    boundaries.push(offset);
+  }
+  checkComposition(text, boundaries);
   return text;
 }
