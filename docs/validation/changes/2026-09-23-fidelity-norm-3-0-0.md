@@ -26,8 +26,10 @@ amended by its independent reviews, prompted by roadmap item 3a and ADR 0005. In
   whether a section carries narrative;
 - U+FFFC and U+FDD0–U+FDEF reject in narrative (`reserved-character`), the one rule applied to
   one side only;
-- the extractor contract writes tables with their grid, numbered markers with a space, pictures
-  with their hash, and a structured source as one page per section.
+- the extractor contract writes tables with their grid (and a table across pages as its logical
+  text, split once per break), numbered markers with a space, pictures with their hash, a
+  continuation line that begins with a bullet glyph with a leading U+0009, and a structured
+  source as one page per section.
 
 `XhtmlErrorCode` gains `list-content`, `reserved-character` and `table-size`.
 
@@ -48,7 +50,7 @@ value sits on inside a multi-line cell). Each was fixed before this change, or, 
 stated. A third review, of the implementation, found rows and columns a renderer draws at
 zero size (a false pass the second review had called a false failure), a scan whose cost grew
 with rows × table width, and three untested precedence rules; each was fixed. The design note
-lists all seven reviews' findings and what changed. A fourth review found a cell continued
+lists all eight reviews' findings and what changed. A fourth review found a cell continued
 across a page break losing a leading bullet on the page side (fixed in section 7, with two verify
 vectors), and quotes carrying grid markers matching across rows (now `invalid-request`). A fifth found that rule stopping a word hyphenated across the break
 inside a cell from joining (fixed in section 7: the continuation then begins with the rest of
@@ -60,7 +62,11 @@ nothing through invisible characters or a line-start bullet (fixed; it now agree
 service on all 11 110 strings of up to four characters from those classes). A seventh found three more page-break layouts (a page footnote between a
 table's parts, a spanning cell's overflow, a repeated footer row); since rounds 4 to 7 each
 found one, section 7's page-break text was rewritten as one rule (a table across pages is its
-logical text, split once per break) and six verify vectors pin the new cases.
+logical text, split once per break) and six verify vectors pin the new cases. An eighth tested that rule on every split point of 450
+random tables (105 247 cases, identical in both languages) and found a caption continuation and,
+present since 2.0.0, a paragraph wrapped before a mid-line bullet losing the bullet on the page
+side; section 7 now has the extractor write such a continuation line with a leading U+0009, a
+table drawn inside a cell is refused, and seven verify vectors pin the cases.
 
 **Impact assessment (step 0).** Importers of `src/fidelity/`:
 
@@ -125,7 +131,7 @@ logical text, split once per break) and six verify vectors pin the new cases.
 **Steps 1–6.** 1: `NORMALIZATION_VERSION` is `fidelity-norm/3.0.0` on both sides. 2:
 `npm run contracts:generate` (no drift), `npm run vectors:generate`, `npm run contracts:fixtures`,
 `npm run contracts:quote-edge` and `npm run differential:smoke` regenerated
-`test/fixtures/fidelity/vectors.json` (411 → 503 vectors: normalisation 62 → 63, XHTML 214 → 282, verify 135 → 158), the four contract fixtures and the smoke corpus. 3: every changed vector,
+`test/fixtures/fidelity/vectors.json` (411 → 510 vectors: normalisation 62 → 63, XHTML 214 → 282, verify 135 → 165), the four contract fixtures and the smoke corpus. 3: every changed vector,
 below. 4: the new vectors: every case the design names, both sides of every boundary (counter
 styles at 26/27, 703, 3999/4000 (702 in the differential), −1/0/1; `start` at `-0`, `007`, `9999`, `10000`; spans at
 0, `02`, 1000, 1001; each `src` form and each refused form; U+FFFC, U+FDD0 and U+FDEF by reference,
@@ -139,7 +145,8 @@ span against empty cells and the reverse, a value moved to another column, a pic
 other bytes and against none, an empty table as `empty-narrative`, a cell continued across a page break with and without its
 bullet, a word in a cell hyphenated across a page break joined and split, a row broken across a page
 in two cells with each cell kept whole and with a word moved to the next cell, a page footnote
-between a table's parts, a spanning cell broken across a page, and a repeated footer row). 5: ADR 0003 amended (Consequences), ADR 0001 amended for
+between a table's parts, a spanning cell broken across a page, a repeated footer row, a caption continued across a
+page, a paragraph wrapped before a mid-line bullet, and a repeated header row excluded). 5: ADR 0003 amended (Consequences), ADR 0001 amended for
 ADR 0005's Type 1 record, ADR 0005 added, `AGENTS.md`'s "Preserve supplied XHTML" reworded to
 the owner's decision of 2026-09-23. 6: UR-09 and UR-22 updated.
 

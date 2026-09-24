@@ -450,6 +450,40 @@ const FOOTER_ACROSS_PAGES = [
 const FOOTER_ACROSS_PAGES_SOURCE = customSource(FOOTER_ACROSS_PAGES);
 const spansOf = (bodies: string[], source: SourceDocumentText): SourceSpan[] =>
   bodies.map((body, index) => spanFor(source, index + 1, body));
+// Review round 8 (section 7). A caption continued across a page break: the extractor inserts
+// U+0009 before the continuation, so a bullet at its start is content.
+const CAPTION_ACROSS_PAGES = ["\ufdd0\nDose 2", "\t\u2022 10 mg\n\ufdd2\t\ufdd3\tA\n\ufdd1"];
+const CAPTION_ACROSS_PAGES_SOURCE = customSource(CAPTION_ACROSS_PAGES);
+// A paragraph the document wraps just before a mid-line bullet: the continuation line begins with
+// U+0009, so "Take 2 • 10 mg" does not read "Take 2 10 mg".
+const WRAP_BEFORE_BULLET = "Take 2\n\t\u2022 10 mg daily.";
+const WRAP_BEFORE_BULLET_SOURCE = customSource([WRAP_BEFORE_BULLET]);
+// A header row the document repeats on page 2 is excluded from that page's body, after the
+// running header.
+const REPEATED_HEADER_ROW = "\ufdd2\t\ufdd3\tPopulation\t\ufdd3\tDose\n";
+const REPEATED_HEADER_BODIES = [
+  `\ufdd0\n${REPEATED_HEADER_ROW}\ufdd2\t\ufdd3\tAdults\t\ufdd3\t10 mg`,
+  "\ufdd2\t\ufdd3\tChildren\t\ufdd3\t5 mg\n\ufdd1",
+];
+const REPEATED_HEADER_SOURCE: SourceDocumentText = (() => {
+  const [first, second] = REPEATED_HEADER_BODIES.map((body, index) => buildPage(index + 1, body));
+  if (first === undefined || second === undefined) throw new Error("fixture");
+  const excluded = `${HEADER}${REPEATED_HEADER_ROW}`;
+  const body = `${REPEATED_HEADER_BODIES[1] ?? ""}\n`;
+  const bodyStart = Array.from(excluded).length;
+  return {
+    extractorVersion: "synthetic-extractor/1.0.0",
+    pages: [
+      first,
+      {
+        page: 2,
+        text: `${excluded}${body}${FOOTER(2)}`,
+        bodyStart,
+        bodyEnd: bodyStart + Array.from(body).length,
+      },
+    ],
+  };
+})();
 const SPANNED_DOSE_TABLE =
   '<table><tr><td>Adults</td><td rowspan="3">10 mg</td></tr><tr><td>Children</td></tr><tr><td>Elderly</td></tr></table>';
 const MID_LINE_BULLET = "Take 2 \u2022 10 mg daily.";
@@ -2428,6 +2462,89 @@ export const verifyCases: VerifyCase[] = [
           "<table><tr><td>a</td><td>1</td></tr><tr><td>Total</td><td>2</td></tr><tr><td>b</td><td>1</td></tr></table>",
         ),
         spansOf(FOOTER_ACROSS_PAGES, FOOTER_ACROSS_PAGES_SOURCE),
+      ),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  // Review round 8: a caption across a page break, a wrap before a bullet, a repeated header row.
+  {
+    name: "caption-across-page-break-keeps-its-bullet",
+    input: toInput(
+      CAPTION_ACROSS_PAGES_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div("<table><caption>Dose 2 \u2022 10 mg</caption><tr><td>A</td></tr></table>"),
+        spansOf(CAPTION_ACROSS_PAGES, CAPTION_ACROSS_PAGES_SOURCE),
+      ),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "caption-across-page-break-without-its-bullet-mismatches",
+    input: toInput(
+      CAPTION_ACROSS_PAGES_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div("<table><caption>Dose 2 10 mg</caption><tr><td>A</td></tr></table>"),
+        spansOf(CAPTION_ACROSS_PAGES, CAPTION_ACROSS_PAGES_SOURCE),
+      ),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "wrap-before-mid-line-bullet-keeps-it",
+    input: toInput(
+      WRAP_BEFORE_BULLET_SOURCE,
+      single("smpc.4.2.posology", paragraphs("Take 2 \u2022 10 mg daily."), [
+        spanFor(WRAP_BEFORE_BULLET_SOURCE, 1, WRAP_BEFORE_BULLET),
+      ]),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "wrap-before-mid-line-bullet-dropped-mismatches",
+    input: toInput(
+      WRAP_BEFORE_BULLET_SOURCE,
+      single("smpc.4.2.posology", paragraphs("Take 2 10 mg daily."), [
+        spanFor(WRAP_BEFORE_BULLET_SOURCE, 1, WRAP_BEFORE_BULLET),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "wrap-before-mid-line-bullet-as-a-list-item-mismatches",
+    input: toInput(
+      WRAP_BEFORE_BULLET_SOURCE,
+      single("smpc.4.2.posology", div("<p>Take 2</p><ul><li>10 mg daily.</li></ul>"), [
+        spanFor(WRAP_BEFORE_BULLET_SOURCE, 1, WRAP_BEFORE_BULLET),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "repeated-header-row-excluded-verifies-once",
+    input: toInput(
+      REPEATED_HEADER_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div(
+          "<table><thead><tr><th>Population</th><th>Dose</th></tr></thead><tbody><tr><td>Adults</td><td>10 mg</td></tr><tr><td>Children</td><td>5 mg</td></tr></tbody></table>",
+        ),
+        spansOf(REPEATED_HEADER_BODIES, REPEATED_HEADER_SOURCE),
+      ),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "repeated-header-row-written-twice-mismatches",
+    input: toInput(
+      REPEATED_HEADER_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div(
+          "<table><tr><th>Population</th><th>Dose</th></tr><tr><td>Adults</td><td>10 mg</td></tr><tr><th>Population</th><th>Dose</th></tr><tr><td>Children</td><td>5 mg</td></tr></table>",
+        ),
+        spansOf(REPEATED_HEADER_BODIES, REPEATED_HEADER_SOURCE),
       ),
     ),
     expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },

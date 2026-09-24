@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and five reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and six reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -522,12 +522,43 @@ compared the agent's test double with the service on 2 962 083 quotes (no diverg
 checked 120 004 list counters in both languages (identical).
 
 1. **High.** A page footnote drawn between a table's two parts read as the last cell's text, so a
-   narrative moving the footnote into that cell verified. 2. **Medium.** Where a spanning cell's
-   overflow goes was open to a page-by-page reading that let a word move into the next row. 3. **Medium.** A repeated footer row was to be written "where the table first has it", mid-table. 4. **Low.** "First continued cell" was undefined when that cell has no text on the earlier page.
-   Rounds 4 to 7 each found one more page-break case, so §7 was rewritten from a list of cases to
-   one rule: a table across pages is its logical text (slot order, each cell whole, a spanning
-   cell in the row it starts in, nothing else inside it; a repeated header where the table first
-   has it, a repeated footer where it last has it, a footnote after the table), split once per
-   break at a boundary, whitespace or a hyphenated word. Six verify vectors pin the three new
-   cases. 5. and 6. **Low.** The line-layout wording in this note, and the zone-a README's count
-   of added vectors. Fixed.
+   narrative moving the footnote into that cell verified.
+2. **Medium.** Where a spanning cell's overflow goes was open to a page-by-page reading that let
+   a word move into the next row.
+3. **Medium.** A repeated footer row was to be written "where the table first has it", mid-table.
+4. **Low.** "First continued cell" was undefined when that cell has no text on the earlier page.
+5. **Low.** The line-layout wording in this note, and the zone-a README's count of added vectors.
+
+Rounds 4 to 7 each found one more page-break case, so §7 was rewritten from a list of cases to
+one rule: a table across pages is its logical text (slot order, each cell whole, a spanning cell
+in the row it starts in, nothing else inside it; a repeated header where the table first has it,
+a repeated footer where it last has it, a footnote after the table), split once per break at a
+boundary, whitespace or a hyphenated word. Six verify vectors pin the three new cases.
+
+## Eighth review (2026-09-23, of the implementation): findings and what changed
+
+The eighth review built the logical text of 450 random tables and applied every allowed split
+point, with and without running headers, excluded labels and repeated rows, in one- and
+two-section layouts and three-page double splits: 105 247 whole-section cases, identical in both
+languages. Every case verified except a caption split before a bullet (finding 1).
+
+1. **High.** A caption continued after a page break began without U+0009, so a bullet at its
+   start was removed on the page side only. Fixed: the extractor inserts U+0009 before a
+   caption's continuation, as before a cell's.
+2. **High (present since 2.0.0).** A paragraph wrapped, or broken at a page, just before a
+   mid-line bullet read "Take 2 10 mg": §1 makes every page break a line feed, and §7 said
+   nothing about wrapped lines. Fixed in §7: a continuation line of a paragraph, heading, list
+   item or caption that begins with a bullet glyph and whitespace is written with a leading
+   U+0009, or the extractor refuses the document.
+3. **Medium.** A table drawn inside a source's table cell could be flattened into the outer cell.
+   Fixed: it has no logical text, and the extractor refuses the document.
+4. **Medium.** "After the table" for a between-parts footnote had two readings. Fixed:
+   immediately after U+FDD1, in page order and then reading order.
+5. **Low.** A continuation label is excluded like a repeated row, and repeated copies are known
+   by the document's structure, never by matching text. Wording of the split point (U+FDD1 at a
+   page end, §3 step 5 whitespace, the extractor inserting U+0009). Formatting of the seventh
+   review's list. Fixed. Seven verify vectors pin findings 1, 2 and the repeated header row.
+
+Rounds 4 to 8 found every remaining case in the extractor contract (§7), not in the scanner or
+the verifier: their logic has not changed since round 3, and the two implementations have agreed
+on every input every round has tried.

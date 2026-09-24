@@ -14301,6 +14301,563 @@
         },
         "reportHash": "278ef1e76a5197842e1fa3a63c3f0404d66995bdf47fd05cc8786270018e750c"
       }
+    },
+    {
+      "name": "caption-across-page-break-keeps-its-bullet",
+      "input": {
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n﷐\nDose 2\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 44
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\n\t• 10 mg\n﷒\t﷓\tA\n﷑\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 52
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><caption>Dose 2 • 10 mg</caption><tr><td>A</td></tr></table></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 43,
+                "textSha256": "0be971bbbcbb3903e7e4225192013f45953db7af4e7c47346f837e7bcbc8bc1a"
+              },
+              {
+                "page": 2,
+                "startOffset": 35,
+                "endOffset": 51,
+                "textSha256": "7fc2acd99243daaceec69206bc3966fd008a28fdafba46f4a9a15266e5f3a3c7"
+              }
+            ],
+            "narrativeDivSha256": "3aaa9166d4a60a7ce8c72d6bc5af5c7fd9d54b44c2e367c5303d2a33ea18f8cd",
+            "normalizedTextSha256": "dc280d0ac2d1b7ce0c2864c516a58749c7c4959ab1da3ddb615cd0afad31b59d"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "extractedTextSha256": "e133d2cb1737e41dfc062c04b86d901e1d3e2bd25da1f7c79baeabbae24a1a3d",
+        "narrativeBindingSha256": "ec922daee86695d3252e6f8c2fe3cca3ee726aef3d45f4e5544c0a2bb82d9128",
+        "status": "passed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "verified",
+            "spanCount": 2,
+            "normalizedTextSha256": "dc280d0ac2d1b7ce0c2864c516a58749c7c4959ab1da3ddb615cd0afad31b59d"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 1
+        },
+        "coverage": {
+          "pageCodePoints": 118,
+          "bodyCodePoints": 26,
+          "coveredCodePoints": 24,
+          "uncoveredGaps": 0
+        },
+        "reportHash": "1f7ff7f2ad99cb2a419e0d1fc338e3aa8ba5aae1a77283807170d7a4d8470226"
+      }
+    },
+    {
+      "name": "caption-across-page-break-without-its-bullet-mismatches",
+      "input": {
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n﷐\nDose 2\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 44
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\n\t• 10 mg\n﷒\t﷓\tA\n﷑\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 52
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><caption>Dose 2 10 mg</caption><tr><td>A</td></tr></table></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 43,
+                "textSha256": "0be971bbbcbb3903e7e4225192013f45953db7af4e7c47346f837e7bcbc8bc1a"
+              },
+              {
+                "page": 2,
+                "startOffset": 35,
+                "endOffset": 51,
+                "textSha256": "7fc2acd99243daaceec69206bc3966fd008a28fdafba46f4a9a15266e5f3a3c7"
+              }
+            ],
+            "narrativeDivSha256": "3c90e353b60a02aa08c85e032cddb9179609f9972ca30e3f5ed6937172504675",
+            "normalizedTextSha256": "572aedfefd4df20542b4e3e404537e0c1b25185cef2cc415122fd97f96762b4c"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "extractedTextSha256": "e133d2cb1737e41dfc062c04b86d901e1d3e2bd25da1f7c79baeabbae24a1a3d",
+        "narrativeBindingSha256": "eeebf6aab40fcba0c3815b97d37201cbf474cc8c757c7a0c714aa3ccbb041992",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 2,
+            "details": {
+              "expectedLength": 24,
+              "actualLength": 22,
+              "firstDifferingOffset": 9,
+              "commonSuffixLength": 13,
+              "expectedWordCount": 10,
+              "actualWordCount": 9,
+              "expectedSha256": "dc280d0ac2d1b7ce0c2864c516a58749c7c4959ab1da3ddb615cd0afad31b59d",
+              "actualSha256": "572aedfefd4df20542b4e3e404537e0c1b25185cef2cc415122fd97f96762b4c"
+            },
+            "normalizedTextSha256": "572aedfefd4df20542b4e3e404537e0c1b25185cef2cc415122fd97f96762b4c"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 118,
+          "bodyCodePoints": 26,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 2
+        },
+        "reportHash": "e5506d9e4f2d747b42d40b214dab7bd84a7165d167f96a1914f07d970b89995e"
+      }
+    },
+    {
+      "name": "wrap-before-mid-line-bullet-keeps-it",
+      "input": {
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nTake 2\n\t• 10 mg daily.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 58
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Take 2 • 10 mg daily.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 57,
+                "textSha256": "e8ad81ad07899747392bde8a150034d7a38a2bc1bea134f1a3a87639d95eb87b"
+              }
+            ],
+            "narrativeDivSha256": "989a23ecb5adb10742c70994cc0497a35bb6e791da98242ef9c3191af5f9b416",
+            "normalizedTextSha256": "d0755ff356730acc51c2e83c88ab7a9ab3130542ba92d12c13a7f131aeca70f4"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "extractedTextSha256": "3050775a002b0cf2b1480f15d649aede6d1cb91b2ac2efb75030a653e055785d",
+        "narrativeBindingSha256": "d2ea69a72d43a51cfc8f9da056d83ae2e966134f373670fb0d5eed7564f3aec3",
+        "status": "passed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "verified",
+            "spanCount": 1,
+            "normalizedTextSha256": "d0755ff356730acc51c2e83c88ab7a9ab3130542ba92d12c13a7f131aeca70f4"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 1
+        },
+        "coverage": {
+          "pageCodePoints": 69,
+          "bodyCodePoints": 23,
+          "coveredCodePoints": 22,
+          "uncoveredGaps": 0
+        },
+        "reportHash": "c42c4372529d0bc42b3b55ee9bcf97a44fc2b63ee510e06b52e136c24d348a52"
+      }
+    },
+    {
+      "name": "wrap-before-mid-line-bullet-dropped-mismatches",
+      "input": {
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nTake 2\n\t• 10 mg daily.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 58
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Take 2 10 mg daily.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 57,
+                "textSha256": "e8ad81ad07899747392bde8a150034d7a38a2bc1bea134f1a3a87639d95eb87b"
+              }
+            ],
+            "narrativeDivSha256": "dc130f823a2a1b43214e0a2b92c46d56f9a7e64af254ae33cbc92d6cc25b51b0",
+            "normalizedTextSha256": "bb02ef447f8c944acc8434afdc30583819b8792ccc78ae5873913e72469a416e"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "extractedTextSha256": "3050775a002b0cf2b1480f15d649aede6d1cb91b2ac2efb75030a653e055785d",
+        "narrativeBindingSha256": "1baa7b94d8e409b96d87a570f2c3b88ee0d003707fa749af10400d1d05eed850",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 1,
+            "details": {
+              "expectedLength": 21,
+              "actualLength": 19,
+              "firstDifferingOffset": 7,
+              "commonSuffixLength": 12,
+              "expectedWordCount": 6,
+              "actualWordCount": 5,
+              "expectedSha256": "d0755ff356730acc51c2e83c88ab7a9ab3130542ba92d12c13a7f131aeca70f4",
+              "actualSha256": "bb02ef447f8c944acc8434afdc30583819b8792ccc78ae5873913e72469a416e"
+            },
+            "normalizedTextSha256": "bb02ef447f8c944acc8434afdc30583819b8792ccc78ae5873913e72469a416e"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 69,
+          "bodyCodePoints": 23,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "4dfdd1b789bc7a72079da2338bb1dd669c83e7cc27ede8f2be80199f9dca6485"
+      }
+    },
+    {
+      "name": "wrap-before-mid-line-bullet-as-a-list-item-mismatches",
+      "input": {
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nTake 2\n\t• 10 mg daily.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 58
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Take 2</p><ul><li>10 mg daily.</li></ul></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 57,
+                "textSha256": "e8ad81ad07899747392bde8a150034d7a38a2bc1bea134f1a3a87639d95eb87b"
+              }
+            ],
+            "narrativeDivSha256": "06525e78ca989102c54d25315115d12ec760c1254ee641210be2fa03b8d1a15f",
+            "normalizedTextSha256": "bb02ef447f8c944acc8434afdc30583819b8792ccc78ae5873913e72469a416e"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "extractedTextSha256": "3050775a002b0cf2b1480f15d649aede6d1cb91b2ac2efb75030a653e055785d",
+        "narrativeBindingSha256": "1baa7b94d8e409b96d87a570f2c3b88ee0d003707fa749af10400d1d05eed850",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 1,
+            "details": {
+              "expectedLength": 21,
+              "actualLength": 19,
+              "firstDifferingOffset": 7,
+              "commonSuffixLength": 12,
+              "expectedWordCount": 6,
+              "actualWordCount": 5,
+              "expectedSha256": "d0755ff356730acc51c2e83c88ab7a9ab3130542ba92d12c13a7f131aeca70f4",
+              "actualSha256": "bb02ef447f8c944acc8434afdc30583819b8792ccc78ae5873913e72469a416e"
+            },
+            "normalizedTextSha256": "bb02ef447f8c944acc8434afdc30583819b8792ccc78ae5873913e72469a416e"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 69,
+          "bodyCodePoints": 23,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "4dfdd1b789bc7a72079da2338bb1dd669c83e7cc27ede8f2be80199f9dca6485"
+      }
+    },
+    {
+      "name": "repeated-header-row-excluded-verifies-once",
+      "input": {
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n﷐\n﷒\t﷓\tPopulation\t﷓\tDose\n﷒\t﷓\tAdults\t﷓\t10 mg\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 78
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\n﷒\t﷓\tPopulation\t﷓\tDose\n﷒\t﷓\tChildren\t﷓\t5 mg\n﷑\nPage 2 of 3",
+              "bodyStart": 57,
+              "bodyEnd": 79
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><thead><tr><th>Population</th><th>Dose</th></tr></thead><tbody><tr><td>Adults</td><td>10 mg</td></tr><tr><td>Children</td><td>5 mg</td></tr></tbody></table></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 77,
+                "textSha256": "6a87c794892f59991f0aef3ef6b41acbe2af7e4af12efbc3d5c449b1f54e6aba"
+              },
+              {
+                "page": 2,
+                "startOffset": 57,
+                "endOffset": 78,
+                "textSha256": "f981ef63b629a1ad6aedfa183cb77893d51a20451e8d017c7fabc39dc654d139"
+              }
+            ],
+            "narrativeDivSha256": "4047b7753b5e0c9245691b5575c40927644559e5af77587f944270bcf9c2fffa",
+            "normalizedTextSha256": "71182034cf5d3f3659df5264d8fbcf077d508f9efb142aa260e44dc6a071a1c6"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "extractedTextSha256": "b5f3d02887ba8fa79b8f5c9dccb21e6b745e3e876770594f06fa2e262f7a2487",
+        "narrativeBindingSha256": "187cdc9fbddfdd79bc5db647ee9a9d74a9b9d3c7fad18704c49e96a615fe0315",
+        "status": "passed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "verified",
+            "spanCount": 2,
+            "normalizedTextSha256": "71182034cf5d3f3659df5264d8fbcf077d508f9efb142aa260e44dc6a071a1c6"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 1
+        },
+        "coverage": {
+          "pageCodePoints": 179,
+          "bodyCodePoints": 65,
+          "coveredCodePoints": 63,
+          "uncoveredGaps": 0
+        },
+        "reportHash": "6bf134668bea98170c1371e42394b281b543dd7de76937e959e1fab2696e471e"
+      }
+    },
+    {
+      "name": "repeated-header-row-written-twice-mismatches",
+      "input": {
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n﷐\n﷒\t﷓\tPopulation\t﷓\tDose\n﷒\t﷓\tAdults\t﷓\t10 mg\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 78
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\n﷒\t﷓\tPopulation\t﷓\tDose\n﷒\t﷓\tChildren\t﷓\t5 mg\n﷑\nPage 2 of 3",
+              "bodyStart": 57,
+              "bodyEnd": 79
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><th>Population</th><th>Dose</th></tr><tr><td>Adults</td><td>10 mg</td></tr><tr><th>Population</th><th>Dose</th></tr><tr><td>Children</td><td>5 mg</td></tr></table></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 77,
+                "textSha256": "6a87c794892f59991f0aef3ef6b41acbe2af7e4af12efbc3d5c449b1f54e6aba"
+              },
+              {
+                "page": 2,
+                "startOffset": 57,
+                "endOffset": 78,
+                "textSha256": "f981ef63b629a1ad6aedfa183cb77893d51a20451e8d017c7fabc39dc654d139"
+              }
+            ],
+            "narrativeDivSha256": "4cf4d0bf6b5e89cdcac65f70c58cbccc51029ef59e7e52e1c1b4a197fac18462",
+            "normalizedTextSha256": "b5348cdcf5b52807d95b8ea85a59f96cc75616b9bac4adf256223a07d6c8b5b1"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "extractedTextSha256": "b5f3d02887ba8fa79b8f5c9dccb21e6b745e3e876770594f06fa2e262f7a2487",
+        "narrativeBindingSha256": "a1ada288a0fc8efa92c8277b383daed59e4d9267a099cd8bfd93ea90f0d48ab9",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 2,
+            "details": {
+              "expectedLength": 64,
+              "actualLength": 86,
+              "firstDifferingOffset": 47,
+              "commonSuffixLength": 17,
+              "expectedWordCount": 19,
+              "actualWordCount": 24,
+              "expectedSha256": "71182034cf5d3f3659df5264d8fbcf077d508f9efb142aa260e44dc6a071a1c6",
+              "actualSha256": "b5348cdcf5b52807d95b8ea85a59f96cc75616b9bac4adf256223a07d6c8b5b1"
+            },
+            "normalizedTextSha256": "b5348cdcf5b52807d95b8ea85a59f96cc75616b9bac4adf256223a07d6c8b5b1"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 179,
+          "bodyCodePoints": 65,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 2
+        },
+        "reportHash": "14c609e1d760e218737b69fc983594383cec9c31559a8bb7420efe59b5ba5646"
+      }
     }
   ]
 }
