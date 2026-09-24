@@ -313,8 +313,11 @@ bytes. PR 2's T refuses every picture.
   run can write only into its own namespace. The output Bundle carries only `resourceType`,
   `id`, `meta`, `language`, `identifier`, `type`, `timestamp` and `entry` (each entry only
   `fullUrl` and `resource`), and its `meta`, like the Composition's, is the profile alone; a
-  source with any other Bundle, entry or `meta` element (a signature, a link, a request, a `meta`
-  extension, tag or source; `versionId` and `lastUpdated` excepted) is refused. Tests build, for
+  source with any other Bundle or entry element (a signature, a link, a request), any `meta`
+  element on any resource but `versionId`, `lastUpdated` and `profile` (an extension, a tag, a
+  source), or a contained resource or implicit rules on any resource is refused. Other
+  address-like values (a Composition's `url`, an extension's `valueUri`) are carried as the source
+  wrote them, a stated residual. Tests build, for
   every source kind, a Bundle that
   reuses an import's entry ids, fullUrls and `submissionId`, and require its PUT URLs and
   persisted references to be disjoint from the import's; and a copied entry that references
@@ -497,6 +500,11 @@ id>`, beside the three kinds `src/pipeline.ts` has.
 - `requestedBy` is a placeholder until roadmap item 2 (D8).
 - The EMA's language integers are read from observation, not from a published table (D5).
 - The MedicinalProductDefinition's identifier is the ePI's id, not a product id (D9).
+- Address-like values other than `Reference.reference` (a Composition's `url`, an extension's
+  `valueUri`) are carried as a source wrote them; no route that is not synthetic reaches the
+  crosswalk with one today (D7).
+- The importer lock reads main's first-parent history; a rewritten history of main is not seen
+  (D10).
 
 ## Not in this change
 

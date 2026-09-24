@@ -128,7 +128,9 @@ shown not to list the document; a picture's deletion rests on an evidence record
 authority's viewer, not on anything the gate observes; the QRD template version in the EMA output
 ("10.4") is ours; imports are dry-run only until PR 5; `requestedBy` is a placeholder until
 roadmap item 2; the EMA's language integers are read from observation; the
-MedicinalProductDefinition's identifier is the ePI's id, not a product id. Not yet built from
+MedicinalProductDefinition's identifier is the ePI's id, not a product id. Address-like values other than
+references (a Composition's `url`, a `valueUri`) are carried as written; the importer lock reads
+main's first-parent history, so a rewritten main is not seen. Not yet built from
 the design: the fetched bytes kept as evidence, first needed when imports persist (PR 5). The
 ledger's column descriptions and an import's lineage name (`custom:authority-import.<authority>.<document id>`)
 are.

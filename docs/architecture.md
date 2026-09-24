@@ -178,10 +178,15 @@ Every id the run persists derives from the source Bundle's identifier value: the
 Bundle and Composition as before, and each copied entry
 `stableUuid("ema-entry:" + resourceType, identifierValue + ":" + position)` with a `urn:uuid`
 fullUrl, its references rewritten to match; a reference naming no entry refuses, and so does
-a source Bundle, entry or `meta` element the crosswalk does not carry (a signature, an entry's
-request, a `meta` extension, tag or source), the output's `meta` being its profile alone. A run
-therefore writes, and points, only into its own namespace, whatever ids its source chose
-(`test/namespace.test.ts`).
+a source Bundle or entry element the crosswalk does not carry (a signature, an entry's request),
+a `meta` element on any resource but `versionId`, `lastUpdated` and `profile` (an extension, a
+tag, a source), and a contained resource or implicit rules on any resource; the output's `meta`
+is its profile alone. A run therefore writes only into its own namespace, and every
+`Reference.reference` it persists names its own output, whatever ids its source chose
+(`test/namespace.test.ts`). Other address-like values a source writes (a Composition's `url`, an
+extension's `valueUri`) are carried as written, a stated residual: no route that is not synthetic
+can reach the crosswalk with one today, since a drawn source must be synthetic and an import
+builds its own record.
 
 Some things it still does without asking, by design: every mapped section takes a new id and, as its
 heading, the source's heading when the rule permits it (the rule's `title` or one of its

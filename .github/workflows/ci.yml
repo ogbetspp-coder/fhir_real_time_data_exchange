@@ -23,8 +23,13 @@ jobs:
         shell: bash --noprofile --norc -eo pipefail {0}
 
     steps:
+      # Full history, so test/authority/lock.test.ts can read every importer version main has
+      # released; no credentials kept, since npm ci below runs install scripts.
       - name: Check out repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
@@ -34,14 +39,13 @@ jobs:
       - name: Install Node dependencies
         run: npm ci --no-audit --no-fund
 
-      # The importer lock this change must keep (test/authority/lock.test.ts): main's for a pull
-      # request, the pre-push commit's for a push; an importer version never changes its code, data
-      # or vectors once released
-      # (docs/design/authority-import-contract.md, D10).
-      - name: Fetch the importer lock's base
+      # The history test/authority/lock.test.ts reads as released: main's for a pull request, the
+      # pre-push commit's for a push; an importer version never changes its code, data or vectors
+      # once released (docs/design/authority-import-contract.md, D10).
+      - name: Name the importer lock's base
         env:
           BEFORE_SHA: ${{ github.event.before }}
-        run: bash scripts/ci/fetch-lock-base.sh
+        run: bash scripts/ci/lock-base.sh
 
       # The test step of `npm run check` is `npm run test:coverage`: the suite under v8 coverage
       # with per-directory floors (vitest.config.ts), so a drop below a floor fails this job.

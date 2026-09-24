@@ -90,10 +90,11 @@ Its change control is its own, beside the procedure in `docs/validation/README.m
 - **The lock.** `src/authority/importer.lock.json` maps each `IMPORTER_VERSION` to the SHA-256 of
   every file under `src/authority/` (code and data) and of the vectors.
   `test/authority/lock.test.ts` fails when either changes while the recorded entry does not, and
-  when an entry already released differs from its released form: CI compares with the lock at
-  the change's base (`scripts/ci/fetch-lock-base.sh`: main for a pull request, the commit before
-  the push for a push to main), so a change of behaviour or data after release must change the
-  version. `npm run authority:lock` writes the entry for a version not yet released.
+  when any entry ever released differs from its released form: CI reads every lock in the
+  first-parent history of the change's base (`scripts/ci/lock-base.sh`: main for a pull request,
+  the commit before the push for a push to main, from full history), so neither a second push
+  nor a manual run can pass a changed released entry, and a change of behaviour or data after
+  release must change the version. A rewritten history of main is a stated residual. `npm run authority:lock` writes the entry for a version not yet released.
 - The version is the importer's reviewed label. Its complete identity is the worker image digest
   the run manifest records, which includes `src/fidelity/`, the hash library, the mapping and
   the dependencies; the lock covers those only where the vectors exercise them.

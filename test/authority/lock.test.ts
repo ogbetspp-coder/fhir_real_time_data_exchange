@@ -19,17 +19,18 @@ describe("the importer lock", () => {
     ).toEqual(lockHashes());
   });
 
-  it("keeps every entry already released", () => {
-    // What was released: LOCK_BASE in CI (scripts/ci/fetch-lock-base.sh: the pre-push commit for
-    // a push, so a push to main is compared with main before it; main otherwise, which for a
-    // manual run on main is this commit, already checked when it was pushed), origin/main
-    // locally.
+  it("keeps every entry ever released", () => {
+    // What was released: every importer lock in the first-parent history of LOCK_BASE (in CI,
+    // scripts/ci/lock-base.sh: the commit before a push, main otherwise; locally origin/main).
+    // Reading the whole history, not one commit, means neither a second push nor a manual run
+    // after a changed released entry can compare with the change itself.
     const base = process.env.LOCK_BASE ?? "origin/main";
     const git = (args: string[]): string | undefined => {
       try {
         return execFileSync("git", args, {
           encoding: "utf8",
           stdio: ["ignore", "pipe", "ignore"],
+          maxBuffer: 64 * 1024 * 1024,
         }).trim();
       } catch {
         return undefined;
@@ -37,18 +38,24 @@ describe("the importer lock", () => {
     };
     const baseCommit = git(["rev-parse", "--verify", `${base}^{commit}`]);
     if (process.env.CI === "true") {
-      expect(baseCommit, "CI must fetch the lock's base").toBeDefined();
+      expect(baseCommit, "CI must name the lock's base").toBeDefined();
     }
     if (baseCommit === undefined) return;
-    const released = git(["show", `${baseCommit}:${LOCK}`]);
-    if (released === undefined) return; // nothing released before this lock existed
+    const commits = (git(["log", "--first-parent", "--format=%H", baseCommit, "--", LOCK]) ?? "")
+      .split("\n")
+      .filter((commit) => commit.length > 0);
     const lock = JSON.parse(readFileSync(LOCK, "utf8")) as Record<string, LockEntry>;
-    for (const [version, entry] of Object.entries(
-      JSON.parse(released) as Record<string, LockEntry>,
-    )) {
-      expect(lock[version], `importer ${version} was released; change IMPORTER_VERSION`).toEqual(
-        entry,
-      );
+    for (const commit of commits) {
+      const released = git(["show", `${commit}:${LOCK}`]);
+      if (released === undefined) continue; // the commit that deleted the lock, if any
+      for (const [version, entry] of Object.entries(
+        JSON.parse(released) as Record<string, LockEntry>,
+      )) {
+        expect(
+          lock[version],
+          `importer ${version} was released (${commit}); change IMPORTER_VERSION`,
+        ).toEqual(entry);
+      }
     }
   });
 });

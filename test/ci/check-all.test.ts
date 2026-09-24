@@ -16,7 +16,7 @@ const script = readFileSync("scripts/check-all.sh", "utf8");
 const NOT_RUN_LOCALLY = new Set([
   "npm ci --no-audit --no-fund",
   "npm run validate:official",
-  "bash scripts/ci/fetch-lock-base.sh",
+  "bash scripts/ci/lock-base.sh",
 ]);
 
 const commands = [...workflow.matchAll(/^[ \t]+run:[ \t]*(\S.*)$/gm)].map((match) =>

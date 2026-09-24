@@ -60,6 +60,8 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
+          # Full history for the importer lock's test (scripts/ci/lock-base.sh).
+          fetch-depth: 0
           persist-credentials: false
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
@@ -71,12 +73,12 @@ jobs:
       - name: Install Node dependencies
         run: npm ci --no-audit --no-fund
 
-      # The importer lock's base (scripts/ci/fetch-lock-base.sh): the commit before this push, or
-      # main for a manual run, so test/authority/lock.test.ts compares with what was released.
-      - name: Fetch the importer lock's base
+      # The importer lock's base (scripts/ci/lock-base.sh): the commit before this push, or main
+      # for a manual run, whose history test/authority/lock.test.ts reads as released.
+      - name: Name the importer lock's base
         env:
           BEFORE_SHA: ${{ github.event.before }}
-        run: bash scripts/ci/fetch-lock-base.sh
+        run: bash scripts/ci/lock-base.sh
 
       - name: Quality gate
         run: npm run check

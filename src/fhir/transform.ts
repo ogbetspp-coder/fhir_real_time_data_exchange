@@ -682,16 +682,26 @@ export function transformType2ToEma(
   // A source's meta may carry what the store manages (versionId, lastUpdated) and the profiles
   // the crosswalk replaces; anything else (an extension, a tag, a source URI) is refused, since
   // it could carry a reference outside the run's namespace. The output's meta is the profile.
-  const metaIssues = (
-    [
-      ["Bundle", sourceBundle.meta],
-      ["Composition", sourceComposition.meta],
-    ] as const
-  ).flatMap(([where, meta]) =>
-    Object.keys((meta as Record<string, unknown> | undefined) ?? {})
+  const metaIssues = [
+    ...Object.keys((sourceBundle.meta as Record<string, unknown> | undefined) ?? {})
       .filter((key) => !CARRIED_META_ELEMENTS.has(key))
-      .map((key) => `Source ${where}.meta carries ${key}, which the crosswalk does not carry`),
-  );
+      .map((key) => `Source Bundle.meta carries ${key}, which the crosswalk does not carry`),
+    // Every resource the run persists, the Composition and each copied entry: its meta is
+    // limited alike, and it holds no contained resource and no implicit rules, which could carry
+    // what the rewrite does not reach.
+    ...sourceBundle.entry.flatMap(({ resource }, position) => {
+      const where = position === 0 ? "Composition" : `Bundle.entry[${position}]`;
+      const meta = (resource.meta as Record<string, unknown> | undefined) ?? {};
+      return [
+        ...Object.keys(meta)
+          .filter((key) => !CARRIED_META_ELEMENTS.has(key))
+          .map((key) => `Source ${where}.meta carries ${key}, which the crosswalk does not carry`),
+        ...["contained", "implicitRules"]
+          .filter((key) => resource[key] !== undefined)
+          .map((key) => `Source ${where} carries ${key}, which the crosswalk does not carry`),
+      ];
+    }),
+  ];
   const bundleIssues = [
     ...metaIssues,
     ...Object.keys(sourceBundle)

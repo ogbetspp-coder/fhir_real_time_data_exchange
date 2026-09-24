@@ -219,4 +219,42 @@ describe("run namespaces", () => {
     const ema = transformType2ToEma(stored, mapping);
     expect(ema.documentBundle.meta).toEqual({ profile: [mapping.profiles.bundle] });
   });
+
+  it("limits every persisted resource alike: meta, contained resources, implicit rules", () => {
+    const tagged = createSyntheticType2Bundle(mapping);
+    tagged.meta = { ...tagged.meta, tag: [{ code: "x" }] };
+    expect(issuesOf(() => transformType2ToEma(tagged, mapping))).toEqual([
+      "Source Bundle.meta carries tag, which the crosswalk does not carry",
+    ]);
+
+    const entryMeta = createSyntheticType2Bundle(mapping);
+    const copied = entryMeta.entry[2]?.resource;
+    if (copied === undefined) throw new Error("fixture has entries");
+    copied.meta = { ...copied.meta, source: "https://example.org/elsewhere" } as never;
+    expect(issuesOf(() => transformType2ToEma(entryMeta, mapping))).toEqual([
+      "Source Bundle.entry[2].meta carries source, which the crosswalk does not carry",
+    ]);
+
+    const contained = createSyntheticType2Bundle(mapping);
+    const holder = contained.entry[1]?.resource;
+    if (holder === undefined) throw new Error("fixture has entries");
+    holder.contained = [{ resourceType: "Binary", id: "b" }];
+    holder.implicitRules = "https://example.org/rules";
+    expect(issuesOf(() => transformType2ToEma(contained, mapping))).toEqual([
+      "Source Bundle.entry[1] carries contained, which the crosswalk does not carry",
+      "Source Bundle.entry[1] carries implicitRules, which the crosswalk does not carry",
+    ]);
+
+    const stored = createSyntheticType2Bundle(mapping);
+    const composition = stored.entry[0]?.resource;
+    if (composition === undefined) throw new Error("fixture has a Composition");
+    composition.meta = {
+      ...composition.meta,
+      versionId: "2",
+      lastUpdated: "2026-09-24T12:00:00Z",
+    };
+    expect(transformType2ToEma(stored, mapping).documentBundle.entry[0]?.resource.meta).toEqual({
+      profile: mapping.profiles.composition,
+    });
+  });
 });
