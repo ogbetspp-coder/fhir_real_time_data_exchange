@@ -87,6 +87,7 @@ let signed: SignedManifest;
 
 function config(overrides: Record<string, string> = {}): AppConfig {
   return loadConfig({
+    ALLOW_SYNTHETIC_SOURCES: "true",
     NODE_ENV: "test",
     DRY_RUN: "true",
     GCP_LOCATION: "europe-west4",

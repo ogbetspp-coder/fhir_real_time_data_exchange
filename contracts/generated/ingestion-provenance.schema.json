@@ -34,8 +34,22 @@
       "additionalProperties": false
     },
     "SourceDocument": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/DrawnSourceDocument"
+        },
+        {
+          "$ref": "#/$defs/AuthoritySourceDocument"
+        }
+      ]
+    },
+    "DrawnSourceDocument": {
       "type": "object",
       "properties": {
+        "kind": {
+          "type": "string",
+          "const": "drawn"
+        },
         "sha256": {
           "$ref": "#/$defs/Sha256Hex"
         },
@@ -66,7 +80,7 @@
           "$ref": "#/$defs/ExtractedTextRef"
         }
       },
-      "required": ["sha256", "byteLength", "mediaType", "filename", "extractedText"],
+      "required": ["kind", "sha256", "byteLength", "mediaType", "filename", "extractedText"],
       "additionalProperties": false
     },
     "Sha256Hex": {
@@ -125,6 +139,222 @@
       "required": ["uri", "sha256", "extractorVersion"],
       "additionalProperties": false,
       "description": "Reference to the extractor's page text (a SourceDocumentText object). It contains narrative and is never inlined."
+    },
+    "AuthoritySourceDocument": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "authority-publication"
+        },
+        "mediaType": {
+          "type": "string",
+          "const": "application/fhir+json"
+        },
+        "authority": {
+          "$ref": "#/$defs/Authority"
+        },
+        "request": {
+          "$ref": "#/$defs/ImportRequest"
+        },
+        "document": {
+          "$ref": "#/$defs/PinnedFile"
+        },
+        "index": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/AuthorityId"
+            },
+            "sha256": {
+              "$ref": "#/$defs/Sha256Hex"
+            },
+            "byteLength": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "epiId": {
+              "$ref": "#/$defs/Token"
+            },
+            "versionNumber": {
+              "$ref": "#/$defs/Token"
+            },
+            "metaVersionId": {
+              "$ref": "#/$defs/Token"
+            },
+            "status": {
+              "type": "string",
+              "const": "current"
+            }
+          },
+          "required": [
+            "id",
+            "sha256",
+            "byteLength",
+            "epiId",
+            "versionNumber",
+            "metaVersionId",
+            "status"
+          ],
+          "additionalProperties": false
+        },
+        "pictures": {
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Picture"
+          }
+        },
+        "sectionPages": {
+          "minItems": 1,
+          "maxItems": 2000,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "path": {
+                "$ref": "#/$defs/SectionPath"
+              },
+              "code": {
+                "$ref": "#/$defs/Token"
+              }
+            },
+            "required": ["page", "path", "code"],
+            "additionalProperties": false
+          }
+        },
+        "extractedText": {
+          "$ref": "#/$defs/ExtractedTextRef"
+        }
+      },
+      "required": [
+        "kind",
+        "mediaType",
+        "authority",
+        "request",
+        "document",
+        "index",
+        "pictures",
+        "sectionPages",
+        "extractedText"
+      ],
+      "additionalProperties": false,
+      "description": "An authority's published ePI, which Zone B fetches itself and re-imports (docs/design/authority-import-contract.md)."
+    },
+    "Authority": {
+      "type": "string",
+      "enum": ["EMA", "synthetic"]
+    },
+    "ImportRequest": {
+      "type": "object",
+      "properties": {
+        "authority": {
+          "$ref": "#/$defs/Authority"
+        },
+        "documentId": {
+          "$ref": "#/$defs/AuthorityId"
+        },
+        "indexId": {
+          "$ref": "#/$defs/AuthorityId"
+        },
+        "language": {
+          "type": "string",
+          "const": "en"
+        }
+      },
+      "required": ["authority", "documentId", "indexId", "language"],
+      "additionalProperties": false,
+      "description": "What a person asked to import: an input to the import, part of the approved content."
+    },
+    "AuthorityId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$",
+      "description": "A lower-case GUID."
+    },
+    "PinnedFile": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/AuthorityId"
+        },
+        "sha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        },
+        "byteLength": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": ["id", "sha256", "byteLength"],
+      "additionalProperties": false,
+      "description": "Bytes as served, after HTTP content decoding."
+    },
+    "Picture": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "fetched"
+            },
+            "reference": {
+              "$ref": "#/$defs/PictureReference"
+            },
+            "url": {
+              "$ref": "#/$defs/HttpUrl"
+            },
+            "sha256": {
+              "$ref": "#/$defs/Sha256Hex"
+            },
+            "byteLength": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": ["kind", "reference", "url", "sha256", "byteLength"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "not-drawn"
+            },
+            "reference": {
+              "$ref": "#/$defs/PictureReference"
+            },
+            "evidence": {
+              "$ref": "#/$defs/Token"
+            }
+          },
+          "required": ["kind", "reference", "evidence"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "PictureReference": {
+      "type": "string",
+      "pattern": "^~\\/_entity\\/annotation\\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$"
+    },
+    "HttpUrl": {
+      "type": "string",
+      "maxLength": 256,
+      "pattern": "^https?:\\/\\/[A-Za-z0-9.-]{1,253}(?::\\d{1,5})?(?:[/?#][A-Za-z0-9._~:/?#@!$&'()*+,;=%|-]*)?$",
+      "description": "http(s) URL without whitespace; may carry |version."
+    },
+    "SectionPath": {
+      "type": "string",
+      "pattern": "^Composition(?:\\.section\\[\\d{1,4}\\]){1,16}$"
     },
     "ExtractionTooling": {
       "type": "object",
@@ -277,6 +507,9 @@
         "sourceKey": {
           "$ref": "#/$defs/SourceKey"
         },
+        "sourceField": {
+          "$ref": "#/$defs/SourcePath"
+        },
         "action": {
           "$ref": "#/$defs/DecisionAction"
         },
@@ -301,6 +534,11 @@
       "maxLength": 256,
       "pattern": "^[A-Za-z][A-Za-z0-9]*(?:\\[\\d+\\])?(?:\\.[A-Za-z][A-Za-z0-9]*(?:\\[\\d+\\])?)*$"
     },
+    "SourcePath": {
+      "type": "string",
+      "maxLength": 256,
+      "pattern": "^(?:List|Bundle|Composition)(?:\\.[A-Za-z][A-Za-z0-9]*(?:\\[(?:\\d{1,4}|[A-Za-z][A-Za-z0-9]*)\\])?)*$"
+    },
     "DecisionAction": {
       "type": "string",
       "enum": ["extracted-verbatim", "code-mapped", "defaulted-by-rule", "human-edited", "rejected"]
@@ -324,12 +562,6 @@
       "required": ["system", "code", "lookupId"],
       "additionalProperties": false,
       "description": "Receipt of the terminology lookup that produced a code."
-    },
-    "HttpUrl": {
-      "type": "string",
-      "maxLength": 256,
-      "pattern": "^https?:\\/\\/[A-Za-z0-9.-]{1,253}(?::\\d{1,5})?(?:[/?#][A-Za-z0-9._~:/?#@!$&'()*+,;=%|-]*)?$",
-      "description": "http(s) URL without whitespace; may carry |version."
     },
     "DecisionReason": {
       "type": "string",

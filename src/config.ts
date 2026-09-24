@@ -17,18 +17,19 @@ const runSourceSet: Record<RunSource, true> = {
 };
 export const RUN_SOURCES = Object.keys(runSourceSet) as [RunSource, ...RunSource[]];
 
-// ADR 0002 consequences: the fixture and healthcare-api sources bypass the document gate, so a
-// deployment that handles anything but synthetic content narrows this to `document`. Unset means
-// every source is enabled. The value is a comma-separated subset of RUN_SOURCES; an unknown name
-// or an empty list is a startup failure, never a silently ignored entry.
+// The run sources that bypass the document gate (ADR 0002 consequences).
+const UNGATED_SOURCES: readonly RunSource[] = ["fixture", "healthcare-api"];
+
+// A comma-separated subset of RUN_SOURCES; an unknown name or an empty list is a startup failure,
+// never a silently ignored entry. Unset, it follows ALLOW_SYNTHETIC_SOURCES (below).
 const EnabledRunSources = z
   .string()
   .optional()
-  .transform((value) =>
-    value === undefined ? [...RUN_SOURCES] : value.split(",").map((entry) => entry.trim()),
-  )
-  .pipe(z.array(z.enum(RUN_SOURCES)).min(1))
-  .transform((sources) => [...new Set(sources)] as readonly RunSource[]);
+  .transform((value) => value?.split(",").map((entry) => entry.trim()))
+  .pipe(z.array(z.enum(RUN_SOURCES)).min(1).optional())
+  .transform((sources) =>
+    sources === undefined ? undefined : ([...new Set(sources)] as readonly RunSource[]),
+  );
 
 const ConfigSchema = z
   .object({
@@ -44,6 +45,13 @@ const ConfigSchema = z
     // simply unavailable: this repository never reads a submission from anywhere else.
     SUBMISSION_BUCKET: optionalNonEmpty,
     ENABLED_RUN_SOURCES: EnabledRunSources,
+    // Whether this deployment accepts synthetic content (docs/design/authority-import-contract.md,
+    // D7). Off by default: then the gate refuses anything synthetic, the ungated sources default
+    // to off, and enabling one is a startup failure.
+    ALLOW_SYNTHETIC_SOURCES: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((value) => value === "true"),
     SUBMISSION_MAX_BYTES: z.coerce
       .number()
       .int()
@@ -61,6 +69,16 @@ const ConfigSchema = z
       .transform((value) => value === "true"),
   })
   .superRefine((value, context) => {
+    const ungated = (value.ENABLED_RUN_SOURCES ?? []).filter((source) =>
+      UNGATED_SOURCES.includes(source),
+    );
+    if (!value.ALLOW_SYNTHETIC_SOURCES && ungated.length > 0) {
+      context.addIssue({
+        code: "custom",
+        path: ["ENABLED_RUN_SOURCES"],
+        message: `${ungated.join(", ")} bypass the document gate and need ALLOW_SYNTHETIC_SOURCES=true`,
+      });
+    }
     if (value.DRY_RUN) return;
 
     const required = [
@@ -84,8 +102,15 @@ const ConfigSchema = z
     }
   });
 
-export type AppConfig = z.infer<typeof ConfigSchema>;
+const ResolvedConfigSchema = ConfigSchema.transform((value) => ({
+  ...value,
+  ENABLED_RUN_SOURCES:
+    value.ENABLED_RUN_SOURCES ??
+    (value.ALLOW_SYNTHETIC_SOURCES ? [...RUN_SOURCES] : (["document"] as readonly RunSource[])),
+}));
+
+export type AppConfig = z.infer<typeof ResolvedConfigSchema>;
 
 export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppConfig {
-  return ConfigSchema.parse(environment);
+  return ResolvedConfigSchema.parse(environment);
 }

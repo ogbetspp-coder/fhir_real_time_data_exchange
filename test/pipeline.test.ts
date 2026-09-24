@@ -15,6 +15,7 @@ import { createSyntheticSubmission } from "../src/fixtures/synthetic-submission.
 import { createSyntheticType2Bundle } from "../src/fixtures/synthetic.js";
 import { sha256 } from "../src/lib/hash.js";
 import { runPipeline } from "../src/pipeline.js";
+import { attested } from "./support/submission.js";
 
 const FIXTURE_RUN_ID = "11111111-1111-4111-a111-111111111111";
 const DOCUMENT_RUN_ID = "22222222-2222-4222-a222-222222222222";
@@ -24,7 +25,12 @@ let config: AppConfig;
 
 beforeAll(async () => {
   mapping = await loadEmaMapping();
-  config = loadConfig({ NODE_ENV: "test", DRY_RUN: "true", GCP_LOCATION: "europe-west4" });
+  config = loadConfig({
+    ALLOW_SYNTHETIC_SOURCES: "true",
+    NODE_ENV: "test",
+    DRY_RUN: "true",
+    GCP_LOCATION: "europe-west4",
+  });
 });
 
 function composition(submission: CanonicalSubmission): FhirComposition {
@@ -59,7 +65,7 @@ describe("pipeline", () => {
     expect(result.status).toBe("validated");
     expect(result.artifactUris).toEqual([]);
     expect(result.evidence.signature).toBeUndefined();
-    expect(result.evidence.manifest.schemaVersion).toBe("1.1.0");
+    expect(result.evidence.manifest.schemaVersion).toBe("2.0.0");
     expect(result.evidence.manifest.validation.preflightErrors).toBe(0);
     expect(result.evidence.manifest.validation.officialValidationExecuted).toBe(false);
     expect(result.evidence.manifest.validation.officialProfileErrors).toBe(0);
@@ -98,7 +104,7 @@ describe("pipeline", () => {
     const { manifest } = result.evidence;
 
     expect(result.status).toBe("validated");
-    expect(manifest.schemaVersion).toBe("1.1.0");
+    expect(manifest.schemaVersion).toBe("2.0.0");
     expect(manifest.source.kind).toBe("document");
     expect(manifest.transformation.decisions).toBe(32);
     // Zone B determinism: the document path must publish exactly what the fixture path publishes.
@@ -106,7 +112,7 @@ describe("pipeline", () => {
       fixture.evidence.manifest.transformation.outputHash,
     );
     expect(manifest.ingestion?.submissionId).toBe(submission.submissionId);
-    expect(manifest.ingestion?.contractVersion).toBe("1.0.0");
+    expect(manifest.ingestion?.contractVersion).toBe("2.0.0");
     expect(manifest.ingestion?.parser).toBe("synthetic-extractor@1.0.0");
     expect(manifest.ingestion?.fidelity.status).toBe("passed");
     expect(manifest.ingestion?.fidelity.coverage.pageCodePoints).toBeGreaterThan(
@@ -116,7 +122,12 @@ describe("pipeline", () => {
     expect(manifest.ingestion?.fidelity.sectionsChecked).toBe(32);
     expect(manifest.ingestion?.fidelity.sectionsMatched).toBe(32);
     expect(manifest.ingestion?.fidelity.reportSha256).toBe(fidelityReport.reportHash);
-    expect(manifest.ingestion?.approval.approverId).toBe(submission.approval.approverId);
+    const ingestionApproval = manifest.ingestion?.approval;
+    expect(
+      ingestionApproval?.method === "authority-publication"
+        ? undefined
+        : ingestionApproval?.approverId,
+    ).toBe(attested(submission).approverId);
     expect(() => RunManifestSchema.parse(manifest)).not.toThrow();
   });
 

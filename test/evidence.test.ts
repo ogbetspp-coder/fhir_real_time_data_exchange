@@ -6,13 +6,19 @@ import { createSyntheticSubmission } from "../src/fixtures/synthetic-submission.
 import { createSyntheticType2Bundle } from "../src/fixtures/synthetic.js";
 import { GcpEvidenceStore, ledgerRow, type LedgerRow } from "../src/gcp/evidence.js";
 import { runPipeline } from "../src/pipeline.js";
+import { drawn } from "./support/submission.js";
 
 let mapping: EmaMapping;
 let config: AppConfig;
 
 beforeAll(async () => {
   mapping = await loadEmaMapping();
-  config = loadConfig({ NODE_ENV: "test", DRY_RUN: "true", GCP_LOCATION: "europe-west4" });
+  config = loadConfig({
+    ALLOW_SYNTHETIC_SOURCES: "true",
+    NODE_ENV: "test",
+    DRY_RUN: "true",
+    GCP_LOCATION: "europe-west4",
+  });
 });
 
 async function fixtureRow(): Promise<LedgerRow> {
@@ -77,9 +83,9 @@ describe("transformation ledger row", () => {
     const row = await documentRow();
 
     expect(row.source_kind).toBe("document");
-    expect(row.contract_version).toBe("1.0.0");
+    expect(row.contract_version).toBe("2.0.0");
     expect(row.fidelity_status).toBe("passed");
-    expect(row.ingestion_source_hash).toBe(submission.provenance.sourceDocument.sha256);
+    expect(row.ingestion_source_hash).toBe(drawn(submission).sha256);
     expect(row.approval_hash).toBe(submission.approval.approvedContentSha256);
   });
 
@@ -105,6 +111,7 @@ describe("the manifest signing key", () => {
   it("is refused when it names a crypto key rather than a crypto key version", async () => {
     const store = new GcpEvidenceStore(
       loadConfig({
+        ALLOW_SYNTHETIC_SOURCES: "true",
         NODE_ENV: "test",
         DRY_RUN: "true",
         GCP_LOCATION: "europe-west4",
@@ -122,6 +129,7 @@ describe("the manifest signing key", () => {
   it("leaves the manifest unsigned rather than guessing when no key is configured", async () => {
     const store = new GcpEvidenceStore(
       loadConfig({
+        ALLOW_SYNTHETIC_SOURCES: "true",
         NODE_ENV: "test",
         DRY_RUN: "true",
         GCP_LOCATION: "europe-west4",

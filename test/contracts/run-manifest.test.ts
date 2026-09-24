@@ -63,7 +63,12 @@ let manifest: RunManifest;
 
 beforeAll(async () => {
   mapping = await loadEmaMapping();
-  config = loadConfig({ NODE_ENV: "test", DRY_RUN: "true", GCP_LOCATION: "europe-west4" });
+  config = loadConfig({
+    ALLOW_SYNTHETIC_SOURCES: "true",
+    NODE_ENV: "test",
+    DRY_RUN: "true",
+    GCP_LOCATION: "europe-west4",
+  });
   const { submission, fidelityReport, sourceText } = createSyntheticSubmission(mapping);
   const result = await runPipeline(
     {
@@ -106,7 +111,7 @@ describe("run manifest contract", () => {
     expect(parsed.success).toBe(true);
     expect(manifest.schemaVersion).toBe(RUN_MANIFEST_VERSION);
     expect(manifest.source.kind).toBe("document");
-    expect(manifest.ingestion?.contractVersion).toBe("1.0.0");
+    expect(manifest.ingestion?.contractVersion).toBe("2.0.0");
   });
 
   it("rejects a document run without an ingestion block", () => {

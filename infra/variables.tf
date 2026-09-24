@@ -75,20 +75,37 @@ variable "enforce_binary_authorization" {
   default     = false
 }
 
+variable "allow_synthetic_sources" {
+  description = <<-EOT
+    Whether the worker accepts synthetic content (ALLOW_SYNTHETIC_SOURCES,
+    docs/design/authority-import-contract.md D7). Off, the gate refuses anything synthetic and the
+    gate-bypassing fixture and healthcare-api sources cannot be enabled. The dev deploy sets it.
+  EOT
+  type        = bool
+  default     = false
+}
+
 variable "enabled_run_sources" {
   description = <<-EOT
     Run sources the worker accepts on POST /v1/runs (ENABLED_RUN_SOURCES). fixture and
-    healthcare-api bypass the document gate (ADR 0002); a deployment that handles anything but
-    synthetic content sets this to ["document"]. Default: every source.
+    healthcare-api bypass the document gate (ADR 0002) and need allow_synthetic_sources.
+    Default (null): every source where synthetic sources are allowed, otherwise ["document"].
   EOT
   type        = list(string)
-  default     = ["fixture", "healthcare-api", "document"]
+  default     = null
 
   validation {
-    condition = length(var.enabled_run_sources) > 0 && alltrue([
+    condition = var.enabled_run_sources == null ? true : (length(var.enabled_run_sources) > 0 && alltrue([
       for source in var.enabled_run_sources : contains(["fixture", "healthcare-api", "document"], source)
-    ])
+    ]))
     error_message = "enabled_run_sources must be a non-empty subset of fixture, healthcare-api, document."
+  }
+
+  validation {
+    condition = var.enabled_run_sources == null ? true : (var.allow_synthetic_sources || alltrue([
+      for source in var.enabled_run_sources : source == "document"
+    ]))
+    error_message = "fixture and healthcare-api bypass the document gate and need allow_synthetic_sources = true."
   }
 }
 

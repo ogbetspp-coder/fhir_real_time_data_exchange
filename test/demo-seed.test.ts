@@ -18,6 +18,7 @@ import {
   type DemoRunOutcome,
   type DemoSeedDeps,
 } from "../scripts/demo/seed-plan.js";
+import { SYNTHETIC } from "./support/submission.js";
 
 // The seed script's decisions without the cloud: object naming, what goes inside the approved
 // content, the request it posts, the order it does things in, and what it prints.
@@ -129,6 +130,7 @@ describe("demo seed plan", () => {
           sourceText: value("sourceText"),
         },
         mapping.sourceCodeSystem,
+        SYNTHETIC,
       ),
     ).not.toThrow();
   });

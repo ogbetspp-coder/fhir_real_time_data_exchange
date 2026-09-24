@@ -12,18 +12,21 @@ import {
   Token,
   Uuid,
 } from "./common.js";
+import { CANONICAL_SUBMISSION_VERSION, GraphType } from "./canonical-submission.js";
 import {
   ApprovalMeaning,
-  ApprovalMethod,
+  ApprovalSchema,
+  AttestationMethod,
   ApproverRole,
   FidelityStatus,
 } from "./ingestion-provenance.js";
 
 // Evidence schema for the signed run manifest (AGENTS.md: "update the mapping manifest and
-// evidence schema together"). Version 1.0.0 is kept so ledger rows written before the
-// ingestion block existed remain readable through `AnyRunManifestSchema`.
+// evidence schema together"). Versions 1.0.0 and 1.1.0 are kept so ledger rows written before
+// the ingestion block, and before authority imports, remain readable through
+// `AnyRunManifestSchema`.
 
-export const RUN_MANIFEST_VERSION = "1.1.0";
+export const RUN_MANIFEST_VERSION = "2.0.0";
 
 export const RunStatus = z
   .enum(["validated", "persisted", "rejected", "failed"])
@@ -91,7 +94,23 @@ export const RunManifestV1Schema = z
   })
   .meta({ id: "RunManifestV1" });
 
-export const IngestionEvidenceSchema = z
+const IngestionFidelitySchema = z.strictObject({
+  status: FidelityStatus.extract(["passed"]),
+  normalizationVersion: NormalizationVersion,
+  sectionsChecked: Count,
+  sectionsMatched: Count,
+  reportSha256: Sha256Hex,
+  narrativeBindingSha256: Sha256Hex,
+  coverage: z.strictObject({
+    pageCodePoints: Count,
+    bodyCodePoints: Count,
+    coveredCodePoints: Count,
+    uncoveredGaps: Count,
+  }),
+});
+
+// The ingestion block of a 1.1.0 manifest, frozen so those ledger rows stay readable.
+export const IngestionEvidenceV1Schema = z
   .strictObject({
     submissionId: Uuid,
     contractVersion: z.literal("1.0.0"),
@@ -118,17 +137,92 @@ export const IngestionEvidenceSchema = z
       approverId: PrincipalId,
       approverRole: ApproverRole,
       approvedAt: IsoDateTime,
-      method: ApprovalMethod,
+      method: AttestationMethod,
       meaning: ApprovalMeaning,
       approvedContentSha256: Sha256Hex,
       recordRef: RecordRef.optional(),
     }),
     provenanceResourceId: Uuid,
   })
+  .meta({ id: "IngestionEvidenceV1" });
+
+// What Zone B fetched from the authority for an import (docs/design/authority-import-contract.md,
+// D1, D12).
+export const AuthorityFetchSchema = z
+  .strictObject({
+    importerVersion: Token,
+    fetched: z
+      .array(
+        z.strictObject({
+          url: HttpUrl,
+          sha256: Sha256Hex,
+          byteLength: Count,
+          fetchedAt: IsoDateTime,
+          evidenceUri: NonEmptyString.optional(),
+        }),
+      )
+      .min(2),
+  })
+  .meta({ id: "AuthorityFetch" });
+
+export const IngestionEvidenceSchema = z
+  .strictObject({
+    submissionId: Uuid,
+    contractVersion: z.literal(CANONICAL_SUBMISSION_VERSION),
+    sourceKind: z.enum(["drawn", "authority-publication"]),
+    graphType: GraphType,
+    // Whether the deployment accepted synthetic content when this run passed its gate (D7).
+    allowSyntheticSources: z.boolean(),
+    sourceDocumentSha256: Sha256Hex,
+    extractionRunId: Uuid,
+    parser: Token,
+    modelId: Token.optional(),
+    promptTemplateVersion: Token.optional(),
+    fidelity: IngestionFidelitySchema,
+    approval: ApprovalSchema,
+    authority: AuthorityFetchSchema.optional(),
+    provenanceResourceId: Uuid,
+  })
+  .superRefine((evidence, context) => {
+    if ((evidence.sourceKind === "authority-publication") !== (evidence.authority !== undefined)) {
+      context.addIssue({
+        code: "custom",
+        message: "an authority import, and only one, records what Zone B fetched",
+      });
+    }
+  })
   .meta({
     id: "IngestionEvidence",
     description: "Hashes, counts, enumerations, and identifiers only; never narrative.",
   });
+
+const runSource = z.strictObject({
+  kind: z.enum(["fixture", "healthcare-api", "document"]),
+  resource: NonEmptyString,
+  hash: Sha256Hex,
+});
+
+function documentRunsCarryIngestion(
+  manifest: { source: { kind: string }; ingestion?: unknown },
+  context: z.RefinementCtx,
+): void {
+  if (manifest.source.kind === "document" && manifest.ingestion === undefined) {
+    context.addIssue({ code: "custom", message: "document runs require an ingestion block" });
+  }
+  if (manifest.source.kind !== "document" && manifest.ingestion !== undefined) {
+    context.addIssue({ code: "custom", message: "only document runs carry an ingestion block" });
+  }
+}
+
+export const RunManifestV11Schema = z
+  .strictObject({
+    schemaVersion: z.literal("1.1.0"),
+    source: runSource,
+    ...manifestBody,
+    ingestion: IngestionEvidenceV1Schema.optional(),
+  })
+  .superRefine(documentRunsCarryIngestion)
+  .meta({ id: "RunManifestV11" });
 
 export const RunManifestSchema = z
   .strictObject({
@@ -141,18 +235,12 @@ export const RunManifestSchema = z
     ...manifestBody,
     ingestion: IngestionEvidenceSchema.optional(),
   })
-  .superRefine((manifest, context) => {
-    if (manifest.source.kind === "document" && manifest.ingestion === undefined) {
-      context.addIssue({ code: "custom", message: "document runs require an ingestion block" });
-    }
-    if (manifest.source.kind !== "document" && manifest.ingestion !== undefined) {
-      context.addIssue({ code: "custom", message: "only document runs carry an ingestion block" });
-    }
-  })
+  .superRefine(documentRunsCarryIngestion)
   .meta({ id: "RunManifest" });
 
 export const AnyRunManifestSchema = z.discriminatedUnion("schemaVersion", [
   RunManifestV1Schema,
+  RunManifestV11Schema,
   RunManifestSchema,
 ]);
 

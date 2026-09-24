@@ -22,7 +22,12 @@ beforeAll(async () => {
   fixture = createSyntheticSubmission(mapping);
 });
 
-const BASE_ENVIRONMENT = { NODE_ENV: "test", DRY_RUN: "true", GCP_LOCATION: "europe-west4" };
+const BASE_ENVIRONMENT = {
+  NODE_ENV: "test",
+  DRY_RUN: "true",
+  GCP_LOCATION: "europe-west4",
+  ALLOW_SYNTHETIC_SOURCES: "true",
+};
 
 function configFor(overrides: Record<string, string> = {}): AppConfig {
   return loadConfig({ ...BASE_ENVIRONMENT, ...overrides });

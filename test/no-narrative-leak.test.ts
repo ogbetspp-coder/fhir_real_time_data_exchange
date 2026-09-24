@@ -31,7 +31,12 @@ let config: AppConfig;
 
 beforeAll(async () => {
   mapping = await loadEmaMapping();
-  config = loadConfig({ NODE_ENV: "test", DRY_RUN: "true", GCP_LOCATION: "europe-west4" });
+  config = loadConfig({
+    ALLOW_SYNTHETIC_SOURCES: "true",
+    NODE_ENV: "test",
+    DRY_RUN: "true",
+    GCP_LOCATION: "europe-west4",
+  });
 });
 
 type NarrativeWindow = { sourceKey: string; offset: number; text: string };

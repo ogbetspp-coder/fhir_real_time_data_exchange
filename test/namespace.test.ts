@@ -90,7 +90,7 @@ describe("run namespaces", () => {
   });
 
   it("refuses the authority-import namespace on every route the pipeline has today", async () => {
-    const config = loadConfig({ DRY_RUN: "true" });
+    const config = loadConfig({ DRY_RUN: "true", ALLOW_SYNTHETIC_SOURCES: "true" });
     const source = withIdentifier(
       createSyntheticType2Bundle(mapping),
       "authority-import:ema:00000000-0000-4000-8000-000000000001",

@@ -120,7 +120,7 @@ def test_the_open_models_are_only_the_fhir_ones() -> None:
         for model in _models("canonical_submission")
         if model.model_config.get("extra") == "allow"
     }
-    assert open_models == {"Type2Bundle", "EntryItem", "Resource"}
+    assert open_models == {"CanonicalBundle", "EntryItem", "Resource"}
 
 
 def test_an_open_model_preserves_the_unknown_field() -> None:

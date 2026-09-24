@@ -101,10 +101,11 @@ def test_bundle_hash_reproduces(submission: Any) -> None:
 
 
 def test_approved_content_hash_reproduces(submission: Any) -> None:
-    # `approvedContent()` in src/contracts/canonical-submission.ts: exactly these three fields,
+    # `approvedContent()` in src/contracts/canonical-submission.ts: exactly these four fields,
     # which is what a human approval is bound to.
     approved = {
         "schemaVersion": submission["schemaVersion"],
+        "graphType": submission["graphType"],
         "bundle": submission["bundle"],
         "provenance": submission["provenance"],
     }
@@ -213,6 +214,7 @@ def test_round_tripped_submission_still_hashes(submission: Any) -> None:
     assert sha256_json(dumped["bundle"]) == submission["bundleSha256"]
     approved = {
         "schemaVersion": dumped["schemaVersion"],
+        "graphType": dumped["graphType"],
         "bundle": dumped["bundle"],
         "provenance": dumped["provenance"],
     }

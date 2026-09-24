@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import type { AppConfig } from "./config.js";
 import {
+  AUTHORITY_IMPORT_PREFIX,
   CANONICAL_SUBMISSION_VERSION,
   RUN_MANIFEST_VERSION,
   RunManifestSchema,
@@ -19,11 +20,7 @@ import {
   validateType2Preflight,
 } from "./fhir/preflight.js";
 import { toProvenanceResource } from "./fhir/provenance.js";
-import {
-  AUTHORITY_IMPORT_PREFIX,
-  sourceIdentifierValue,
-  transformType2ToEma,
-} from "./fhir/transform.js";
+import { sourceIdentifierValue, transformType2ToEma } from "./fhir/transform.js";
 import { mappingReference, type EmaMapping } from "./fhir/mapping.js";
 import type { FhirBundle, FhirResource, OperationOutcome } from "./fhir/types.js";
 import { GcpEvidenceStore, type RunManifest, type SignedManifest } from "./gcp/evidence.js";
@@ -78,15 +75,19 @@ function countErrors(outcomes: OperationOutcome[]): number {
 function ingestionEvidence(
   gate: DocumentGateResult,
   provenanceResourceId: string,
+  allowSyntheticSources: boolean,
 ): IngestionEvidence {
-  const { provenance, approval, submissionId } = gate.submission;
+  const { provenance, approval, submissionId, graphType } = gate.submission;
   const { parser, model, promptTemplate, extractionRunId } = provenance.extraction;
-  const { recordRef, ...attestation } = approval;
+  const source = provenance.sourceDocument;
 
   return {
     submissionId,
     contractVersion: CANONICAL_SUBMISSION_VERSION,
-    sourceDocumentSha256: provenance.sourceDocument.sha256,
+    sourceKind: source.kind,
+    graphType,
+    allowSyntheticSources,
+    sourceDocumentSha256: source.kind === "drawn" ? source.sha256 : source.document.sha256,
     extractionRunId,
     parser: `${parser.name}@${parser.version}`,
     ...(model === undefined ? {} : { modelId: model.id }),
@@ -100,7 +101,7 @@ function ingestionEvidence(
       narrativeBindingSha256: gate.report.narrativeBindingSha256,
       coverage: { ...gate.report.coverage },
     },
-    approval: { ...attestation, ...(recordRef === undefined ? {} : { recordRef }) },
+    approval,
     provenanceResourceId,
   };
 }
@@ -110,10 +111,13 @@ type DocumentInput = Extract<PipelineInput, { sourceKind: "document" }>;
 function documentGate(
   input: DocumentInput,
   mapping: EmaMapping,
+  config: AppConfig,
   runId: string,
 ): DocumentGateResult {
   try {
-    return verifyDocumentSubmission(input, mapping.sourceCodeSystem);
+    return verifyDocumentSubmission(input, mapping.sourceCodeSystem, {
+      allowSyntheticSources: config.ALLOW_SYNTHETIC_SOURCES,
+    });
   } catch (error) {
     if (error instanceof SubmissionRejectedError) {
       log("warning", "Canonical submission rejected", {
@@ -146,7 +150,7 @@ export async function runPipeline(
   let gate: DocumentGateResult | undefined;
   let source: FhirBundle;
   if (input.sourceKind === "document") {
-    gate = documentGate(input, mapping, runId);
+    gate = documentGate(input, mapping, config, runId);
     source = gate.bundle;
   } else {
     source = input.source;
@@ -199,7 +203,7 @@ export async function runPipeline(
     if (provenanceResourceId === undefined) {
       throw new Error("Ingestion Provenance requires an id");
     }
-    ingestion = ingestionEvidence(gate, provenanceResourceId);
+    ingestion = ingestionEvidence(gate, provenanceResourceId, config.ALLOW_SYNTHETIC_SOURCES);
   }
 
   const profiles = [

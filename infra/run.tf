@@ -4,6 +4,13 @@ locals {
   # records do (infra/query.tf). null when the reference carries no digest; the precondition on
   # the service turns that into a plan-time error.
   worker_image_digest = try(regex("@(sha256:[0-9a-f]{64})$", var.worker_image)[0], null)
+
+  # Unset, the run sources follow the synthetic flag, as the worker's own default does
+  # (src/config.ts): every source where synthetic content is allowed, otherwise the gated one.
+  enabled_run_sources = coalesce(
+    var.enabled_run_sources,
+    var.allow_synthetic_sources ? ["fixture", "healthcare-api", "document"] : ["document"],
+  )
 }
 
 resource "google_cloud_run_v2_service" "worker" {
@@ -124,7 +131,11 @@ resource "google_cloud_run_v2_service" "worker" {
       }
       env {
         name  = "ENABLED_RUN_SOURCES"
-        value = join(",", var.enabled_run_sources)
+        value = join(",", local.enabled_run_sources)
+      }
+      env {
+        name  = "ALLOW_SYNTHETIC_SOURCES"
+        value = tostring(var.allow_synthetic_sources)
       }
       env {
         name  = "FHIR_ANALYTICS_DATASET"

@@ -22,9 +22,6 @@ const EMA_LIST_CODE = "100000155539";
 const EMA_LIST_DISPLAY = "Combined File of all Documents";
 const QRD_TEMPLATE_EXTENSION =
   "http://ema.europa.eu/fhir/StructureDefinition/ext-epi-qrdtemplate-version";
-// An identifier value in this namespace is written only by the authority importer
-// (docs/design/authority-import-contract.md, D7). Every other path refuses a source that has one.
-export const AUTHORITY_IMPORT_PREFIX = "authority-import:";
 
 export type MappingDecision = {
   sourceKey: string;

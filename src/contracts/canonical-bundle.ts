@@ -3,17 +3,16 @@ import { z } from "zod";
 import { CanonicalUri, IsoDateTime, NonEmptyString } from "./common.js";
 
 // Deliberately loose: FHIR resources are open by nature and `src/fhir/preflight.ts` remains the
-// authority on Type 2 graph structure. This schema only pins the handful of fields the contract
+// authority on the graph's structure. This schema only pins the handful of fields the contract
 // invariants and hashes rely on, so a submission cannot be a non-document or an empty Bundle.
 
 // Strict and grammar-limited: the identifier and the first entry's fullUrl are copied into the
 // Provenance resource, so they must not be able to carry free text.
+// The value is required: every id the run persists derives from it
+// (docs/design/authority-import-contract.md, D7).
 const BundleIdentifierSchema = z.strictObject({
   system: CanonicalUri.optional(),
-  value: z
-    .string()
-    .regex(/^[A-Za-z0-9._:-]{1,128}$/)
-    .optional(),
+  value: z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/),
 });
 
 const BundleEntrySchema = z.looseObject({
@@ -55,7 +54,7 @@ export const LooseCompositionSchema = z.looseObject({
   section: z.array(SectionSchema),
 });
 
-export const Type2BundleSchema = z
+export const CanonicalBundleSchema = z
   .looseObject({
     resourceType: z.literal("Bundle"),
     id: NonEmptyString.optional(),
@@ -65,9 +64,9 @@ export const Type2BundleSchema = z
     entry: z.array(BundleEntrySchema).min(1).max(500),
   })
   .meta({
-    id: "Type2Bundle",
+    id: "CanonicalBundle",
     description:
-      "HL7 Global ePI Type 2 document Bundle (FHIR R5). Structural validation happens in Zone B preflight and the HL7 validator.",
+      "HL7 Global ePI document Bundle (FHIR R5), Type 2 or, for an authority import, Type 1. Structural validation happens in Zone B preflight and the HL7 validator.",
   });
 
-export type Type2Bundle = z.infer<typeof Type2BundleSchema>;
+export type CanonicalBundle = z.infer<typeof CanonicalBundleSchema>;

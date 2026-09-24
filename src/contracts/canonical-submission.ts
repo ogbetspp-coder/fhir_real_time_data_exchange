@@ -11,14 +11,32 @@ import {
   type NarrativeSection,
 } from "../fidelity/index.js";
 import type { FhirBundle } from "../fhir/types.js";
+import { xhtmlToText } from "../fidelity/xhtml.js";
 import { sha256, sha256Utf8 } from "../lib/hash.js";
 import { jsonShapeIssues } from "../lib/json-shape.js";
 import { IsoDateTime, Sha256Hex, Uuid } from "./common.js";
 import { FidelityReportSchema, SourceDocumentTextSchema } from "./fidelity-report.js";
 import { ApprovalSchema, IngestionProvenanceSchema } from "./ingestion-provenance.js";
-import { LooseCompositionSchema, Type2BundleSchema, type Type2Bundle } from "./type2-bundle.js";
+import {
+  CanonicalBundleSchema,
+  LooseCompositionSchema,
+  type CanonicalBundle,
+} from "./canonical-bundle.js";
 
-export const CANONICAL_SUBMISSION_VERSION = "1.0.0";
+export const CANONICAL_SUBMISSION_VERSION = "2.0.0";
+
+// Type 2: the full product graph. Type 1: an authority import's text-only record, whose product
+// identity comes from the authority's index (docs/design/authority-import-contract.md, D9).
+export const GraphType = z.enum(["type1", "type2"]).meta({ id: "GraphType" });
+
+// An identifier value in this namespace is written only by the authority importer
+// (docs/design/authority-import-contract.md, D7). Every other path refuses a source that has one.
+export const AUTHORITY_IMPORT_PREFIX = "authority-import:";
+
+// The importer, the only extractor of an authority's publication; Zone B re-executes it.
+export const AUTHORITY_IMPORTER_NAME = "authority-import";
+// What a synthetic extractor, terminology service or identifier value begins with.
+export const SYNTHETIC_PREFIX = "synthetic-";
 
 // Bounds on strings anywhere in the Bundle outside the verified narratives. Product-graph
 // fields are names, codes, identifiers, and URLs; regulated prose is longer than this and must
@@ -47,7 +65,8 @@ const CanonicalSubmissionBase = z.strictObject({
   schemaVersion: z.literal(CANONICAL_SUBMISSION_VERSION),
   submissionId: Uuid,
   createdAt: IsoDateTime,
-  bundle: Type2BundleSchema,
+  graphType: GraphType,
+  bundle: CanonicalBundleSchema,
   bundleSha256: Sha256Hex,
   provenance: IngestionProvenanceSchema,
   approval: ApprovalSchema,
@@ -58,13 +77,80 @@ export type CanonicalSubmission = z.infer<typeof CanonicalSubmissionBase>;
 // The content an approver attests to. The approval block itself is excluded, and the schema
 // version is included so a re-approval is forced whenever the contract changes.
 export function approvedContent(
-  submission: Pick<CanonicalSubmission, "schemaVersion" | "bundle" | "provenance">,
-): { schemaVersion: string; bundle: Type2Bundle; provenance: CanonicalSubmission["provenance"] } {
+  submission: Pick<CanonicalSubmission, "schemaVersion" | "graphType" | "bundle" | "provenance">,
+): {
+  schemaVersion: string;
+  graphType: CanonicalSubmission["graphType"];
+  bundle: CanonicalBundle;
+  provenance: CanonicalSubmission["provenance"];
+} {
   return {
     schemaVersion: submission.schemaVersion,
+    graphType: submission.graphType,
     bundle: submission.bundle,
     provenance: submission.provenance,
   };
+}
+
+// How the source, the graph type, the approval and the extractor must fit together
+// (docs/design/authority-import-contract.md, D3, D7, D8).
+function sourceIssues(submission: CanonicalSubmission): string[] {
+  const issues: string[] = [];
+  const { provenance, approval, graphType } = submission;
+  const { sourceDocument: source, extraction } = provenance;
+  const { parser } = extraction;
+
+  if (parser.name.includes("/") || parser.name.includes("@")) {
+    issues.push("extraction.parser.name must not contain / or @");
+  }
+  if (source.extractedText.extractorVersion !== `${parser.name}/${parser.version}`) {
+    issues.push(
+      "sourceDocument.extractedText.extractorVersion must be extraction.parser's name/version",
+    );
+  }
+
+  if (source.kind === "drawn") {
+    if (graphType !== "type2") issues.push("A drawn source carries a type2 graph");
+    if (approval.method === "authority-publication") {
+      issues.push("An authority-publication approval requires an authority-publication source");
+    }
+    return issues;
+  }
+
+  if (graphType !== "type1") issues.push("An authority publication carries a type1 graph");
+  if (parser.name !== AUTHORITY_IMPORTER_NAME) {
+    issues.push(`An authority publication's extractor is ${AUTHORITY_IMPORTER_NAME}`);
+  }
+  if (extraction.model !== undefined || extraction.promptTemplate !== undefined) {
+    issues.push("An authority import uses no model and no prompt template");
+  }
+  const { request } = source;
+  if (request.authority !== source.authority) issues.push("The request names another authority");
+  if (request.documentId !== source.document.id) issues.push("The request names another document");
+  if (request.indexId !== source.index.id) issues.push("The request names another index");
+  source.sectionPages.forEach(({ page }, position) => {
+    if (page !== position + 1) issues.push("sourceDocument.sectionPages must number pages 1..n");
+  });
+  const paths = source.sectionPages.map(({ path }) => path);
+  if (new Set(paths).size !== paths.length) {
+    issues.push("sourceDocument.sectionPages repeats a section path");
+  }
+
+  if (approval.method !== "authority-publication") {
+    issues.push("An authority publication's approval is its authority-publication");
+    return issues;
+  }
+  const { publication } = approval;
+  if (approval.authority !== source.authority) issues.push("The approval names another authority");
+  if (publication.documentId !== source.document.id) {
+    issues.push("The approval names another document");
+  }
+  if (publication.indexId !== source.index.id) issues.push("The approval names another index");
+  if (publication.epiId !== source.index.epiId) issues.push("The approval names another ePI");
+  if (publication.versionNumber !== source.index.versionNumber) {
+    issues.push("The approval names another version of the ePI");
+  }
+  return issues;
 }
 
 // Invariants that need nothing but the submission itself. They are Zone B ingress rules and are
@@ -72,6 +158,7 @@ export function approvedContent(
 export function structuralInvariantIssues(submission: CanonicalSubmission): string[] {
   const issues: string[] = [];
   const { provenance, approval } = submission;
+  issues.push(...sourceIssues(submission));
 
   if (sha256(submission.bundle) !== submission.bundleSha256) {
     issues.push("bundleSha256 does not match the Bundle");
@@ -220,11 +307,92 @@ function unverifiedTextIssues(bundle: unknown, verifiedDivPaths: Set<string>): s
   return issues;
 }
 
+// What a deployment accepts (docs/design/authority-import-contract.md, D7).
+export type GateOptions = { allowSyntheticSources: boolean };
+
+// The marker every synthetic narrative carries (test/synthetic-only.test.ts).
+export const SYNTHETIC_MARKER = "not for clinical use";
+
+// Synthetic content is refused unless the deployment accepts it; where it does, a synthetic
+// submission carries every mark of one and any other none. No drawn-document extractor is
+// qualified (fidelity §7), so a drawn submission must be synthetic.
+function syntheticIssues(
+  submission: CanonicalSubmission,
+  narratives: NarrativeSection[],
+  options: GateOptions,
+): string[] {
+  const { sourceDocument: source, extraction } = submission.provenance;
+  const identifier = submission.bundle.identifier.value;
+  const marked = narratives.filter(({ div }) => {
+    try {
+      return xhtmlToText(div).includes(SYNTHETIC_MARKER);
+    } catch {
+      return false;
+    }
+  }).length;
+  const terminology = extraction.terminologyService?.name;
+  const marks = {
+    extractor: extraction.parser.name.startsWith(SYNTHETIC_PREFIX),
+    terminology: terminology?.startsWith(SYNTHETIC_PREFIX) === true,
+    identifier:
+      identifier.startsWith(SYNTHETIC_PREFIX) ||
+      identifier.startsWith(`${AUTHORITY_IMPORT_PREFIX}synthetic:`),
+    authority: source.kind === "authority-publication" && source.authority === "synthetic",
+    narrative: marked > 0,
+  };
+  const synthetic = source.kind === "drawn" ? marks.extractor : marks.authority;
+
+  if (!options.allowSyntheticSources) {
+    if (source.kind === "drawn") {
+      return ["No drawn-document extractor is qualified (fidelity §7)"];
+    }
+    return Object.values(marks).some(Boolean)
+      ? ["Synthetic content where the deployment accepts none"]
+      : [];
+  }
+  if (source.kind === "drawn" && !synthetic) {
+    return ["No drawn-document extractor is qualified (fidelity §7)"];
+  }
+  const issues: string[] = [];
+  if (synthetic) {
+    if (terminology !== undefined && !marks.terminology) {
+      issues.push("A synthetic submission's terminology service is synthetic");
+    }
+    if (!marks.identifier) issues.push("A synthetic submission's Bundle identifier is synthetic");
+    if (marked !== narratives.length) {
+      issues.push("Every narrative of a synthetic submission carries the synthetic marker");
+    }
+  } else if (Object.values(marks).some(Boolean)) {
+    issues.push("A non-synthetic submission carries a synthetic mark");
+  }
+  return issues;
+}
+
+// A structured source has one page per section of the authority's document, each wholly body
+// (fidelity §7; docs/design/authority-import-contract.md, D4).
+function structuredPageIssues(
+  source: CanonicalSubmission["provenance"]["sourceDocument"],
+  text: z.infer<typeof SourceDocumentTextSchema>,
+): string[] {
+  if (source.kind !== "authority-publication") return [];
+  const issues: string[] = [];
+  if (text.pages.length !== source.sectionPages.length) {
+    issues.push("A structured source has one page per section");
+  }
+  for (const page of text.pages) {
+    if (page.bodyStart !== 0 || page.bodyEnd !== Array.from(page.text).length) {
+      issues.push(`Page ${page.page} of a structured source is not wholly body`);
+    }
+  }
+  return issues;
+}
+
 // Zone B ingress gate for `source: "document"` runs (ADR 0002 invariants, ADR 0003 gate).
 // Throws `SubmissionRejectedError` with reason strings that never contain narrative text.
 export function verifyDocumentSubmission(
   input: DocumentSubmissionInput,
   sourceCodeSystem: string,
+  options: GateOptions,
 ): DocumentGateResult {
   const structural = [
     ...jsonShapeIssues("submission", input.submission),
@@ -310,6 +478,22 @@ export function verifyDocumentSubmission(
     }
   }
 
+  issues.push(...syntheticIssues(submission, narrativeSections, options));
+  const identifier = submission.bundle.identifier.value;
+  const source = submission.provenance.sourceDocument;
+  if (source.kind === "drawn" && identifier.startsWith(AUTHORITY_IMPORT_PREFIX)) {
+    issues.push("The authority-import namespace is written only by the importer");
+  }
+  if (source.kind === "authority-publication") {
+    const segment = source.authority === "EMA" ? "ema" : "synthetic";
+    if (identifier !== `${AUTHORITY_IMPORT_PREFIX}${segment}:${source.document.id}`) {
+      issues.push("An authority import's Bundle identifier is its authority-import value");
+    }
+    // Zone B recomputes an import from the authority's bytes before trusting any of it (D1);
+    // until that recomputation is wired into this gate, no import is accepted.
+    issues.push("Authority imports are not accepted until the gate recomputes them");
+  }
+
   issues.push(
     ...unverifiedTextIssues(
       submission.bundle,
@@ -322,7 +506,10 @@ export function verifyDocumentSubmission(
     issues.push(...zodIssues(sourceText.error).map((issue) => `sourceText.${issue}`));
   } else if (sha256(sourceText.data) !== extractedText.sha256) {
     issues.push("Extracted source text does not match sourceDocument.extractedText.sha256");
+  } else if (sourceText.data.extractorVersion !== extractedText.extractorVersion) {
+    issues.push("Extracted source text was written by another extractor");
   } else {
+    issues.push(...structuredPageIssues(source, sourceText.data));
     // Every rejection must surface as a classified contract rejection, so structural failures of
     // the re-execution are folded into the issue list rather than escaping as another error type.
     try {
@@ -334,6 +521,10 @@ export function verifyDocumentSubmission(
       });
       if (fresh.reportHash !== report.reportHash) {
         issues.push("Re-executed fidelity check does not reproduce the declared report");
+      }
+      // A structured source's page without a span must draw nothing (fidelity §7, ADR 0005).
+      if (source.kind === "authority-publication" && fresh.coverage.uncoveredGaps !== 0) {
+        issues.push("A page of the authority's document that no narrative covers is not blank");
       }
     } catch (error) {
       if (error instanceof FidelityError) {

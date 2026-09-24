@@ -1,7 +1,8 @@
 {
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "2.0.0",
   "submissionId": "4b1d2c3e-5f60-4a71-8b92-0c1d2e3f4a5b",
   "createdAt": "2026-09-19T00:00:00Z",
+  "graphType": "type2",
   "bundle": {
     "resourceType": "Bundle",
     "id": "synthetic-type2-smpc",
@@ -933,6 +934,7 @@
   "bundleSha256": "e95421e1d5de87f5e637edb5900487ab0bd5cc6942e0861c629d129f03836490",
   "provenance": {
     "sourceDocument": {
+      "kind": "drawn",
       "sha256": "c226c77c373a69ba2a0e131298356e48916601fabdf85cb58d87a516c14674b4",
       "byteLength": 1024,
       "mediaType": "application/pdf",
@@ -1562,6 +1564,6 @@
     "approvedAt": "2026-09-19T00:00:00Z",
     "method": "api-attestation",
     "meaning": "reviewed-fidelity-and-structure",
-    "approvedContentSha256": "d3c5a43a4af001e9ce5ab6ae260a24b59739dc33a39def4042e9fdaaedf08e95"
+    "approvedContentSha256": "0484110fd66761ab6dfd25ed06ec1d7c5bf916a18dec248bfd1049e1eed59d1d"
   }
 }

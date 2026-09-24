@@ -43,4 +43,4 @@ export * from "./ingestion-provenance.js";
 export * from "./query-tools.js";
 export * from "./run-manifest.js";
 export * from "./run-request.js";
-export * from "./type2-bundle.js";
+export * from "./canonical-bundle.js";

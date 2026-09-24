@@ -50,8 +50,12 @@ export const ExtractedTextRefSchema = z
       "Reference to the extractor's page text (a SourceDocumentText object). It contains narrative and is never inlined.",
   });
 
-export const SourceDocumentSchema = z
+// A document a reader draws (PDF, Word). No extractor of one is qualified under
+// fidelity-norm/3.0.0 (docs/fidelity-normalization.md §7): only a synthetic extractor may produce
+// one, and only where the deployment accepts synthetic sources.
+export const DrawnSourceDocumentSchema = z
   .strictObject({
+    kind: z.literal("drawn"),
     sha256: Sha256Hex,
     byteLength: PositiveInt,
     mediaType: MediaType,
@@ -62,6 +66,92 @@ export const SourceDocumentSchema = z
     // Required: Zone B always re-executes the fidelity check against this text (ADR 0003).
     extractedText: ExtractedTextRefSchema,
   })
+  .meta({ id: "DrawnSourceDocument" });
+
+// The authorities whose publications may be imported, and the synthetic one the tests and the
+// demo use (docs/design/authority-import-contract.md, D7).
+export const Authority = z.enum(["EMA", "synthetic"]).meta({ id: "Authority" });
+
+// The authority's own ids for a document and its List, as its API serves them.
+export const AuthorityId = z
+  .string()
+  .regex(/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/)
+  .meta({ id: "AuthorityId", description: "A lower-case GUID." });
+
+// A section of the authority's Composition, by its position in the section tree.
+export const SectionPath = z
+  .string()
+  .regex(/^Composition(?:\.section\[\d{1,4}\]){1,16}$/)
+  .meta({ id: "SectionPath" });
+
+// A reference to a picture the document names outside its own bytes, in the grammars the
+// importer knows (docs/design/authority-import-contract.md, D6).
+export const PictureReference = z
+  .string()
+  .regex(/^~\/_entity\/annotation\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/)
+  .meta({ id: "PictureReference" });
+
+export const PinnedFileSchema = z
+  .strictObject({ id: AuthorityId, sha256: Sha256Hex, byteLength: PositiveInt })
+  .meta({ id: "PinnedFile", description: "Bytes as served, after HTTP content decoding." });
+
+export const ImportRequestSchema = z
+  .strictObject({
+    authority: Authority,
+    documentId: AuthorityId,
+    indexId: AuthorityId,
+    language: z.literal("en"),
+  })
+  .meta({
+    id: "ImportRequest",
+    description:
+      "What a person asked to import: an input to the import, part of the approved content.",
+  });
+
+export const PictureSchema = z
+  .discriminatedUnion("kind", [
+    z.strictObject({
+      kind: z.literal("fetched"),
+      reference: PictureReference,
+      url: HttpUrl,
+      sha256: Sha256Hex,
+      byteLength: PositiveInt,
+    }),
+    z.strictObject({ kind: z.literal("not-drawn"), reference: PictureReference, evidence: Token }),
+  ])
+  .meta({ id: "Picture" });
+
+export const AuthoritySourceDocumentSchema = z
+  .strictObject({
+    kind: z.literal("authority-publication"),
+    mediaType: z.literal("application/fhir+json"),
+    authority: Authority,
+    request: ImportRequestSchema,
+    document: PinnedFileSchema,
+    index: z.strictObject({
+      id: AuthorityId,
+      sha256: Sha256Hex,
+      byteLength: PositiveInt,
+      epiId: Token,
+      versionNumber: Token,
+      metaVersionId: Token,
+      status: z.literal("current"),
+    }),
+    pictures: z.array(PictureSchema).max(500),
+    sectionPages: z
+      .array(z.strictObject({ page: PositiveInt, path: SectionPath, code: Token }))
+      .min(1)
+      .max(2_000),
+    extractedText: ExtractedTextRefSchema,
+  })
+  .meta({
+    id: "AuthoritySourceDocument",
+    description:
+      "An authority's published ePI, which Zone B fetches itself and re-imports (docs/design/authority-import-contract.md).",
+  });
+
+export const SourceDocumentSchema = z
+  .discriminatedUnion("kind", [DrawnSourceDocumentSchema, AuthoritySourceDocumentSchema])
   .meta({ id: "SourceDocument" });
 
 export const ToolVersionSchema = z
@@ -145,10 +235,20 @@ export const TerminologyRefSchema = z
     description: "Receipt of the terminology lookup that produced a code.",
   });
 
+// The field of the authority's document or List a value was read from.
+export const SourcePath = z
+  .string()
+  .regex(
+    /^(?:List|Bundle|Composition)(?:\.[A-Za-z][A-Za-z0-9]*(?:\[(?:\d{1,4}|[A-Za-z][A-Za-z0-9]*)\])?)*$/,
+  )
+  .max(256)
+  .meta({ id: "SourcePath" });
+
 export const StructuringDecisionSchema = z
   .strictObject({
     target: TargetPath,
     sourceKey: SourceKey.optional(),
+    sourceField: SourcePath.optional(),
     action: DecisionAction,
     ruleId: Token.optional(),
     terminologyRef: TerminologyRefSchema.optional(),
@@ -185,28 +285,69 @@ export const ApproverRole = z
   .enum(["content-reviewer", "qa-reviewer"])
   .meta({ id: "ApproverRole" });
 
-export const ApprovalMethod = z.enum(["api-attestation", "manual-record"]).meta({
-  id: "ApprovalMethod",
+export const AttestationMethod = z.enum(["api-attestation", "manual-record"]).meta({
+  id: "AttestationMethod",
   description: "Attestation placeholders. Electronic signature is a future control boundary.",
 });
+
+export const ApprovalMethod = z
+  .enum(["api-attestation", "manual-record", "authority-publication"])
+  .meta({ id: "ApprovalMethod" });
 
 export const ApprovalMeaning = z
   .enum(["reviewed-fidelity-and-structure"])
   .meta({ id: "ApprovalMeaning" });
 
-export const ApprovalSchema = z
+export const AttestedApprovalSchema = z
   .strictObject({
     approverId: PrincipalId,
     approverRole: ApproverRole,
     approvedAt: IsoDateTime,
-    method: ApprovalMethod,
+    method: AttestationMethod,
     meaning: ApprovalMeaning,
     approvedContentSha256: Sha256Hex,
     recordRef: RecordRef.optional(),
   })
+  .meta({ id: "AttestedApproval" });
+
+// The EMA says of its ePI service that its documents are "for pilot purposes only".
+export const AuthorityStatus = z.enum(["pilot"]).meta({ id: "AuthorityStatus" });
+
+export const AuthorityApprovalSchema = z
+  .strictObject({
+    method: z.literal("authority-publication"),
+    meaning: z.literal("authority-publication-imported"),
+    authority: Authority,
+    authorityStatus: AuthorityStatus,
+    publication: z.strictObject({
+      epiId: Token,
+      documentId: AuthorityId,
+      indexId: AuthorityId,
+      versionNumber: Token,
+      procedureNumber: Token,
+      // When the authority assembled the document, as it wrote it; not a publication date.
+      authorityTimestamp: IsoDateTime,
+    }),
+    // Who asked for the import: a placeholder, like approverId, until roadmap item 2.
+    requestedBy: PrincipalId,
+    requestedAt: IsoDateTime,
+    approvedContentSha256: Sha256Hex,
+  })
+  .meta({
+    id: "AuthorityApproval",
+    description:
+      "The approval is the authority's publication; the person named requested the import (docs/design/authority-import-contract.md, D2, D8).",
+  });
+
+export const ApprovalSchema = z
+  .discriminatedUnion("method", [AttestedApprovalSchema, AuthorityApprovalSchema])
   .meta({ id: "Approval" });
 
 export type SourceDocument = z.infer<typeof SourceDocumentSchema>;
+export type DrawnSourceDocument = z.infer<typeof DrawnSourceDocumentSchema>;
+export type AuthoritySourceDocument = z.infer<typeof AuthoritySourceDocumentSchema>;
+export type AttestedApproval = z.infer<typeof AttestedApprovalSchema>;
+export type AuthorityApproval = z.infer<typeof AuthorityApprovalSchema>;
 export type ExtractionTooling = z.infer<typeof ExtractionToolingSchema>;
 export type SourceSpan = z.infer<typeof SourceSpanSchema>;
 export type SectionProvenance = z.infer<typeof SectionProvenanceSchema>;

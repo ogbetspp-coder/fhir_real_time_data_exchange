@@ -8,7 +8,7 @@ import {
   type SectionProvenance,
   type SourceSpan,
   type StructuringDecision,
-  type Type2Bundle,
+  type CanonicalBundle,
 } from "../contracts/index.js";
 import {
   NORMALIZATION_VERSION,
@@ -238,6 +238,7 @@ export function createSyntheticSubmission(
 
   const provenance: IngestionProvenance = {
     sourceDocument: {
+      kind: "drawn",
       sha256: sha256Utf8(sourceFilename),
       byteLength: 1024,
       mediaType: "application/pdf",
@@ -263,11 +264,12 @@ export function createSyntheticSubmission(
     },
   };
 
-  const type2Bundle = bundle as unknown as Type2Bundle;
+  const type2Bundle = bundle as unknown as CanonicalBundle;
   const submission: CanonicalSubmission = {
     schemaVersion: CANONICAL_SUBMISSION_VERSION,
     submissionId: identity.submissionId,
     createdAt: identity.createdAt,
+    graphType: "type2",
     bundle: type2Bundle,
     bundleSha256: sha256(type2Bundle),
     provenance,
@@ -280,6 +282,7 @@ export function createSyntheticSubmission(
       approvedContentSha256: sha256(
         approvedContent({
           schemaVersion: CANONICAL_SUBMISSION_VERSION,
+          graphType: "type2",
           bundle: type2Bundle,
           provenance,
         }),
@@ -287,10 +290,12 @@ export function createSyntheticSubmission(
     },
   };
 
-  // The fixture is only useful if it is what Zone B accepts; this throws the moment it drifts.
+  // The fixture is only useful if it is what Zone B accepts where synthetic sources are allowed;
+  // this throws the moment it drifts.
   verifyDocumentSubmission(
     { submission, fidelityReport: report, sourceText: source },
     mapping.sourceCodeSystem,
+    { allowSyntheticSources: true },
   );
 
   return { submission, fidelityReport: report, sourceText: source };
