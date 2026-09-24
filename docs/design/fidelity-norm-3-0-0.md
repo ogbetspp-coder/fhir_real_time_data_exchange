@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and thirty reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and thirty-one reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -1151,3 +1151,21 @@ the reader), the review found no false pass, divergence or crash:
    each now fails.
 3. and 4. **Low.** Wording (self-closing elements other than `br`, `hr` and `img`; ASCII
    letters), and a literal C1 control named among the reader's residuals.
+
+## Thirty-first review (2026-09-24): findings and what changed
+
+Scoped to this change, the review found no false pass, divergence or crash in the fidelity
+contract or the quote-edge rule (fresh fuzz and differential, 0 differences):
+
+1. **Medium.** The reader refused a `br`, `img` or `hr` with content only when the content held
+   something other than whitespace, U+00A0 included, which an HTML parser keeps as text. Fixed:
+   any content refuses.
+2. **Medium.** Stated reader rules without a test of their own (a style limited to ASCII, a
+   negative bottom margin, vertical padding at the bottom, a border with two colours). Pinned,
+   with the hairline and line-height bounds at their edge, a zero-padded hexadecimal C1
+   reference, a root that is not a div and a bare "<" before a digit.
+3. **Medium.** The reader's residual wording for a literal C1 control was wrong: HTML remaps a
+   character reference, not a literal one, which stays itself and is drawn as a blank or a box.
+   Fixed, and the same rationale in section 2 of the specification (the rule is unchanged).
+4. and 5. **Low.** "Maps through windows-1252" holds for all but five of U+0080–U+009F; a lone
+   surrogate in a div, which raised an error, now refuses the section.

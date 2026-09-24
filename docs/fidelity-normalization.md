@@ -74,8 +74,9 @@ The input is malformed, and the section fails with `malformed-narrative` (reason
 
 U+000B and U+000C reject on both sides (`forbidden-character`): they are not XML characters,
 and a renderer draws them as nothing or as a box. The C1 controls reject because a renderer
-remaps them through windows-1252 (U+0085 is drawn as "…"), so a narrative carrying one shows
-a character the check does not see. The bidirectional controls reject because their reach
+draws them as nothing a text layer can hold: an HTML parser remaps a character reference to one
+through windows-1252 (`&#133;` is drawn as "…"), and a literal one is drawn as a blank or a box,
+so a narrative carrying one shows a character the check does not see. The bidirectional controls reject because their reach
 differs between a narrative block and a line of page text, and no EU product-information
 language needs them. The interlinear annotation controls are reserved by Unicode for internal
 use and drawn as a blank ("Take 10 " U+FFF9 "000" is drawn as one number with a gap in it), and a

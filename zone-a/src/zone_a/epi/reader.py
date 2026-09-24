@@ -16,13 +16,14 @@ the page and comparing it with this reading is ADR 0005's renderer cross-check. 
 the div as a browser does: it parses XML, and a browser the EMA's div as HTML. Where the two build
 different trees it refuses the cases listed below (processing instructions, comments, prefixed
 elements, self-closing elements other than ``br``, ``hr`` and ``img``, and the rest); any other
-difference is a stated residual (among them a literal C1 control, which HTML maps through
-windows-1252 and the reader reads, and treats as whitespace, as itself), and reading with an HTML5
-parser, as a browser does, is a tracked follow-up (``docs/roadmap.md``, item 3a). It is not the
-fidelity scanner (``zone_a.fidelity.xhtml``), which is the contract for narrative this repository
-publishes and stays as strict as it is; the EMA's own divs carry inline CSS on nearly every element,
-which that scanner rightly refuses. Here each section is read on its own, so a section the reader
-cannot vouch for is refused (``Section.refusal``) without losing the rest of the document.
+difference is a stated residual (among them a literal C1 control, which HTML keeps as itself and a
+browser draws as a blank or a box, and which the reader reads as a character), and reading with an
+HTML5 parser, as a browser does, is a tracked follow-up (``docs/roadmap.md``, item 3a). It is not
+the fidelity scanner (``zone_a.fidelity.xhtml``), which is the contract for narrative this
+repository publishes and stays as strict as it is; the EMA's own divs carry inline CSS on nearly
+every element, which that scanner rightly refuses. Here each section is read on its own, so a
+section the reader cannot vouch for is refused (``Section.refusal``) without losing the rest of the
+document.
 
 What a section's text is:
 
@@ -70,29 +71,29 @@ What refuses a section (``SectionRefusal.code``):
   zero-width characters, bidirectional controls), which a browser hides or which reorders
   what it shows.
 
-Also refused as ``malformed-xhtml``: a root that is not a ``div``, a ``br``, ``img`` or ``hr`` with
-content, markup an HTML parser rebuilds or reads otherwise (a block in an open ``p``, an ``li`` in
-an ``li``, an ``a`` in an ``a``, a table part outside a table, a processing instruction or comment,
-an element with a namespace prefix, a self-closing element other than ``br``, ``hr`` and ``img``,
-``</br>``, a reference to U+0080 to U+009F, which HTML maps through windows-1252), elements nested
-deeper than 128 (a table's row group and row counted; a section deep in the Bundle can be refused as
-nested too deeply to read within that bound, a false failure), and a CDATA section (an XML parser
-reads it as text, an HTML parser as a comment). As ``unsupported-element``: text between the parts
-of a table, which a browser moves out of the table. As ``unsupported-style``: a margin or indent
-more than an inch to the left, text drawn more than 12pt left of its container's start (the blocks'
-margins and the indent inherited through blocks, inline elements and table rows summed, each read as
-the most negative value any of its declarations names; a table cell starts again from the table's
-own offset), which moves it off the page or over what lies there, or a margin or indent in a unit
-the reader does not know (``%``, ``vw``, ``calc()``...); layout that draws one text over another (a
-negative margin on inline text or at a block's top or bottom, vertical padding on inline text and
-any padding on it over a background, a border on it wider than a hairline, a height outside table
-parts and pictures, a line height below 12pt, 100% or 1em, a font above 14pt); a font outside a
-closed list of Unicode text fonts (a symbol font draws other glyphs); a border value on inline text
-a browser would not accept whole, or one inherited from the parent; a style CSS would split
-otherwise than the reader (a quote outside a font family name, a comment, an escape, a bracket
-outside ``rgb()``, a character outside ASCII letters, digits, whitespace and ``# % ! . , : ; ' " ( )
--``); and a margin or indent with a value a browser drops (the wrong number of values,
-``text-indent: auto``).
+Also refused as ``malformed-xhtml``: a root that is not a ``div``, a lone surrogate, a ``br``,
+``img`` or ``hr`` with content, markup an HTML parser rebuilds or reads otherwise (a block in an
+open ``p``, an ``li`` in an ``li``, an ``a`` in an ``a``, a table part outside a table, a processing
+instruction or comment, an element with a namespace prefix, a self-closing element other than
+``br``, ``hr`` and ``img``, ``</br>``, a reference to U+0080 to U+009F, which HTML maps through
+windows-1252 (all but five of them)), elements nested deeper than 128 (a table's row group and row
+counted; a section deep in the Bundle can be refused as nested too deeply to read within that bound,
+a false failure), and a CDATA section (an XML parser reads it as text, an HTML parser as a comment).
+As ``unsupported-element``: text between the parts of a table, which a browser moves out of the
+table. As ``unsupported-style``: a margin or indent more than an inch to the left, text drawn more
+than 12pt left of its container's start (the blocks' margins and the indent inherited through
+blocks, inline elements and table rows summed, each read as the most negative value any of its
+declarations names; a table cell starts again from the table's own offset), which moves it off the
+page or over what lies there, or a margin or indent in a unit the reader does not know (``%``,
+``vw``, ``calc()``...); layout that draws one text over another (a negative margin on inline text or
+at a block's top or bottom, vertical padding on inline text and any padding on it over a background,
+a border on it wider than a hairline, a height outside table parts and pictures, a line height below
+12pt, 100% or 1em, a font above 14pt); a font outside a closed list of Unicode text fonts (a symbol
+font draws other glyphs); a border value on inline text a browser would not accept whole, or one
+inherited from the parent; a style CSS would split otherwise than the reader (a quote outside a font
+family name, a comment, an escape, a bracket outside ``rgb()``, a character outside ASCII letters,
+digits, whitespace and ``# % ! . , : ; ' " ( ) -``); and a margin or indent with a value a browser
+drops (the wrong number of values, ``text-indent: auto``).
 
 What refuses the document (``EpiRefusedError``): not UTF-8 JSON, not a document Bundle, not the
 shape of one (a section, code, text, div or entry of the wrong JSON type), not exactly one entry
@@ -852,14 +853,15 @@ def _walk_element(
         _, own = _left_offsets(element.get("style", ""))
         if own is not None:
             builder.indent = own
-    if name == "hr" and (len(element) or (element.text or "").strip()):
+    # Any text at all, a space or U+00A0 included: an HTML parser keeps it after the element.
+    if name == "hr" and (len(element) or element.text):
         raise _RefusedError("malformed-xhtml", "hr with content")
     if name == "br":
         builder.line_break(here)
     elif name == "img":
         builder.picture(here)
     if name in ("br", "img"):
-        if len(element) or (element.text or "").strip():
+        if len(element) or element.text:
             raise _RefusedError("malformed-xhtml", f"{name} with content")
         builder.text(element.tail or "", marks)
         return
@@ -968,7 +970,8 @@ def read_div(div: str) -> tuple[tuple[Paragraph, ...], SectionRefusal | None, tu
         div = _BARE_LESS_THAN.sub("&lt;", div)
     try:
         root = ET.fromstring(div)
-    except ET.ParseError as error:
+    except (ET.ParseError, ValueError) as error:
+        # ValueError (UnicodeEncodeError among them): a lone surrogate the JSON decoded.
         return (), SectionRefusal("malformed-xhtml", f"not well-formed: {error}"), notes
     builder = _Builder()
     try:

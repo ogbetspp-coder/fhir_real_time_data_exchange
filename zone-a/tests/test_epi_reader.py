@@ -587,6 +587,22 @@ def test_nesting_the_interpreter_cannot_follow_refuses_the_section() -> None:
         ('<p style="font-size:15pt">x</p>', "unsupported-style"),
         ('<p style="line-height:95%">x</p>', "unsupported-style"),
         ('<p style="margin-left:-0.9em">x</p>', "unsupported-style"),
+        # Review round 31: content in a void element, whatever it is; a style limited to ASCII;
+        # a negative bottom margin; vertical padding at the bottom; a border with two colours;
+        # the hairline and line-height bounds at their edge; a zero-padded hexadecimal C1 reference;
+        # a root that is not a div.
+        ('<p>1<img src="data:image/png;base64,AA==">x</img>0</p>', "malformed-xhtml"),
+        ('<p>5<img src="data:image/png;base64,AA=="> </img>mg</p>', "malformed-xhtml"),
+        ('<p>1<img src="data:image/png;base64,AA==">&#160;</img>0</p>', "malformed-xhtml"),
+        ('<div>1<hr>&#160;</hr>0</div>', "malformed-xhtml"),
+        ('<p><span style="border-bottom:1px solid;border-bottom:0 none blac&#x212A;">'
+         "&lt;</span> 5</p>", "unsupported-style"),
+        ('<p style="margin-bottom:-30pt">a</p><p>b</p>', "unsupported-style"),
+        ('<p>x<span style="padding-bottom:13pt">y</span></p>', "unsupported-style"),
+        ('<p><span style="border-bottom:1px solid black red">x</span></p>', "unsupported-style"),
+        ('<p><span style="border-bottom:1pt solid">x</span></p>', "unsupported-style"),
+        ('<p style="line-height:11.5pt">x</p>', "unsupported-style"),
+        ('<p>a&#x0096;b</p>', "malformed-xhtml"),
     ],
 )  # fmt: skip
 def test_what_a_browser_reads_otherwise_refuses(inner: str, code: str) -> None:
@@ -637,3 +653,19 @@ def test_the_nesting_bound_counts_elements_and_a_tables_row_group_and_row() -> N
     refusal = read_div(div(tables(33)))[1]
     assert refusal is not None
     assert refusal.detail == "elements nested deeper than 128"
+
+
+def test_a_root_that_is_not_a_div_and_a_lone_surrogate_refuse() -> None:
+    _, refusal, _ = read_div('<p xmlns="http://www.w3.org/1999/xhtml">x</p>')
+    assert refusal is not None
+    assert refusal.code == "malformed-xhtml"
+    _, refusal, _ = read_div(div("<p>a\ud800b</p>"))
+    assert refusal is not None
+    assert refusal.code == "malformed-xhtml"
+
+
+def test_a_less_than_sign_before_a_digit_is_read_as_text() -> None:
+    paragraphs, refusal, notes = read_div(div("<p>CrCl <30</p>"))
+    assert refusal is None
+    assert paragraphs[0].text == "CrCl <30"
+    assert notes

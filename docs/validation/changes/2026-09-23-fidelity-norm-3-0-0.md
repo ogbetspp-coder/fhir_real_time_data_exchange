@@ -453,7 +453,10 @@ restored.
   reader's claim states the rest as a residual, with reading by an HTML5 parser tracked as a
   follow-up (roadmap item 3a). A thirtieth review, scoped to this change, found no false pass,
   divergence or crash: a zero-padded C1 reference now refuses, and the reader rules it named are
-  each pinned by a test.
+  each pinned by a test. A thirty-first review found the same: a `br`, `img` or `hr` holding only
+  whitespace now refuses, four more stated reader rules are pinned, and the rationale for
+  refusing a literal C1 control is corrected in the reader and in section 2 (a character
+  reference is remapped through windows-1252; a literal one is drawn as a blank or a box).
 
 - **Every submission carrying 2.0.0 is refused by the worker gate** from the moment this change
   deploys. Nothing in the repository produces a 2.0.0 submission after it.
