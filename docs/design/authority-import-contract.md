@@ -503,8 +503,10 @@ id>`, beside the three kinds `src/pipeline.ts` has.
 - Address-like values other than `Reference.reference` (a Composition's `url`, an extension's
   `valueUri`) are carried as a source wrote them; no route that is not synthetic reaches the
   crosswalk with one today (D7).
-- The importer lock reads main's first-parent history; a rewritten history of main is not seen
-  (D10).
+- The importer lock reads main's first-parent history; a rewritten history of main is not seen,
+  and a branch merged by rebase or fast-forward would release every intermediate lock entry it
+  carried, failing every later run (fails closed; pull requests merge with a merge commit or a
+  squash, AGENTS.md) (D10).
 
 ## Not in this change
 

@@ -58,6 +58,10 @@ Google Cloud Healthcare API and observe their native near-real-time BigQuery str
    not deploy. Cloud Build
    only builds images.
 6. Use a separate git worktree for every parallel writing agent.
+7. Merge a pull request with a merge commit (or a squash), never by rebase or fast-forward: the
+   importer lock's test reads main's first-parent history as released
+   (`test/authority/lock.test.ts`), so a rebased branch would release every intermediate lock
+   entry it carried and fail every later run.
 
 ## Toolchain
 

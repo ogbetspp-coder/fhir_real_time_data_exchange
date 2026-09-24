@@ -221,11 +221,14 @@ describe("run namespaces", () => {
   });
 
   it("limits every persisted resource alike: meta, contained resources, implicit rules", () => {
-    const tagged = createSyntheticType2Bundle(mapping);
-    tagged.meta = { ...tagged.meta, tag: [{ code: "x" }] };
-    expect(issuesOf(() => transformType2ToEma(tagged, mapping))).toEqual([
-      "Source Bundle.meta carries tag, which the crosswalk does not carry",
-    ]);
+    for (const key of ["tag", "security", "source", "extension", "id"]) {
+      const tagged = createSyntheticType2Bundle(mapping);
+      tagged.meta = { ...tagged.meta, [key]: [{ code: "x" }] };
+      expect(
+        issuesOf(() => transformType2ToEma(tagged, mapping)),
+        key,
+      ).toEqual([`Source Bundle.meta carries ${key}, which the crosswalk does not carry`]);
+    }
 
     const entryMeta = createSyntheticType2Bundle(mapping);
     const copied = entryMeta.entry[2]?.resource;

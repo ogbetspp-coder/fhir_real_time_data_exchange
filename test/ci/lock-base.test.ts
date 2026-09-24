@@ -27,12 +27,15 @@ describe("the jobs that run the checks", () => {
   ] as const) {
     it(`${workflow} ${name} names the lock's base from full history before the checks`, () => {
       const text = job(workflow, name);
-      expect(text).toMatch(/fetch-depth: 0/);
-      expect(text).toMatch(/persist-credentials: false/);
+      expect(text).toMatch(/^\s+fetch-depth: 0$/m);
+      expect(text).toMatch(/^\s+persist-credentials: false$/m);
       const step = text.indexOf("run: bash scripts/ci/lock-base.sh");
       expect(step).toBeGreaterThan(-1);
       expect(text.slice(0, step)).toMatch(/BEFORE_SHA: \$\{\{ github\.event\.before \}\}/);
       expect(step).toBeLessThan(text.indexOf("run: npm run check"));
+      // The step runs unconditionally.
+      const stepStart = text.lastIndexOf("- name:", step);
+      expect(text.slice(stepStart, step)).not.toMatch(/\bif:/);
     });
   }
 });
@@ -47,16 +50,21 @@ describe("scripts/ci/lock-base.sh", () => {
   git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "two");
   const second = git("rev-parse", "HEAD");
   git("update-ref", "refs/remotes/origin/main", second);
+  // HEAD is not main, so a base read from HEAD would show.
+  git("checkout", "-q", "--detach", first);
 
   function base(environment: Record<string, string>): { status: number; base?: string } {
     const output = path.join(repository, `env-${String(Math.random()).slice(2)}`);
-    writeFileSync(output, "");
+    writeFileSync(output, "EARLIER=kept\n");
     const run = spawnSync("bash", [SCRIPT], {
       cwd: repository,
       env: { PATH: process.env.PATH, GITHUB_ENV: output, ...environment },
       encoding: "utf8",
     });
-    const line = readFileSync(output, "utf8").trim();
+    const lines = readFileSync(output, "utf8").trim().split("\n");
+    // The step appends; what the file held before stays.
+    expect(lines[0]).toBe("EARLIER=kept");
+    const line = lines[1] ?? "";
     return {
       status: run.status ?? 1,
       ...(line === "" ? {} : { base: line.replace("LOCK_BASE=", "") }),
