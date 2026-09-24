@@ -110,7 +110,7 @@ closes the open items the reviews recorded (the blast radius below says why).
   of every cell on its side, in each row its cell covers, the grid rebuilt from the markers once
   per search ("10" | "000 IU" is drawn as one number, and a cell's lines are centred, so any of
   them can sit level with the quote); the agent's port follows. On the three pinned SmPCs this
-  refuses 196 of 789 whole-cell quotes that a reader might read apart (a fail-safe `no-match`,
+  refuses 198 of 789 whole-cell quotes that a reader might read apart (a fail-safe `no-match`,
   stated in UR-22; `agent/scripts/measure_table_quotes.py`). A quote that runs across two cells or across a picture is `no-match`, and a quote that
   carries a grid marker or U+FFFC itself is `invalid-request` (it could join two rows, or quote
   nothing a reader sees): a
@@ -412,7 +412,15 @@ restored.
   exact); the ePI reader applied a later declaration over an `!important` one and read an
   unparseable border value as none (now cascaded by importance, and refused); the check
   skipped faint or struck signs (now reported); and two sub-rules had no test. The table figure
-  is 196 of 789, 51 beginning with a letter.
+  is 196 of 789, 51 beginning with a letter. A twenty-second review, which found no
+  disagreement and measured the inverted rule refusing no more paragraphs, sentences or
+  clauses on the pinned SmPCs than before, found the right edge not reading past a combining
+  mark or an opening mark after the space ("Up to 10" of "10 " U+0332 "000 IU"; it now reads
+  past what the left edge reads past, in text, in cells and in the agent's splitter); no test
+  isolating a cell that starts with a sign; the reader accepting border values a browser drops
+  (a five-digit colour, a keyword among other values) and `inherit` (now refused), and any font
+  (a closed list of Unicode text fonts now); and the check skipping shading over a sign (now
+  reported). The table figure is 198 of 789, 51 beginning with a letter.
 
 - **Every submission carrying 2.0.0 is refused by the worker gate** from the moment this change
   deploys. Nothing in the repository produces a 2.0.0 submission after it.

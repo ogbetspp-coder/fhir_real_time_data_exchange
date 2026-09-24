@@ -365,6 +365,10 @@ def test_inline_borders_are_read_side_by_side(style: str, expected: list[str]) -
         ("border-bottom: 1px solid !important; border-bottom: none", ["underline"]),
         # A border image is drawn whatever the style.
         ("border-image: none", []),
+        ("border-image: initial", []),
+        # "initial" and "unset" are the initial values, none.
+        ("border-bottom: 1px solid; border-bottom: initial", []),
+        ("border-bottom: 1px solid; border-bottom-style: unset", []),
     ],
 )
 def test_inline_borders_cascade_as_a_browser_does(style: str, expected: list[str]) -> None:
@@ -382,6 +386,14 @@ def test_inline_borders_cascade_as_a_browser_does(style: str, expected: list[str
         "border-bottom: 0 0",
         "border-bottom: var(--u, 1px solid)",
         "border-image: linear-gradient(black, black) 0 0 1 0",
+        # A colour a browser does not accept, and a keyword among other values: dropped by a
+        # browser, which keeps the earlier border (review round 22).
+        "border-bottom: 1px solid; border-bottom: none #12345",
+        "border-bottom: 1px solid; border-bottom: none auto",
+        "border-bottom: 1px solid; border-bottom: 0 inherit",
+        "border-bottom: 1px solid; border-bottom: none initial",
+        # "inherit" takes the parent's border, which the reader does not follow.
+        "border-bottom: inherit",
     ],
 )
 def test_a_border_value_the_reader_cannot_read_whole_refuses(style: str) -> None:
@@ -389,3 +401,19 @@ def test_a_border_value_the_reader_cannot_read_whole_refuses(style: str) -> None
     _, refused, _ = read_div(div(f'<p><span style="{style}">&lt;</span></p>'))
     assert refused is not None
     assert refused.code == "unsupported-style"
+
+
+@pytest.mark.parametrize(
+    ("family", "refused"),
+    [
+        ("'Times New Roman', serif", False),
+        ("Verdana, sans-serif", False),
+        ("Wingdings", True),
+        ("Symbol", True),
+        ("'Times New Roman', Symbol", True),
+    ],
+)
+def test_a_font_outside_the_text_fonts_refuses(family: str, refused: bool) -> None:
+    # A symbol-encoded font draws other glyphs: Wingdings "J" is a smiling face (review round 22).
+    _, refusal, _ = read_div(div(f'<p><span style="font-family: {family}">J</span></p>'))
+    assert (refusal is not None and refusal.code == "unsupported-style") == refused

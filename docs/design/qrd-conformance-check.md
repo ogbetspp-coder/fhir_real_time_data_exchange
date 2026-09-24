@@ -135,10 +135,14 @@ Every finding below was confirmed by reading the source div.
   EMA's viewer draws as "≥" while the text says ">", and Jentadueto underlines a 5.1 heading
   holding "≥". Underlines over words, digits, e-mail addresses and plain punctuation (the
   Brukinsa 4.5 subheadings, for example) change nothing and are not reported. Faint and
-  struck text is reported over a sign as well as a word (a white "-" before "20 °C" reads
+  struck text, and shaded text (dark or same-colour shading hides a sign), is reported over a
+  sign as well as a word (a white "-" before "20 °C" reads
   "-20 °C" to the text and "20 °C" to a reader). A bottom border on a block or a table cell is
   layout and is not marked: under a lone sign in a narrow cell or block it draws "≤", which is a
-  stated residual of the check (ADR 0005's closed CSS list governs the import).
+  stated residual of the check (ADR 0005's closed CSS list governs the import). The reader
+  refuses a section naming a font outside a closed list of Unicode text fonts (a symbol font
+  draws other glyphs: Wingdings "J" is a smiling face) and a border value a browser would not
+  accept whole or that inherits from the parent.
 
 The mapping lacks three EMA codes the labels use (Pregnancy, Breast-feeding and Fertility under
 4.6); the check reports them as `unmapped-code`, for information.

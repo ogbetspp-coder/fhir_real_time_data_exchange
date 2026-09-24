@@ -290,12 +290,16 @@ def _zero_width(value: str) -> bool:
 _WIDTH: Final = re.compile(r"thin|medium|thick|0|[0-9]+(\.[0-9]+)?(px|pt|pc|in|cm|mm|em|ex|rem)")
 
 
+# CSS-wide keywords: a browser accepts one only as a declaration's whole value.
+_GLOBAL_KEYWORDS: Final = frozenset({"inherit", "initial", "unset", "revert", "revert-layer"})
+
+
 def _border_colour(token: str) -> bool:
+    """A colour a browser accepts in a border shorthand: a named colour, or #rgb, #rgba, #rrggbb
+    or #rrggbbaa (not ``none``, ``auto`` or a CSS-wide keyword, which ``_NAMED`` also holds)."""
     return (
-        token in _NAMED
-        or token in ("transparent", "currentcolor")
-        or re.fullmatch(r"#[0-9a-f]{3,8}", token) is not None
-    )
+        token in _NAMED and token not in ("none", "auto") and token not in _GLOBAL_KEYWORDS
+    ) or re.fullmatch(r"#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})", token) is not None
 
 
 def _valid_border(part: str, token: str) -> bool:
@@ -338,8 +342,16 @@ def _inline_borders(style: str) -> set[str]:
         if "(" in value or "\\" in value:
             raise _RefusedError("unsupported-style", f"{name}: {value}")
         tokens = value.split()
+        if set(tokens) & _GLOBAL_KEYWORDS:
+            # "inherit" takes the parent's border, which the reader does not follow; a keyword
+            # among other values is invalid, and a browser drops the declaration.
+            if len(tokens) != 1 or tokens[0] in ("inherit", "revert", "revert-layer"):
+                raise _RefusedError("unsupported-style", f"{name}: {value}")
+            to_initial = True
+        else:
+            to_initial = False
         if name.startswith("border-image"):
-            if tokens != ["none"]:
+            if not to_initial and tokens != ["none"]:
                 kinds |= {"underline", "border"}
             continue
         # `_style` has already refused any border property but the physical sides, their
@@ -350,6 +362,14 @@ def _inline_borders(style: str) -> set[str]:
             targets = [side]
         else:
             targets, part = list(_SIDES), rest
+        if to_initial:
+            # "initial" and "unset" (a border is not inherited) are the initial values.
+            for target in targets:
+                if part in ("style", ""):
+                    styles[target] = "none"
+                if part in ("width", ""):
+                    widths[target] = "medium"
+            continue
         if part in ("style", "width"):
             count_ok = len(tokens) == 1 if side in _SIDES else 1 <= len(tokens) <= 4
             if not count_ok or not all(_valid_border(part, token) for token in tokens):
@@ -382,10 +402,43 @@ def _inline_borders(style: str) -> set[str]:
     return kinds
 
 
+# The Unicode text fonts a family list may name: the pinned labels' own and the common others.
+_TEXT_FONTS: Final = frozenset(
+    {
+        "times new roman",
+        "times new roman bold",
+        "times",
+        "arial",
+        "arial unicode ms",
+        "helvetica",
+        "verdana",
+        "calibri",
+        "cambria",
+        "segoe ui",
+        "tahoma",
+        "georgia",
+        "garamond",
+        "courier new",
+        "courier",
+        "serif",
+        "sans-serif",
+        "monospace",
+    }
+)
+
+
 def _style(style: str) -> set[str]:
     """The mark kinds a style attribute asks for, or a refusal."""
     kinds: set[str] = set()
     for name, value in _declarations(style):
+        if name == "font-family":
+            # A symbol-encoded font draws other glyphs for the same code points (Wingdings "J"
+            # is drawn as a smiling face, Symbol "³" as "≥"), so every family named must be a
+            # Unicode text font the reader knows (ADR 0005's closed list).
+            for family in value.split(","):
+                if family.strip().strip("'\"") not in _TEXT_FONTS:
+                    raise _RefusedError("unsupported-style", f"{name}: {value}")
+            continue
         if _LAYOUT.fullmatch(name):
             if name.startswith(("margin", "text-indent")) and not _on_page(value):
                 raise _RefusedError("unsupported-style", f"{name}: {value}")

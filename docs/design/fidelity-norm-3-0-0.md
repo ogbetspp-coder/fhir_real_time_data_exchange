@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and twenty-one reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and twenty-two reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -965,3 +965,26 @@ Each fix is pinned by vectors on both sides, and a break of each is caught by th
 7. to 10. **Low.** A sign after the quote (now a cut after a number, item 3); "nothing
    precedes" stated; a bottom border on a block or cell stated as a residual of the check;
    the script's wording aligned ("beginning with a letter").
+
+## Twenty-second review (2026-09-24): findings and what changed
+
+The review found no disagreement between the service, the agent and an independent oracle over
+every code point and 167 000 fuzzed quotes, and measured the inverted rule on the pinned SmPCs'
+paragraphs: it refuses the same 4 of 846 paragraphs, 1 332 sentences and 2 446 clauses as before
+(adjacent numbers across a paragraph break), and 20 more of 20 186 five-word windows, each a
+number before a sign, as intended.
+
+1. **High.** The right edge read the code point after the space past gaps only, while the left
+   reads past combining marks and opening marks too: "Up to 10" of "10 " U+0332 "000 IU" and
+   "100" of "100 (× 10⁹/l)" matched. Fixed: both edges, the cells' first code points and the
+   agent's answer splitter read past the same.
+2. **Medium.** No test isolated a cell that starts with a sign. Fixed.
+3. **Medium.** The reader accepted border values a browser drops (a five- or seven-digit colour,
+   `none auto`, a keyword among other values) and read `inherit` as none. Fixed: colours and
+   CSS-wide keywords are read as a browser reads them, and `inherit` refuses.
+4. **Medium.** Shading over a sign was not reported. Fixed.
+5. **Medium.** The reader accepted any font, a symbol font included. Fixed: a closed list of
+   Unicode text fonts, as ADR 0005 states.
+6. to 9. **Low.** Wording ("‹" is a sign, the scanner markers and modifier letters in UR-22),
+   the bit constants' comment, pins for the rules that only loosen, and residuals (letters drawn
+   like digits, « and », dashes drawn like signs, a spaced ratio colon).

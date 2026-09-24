@@ -30,7 +30,7 @@ from typing import Any, Final, Literal, NotRequired, TypedDict, final
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 
-from .quote_edge import edge_after, edge_before, non_gap
+from .quote_edge import drawn_from, edge_after, edge_before, non_gap
 
 __all__ = [
     "AGENT_TURN_RESOURCE",
@@ -264,7 +264,7 @@ def _acceptable_cut(text: str, index: int) -> bool:
     if resume == len(text):
         return False
     return edge_after(text, index, non_gap(text, index - 1, -1)) and edge_before(
-        text, resume, non_gap(text, resume, 1)
+        text, resume, drawn_from(text, resume)
     )
 
 

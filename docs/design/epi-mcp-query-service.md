@@ -384,14 +384,11 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
     number, and a quote may neither end with "10" or "10" U+2009 nor begin with "000" or "½"
     there. A quote, or the opening punctuation before it, preceded by a sign and a space has
     lost it: reading back from the space past gaps, combining marks and the opening marks, a run
-    of code points that are not letters, numbers or gaps holding a sign is a cut. And a quote
-    ending in a number before a space and a sign has lost what the sign says of it ("30" of "30
-    %", "100" of "100 × 10⁹/l", "25" of "25 °C", "20" of "20 +/- 5"). A sign is anything that is
-    not a letter (a modifier letter, Lm, is a sign), a number, a gap, a combining mark, an
-    opening mark, one of the scanner's markers, a dash or hyphen (general category Pd, far more
+    of code points that are not letters, numbers or gaps holding a sign is a cut. And a quote ending in a number before a space and a sign, read past gaps, combining marks and opening marks as on the left ("100" of "100 (× 10⁹/l)", "10" of "10 " U+0332 "000"), has lost what the sign says of it ("30" of "30
+    %", "100" of "100 × 10⁹/l", "25" of "25 °C", "20" of "20 +/- 5"). A sign is anything that is not a letter (a modifier letter, Lm, is a sign), a number, a gap, a combining mark, an opening mark the reading skips (those of `QUOTE_OPENERS` but "‹", which is drawn like "<"), one of the scanner's markers (U+FFFC, U+FDD0–U+FDEF), a dash or hyphen (general category Pd, far more
     often a separator), or plain punctuation: `. , ; : ! ? ) ] } " ' ’ ” » …`, the marks `® ™ ©`,
     and the reference marks `* † ‡ § ¶ #`, which bind neither side. So a look-alike no list names
-    (`˂`, `❮`, `⧼`, `⟪`, `‹`, `➕`, a middle dot, a slash) is still a cut. The postfix signs `% ‰
+    (`˂`, `❮`, `⧼`, `⟪`, `➕`, a middle dot, a slash) is still a cut. The postfix signs `% ‰
 ‱ ° ′ ″ ℃ ℉` bind the number before them only, so they count after a number and not before a
     quote ("30 patients" in "12 % 30 patients" matches). So "30 ml/min" is cut after "CrCl <"
     U+2063 " ", "CrCl <" U+0332 (drawn "≤"), "CrCl <=", inside "CrCl < ( 30 ml/min )", "CrCl <
@@ -399,8 +396,7 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
     +/-", and "10 cells" after "2 ·". A number before an opening bracket also joins one after it
     ("000 IU" in "Give 10 (000 IU)"), a false failure. Stated residuals: a letter drawn like a
     sign is not read as one ("x" or Cyrillic "х" for "×" in "Take 2 x 10 mg", U+1438 for "<");
-    an asterisk written for a multiplication is read as a reference mark ("2 * 10"); and a quote
-    may end before a decimal separator set off by a space ("Take 1" of "Take 1 ,5 mg"). All are
+    an asterisk written for a multiplication is read as a reference mark ("2 * 10"); a quote may end before a decimal separator or a ratio's colon set off by a space ("Take 1" of "Take 1 ,5 mg", "dilute 1" of "dilute 1 : 10"); a letter drawn like a digit ("O" or Cyrillic "О" for 0, "l" for 1) is a letter; « and » are opening and plain punctuation although drawn like "≪" and "≫"; and a dash drawn like a sign (U+30A0 and U+2E40 like "=", U+301C like "~") is a dash. All are
     cuts;
   - **across table cells** (from `fidelity-norm/3.0.0`): a renderer draws a row's cells side by
     side with a gap about as wide as a space and centres each cell's lines vertically, so any
@@ -418,7 +414,7 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
     quote beginning with a digit is refused when any cell to its left in its rows holds a word
     ending in a digit, any quote at a word boundary in a cell is refused when any cell to its
     left holds a word ending in a sign, and a quote ending in a digit when any cell to its right
-    holds a word beginning with one, or a sign. On the three pinned SmPCs 196 of 789 whole-cell
+    holds a word beginning with one, or a sign. On the three pinned SmPCs 198 of 789 whole-cell
     quotes are refused by this rule alone, 51 of them beginning with a letter
     (`agent/scripts/measure_table_quotes.py`, which rebuilds each grid approximately): in Jentadueto's renal table
     `< 30` | "Metformin is contraindicated" | "No dose adjustment" refuses both right-hand

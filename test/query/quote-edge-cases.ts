@@ -204,6 +204,26 @@ export const quoteEdgeCases: QuoteEdgeCase[] = [
     whole: ["30 patients responded.", "25 mg was given.", "10 mg.", "20 mg.", "25 mg"],
   },
   {
+    // Review round 22: the right edge reads past what the left edge reads past, a combining mark
+    // and an opening mark, and a cell holding only a sign after a number binds it.
+    text: "Up to 10 \u0332000 IU. Platelets 100 \u0332\u00d7 10\u2079/l. At least 30 \u0301% of. Count 200 (\u00d7 10\u2079/l).",
+    cut: ["Up to 10", "\u0332000 IU.", "Platelets 100", "At least 30", "Count 200"],
+    whole: ["Up to", "Platelets", "At least", "Count"],
+  },
+  {
+    markup:
+      "<table><tr><td>30</td><td>%</td></tr><tr><td>100</td><td>&#xD7;</td></tr><tr><td>40</td><td>&#x332;%</td></tr><tr><td>50</td><td>(%)</td></tr></table>",
+    cut: ["30", "100", "40", "50"],
+    whole: [],
+  },
+  {
+    // What is not a sign, pinned: a dash, "®", a reference mark; and a postfix sign after a
+    // number binds it.
+    text: "Brand\u00ae 80 mg. Range 10 \u2013 20 mg. Grade\u2020 30 mg. Loss 5 \u2030 daily.",
+    cut: ["Loss 5"],
+    whole: ["80 mg.", "Range 10", "20 mg.", "30 mg.", "Loss"],
+  },
+  {
     // A cell of a long run of brackets is read whole, however long; a sign starting the cell
     // after a number binds it.
     markup: `<table><tr><td>a ${"(".repeat(300)}</td><td>30 mg</td></tr><tr><td>100</td><td>&#xD7; 10&#x2079;/l</td></tr></table>`,

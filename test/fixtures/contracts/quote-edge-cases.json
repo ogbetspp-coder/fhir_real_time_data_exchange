@@ -838,6 +838,115 @@
       ]
     },
     {
+      "text": "Up to 10 ̲000 IU. Platelets 100 ̲× 10⁹/l. At least 30 ́% of. Count 200 (× 10⁹/l).",
+      "quotes": [
+        {
+          "quote": "Up to 10",
+          "result": "no-match"
+        },
+        {
+          "quote": "̲000 IU.",
+          "result": "no-match"
+        },
+        {
+          "quote": "Platelets 100",
+          "result": "no-match"
+        },
+        {
+          "quote": "At least 30",
+          "result": "no-match"
+        },
+        {
+          "quote": "Count 200",
+          "result": "no-match"
+        },
+        {
+          "quote": "Up to",
+          "result": "match",
+          "startOffset": 0,
+          "endOffset": 5
+        },
+        {
+          "quote": "Platelets",
+          "result": "match",
+          "startOffset": 18,
+          "endOffset": 27
+        },
+        {
+          "quote": "At least",
+          "result": "match",
+          "startOffset": 42,
+          "endOffset": 50
+        },
+        {
+          "quote": "Count",
+          "result": "match",
+          "startOffset": 61,
+          "endOffset": 66
+        }
+      ]
+    },
+    {
+      "text": "﷐ ﷒ ﷓ 30 ﷓ % ﷒ ﷓ 100 ﷓ × ﷒ ﷓ 40 ﷓ ̲% ﷒ ﷓ 50 ﷓ (%) ﷑",
+      "quotes": [
+        {
+          "quote": "30",
+          "result": "no-match"
+        },
+        {
+          "quote": "100",
+          "result": "no-match"
+        },
+        {
+          "quote": "40",
+          "result": "no-match"
+        },
+        {
+          "quote": "50",
+          "result": "no-match"
+        }
+      ]
+    },
+    {
+      "text": "Brand® 80 mg. Range 10 – 20 mg. Grade† 30 mg. Loss 5 ‰ daily.",
+      "quotes": [
+        {
+          "quote": "Loss 5",
+          "result": "no-match"
+        },
+        {
+          "quote": "80 mg.",
+          "result": "match",
+          "startOffset": 7,
+          "endOffset": 13
+        },
+        {
+          "quote": "Range 10",
+          "result": "match",
+          "startOffset": 14,
+          "endOffset": 22
+        },
+        {
+          "quote": "20 mg.",
+          "result": "match",
+          "startOffset": 25,
+          "endOffset": 31
+        },
+        {
+          "quote": "30 mg.",
+          "result": "match",
+          "startOffset": 39,
+          "endOffset": 45
+        },
+        {
+          "quote": "Loss",
+          "result": "match",
+          "startOffset": 46,
+          "endOffset": 50
+        }
+      ]
+    },
+    {
       "text": "﷐ ﷒ ﷓ a (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((( ﷓ 30 mg ﷒ ﷓ 100 ﷓ × 10⁹/l ﷑",
       "quotes": [
         {

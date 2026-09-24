@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 from typing import Final
 
 __all__ = [
+    "drawn_from",
     "edge_after",
     "edge_before",
     "find_quote_occurrence",
@@ -264,9 +265,10 @@ def _word_bits(text: str) -> int:
     """``wordBits``: a word ends in a sign when reading back from its end reaches a sign's run."""
     bits = 0
     for word in _words(text):
-        if _is_digit(word[0]):
+        first = drawn_from(word, 0)
+        if _is_digit(first):
             bits |= _STARTS_DIGIT
-        if _is_sign(word[0]):
+        if _is_sign(first):
             bits |= _STARTS_SIGN
         if _is_digit(word[-1]):
             bits |= _ENDS_DIGIT
@@ -399,6 +401,13 @@ class _Signs:
         return self._reached[index]
 
 
+def drawn_from(text: str, index: int) -> str | None:
+    """``drawnFrom``: the first code point from ``index`` not skipped when reading for a sign."""
+    while index < len(text) and _skipped_before_sign(text[index]):
+        index += 1
+    return text[index] if 0 <= index < len(text) else None
+
+
 def _cut_after_space(
     text: str,
     space: int,
@@ -454,7 +463,8 @@ def edge_after(text: str, end: int, last: str | None, tables: _Tables | None = N
     if is_word_character(after):
         return False
     if after == " ":
-        following = non_gap(text, end + 1, 1)
+        # Read past what the left edge reads past: gaps, combining marks and opening marks.
+        following = drawn_from(text, end + 1)
         # A number or a sign after a number binds it ("10 000", "30 %", "100" and a
         # multiplication sign).
         if _is_digit(last) and (_is_digit(following) or _is_sign(following)):
@@ -477,7 +487,7 @@ def find_quote_occurrence(text: str, quote: str) -> int:
         return -1
     tables = _index_tables(text)
     signs = _Signs(text)
-    first = non_gap(quote, 0, 1)
+    first = drawn_from(quote, 0)
     last = non_gap(quote, len(quote) - 1, -1)
     found = text.find(quote)
     while found >= 0:

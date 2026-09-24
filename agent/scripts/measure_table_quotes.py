@@ -1,6 +1,6 @@
 """How many whole-cell quotes the quote-edge rule's table clause refuses on the pinned SmPCs.
 
-The figure the query design and UR-22 state ("196 of 789") comes from here. For every table in
+The figure the query design and UR-22 state ("198 of 789") comes from here. For every table in
 the three pinned EMA SmPCs (``labels/ema-epi/sources``), every cell's text is quoted against the
 table's text twice: once with the whole grid (the rule reads every cell beside it) and once alone
 in a one-cell table. A quote that matches alone and not in its table is refused by the table
