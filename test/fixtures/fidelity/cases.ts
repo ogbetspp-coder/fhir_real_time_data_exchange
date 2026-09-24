@@ -484,6 +484,11 @@ const REPEATED_HEADER_SOURCE: SourceDocumentText = (() => {
     ],
   };
 })();
+// Review round 12: U+1680 draws as a stroke, "Take 2-10 mg", not as a space.
+const OGHAM_LINE = "Take 2\u168010 mg daily.";
+const OGHAM_SOURCE = customSource([OGHAM_LINE]);
+const SPACE_LINE = "Take 2 10 mg daily.";
+const SPACE_SOURCE = customSource([SPACE_LINE]);
 const SPANNED_DOSE_TABLE =
   '<table><tr><td>Adults</td><td rowspan="3">10 mg</td></tr><tr><td>Children</td></tr><tr><td>Elderly</td></tr></table>';
 const MID_LINE_BULLET = "Take 2 \u2022 10 mg daily.";
@@ -2549,6 +2554,25 @@ export const verifyCases: VerifyCase[] = [
     ),
     expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
   },
+  // Review round 12: U+1680 is content, drawn as a stroke.
+  {
+    name: "ogham-space-mark-against-a-space-mismatches",
+    input: toInput(
+      OGHAM_SOURCE,
+      single("smpc.4.2.posology", paragraphs(SPACE_LINE), [spanFor(OGHAM_SOURCE, 1, OGHAM_LINE)]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "space-against-an-ogham-space-mark-mismatches",
+    input: toInput(
+      SPACE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("Take 2&#x1680;10 mg daily."), [
+        spanFor(SPACE_SOURCE, 1, SPACE_LINE),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
 ];
 
 export const throwCases: ThrowCase[] = [
@@ -2756,6 +2780,12 @@ export const normalizationCases: NormalizationCase[] = [
   { name: "soft-hyphen-crlf", input: "intra­\r\nvenous", expected: "intravenous" },
   { name: "soft-hyphen-then-space-stays", input: "intra­ venous", expected: "intra venous" },
   { name: "ligature-then-combining", input: "ﬁ́", expected: "fí" },
+  // U+1680 OGHAM SPACE MARK is drawn as a stroke, so it is content (fidelity-norm/3.0.0).
+  {
+    name: "ogham-space-mark-is-content",
+    input: "Take 2\u168010 mg",
+    expected: "Take 2\u168010 mg",
+  },
   // A picture token is closed by U+FFFC, which composes with nothing, so NFC leaves its digits.
   {
     name: "combining-mark-after-picture-token",
@@ -4234,5 +4264,55 @@ export const xhtmlCases: XhtmlCase[] = [
     ),
     expected:
       "\n\n\ufdd0\n\ufdd2\t\ufdd3\ta\t\t\ufdd3\tb\t\t\ufdd3\tc\t\n\n\ufdd2\t\ufdd3\td\t\t\ufdd5\t\t\ufdd5\t\n\n\ufdd1\n\n",
+  },
+  // Review round 12: the href grammar, pinned at each boundary.
+  {
+    name: "href-host-of-64-accepted",
+    input: div(
+      '<p><a href="https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.org/">x</a></p>',
+    ),
+    expected: "\n\nx\n\n",
+  },
+  {
+    name: "href-host-of-65-rejected",
+    input: div(
+      '<p><a href="https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.org/">x</a></p>',
+    ),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "href-underscore-in-host-rejected",
+    input: div('<p><a href="https://ex_ample.org/">x</a></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "href-port-rejected",
+    input: div('<p><a href="https://example.org:443/">x</a></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "href-user-information-rejected",
+    input: div('<p><a href="https://user@example.org/">x</a></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "href-empty-segment-accepted",
+    input: div('<p><a href="https://example.org//x">x</a></p>'),
+    expected: "\n\nx\n\n",
+  },
+  {
+    name: "href-eight-segments-and-slash-accepted",
+    input: div('<p><a href="https://example.org/1/2/3/4/5/6/7/8/">x</a></p>'),
+    expected: "\n\nx\n\n",
+  },
+  {
+    name: "href-nine-segments-rejected",
+    input: div('<p><a href="https://example.org/1/2/3/4/5/6/7/8/9">x</a></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "href-segment-of-33-rejected",
+    input: div('<p><a href="https://example.org/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">x</a></p>'),
+    expected: { error: "forbidden-attribute" },
   },
 ];

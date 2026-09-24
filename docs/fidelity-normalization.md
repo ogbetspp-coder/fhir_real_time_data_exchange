@@ -137,9 +137,11 @@ pair rejects even if the next reference completes it.
    so a list item at the start of a section is still a list item on both sides.
 
 5. Replace every whitespace-class code point with U+0020 — closed list: U+0009, U+000A,
-   U+000D, U+0020, U+00A0, U+1680, U+2000–U+200A, U+2028, U+2029, U+202F, U+205F, U+3000.
+   U+000D, U+0020, U+00A0, U+2000–U+200A, U+2028, U+2029, U+202F, U+205F, U+3000.
    Then collapse runs of U+0020 to a single U+0020 and remove leading and trailing U+0020.
-   U+000B, U+000C and U+0085 are not in the list: section 2 rejects them.
+   U+000B, U+000C and U+0085 are not in the list: section 2 rejects them. U+1680 OGHAM SPACE
+   MARK is not in the list (from 3.0.0): a renderer draws it as a stroke, so "Take 2" U+1680
+   "10 mg" reads as a range, not as two numbers, and it is content.
 
 The procedure is idempotent: applying it twice yields the first result (the golden vectors
 include the blocking cases that make step order matter, and step 4's rule that the start of the
@@ -339,8 +341,9 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   root.
 - Attribute values are never compared against the source, so they must not be able to carry
   text. Each value must match its token form or the element rejects: `xml:lang`, `lang`,
-  `scope` — `[A-Za-z0-9_.:-]{1,32}`; `href` — `https://` host and up to eight path segments of
-  at most 32 unreserved characters (no query or fragment); `type` — exactly `1`, `a`, `A`, `i`
+  `scope` — `[A-Za-z0-9_.:-]{1,32}`; `href` — the whole value matching
+  `https://[A-Za-z0-9.-]{1,64}(/[A-Za-z0-9._~-]{0,32}){0,8}/?` (so no port, user information,
+  underscore in the host, query or fragment; an empty path segment is allowed); `type` — exactly `1`, `a`, `A`, `i`
   or `I`; `start` — `0|-?[1-9][0-9]{0,3}`; `colspan`, `rowspan` — `[1-9][0-9]{0,2}|1000`;
   `src` — `data:image/png;base64,` or `data:image/jpeg;base64,` followed by a body that is
   non-empty, at most 1 398 104 code points (the base64 length of 1 MiB), a multiple of 4 long,
@@ -385,7 +388,7 @@ not a `br`, `table` or `td`. Any other code point where the grammar allows `WS` 
 fail its grammar, which is `malformed-tag` (below). An implementation whose regex dialect
 differs in any of these must spell the class out; a port that copies the reference's regex
 text verbatim is wrong. General category N (section 5, `sup` and `sub`) is the Unicode
-general category of the pinned Unicode version.
+general category of the pinned Unicode version (Unicode 16.0, the pinned runtime's; ADR 0003).
 
 - Start tag: `<(NAME)(ATTRS)WS*(/?)>` where `NAME` is `[A-Za-z][A-Za-z0-9]*` and `ATTRS` is
   zero or more of `WS+ ANAME WS* = WS* ( "[^"<]*" | '[^'<]*' )`, with `ANAME` =
@@ -712,12 +715,15 @@ An extractor must:
   page as its body, holding exactly the text section 5's scanner code emits for T(div), and
   nothing else (the scanner's text begins and ends with U+000A). T is ADR 0005's stated lexical
   transform of the div string: it deletes attributes and CSS declarations on closed lists,
-  rewrites a raised or lowered run as `sup` or `sub`, and replaces a referenced picture with its
-  pinned `data:` URI or deletes it; it does nothing else. Where the scanner refuses T(div) (any
+  unwraps a `span` left with no attributes and a link (keeping their text), rewrites a raised or
+  lowered run as `sup` or `sub`, and replaces a referenced picture with its pinned `data:` URI or
+  deletes it; it does nothing else. A picture's token is the hash of its `src` exactly as T(div)
+  holds it, not re-encoded. Where the scanner refuses T(div) (any
   section 5 reason, `soft-hyphen-at-boundary` included), where T meets anything not on its
   lists, or where the div's text, character references decoded, holds U+00AD or another
-  section 3 step 1 invisible character, the extractor refuses the section. A section whose div
-  draws nothing gets its page and no narrative. The narrative section's span covers that page's
+  section 3 step 1 invisible character, the extractor refuses the section. A section draws nothing when section 5's `empty-narrative` test holds for
+  its text; it gets its page and no narrative, and every page without a span must normalise to
+  nothing (the importer and the gate refuse otherwise, ADR 0005). The narrative section's span covers that page's
   body, and sections 1 and 6 apply unchanged. The drawn-document rules of this section (line
   layout, continuation lines, discretionary hyphens, tables across page breaks, body ranges) do
   not apply;
@@ -772,7 +778,7 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   emits U+FFFC, the SHA-256 of its `src` and U+FFFC; the tables of a narrative cover at most
   50 000 slots (`table-size`); a narrative of only grid markers is `empty-narrative`. U+FFFC and
   U+FDD0–U+FDEF reject in narrative
-  (`reserved-character`, the one rule applied to one side only). Section 7 qualifies structured sources only;
+  (`reserved-character`, the one rule applied to one side only). U+1680 OGHAM SPACE MARK, drawn as a stroke, leaves the section 3 whitespace list and is content. Section 7 qualifies structured sources only;
   drawn-document extraction is not qualified until a later version closes the open items the
   reviews recorded. The extractor contract (section 7) writes tables with their grid, numbered markers with a space, pictures with their hash, and
   a structured source as one page per section. Major under section 8: extractor output that

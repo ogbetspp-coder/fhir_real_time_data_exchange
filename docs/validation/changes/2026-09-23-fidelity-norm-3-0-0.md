@@ -6,7 +6,8 @@ evidenced libraries". The UR- rows it cites are in that file._
 **What changed.** `NORMALIZATION_VERSION` moved from `fidelity-norm/2.0.0` to
 `fidelity-norm/3.0.0` in `src/fidelity/normalize.ts` and `zone-a/src/zone_a/fidelity/normalize.py`,
 and `docs/fidelity-normalization.md` was updated to 3.0.0 (the preamble and sections 2, 4, 5, 7
-and 9; sections 1, 3, 6 and 8 unchanged). The design is `docs/design/fidelity-norm-3-0-0.md` as
+and 9, and section 3 step 5, which no longer counts U+1680 OGHAM SPACE MARK as whitespace;
+sections 1, 6 and 8 unchanged). The design is `docs/design/fidelity-norm-3-0-0.md` as
 amended by its independent reviews, prompted by roadmap item 3a and ADR 0005. In short:
 
 - `ol` is allowed with `type` (`1 a A i I`) and `start` (`0|-?[1-9][0-9]{0,3}`), and each of its
@@ -50,7 +51,8 @@ value sits on inside a multi-line cell). Each was fixed before this change, or, 
 stated. A third review, of the implementation, found rows and columns a renderer draws at
 zero size (a false pass the second review had called a false failure), a scan whose cost grew
 with rows × table width, and three untested precedence rules; each was fixed. The design note
-lists all eight reviews' findings and what changed. A fourth review found a cell continued
+lists all twelve reviews' findings and what changed (two of the design, ten of the
+implementation). A fourth review found a cell continued
 across a page break losing a leading bullet on the page side (fixed in section 7, with two verify
 vectors), and quotes carrying grid markers matching across rows (now `invalid-request`). A fifth found that rule stopping a word hyphenated across the break
 inside a cell from joining (fixed in section 7: the continuation then begins with the rest of
@@ -67,6 +69,10 @@ random tables (105 247 cases, identical in both languages) and found a caption c
 present since 2.0.0, a paragraph wrapped before a mid-line bullet losing the bullet on the page
 side; section 7 now has the extractor write such a continuation line with a leading U+0009, a
 table drawn inside a cell is refused, and seven verify vectors pin the cases.
+
+After the ninth review the version was scoped: it qualifies structured sources only (an FHIR
+ePI with XHTML narratives), and drawn-document extraction is not qualified until a later version
+closes the open items the reviews recorded (the blast radius below says why).
 
 **Impact assessment (step 0).** Importers of `src/fidelity/`:
 
@@ -131,7 +137,7 @@ table drawn inside a cell is refused, and seven verify vectors pin the cases.
 **Steps 1–6.** 1: `NORMALIZATION_VERSION` is `fidelity-norm/3.0.0` on both sides. 2:
 `npm run contracts:generate` (no drift), `npm run vectors:generate`, `npm run contracts:fixtures`,
 `npm run contracts:quote-edge` and `npm run differential:smoke` regenerated
-`test/fixtures/fidelity/vectors.json` (411 → 510 vectors: normalisation 62 → 63, XHTML 214 → 282, verify 135 → 165), the four contract fixtures and the smoke corpus. 3: every changed vector,
+`test/fixtures/fidelity/vectors.json` (411 → 522 vectors: normalisation 62 → 63 → 64, XHTML 214 → 291, verify 135 → 167), the four contract fixtures and the smoke corpus. 3: every changed vector,
 below. 4: the new vectors: every case the design names, both sides of every boundary (counter
 styles at 26/27, 703, 3999/4000 (702 in the differential), −1/0/1; `start` at `-0`, `007`, `9999`, `10000`; spans at
 0, `02`, 1000, 1001; each `src` form and each refused form; U+FFFC, U+FDD0 and U+FDEF by reference,
@@ -260,7 +266,14 @@ specification states the rule directly. Each break was restored.
   nearly every label has); ADR 0005 records each refusal and how PR 3 settles it, including a
   possible minor version of this contract for `½` and `∞` in `sub`. A pairwise property test on
   each side checks that a narrative verifies against another's structured page only when both
-  read the same.
+  read the same. A twelfth review found U+1680 OGHAM SPACE MARK, drawn as a stroke,
+  normalised as a space since 1.0.0 (section 3 step 5 no longer lists it; two verify vectors and a
+  normalisation vector), the `href` grammar unstated since 2.0.0 (section 5 now gives the whole
+  regular expression; nine boundary vectors), and gaps in ADR 0005's requirements: links and
+  bare spans unwrapped as a fourth operation of T, raised offsets summed per glyph, "draws
+  nothing" defined and every uncovered page required to be blank, picture sizes bounded, a
+  picture deleted only on pinned evidence that the authority's viewer draws nothing, and a
+  structured picture's token taken from `src` as T(div) holds it.
 
 - **Every submission carrying 2.0.0 is refused by the worker gate** from the moment this change
   deploys. Nothing in the repository produces a 2.0.0 submission after it.

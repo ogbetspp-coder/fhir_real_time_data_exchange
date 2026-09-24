@@ -27,6 +27,11 @@
       "expected": "fí"
     },
     {
+      "name": "ogham-space-mark-is-content",
+      "input": "Take 2 10 mg",
+      "expected": "Take 2 10 mg"
+    },
+    {
       "name": "combining-mark-after-picture-token",
       "input": "￼eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee￼́x",
       "expected": "￼eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee￼́x"
@@ -2157,6 +2162,63 @@
       "name": "accepts-two-trailing-covered-slots",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>a</td><td rowspan=\"2\">b</td><td rowspan=\"2\">c</td></tr><tr><td>d</td></tr></table></div>",
       "expected": "\n\n﷐\n﷒\t﷓\ta\t\t﷓\tb\t\t﷓\tc\t\n\n﷒\t﷓\td\t\t﷕\t\t﷕\t\n\n﷑\n\n"
+    },
+    {
+      "name": "href-host-of-64-accepted",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.org/\">x</a></p></div>",
+      "expected": "\n\nx\n\n"
+    },
+    {
+      "name": "href-host-of-65-rejected",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.org/\">x</a></p></div>",
+      "expected": {
+        "error": "forbidden-attribute"
+      }
+    },
+    {
+      "name": "href-underscore-in-host-rejected",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"https://ex_ample.org/\">x</a></p></div>",
+      "expected": {
+        "error": "forbidden-attribute"
+      }
+    },
+    {
+      "name": "href-port-rejected",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"https://example.org:443/\">x</a></p></div>",
+      "expected": {
+        "error": "forbidden-attribute"
+      }
+    },
+    {
+      "name": "href-user-information-rejected",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"https://user@example.org/\">x</a></p></div>",
+      "expected": {
+        "error": "forbidden-attribute"
+      }
+    },
+    {
+      "name": "href-empty-segment-accepted",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"https://example.org//x\">x</a></p></div>",
+      "expected": "\n\nx\n\n"
+    },
+    {
+      "name": "href-eight-segments-and-slash-accepted",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"https://example.org/1/2/3/4/5/6/7/8/\">x</a></p></div>",
+      "expected": "\n\nx\n\n"
+    },
+    {
+      "name": "href-nine-segments-rejected",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"https://example.org/1/2/3/4/5/6/7/8/9\">x</a></p></div>",
+      "expected": {
+        "error": "forbidden-attribute"
+      }
+    },
+    {
+      "name": "href-segment-of-33-rejected",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"https://example.org/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\">x</a></p></div>",
+      "expected": {
+        "error": "forbidden-attribute"
+      }
     }
   ],
   "verify": [
@@ -14857,6 +14919,160 @@
           "uncoveredGaps": 2
         },
         "reportHash": "14c609e1d760e218737b69fc983594383cec9c31559a8bb7420efe59b5ba5646"
+      }
+    },
+    {
+      "name": "ogham-space-mark-against-a-space-mismatches",
+      "input": {
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nTake 2 10 mg daily.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 55
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Take 2 10 mg daily.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 54,
+                "textSha256": "a6a2aaf0b8f6833f990755c3d1c359e7cd52100afc6d6a83656f8c2abb84aa2b"
+              }
+            ],
+            "narrativeDivSha256": "dc130f823a2a1b43214e0a2b92c46d56f9a7e64af254ae33cbc92d6cc25b51b0",
+            "normalizedTextSha256": "bb02ef447f8c944acc8434afdc30583819b8792ccc78ae5873913e72469a416e"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "extractedTextSha256": "16750775b8a2a6de718cb073b2b60678a87bd0d8b47c13dfec1d508b55d6de62",
+        "narrativeBindingSha256": "1baa7b94d8e409b96d87a570f2c3b88ee0d003707fa749af10400d1d05eed850",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 1,
+            "details": {
+              "expectedLength": 19,
+              "actualLength": 19,
+              "firstDifferingOffset": 6,
+              "commonSuffixLength": 12,
+              "expectedWordCount": 4,
+              "actualWordCount": 5,
+              "expectedSha256": "a6a2aaf0b8f6833f990755c3d1c359e7cd52100afc6d6a83656f8c2abb84aa2b",
+              "actualSha256": "bb02ef447f8c944acc8434afdc30583819b8792ccc78ae5873913e72469a416e"
+            },
+            "normalizedTextSha256": "bb02ef447f8c944acc8434afdc30583819b8792ccc78ae5873913e72469a416e"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 66,
+          "bodyCodePoints": 20,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "69525bc18537f34ac85cdb03f109974fbb5793f90e1029c27b7daf86d72a31d1"
+      }
+    },
+    {
+      "name": "space-against-an-ogham-space-mark-mismatches",
+      "input": {
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nTake 2 10 mg daily.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 55
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Take 2&#x1680;10 mg daily.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 54,
+                "textSha256": "bb02ef447f8c944acc8434afdc30583819b8792ccc78ae5873913e72469a416e"
+              }
+            ],
+            "narrativeDivSha256": "6fb5f4202e4a6828a2c267aa5c05aefa50f1b6d0c0c6aa37fbc2c6612282f66b",
+            "normalizedTextSha256": "a6a2aaf0b8f6833f990755c3d1c359e7cd52100afc6d6a83656f8c2abb84aa2b"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "extractedTextSha256": "9cb7eac35d5a0dd732951e26ef30b2134bbfb33b9c3d1441d28b8264d43764dc",
+        "narrativeBindingSha256": "7f62bee7d7e15c787f516d0a8bc368e0950505011c0ff0a3c877e8687ee3f0f5",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "mismatch",
+            "spanCount": 1,
+            "details": {
+              "expectedLength": 19,
+              "actualLength": 19,
+              "firstDifferingOffset": 6,
+              "commonSuffixLength": 12,
+              "expectedWordCount": 5,
+              "actualWordCount": 4,
+              "expectedSha256": "bb02ef447f8c944acc8434afdc30583819b8792ccc78ae5873913e72469a416e",
+              "actualSha256": "a6a2aaf0b8f6833f990755c3d1c359e7cd52100afc6d6a83656f8c2abb84aa2b"
+            },
+            "normalizedTextSha256": "a6a2aaf0b8f6833f990755c3d1c359e7cd52100afc6d6a83656f8c2abb84aa2b"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 66,
+          "bodyCodePoints": 20,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "7eec701869fe35221a54e7112521db730ccb1b8f7bb0b33ea20013f45751b6ab"
       }
     }
   ]

@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and nine reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and ten reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -337,7 +337,9 @@ Against the reference, parse5, and a browser in both HTML and XML parsing:
 16. These `src` values reject: `javascript:x`, `//evil/x`, `../x`, `a/../x`, `/x`, `x`,
     `https://h/x`, `data:image/svg+xml;base64,AAAA`, a base64 body of length 5, and `=` in the
     middle of a body.
-17. 50 rows of `<td colspan="1000">` are accepted; one more slot is `table-size`.
+17. One row of 1000 single cells and 49 rows of `<td colspan="1000">` are accepted; one more
+    slot is `table-size` (50 rows of the spanning cell alone are `table-shape`: no single cell
+    starts in columns 1 to 999).
 18. `<table><tr><td></td></tr></table>` alone is `empty-narrative`.
 
 ## First review (2026-09-23): findings and what changed
@@ -688,3 +690,32 @@ resolves pictures) and precise requirements for T, the renderer cross-check (HTM
 visibility included) and empty sections; the closed lists themselves, and the label's refusals
 (including whether `½` and `∞` in `sub` need a minor version of this contract), are PR 3's, with
 its own reviews. §7 matches. Findings 6 to 10 are fixed here, with a pairwise property test.
+
+## Twelfth review (2026-09-23, of the scoped version): findings and what changed
+
+The twelfth review found no TS/Python divergence (every probe gave identical report hashes) and:
+
+1. **High (since 1.0.0).** U+1680 OGHAM SPACE MARK is drawn as a stroke ("Take 2▬10 mg"), but §3
+   step 5 normalised it as a space, so a page with it verified against a narrative with a space.
+   Fixed: it is content; the crosswalk counts it as drawn; three vectors.
+2. **High (since 2.0.0).** §5 did not state the `href` grammar (ports, user information, an
+   underscore, host length, empty segments, a trailing slash). Fixed: the whole regular
+   expression; nine boundary vectors.
+3. **Medium.** ADR 0005 said T does three things and also unwrapped spans and links; §7 did not
+   list unwrapping. Fixed: a fourth, closed operation in both.
+4. **Medium.** Raised offsets were judged run by run; nested small offsets add up to a
+   superscript. Fixed: the total baseline shift per glyph, and the cross-check compares it.
+5. **Medium.** "Draws nothing" was undefined and an uncovered page could hold text. Fixed:
+   §5's `empty-narrative` test on the page, and every page without a span must be blank
+   (importer and PR 2's gate).
+6. **Medium.** Picture sizes were unbounded. Fixed: a stated lower bound, and the cross-check
+   compares each picture's drawn box.
+7. **Medium.** A picture that "cannot be fetched" depended on who fetched. Fixed: resolve against
+   the authority's published base URL; delete only on pinned evidence; any other failure fails.
+8. **Medium.** §7 hashed canonical base64 while ADR 0005 carried an embedded picture as it is.
+   Fixed: a structured picture's token is the hash of `src` as T(div) holds it.
+9. **Low.** The cross-check's stylesheet wording, a relative faint-text bound, section 10's
+   negative margin, the pinned Unicode version, the change record's review count, and this
+   note's case 17. Fixed. The pairwise property test is a tautology for whole-page spans, as the
+   review noted; its value is the pairing of narratives, and the refusal paths belong to the
+   importer's tests (PR 3).

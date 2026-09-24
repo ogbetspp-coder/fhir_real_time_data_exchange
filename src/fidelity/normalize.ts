@@ -31,9 +31,11 @@ const BULLET_GLYPHS = new Set([
   0x2022, 0x2023, 0x25a0, 0x25a1, 0x25aa, 0x25ab, 0x25cb, 0x25cf, 0x25e6,
 ]);
 
-// Section 3 step 5. U+000B, U+000C and U+0085 are not here: section 2 rejects them.
+// Section 3 step 5. U+000B, U+000C and U+0085 are not here: section 2 rejects them. U+1680
+// OGHAM SPACE MARK is not here either (fidelity-norm/3.0.0): a renderer draws it as a stroke, so
+// "Take 2" U+1680 "10 mg" reads as a range, and it is content.
 const WHITESPACE = new Set([
-  0x0009, 0x000a, 0x000d, 0x0020, 0x00a0, 0x1680, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000,
+  0x0009, 0x000a, 0x000d, 0x0020, 0x00a0, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000,
 ]);
 
 export function isWhitespace(codePoint: number): boolean {

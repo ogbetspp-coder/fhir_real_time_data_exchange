@@ -40,9 +40,10 @@ BULLET_GLYPHS: Final = frozenset(
 )
 
 # Closed list, section 3 step 5. U+2000-U+200A is a range, handled in is_whitespace(). U+000B,
-# U+000C and U+0085 are not here: since fidelity-norm/2.0.0 section 2 rejects them.
+# U+000C and U+0085 are not here: since fidelity-norm/2.0.0 section 2 rejects them. U+1680 OGHAM
+# SPACE MARK is not here either (fidelity-norm/3.0.0): a renderer draws it as a stroke.
 WHITESPACE: Final = frozenset(
-    {0x0009, 0x000A, 0x000D, 0x0020, 0x00A0, 0x1680, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000}
+    {0x0009, 0x000A, 0x000D, 0x0020, 0x00A0, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000}
 )
 
 SOFT_HYPHEN: Final = chr(0x00AD)

@@ -37,9 +37,10 @@ Three facts about that source meet three rules of the record:
    transform T edits the authority's div string itself (no parse and re-serialise, which would
    lose the refusals below), and the page is exactly what §5's scanner code emits for T(div): one
    page per section, as `docs/fidelity-normalization.md` §7 defines for a structured source. T
-   does only three things: it deletes attributes and CSS declarations on a closed list; it
-   rewrites a raised or lowered run as `sup` or `sub`; and it replaces a referenced picture with
-   its pinned `data:` URI, or deletes it and records it (decision 3). Where the scanner refuses
+   does only four things: it deletes attributes and CSS declarations on a closed list; it
+   unwraps a `span` left with no attributes, and a link, keeping their text; it rewrites a
+   raised or lowered run as `sup` or `sub`; and it replaces a referenced picture with its pinned
+   `data:` URI, or deletes it and records it (decision 3). Where the scanner refuses
    T(div), where T meets anything not on its lists, or where the div's text (character
    references decoded) holds U+00AD or another §3 step 1 invisible character, the section
    refuses. The clean div stored in the record is T(div), so the fidelity check compares the
@@ -65,26 +66,35 @@ Three facts about that source meet three rules of the record:
      vertical margins never negative; borders only on table parts, thin and dark; an inline
      background only with no padding; `line-height` at least normal; `width` and `height` only
      on table parts and pictures; `vertical-align: baseline` only outside `sup` and `sub`, and
-     `top`, `middle`, `bottom` only on table cells. Struck, hidden, faint (white, nearly white,
-     under two points) or transparent text refuses, and so do `opacity`, `clip`, `overflow`,
+     `top`, `middle`, `bottom` only on table cells; a picture's `width` and `height` no smaller
+     than a stated bound, so a picture the authority draws at a pixel is not carried at full
+     size. Struck, hidden, faint (white, nearly white, under two points or well under the
+     surrounding text) or transparent text refuses, and so do `opacity`, `clip`, `overflow`,
      `display`, `position` other than a folded vertical offset, `content`, `text-transform`,
      `list-style-type` and every unlisted property.
    - **Colour.** A text colour and a shading are dropped only where the text keeps a stated
      contrast with its effective background (for example WCAG's 4.5:1), since colour hides text
      only through contrast; otherwise the section refuses.
-   - **Raised and lowered runs.** `vertical-align: super` or `sub`, and `position: relative` with
-     a vertical offset, become `sup` or `sub` when the offset is at least a stated fraction of
-     the run's font size, and are deleted below a stated bound (the label's 18 runs at
+   - **Raised and lowered runs.** Each glyph's total baseline shift is summed over every
+     ancestor's `vertical-align`, relative `top` or `bottom`, `sup` and `sub`, and measured
+     against its effective font size: at least a stated fraction, the glyph is folded as `sup`
+     or `sub`; below a stated bound, the offsets are deleted (the label's 18 runs at
      `top: .5pt` in 5.1 must not turn "(" into "₍"); between the two, the section refuses.
-   - **Empty sections.** A section whose div draws nothing (the label's `<div>&#160;</div>`
-     heading sections) gets its page but no narrative and no span.
+     Offsets are never judged run by run, since nested small offsets add up to a superscript.
+   - **Empty sections.** A section draws nothing when §5's `empty-narrative` test holds for the
+     scanner's text of T(div) (the label's `<div>&#160;</div>` heading sections): it gets its
+     page but no narrative and no span. Every page without a span must normalise to nothing (the
+     report's uncovered gaps are zero), enforced by the importer and by PR 2's gate, because the
+     verifier alone reads coverage as evidence, not as a failure.
 
    Two checks close what the equality cannot see, because T could itself drop something drawn:
    - **A renderer cross-check.** In CI, every pinned publication is drawn by a headless browser
-     with no author stylesheet, in HTML mode (as a browser draws the EMA's div) and in XML mode.
-     The list numbers (from the accessibility tree), each table's grid (from cell rectangles),
-     the text, and each text box's visibility (on the page and not overlapped) are compared with
-     the page. A difference fails the build.
+     with its inline styles and presentational attributes applied and without the authority's
+     class stylesheet, in HTML mode (as a browser draws the EMA's div) and in XML mode. The list
+     numbers (from the accessibility tree), each table's grid (from cell rectangles), the text,
+     each text box's visibility (on the page and not overlapped), each glyph's drawn baseline
+     shift against whether the page folds it, and each picture's drawn box are compared with the
+     page. A difference fails the build.
    - **A line check.** Inside every table cell, T(div) must hold the same sequence of line breaks
      and paragraphs as the authority's div, compared structurally. The fidelity contract does
      not compare the line a value sits on inside a cell (§5, a stated residual), and an import
@@ -101,8 +111,9 @@ Three facts about that source meet three rules of the record:
    under the attribute rule above); the QRD Appendix V link, whose path is longer than §5's href
    grammar allows and which is in every EU SmPC, and an `http:` link in section 10 (links are
    unwrapped, so neither reaches the scanner); `t` with a lowered `½` and `AUC` with a lowered
-   `(0-∞)`, which §5 refuses inside `sub` and which nearly every label has in 5.2; and one
-   `table-shape` in 5.1, not yet explained. PR 3 settles each: the unwrapping above, the contrast
+   `(0-∞)`, which §5 refuses inside `sub` and which nearly every label has in 5.2; one
+   `table-shape` in 5.1, not yet explained; and section 10's `margin: 0cm -0.1pt …`, which the
+   rule on negative margins refuses. PR 3 settles each: the unwrapping above, the contrast
    rule, the table investigated (an EMA defect is refused and recorded, decision 3), and, for `½`
    and `∞` in `sub`, a proposed minor version of the fidelity contract, reviewed like this one,
    if the lowered forms are to be accepted. Until then the label cannot be imported whole.
@@ -122,11 +133,14 @@ Three facts about that source meet three rules of the record:
    viewer's origin serves at that path, or nothing, and the fidelity contract accepts only a
    `data:` URI (fidelity-norm/3.0.0 §5). A picture the authority embeds is carried as it is. A
    picture the authority references is fetched from the authority, pinned by hash beside the
-   publication, and carried as a `data:` URI. A reference that cannot be fetched draws nothing
-   for any reader (the EMA's `~/_entity/annotation/…` references draw at zero size in a browser):
-   it is not carried, the reader emits nothing for it, and the import records it, with its
-   reference and section, as a finding. That is not a repair: the record shows what every
-   reader of the authority's publication sees.
+   publication, and carried as a `data:` URI. The reference is resolved against the base URL the
+   authority publishes the document under. A picture is deleted only on pinned evidence that the
+   authority's own viewer draws nothing for it (the EMA's `~/_entity/annotation/…` references
+   return "not found" from its ePI service and draw at zero size in a browser): it is not
+   carried, the reader emits nothing for it, and the import records it, with its reference,
+   section and the evidence, as a finding. That is not a repair: the record shows what every
+   reader of the authority's publication sees. Any other failure to fetch a picture fails the
+   import, since it says nothing about what readers see.
 
 4. **The approval is the authority's publication.** The submission's approval names the
    authority's publication (ePI identifier and procedure number), not an approval of ours.

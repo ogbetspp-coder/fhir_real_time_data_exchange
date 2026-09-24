@@ -86,6 +86,8 @@ const INVISIBLE_CODE_POINTS = new Set([0x200b, 0x200c, 0x200d, 0x2060, 0x00ad]);
 function isVisible(character: string): boolean {
   const codePoint = character.codePointAt(0) ?? 0;
   if (isGridMarker(codePoint)) return false;
+  // U+1680 OGHAM SPACE MARK is `\s` to JavaScript but drawn as a stroke (fidelity-norm/3.0.0).
+  if (codePoint === 0x1680) return true;
   return !/\s/u.test(character) && !INVISIBLE_CODE_POINTS.has(codePoint);
 }
 

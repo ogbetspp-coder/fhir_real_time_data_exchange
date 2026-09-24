@@ -342,6 +342,7 @@ describe("deterministic Type 2 to EMA conversion", () => {
   it.each([
     ["a numbered item", '<ol start="2"><li></li></ol>'],
     ["a table with one filled cell", "<table><tr><td></td><td>x</td></tr></table>"],
+    ["an Ogham space mark, which is drawn as a stroke", "<p>&#x1680;</p>"],
   ])("counts %s as narrative a reader sees", (_name, content) => {
     const source = createSyntheticType2Bundle(mapping);
     findSection(composition(source).section, "smpc.4.3").text = {

@@ -78,7 +78,7 @@ def _composition(submission: Mapping[str, Any]) -> Mapping[str, Any]:
 _INVISIBLE: Final = frozenset("\u00ad\u200b\ufeff\u2060")
 _BULLETS: Final = frozenset("\u2022\u2023\u25a0\u25a1\u25aa\u25ab\u25cb\u25cf\u25e6")
 _WHITESPACE: Final = frozenset(
-    "\t\n\r \u00a0\u1680\u2028\u2029\u202f\u205f\u3000"
+    "\t\n\r \u00a0\u2028\u2029\u202f\u205f\u3000"
     + "".join(chr(point) for point in range(0x2000, 0x200B))
 )
 
