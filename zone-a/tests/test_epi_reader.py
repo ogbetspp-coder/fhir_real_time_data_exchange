@@ -371,6 +371,8 @@ def test_inline_borders_are_read_side_by_side(style: str, expected: list[str]) -
         # "initial" and "unset" are the initial values, none.
         ("border-bottom: 1px solid; border-bottom: initial", []),
         ("border-bottom: 1px solid; border-bottom-style: unset", []),
+        # A shorthand resets every part it leaves out: no style is none (review round 34).
+        ("border-bottom: 1px solid; border-bottom: 1px", []),
     ],
 )
 def test_inline_borders_cascade_as_a_browser_does(style: str, expected: list[str]) -> None:
@@ -462,6 +464,20 @@ def test_a_font_outside_the_text_fonts_refuses(family: str, refused: bool) -> No
         ('<p><span style="font-size:1rem">x</span></p>', True),
         ('<p style="line-height:1.2rem">x</p>', True),
         ('<p style="line-height:x%">x</p>', True),
+        # Review round 34: a shorthand resets the width it leaves out (to medium); margin and
+        # padding shorthands are read per side; the rules hold on every inline element.
+        ('<p>1 <span style="border-bottom-width:0;border-bottom:solid">&lt;</span> 2</p>', True),
+        ('<p>Keep<span style="border-bottom:thick solid"></span> dry.</p>', True),
+        ('<p>a</p><p style="margin:-10pt 0 0 0">x</p>', True),
+        ('<p style="margin:0 0 -10pt 0">x</p><p>b</p>', True),
+        ('<p>a</p><p><span style="padding:10pt 0">x</span></p>', True),
+        ('<p>a</p><p><span style="padding:0 10pt">x</span></p>', False),
+        ('<p>&lt;<b style="padding-top:30px">x</b></p>', True),
+        ('<p>a<span style="margin-left:-0.5pt">x</span></p>', True),
+        ('<p>&lt;<span style="background:white;padding-left:2pt">x</span></p>', True),
+        ('<p>&lt;<span style="padding-left:2pt">x</span></p>', False),
+        ('<p style="line-height:0">x</p>', True),
+        ('<p style="height:0">Take 10</p>', True),
     ],
 )
 def test_layout_that_overprints_text_refuses(inner: str, refused: bool) -> None:
@@ -492,6 +508,46 @@ def test_layout_that_overprints_text_refuses(inner: str, refused: bool) -> None:
         ('<table><tbody style="text-indent:-72pt"><tr><td>Take</td></tr></tbody></table>', True),
         ('<div><span style="text-indent:-72pt"><p>Do not take</p></span></div>', True),
         ('<table style="margin-left:-11pt"><tr><td>' * 3 + "x" + "</td></tr></table>" * 3, True),
+        # Review round 34: a cell's own margin gives no credit; an indent is order-free; a row's
+        # indent does not leak out of a nested table into the next cell; an inline element
+        # carries an indent down; each declaration alone is bounded by an inch.
+        (
+            '<table><tr><td style="margin-left:20pt"><p style="margin-left:-25pt">x</p>'
+            "</td></tr></table>",
+            True,
+        ),
+        (
+            '<table><tr><td style="margin-left:20pt"><p style="margin-left:-5pt">x</p>'
+            "</td></tr></table>",
+            False,
+        ),
+        ('<p style="text-indent:-30pt !important;text-indent:0">x</p>', True),
+        (
+            '<table><tr style="text-indent:-10pt"><td><table><tr style="text-indent:0"><td>i'
+            '</td></tr></table></td><td><p style="margin-left:-5pt">x</p></td></tr></table>',
+            True,
+        ),
+        (
+            '<table><tr style="text-indent:0"><td><table><tr style="text-indent:0"><td>i'
+            '</td></tr></table></td><td><p style="margin-left:-5pt">x</p></td></tr></table>',
+            False,
+        ),
+        ('<div><b style="text-indent:-30pt"><p>x</p></b></div>', True),
+        ('<div style="margin-left:100pt"><p style="margin-left:-80pt">x</p></div>', True),
+        ('<div style="margin-left:100pt"><p style="margin-left:-5.2em">x</p></div>', True),
+        ('<div style="margin-left:100pt"><p style="margin-left:-5.1em">x</p></div>', False),
+        ('<div style="margin-left:100pt"><p style="margin-left:-72pt">x</p></div>', False),
+        # Each unit's size, either side of the 12pt bound.
+        ('<p style="margin-left:-0.43cm">x</p>', True),
+        ('<p style="margin-left:-0.42cm">x</p>', False),
+        ('<p style="margin-left:-4.25mm">x</p>', True),
+        ('<p style="margin-left:-4.2mm">x</p>', False),
+        ('<p style="margin-left:-0.17in">x</p>', True),
+        ('<p style="margin-left:-0.16in">x</p>', False),
+        ('<p style="margin-left:-1.01pc">x</p>', True),
+        ('<p style="margin-left:-1pc">x</p>', False),
+        ('<p style="margin-left:-16.1px">x</p>', True),
+        ('<p style="margin-left:-16px">x</p>', False),
     ],
 )
 def test_text_drawn_left_of_its_container_refuses(inner: str, refused: bool) -> None:
@@ -720,3 +776,103 @@ def test_a_lone_surrogate_anywhere_refuses_the_document(where: str) -> None:
 def test_a_bundle_python_cannot_read_refuses_the_document(document: bytes) -> None:
     with pytest.raises(EpiRefusedError):
         read_epi(document)
+
+
+@pytest.mark.parametrize(
+    ("inner", "code"),
+    [
+        # Each rule below is pinned alone (mutation run, review round 34).
+        ('<p><span style="border-bottom:revert">&lt;</span></p>', "unsupported-style"),
+        ('<p style="max-height:0">x</p>', "unsupported-style"),
+        ('<p><span style="font-weight:bold)">x</span></p>', "unsupported-style"),
+        ('<p style="color:rgb(300,0,0)">x</p>', "unsupported-style"),
+        ('<p style="color">x</p>', "unsupported-style"),
+        ('<table><tr><td style="text-decoration:overline">x</td></tr></table>',
+         "unsupported-style"),
+        (
+            '<p><span style="border-bottom-width:1px;border-bottom:initial;'
+            'border-bottom-style:solid">&lt;</span></p>',
+            "unsupported-style",
+        ),
+        ('<p><span style="border-bottom:1px solid;border-color:inherit">&lt;</span></p>',
+         "unsupported-style"),
+        ('<p><span style="font-family:\'Ari&quot;al\'">x</span></p>', "unsupported-style"),
+        ("<table><tbody><tr><td>x</td></tr></tbody>stray</table>", "unsupported-element"),
+        ("<table><tbody><tr><td>x</td></tr>stray</tbody></table>", "unsupported-element"),
+        ("<table>&#160;<tr><td>x</td></tr></table>", "unsupported-element"),
+        ("<p><del>x</del></p>", "unsupported-element"),
+        ('<p><b xmlns="urn:x">x</b></p>', "malformed-xhtml"),
+        ("<p>" + "<span>" * 127 + "x" + "</span>" * 127 + "</p>", "malformed-xhtml"),
+        ('<p><span class="MSOCOMANCHOR">x</span></p>', "embedded-comment"),
+        ('<p><span class="MsoCommentReference">x</span></p>', "embedded-comment"),
+    ],
+)  # fmt: skip
+def test_each_rule_refuses_alone(inner: str, code: str) -> None:
+    _, refusal, _ = read_div(div(inner))
+    assert refusal is not None
+    assert refusal.code == code
+
+
+@pytest.mark.parametrize(
+    ("inner", "expected"),
+    [
+        # A cell closes the li around its table, so a list in it is not an li in an li.
+        (
+            "<ul><li><table><tr><td><ul><li>x</li></ul></td></tr></table></li></ul>",
+            [("x", (0, 0, 0), 2, [])],
+        ),
+        (
+            "<ul><li><table><tr><td><li>x</li></td></tr></table></li></ul>",
+            [("x", (0, 0, 0), 1, [])],
+        ),
+        # A nested table's text belongs to the outer cell.
+        (
+            "<table><tr><td>o</td><td><table><tr><td>i</td></tr></table></td></tr></table>",
+            [("o", (0, 0, 0), None, []), ("i", (0, 0, 1), None, [])],
+        ),
+        ("<ul><li>a<ul><li>b</li></ul></li></ul>", [("a", None, 1, []), ("b", None, 2, [])]),
+        # A line break swallows the space before it; a trailing one is dropped.
+        ("<p>a <br/>b</p>", [("a\nb", None, None, [])]),
+        ("<p>a<br/></p>", [("a", None, None, [])]),
+        ('<p style="color:rgb(255,0,0)">x</p>', [("x", None, None, ["color-#ff0000"])]),
+        ('<p style="color:#303030">x</p>', [("x", None, None, ["color-#303030"])]),
+        ('<p style="color:#202020">x</p>', [("x", None, None, [])]),
+        ('<p style="color:transparent">x</p>', [("x", None, None, ["faint"])]),
+        (
+            '<table><tr><td style="text-decoration:underline">x</td></tr></table>',
+            [("x", (0, 0, 0), None, ["underline"])],
+        ),
+        ("<p><strike>x</strike></p>", [("x", None, None, ["strike"])]),
+        (
+            '<p><span style="border-bottom:1px solid #0008">&lt;</span></p>',
+            [("<", None, None, ["underline"])],
+        ),
+        ('<p><span style="border-bottom:0ex solid">&lt;</span></p>', [("<", None, None, [])]),
+        ('<p><span style="border-bottom:0rem solid">&lt;</span></p>', [("<", None, None, [])]),
+        (
+            '<p><span style="border-image:1">&lt;</span></p>',
+            [("<", None, None, ["border", "underline"])],
+        ),
+        ("<p>" + "<span>" * 126 + "x" + "</span>" * 126 + "</p>", [("x", None, None, [])]),
+    ],
+)
+def test_what_each_rule_reads(inner: str, expected: list[Any]) -> None:
+    paragraphs, refusal, _ = read_div(div(inner))
+    assert refusal is None, refusal
+    assert [
+        (
+            p.text,
+            p.table,
+            p.numbering.level if p.numbering else None,
+            sorted(m.kind for m in p.marks),
+        )
+        for p in paragraphs
+    ] == expected
+
+
+@pytest.mark.parametrize("changes", [{"type": "collection"}, {"resourceType": "Parameters"}])
+def test_a_bundle_that_is_not_a_document_bundle_refuses(changes: dict[str, Any]) -> None:
+    document = json.loads(bundle([{"title": "t", "text": {"div": div("<p>x</p>")}}]))
+    document.update(changes)
+    with pytest.raises(EpiRefusedError):
+        read_epi(json.dumps(document).encode())

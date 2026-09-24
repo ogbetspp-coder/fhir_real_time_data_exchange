@@ -96,10 +96,11 @@ family name, a comment, an escape, a bracket outside ``rgb()``, a character outs
 digits, whitespace and ``# % ! . , : ; ' " ( ) -``); and a margin or indent with a value a browser
 drops (the wrong number of values, ``text-indent: auto``).
 
-What refuses the document (``EpiRefusedError``): not UTF-8 JSON, a lone surrogate anywhere in it,
-not a document Bundle, not the shape of one (a section, code, text, div or entry of the wrong JSON
-type), not exactly one entry with sections, a resource with sections that is not a Composition, a
-section without a title, or nesting too deep to read.
+What refuses the document (``EpiRefusedError``): not UTF-8 JSON (or JSON with an integer longer
+than Python's digit limit), a lone surrogate anywhere in it, not a document Bundle, not the shape
+of one (a section, code, text, div or entry of the wrong JSON type), not exactly one entry with
+sections, a resource with sections that is not a Composition, a section without a title, or nesting
+too deep to read.
 """
 
 from __future__ import annotations
@@ -551,8 +552,9 @@ class _Builder:
     # 1 inside ``ul`` (a bullet), 2 inside ``ol`` (a number the browser computes).
     list_kind: int = 1
     tables: int = 0
-    # How far the text's container starts left of the page's (or its cell's) content edge, in
-    # points: the blocks' left margins summed, and the first line's inherited indent.
+    # The offset of the text's container from the section's start, in points (a cell's from
+    # zero, or from its table's offset when negative); negative is to the left. The blocks' left
+    # margins summed, and the first line's inherited indent.
     left: float = 0.0
     indent: float | None = None
     nesting: int = 0
@@ -902,7 +904,6 @@ def _table(element: ET.Element, builder: _Builder, marks: frozenset[str], depth:
 def _table_rows(element: ET.Element, builder: _Builder, marks: frozenset[str], depth: int) -> None:
     builder.flush()
     saved_part = builder.part_indent
-    builder.part_indent = builder.indent
     index = builder.tables
     builder.tables += 1
     outer = builder.table

@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and thirty-three reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and thirty-four reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -1194,3 +1194,21 @@ as a false failure; a JSON integer past Python's digit limit refuses the documen
 agree on where a cell's offset starts (zero, or the table's own offset when negative), pinned by
 a test; two lines of unreachable code are removed. The review's mutation sweep of the reader (84
 mutants) now leaves only mutants that add refusals or change nothing.
+
+## Thirty-fourth review (2026-09-24): findings and what changed
+
+Scoped to this change, the review found no false pass, divergence, crash or refusal of a pinned
+label. Its five Medium findings were again reader rules no test pinned, found by a fresh mutation
+sweep: a table cell's own margin gives no credit to the text in it; an indent is read order-free
+under `!important`; a border shorthand resets the width it leaves out; margin and padding
+shorthands are read per side; a row's indent does not leak out of a nested table into the next
+cell. Each is now pinned, with a passing case beside each refusing one. Its Low findings are closed
+too: the per-declaration bound of an inch is pinned (a pull of 80pt under a 100pt margin refuses,
+72pt does not), each unit's size is pinned either side of the 12pt bound, the inline and padding
+rules are pinned on `b` and under the `background` shorthand, one line of dead code is removed, and
+the reader's comments and docstring say where an offset is measured from and name the integer past
+Python's digit limit. Every mutant of the review's three sweeps (182 in all, three of them written against code since removed) is now killed, except six
+that change nothing a reader can see: a check that another rule already covers (`max-height`,
+`del`, a declaration without a colon, the `MsoCommentReference` class, a quote in a font family the
+closed font list refuses anyway) or that cannot be reached (an `hr` has no content to hold an open
+paragraph).
