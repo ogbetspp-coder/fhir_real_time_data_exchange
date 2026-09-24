@@ -110,7 +110,7 @@ closes the open items the reviews recorded (the blast radius below says why).
   of every cell on its side, in each row its cell covers, the grid rebuilt from the markers once
   per search ("10" | "000 IU" is drawn as one number, and a cell's lines are centred, so any of
   them can sit level with the quote); the agent's port follows. On the three pinned SmPCs this
-  refuses 192 of 789 whole-cell quotes that a reader might read apart (a fail-safe `no-match`,
+  refuses 196 of 789 whole-cell quotes that a reader might read apart (a fail-safe `no-match`,
   stated in UR-22; `agent/scripts/measure_table_quotes.py`). A quote that runs across two cells or across a picture is `no-match`, and a quote that
   carries a grid marker or U+FFFC itself is `invalid-request` (it could join two rows, or quote
   nothing a reader sees): a
@@ -402,7 +402,17 @@ restored.
   brackets and spaces was quadratic); the ePI reader now expands multi-value border shorthands
   per side as a browser cascades them, and the check reports a border over any visible text;
   `underline_changes` refuses any underlined lower-case letter after a number of any script
-  and the "N" look-alikes; the table figure is now 192 of 789 and its script is committed.
+  and the "N" look-alikes; the table figure is now 192 of 789 and its script is committed. A
+  twenty-first review found the sign list still short (look-alikes from other blocks, "❮", "⧼",
+  "➕", a middle dot, a slash) and the opening marks the code skipped narrower than the design
+  said: the rule is now inverted, so anything but a letter, a number, a gap, a mark, an opening
+  mark, a dash or plain punctuation is a sign, with reference marks plain and postfix signs
+  ("%", "°") read after a number only, and a sign after a number binds it too ("100" of "100 ×
+  10⁹/l"); the agent's double read a long cell word with the splitter's bounded walk (now
+  exact); the ePI reader applied a later declaration over an `!important` one and read an
+  unparseable border value as none (now cascaded by importance, and refused); the check
+  skipped faint or struck signs (now reported); and two sub-rules had no test. The table figure
+  is 196 of 789, 51 beginning with a letter.
 
 - **Every submission carrying 2.0.0 is refused by the worker gate** from the moment this change
   deploys. Nothing in the repository produces a 2.0.0 submission after it.

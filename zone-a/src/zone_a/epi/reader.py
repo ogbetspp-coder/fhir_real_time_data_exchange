@@ -287,20 +287,61 @@ def _zero_width(value: str) -> bool:
     return re.fullmatch(r"0+(\.0+)?[a-z]*", value) is not None
 
 
+_WIDTH: Final = re.compile(r"thin|medium|thick|0|[0-9]+(\.[0-9]+)?(px|pt|pc|in|cm|mm|em|ex|rem)")
+
+
+def _border_colour(token: str) -> bool:
+    return (
+        token in _NAMED
+        or token in ("transparent", "currentcolor")
+        or re.fullmatch(r"#[0-9a-f]{3,8}", token) is not None
+    )
+
+
+def _valid_border(part: str, token: str) -> bool:
+    if part == "style":
+        return token in _BORDER_STYLES
+    return _WIDTH.fullmatch(token) is not None
+
+
+def _importance_ordered(style: str) -> list[tuple[str, str]]:
+    """The declarations in the order a browser applies them: normal ones, then ``!important``."""
+    normal: list[tuple[str, str]] = []
+    important: list[tuple[str, str]] = []
+    for part in style.split(";"):
+        if not part.strip():
+            continue
+        name, _, value = part.partition(":")
+        value = value.strip().lower()
+        target = important if value.endswith("!important") else normal
+        target.append((name.strip().lower(), value.removesuffix("!important").strip()))
+    return normal + important
+
+
 def _inline_borders(style: str) -> set[str]:
     """The marks a style's borders ask for on an inline element, read as a browser cascades them.
 
     A side is drawn when its style is neither none nor hidden (the initial style is none) and
-    its width is not zero. A border along the bottom is drawn as an underline; one on another
-    side as a bar beside or over the text ("|05 mg", "1⋮5"), which is its own mark, ``border``.
-    A value the reader cannot place counts as drawn.
+    its width is not zero, the ``!important`` declarations applied last. A border along the
+    bottom is drawn as an underline; one on another side as a bar beside or over the text ("|05
+    mg", "1⋮5"), which is its own mark, ``border``. A border image is drawn whatever the style,
+    on every side. A border value the reader cannot parse whole (a function such as ``var()``, a
+    token that is no width, style or colour, the wrong number of values) refuses the section: a
+    browser would drop it or read it otherwise, and neither can be told here.
     """
     styles = dict.fromkeys(_SIDES, "none")
     widths = dict.fromkeys(_SIDES, "medium")
-    for name, value in _declarations(style):
+    kinds: set[str] = set()
+    for name, value in _importance_ordered(style):
         if not name.startswith("border") or name in ("border-collapse", "border-spacing"):
             continue
-        tokens = value.lower().split()
+        if "(" in value or "\\" in value:
+            raise _RefusedError("unsupported-style", f"{name}: {value}")
+        tokens = value.split()
+        if name.startswith("border-image"):
+            if tokens != ["none"]:
+                kinds |= {"underline", "border"}
+            continue
         # `_style` has already refused any border property but the physical sides, their
         # width, style and colour, and the shorthands (`_LAYOUT`).
         rest = name.removeprefix("border").removeprefix("-")
@@ -309,23 +350,31 @@ def _inline_borders(style: str) -> set[str]:
             targets = [side]
         else:
             targets, part = list(_SIDES), rest
-        if part == "style":
-            per = _per_side(tokens) if side not in _SIDES else {side: tokens[0] if tokens else ""}
+        if part in ("style", "width"):
+            count_ok = len(tokens) == 1 if side in _SIDES else 1 <= len(tokens) <= 4
+            if not count_ok or not all(_valid_border(part, token) for token in tokens):
+                raise _RefusedError("unsupported-style", f"{name}: {value}")
+            per = {side: tokens[0]} if side in _SIDES else _per_side(tokens)
             for target in targets:
-                styles[target] = per.get(target, "")
-        elif part == "width":
-            per = _per_side(tokens) if side not in _SIDES else {side: tokens[0] if tokens else ""}
-            for target in targets:
-                widths[target] = per.get(target, "")
+                (styles if part == "style" else widths)[target] = per[target]
         elif part == "":
-            # The shorthand: width, style and colour in any order, missing ones reset.
-            found_style = next((t for t in tokens if t in _BORDER_STYLES), "none")
-            found_width = next((t for t in tokens if _zero_width(t)), "medium")
+            # The shorthand: at most one width, style and colour, in any order; missing ones
+            # reset to the initial values.
+            found_style = [t for t in tokens if t in _BORDER_STYLES]
+            found_width = [t for t in tokens if _WIDTH.fullmatch(t)]
+            colours = [t for t in tokens if t not in found_style and t not in found_width]
+            if (
+                not tokens
+                or len(found_style) > 1
+                or len(found_width) > 1
+                or len(colours) > 1
+                or not all(_border_colour(t) for t in colours)
+            ):
+                raise _RefusedError("unsupported-style", f"{name}: {value}")
             for target in targets:
-                styles[target] = found_style
-                widths[target] = found_width
+                styles[target] = found_style[0] if found_style else "none"
+                widths[target] = found_width[0] if found_width else "medium"
         # Colour neither draws nor removes a border.
-    kinds: set[str] = set()
     for side in _SIDES:
         if styles[side] in ("none", "hidden") or _zero_width(widths[side]):
             continue

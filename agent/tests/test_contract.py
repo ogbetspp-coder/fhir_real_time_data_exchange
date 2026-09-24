@@ -119,11 +119,12 @@ def test_a_token_longer_than_the_window_is_one_longer_chunk_not_a_cut_inside_it(
 
 
 def test_an_astral_character_is_measured_as_two_units_and_never_split() -> None:
-    # U+1F600 costs two UTF-16 code units; a window of three fits one and the space after it,
-    # not two.
-    text = "\U0001f600 \U0001f600 \U0001f600"
+    # U+1D400 MATHEMATICAL BOLD CAPITAL A costs two UTF-16 code units; a window of three fits one
+    # and the space after it, not two. (A letter: an emoji is a symbol, which the quote-edge
+    # rule reads as a sign binding what follows.)
+    text = "\U0001d400 \U0001d400 \U0001d400"
     chunks = split_for_verification(text, limit=3)
-    assert chunks == ("\U0001f600", "\U0001f600", "\U0001f600")
+    assert chunks == ("\U0001d400", "\U0001d400", "\U0001d400")
     assert all(utf16_length(chunk) <= 3 for chunk in chunks)
 
 

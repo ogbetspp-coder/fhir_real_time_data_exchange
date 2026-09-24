@@ -1,6 +1,6 @@
 """How many whole-cell quotes the quote-edge rule's table clause refuses on the pinned SmPCs.
 
-The figure the query design and UR-22 state ("192 of 789") comes from here. For every table in
+The figure the query design and UR-22 state ("196 of 789") comes from here. For every table in
 the three pinned EMA SmPCs (``labels/ema-epi/sources``), every cell's text is quoted against the
 table's text twice: once with the whole grid (the rule reads every cell beside it) and once alone
 in a one-cell table. A quote that matches alone and not in its table is refused by the table
@@ -116,11 +116,11 @@ def main() -> None:
                     alone = f"{TABLE} {ROW} {CELL} {quote} {END}"
                     if locate_quote(text, quote) is None and locate_quote(alone, quote) is not None:
                         refused += 1
-                        if not re.match(r"\d", quote):
+                        if unicodedata.category(quote[0])[0] == "L":
                             refused_words += 1
     print(
         f"{refused} of {total} whole-cell quotes are refused by the table clause alone, "
-        f"{refused_words} of them not beginning with a digit"
+        f"{refused_words} of them beginning with a letter"
     )
 
 

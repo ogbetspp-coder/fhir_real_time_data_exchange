@@ -162,14 +162,53 @@ export const quoteEdgeCases: QuoteEdgeCase[] = [
       "60 ml/min.",
       "\u00bd tablets daily.",
       "Take 1",
+      // A sign after a number binds it too.
+      "Mean 20",
     ],
-    whole: ["CrCl", "Mean 20"],
+    whole: ["CrCl", "Mean"],
   },
   {
     markup:
       "<table><tr><td>10</td><td>&#x2080;&#x2080;&#x2080; IU</td></tr><tr><td>CrCl &lt;=</td><td>30 ml/min</td></tr></table>",
     cut: ["10", "30 ml/min"],
     whole: ["CrCl"],
+  },
+  {
+    // Review round 21: a sign is anything but a letter, a number, plain punctuation or a dash,
+    // so look-alikes no list names cut; a sign after a number binds it too; a combining mark
+    // and an opening mark are read past, and "‹" joined to a quote is a sign.
+    text: "CrCl < \uff08 30 ml/min \uff09. CrCl \u276e 40 ml/min. Count 2 \u00b7 10 cells. Take 1 / 2 tablet. CrCl <\u02cd 50 ml/min. CrCl \u203960 ml/min. CrCl < (\u0332 70 ml/min. CrCl < \u0301 80 ml/min. Platelets below 100 \u00d7 10\u2079/l. Reduced by 30 %.",
+    cut: [
+      "30 ml/min",
+      "40 ml/min.",
+      "10 cells.",
+      "2 tablet.",
+      "50 ml/min.",
+      "60 ml/min.",
+      "70 ml/min.",
+      "80 ml/min.",
+      "Platelets below 100",
+      "Reduced by 30",
+      "Count 2",
+      "Take 1",
+    ],
+    whole: ["CrCl", "Count", "Take", "Platelets below"],
+  },
+  {
+    // A postfix sign binds the number before it only, and a reference mark binds neither, so
+    // the quotes after them match. Stated residuals, pinned: an asterisk written for a
+    // multiplication, and the letter "x" for "×", are not read as signs.
+    markup:
+      "<p>In 12 % 30 patients responded. Grade 3* 25 mg was given. Take 2 * 10 mg. Take 3 x 20 mg.</p><table><tr><td>Grade 3 (12%)</td><td>25 mg</td></tr></table>",
+    cut: ["In 12"],
+    whole: ["30 patients responded.", "25 mg was given.", "10 mg.", "20 mg.", "25 mg"],
+  },
+  {
+    // A cell of a long run of brackets is read whole, however long; a sign starting the cell
+    // after a number binds it.
+    markup: `<table><tr><td>a ${"(".repeat(300)}</td><td>30 mg</td></tr><tr><td>100</td><td>&#xD7; 10&#x2079;/l</td></tr></table>`,
+    cut: ["100"],
+    whole: ["30 mg"],
   },
   {
     // Review round 16: a Mongolian or Yi letter the default serif face draws as a blank.

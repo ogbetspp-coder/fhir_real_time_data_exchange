@@ -59,7 +59,8 @@ def test_the_export_is_at_the_fakes_normalisation_version_and_covers_both_answer
     [
         ("QUOTE_OPENERS", quote_edge.QUOTE_OPENERS),
         ("QUOTE_CLOSERS", quote_edge.QUOTE_CLOSERS),
-        ("SIGN_LOOKALIKES", quote_edge.SIGN_LOOKALIKES),
+        ("PLAIN_PUNCTUATION", quote_edge.PLAIN_PUNCTUATION),
+        ("POSTFIX_SIGNS", quote_edge.POSTFIX_SIGNS),
     ],
 )
 def test_each_character_set_is_the_services_own(name: str, ported: frozenset[str]) -> None:

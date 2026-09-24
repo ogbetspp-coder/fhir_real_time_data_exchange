@@ -134,7 +134,11 @@ Every finding below was confirmed by reading the source div.
   text (the reader's `border` mark, read side by side as a browser cascades the styles): Brukinsa writes ">1", ">5" and ">2" in 5.1 with the ">" underlined, which the
   EMA's viewer draws as "≥" while the text says ">", and Jentadueto underlines a 5.1 heading
   holding "≥". Underlines over words, digits, e-mail addresses and plain punctuation (the
-  Brukinsa 4.5 subheadings, for example) change nothing and are not reported.
+  Brukinsa 4.5 subheadings, for example) change nothing and are not reported. Faint and
+  struck text is reported over a sign as well as a word (a white "-" before "20 °C" reads
+  "-20 °C" to the text and "20 °C" to a reader). A bottom border on a block or a table cell is
+  layout and is not marked: under a lone sign in a narrow cell or block it draws "≤", which is a
+  stated residual of the check (ADR 0005's closed CSS list governs the import).
 
 The mapping lacks three EMA codes the labels use (Pregnancy, Breast-feeding and Fertility under
 4.6); the check reports them as `unmapped-code`, for information.

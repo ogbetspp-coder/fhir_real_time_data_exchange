@@ -234,10 +234,11 @@ function codePointAtIndex(text: string, index: number): string | undefined {
 //   punctuation (QUOTE_CLOSERS) that is itself followed by a space or the end of the text. So a
 //   quote may end before a sentence's full stop, a comma, a colon or a closing parenthesis
 //   followed by a space, and not before "." or "," or "/" followed by a digit or a letter.
-// - Across a space. A quote that begins with a digit after a space preceded by a digit, or ends
-//   with a digit before a space followed by a digit, has cut a space-grouped number ("1 000"
-//   out of "1 000 000 IU"); a quote preceded by a comparator or sign and a space
-//   (isSpacedSign: "≥ 30 ml/min") has lost it. Both are cuts.
+// - Across a space. A quote that begins with a number after a space preceded by a number, or
+//   ends with a number before a space followed by a number, has cut a space-grouped number
+//   ("1 000" out of "1 000 000 IU"); a quote preceded by a sign and a space (isSpacedSign:
+//   "≥ 30 ml/min"), or ending in a number before a space and a sign ("30 %", "100 × 10⁹/l"),
+//   has lost it. All are cuts.
 //
 // It is never looser than the gate: a word character on either side is a cut before any of the
 // above is consulted, under the fidelity library's own isWordCharacter. It is not a grammar,
@@ -267,28 +268,91 @@ const QUOTE_CLOSERS = new Set([
   "…",
 ]);
 
-// Signs and comparators that still bind a number across a space: every mathematical symbol
-// (general category Sm: "<", "≥", "±", "×", "=", "+", "~", "≮", "⋜" and the rest) and the
-// look-alikes of a comparator that are not (SIGN_LOOKALIKES: MODIFIER LETTER LEFT, RIGHT, UP and
-// DOWN ARROWHEAD, SINGLE ANGLE QUOTATION MARKS, and the CJK and mathematical angle brackets,
-// each drawn like "<" or ">"). Hyphens and dashes are not signs: set off by spaces they are far
-// more often separators. A letter that looks like a sign (U+1438 CANADIAN SYLLABICS PA) is not
-// read as one, a stated residual.
-const MATH_SYMBOL = /^\p{Sm}$/u;
-const SIGN_LOOKALIKES = new Set(["˂", "˃", "˄", "˅", "‹", "›", "〈", "〉", "⟨", "⟩"]);
-
-function isSpacedSign(character: string | undefined): boolean {
-  return character !== undefined && (MATH_SYMBOL.test(character) || SIGN_LOOKALIKES.has(character));
-}
+// What may stand between a number and a quote's edge across a space without binding them: plain
+// punctuation (PLAIN_PUNCTUATION: sentence marks, closing brackets and quotation marks, and "®",
+// "™", "©"), and dashes and hyphens (general category Pd: set off by spaces they are far more
+// often separators than signs). Every other code point that is not a letter, a number, a gap, a
+// combining mark, an opening mark reading back skips, or one of the scanner's own markers is
+// read as a sign: a mathematical symbol, a comparator's look-alike from any block ("˂", "❮",
+// "⧼", "⟪", "‹"), a dingbat ("➕"), a middle dot, a slash, "%", "°". A look-alike no list names
+// is therefore still a cut. A letter drawn like a sign ("x" or Cyrillic "х" for "×", U+1438 for
+// "<") is not read as one, a stated residual; modifier letters (Lm, "ˍ") are signs here.
+const PLAIN_PUNCTUATION = new Set([
+  ".",
+  ",",
+  ";",
+  ":",
+  "!",
+  "?",
+  ")",
+  "]",
+  "}",
+  '"',
+  "'",
+  "’",
+  "”",
+  "»",
+  "…",
+  "®",
+  "™",
+  "©",
+  // Reference marks: a footnote's mark after a word or a number binds neither ("decreased†",
+  // "Grade 3*"). An asterisk written for a multiplication ("2 * 10") is not read as one, a
+  // stated residual.
+  "*",
+  "†",
+  "‡",
+  "§",
+  "¶",
+  "#",
+]);
+// Signs that bind the number before them only ("30 %", "25 °C"): read after a number, never as
+// a sign before a quote.
+const POSTFIX_SIGNS = new Set(["%", "‰", "‱", "°", "′", "″", "℃", "℉"]);
+const DASH = /^\p{Pd}$/u;
+const LETTER = /^\p{L}$/u;
+const MODIFIER_LETTER = /^\p{Lm}$/u;
+const MARK = /^\p{M}$/u;
 
 // A number is any code point of general category N: a decimal digit of any script, and "½",
 // "¹" or "₂" as well, so "1 ½" and "10" | "₀₀₀" are each one number.
 const NUMBER = /^\p{N}$/u;
-const LETTER_OR_NUMBER = /^[\p{L}\p{N}]$/u;
-const MARK = /^\p{M}$/u;
 
 function isDigit(character: string | undefined): boolean {
   return character !== undefined && NUMBER.test(character);
+}
+
+function isLetterOrNumber(character: string): boolean {
+  return (LETTER.test(character) && !MODIFIER_LETTER.test(character)) || NUMBER.test(character);
+}
+
+// The scanner's grid markers and picture token delimiters: structure, never a sign.
+function isScannerMarker(character: string): boolean {
+  const codePoint = character.codePointAt(0) ?? 0;
+  return codePoint === 0xfffc || (codePoint >= 0xfdd0 && codePoint <= 0xfdef);
+}
+
+// The opening marks reading back for a sign skips: QUOTE_OPENERS but "‹", drawn like "<".
+function isSkippedOpener(character: string): boolean {
+  return QUOTE_OPENERS.has(character) && character !== "‹";
+}
+
+// A sign before a quote binds the number after it: a postfix sign does not.
+function isSignBefore(character: string): boolean {
+  return isSpacedSign(character) && !POSTFIX_SIGNS.has(character);
+}
+
+function isSpacedSign(character: string | undefined): boolean {
+  return (
+    character !== undefined &&
+    !isLetterOrNumber(character) &&
+    !isGapPoint(character) &&
+    !MARK.test(character) &&
+    !isScannerMarker(character) &&
+    !isSkippedOpener(character) &&
+    !PLAIN_PUNCTUATION.has(character) &&
+    !DASH.test(character)
+  );
 }
 
 function isGapPoint(character: string | undefined): boolean {
@@ -345,6 +409,7 @@ const SLOT_MARKERS = new Set([CELL_START, COVERED_LEFT, COVERED_ABOVE]);
 const ENDS_SIGN = 1;
 const ENDS_DIGIT = 2;
 const STARTS_DIGIT = 4;
+const STARTS_SIGN = 8;
 
 type Cell = {
   // For each row the cell covers, from its first: the bits of every cell to its left in that
@@ -372,6 +437,7 @@ function wordBits(text: string, start: number, end: number): number {
   for (const points of words) {
     if (points.length === 0) continue;
     if (isDigit(points[0])) bits |= STARTS_DIGIT;
+    if (isSpacedSign(points[0])) bits |= STARTS_SIGN;
     if (isDigit(points[points.length - 1])) bits |= ENDS_DIGIT;
     const word = points.join("");
     if (signsBefore(word)[word.length] === 1) bits |= ENDS_SIGN;
@@ -477,7 +543,7 @@ function cutAcrossCellBefore(
 }
 
 // Whether a quote ending at UTF-16 index `end` inside a cell, whose last code point that is not
-// a gap is `last`, has cut a number drawn on in a cell to its right.
+// a gap is `last`, has cut a number drawn on, or lost a sign after it, in a cell to its right.
 function cutAcrossCellAfter(
   tables: TableIndex | undefined,
   end: number,
@@ -485,20 +551,17 @@ function cutAcrossCellAfter(
 ): boolean {
   const cell = tables?.cells[tables.cellAt[end] ?? -1];
   if (cell === undefined || !isDigit(last)) return false;
-  return cell.right.some((bits) => (bits & STARTS_DIGIT) !== 0);
+  return cell.right.some((bits) => (bits & (STARTS_DIGIT | STARTS_SIGN)) !== 0);
 }
 
-// What reading back for a sign skips: gaps, combining marks, and opening punctuation that is not
-// itself a sign.
+// What reading back for a sign skips: gaps, combining marks, and the opening marks.
 function skippedBeforeSign(point: string): boolean {
-  return (
-    isGapPoint(point) || MARK.test(point) || (QUOTE_OPENERS.has(point) && !isSpacedSign(point))
-  );
+  return isGapPoint(point) || MARK.test(point) || isSkippedOpener(point);
 }
 
 // For each UTF-16 index of `text`: 1 when reading back from it, past what `skippedBeforeSign`
-// skips, reaches a run of symbols and punctuation (no letter, number or gap) holding a sign. One
-// pass over the text, so the rule stays linear however long a run of brackets and spaces is.
+// skips, reaches a run of code points (no letter, number, gap or scanner marker) holding a sign.
+// One pass over the text, so the rule stays linear however long a run of brackets and spaces is.
 function signsBefore(text: string): Uint8Array {
   const reached = new Uint8Array(text.length + 1);
   let runHasSign = false;
@@ -507,11 +570,11 @@ function signsBefore(text: string): Uint8Array {
   for (const point of text) {
     if (isGapPoint(point)) {
       runHasSign = false;
-    } else if (LETTER_OR_NUMBER.test(point)) {
+    } else if (isLetterOrNumber(point) || isScannerMarker(point)) {
       runHasSign = false;
       current = 0;
     } else {
-      runHasSign ||= isSpacedSign(point);
+      runHasSign ||= isSignBefore(point);
       if (!skippedBeforeSign(point)) current = runHasSign ? 1 : 0;
     }
     index += point.length;
@@ -550,7 +613,7 @@ function edgeBefore(text: string, start: number, quote: string, context: SearchC
   let index = start;
   while (before !== undefined && QUOTE_OPENERS.has(before)) {
     // An opening mark drawn like a comparator ("‹30") is a sign joined to the quote.
-    if (isSpacedSign(before)) return false;
+    if (!isSkippedOpener(before)) return false;
     index -= before.length;
     before = codePointBefore(text, index);
   }
@@ -565,7 +628,8 @@ function edgeAfter(text: string, end: number, quote: string, context: SearchCont
   if (isWordCharacter(after)) return false;
   if (after === " ") {
     const last = nonGapBefore(quote, quote.length);
-    if (isDigit(nonGapFrom(text, end + 1)) && isDigit(last)) return false;
+    const next = nonGapFrom(text, end + 1);
+    if (isDigit(last) && (isDigit(next) || isSpacedSign(next))) return false;
     return !cutAcrossCellAfter(context.tables, end, last);
   }
   let index = end;

@@ -356,3 +356,36 @@ def test_inline_borders_are_read_side_by_side(style: str, expected: list[str]) -
     # Review round 20: the 1-4 value shorthands are expanded per side, as a browser does.
     marks = kinds(f'<p><span style="{style}">&lt;</span></p>')
     assert sorted({kind for _, _, kind in marks}) == expected
+
+
+@pytest.mark.parametrize(
+    ("style", "expected"),
+    [
+        # An !important declaration wins over a later normal one, as in a browser.
+        ("border-bottom: 1px solid !important; border-bottom: none", ["underline"]),
+        # A border image is drawn whatever the style.
+        ("border-image: none", []),
+    ],
+)
+def test_inline_borders_cascade_as_a_browser_does(style: str, expected: list[str]) -> None:
+    marks = kinds(f'<p><span style="{style}">&lt;</span></p>')
+    assert sorted({kind for _, _, kind in marks}) == expected
+
+
+@pytest.mark.parametrize(
+    "style",
+    [
+        "border-bottom-width: 0 1px",
+        "border-bottom-style: none solid",
+        "border-width: 0 0 0 0 0",
+        "border-bottom: nonsense",
+        "border-bottom: 0 0",
+        "border-bottom: var(--u, 1px solid)",
+        "border-image: linear-gradient(black, black) 0 0 1 0",
+    ],
+)
+def test_a_border_value_the_reader_cannot_read_whole_refuses(style: str) -> None:
+    # A browser drops or reads these otherwise; the reader cannot tell which (review round 21).
+    _, refused, _ = read_div(div(f'<p><span style="{style}">&lt;</span></p>'))
+    assert refused is not None
+    assert refused.code == "unsupported-style"

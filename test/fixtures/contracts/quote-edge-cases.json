@@ -685,16 +685,20 @@
           "result": "no-match"
         },
         {
+          "quote": "Mean 20",
+          "result": "no-match"
+        },
+        {
           "quote": "CrCl",
           "result": "match",
           "startOffset": 0,
           "endOffset": 4
         },
         {
-          "quote": "Mean 20",
+          "quote": "Mean",
           "result": "match",
           "startOffset": 72,
-          "endOffset": 79
+          "endOffset": 76
         }
       ]
     },
@@ -714,6 +718,137 @@
           "result": "match",
           "startOffset": 22,
           "endOffset": 26
+        }
+      ]
+    },
+    {
+      "text": "CrCl < （ 30 ml/min ）. CrCl ❮ 40 ml/min. Count 2 · 10 cells. Take 1 / 2 tablet. CrCl <ˍ 50 ml/min. CrCl ‹60 ml/min. CrCl < (̲ 70 ml/min. CrCl < ́ 80 ml/min. Platelets below 100 × 10⁹/l. Reduced by 30 %.",
+      "quotes": [
+        {
+          "quote": "30 ml/min",
+          "result": "no-match"
+        },
+        {
+          "quote": "40 ml/min.",
+          "result": "no-match"
+        },
+        {
+          "quote": "10 cells.",
+          "result": "no-match"
+        },
+        {
+          "quote": "2 tablet.",
+          "result": "no-match"
+        },
+        {
+          "quote": "50 ml/min.",
+          "result": "no-match"
+        },
+        {
+          "quote": "60 ml/min.",
+          "result": "no-match"
+        },
+        {
+          "quote": "70 ml/min.",
+          "result": "no-match"
+        },
+        {
+          "quote": "80 ml/min.",
+          "result": "no-match"
+        },
+        {
+          "quote": "Platelets below 100",
+          "result": "no-match"
+        },
+        {
+          "quote": "Reduced by 30",
+          "result": "no-match"
+        },
+        {
+          "quote": "Count 2",
+          "result": "no-match"
+        },
+        {
+          "quote": "Take 1",
+          "result": "no-match"
+        },
+        {
+          "quote": "CrCl",
+          "result": "match",
+          "startOffset": 0,
+          "endOffset": 4
+        },
+        {
+          "quote": "Count",
+          "result": "match",
+          "startOffset": 40,
+          "endOffset": 45
+        },
+        {
+          "quote": "Take",
+          "result": "match",
+          "startOffset": 60,
+          "endOffset": 64
+        },
+        {
+          "quote": "Platelets below",
+          "result": "match",
+          "startOffset": 156,
+          "endOffset": 171
+        }
+      ]
+    },
+    {
+      "text": "In 12 % 30 patients responded. Grade 3* 25 mg was given. Take 2 * 10 mg. Take 3 x 20 mg. ﷐ ﷒ ﷓ Grade 3 (12%) ﷓ 25 mg ﷑",
+      "quotes": [
+        {
+          "quote": "In 12",
+          "result": "no-match"
+        },
+        {
+          "quote": "30 patients responded.",
+          "result": "match",
+          "startOffset": 8,
+          "endOffset": 30
+        },
+        {
+          "quote": "25 mg was given.",
+          "result": "match",
+          "startOffset": 40,
+          "endOffset": 56
+        },
+        {
+          "quote": "10 mg.",
+          "result": "match",
+          "startOffset": 66,
+          "endOffset": 72
+        },
+        {
+          "quote": "20 mg.",
+          "result": "match",
+          "startOffset": 82,
+          "endOffset": 88
+        },
+        {
+          "quote": "25 mg",
+          "result": "match",
+          "startOffset": 40,
+          "endOffset": 45
+        }
+      ]
+    },
+    {
+      "text": "﷐ ﷒ ﷓ a (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((( ﷓ 30 mg ﷒ ﷓ 100 ﷓ × 10⁹/l ﷑",
+      "quotes": [
+        {
+          "quote": "100",
+          "result": "no-match"
+        },
+        {
+          "quote": "30 mg",
+          "result": "match",
+          "startOffset": 311,
+          "endOffset": 316
         }
       ]
     },

@@ -33,19 +33,27 @@ __all__ = [
     "locate_quote",
 ]
 
-# src/query/tools.ts QUOTE_OPENERS, QUOTE_CLOSERS and SIGN_LOOKALIKES, character for character, by
-# code point: several are look-alikes of the ASCII characters they must not be confused with.
+# src/query/tools.ts QUOTE_OPENERS, QUOTE_CLOSERS and PLAIN_PUNCTUATION, character for character,
+# by code point: several are look-alikes of the ASCII characters they must not be confused with.
 QUOTE_OPENERS: Final = frozenset(
     map(chr, (0x28, 0x5B, 0x7B, 0x22, 0x27, 0x2018, 0x201C, 0x201E, 0xAB, 0x2039, 0xBF, 0xA1))
 )
 QUOTE_CLOSERS: Final = frozenset(".,;:!?)]}\"'") | frozenset(
     map(chr, (0x2019, 0x201D, 0xBB, 0x203A, 0x2026))
 )
-# ``isSpacedSign``: every mathematical symbol (category Sm) and these look-alikes of a comparator
-# that are not: the modifier letter arrowheads, the single angle quotation marks, and the CJK and
-# mathematical angle brackets.
-SIGN_LOOKALIKES: Final = frozenset(
-    map(chr, (0x02C2, 0x02C3, 0x02C4, 0x02C5, 0x2039, 0x203A, 0x3008, 0x3009, 0x27E8, 0x27E9))
+# What may stand between a number and a quote's edge without binding them (``isSpacedSign``):
+# plain punctuation, and dashes (category Pd). Every other code point that is not a letter (other
+# than a modifier letter), a number, a gap, a mark, a skipped opener or a scanner marker is a sign.
+PLAIN_PUNCTUATION: Final = (
+    frozenset(".,;:!?)]}\"'")
+    | frozenset(map(chr, (0x2019, 0x201D, 0xBB, 0x2026, 0xAE, 0x2122, 0xA9)))
+    # Reference marks: a footnote's mark binds neither side.
+    | frozenset("*#")
+    | frozenset(map(chr, (0x2020, 0x2021, 0xA7, 0xB6)))
+)
+# Signs that bind the number before them only: read after a number, never before a quote.
+POSTFIX_SIGNS: Final = frozenset("%") | frozenset(
+    map(chr, (0x2030, 0x2031, 0xB0, 0x2032, 0x2033, 0x2103, 0x2109))
 )
 
 # src/fidelity/normalize.ts: the invisible formatting characters of step 1 (soft hyphen, zero
@@ -63,19 +71,46 @@ def _is_digit(character: str | None) -> bool:
     return character is not None and unicodedata.category(character)[0] == "N"
 
 
+def _letter_or_number(character: str) -> bool:
+    category = unicodedata.category(character)
+    return (category[0] == "L" and category != "Lm") or category[0] == "N"
+
+
+def _scanner_marker(character: str) -> bool:
+    """The scanner's grid markers and picture token delimiters: structure, never a sign."""
+    point = ord(character)
+    return point == 0xFFFC or 0xFDD0 <= point <= 0xFDEF
+
+
+def _skipped_opener(character: str) -> bool:
+    """``isSkippedOpener``: the opening marks reading back skips, all but U+2039 (drawn "<")."""
+    return character in QUOTE_OPENERS and character != "\u2039"
+
+
 def _is_sign(character: str | None) -> bool:
-    """``isSpacedSign``: a mathematical symbol, or a look-alike of a comparator."""
-    return character is not None and (
-        unicodedata.category(character) == "Sm" or character in SIGN_LOOKALIKES
+    """``isSpacedSign``: anything but a letter, a number, a gap, a mark, a skipped opener, a
+    scanner marker, plain punctuation or a dash."""
+    if character is None or _letter_or_number(character) or is_gap(character):
+        return False
+    category = unicodedata.category(character)
+    return not (
+        category[0] == "M"
+        or category == "Pd"
+        or _scanner_marker(character)
+        or _skipped_opener(character)
+        or character in PLAIN_PUNCTUATION
     )
 
 
+def _sign_before(character: str) -> bool:
+    """``isSignBefore``: a sign before a quote binds the number after it; a postfix one does not."""
+    return _is_sign(character) and character not in POSTFIX_SIGNS
+
+
 def _skipped_before_sign(character: str) -> bool:
-    """What reading back for a sign skips: gaps, marks, and openers that are not signs."""
+    """What reading back for a sign skips: gaps, marks, and the opening marks."""
     return (
-        is_gap(character)
-        or unicodedata.category(character)[0] == "M"
-        or (character in QUOTE_OPENERS and not _is_sign(character))
+        is_gap(character) or unicodedata.category(character)[0] == "M" or _skipped_opener(character)
     )
 
 
@@ -87,11 +122,11 @@ def _signs_before(text: str) -> list[bool]:
     for index, character in enumerate(text):
         if is_gap(character):
             run_has_sign = False
-        elif unicodedata.category(character)[0] in "LN":
+        elif _letter_or_number(character) or _scanner_marker(character):
             run_has_sign = False
             current = False
         else:
-            run_has_sign = run_has_sign or _is_sign(character)
+            run_has_sign = run_has_sign or _sign_before(character)
             if not _skipped_before_sign(character):
                 current = run_has_sign
         reached[index + 1] = current
@@ -114,9 +149,12 @@ def _sign_walk(text: str, index: int) -> bool | None:
         if steps > _WALK_LIMIT:
             return None
     while (
-        index >= 0 and not is_gap(text[index]) and unicodedata.category(text[index])[0] not in "LN"
+        index >= 0
+        and not is_gap(text[index])
+        and not _letter_or_number(text[index])
+        and not _scanner_marker(text[index])
     ):
-        if _is_sign(text[index]):
+        if _sign_before(text[index]):
             return True
         index -= 1
         steps += 1
@@ -209,6 +247,7 @@ _SLOT_MARKERS: Final = frozenset((_CELL_START, _COVERED_LEFT, _COVERED_ABOVE))
 _ENDS_SIGN: Final = 1
 _ENDS_DIGIT: Final = 2
 _STARTS_DIGIT: Final = 4
+_STARTS_SIGN: Final = 8
 
 
 @dataclass
@@ -227,9 +266,12 @@ def _word_bits(text: str) -> int:
     for word in _words(text):
         if _is_digit(word[0]):
             bits |= _STARTS_DIGIT
+        if _is_sign(word[0]):
+            bits |= _STARTS_SIGN
         if _is_digit(word[-1]):
             bits |= _ENDS_DIGIT
-        if _sign_reached(word, len(word)):
+        # Exact, however long the word: it is read whole (``_sign_reached`` is for the splitter).
+        if _signs_before(word)[len(word)]:
             bits |= _ENDS_SIGN
     return bits
 
@@ -338,7 +380,7 @@ def _cut_across_cell_before(tables: _Tables | None, start: int, first: str | Non
 def _cut_across_cell_after(tables: _Tables | None, end: int, last: str | None) -> bool:
     if tables is None or tables.cell_at[end] < 0 or not _is_digit(last):
         return False
-    return any(bits & _STARTS_DIGIT for bits in tables.right[tables.cell_at[end]])
+    return any(bits & (_STARTS_DIGIT | _STARTS_SIGN) for bits in tables.right[tables.cell_at[end]])
 
 
 class _Signs:
@@ -391,7 +433,7 @@ def edge_before(
         return not _cut_after_space(text, start - 1, start, first, tables, signs)
     index = start
     while before is not None and before in QUOTE_OPENERS:
-        if _is_sign(before):
+        if not _skipped_opener(before):
             # An opening mark drawn like a comparator (U+2039 before "30") is a sign joined to
             # the quote.
             return False
@@ -412,7 +454,10 @@ def edge_after(text: str, end: int, last: str | None, tables: _Tables | None = N
     if is_word_character(after):
         return False
     if after == " ":
-        if _is_digit(non_gap(text, end + 1, 1)) and _is_digit(last):
+        following = non_gap(text, end + 1, 1)
+        # A number or a sign after a number binds it ("10 000", "30 %", "100" and a
+        # multiplication sign).
+        if _is_digit(last) and (_is_digit(following) or _is_sign(following)):
             return False
         return not _cut_across_cell_after(tables, end, last)
     index = end

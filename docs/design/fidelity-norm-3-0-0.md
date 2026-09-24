@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and twenty reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and twenty-one reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -937,3 +937,31 @@ Each fix is pinned by vectors on both sides, and a break of each is caught by th
 8. **Low.** Wording (the check's design, ADR 0005, the module docstring, "10 (000"), the
    parity test reading comments as entries, a border over a sign not reported, and the 192 of
    789 figure now reproducible (`agent/scripts/measure_table_quotes.py`).
+
+## Twenty-first review (2026-09-24): findings and what changed
+
+1. **High.** The agent's double read a long cell word with the splitter's bounded walk, which
+   counts an over-long walk as a sign, so it refused a quote the service matched. Fixed: a cell
+   word is read whole and exactly.
+2. **High.** The design said the sign is read past "opening punctuation"; the code skipped a
+   fixed list, so "CrCl < （ 30 ml/min ）" matched. Fixed by item 3: an opening mark outside
+   the list is now a sign itself.
+3. **High.** Look-alikes outside category Sm and outside the named list ("❮", "⧼", "⟪", "➕",
+   "˖", "⁓", a middle dot, a spaced slash, "<" with U+02CD) were not signs. Fixed by inverting
+   the rule: a sign is anything but a letter (modifier letters are signs), a number, a gap, a
+   combining mark, an opening mark, a scanner marker, a dash or plain punctuation. Reference
+   marks (`* † ‡ § ¶ #`) are plain; postfix signs (`% ‰ ‱ ° ′ ″ ℃ ℉`) count only after a number;
+   and a quote ending in a number before a space and a sign is cut ("100" of "100 × 10⁹/l",
+   "30" of "30 %"), which the right edge had not read. Measured on the pinned SmPCs the table
+   figure is 196 of 789 (it would be 295 with "%" and the reference marks read as signs before a
+   quote, which is why they are not).
+4. **Medium.** The ePI reader applied a later declaration over an `!important` one, read an
+   unparseable border value as none, and ignored `border-image`. Fixed: declarations are
+   applied normal first, then important; a border value that is not whole (a function, the
+   wrong number of values, a token that is no width, style or colour) refuses the section; a
+   border image is drawn on every side.
+5. **Medium.** The check skipped faint or struck text over a sign. Fixed.
+6. **Medium.** Reading past combining marks and the "‹30" join had no service test. Fixed.
+7. to 10. **Low.** A sign after the quote (now a cut after a number, item 3); "nothing
+   precedes" stated; a bottom border on a block or cell stated as a residual of the check;
+   the script's wording aligned ("beginning with a letter").
