@@ -590,16 +590,34 @@ def _length_points(value: str) -> float | None:
     return -size if match.group(1) else size
 
 
-def _refuse_overprint(name: str, style: str) -> None:
-    """Refuse layout a browser draws as other text (review round 23 of fidelity-norm/3.0.0).
+# The bounds within which lines of text cannot be drawn over one another: the pinned labels set
+# fonts of 12pt at most and line heights of 12.65pt or 115% at least. Text larger than the line
+# it sits on reaches into the next one (a 40pt run under a 115% line hides the line above).
+_LARGEST_FONT_POINTS: Final = 14.0
+_SMALLEST_LINE_POINTS: Final = 12.0
 
-    A negative margin on inline text overprints its neighbour ("≥" drawn from ">" and "_"); a
-    negative top or bottom margin, a height outside table parts and a line height below normal
-    lay one line over another; padding on inline text with a background paints over the text
-    around it. ADR 0005 refuses the same on import.
+
+def _nonzero_length(token: str) -> bool:
+    """Whether a length token may be other than zero: anything but a parsed zero, a unit the
+    reader cannot place (``rem``, ``ch``, ``calc()``) included."""
+    points = _length_points(token)
+    return points is None or points != 0
+
+
+def _refuse_overprint(name: str, style: str) -> None:
+    """Refuse layout a browser draws as other text (reviews 23 and 24 of fidelity-norm/3.0.0).
+
+    A negative margin on inline text or a picture overprints its neighbour ("≥" drawn from ">"
+    and "_"); a negative top or bottom margin, a height outside table parts and pictures, a line
+    height below 12pt, 100% or 1em, and a font above 14pt, 130% or 1.3em lay one line over
+    another; padding on inline text paints its background or border over the lines around it
+    when it is vertical, or over its neighbours when it has a background. These are bounds, not
+    a layout engine: layout inside them that still draws one text over another (text at the
+    bounds' edge, a block overflowing its table cell) is a stated residual of the check, and ADR
+    0005's renderer cross-check is what secures the import.
     """
     declarations = _declarations(style)
-    inline = name in _INLINE
+    inline = name in _INLINE or name == "img"
     background = any(
         key in ("background", "background-color") and value not in ("transparent", "none")
         for key, value in declarations
@@ -612,9 +630,13 @@ def _refuse_overprint(name: str, style: str) -> None:
                 points = _length_points(size)
                 if points is not None and points < 0 and (inline or side in ("top", "bottom")):
                     raise _RefusedError("unsupported-style", f"{name} {key}: {value}")
-        elif key.startswith("padding") and inline and background:
-            if any((_length_points(t) or 0) != 0 or t.endswith("%") for t in tokens):
-                raise _RefusedError("unsupported-style", f"{name} {key} over a background")
+        elif key.startswith("padding") and name in _INLINE:
+            sides = _per_side(tokens) if key == "padding" else {key.removeprefix("padding-"): value}
+            vertical = any(
+                _nonzero_length(size) for side, size in sides.items() if side in ("top", "bottom")
+            )
+            if vertical or (background and any(_nonzero_length(t) for t in tokens)):
+                raise _RefusedError("unsupported-style", f"{name} {key}: {value}")
         elif key in ("height", "max-height") and name not in _SIZED and value != "auto":
             raise _RefusedError("unsupported-style", f"{name} {key}: {value}")
         elif key == "line-height" and value != "normal":
@@ -622,10 +644,22 @@ def _refuse_overprint(name: str, style: str) -> None:
                 low = float(value[:-1] or 0) < 100
             elif re.fullmatch(r"[0-9]+(\.[0-9]+)?", value):
                 low = float(value) < 1
+            elif value.endswith("em"):
+                low = float(value[:-2] or 0) < 1
             else:
                 points = _length_points(value)
-                low = points is None or points < 8
+                low = points is None or points < _SMALLEST_LINE_POINTS
             if low:
+                raise _RefusedError("unsupported-style", f"{name} {key}: {value}")
+        elif key == "font-size":
+            if value.endswith("%"):
+                high = float(value[:-1] or 0) > 130
+            elif value.endswith("em"):
+                high = float(value[:-2] or 0) > 1.3
+            else:
+                points = _length_points(value)
+                high = points is not None and points > _LARGEST_FONT_POINTS
+            if high:
                 raise _RefusedError("unsupported-style", f"{name} {key}: {value}")
 
 

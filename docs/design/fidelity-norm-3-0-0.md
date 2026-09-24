@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and twenty-three reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and twenty-four reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -970,7 +970,7 @@ Each fix is pinned by vectors on both sides, and a break of each is caught by th
 
 The review found no disagreement between the service, the agent and an independent oracle over
 every code point and 167 000 fuzzed quotes, and measured the inverted rule on the pinned SmPCs'
-paragraphs: it refuses the same 4 of 846 paragraphs, 1 332 sentences and 2 446 clauses as before
+paragraphs: it refuses 4 of 846 paragraphs, 4 of 1 332 sentences and 4 of 2 446 clauses, as before
 (adjacent numbers across a paragraph break), and 20 more of 20 186 five-word windows, each a
 number before a sign, as intended.
 
@@ -1008,3 +1008,29 @@ number before a sign, as intended.
    line heights 12.65 pt or 115% and up, their negative margins at a paragraph's side).
 4. to 6. **Low.** Stale comments and docstrings; the right-edge wording in the query design and
    UR-22 aligned; pins for "‰" and "…" as not signs before a quote.
+
+## Twenty-fourth review (2026-09-24): findings and what changed
+
+The review found the quote-edge rule clean: the service, the agent's port and its test double
+and an oracle rebuilt from the query design agree over every code point (51 probes) and 175 086
+fuzzed quotes, and the stated costs hold (4 paragraphs, 4 sentences, 4 clauses, 220 of 20 186
+five-word windows, 196 of 789 whole-cell quotes). Its findings were in the ePI reader's layout
+bounds and in missing pins:
+
+1. to 4. **Medium.** Layout the round-23 refusals missed: a large font under a percentage line
+   height (a 40pt run under a 115% line hides the line above), padding in a unit the reader
+   cannot place (read as zero), vertical padding lifting an inline border over the line above
+   ("<" underlined, "≤"), and a negative margin on a picture. Fixed: a line height of 12pt, 100%
+   or 1em at least, a font of 14pt, 130% or 1.3em at most (the pinned labels set 12pt at most
+   and 12.65pt or 115% at least), an unplaceable padding counted as non-zero, vertical padding
+   on inline text refused, a picture's margins read as inline text's.
+2. **Medium.** A block overflowing its table cell (a negative side margin, a narrow width)
+   overprints the next cell; Nuvaxovid sets negative side margins inside cells, so it cannot be
+   refused outright. Stated as a residual of the check, with the rest of what bounds cannot
+   catch: the QRD check's design says the bounds are not a layout engine, and ADR 0005's
+   renderer cross-check is what secures the import.
+3. and 7. **Medium, Low.** Pins: a cell's first number read past a combining mark (a mutant
+   survived), and not past an opening mark; the number before the space not past one either.
+4. to 10. **Low.** The splitter's docstring (an answer's own ends are not cuts), a combining
+   mark on a space stated as a residual, and wording (numbers and opening marks, a stale
+   comment, the QRD design's "layout properties are ignored", a round-22 sentence).

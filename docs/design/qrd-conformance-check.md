@@ -42,8 +42,10 @@ not the fidelity scanner, which is the contract for narrative this repository pu
 rightly refuses the EMA's divs (inline CSS on nearly every element).
 
 Each section is read on its own, so a section the reader cannot vouch for is refused without
-losing the rest. CSS is checked against a closed list: layout properties are ignored, text
-colour, background and tiny text are marked, and anything else (`display`, `visibility:
+losing the rest. CSS is checked against a closed list: layout properties are ignored within bounds that
+keep lines of text apart (a line height of 12pt, 100% or 1em at least, a font of 14pt at most, no
+negative top or bottom margin, no negative margin on inline text or a picture, no vertical
+padding on inline text), text colour, background and tiny text are marked, and anything else (`display`, `visibility:
 hidden`, an unknown property) refuses the section. Word comment markup refuses the section,
 because the comment's text would otherwise read as label text.
 
@@ -144,7 +146,11 @@ Every finding below was confirmed by reading the source div.
   draws other glyphs: Wingdings "J" is a smiling face) and a border value a browser would not
   accept whole or that inherits from the parent, and layout that draws one text over another (a
   negative margin on inline text or at a block's top or bottom, padding on inline text over a
-  background, a height outside table parts and pictures, a line height below normal).
+  background, a height outside table parts and pictures, a line height or font outside the
+  bounds above). Those are bounds, not a layout engine: layout inside them that still draws one
+  text over another (text at the bounds' edge, a block overflowing its table cell, a combining
+  mark on a space drawn as a stroke) is a stated residual of the check; ADR 0005's renderer
+  cross-check is what secures the import.
 
 The mapping lacks three EMA codes the labels use (Pregnancy, Breast-feeding and Fertility under
 4.6); the check reports them as `unmapped-code`, for information.

@@ -426,7 +426,12 @@ restored.
   "0.52" before "(95% CI" and 108 more five-word windows; signs are still read past them); and
   the ePI reader reading layout that overprints text ("≥" drawn from ">" and a pulled-back "_",
   a line laid over another), which now refuses. The table figure is 196 of 789, 51 beginning
-  with a letter, and paragraphs, sentences and clauses are refused as before.
+  with a letter, and paragraphs, sentences and clauses are refused as before. A twenty-fourth
+  review found the quote-edge rule clean and the reader's layout refusals short (a large font
+  under its line, padding in an unknown unit, vertical padding lifting a border, a picture's
+  negative margin): the reader now holds lines apart within stated bounds (line height, font
+  size, margins, padding), a block overflowing its table cell is a stated residual of the check,
+  and ADR 0005's renderer cross-check is what secures the import.
 
 - **Every submission carrying 2.0.0 is refused by the worker gate** from the moment this change
   deploys. Nothing in the repository produces a 2.0.0 submission after it.

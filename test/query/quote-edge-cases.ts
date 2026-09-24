@@ -242,6 +242,14 @@ export const quoteEdgeCases: QuoteEdgeCase[] = [
     whole: ["Up to"],
   },
   {
+    // Review round 24: a cell's first number is read past a combining mark, not past an
+    // opening mark; nor is the number before the space.
+    markup:
+      "<table><tr><td>Up to 10</td><td>&#x332;000 IU</td></tr><tr><td>Up to 20</td><td>(5 mg)</td></tr></table><p>Take x 10( 000 IU daily.</p>",
+    cut: ["Up to 10"],
+    whole: ["Up to 20", "000 IU daily."],
+  },
+  {
     // A cell of a long run of brackets is read whole, however long; a sign starting the cell
     // after a number binds it.
     markup: `<table><tr><td>a ${"(".repeat(300)}</td><td>30 mg</td></tr><tr><td>100</td><td>&#xD7; 10&#x2079;/l</td></tr></table>`,

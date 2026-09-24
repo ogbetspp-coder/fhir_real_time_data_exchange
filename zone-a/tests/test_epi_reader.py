@@ -434,6 +434,19 @@ def test_a_font_outside_the_text_fonts_refuses(family: str, refused: bool) -> No
         ('<p style="line-height:0.5">x</p>', True),
         ('<p style="line-height:13pt">x</p>', False),
         ('<p style="line-height:115%">x</p>', False),
+        # Review round 24: a large font under its line, padding in a unit the reader cannot
+        # place, vertical padding on inline text, a picture pulled over text.
+        ('<p style="line-height:115%">x<span style="font-size:40pt">y</span></p>', True),
+        ('<p style="font-size:40pt;line-height:8pt">x</p>', True),
+        ('<p style="line-height:0.9em">x</p>', True),
+        ('<p style="font-size:12pt">x</p>', False),
+        ('<p><span style="background-color:white;padding-top:1.1rem">x</span></p>', True),
+        ('<p><span style="background-color:white;padding:1.2ex 1ch">x</span></p>', True),
+        ('<p><span style="padding-top:13pt;border-top:1px solid black">x</span></p>', True),
+        (
+            '<p>Do not crush.<img style="margin-left:-66pt" src="data:image/png;base64,AA=="/></p>',
+            True,
+        ),
     ],
 )
 def test_layout_that_overprints_text_refuses(inner: str, refused: bool) -> None:

@@ -520,8 +520,9 @@ function cutAcrossCellBefore(
   );
 }
 
-// Whether a quote ending at UTF-16 index `end` inside a cell, whose last code point that is not
-// a gap is `last`, has cut a number drawn on, or lost a sign after it, in a cell to its right.
+// Whether a quote ending at UTF-16 index `end` inside a cell, whose last code point that is
+// neither a gap nor a combining mark is `last`, has cut a number drawn on, or lost a sign after
+// it, in a cell to its right.
 function cutAcrossCellAfter(
   tables: TableIndex | undefined,
   end: number,

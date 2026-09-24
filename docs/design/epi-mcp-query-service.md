@@ -379,7 +379,7 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
   - **across a space**: a quote that begins with a number after a space preceded by a number, or
     ends with a number before a space followed by a number, has cut a space-grouped number; a
     number is any code point of general category N (a decimal digit of any script, and "½", "¹"
-    and "₂" too), and the one on each side is read past every gap (from `fidelity-norm/3.0.0`, the specification's section 6) and every combining mark, but not past an opening mark ("0.52 (95%" is two numbers), so "10" U+2009 " 000", "5" U+2063 " 000" and "1 ½" are one
+    and "₂" too), and the one on each side is read past every gap (from `fidelity-norm/3.0.0`, the specification's section 6) and every combining mark; an opening mark inside the quote or after the space separates two numbers ("0.52" of "0.52 (95%" matches), while one before the quote does not ("000 IU" of "Give 10 (000 IU)" is refused, a false failure), so "10" U+2009 " 000", "5" U+2063 " 000" and "1 ½" are one
     number, and a quote may neither end with "10" or "10" U+2009 nor begin with "000" or "½"
     there. A quote, or the opening punctuation before it, preceded by a sign and a space has
     lost it: reading back from the space past gaps, combining marks and the opening marks, a run
@@ -395,7 +395,7 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
     +/-", and "10 cells" after "2 ·". A number before an opening bracket also joins one after it
     ("000 IU" in "Give 10 (000 IU)"), a false failure. Stated residuals: a letter drawn like a
     sign is not read as one ("x" or Cyrillic "х" for "×" in "Take 2 x 10 mg", U+1438 for "<");
-    an asterisk written for a multiplication is read as a reference mark ("2 * 10"); a quote may end before a decimal separator or a ratio's colon set off by a space ("Take 1" of "Take 1 ,5 mg", "dilute 1" of "dilute 1 : 10"); a letter drawn like a digit ("O" or Cyrillic "О" for 0, "l" for 1) is a letter; « and » are opening and plain punctuation although drawn like "≪" and "≫"; and a dash drawn like a sign (U+30A0 and U+2E40 like "=", U+301C like "~") is a dash. All are
+    an asterisk written for a multiplication is read as a reference mark ("2 * 10"); a quote may end before a decimal separator or a ratio's colon set off by a space ("Take 1" of "Take 1 ,5 mg", "dilute 1" of "dilute 1 : 10"); a letter drawn like a digit ("O" or Cyrillic "О" for 0, "l" for 1) is a letter; « and » are opening and plain punctuation although drawn like "≪" and "≫"; a dash drawn like a sign (U+30A0 and U+2E40 like "=", U+301C like "~") is a dash; and a combining mark on a space (U+0335, drawn as a stroke in some fonts) is read past, not as a sign. All are
     cuts;
   - **across table cells** (from `fidelity-norm/3.0.0`): a renderer draws a row's cells side by
     side with a gap about as wide as a space and centres each cell's lines vertically, so any
