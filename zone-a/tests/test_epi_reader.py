@@ -819,6 +819,10 @@ def test_a_bundle_python_cannot_read_refuses_the_document(document: bytes) -> No
         ("<p>Take&#127;5</p>", "format-character"),
         ("<p>Take\x7f5</p>", "format-character"),
         ("<p>Take\x855</p>", "format-character"),
+        ("<p>Take\x805</p>", "format-character"),
+        ("<p>Take\x9f5</p>", "format-character"),
+        # A self-closing block: HTML ignores the "/" and moves the text after it inside.
+        ('<div><p style="color:red"/>x</div>', "malformed-xhtml"),
         ("<table><tfoot><tr><td>x</td></tr></tfoot></table>", "unsupported-element"),
         ("<table><caption><b>c</b></caption><tr><td>x</td></tr></table>", "unsupported-element"),
         ("<table><colgroup></colgroup><tr><td>x</td></tr></table>", "unsupported-element"),

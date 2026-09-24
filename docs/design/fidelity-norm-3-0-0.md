@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and thirty-five reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and thirty-six reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -1233,3 +1233,16 @@ sweep's remaining survivors change nothing a reader can see or only add a refusa
 `rgb()` strip, quotes or `/` in other properties, `!important` kept in values, a first-line indent
 to the right, the width of `thin`, the doctype and bare `<!` checks, HTML's unmapped `&#129;`, `&#X96;`
 which XML refuses anyway).
+
+## Thirty-sixth review (2026-09-24): findings and what changed
+
+Scoped to this change, the review found no High or Medium finding: no false pass, divergence,
+crash or refusal of a pinned label, across fresh differential corpora (63 000 cases), quote-edge
+fuzz (21 688 quotes), a table-order fuzz of the new `thead` rule against the order a browser draws
+(60 000 tables) and a crash fuzz (60 000 inputs). Its three Low findings are closed: literal
+U+0080 and U+009F are pinned beside U+0085; a self-closing `p`, where HTML moves the most content,
+is pinned; the change record and docstring word the `thead` rule exactly (a browser draws a table's
+first header group at the top; a later one is a false failure). The round-35 list of surviving
+mutants was incomplete: besides those named, the remaining survivors extend a list whose rule
+another member pins (`vertical-align` lengths, self-closing elements), are covered by another rule
+(a bracket outside `rgb()`), only add refusals, or are code unchanged from `main`.

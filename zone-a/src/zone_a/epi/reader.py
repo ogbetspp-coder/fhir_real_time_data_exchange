@@ -80,21 +80,21 @@ them)), elements nested deeper than 128 (a table's row group and row counted; a 
 Bundle can be refused as nested too deeply to read within that bound, a false failure), and a CDATA
 section (an XML parser reads it as text, an HTML parser as a comment). As ``unsupported-element``:
 text between the parts of a table, which a browser moves out of the table, and a ``thead`` after a
-table's body, which a browser draws at the top. As ``unsupported-style``: a margin or indent more
-than an inch to the left, text drawn more than 12pt left of its container's start (the blocks'
-margins and the indent inherited through blocks, inline elements and table rows summed, each read
-as the most negative value any of its declarations names; a table cell starts again from zero, or
-from the table's own offset when that is negative), which moves it off the page or over what lies
-there, or a margin or indent in a unit the reader does not know (``%``, ``vw``, ``calc()``...);
-layout that draws one text over another (a negative margin on inline text or at a block's top or
-bottom, vertical padding on inline text and any padding on it over a background, a border on it
-wider than a hairline, a height outside table parts and pictures, a line height below 12pt, 100% or
-1em, a font above 14pt); a font outside a closed list of Unicode text fonts (a symbol font draws
-other glyphs); a border value on inline text a browser would not accept whole, or one inherited
-from the parent; a style CSS would split otherwise than the reader (a quote outside a font family
-name or inside a quoted one, a comment, an escape, a bracket outside ``rgb()``, a character outside
-ASCII letters, digits, whitespace and ``# % ! . , : ; ' " ( ) -``); and a margin or indent with a
-value a browser drops (the wrong number of values, ``text-indent: auto``).
+table's body (a browser draws a table's first header group at the top). As ``unsupported-style``: a
+margin or indent more than an inch to the left, text drawn more than 12pt left of its container's
+start (the blocks' margins and the indent inherited through blocks, inline elements and table rows
+summed, each read as the most negative value any of its declarations names; a table cell starts
+again from zero, or from the table's own offset when that is negative), which moves it off the page
+or over what lies there, or a margin or indent in a unit the reader does not know (``%``, ``vw``,
+``calc()``...); layout that draws one text over another (a negative margin on inline text or at a
+block's top or bottom, vertical padding on inline text and any padding on it over a background, a
+border on it wider than a hairline, a height outside table parts and pictures, a line height below
+12pt, 100% or 1em, a font above 14pt); a font outside a closed list of Unicode text fonts (a symbol
+font draws other glyphs); a border value on inline text a browser would not accept whole, or one
+inherited from the parent; a style CSS would split otherwise than the reader (a quote outside a
+font family name or inside a quoted one, a comment, an escape, a bracket outside ``rgb()``, a
+character outside ASCII letters, digits, whitespace and ``# % ! . , : ; ' " ( ) -``); and a margin
+or indent with a value a browser drops (the wrong number of values, ``text-indent: auto``).
 
 What refuses the document (``EpiRefusedError``): not UTF-8 JSON (or JSON with an integer longer
 than Python's digit limit), a lone surrogate anywhere in it, not a document Bundle, not the shape
