@@ -2371,6 +2371,93 @@
       "expected": {
         "error": "invisible-character"
       }
+    },
+    {
+      "name": "rejects-mark-that-does-not-compose-after-bold",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>CrCl &#x2A7D;<b>&#x338;</b> 30</p></div>",
+      "expected": {
+        "error": "combining-across-markup"
+      }
+    },
+    {
+      "name": "rejects-acute-after-q-across-bold",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>q<b>&#x301;</b></p></div>",
+      "expected": {
+        "error": "combining-across-markup"
+      }
+    },
+    {
+      "name": "rejects-mark-after-a-long-run-across-bold",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>e&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;<b>&#x301;</b></p></div>",
+      "expected": {
+        "error": "combining-across-markup"
+      }
+    },
+    {
+      "name": "rejects-hangul-vowel-across-bold",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>&#x1100;<b>&#x1161;</b></p></div>",
+      "expected": {
+        "error": "combining-across-markup"
+      }
+    },
+    {
+      "name": "accepts-mark-before-an-end-tag",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><b>e&#x301;</b>x</p></div>",
+      "expected": "\n\néx\n\n"
+    },
+    {
+      "name": "rejects-small-inside-code",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><code>a<small>b</small></code></p></div>",
+      "expected": {
+        "error": "nesting-depth"
+      }
+    },
+    {
+      "name": "rejects-small-inside-h6",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><h6>a<small>b</small></h6></div>",
+      "expected": {
+        "error": "nesting-depth"
+      }
+    },
+    {
+      "name": "accepts-sup-inside-h6",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><h6>10<sup>9</sup></h6></div>",
+      "expected": "\n\n10⁹\n\n"
+    },
+    {
+      "name": "nesting-depth-before-parent-check",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><li>x</li></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></div>",
+      "expected": {
+        "error": "nesting-depth"
+      }
+    },
+    {
+      "name": "void-element-counts-toward-depth",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><br/></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></div>",
+      "expected": {
+        "error": "nesting-depth"
+      }
+    },
+    {
+      "name": "reserved-before-invisible-character",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>­￼</p></div>",
+      "expected": {
+        "error": "reserved-character"
+      }
+    },
+    {
+      "name": "cdata-end-before-unmappable-script",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><sup>]]></sup></p></div>",
+      "expected": {
+        "error": "cdata"
+      }
+    },
+    {
+      "name": "table-content-before-cdata-end",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr>]]></tr></table></div>",
+      "expected": {
+        "error": "table-content"
+      }
     }
   ],
   "verify": [
@@ -12178,7 +12265,7 @@
           {
             "sourceKey": "smpc.4.2.posology",
             "path": "Composition.section[0].section[0]",
-            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>The maximum dose is 10</p></div>"
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>The maximum dose is 10 </p></div>"
           }
         ],
         "provenance": [
@@ -12192,8 +12279,8 @@
                 "textSha256": "2e6b02ef9297fb7e8749e6632a3bdccbe9d148f6da153689f7620de921b4c9fb"
               }
             ],
-            "narrativeDivSha256": "6cdd2bb42275223e42560bd4b8f7f5278a7e387682cbe78ea77f892c2b9f4421",
-            "normalizedTextSha256": "da700767eb4597f7ce966d1da2204d155fafa98bdae4a359b864595926a8c4f0"
+            "narrativeDivSha256": "cf2129b04831a9eca115cb22f38debfc241105ac8c93e58b23ba1612ddb3f059",
+            "normalizedTextSha256": "2e6b02ef9297fb7e8749e6632a3bdccbe9d148f6da153689f7620de921b4c9fb"
           }
         ]
       },
@@ -12201,25 +12288,16 @@
         "reportVersion": "1.0.0",
         "normalizationVersion": "fidelity-norm/3.0.0",
         "extractedTextSha256": "3d155c71cb72d0899ef16355a42d9c0cef926f99f989c4be84685b3a282b49fa",
-        "narrativeBindingSha256": "ceff77f23ecdc1aa2962875c9a5496b7b83dc7711573eddbef46fa76b97db39f",
+        "narrativeBindingSha256": "ba5d946ca37646ee997c641ec76c5f116f2130e2d12ed29d1730c17a32f07688",
         "status": "failed",
         "sections": [
           {
             "sourceKey": "smpc.4.2.posology",
             "path": "Composition.section[0].section[0]",
-            "status": "mismatch",
+            "status": "invalid-provenance",
             "spanCount": 1,
-            "details": {
-              "expectedLength": 23,
-              "actualLength": 22,
-              "firstDifferingOffset": 22,
-              "commonSuffixLength": 0,
-              "expectedWordCount": 5,
-              "actualWordCount": 5,
-              "expectedSha256": "2e6b02ef9297fb7e8749e6632a3bdccbe9d148f6da153689f7620de921b4c9fb",
-              "actualSha256": "da700767eb4597f7ce966d1da2204d155fafa98bdae4a359b864595926a8c4f0"
-            },
-            "normalizedTextSha256": "da700767eb4597f7ce966d1da2204d155fafa98bdae4a359b864595926a8c4f0"
+            "reason": "word-cut",
+            "normalizedTextSha256": "2e6b02ef9297fb7e8749e6632a3bdccbe9d148f6da153689f7620de921b4c9fb"
           }
         ],
         "issues": [],
@@ -12233,7 +12311,7 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "2b467c53c1034ce5bb7d704eeecadeed36285c8a354f6659b562cbdf92fd463a"
+        "reportHash": "b2946c0b6dbb976bd1926c5d42a120d381aae904f66cd06e018f7dec6add48eb"
       }
     },
     {
@@ -12255,7 +12333,7 @@
           {
             "sourceKey": "smpc.4.2.posology",
             "path": "Composition.section[0].section[0]",
-            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>The maximum dose is 10</p></div>"
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>The maximum dose is 10 </p></div>"
           }
         ],
         "provenance": [
@@ -12269,8 +12347,8 @@
                 "textSha256": "f27b75a09766c1068d141c692f7da11599cfaf240ba5cd39c211cb8d922ae760"
               }
             ],
-            "narrativeDivSha256": "6cdd2bb42275223e42560bd4b8f7f5278a7e387682cbe78ea77f892c2b9f4421",
-            "normalizedTextSha256": "da700767eb4597f7ce966d1da2204d155fafa98bdae4a359b864595926a8c4f0"
+            "narrativeDivSha256": "af104e6a9e5e87d4c85399ea3cd126ca485840437866c533ab325130e7c172cc",
+            "normalizedTextSha256": "f27b75a09766c1068d141c692f7da11599cfaf240ba5cd39c211cb8d922ae760"
           }
         ]
       },
@@ -12278,25 +12356,16 @@
         "reportVersion": "1.0.0",
         "normalizationVersion": "fidelity-norm/3.0.0",
         "extractedTextSha256": "a9fa80fe6b14a97f287482777fed2afe913a813cacdaf3f47b12733e7261f3fc",
-        "narrativeBindingSha256": "ceff77f23ecdc1aa2962875c9a5496b7b83dc7711573eddbef46fa76b97db39f",
+        "narrativeBindingSha256": "8280bedc3930bb7e4cc58d620ff9f3cb08e040097ccd24c0a704f1f53ebd0cc5",
         "status": "failed",
         "sections": [
           {
             "sourceKey": "smpc.4.2.posology",
             "path": "Composition.section[0].section[0]",
-            "status": "mismatch",
+            "status": "invalid-provenance",
             "spanCount": 1,
-            "details": {
-              "expectedLength": 23,
-              "actualLength": 22,
-              "firstDifferingOffset": 22,
-              "commonSuffixLength": 0,
-              "expectedWordCount": 5,
-              "actualWordCount": 5,
-              "expectedSha256": "f27b75a09766c1068d141c692f7da11599cfaf240ba5cd39c211cb8d922ae760",
-              "actualSha256": "da700767eb4597f7ce966d1da2204d155fafa98bdae4a359b864595926a8c4f0"
-            },
-            "normalizedTextSha256": "da700767eb4597f7ce966d1da2204d155fafa98bdae4a359b864595926a8c4f0"
+            "reason": "word-cut",
+            "normalizedTextSha256": "f27b75a09766c1068d141c692f7da11599cfaf240ba5cd39c211cb8d922ae760"
           }
         ],
         "issues": [],
@@ -12310,7 +12379,7 @@
           "coveredCodePoints": 0,
           "uncoveredGaps": 1
         },
-        "reportHash": "37d08981e4574609764f19ce511b1b1acd9c22bc073ad82731f22dab256e28cb"
+        "reportHash": "73d226037dc3e9299c8b972f846934c29e24917fa37ca0c9b1b125f7e972fc27"
       }
     },
     {
@@ -15290,6 +15359,210 @@
           "uncoveredGaps": 1
         },
         "reportHash": "07b43f9112f8977c7d1efc90e1998295365d87cd1a57ef1c895c4917c6b2ce42"
+      }
+    },
+    {
+      "name": "span-starts-after-thin-space-inside-number",
+      "input": {
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nThe maximum dose is 10  000 IU daily.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 73
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>000 IU daily.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 58,
+                "endOffset": 72,
+                "textSha256": "4a44bde9e8f75ce384840422c5a3bcffd441ec3291511ecb007992fc6b3e54e7"
+              }
+            ],
+            "narrativeDivSha256": "9684c9d5671e4d9c1b8948a78a1c2ff2a1a4bd1dc845f1efd230f17f02c5de0d",
+            "normalizedTextSha256": "44af22655bd9b2c1353795c8cef5e1c9ec2fc16a6d1fd6282ba2ac730fea894d"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "extractedTextSha256": "3d155c71cb72d0899ef16355a42d9c0cef926f99f989c4be84685b3a282b49fa",
+        "narrativeBindingSha256": "3b689e709653a8fe593bcf14cd73c95a9ba9e4790f9cafa564bbc7c986d8537c",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "invalid-provenance",
+            "spanCount": 1,
+            "reason": "word-cut",
+            "normalizedTextSha256": "44af22655bd9b2c1353795c8cef5e1c9ec2fc16a6d1fd6282ba2ac730fea894d"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 84,
+          "bodyCodePoints": 38,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "13c9018025abd7fda8d80cd74ea0265812dcfb4b34ee00708ff0ee3eb20e3bb2"
+      }
+    },
+    {
+      "name": "span-ends-with-invisible-separator-inside-number",
+      "input": {
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nThe maximum dose is 10⁣ 000 IU daily.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 73
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>The maximum dose is 10&#x2063;</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 58,
+                "textSha256": "1814746db12249fbfedb9da3c03cb82a01b076d4220353913bd81228893229df"
+              }
+            ],
+            "narrativeDivSha256": "17f2f5ced40811953a9c1fe6c6d9aa7149ba734788fea391353d8cf213433694",
+            "normalizedTextSha256": "1814746db12249fbfedb9da3c03cb82a01b076d4220353913bd81228893229df"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "extractedTextSha256": "643fcffd26e6186b2c20f508aadaa5237514b79bc4a859c8a937dd30c3c5df44",
+        "narrativeBindingSha256": "a8f94ef27ef9753709da67bc58d04e880faafde9ea1788a6889552af4312c560",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "invalid-provenance",
+            "spanCount": 1,
+            "reason": "word-cut",
+            "normalizedTextSha256": "1814746db12249fbfedb9da3c03cb82a01b076d4220353913bd81228893229df"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 84,
+          "bodyCodePoints": 38,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "9755105ad3077d7630052f3bf527c6c60b03c938ca5985e13ba4736e52d586f9"
+      }
+    },
+    {
+      "name": "span-starts-after-invisible-separator-inside-number",
+      "input": {
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nThe maximum dose is 10⁣ 000 IU daily.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 73
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>000 IU daily.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 58,
+                "endOffset": 72,
+                "textSha256": "4a44bde9e8f75ce384840422c5a3bcffd441ec3291511ecb007992fc6b3e54e7"
+              }
+            ],
+            "narrativeDivSha256": "9684c9d5671e4d9c1b8948a78a1c2ff2a1a4bd1dc845f1efd230f17f02c5de0d",
+            "normalizedTextSha256": "44af22655bd9b2c1353795c8cef5e1c9ec2fc16a6d1fd6282ba2ac730fea894d"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "extractedTextSha256": "643fcffd26e6186b2c20f508aadaa5237514b79bc4a859c8a937dd30c3c5df44",
+        "narrativeBindingSha256": "3b689e709653a8fe593bcf14cd73c95a9ba9e4790f9cafa564bbc7c986d8537c",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "invalid-provenance",
+            "spanCount": 1,
+            "reason": "word-cut",
+            "normalizedTextSha256": "44af22655bd9b2c1353795c8cef5e1c9ec2fc16a6d1fd6282ba2ac730fea894d"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 84,
+          "bodyCodePoints": 38,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "742a5b4d4efadd32f77e14663c2aaba2adb32843fe00657489e3af81a35cbf0a"
       }
     }
   ]

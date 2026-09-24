@@ -181,13 +181,16 @@ def _find_invisible_break(text: str) -> int | None:
 MAX_DEPTH: Final = 32
 MAX_INDENTS: Final = 6
 HEADINGS: Final = frozenset({"h1", "h2", "h3", "h4", "h5", "h6"})
+# The elements a renderer draws smaller than the text around them: at most one open at once, so
+# `<h6><small>` (drawn at about 9 px, and 7 px with a `sup`) is refused.
+SHRINKING: Final = frozenset({"small", "code", "h5", "h6"})
 INDENTING: Final = frozenset({"blockquote", "ul", "ol", "dd"})
 
 
 def _check_nesting(name: str, stack: list[str], offset: int) -> None:
     if len(stack) > MAX_DEPTH:
         raise XhtmlError("nesting-depth", offset)
-    if name == "small" and "small" in stack:
+    if name in SHRINKING and any(open_name in SHRINKING for open_name in stack):
         raise XhtmlError("nesting-depth", offset)
     if name in HEADINGS and any(open_name in HEADINGS for open_name in stack):
         raise XhtmlError("nesting-depth", offset)
@@ -202,12 +205,16 @@ def _check_nesting(name: str, stack: list[str], offset: int) -> None:
 SPLITTING_INLINE: Final = frozenset(
     {"span", "b", "i", "u", "em", "strong", "sup", "sub", "small", "a", "abbr", "cite", "code"}
 )
-# How far each side of such a tag is composed to find a composition across it.
+# How far each side of such a tag is composed to find a composition across it. A combining mark
+# right after the tag is refused whatever its distance from the letter, so the window only has to
+# catch the Hangul jamo that compose without being marks.
 COMPOSE_WINDOW: Final = 64
 
 
 def _check_composition(text: str, boundaries: list[int]) -> None:
     for boundary in boundaries:
+        if boundary < len(text) and unicodedata.category(text[boundary])[0] == "M":
+            raise XhtmlError("combining-across-markup", boundary)
         before = text[max(0, boundary - COMPOSE_WINDOW) : boundary]
         after = text[boundary : boundary + COMPOSE_WINDOW]
         if compose_text(before + after) != compose_text(before) + compose_text(after):

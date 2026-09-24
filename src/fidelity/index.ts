@@ -3,6 +3,7 @@ export {
   NormalizationError,
   countWords,
   findForbiddenCharacter,
+  isGap,
   isWordCharacter,
   normalizeText,
 } from "./normalize.js";

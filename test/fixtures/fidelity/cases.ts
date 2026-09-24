@@ -492,6 +492,8 @@ const SPACE_SOURCE = customSource([SPACE_LINE]);
 // Review round 13: U+200A HAIR SPACE is drawn about a pixel wide, "210 mg", so it is content.
 const HAIR_LINE = "Take 2 10 mg tablets.";
 const HAIR_SOURCE = customSource([HAIR_LINE]);
+// Review round 14: an invisible separator (U+2063, drawn as nothing) between the groups.
+const GROUPED_INVISIBLE_THEN_SPACE_SOURCE = customSource([GROUPED("\u2063 ")]);
 const SPANNED_DOSE_TABLE =
   '<table><tr><td>Adults</td><td rowspan="3">10 mg</td></tr><tr><td>Children</td></tr><tr><td>Elderly</td></tr></table>';
 const MID_LINE_BULLET = "Take 2 \u2022 10 mg daily.";
@@ -2118,23 +2120,31 @@ export const verifyCases: VerifyCase[] = [
     name: "span-ends-with-thin-space-inside-number",
     input: toInput(
       GROUPED_THIN_THEN_SPACE_SOURCE,
-      single("smpc.4.2.posology", paragraphs("The maximum dose is 10"), [
+      single("smpc.4.2.posology", paragraphs("The maximum dose is 10\u2009"), [
         spanFor(GROUPED_THIN_THEN_SPACE_SOURCE, 1, "The maximum dose is 10\u2009"),
       ]),
     ),
-    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
+    },
   },
   {
-    // The inner code point skips every section 3 whitespace code point, the joiners too: a span
-    // ending in U+202F before a space still ends inside the number.
+    // The inner code point skips every gap (section 6), a thin space too: a span ending in U+202F
+    // before a space still ends inside the number, even with the U+202F in the narrative.
     name: "span-ends-with-narrow-no-break-space-inside-number",
     input: toInput(
       GROUPED_NNBSP_THEN_SPACE_SOURCE,
-      single("smpc.4.2.posology", paragraphs("The maximum dose is 10"), [
+      single("smpc.4.2.posology", paragraphs("The maximum dose is 10\u202f"), [
         spanFor(GROUPED_NNBSP_THEN_SPACE_SOURCE, 1, "The maximum dose is 10\u202f"),
       ]),
     ),
-    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
+    },
   },
   {
     name: "span-starts-with-space-inside-double-spaced-number",
@@ -2597,6 +2607,50 @@ export const verifyCases: VerifyCase[] = [
       ]),
     ),
     expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  // Review round 14: the digit-group rule reads past every gap, content spaces and code points
+  // drawn as nothing included, on both edges.
+  {
+    name: "span-starts-after-thin-space-inside-number",
+    input: toInput(
+      GROUPED_THIN_THEN_SPACE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("000 IU daily."), [
+        spanFor(GROUPED_THIN_THEN_SPACE_SOURCE, 1, " 000 IU daily."),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
+    },
+  },
+  {
+    name: "span-ends-with-invisible-separator-inside-number",
+    input: toInput(
+      GROUPED_INVISIBLE_THEN_SPACE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("The maximum dose is 10&#x2063;"), [
+        spanFor(GROUPED_INVISIBLE_THEN_SPACE_SOURCE, 1, "The maximum dose is 10\u2063"),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
+    },
+  },
+  {
+    name: "span-starts-after-invisible-separator-inside-number",
+    input: toInput(
+      GROUPED_INVISIBLE_THEN_SPACE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("000 IU daily."), [
+        spanFor(GROUPED_INVISIBLE_THEN_SPACE_SOURCE, 1, " 000 IU daily."),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
+    },
   },
 ];
 
@@ -4444,5 +4498,77 @@ export const xhtmlCases: XhtmlCase[] = [
     name: "rejects-soft-hyphen-in-a-number",
     input: div("<p>Take 2&#xAD;10 mg</p>"),
     expected: { error: "invisible-character" },
+  },
+  // Review round 14: marks after inline tags, the shrink bound, and precedence pinned.
+  {
+    name: "rejects-mark-that-does-not-compose-after-bold",
+    input: div("<p>CrCl &#x2A7D;<b>&#x338;</b> 30</p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "rejects-acute-after-q-across-bold",
+    input: div("<p>q<b>&#x301;</b></p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "rejects-mark-after-a-long-run-across-bold",
+    input: div(
+      "<p>e&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;<b>&#x301;</b></p>",
+    ),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "rejects-hangul-vowel-across-bold",
+    input: div("<p>&#x1100;<b>&#x1161;</b></p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "accepts-mark-before-an-end-tag",
+    input: div("<p><b>e&#x301;</b>x</p>"),
+    expected: "\n\ne\u0301x\n\n",
+  },
+  {
+    name: "rejects-small-inside-code",
+    input: div("<p><code>a<small>b</small></code></p>"),
+    expected: { error: "nesting-depth" },
+  },
+  {
+    name: "rejects-small-inside-h6",
+    input: div("<h6>a<small>b</small></h6>"),
+    expected: { error: "nesting-depth" },
+  },
+  {
+    name: "accepts-sup-inside-h6",
+    input: div("<h6>10<sup>9</sup></h6>"),
+    expected: "\n\n10\u2079\n\n",
+  },
+  {
+    name: "nesting-depth-before-parent-check",
+    input: div(
+      "<span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><li>x</li></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span>",
+    ),
+    expected: { error: "nesting-depth" },
+  },
+  {
+    name: "void-element-counts-toward-depth",
+    input: div(
+      "<span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><br/></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span>",
+    ),
+    expected: { error: "nesting-depth" },
+  },
+  {
+    name: "reserved-before-invisible-character",
+    input: div("<p>\u00ad\ufffc</p>"),
+    expected: { error: "reserved-character" },
+  },
+  {
+    name: "cdata-end-before-unmappable-script",
+    input: div("<p><sup>]]></sup></p>"),
+    expected: { error: "cdata" },
+  },
+  {
+    name: "table-content-before-cdata-end",
+    input: div("<table><tr>]]></tr></table>"),
+    expected: { error: "table-content" },
   },
 ];

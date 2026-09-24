@@ -58,6 +58,52 @@ def _is_digit(character: str | None) -> bool:
     return character is not None and unicodedata.category(character) == "Nd"
 
 
+# src/fidelity/normalize.ts ``isGap`` (fidelity-norm/3.0.0 section 6): section 3 whitespace, the
+# spaces narrower than a quarter of an em, and Default_Ignorable_Code_Point (Unicode 16.0).
+_WHITESPACE: Final = frozenset(
+    {0x09, 0x0A, 0x0D, 0x20, 0xA0, 0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2007, 0x2008}
+    | {0x2028, 0x2029, 0x3000}
+)
+_THIN_SPACES: Final = frozenset((0x2006, 0x2009, 0x200A, 0x202F, 0x205F))
+_DEFAULT_IGNORABLE: Final = (
+    (0x00AD, 0x00AD),
+    (0x034F, 0x034F),
+    (0x061C, 0x061C),
+    (0x115F, 0x1160),
+    (0x17B4, 0x17B5),
+    (0x180B, 0x180F),
+    (0x200B, 0x200F),
+    (0x202A, 0x202E),
+    (0x2060, 0x206F),
+    (0x3164, 0x3164),
+    (0xFE00, 0xFE0F),
+    (0xFEFF, 0xFEFF),
+    (0xFFA0, 0xFFA0),
+    (0xFFF0, 0xFFF8),
+    (0x1BCA0, 0x1BCA3),
+    (0x1D173, 0x1D17A),
+    (0xE0000, 0xE0FFF),
+)
+
+
+def _is_gap(character: str) -> bool:
+    point = ord(character)
+    return (
+        point in _WHITESPACE
+        or point in _THIN_SPACES
+        or any(low <= point <= high for low, high in _DEFAULT_IGNORABLE)
+    )
+
+
+def non_gap(text: str, index: int, step: int) -> str | None:
+    """The first code point from ``index`` in direction ``step`` that is not a gap."""
+    while 0 <= index < len(text):
+        if not _is_gap(text[index]):
+            return text[index]
+        index += step
+    return None
+
+
 def _at(text: str, index: int) -> str | None:
     return text[index] if 0 <= index < len(text) else None
 
@@ -73,7 +119,7 @@ def edge_before(text: str, start: int, first: str | None) -> bool:
         beyond = _at(text, start - 2)
         if beyond is not None and beyond in SPACED_SIGNS:
             return False
-        return not (_is_digit(beyond) and _is_digit(first))
+        return not (_is_digit(non_gap(text, start - 2, -1)) and _is_digit(first))
     index = start
     while before is not None and before in QUOTE_OPENERS:
         index -= 1
@@ -89,7 +135,7 @@ def edge_after(text: str, end: int, last: str | None) -> bool:
     if is_word_character(after):
         return False
     if after == " ":
-        return not (_is_digit(_at(text, end + 1)) and _is_digit(last))
+        return not (_is_digit(non_gap(text, end + 1, 1)) and _is_digit(last))
     index = end
     while after is not None and after in QUOTE_CLOSERS:
         index += 1
@@ -107,7 +153,9 @@ def find_quote_occurrence(text: str, quote: str) -> int:
         return -1
     found = text.find(quote)
     while found >= 0:
-        if edge_before(text, found, quote[0]) and edge_after(text, found + len(quote), quote[-1]):
+        first = non_gap(quote, 0, 1)
+        last = non_gap(quote, len(quote) - 1, -1)
+        if edge_before(text, found, first) and edge_after(text, found + len(quote), last):
             return found
         found = text.find(quote, found + 1)
     return -1

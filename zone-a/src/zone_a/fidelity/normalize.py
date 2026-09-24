@@ -60,9 +60,34 @@ WHITESPACE: Final = frozenset(
         0x2008,
         0x2028,
         0x2029,
-        0x205F,
         0x3000,
     }
+)
+
+# The spaces narrower than a quarter of an em: SIX-PER-EM, THIN, HAIR, NARROW NO-BREAK and MEDIUM
+# MATHEMATICAL SPACE. Content (section 3 step 5), yet drawn as a gap.
+THIN_SPACES: Final = frozenset({0x2006, 0x2009, 0x200A, 0x202F, 0x205F})
+
+# Unicode's Default_Ignorable_Code_Point, spelled out (Unicode 16.0, DerivedCoreProperties.txt):
+# code points a renderer draws as nothing. Python's unicodedata does not expose the property.
+DEFAULT_IGNORABLE: Final = (
+    (0x00AD, 0x00AD),
+    (0x034F, 0x034F),
+    (0x061C, 0x061C),
+    (0x115F, 0x1160),
+    (0x17B4, 0x17B5),
+    (0x180B, 0x180F),
+    (0x200B, 0x200F),
+    (0x202A, 0x202E),
+    (0x2060, 0x206F),
+    (0x3164, 0x3164),
+    (0xFE00, 0xFE0F),
+    (0xFEFF, 0xFEFF),
+    (0xFFA0, 0xFFA0),
+    (0xFFF0, 0xFFF8),
+    (0x1BCA0, 0x1BCA3),
+    (0x1D173, 0x1D17A),
+    (0xE0000, 0xE0FFF),
 )
 
 SOFT_HYPHEN: Final = chr(0x00AD)
@@ -80,6 +105,19 @@ class NormalizationError(ValueError):
 def is_whitespace(code_point: int) -> bool:
     """True for the closed whitespace list of section 3 step 5, and nothing else."""
     return code_point in WHITESPACE
+
+
+def is_gap(code_point: int) -> bool:
+    """A gap for the digit-group rules (section 6) and the quote-edge rule.
+
+    Section 3 whitespace, a thin space, or a code point drawn as nothing: reading past these,
+    "10" U+2009 " 000" is one number, however the gap between its groups is written.
+    """
+    return (
+        code_point in WHITESPACE
+        or code_point in THIN_SPACES
+        or any(low <= code_point <= high for low, high in DEFAULT_IGNORABLE)
+    )
 
 
 def is_word_character(character: str) -> bool:

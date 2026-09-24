@@ -32,16 +32,54 @@ const BULLET_GLYPHS = new Set([
 ]);
 
 // Section 3 step 5. U+000B, U+000C and U+0085 are not here: section 2 rejects them. Nor, from
-// fidelity-norm/3.0.0, are the spaces a renderer does not draw as a gap: U+1680 OGHAM SPACE MARK
-// is drawn as a stroke ("Take 2" U+1680 "10 mg" reads as a range), and U+2006, U+2009, U+200A and
-// U+202F are drawn one or two pixels wide, so "2" U+200A "10" looks like "210". They are content.
+// fidelity-norm/3.0.0, are the spaces a renderer does not draw as a full gap: U+1680 OGHAM SPACE
+// MARK is drawn as a stroke ("Take 2" U+1680 "10 mg" reads as a range), and the spaces narrower
+// than a quarter of an em (THIN_SPACES) can look like no space at all ("2" U+200A "10" as "210").
+// They are content.
 const WHITESPACE = new Set([
   0x0009, 0x000a, 0x000d, 0x0020, 0x00a0, 0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2007,
-  0x2008, 0x2028, 0x2029, 0x205f, 0x3000,
+  0x2008, 0x2028, 0x2029, 0x3000,
 ]);
 
 export function isWhitespace(codePoint: number): boolean {
   return WHITESPACE.has(codePoint);
+}
+
+// The spaces narrower than a quarter of an em: SIX-PER-EM, THIN, HAIR, NARROW NO-BREAK and MEDIUM
+// MATHEMATICAL SPACE. Content (section 3 step 5), yet drawn as a gap.
+const THIN_SPACES = new Set([0x2006, 0x2009, 0x200a, 0x202f, 0x205f]);
+
+// Unicode's Default_Ignorable_Code_Point, spelled out (Unicode 16.0, DerivedCoreProperties.txt):
+// code points a renderer draws as nothing.
+const DEFAULT_IGNORABLE: readonly (readonly [number, number])[] = [
+  [0x00ad, 0x00ad],
+  [0x034f, 0x034f],
+  [0x061c, 0x061c],
+  [0x115f, 0x1160],
+  [0x17b4, 0x17b5],
+  [0x180b, 0x180f],
+  [0x200b, 0x200f],
+  [0x202a, 0x202e],
+  [0x2060, 0x206f],
+  [0x3164, 0x3164],
+  [0xfe00, 0xfe0f],
+  [0xfeff, 0xfeff],
+  [0xffa0, 0xffa0],
+  [0xfff0, 0xfff8],
+  [0x1bca0, 0x1bca3],
+  [0x1d173, 0x1d17a],
+  [0xe0000, 0xe0fff],
+];
+
+function isDefaultIgnorable(codePoint: number): boolean {
+  return DEFAULT_IGNORABLE.some(([low, high]) => codePoint >= low && codePoint <= high);
+}
+
+// A gap for the digit-group rules (section 6) and the quote-edge rule: section 3 whitespace, a
+// thin space, or a code point drawn as nothing. Reading past these, "10" U+2009 " 000" is one
+// number, however the gap between its groups is written.
+export function isGap(codePoint: number): boolean {
+  return isWhitespace(codePoint) || THIN_SPACES.has(codePoint) || isDefaultIgnorable(codePoint);
 }
 
 const WORD_CHARACTER = /^[\p{L}\p{N}\p{M}]$/u;

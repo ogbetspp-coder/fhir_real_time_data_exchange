@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and eleven reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and fourteen reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -750,3 +750,27 @@ HTML and XML modes, and found four false passes in rules older than 3.0.0:
 Every new rule is pinned by vectors on both sides of its limit, and a break of each is caught by
 the vectors (the differential catches the frequent ones; the rare ones are masked at some seeds by
 an earlier error in the same generated document).
+
+## Fourteenth review (2026-09-23): findings and what changed
+
+The fourteenth review tested the thirteenth's fixes against Chrome and found them incomplete:
+
+1. **High.** The composition rule compared NFC on each side of a tag, but a combining mark that
+   NFC does not compose (U+0301 after "q", U+0338 after most letters) is still drawn apart from
+   its letter after an inline tag, and read with it. Fixed: the first code point emitted after
+   an inline tag must not be of general category M; the NFC window stays for the Hangul jamo,
+   which compose without being marks. Its offset is stated to be in the emitted text.
+2. **High.** Making U+2009 and U+202F content broke section 6's number rule: "10" U+2009 " 000"
+   no longer read as one number, so "10" could be quoted from it; the quote-edge rule in the
+   query service and the agent had the same gap. Fixed: a gap (section 3 whitespace, the thin
+   spaces, and Default_Ignorable code points, drawn as nothing) is defined once, and the digit
+   rule and the quote-edge rule read past every gap.
+3. **Medium.** U+205F MEDIUM MATHEMATICAL SPACE is four eighteenths of an em, drawn as narrow as
+   a thin space. Fixed: content, with the others; the criterion is stated (narrower than a
+   quarter of an em).
+4. **Medium.** `code`, `h5` and `h6` shrink text as `small` does, and nested together reach seven
+   pixels. Fixed: at most one of the four open at once.
+5. **Low.** How a void element counts towards the depth bound was unstated. Fixed: at its own
+   start tag.
+
+Each fix is pinned by vectors on both sides, and a break of each is caught by them.

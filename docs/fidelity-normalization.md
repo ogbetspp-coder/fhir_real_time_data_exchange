@@ -147,13 +147,15 @@ pair rejects even if the next reference completes it.
    so a list item at the start of a section is still a list item on both sides.
 
 5. Replace every whitespace-class code point with U+0020 — closed list: U+0009, U+000A,
-   U+000D, U+0020, U+00A0, U+2000–U+2005, U+2007, U+2008, U+2028, U+2029, U+205F, U+3000.
+   U+000D, U+0020, U+00A0, U+2000–U+2005, U+2007, U+2008, U+2028, U+2029, U+3000.
    Then collapse runs of U+0020 to a single U+0020 and remove leading and trailing U+0020.
    U+000B, U+000C and U+0085 are not in the list: section 2 rejects them. U+1680 OGHAM SPACE
    MARK is not in the list (from 3.0.0): a renderer draws it as a stroke, so "Take 2" U+1680
-   "10 mg" reads as a range, not as two numbers, and it is content. Nor are U+2006, U+2009,
-   U+200A and U+202F (from 3.0.0): a renderer draws them one or two pixels wide, so "2" U+200A
-   "10" looks like "210"; they are content.
+   "10 mg" reads as a range, not as two numbers, and it is content. Nor are the spaces
+   narrower than a quarter of an em, U+2006, U+2009, U+200A, U+202F and U+205F (from 3.0.0):
+   at text sizes a renderer draws them two to five pixels wide, and in some fonts barely wider
+   than nothing, so "2" U+200A "10" looks like "210"; they are content. Section 6 still reads them as a gap
+   between the groups of a number.
 
 The procedure is idempotent: applying it twice yields the first result (the golden vectors
 include the blocking cases that make step order matter, and step 4's rule that the start of the
@@ -337,19 +339,23 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   number), `tfoot` (at most one), never both forms in one table. `caption`, `thead`, `tbody`,
   `tfoot` must be direct children of `table`; `tr` of `table` or a section; `td` and `th` of
   `tr`. Violations reject (`table-structure`, `table-section-order`, or `misnested-tag`).
-- Nesting is bounded (`nesting-depth`, from 3.0.0): at most 32 elements open below the root
-  (an HTML parser stops nesting at 512 open elements and moves what follows elsewhere, so a deeply
-  nested `sup` is drawn after the text that follows it); no `small` inside an open `small` and no
-  heading inside an open heading (each shrinks the text, towards illegible); and at most six of
-  `blockquote`, `ul`, `ol` and `dd` open at once, the new element included (each indents, and
+- Nesting is bounded (`nesting-depth`, from 3.0.0): an element's start tag rejects when 32
+  elements are already open below the root, a void element (`br`, `hr`, `img`) included at its
+  own start tag, so at most 32 are open below the root (an HTML parser stops nesting at 512 open
+  elements and moves what follows elsewhere, so a deeply nested `sup` is drawn after the text
+  that follows it); at most one of `small`, `code`, `h5` and `h6` open at once, and no heading
+  inside an open heading (each shrinks the text, and together they reach seven pixels); and at
+  most six of `blockquote`, `ul`, `ol` and `dd` open at once, the new element included (each indents, and
   more push the text off a narrow page).
 - The raw sequence `]]>` in text rejects (`cdata`): it ends a CDATA section to an XML parser,
   which then refuses the document and draws none of it.
-- A composition across inline markup rejects (`combining-across-markup`, from 3.0.0): at each
-  start or end tag of `span`, `b`, `i`, `u`, `em`, `strong`, `sup`, `sub`, `small`, `a`, `abbr`,
-  `cite` or `code`, the 64 code points of the emitted text before it and the 64 after it must
-  give the same text through section 3 steps 1 to 3 together as separately. A renderer draws the
-  text on each side of such a tag in its own run, so a combining mark after the tag does not
+- A combining mark or a composition across inline markup rejects (`combining-across-markup`,
+  from 3.0.0): at each start or end tag of `span`, `b`, `i`, `u`, `em`, `strong`, `sup`, `sub`,
+  `small`, `a`, `abbr`, `cite` or `code`, the first code point emitted after the tag must not be
+  of general category M, and the 64 code points of the emitted text before the tag and the 64
+  after it must give the same text through section 3 steps 1 to 3 together as separately (which
+  catches the Hangul jamo that compose without being marks). Its offset is in the emitted text,
+  not in the `div`. A renderer draws the text on each side of such a tag in its own run, so a combining mark after the tag does not
   join the letter before it: `CrCl &lt;<b>&#x338;</b> 30` is drawn "CrCl </ 30" while NFC reads
   "≮", and `caf<b>e</b>&#x301;` is drawn with a separate accent.
 - A root language tag changes the font a renderer picks (`lang="ja"` draws Latin text, dashes
@@ -510,8 +516,14 @@ The scanner's reason codes are, in the order of this section: `forbidden-charact
   (`1.5`, `−20`, `0.5`, `1,000`) and inside a word it is part of the word (`non-steroidal`).
   - Edge whitespace is the §3 step 5 whitespace list without U+00A0 and U+2007. Those two join
     the groups of a number (`10 000`), so for the edge rules they are not a boundary between
-    tokens. (U+2009 and U+202F, which also join groups, are content from 3.0.0, section 3, so no
-    edge falls inside them.)
+    tokens.
+  - A gap is §3 step 5 whitespace; a space narrower than a quarter of an em (U+2006, U+2009,
+    U+200A, U+202F, U+205F), which §3 makes content; or a Default_Ignorable_Code_Point of
+    Unicode 16.0 (U+00AD, U+034F, U+061C, U+115F–U+1160, U+17B4–U+17B5, U+180B–U+180F,
+    U+200B–U+200F, U+202A–U+202E, U+2060–U+206F, U+3164, U+FE00–U+FE0F, U+FEFF, U+FFA0,
+    U+FFF0–U+FFF8, U+1BCA0–U+1BCA3, U+1D173–U+1D17A, U+E0000–U+E0FFF), drawn as nothing. The
+    digit-group rule below reads past every gap, so "10" U+2009 " 000" and "10" U+2063 " 000"
+    are each one number.
   - Start. Read backwards from the code point before the first span's start offset through
     page n's body. On passing its bodyStart, continue from the last code point of page n−1's
     body, and so on through earlier pages. Only body text is read, and earlier pages are read
@@ -524,11 +536,11 @@ The scanner's reason codes are, in the order of this section: `forbidden-charact
     before `bodyEnd` a line feed).
   - Numbers grouped with a space. On either edge it is also a cut when the code point on the
     inner side of the edge is a digit (general category Nd), and the first code point beyond
-    it that is not §3 step 5 whitespace, read inside the body without crossing a U+000A, is
-    also Nd. The inner code point is the span's first code point that is not §3 step 5
-    whitespace (at the start) or its last (at the end): a span that begins or ends with
-    whitespace is judged by the digit inside it. So "…is 10" cannot be taken from "…is 10 000
-    IU", with a space, U+00A0 or U+2007 between the groups or two of them ("10 ␠␠000"), even by a span that ends with the first space,
+    it that is not a gap, read inside the body without crossing a U+000A, is also Nd. The inner
+    code point is the span's first code point that is not a gap (at the start) or its last (at
+    the end): a span that begins or ends with a gap is judged by the digit inside it. So "…is
+    10" cannot be taken from "…is 10 000 IU", with a gap or two between the groups ("10 ␠␠000",
+    "10 U+2009␠000"), even by a span that ends with the first space,
     nor "000 IU" after it by a span that starts with the second; a number at the end of one
     line and a number at the start of the next are separate. (The inner code point skips the
     joiners U+00A0 and U+2007 as well, although they are not edge whitespace: a span ending "10"
@@ -803,7 +815,7 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   emits U+FFFC, the SHA-256 of its `src` and U+FFFC; the tables of a narrative cover at most
   50 000 slots (`table-size`); a narrative of only grid markers is `empty-narrative`. U+FFFC and
   U+FDD0–U+FDEF reject in narrative
-  (`reserved-character`, one of the two rules applied to one side only). U+1680 OGHAM SPACE MARK, drawn as a stroke, and U+2006, U+2009, U+200A and U+202F, drawn a pixel or two wide, leave the section 3 whitespace list and are content; narrative rejects U+00AD and U+200B (`invisible-character`, withdrawing `soft-hyphen-at-boundary`); nesting is bounded (`nesting-depth`); `]]>` in text rejects (`cdata`); and a composition across inline markup rejects (`combining-across-markup`). Section 7 qualifies structured sources only;
+  (`reserved-character`, one of the two rules applied to one side only). U+1680 OGHAM SPACE MARK, drawn as a stroke, and the spaces narrower than a quarter of an em (U+2006, U+2009, U+200A, U+202F, U+205F) leave the section 3 whitespace list and are content; narrative rejects U+00AD and U+200B (`invisible-character`, withdrawing `soft-hyphen-at-boundary`); nesting is bounded (`nesting-depth`); `]]>` in text rejects (`cdata`); and a combining mark or a composition across inline markup rejects (`combining-across-markup`); section 6's digit-group rule reads past every gap. Section 7 qualifies structured sources only;
   drawn-document extraction is not qualified until a later version closes the open items the
   reviews recorded. The extractor contract (section 7) writes tables with their grid, numbered markers with a space, pictures with their hash, and
   a structured source as one page per section. Major under section 8: extractor output that

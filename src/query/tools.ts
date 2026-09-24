@@ -24,6 +24,7 @@ import {
 } from "../contracts/query-tools.js";
 import {
   NORMALIZATION_VERSION,
+  isGap,
   isReservedCodePoint,
   isWordCharacter,
   normalizeText,
@@ -291,6 +292,35 @@ function isDigit(character: string | undefined): boolean {
   return character !== undefined && DECIMAL_DIGIT.test(character);
 }
 
+function isGapPoint(character: string | undefined): boolean {
+  return character !== undefined && isGap(character.codePointAt(0) ?? 0);
+}
+
+// The first code point before UTF-16 index `index` that is not a gap (section 6: whitespace, a
+// thin space, or a code point drawn as nothing), or undefined.
+function nonGapBefore(text: string, index: number): string | undefined {
+  let position = index;
+  let character = codePointBefore(text, position);
+  while (character !== undefined && isGapPoint(character)) {
+    position -= character.length;
+    character = codePointBefore(text, position);
+  }
+  return character;
+}
+
+// The first code point at or after UTF-16 index `index` that is not a gap, or undefined.
+function nonGapFrom(text: string, index: number): string | undefined {
+  let position = index;
+  let character = codePointAtIndex(text, position);
+  while (character !== undefined && isGapPoint(character)) {
+    position += character.length;
+    character = codePointAtIndex(text, position);
+  }
+  return character;
+}
+
+// A digit on both sides of a space, read past every gap, is one number grouped with spaces
+// ("10 000", "10" U+2009 " 000"): the quote may not begin or end between its groups.
 function edgeBefore(text: string, start: number, quote: string): boolean {
   let before = codePointBefore(text, start);
   if (before === undefined) return true;
@@ -298,7 +328,7 @@ function edgeBefore(text: string, start: number, quote: string): boolean {
   if (before === " ") {
     const beyond = codePointBefore(text, start - 1);
     if (beyond !== undefined && SPACED_SIGNS.has(beyond)) return false;
-    return !(isDigit(beyond) && isDigit(codePointAtIndex(quote, 0)));
+    return !(isDigit(nonGapBefore(text, start - 1)) && isDigit(nonGapFrom(quote, 0)));
   }
   let index = start;
   while (before !== undefined && QUOTE_OPENERS.has(before)) {
@@ -313,8 +343,7 @@ function edgeAfter(text: string, end: number, quote: string): boolean {
   if (after === undefined) return true;
   if (isWordCharacter(after)) return false;
   if (after === " ") {
-    const beyond = codePointAtIndex(text, end + 1);
-    return !(isDigit(beyond) && isDigit(codePointBefore(quote, quote.length)));
+    return !(isDigit(nonGapFrom(text, end + 1)) && isDigit(nonGapBefore(quote, quote.length)));
   }
   let index = end;
   while (after !== undefined && QUOTE_CLOSERS.has(after)) {

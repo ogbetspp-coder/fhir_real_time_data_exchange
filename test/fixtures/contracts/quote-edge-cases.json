@@ -338,6 +338,43 @@
       ]
     },
     {
+      "text": "The maximum dose is 10  000 IU daily. Up to 5⁣ 000 IU weekly.",
+      "quotes": [
+        {
+          "quote": "000 IU daily.",
+          "result": "no-match"
+        },
+        {
+          "quote": "The maximum dose is 10",
+          "result": "no-match"
+        },
+        {
+          "quote": "The maximum dose is 10 ",
+          "result": "no-match"
+        },
+        {
+          "quote": "000 IU weekly.",
+          "result": "no-match"
+        },
+        {
+          "quote": "Up to 5⁣",
+          "result": "no-match"
+        },
+        {
+          "quote": "The maximum dose is 10  000 IU daily.",
+          "result": "match",
+          "startOffset": 0,
+          "endOffset": 37
+        },
+        {
+          "quote": "Up to 5⁣ 000 IU weekly.",
+          "result": "match",
+          "startOffset": 38,
+          "endOffset": 61
+        }
+      ]
+    },
+    {
       "text": "Code 𝐀5 mg. Take 5 mg𝐀 now. Code 𝐀 then 𝐁 dose.",
       "quotes": [
         {

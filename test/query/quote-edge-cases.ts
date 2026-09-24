@@ -73,6 +73,19 @@ export const quoteEdgeCases: QuoteEdgeCase[] = [
     whole: ["Warning", "one tablet", '"one tablet"', "Up to 1 000 000 IU daily"],
   },
   {
+    // fidelity-norm/3.0.0: a thin space and an invisible separator are content, yet drawn as a
+    // gap, so a number grouped with one of them and a space is still one number.
+    text: "The maximum dose is 10\u2009 000 IU daily. Up to 5\u2063 000 IU weekly.",
+    cut: [
+      "000 IU daily.",
+      "The maximum dose is 10",
+      "The maximum dose is 10\u2009",
+      "000 IU weekly.",
+      "Up to 5\u2063",
+    ],
+    whole: ["The maximum dose is 10\u2009 000 IU daily.", "Up to 5\u2063 000 IU weekly."],
+  },
+  {
     // Letters outside the Basic Multilingual Plane, before and after a quote, and before a
     // match, so that offsets are counted in code points, not in UTF-16 units.
     text: "Code \u{1D400}5 mg. Take 5 mg\u{1D400} now. Code \u{1D400} then \u{1D401} dose.",

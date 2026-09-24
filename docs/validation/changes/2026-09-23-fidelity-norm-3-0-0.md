@@ -28,10 +28,13 @@ amended by its independent reviews, prompted by roadmap item 3a and ADR 0005. In
 - U+FFFC and U+FDD0–U+FDEF reject in narrative (`reserved-character`), and so do U+00AD and
   U+200B (`invisible-character`, withdrawing `soft-hyphen-at-boundary`): the two rules applied
   to one side only;
-- U+1680, U+2006, U+2009, U+200A and U+202F leave the section 3 whitespace list, since a renderer
-  draws them as a stroke or a pixel or two wide;
-- nesting is bounded (`nesting-depth`), `]]>` in text rejects (`cdata`), and a composition across
-  inline markup rejects (`combining-across-markup`);
+- U+1680 and the spaces narrower than a quarter of an em (U+2006, U+2009, U+200A, U+202F,
+  U+205F) leave the section 3 whitespace list, since a renderer draws them as a stroke or a few
+  pixels wide; section 6's digit-group rule and the quote-edge rule read past them, and past
+  every Default_Ignorable code point, as a gap;
+- nesting is bounded (`nesting-depth`, with at most one of `small`, `code`, `h5` and `h6` open),
+  `]]>` in text rejects (`cdata`), and a combining mark after an inline tag, or a composition
+  across one, rejects (`combining-across-markup`);
 - the extractor contract writes tables with their grid (and a table across pages as its logical
   text, split once per break), numbered markers with a space, pictures with their hash, a
   continuation line that begins with a bullet glyph with a leading U+0009, and a structured
@@ -144,7 +147,7 @@ closes the open items the reviews recorded (the blast radius below says why).
 **Steps 1–6.** 1: `NORMALIZATION_VERSION` is `fidelity-norm/3.0.0` on both sides. 2:
 `npm run contracts:generate` (no drift), `npm run vectors:generate`, `npm run contracts:fixtures`,
 `npm run contracts:quote-edge` and `npm run differential:smoke` regenerated
-`test/fixtures/fidelity/vectors.json` (411 → 545 vectors: normalisation 62 → 69, XHTML 214 → 308, verify 135 → 168; 143 added,
+`test/fixtures/fidelity/vectors.json` (411 → 561 vectors: normalisation 62 → 69, XHTML 214 → 321, verify 135 → 171; 159 added,
 9 removed or renamed), the four contract fixtures and the smoke corpus. 3: every changed vector,
 below. 4: the new vectors: every case the design names, both sides of every boundary (counter
 styles at 26/27, 703, 3999/4000 (702 in the differential), −1/0/1; `start` at `-0`, `007`, `9999`, `10000`; spans at
@@ -206,50 +209,53 @@ vectors):
 
 | Break                                                     | Differential    | Vectors |
 | --------------------------------------------------------- | --------------- | ------- |
-| alphabetic counter off by one                             | 5 / 8 / 7       | 3       |
-| roman range to 4000                                       | 5 / 2 / 1       | 1       |
-| ordinal not advanced                                      | 17 / 20 / 24    | 5       |
-| `li` allowed anywhere                                     | 99 / 97 / 107   | 26      |
-| an element allowed in a list                              | 0 / 1 / 2       | 1       |
-| text allowed in a list                                    | 2 / 0 / 0       | 2       |
-| overlap not checked                                       | 6 / 2 / 6       | 2       |
-| clipped row span not checked                              | 2 / 3 / 0       | 2       |
+| alphabetic counter off by one                             | 7 / 9 / 4       | 3       |
+| roman range to 4000                                       | 4 / 2 / 2       | 1       |
+| ordinal not advanced                                      | 20 / 20 / 16    | 5       |
+| `li` allowed anywhere                                     | 101 / 104 / 100 | 26      |
+| an element allowed in a list                              | 0 / 2 / 0       | 1       |
+| text allowed in a list                                    | 3 / 0 / 5       | 2       |
+| overlap not checked                                       | 6 / 1 / 4       | 2       |
+| clipped row span not checked                              | 2 / 3 / 1       | 2       |
 | a row with a hole not refused                             | 0 / 0 / 0       | 0       |
-| zero-height row not refused                               | 3 / 0 / 1       | 1       |
-| zero-width column not refused                             | 1 / 5 / 3       | 1       |
-| covered-left slots dropped                                | 5 / 3 / 9       | 4       |
-| covered-above slots before a cell dropped                 | 2 / 2 / 3       | 6       |
-| covered-above slots after a row dropped                   | 5 / 3 / 3       | 4       |
-| cell marker dropped                                       | 22 / 22 / 26    | 47      |
-| row marker dropped                                        | 32 / 41 / 35    | 48      |
-| end-of-table marker dropped                               | 35 / 44 / 38    | 50      |
-| nested table (in a cell or a caption) allowed             | 5 / 7 / 7       | 3       |
-| slot limit not checked                                    | 2 / 2 / 1       | 2       |
-| `table-size` decided before overlap                       | 2 / 0 / 0       | 1       |
-| picture hashed from another value                         | 15 / 20 / 15    | 4       |
-| picture token not closed                                  | 15 / 20 / 15    | 4       |
-| reference `src` accepted                                  | 4 / 3 / 1       | 6       |
-| reserved check of the whole `div` dropped                 | 3 / 3 / 4       | 1       |
-| `reserved-character` decided before `forbidden-character` | 0 / 0 / 0       | 1       |
-| reserved reference allowed                                | 4 / 3 / 2       | 4       |
-| reserved range narrowed to U+FDD0–U+FDD5                  | 2 / 2 / 4       | 1       |
-| span 1000 refused                                         | 6 / 3 / 2       | 4       |
-| `start="-0"` accepted                                     | 0 / 1 / 0       | 1       |
-| `data:` padding inside the body accepted                  | 3 / 2 / 0       | 1       |
-| `img` without `src` accepted                              | 3 / 4 / 5       | 2       |
-| `void-element` decided before a missing `src`             | 2 / 2 / 1       | 2       |
-| nesting depth not bounded                                 | 0 / 2 / 0       | 1       |
-| `small` inside `small` allowed                            | 0 / 0 / 0       | 1       |
-| indenting containers not bounded                          | 0 / 0 / 0       | 2       |
-| `]]>` in text accepted                                    | 0 / 1 / 0       | 1       |
-| composition across markup not checked                     | 2 / 1 / 1       | 4       |
-| invisible break in the `div` accepted                     | 421 / 373 / 400 | 3       |
-| invisible break by reference accepted                     | 3 / 3 / 4       | 19      |
-| `img` not a void element                                  | 25 / 35 / 29    | 9       |
+| zero-height row not refused                               | 1 / 1 / 1       | 1       |
+| zero-width column not refused                             | 3 / 4 / 5       | 1       |
+| covered-left slots dropped                                | 7 / 4 / 9       | 4       |
+| covered-above slots before a cell dropped                 | 3 / 2 / 3       | 6       |
+| covered-above slots after a row dropped                   | 5 / 1 / 6       | 4       |
+| cell marker dropped                                       | 22 / 21 / 27    | 47      |
+| row marker dropped                                        | 31 / 38 / 42    | 48      |
+| end-of-table marker dropped                               | 35 / 43 / 49    | 50      |
+| nested table (in a cell or a caption) allowed             | 6 / 6 / 8       | 3       |
+| slot limit not checked                                    | 2 / 1 / 0       | 2       |
+| `table-size` decided before overlap                       | 1 / 0 / 0       | 1       |
+| picture hashed from another value                         | 15 / 13 / 14    | 4       |
+| picture token not closed                                  | 15 / 13 / 14    | 4       |
+| reference `src` accepted                                  | 4 / 5 / 4       | 6       |
+| reserved check of the whole `div` dropped                 | 2 / 2 / 4       | 2       |
+| `reserved-character` decided before `forbidden-character` | 2 / 1 / 3       | 1       |
+| reserved reference allowed                                | 3 / 3 / 2       | 4       |
+| reserved range narrowed to U+FDD0–U+FDD5                  | 1 / 1 / 4       | 1       |
+| span 1000 refused                                         | 5 / 3 / 2       | 4       |
+| `start="-0"` accepted                                     | 1 / 1 / 1       | 1       |
+| `data:` padding inside the body accepted                  | 1 / 3 / 0       | 1       |
+| `img` without `src` accepted                              | 2 / 3 / 2       | 2       |
+| `void-element` decided before a missing `src`             | 2 / 2 / 2       | 2       |
+| nesting depth not bounded                                 | 0 / 0 / 0       | 3       |
+| two shrinking elements allowed                            | 7 / 1 / 1       | 3       |
+| heading inside a heading allowed                          | 19 / 14 / 21    | 1       |
+| mark after an inline tag accepted                         | 0 / 0 / 0       | 3       |
+| indenting containers not bounded                          | 1 / 1 / 1       | 2       |
+| `]]>` in text accepted                                    | 1 / 1 / 3       | 2       |
+| composition across markup not checked                     | 3 / 3 / 3       | 8       |
+| invisible break in the div accepted                       | 389 / 411 / 412 | 3       |
+| invisible break by reference accepted                     | 2 / 3 / 2       | 19      |
+| `img` not a void element                                  | 25 / 20 / 25    | 9       |
+| edge rules read only section 3 whitespace, not every gap  | 2 / 2 / 5       | 3       |
 
 Every break but one is caught by the vectors. The differential catches the frequent ones on all
-three seeds; the rarest (nesting and indent bounds, `small` inside `small`, `]]>`, the precedence
-of two pre-scan checks, `start="-0"`) are drawn rarely enough, or masked often enough by an
+three seeds; the rarest (the nesting bound, a combining mark after an inline tag, which the
+differential's generator does not draw, the indent bound and `]]>`) are drawn rarely enough, or masked often enough by an
 earlier error in the same generated document, to be missed at some seeds, and the vectors pin
 each. The hole check is never decisive on its own: a row with a hole always also covers fewer
 slots than the row its row span starts in (a cell takes the first uncovered slot, so the span's
@@ -302,7 +308,14 @@ restored.
   (`combining-across-markup`); and a soft hyphen or zero-width space inside a number, which a
   narrow viewer breaks at (narrative now rejects both, `invisible-character`, which withdraws
   `soft-hyphen-at-boundary`). It also found `]]>` in text accepted though an XML renderer then
-  draws nothing (`cdata`).
+  draws nothing (`cdata`). A fourteenth review found the thirteenth's fixes incomplete: a
+  combining mark after a tag that NFC leaves apart (U+0301 after "q") still drawn apart from its
+  letter (now any category M code point first after an inline tag rejects); U+205F, a
+  medium mathematical space, drawn as narrow as the thin spaces (now content); `code`, `h5` and
+  `h6` shrinking text like `small` (at most one of the four open); and, from making thin spaces
+  content, the digit-group and quote-edge rules no longer seeing "10" U+2009 " 000" as one
+  number (both now read past every gap: whitespace, thin spaces and Default_Ignorable code
+  points).
 
 - **Every submission carrying 2.0.0 is refused by the worker gate** from the moment this change
   deploys. Nothing in the repository produces a 2.0.0 submission after it.

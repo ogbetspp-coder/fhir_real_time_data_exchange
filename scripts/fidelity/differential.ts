@@ -104,48 +104,50 @@ const LIGATURE = CHARS(0xfb00, 0xfb01, 0xfb02, 0xfb03, 0xfb04, 0xfb06);
 // NFKC, which section 3 deliberately does not use.
 const NEAR_LIGATURE = CHARS(0xfb05, 0xfb13, 0x0132, 0x01c4);
 const BULLET = CHARS(0x2022, 0x2023, 0x25a0, 0x25a1, 0x25aa, 0x25ab, 0x25cb, 0x25cf, 0x25e6);
-// Separators between the groups of a number: a space and a thin space are whitespace, the
-// joiners are whitespace but not a boundary for the edge rules.
-const GROUP_SEPARATORS = CHARS(0x0020, 0x2009);
-const GROUP_JOINERS = CHARS(0x00a0, 0x2007, 0x202f);
+// Separators between the groups of a number: a space is whitespace; the joiners are whitespace
+// but not a boundary for the edge rules; and the gaps are content (fidelity-norm/3.0.0: a thin
+// space, drawn as a narrow gap, or an invisible separator, drawn as nothing), which the digit
+// rule reads past.
+const GROUP_SEPARATORS = CHARS(0x0020);
+const GROUP_JOINERS = CHARS(0x00a0, 0x2007);
+const GROUP_GAPS = CHARS(0x2009, 0x202f, 0x200a, 0x2063);
 // What stands between two groups: one code point, or two (a span can then end or start inside
 // the run and still cut the number, review round 3).
 const GROUP_RUNS: readonly string[] = [
   ...GROUP_SEPARATORS,
   ...GROUP_JOINERS,
+  ...GROUP_GAPS,
   "  ",
   `${CP(0x2009)} `,
   ` ${CP(0x00a0)}`,
   `${CP(0x202f)} `,
+  ` ${CP(0x2009)}`,
+  `${CP(0x2063)} `,
 ];
 // U+2043 and U+2219 were bullets until the review of fidelity-norm/2.0.0 made them content.
 const NEAR_BULLET = CHARS(0x2024, 0x25a2, 0x25cc, 0x00b7, 0x2027, 0x2043, 0x2219);
 // Section 3 step 5. U+000B, U+000C and U+0085 left the list in fidelity-norm/2.0.0: section 2
-// rejects them, and they are in FORBIDDEN_2_0_0 below.
+// rejects them, and they are in FORBIDDEN_2_0_0 below. U+1680 and the spaces narrower than a
+// quarter of an em left it in 3.0.0 and are CONTENT_SPACES.
 const WHITESPACE = CHARS(
   0x0009,
   0x000a,
   0x000d,
   0x0020,
   0x00a0,
-  0x1680,
   0x2000,
   0x2001,
   0x2002,
   0x2003,
   0x2004,
   0x2005,
-  0x2006,
   0x2007,
   0x2008,
-  0x2009,
-  0x200a,
   0x2028,
   0x2029,
-  0x202f,
-  0x205f,
   0x3000,
 );
+const CONTENT_SPACES = CHARS(0x1680, 0x2006, 0x2009, 0x200a, 0x202f, 0x205f);
 // Not in the section 3 list, and each is "whitespace" to something: U+180E was a space
 // separator before Unicode 6.3, U+3164 and U+2800 render blank, U+00B7 is a visible dot.
 const NEAR_WHITESPACE = CHARS(0x180e, 0x3164, 0x2800, 0x00b7);
@@ -222,6 +224,7 @@ const FRAGMENTS: readonly Fragment[] = [
   { weight: 8, className: "whitespace-class", make: (random) => pick(random, WHITESPACE) },
   { weight: 3, className: "whitespace-run", make: (random) => pick(random, WHITESPACE).repeat(3) },
   { weight: 2, className: "near-whitespace", make: (random) => pick(random, NEAR_WHITESPACE) },
+  { weight: 3, className: "content-space", make: (random) => pick(random, CONTENT_SPACES) },
   { weight: 6, className: "invisible", make: (random) => pick(random, INVISIBLE) },
   {
     weight: 4,
@@ -1858,7 +1861,7 @@ const SPAN_LAYOUTS: readonly SpanLayout[] = [
       const points = Array.from(built.page.text);
       const isDigit = (character: string | undefined): boolean =>
         character !== undefined && character >= "0" && character <= "9";
-      const separators = [...GROUP_SEPARATORS, ...GROUP_JOINERS];
+      const separators = [...GROUP_SEPARATORS, ...GROUP_JOINERS, ...GROUP_GAPS];
       const candidates: { sentence: { start: number; end: number }; at: number; run: number }[] =
         [];
       for (const sentence of built.sentences) {
@@ -1866,7 +1869,11 @@ const SPAN_LAYOUTS: readonly SpanLayout[] = [
           if (!isDigit(points[at - 1]) || !separators.includes(points[at] ?? "")) continue;
           let run = at;
           while (run < sentence.end && separators.includes(points[run] ?? "")) run += 1;
-          if (isDigit(points[run]) || GROUP_JOINERS.includes(points[at] ?? "")) {
+          if (
+            isDigit(points[run]) ||
+            GROUP_JOINERS.includes(points[at] ?? "") ||
+            GROUP_GAPS.includes(points[at] ?? "")
+          ) {
             candidates.push({ sentence, at, run });
           }
         }

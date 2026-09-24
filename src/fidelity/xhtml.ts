@@ -175,11 +175,16 @@ function findInvisibleBreak(text: string): number | undefined {
 const MAX_DEPTH = 32;
 const MAX_INDENTS = 6;
 const HEADINGS = new Set(["h1", "h2", "h3", "h4", "h5", "h6"]);
+// The elements a renderer draws smaller than the text around them: at most one open at once, so
+// `<h6><small>` (drawn at about 9 px, and 7 px with a `sup`) is refused.
+const SHRINKING = new Set(["small", "code", "h5", "h6"]);
 const INDENTING = new Set(["blockquote", "ul", "ol", "dd"]);
 
 function checkNesting(name: string, stack: readonly string[], offset: number): void {
   if (stack.length > MAX_DEPTH) throw new XhtmlError("nesting-depth", offset);
-  if (name === "small" && stack.includes("small")) throw new XhtmlError("nesting-depth", offset);
+  if (SHRINKING.has(name) && stack.some((open) => SHRINKING.has(open))) {
+    throw new XhtmlError("nesting-depth", offset);
+  }
   if (HEADINGS.has(name) && stack.some((open) => HEADINGS.has(open))) {
     throw new XhtmlError("nesting-depth", offset);
   }
@@ -206,13 +211,17 @@ const SPLITTING_INLINE = new Set([
   "cite",
   "code",
 ]);
-// How far each side of such a tag is composed to find a composition across it: a combining
-// sequence longer than this is refused as nothing a label holds.
+// How far each side of such a tag is composed to find a composition across it. A combining mark
+// right after the tag is refused whatever its distance from the letter, so the window only has
+// to catch the Hangul jamo that compose without being marks.
 const COMPOSE_WINDOW = 64;
+const MARK = /^\p{M}$/u;
 
 function checkComposition(text: string, boundaries: readonly number[]): void {
   const points = Array.from(text);
   for (const boundary of boundaries) {
+    if (MARK.test(points[boundary] ?? ""))
+      throw new XhtmlError("combining-across-markup", boundary);
     const before = points.slice(Math.max(0, boundary - COMPOSE_WINDOW), boundary).join("");
     const after = points.slice(boundary, boundary + COMPOSE_WINDOW).join("");
     if (composeText(before + after) !== composeText(before) + composeText(after)) {

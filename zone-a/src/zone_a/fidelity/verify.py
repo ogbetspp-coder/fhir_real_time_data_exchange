@@ -13,9 +13,9 @@ such read goes through ``_at()``.
 Numbers are the other trap. JSON has one number type and JavaScript has one number type, so
 ``1`` and ``1.0`` are the same value on the Zone B side and ``Number.isInteger`` accepts both;
 ``json.loads`` gives Python an ``int`` for the first and a ``float`` for the second, and
-``isinstance(x, int)`` accepts only the first. A page written ``"page": 1.0`` \u2014 which the
+``isinstance(x, int)`` accepts only the first. A page written ``"page": 1.0`` — which the
 contract's ``{"type": "integer"}`` permits, because JSON Schema defines an integer as a number
-with a zero fractional part \u2014 therefore verified in Zone B and was refused here. Every offset
+with a zero fractional part — therefore verified in Zone B and was refused here. Every offset
 read from the payload goes through ``_as_integer()``, which is ``Number.isInteger`` plus the
 normalisation to ``int`` that Python's slicing and arithmetic need afterwards.
 """
@@ -33,6 +33,7 @@ from .normalize import (
     NormalizationError,
     count_words,
     find_forbidden_character,
+    is_gap,
     is_whitespace,
     normalize_text,
 )
@@ -246,8 +247,8 @@ def _is_blank_slice(index: PageIndex, start: int, end: int) -> bool:
         return False
 
 
-# Whitespace for the edge rules: section 3 step 5's list without U+00A0, U+2007 and U+202F, which
-# join the groups of a number (`10 000`) and so are not a boundary between tokens.
+# Whitespace for the edge rules: section 3 step 5's list without U+00A0 and U+2007, which join the
+# groups of a number (`10 000`) and so are not a boundary between tokens.
 NUMBER_JOINERS: Final = frozenset({0x00A0, 0x2007})
 
 
@@ -264,7 +265,7 @@ def _is_decimal_digit(character: str | None) -> bool:
 
 
 def _next_token(index: PageIndex, start: int, step: int) -> str | None:
-    """The first non-whitespace code point from ``start`` in direction ``step``, in the body.
+    """The first code point from ``start`` in direction ``step`` that is not a gap, in the body.
 
     Reading stops at U+000A (``None``): a number is never read across a line break.
     """
@@ -273,7 +274,7 @@ def _next_token(index: PageIndex, start: int, step: int) -> str | None:
         character = index.text[position]
         if character == "\n":
             return None
-        if not is_whitespace(ord(character)):
+        if not is_gap(ord(character)):
             return character
         position += step
     return None
@@ -300,9 +301,9 @@ def _start_cuts_word(pages: dict[int, PageIndex], span: Json) -> bool:
     first = pages.get(span["page"])
     start = span["startOffset"]
     if first is not None:
-        # The span's first code point that is not section 3 whitespace (joiners included).
+        # The span's first code point that is not a gap (a thin space such as U+202F included).
         inner = start
-        while inner < span["endOffset"] and is_whitespace(ord(first.text[inner])):
+        while inner < span["endOffset"] and is_gap(ord(first.text[inner])):
             inner += 1
         if inner < span["endOffset"] and _cuts_digit_group(first, inner, inner - 1, -1):
             return True
@@ -344,9 +345,9 @@ def _end_cuts_word(index: PageIndex, span: Json) -> bool:
         return False
     if not _is_edge_whitespace(_at(index.text, end)):
         return True
-    # The span's last code point that is not section 3 whitespace (joiners included).
+    # The span's last code point that is not a gap (a thin space such as U+202F included).
     inner = trimmed
-    while inner > start and is_whitespace(ord(index.text[inner - 1])):
+    while inner > start and is_gap(ord(index.text[inner - 1])):
         inner -= 1
     return inner > start and _cuts_digit_group(index, inner - 1, inner, 1)
 
@@ -354,8 +355,8 @@ def _end_cuts_word(index: PageIndex, span: Json) -> bool:
 def _resolve_spans(spans: list[Json], pages: dict[int, PageIndex]) -> _Resolved | tuple[str, str]:
     """Locate and hash-check a section's spans.
 
-    Returns one contiguous raw slice per page \u2014 so the source's own characters, never
-    whitespace of ours, decide where words begin and end \u2014 or a ``(status, reason)`` pair.
+    Returns one contiguous raw slice per page — so the source's own characters, never
+    whitespace of ours, decide where words begin and end — or a ``(status, reason)`` pair.
     """
     pieces: list[_Piece] = []
     previous: Json = None
