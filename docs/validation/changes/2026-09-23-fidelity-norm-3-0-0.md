@@ -249,7 +249,18 @@ specification states the rule directly. Each break was restored.
   needed a closed definition (the page is exactly the scanner's text of the div with ADR 0005's
   droppable presentation removed; a section the scanner refuses, or that holds a soft hyphen,
   refuses), and that ADR 0005 needed a closed list of the presentation that may be dropped;
-  both are fixed, with a property test over every accepted XHTML vector.
+  both are fixed, with a property test over every accepted XHTML vector. An eleventh review found
+  the scanner and verifier sound on 804 divs from the pinned EMA labels, and the remaining gaps
+  in ADR 0005's detailed lists (attributes, CSS that can hide or overprint, raised runs, how
+  presentation is removed); ADR 0005 now states the page as the scanner's text of T(div), a
+  lexical transform of the div string, with precise requirements on T, and leaves the closed
+  lists, settled against the real label, to the importer (PR 3). It also found that the pinned
+  Imatinib Teva label cannot be imported whole under the rules as written (six sections refuse
+  in the scanner, among them `t` with a lowered `½` and `AUC` with a lowered `(0-∞)`, which
+  nearly every label has); ADR 0005 records each refusal and how PR 3 settles it, including a
+  possible minor version of this contract for `½` and `∞` in `sub`. A pairwise property test on
+  each side checks that a narrative verifies against another's structured page only when both
+  read the same.
 
 - **Every submission carrying 2.0.0 is refused by the worker gate** from the moment this change
   deploys. Nothing in the repository produces a 2.0.0 submission after it.

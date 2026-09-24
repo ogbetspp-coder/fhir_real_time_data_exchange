@@ -601,7 +601,8 @@ extractor is a controlled component: its name and version are recorded in
 narratives are XHTML (ADR 0005); every other source, a Word document however it is read
 included, is a drawn document. The rules below are complete for a structured source (the
 structured-source rule below): its page text is exactly the scanner's text for each section,
-so none of the layout rules for drawn documents comes into play. For a drawn document they are not complete. The independent reviews of 3.0.0 found cases where text
+so none of the layout rules for drawn documents comes into play; whether T drops only what
+cannot change the drawn page is ADR 0005's to secure (its requirements and renderer cross-check). For a drawn document they are not complete. The independent reviews of 3.0.0 found cases where text
 a conforming extractor may write lets a narrative verify that the document does not draw: a line
 wrapped at the space between the groups of a number or after a dash, which section 6's edge
 rules then read as a token boundary; an undrawn soft hyphen at the end of a block, which step 1
@@ -708,14 +709,18 @@ An extractor must:
   is a paragraph before U+FDD0. Outside a table cell, a `ul` item's bullet is emitted as section 3 step 4 removes it, or
   not at all; inside a cell, not at all (step 4 removes nothing on a cell's line);
 - for a structured source, emit one page per source section, in source order, with the whole
-  page as its body, holding exactly the text section 5's scanner emits for the section's div
-  once the presentation ADR 0005 lists as droppable is removed, and nothing else (the scanner's
-  text begins and ends with U+000A). Where the scanner would refuse that div (any section 5
-  reason, `soft-hyphen-at-boundary` included), where ADR 0005 refuses its presentation, or
-  where the div holds U+00AD or another section 3 step 1 invisible character, the extractor
-  refuses the section. The narrative section's span covers that page's body, and sections 1
-  and 6 apply unchanged. The drawn-document rules of this section (line layout, continuation
-  lines, discretionary hyphens, tables across page breaks, body ranges) do not apply;
+  page as its body, holding exactly the text section 5's scanner code emits for T(div), and
+  nothing else (the scanner's text begins and ends with U+000A). T is ADR 0005's stated lexical
+  transform of the div string: it deletes attributes and CSS declarations on closed lists,
+  rewrites a raised or lowered run as `sup` or `sub`, and replaces a referenced picture with its
+  pinned `data:` URI or deletes it; it does nothing else. Where the scanner refuses T(div) (any
+  section 5 reason, `soft-hyphen-at-boundary` included), where T meets anything not on its
+  lists, or where the div's text, character references decoded, holds U+00AD or another
+  section 3 step 1 invisible character, the extractor refuses the section. A section whose div
+  draws nothing gets its page and no narrative. The narrative section's span covers that page's
+  body, and sections 1 and 6 apply unchanged. The drawn-document rules of this section (line
+  layout, continuation lines, discretionary hyphens, tables across page breaks, body ranges) do
+  not apply;
 - in a raised or lowered glyph run, emit every digit and sign of section 5's folding tables as
   its script code point — raised: U+0030–U+0039 as U+2070, U+00B9, U+00B2, U+00B3,
   U+2074–U+2079, `+`, U+FE62, U+FF0B and U+2795 as U+207A, `-`, U+2212, U+2010–U+2015,

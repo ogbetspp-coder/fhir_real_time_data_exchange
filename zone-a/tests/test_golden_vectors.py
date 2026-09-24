@@ -240,3 +240,17 @@ def test_a_structured_source_verifies_every_accepted_vector() -> None:
     together = verify_narrative_fidelity(_structured_source(divs))
     assert [s for s in together["sections"] if s["status"] != "verified"] == []
     assert together["status"] == "passed"
+
+
+def test_a_narrative_verifies_against_another_page_only_when_both_read_the_same() -> None:
+    divs = _structured_divs()
+    for page in divs:
+        source = _structured_source([page])
+        expected = normalize_text(xhtml_to_text(page))
+        for narrative in divs:
+            source["sections"][0]["div"] = narrative
+            passed = verify_narrative_fidelity(source)["status"] == "passed"
+            assert passed == (normalize_text(xhtml_to_text(narrative)) == expected), (
+                narrative,
+                page,
+            )

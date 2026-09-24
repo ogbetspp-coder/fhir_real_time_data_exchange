@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and eight reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and nine reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -256,10 +256,13 @@ The contract replaces the 2.0.0 table and list rules:
   whitespace in a cell, or a hyphenated word; the later page then begins with U+0009, ⟦row⟧, or
   the rest of the word. Any allowed split gives the same normalised text (the spec's §7 is the
   full text; rounds 4 to 7 below found the cases this rule now covers).
-- **Structured sources.** An extractor over a structured source (an authority's FHIR ePI, ADR 0005) emits one page per source section, in source order, with the whole page as the body,
-  beginning and ending with U+000A as the scanner's text does. Each page's text is the section
-  narrative as a renderer draws it, following the rules above. The narrative section's span
-  covers that page's body. §1 and §6 then apply unchanged.
+- **Structured sources.** A structured source is an FHIR ePI document Bundle with XHTML
+  narratives. Its extractor emits one page per source section, holding exactly §5's scanner text
+  of T(div), where T is ADR 0005's lexical transform (closed-list deletions, raised and lowered
+  runs rewritten as `sup`/`sub`, referenced pictures replaced or deleted); a section the scanner
+  refuses, or whose text holds a soft hyphen or another invisible character, refuses. The
+  drawn-document rules do not apply, and §1 and §6 apply unchanged (the spec's §7 is the full
+  text).
 
 ## Impact
 
@@ -651,3 +654,37 @@ deferring the gate's enforcement to PR 2 is safe (the only producer is the synth
 6. to 8. **Low.** A wrong cross-reference in §7, an unstated order-dependent false failure (closed
    by refusing soft hyphens), the change-record index, the roadmap's engine item and the
    change record's interim control. Fixed.
+
+## Eleventh review (2026-09-23, of the scoped version): findings and what changed
+
+The eleventh review found the scanner, the verifier and the two implementations sound (804 divs
+derived from the four pinned EMA labels gave identical texts and codes in both languages; Chrome's
+drawn text of 555 accepted EMA divs matched the scanner's words), and found the remaining gaps in
+ADR 0005, the import's rules, which PR 3 implements:
+
+1. **High.** Decision 1 had no rule for HTML attributes and contradicted itself (`dir="rtl"`
+   reorders "10 mg or 20 mg"; `bgcolor` hides a cell; refusing every attribute refuses every EMA
+   table).
+2. **High.** Its CSS list admitted text hidden or overprinted (inline padding with a
+   white background, borders, `line-height: 0`, negative indents and margins, `height: 0`,
+   `baseline` on a `sup`, relative font sizes, transparent colours, a family list ending in a
+   listed font).
+3. **Medium.** "Exactly the scanner's text once presentation is removed" could
+   not express the rewrites the ADR requires (raised runs, referenced pictures).
+4. **Medium.** How
+   presentation is removed, and the cross-check's parse mode, were unstated.
+5. **Medium.** The
+   pinned Imatinib Teva label cannot be imported under the rules as written: six sections refuse
+   in the scanner and three more under the colour rules.
+6. **Medium.** A stale sentence in this
+   note's E.
+7. to 10. **Low.** Decoded text, the demo script, a pairwise property, empty sections.
+
+**Decision.** Each round of review of ADR 0005's detailed lists found more, because those lists
+decide what may be dropped from real markup and can only be settled against the real label.
+ADR 0005 now states the principle (the page is the scanner's text of T(div), a lexical transform
+of the div string that deletes only what cannot change the drawn page, rewrites raised runs and
+resolves pictures) and precise requirements for T, the renderer cross-check (HTML and XML modes,
+visibility included) and empty sections; the closed lists themselves, and the label's refusals
+(including whether `½` and `∞` in `sub` need a minor version of this contract), are PR 3's, with
+its own reviews. §7 matches. Findings 6 to 10 are fixed here, with a pairwise property test.

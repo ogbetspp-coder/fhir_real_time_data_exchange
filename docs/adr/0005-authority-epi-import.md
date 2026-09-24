@@ -29,75 +29,83 @@ Three facts about that source meet three rules of the record:
 
 1. **Presentation is not narrative.** An authority import enters the record as clean XHTML
    built mechanically from the authority's div. It keeps the same words, paragraphs, line breaks,
-   lists (with their `type` and `start`), tables (with their spans), pictures (decision 3),
-   raised and lowered text (as `sup` and `sub`), and bold, italic and underline. Every style,
-   class and other presentational attribute is dropped. Nothing is added, reordered or reworded.
+   lists (with their `type` and `start`), tables (with their spans), pictures (decision 3), and
+   raised and lowered text (as `sup` and `sub`). Presentation that cannot change what a reader
+   sees is dropped. Nothing is added, reordered or reworded.
 
-   Presentation is dropped only from this closed list; any other property or value refuses
-   the section, because a text check cannot see what it does to the drawn page:
-   - `class` (the authority's stylesheet is not applied: a stated residual, below) and the
-     `mso-` properties a browser ignores;
-   - `font-family` naming a Unicode text font on a closed list kept with the reader (for
-     example Times New Roman, Arial, Calibri, Verdana, and the generic `serif` and
-     `sans-serif`); a symbol-encoded font (Symbol, Wingdings, Webdings, ZapfDingbats, MT Extra)
-     or any font not on the list refuses, because in Symbol `m` draws `μ`;
-   - `font-size` of two points or more, `font-weight`, `font-style` and underline (bold,
-     italic and underline are kept as `strong`, `em` and `u`);
-   - a text `color` that is black or nearly black, and a white or transparent background;
-   - `margin`, `padding` and `text-indent` within one inch either way, `border`, `line-height`,
-     `text-align`, `width` and `height`, and page-break properties;
-   - `vertical-align: baseline` anywhere, and `top`, `middle` or `bottom` on a table cell only.
+   **The page is the scanner's text of a transformed div.** For each section, a stated lexical
+   transform T edits the authority's div string itself (no parse and re-serialise, which would
+   lose the refusals below), and the page is exactly what §5's scanner code emits for T(div): one
+   page per section, as `docs/fidelity-normalization.md` §7 defines for a structured source. T
+   does only three things: it deletes attributes and CSS declarations on a closed list; it
+   rewrites a raised or lowered run as `sup` or `sub`; and it replaces a referenced picture with
+   its pinned `data:` URI, or deletes it and records it (decision 3). Where the scanner refuses
+   T(div), where T meets anything not on its lists, or where the div's text (character
+   references decoded) holds U+00AD or another §3 step 1 invisible character, the section
+   refuses. The clean div stored in the record is T(div), so the fidelity check compares the
+   record with the page by construction; what makes the import trustworthy is that T drops only
+   what cannot change the drawn page, which the requirements below and the renderer cross-check
+   secure.
 
-   A mark that changes what the words say, or whether they are seen, is never dropped:
-   - raised and lowered runs (`sup`, `sub`, `vertical-align` other than `baseline` on inline
-     content, `position: relative` with a vertical offset) are kept as `sup` and `sub` and
-     folded on both sides, or refuse the section; PR 3 fixes the offsets that count, against
-     the pinned label and the renderer cross-check below;
-   - struck-through text, hidden text (`display: none`, a `visibility` other than `visible`),
-     faint text (white, nearly white, or under two points), a text colour or a shading refuses
-     the section. Colour against shading can hide text as surely as white on white, and a
-     colour rule that proved contrast would be a new contract. So do `opacity`, `clip`,
-     `overflow`, any other `position`, `content`, `text-transform` and `list-style-type`, which
-     would change the drawn text or the list numbers the check proves.
+   **Requirements on T**, designed and reviewed in PR 3 against the pinned label:
+   - **Closed attribute list, by element and value.** What may be deleted is named (for example
+     `valign`, `align`, `border`, `cellspacing`, `cellpadding`, `width` on table parts, `nowrap`,
+     `lang`, `title`, `id`, `a@name`, `hr@size`), and every other attribute refuses: in
+     particular `dir` other than `ltr` (`<p dir="rtl">10 mg or 20 mg</p>` draws "mg or 20 mg
+     10"), `bgcolor`, `background`, `hidden`, `li@value`, `ol@reversed`, `type` outside a list,
+     and `font@color`, `face` and `size`. No element is unwrapped or removed except a `span`
+     left with no attributes, and a link, whose text is kept and whose target is not drawn; any
+     other element the scanner refuses (`font`, `center`, `bdo`, `ruby`, `q`, `ins`, `del`, `s`)
+     refuses the section.
+   - **Closed CSS list, by property and value, that can neither hide nor overprint text.** Font
+     families only from a closed list of Unicode text fonts, every family in the list on it
+     (symbol-encoded fonts such as Symbol and Wingdings refuse); font sizes in absolute units
+     only, with the effective size at least two points; opaque text colours; margins, padding
+     and indents never negative (except a hanging indent that keeps the line start on the page),
+     vertical margins never negative; borders only on table parts, thin and dark; an inline
+     background only with no padding; `line-height` at least normal; `width` and `height` only
+     on table parts and pictures; `vertical-align: baseline` only outside `sup` and `sub`, and
+     `top`, `middle`, `bottom` only on table cells. Struck, hidden, faint (white, nearly white,
+     under two points) or transparent text refuses, and so do `opacity`, `clip`, `overflow`,
+     `display`, `position` other than a folded vertical offset, `content`, `text-transform`,
+     `list-style-type` and every unlisted property.
+   - **Colour.** A text colour and a shading are dropped only where the text keeps a stated
+     contrast with its effective background (for example WCAG's 4.5:1), since colour hides text
+     only through contrast; otherwise the section refuses.
+   - **Raised and lowered runs.** `vertical-align: super` or `sub`, and `position: relative` with
+     a vertical offset, become `sup` or `sub` when the offset is at least a stated fraction of
+     the run's font size, and are deleted below a stated bound (the label's 18 runs at
+     `top: .5pt` in 5.1 must not turn "(" into "₍"); between the two, the section refuses.
+   - **Empty sections.** A section whose div draws nothing (the label's `<div>&#160;</div>`
+     heading sections) gets its page but no narrative and no span.
 
-   The authority's div is read by the ePI reader (`zone_a.epi.reader`), acting as an extractor
-   under `docs/fidelity-normalization.md` §7 (fidelity-norm/3.0.0). The page it writes for a
-   section is exactly the text §5's scanner emits for the section's div once the presentation
-   listed above is removed, and nothing else; where the scanner would refuse that div (any §5
-   reason, `soft-hyphen-at-boundary` included), or the div holds U+00AD or another §3 step 1
-   invisible character, the reader refuses the section. So:
-   - it draws list numbers with §5's counter algorithm, and refuses an `li` that is not a
-     direct child of `ol` or `ul`;
-   - it lays tables out by the HTML table model and emits the grid markers;
-   - it emits a picture as §7 says (decision 3);
-   - it folds raised and lowered digits and signs;
-   - it refuses what the scanner refuses rather than canonicalising it: a `start`, `type`,
-     `colspan` or `rowspan` value outside the scanner's grammar, a non-void element written
-     self-closing (an HTML viewer and an XML parser read it differently), and a picture drawn
-     at zero or near-zero size.
-
-   Its text is one page per section, in the authority's order, beginning and ending with a line
-   feed (§7, structured sources), and each narrative section's provenance span covers its page.
-   The unchanged verifier (§1, §6) then proves, section by section, that the clean div's words,
-   list numbers, table grids and pictures read as the reader reads the authority's div. Where
-   they do not, the import fails before anything is written. The authority's file stays pinned
-   by hash, and the provenance records the hash of every source div.
-
-   Two checks close what that equality cannot see, because the reader and the builder share
-   the walk and could share a misreading:
+   Two checks close what the equality cannot see, because T could itself drop something drawn:
    - **A renderer cross-check.** In CI, every pinned publication is drawn by a headless browser
-     with no author stylesheet, and the list numbers (from the accessibility tree), each table's
-     grid (from cell rectangles) and the text are compared with the reader's. A difference fails
-     the build.
-   - **A line check.** Inside every table cell, the clean div must hold the same sequence of
-     line breaks and paragraphs as the authority's div, compared structurally. The fidelity
-     contract does not compare the line a value sits on inside a cell (§5, a stated residual),
-     and an import is where both sides' markup is at hand.
+     with no author stylesheet, in HTML mode (as a browser draws the EMA's div) and in XML mode.
+     The list numbers (from the accessibility tree), each table's grid (from cell rectangles),
+     the text, and each text box's visibility (on the page and not overlapped) are compared with
+     the page. A difference fails the build.
+   - **A line check.** Inside every table cell, T(div) must hold the same sequence of line breaks
+     and paragraphs as the authority's div, compared structurally. The fidelity contract does
+     not compare the line a value sits on inside a cell (§5, a stated residual), and an import
+     is where both sides' markup is at hand.
 
    Not proved, and stated: the authority's own stylesheet (`class` values are dropped and the
    EMA's stylesheet is not applied); paragraph breaks, headings, bullets, list nesting and
    emphasis, which are kept but compared only by the line check and the round trip (PR 4).
-   `AGENTS.md`'s "Preserve supplied XHTML" is reworded to say exactly what is proved.
+
+   **What the first label already shows.** The eleventh review of `fidelity-norm/3.0.0` ran the
+   pinned Imatinib Teva SmPC through the scanner with its presentation loosely stripped: 6 of its
+   32 sections refuse, and these requirements would add the QRD grey shading of the reporting
+   section and two coloured passages. The refusals are a `span` left inside a `sup` (unwrapped
+   under the attribute rule above); the QRD Appendix V link, whose path is longer than §5's href
+   grammar allows and which is in every EU SmPC, and an `http:` link in section 10 (links are
+   unwrapped, so neither reaches the scanner); `t` with a lowered `½` and `AUC` with a lowered
+   `(0-∞)`, which §5 refuses inside `sub` and which nearly every label has in 5.2; and one
+   `table-shape` in 5.1, not yet explained. PR 3 settles each: the unwrapping above, the contrast
+   rule, the table investigated (an EMA defect is refused and recorded, decision 3), and, for `½`
+   and `∞` in `sub`, a proposed minor version of the fidelity contract, reviewed like this one,
+   if the lowered forms are to be accepted. Until then the label cannot be imported whole.
 
 2. **A text-only (Type 1) record is allowed for an authority import.** The graph holds the
    Composition, a MedicinalProductDefinition with the product name, the marketing authorisation
@@ -140,4 +148,6 @@ Three facts about that source meet three rules of the record:
   order, and the same text in every section as the ePI reader reads it. Presentation is not
   compared.
 - A label with any refused or mis-coded section cannot be imported whole until the authority
-  corrects it; Imatinib Teva was chosen because its sections are all coded correctly.
+  corrects it, or until PR 3's requirements above admit what it draws; Imatinib Teva was chosen
+  because its sections are all coded correctly, and the refusals decision 1 records are PR 3's
+  first work.

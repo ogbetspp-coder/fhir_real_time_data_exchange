@@ -392,7 +392,9 @@ than by reading. That is what an ePI hub is for.
   post-check is still awaiting its first live turn. The assistant is an information-retrieval
   aid for trained staff — not a regulatory decision system.
 - The fidelity check proves that published narrative matches the approved source document's
-  text. For a structured source (an authority's ePI) that is the document itself; for a PDF or
+  text. For a structured source (an authority's ePI) that is the authority's text as the ePI
+  reader reads it, with the authority's stylesheet not applied and paragraph breaks and emphasis
+  kept but not proved; for a PDF or
   Word source, which `fidelity-norm/3.0.0` does not qualify, it is only the extracted text. It
   does not prove the source document is correct; a human approved that, and the Provenance
   resource says who.
