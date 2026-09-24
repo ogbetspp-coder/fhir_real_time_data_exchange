@@ -1084,7 +1084,7 @@
       "expected": "\n\nAUC₍₀₋∞₎ and AUC₀₋∞\n\n"
     },
     {
-      "name": "sub-half-between-letter-and-break-kept",
+      "name": "sub-half-life-between-word-and-break-kept",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><em>t</em><sub>½</sub> 2, (t<sub>½</sub>) and t<sub>½</sub>.</p></div>",
       "expected": "\n\nt½ 2, (t½) and t½.\n\n"
     },
@@ -1249,8 +1249,8 @@
     },
     {
       "name": "sub-half-before-other-breaks-kept",
-      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>t<sub>½</sub>; t<sub>½</sub>: t<sub>½</sub><br/>t<sub>½</sub></p></div>",
-      "expected": "\n\nt½; t½: t½\nt½\n\n"
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>t<sub>½</sub>; t<sub>½</sub>: t<sub>½</sub>, t<sub>½</sub><br/>t<sub>½</sub></p></div>",
+      "expected": "\n\nt½; t½: t½, t½\nt½\n\n"
     },
     {
       "name": "rejects-sub-half-before-digit",

@@ -56,8 +56,9 @@ In code: the sub rule's kept set (`own`) gains the two code points (`KEPT_IN_SUB
 `src/fidelity/xhtml.ts` and `zone-a/src/zone_a/fidelity/xhtml.py`); the scanner records each
 `sub` holding ½ and the positions of what it emits inside `sup` and `sub`, and
 `checkLoweredHalves` / `_check_lowered_halves` applies the rule after the scan. The mark rule's
-look past ignorables (`checkComposition`) is now computed once per text rather than once per tag,
-which the second review found quadratic. `NORMALIZATION_VERSION` becomes `fidelity-norm/3.1.0`.
+look past ignorables (`checkComposition`) now keeps one cursor over the text, since boundaries only
+increase, rather than reading the run again at every tag, which the second review found
+quadratic. `NORMALIZATION_VERSION` becomes `fidelity-norm/3.1.0`.
 
 Section 7 gains one sentence: an extractor refuses a document whose raised or lowered run holds
 what section 5 refuses inside the corresponding element (a raised ½, a lowered ½ outside the
@@ -77,9 +78,11 @@ or ∞ can make the check pass text a reader reads differently.
    the line. 3.1.0 adds a markup form for existing text, never a text. Sections 3 and 6 (the
    normalisation and every quote-edge, digit-group and sign rule) therefore see nothing they
    have not seen.
-2. **∞ has one reading wherever it is.** It is never part of a number, so which run it belongs to
-   does not change what is read: `AUC<sub>(0-</sub>∞<sub>)</sub>` and `AUC<sub>(0-∞)</sub>` say
-   the same.
+2. **∞ is kept as a letter is, and never joins a number.** It is never part of a number, so it
+   cannot change which number a lowered run holds: `AUC<sub>(0-</sub>∞<sub>)</sub>` and
+   `AUC<sub>(0-∞)</sub>` read the same. Its own position is lost as a letter's is:
+   `x<sub>∞</sub>` (an index) and `x∞` on the line both read `x∞`, the residual section 5 and
+   ADR 0003 state for a raised or lowered letter (`10<sup>n</sup>` against "10n").
 3. **½ is a number, so the danger is joining, and the rule removes it.** The first review found
    that ½ kept anywhere in `sub` loses which run it belongs to: `log<sub>2½</sub>` (logarithm to
    the base 2½) and `log<sub>2</sub>½` (log₂ of ½, that is −1) both read `log₂½`;
@@ -126,9 +129,13 @@ or ∞ can make the check pass text a reader reads differently.
 ## Consequences
 
 - Minor version (section 8): inputs refused under 3.0.0 now give text, pinned by new vectors.
+  Section 7's new sentence only adds a refusal, on a path no qualified extractor takes (drawn
+  documents are not qualified, and no drawn-document extractor exists), so it invalidates no
+  extractor's output and is not a major change; it closes a gap 3.0.0 left open for the version
+  that qualifies them (a lowered `2½` run extracted as `log₂½`).
   Forty-three XHTML vectors are added (591 → 634): ½ kept (literal, decimal and hex reference,
   after markup, after a space, `(` and a line start, before a space, `)`, `.`, `,`, `;`, `:` and a
-  line break, at a cell's end) and refused on every side of the rule (after a digit, a sign, a
+  line break, at a cell's end; the most common real form, `the t<sub>½</sub> was`, first) and refused on every side of the rule (after a digit, a sign, a
   joiner, a subscript letter, a lowered letter, a lowered `t`, a modifier letter, an ordinal, an
   ideographic numeral, a mathematical letter, a blank-drawn letter, an operator name, a Roman
   numeral, a hexadecimal digit, a `t` inside a word and a `t` after an index; at a line start;
@@ -139,8 +146,8 @@ or ∞ can make the check pass text a reader reads differently.
   error wins; the rule precedes `combining-across-markup`, whether that comes before or after it
   in the document). The differential generator gains two random classes (the two code points and
   their neighbours in both scripts; lowered halves between neighbours on both sides of the rule),
-  and every full corpus ends with the complete cross-product of 31 neighbours before, 7 contents
-  and 23 after (4991 clean paragraphs); all three are required. Linear-time tests pin the mark
+  and every full corpus ends with the complete cross-product of 36 neighbours before, 7 contents
+  and 23 after (5796 clean paragraphs); all three are required. Linear-time tests pin the mark
   rule and the lowered-half rule on 20 000 tags and 20 000 halves in both languages.
 - The authority importer's golden vectors embed the version, so its lock requires a new version:
   `IMPORTER_VERSION` 1.1.0 (it now also accepts the two forms).
@@ -182,3 +189,15 @@ or ∞ can make the check pass text a reader reads differently.
    `. , ; :` "closing punctuation"; a code comment still named every fraction as refused. Each
    fixed. The review also confirmed that the mark rule's refactor changes no result (every
    div of six 6000-case corpora, 3.0.0 against this change) and that ∞ joins nothing.
+4. **Fourth independent review** (2026-09-24). No High or Medium; ready as a minor version once
+   its Low items were fixed. Low: this note said ∞ "has one reading wherever it is", while a
+   lowered ∞ loses its position as a letter does (`x<sub>∞</sub>` against `x∞`, the stated
+   residual; section 5 and the code comments now say so); stale "after a letter" wording in the
+   generator and a vector's name; a claimed vector before `,` that did not exist, and a
+   cross-product without the real form's space before the `t` (added, with `2(t`, `x t`, `the t`
+   and a tab); the Python linear-time test's figures; the change record's product count; no
+   argument why section 7's new refusal is not major (added above); and, in both languages, the
+   lowered-half rule copied the text into per-code-point arrays and the mark rule built a
+   whole-text array even with no tags (4 MB with one half: 615 MB peak in TypeScript, 389 MB in
+   Python). Fixed: the rule steps over output pieces and the mark rule keeps one cursor; the same
+   input now peaks at 168 MB and 65 MB, and no vector or cross-product outcome changed.

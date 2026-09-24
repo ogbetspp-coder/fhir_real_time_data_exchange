@@ -15,19 +15,19 @@ reads `t½` and `AUC<sub>(0-∞)</sub>` reads `AUC₍₀₋∞₎`; `log<sub>2½
 `VIII<sub>½</sub>` and `1<sub>½</sub>` still reject. Inside `sup` both still reject. Section 7 now says an extractor
 refuses a raised or lowered run holding what section 5 refuses there. In code:
 `KEPT_IN_SUBSCRIPT` and `checkLoweredHalves` in `src/fidelity/xhtml.ts`, and the same in
-`zone-a/src/zone_a/fidelity/xhtml.py`; the mark rule's look past ignorables is now computed once
-per text in both (the second review found it quadratic, present since 3.0.0, with no change of
+`zone-a/src/zone_a/fidelity/xhtml.py`; the mark rule's look past ignorables now reads each run once,
+with one cursor, in both (the second review found it quadratic, present since 3.0.0, with no change of
 result). The design, with its reviews, is
 `docs/design/fidelity-norm-3-1-0.md`. The authority importer moves to 1.1.0 (`IMPORTER_VERSION`,
 `src/authority/importer.lock.json`), because its golden vectors carry the version.
 
 **Why.** ADR 0005 decision 1 left the EMA's lowered `½` (half-life) and `(0-∞)` (AUC) to a
 minor version of the fidelity contract. A scan of every English SmPC the EMA's ePI service lists
-(21 documents in 23 product Lists) found ½ lowered six times in four products and ∞ lowered twice,
+(21 documents in 23 product Lists) found ½ lowered six times, once each in six SmPCs of three products, and ∞ lowered twice,
 and no other refused script content except Brukinsa's raised ± footnote mark. Without this
 change no Imatinib Teva SmPC can be imported whole (4.5 and 5.2 refuse). The design explains why
 the change admits no false pass: it creates no text a narrative could not already carry; ∞ has
-one reading wherever it is; and ½, a number, is kept only where it has no number to join (the
+no number to join and is kept as a letter is; and ½, a number, is kept only where it has no number to join (the
 first review showed `log<sub>2½</sub>` and `log<sub>2</sub>½` reading alike when ½ was kept
 anywhere). Raised, the two differ (`2<sup>½</sup>` is a root), so `sup` still
 refuses them.
@@ -80,12 +80,12 @@ fixed family, all three required in the full corpus (`zone-a/tests/test_differen
 `script-kept-in-subscript` draws ½, ∞, ¼ and U+29DC, literal and as references, inside `sup` and
 `sub`; `script-lowered-half` writes a `sub` holding ½ between neighbours drawn from both sides of
 the rule; and `script-lowered-half-cross`, appended to every corpus of at least 500 cases (the CI
-corpus included, the smoke corpus not), is the complete cross-product of 31 neighbours before, 7
-contents and 23 after, each in an otherwise clean paragraph (4991 cases: 273 accepted, 4718
-refused). ½ left the `script-unmappable` pool. TypeScript and Python agree on all 10 991 cases at
-each of seeds 20260920, 1, 2, 3, 4 and 77 (65 946 cases). Counted as generated documents
+corpus included, the smoke corpus not), is the complete cross-product of 36 neighbours before, 7
+contents and 23 after, each in an otherwise clean paragraph (5796 cases: 468 accepted, 5328
+refused). ½ left the `script-unmappable` pool. TypeScript and Python agree on all 11 796 cases at
+each of seeds 20260920, 1, 2, 3, 4 and 77 (70 776 cases). Counted as generated documents
 carrying each random class, by the TypeScript's outcome, over those six seeds:
-`script-kept-in-subscript` 21 accepted and 755 refused, `script-lowered-half` 2 accepted and 426
+`script-kept-in-subscript` 21 accepted and 755 refused, `script-lowered-half` 4 accepted and 424
 refused (most refusals come from other generated errors in the same document, which is why the
 cross-product is there).
 

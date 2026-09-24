@@ -239,29 +239,42 @@ def _check_lowered_halves(
     it can be a number or an operator (``VIII<sub>½</sub>``, ``log<sub>½</sub>``). Nothing is read
     past: each neighbour is the adjacent emitted code point.
     """
-    points: list[str] = []
-    piece_start: list[int] = []
-    in_script: list[bool] = []
-    for position, piece in enumerate(output):
-        piece_start.append(len(points))
-        points.extend(piece)
-        in_script.extend([position in script_pieces] * len(piece))
-    piece_start.append(len(points))
+    # A code point of the text as (piece, index in the piece), found by stepping over the pieces
+    # that emit nothing; a piece emitted inside ``sup`` or ``sub`` holds one code point. The steps
+    # of different halves do not overlap, so the rule stays linear without a copy of the text.
 
-    def on_line(at: int, allowed: frozenset[str]) -> bool:
-        return at < 0 or at >= len(points) or (points[at] in allowed and not in_script[at])
+    def last(piece: int) -> tuple[str, int, int] | None:
+        while piece >= 0 and output[piece] == "":
+            piece -= 1
+        if piece < 0:
+            return None
+        return output[piece][-1], piece, len(output[piece]) - 1
+
+    def previous(at: tuple[str, int, int]) -> tuple[str, int, int] | None:
+        _, piece, index = at
+        if index > 0:
+            return output[piece][index - 1], piece, index - 1
+        return last(piece - 1)
+
+    def following(piece: int) -> tuple[str, int, int] | None:
+        while piece < len(output) and output[piece] == "":
+            piece += 1
+        if piece >= len(output):
+            return None
+        return output[piece][0], piece, 0
+
+    def on_line(at: tuple[str, int, int] | None, allowed: frozenset[str]) -> bool:
+        return at is None or (at[0] in allowed and at[1] not in script_pieces)
 
     for half in halves:
-        start = piece_start[half.start]
-        end = piece_start[half.end]
+        letter = last(half.start - 1)
         if (
-            end - start != 1
-            or start < 1
-            or points[start] != chr(HALF)
-            or points[start - 1] != "t"
-            or in_script[start - 1]
-            or not on_line(start - 2, _BEFORE_HALF_LIFE)
-            or not on_line(end, _AFTER_HALF)
+            "".join(output[half.start : half.end]) != chr(HALF)
+            or letter is None
+            or letter[0] != "t"
+            or letter[1] in script_pieces
+            or not on_line(previous(letter), _BEFORE_HALF_LIFE)
+            or not on_line(following(half.end), _AFTER_HALF)
         ):
             raise XhtmlError("unmappable-script", half.offset)
 
@@ -282,21 +295,18 @@ def _point_offsets(output: list[str]) -> Callable[[int], int]:
 
 
 def _check_composition(text: str, boundaries: list[int]) -> None:
-    # For each position, the first code point at or after it that is not a Default_Ignorable
-    # non-mark: a word joiner or a zero-width joiner between the tag and a mark is drawn as
-    # nothing, and the mark after it is still drawn apart from the letter before the tag.
-    # Computed once from the end, so a long run of ignorables after many tags is read once.
-    drawn: list[str | None] = [None] * (len(text) + 1)
-    for position in range(len(text) - 1, -1, -1):
-        character = text[position]
-        drawn[position] = (
-            character
-            if _is_mark(character) or not is_default_ignorable(ord(character))
-            else drawn[position + 1]
-        )
+    # The first code point at or after each boundary that is not a Default_Ignorable non-mark: a
+    # word joiner or a zero-width joiner between the tag and a mark is drawn as nothing, and the
+    # mark after it is still drawn apart from the letter before the tag. Boundaries only increase,
+    # so one cursor reads each run of ignorables once.
+    cursor = 0
     for boundary in boundaries:
-        first = drawn[boundary]
-        if first is not None and _is_mark(first):
+        cursor = max(cursor, boundary)
+        while cursor < len(text) and not (
+            _is_mark(text[cursor]) or not is_default_ignorable(ord(text[cursor]))
+        ):
+            cursor += 1
+        if cursor < len(text) and _is_mark(text[cursor]):
             raise XhtmlError("combining-across-markup", boundary)
         before = text[max(0, boundary - COMPOSE_WINDOW) : boundary]
         after = text[boundary : boundary + COMPOSE_WINDOW]
@@ -361,7 +371,8 @@ SUBSCRIPT_LETTERS: Final = tuple(range(0x2090, 0x209D))
 # Kept unchanged inside ``sub`` from fidelity-norm/3.1.0: U+00BD VULGAR FRACTION ONE HALF and
 # U+221E INFINITY, as in ``t<sub>½</sub>`` and ``AUC<sub>(0-∞)</sub>``. Neither has a subscript
 # form; raised, ``2<sup>½</sup>`` is a root. ½ is a number, so it is kept only where it cannot
-# join a number on either side (_check_lowered_halves); ∞ has one reading wherever it is.
+# join a number on either side (_check_lowered_halves); ∞ never joins a number, and loses its
+# position as a letter does (section 5's stated residual).
 HALF: Final = 0x00BD
 KEPT_IN_SUBSCRIPT: Final = (HALF, 0x221E)
 

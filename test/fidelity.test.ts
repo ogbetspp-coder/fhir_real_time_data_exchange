@@ -236,7 +236,7 @@ describe("xhtml scanner", () => {
 
   // fidelity-norm/3.1.0 review round 2: the mark rule reads each run of ignorables once, and
   // the lowered-half rule looks only at adjacent pieces. Twenty thousand tags before twenty
-  // thousand word joiners took 72 s here before (150 KB).
+  // thousand word joiners (a div of 160 057 code points) took about 72 s here before.
   it("checks marks after many tags and many lowered halves in linear time", () => {
     const root = (body: string): string =>
       `<div xmlns="http://www.w3.org/1999/xhtml"><p>${body}</p></div>`;

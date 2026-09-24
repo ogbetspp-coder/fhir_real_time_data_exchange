@@ -179,8 +179,8 @@ def test_empty_rows_under_a_wide_row_scan_in_linear_time() -> None:
 def test_marks_after_many_tags_and_many_lowered_halves_scan_in_linear_time() -> None:
     """The mark rule reads each run of ignorables once (fidelity-norm/3.1.0 review round 2).
 
-    The lowered-half rule looks only at adjacent pieces. A 37 KB div of tags before word joiners
-    took 50 s here before.
+    The lowered-half rule looks only at adjacent pieces. The div of 20 000 tags before 20 000 word
+    joiners (160 057 code points) took 396 s here before.
     """
 
     def root(body: str) -> str:

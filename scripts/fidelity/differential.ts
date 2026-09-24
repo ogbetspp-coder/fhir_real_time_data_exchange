@@ -515,9 +515,8 @@ const SCRIPT_PIECES: readonly { className: string; pool: readonly string[] }[] =
   },
   { className: "script-reference", pool: ["&#x2212;", "&#54;", "&#x2B;", "&#8315;", "&#x2082;"] },
   { className: "script-space", pool: [SPACE, TAB] },
-  // fidelity-norm/3.1.0: ∞ is kept inside `sub`, ½ only as its whole content between a letter
-  // and no number (scriptLoweredHalf); both reject inside `sup`; ¼ and ⧜ are their neighbours
-  // that still reject in both.
+  // fidelity-norm/3.1.0: ∞ is kept inside `sub`, ½ only as the half-life (scriptLoweredHalf);
+  // both reject inside `sup`; ¼ and ⧜ are their neighbours that still reject in both.
   {
     className: "script-kept-in-subscript",
     pool: [...CHARS(0x00bd, 0x221e, 0x00bc, 0x29dc), "&#189;", "&#x221E;", "&#188;", "&#x29DC;"],
@@ -551,13 +550,15 @@ function scriptText(random: Random, classes: Set<string>): string {
   return text;
 }
 
-// fidelity-norm/3.1.0: a lowered ½ is kept only as a `sub`'s whole content after a letter and
-// before no number or script sign; each part is drawn from forms on both sides of that rule.
+// fidelity-norm/3.1.0: a lowered ½ is kept only as the half-life, a `sub`'s whole content right
+// after a `t` that starts a word and right before a break, a space or `) . , ; :`; each part is
+// drawn from forms on both sides of that rule.
 const HALF_BEFORE = [
   ...["t", "T", "x", "(t", "<em>t</em>", "<b>t</b>", "\u00e9", "t&#x2060;", "", "1", "-", " "],
   ...["&#x2082;", "log\u2099", "log<sub>n</sub>", "t<sup>2</sup>", "&#x1878;", "2\u02b9"],
   ...["1\u00aa", "\u4e8c", "&#x1D4C9;", "</p><p>t"],
   ...["log", "VIII", "0xA", "log<sub>2</sub>t", "2t", "at", "&#x74;", "<sub>t</sub>", "<br/>t"],
+  ...[" t", "the t", "2(t", "x t", "&#9;t"],
 ];
 const HALF_CONTENT = ["½", "&#189;", "&#xBD;", "½ ", "2½", "½½", "-½"];
 const HALF_AFTER = [
@@ -2272,4 +2273,7 @@ if (count >= 500) {
 const corpus = lines.length === 0 ? "" : `${lines.join(LF)}${LF}`;
 if (out === undefined) process.stdout.write(corpus);
 else writeFileSync(out, corpus, "utf8");
-process.stderr.write(`differential corpus: ${count} cases, seed ${seed}${LF}`);
+const cross = lines.length - count;
+process.stderr.write(
+  `differential corpus: ${count} cases${cross > 0 ? ` + ${cross} lowered-half cases` : ""}, seed ${seed}${LF}`,
+);

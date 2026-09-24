@@ -291,9 +291,10 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   has a subscript form. Inside `sup` both still reject: `2<sup>½</sup>` is a square root, not
   "2½". Every other code point of general category N, Sm, Ps, Pe or Pd inside `sub` still
   rejects as stated above. Other code points (letters, footnote
-  marks, ®, `/`) are kept unchanged. Raising a letter or a mark is taken not to change what it
-  says, which is not always so: `10<sup>n</sup>` reads "10n" and verifies against a plain "10n"
-  (a stated residual, as in ADR 0003),
+  marks, ®, `/`) are kept unchanged. Raising a letter or a mark (or, from 3.1.0, lowering ∞ or
+  the half-life's ½) is taken not to change what it says, which is not always so:
+  `10<sup>n</sup>` reads "10n" and verifies against a plain "10n", and `x<sub>∞</sub>` against
+  "x∞" (a stated residual, as in ADR 0003),
   so `C<sub>max</sub>`, `<sup>a</sup>` and `<sup>®</sup>` are accepted, and `t<sub>1/2</sub>`
   is `t₁/₂`.
 - Tables contain only table parts. The only children of `table` are `caption`, `thead`,
@@ -883,7 +884,9 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   that an extractor refuses a raised or lowered run holding what section 5 refuses in the
   corresponding element. Nothing else changes: every narrative 3.0.0 accepts reads the same,
   inside `sup` both still reject, and no text arises that a narrative could not already write
-  with the code points themselves. Forty-three XHTML vectors are added, each an input whose
+  with the code points themselves. Section 7's new sentence only adds a refusal on a path no
+  qualified extractor takes, so it invalidates no extractor's output. Forty-three XHTML vectors
+  are added, each an input whose
   outcome under 3.0.0 differs or which pins the new rule's edges; the existing vectors change only
   in the version string and the hashes that embed it.
 - `fidelity-norm/3.0.0` (major) — numbered lists, table grids and pictures, seen as a reader

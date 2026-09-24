@@ -252,31 +252,42 @@ function checkLoweredHalves(
   halves: readonly LoweredHalf[],
   scriptPieces: ReadonlySet<number>,
 ): void {
-  // Code points of the text, and which of them were emitted inside `sup` or `sub` (a script
-  // element emits one code point per piece).
-  const points: string[] = [];
-  const pieceStart: number[] = [];
-  const inScript: boolean[] = [];
-  output.forEach((piece, position) => {
-    pieceStart.push(points.length);
-    for (const point of piece) {
-      points.push(point);
-      inScript.push(scriptPieces.has(position));
-    }
-  });
-  pieceStart.push(points.length);
-  const onLine = (at: number, allowed: ReadonlySet<string>): boolean =>
-    at < 0 || at >= points.length || (allowed.has(points[at] ?? "") && inScript[at] !== true);
+  // A code point of the text as (piece, index in the piece), found by stepping over the pieces
+  // that emit nothing; a piece emitted inside `sup` or `sub` holds one code point. The steps of
+  // different halves do not overlap, so the rule stays linear without a copy of the text.
+  type At = { point: string; piece: number; index: number } | undefined;
+  const last = (piece: number): At => {
+    let position = piece;
+    while (position >= 0 && output[position] === "") position -= 1;
+    const points = Array.from(output[position] ?? "");
+    return position < 0
+      ? undefined
+      : { point: points.at(-1) ?? "", piece: position, index: points.length - 1 };
+  };
+  const previous = (at: NonNullable<At>): At =>
+    at.index > 0
+      ? {
+          point: Array.from(output[at.piece] ?? "")[at.index - 1] ?? "",
+          piece: at.piece,
+          index: at.index - 1,
+        }
+      : last(at.piece - 1);
+  const next = (piece: number): At => {
+    let position = piece;
+    while (position < output.length && output[position] === "") position += 1;
+    const point = Array.from(output[position] ?? "")[0];
+    return point === undefined ? undefined : { point, piece: position, index: 0 };
+  };
+  const onLine = (at: At, allowed: ReadonlySet<string>): boolean =>
+    at === undefined || (allowed.has(at.point) && !scriptPieces.has(at.piece));
   for (const { start, end, offset } of halves) {
-    const from = pieceStart[start] ?? 0;
-    const to = pieceStart[end] ?? 0;
+    const letter = last(start - 1);
     if (
-      to - from !== 1 ||
-      points[from] !== String.fromCodePoint(HALF) ||
-      points[from - 1] !== "t" ||
-      inScript[from - 1] === true ||
-      !onLine(from - 2, BEFORE_HALF_LIFE) ||
-      !onLine(to, AFTER_HALF)
+      output.slice(start, end).join("") !== String.fromCodePoint(HALF) ||
+      letter?.point !== "t" ||
+      scriptPieces.has(letter.piece) ||
+      !onLine(previous(letter), BEFORE_HALF_LIFE) ||
+      !onLine(next(end), AFTER_HALF)
     ) {
       throw new XhtmlError("unmappable-script", offset);
     }
@@ -285,20 +296,18 @@ function checkLoweredHalves(
 
 function checkComposition(text: string, boundaries: readonly number[]): void {
   const points = Array.from(text);
-  // For each position, the first code point at or after it that is not a Default_Ignorable code
-  // point other than a mark: a word joiner or a zero-width joiner between the tag and a mark is
-  // drawn as nothing, and the mark after it is still drawn apart from the letter before the tag.
-  // Computed once from the end, so a long run of ignorables after many tags is read once.
-  const drawn: string[] = new Array<string>(points.length + 1).fill("");
-  for (let position = points.length - 1; position >= 0; position -= 1) {
-    const point = points[position] ?? "";
-    drawn[position] =
-      MARK.test(point) || !isDefaultIgnorable(point.codePointAt(0) ?? 0)
-        ? point
-        : (drawn[position + 1] ?? "");
-  }
+  // The first code point at or after each boundary that is not a Default_Ignorable code point
+  // other than a mark: a word joiner or a zero-width joiner between the tag and a mark is drawn as
+  // nothing, and the mark after it is still drawn apart from the letter before the tag. Boundaries
+  // only increase, so one cursor reads each run of ignorables once.
+  let cursor = 0;
   for (const boundary of boundaries) {
-    if (MARK.test(drawn[boundary] ?? "")) {
+    if (cursor < boundary) cursor = boundary;
+    for (; cursor < points.length; cursor += 1) {
+      const point = points[cursor] ?? "";
+      if (MARK.test(point) || !isDefaultIgnorable(point.codePointAt(0) ?? 0)) break;
+    }
+    if (MARK.test(points[cursor] ?? "")) {
       throw new XhtmlError("combining-across-markup", boundary);
     }
     const before = points.slice(Math.max(0, boundary - COMPOSE_WINDOW), boundary).join("");
@@ -387,7 +396,8 @@ const SUBSCRIPT_LETTERS = [
 // Kept unchanged inside `sub` from fidelity-norm/3.1.0: U+00BD VULGAR FRACTION ONE HALF and
 // U+221E INFINITY, as in `t<sub>½</sub>` and `AUC<sub>(0-∞)</sub>`. Neither has a subscript form;
 // raised, `2<sup>½</sup>` is a root. ½ is a number, so it is kept only where it cannot join a
-// number on either side (checkLoweredHalves); ∞ has one reading wherever it is.
+// number on either side (checkLoweredHalves); ∞ never joins a number, and loses its position as
+// a letter does (section 5's stated residual).
 const HALF = 0x00bd;
 const KEPT_IN_SUBSCRIPT = [HALF, 0x221e];
 

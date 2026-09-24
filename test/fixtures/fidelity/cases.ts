@@ -3541,9 +3541,10 @@ export const xhtmlCases: XhtmlCase[] = [
     input: div("<p><sup>½</sup></p>"),
     expected: { error: "unmappable-script" },
   },
-  // fidelity-norm/3.1.0: inside `sub`, ∞ is kept unchanged, and ½ only as the element's whole
-  // content after a letter and before no number or script sign (the real labels' half-life and
-  // AUC); inside `sup` both still reject, and so does every other number inside `sub`.
+  // fidelity-norm/3.1.0: inside `sub`, ∞ is kept unchanged, and ½ only as the half-life, the
+  // element's whole content right after a `t` that starts a word and right before a break, a
+  // space or `) . , ; :` (the real labels' half-life and AUC); inside `sup` both still reject, and
+  // so does every other number inside `sub`.
   {
     name: "sub-vulgar-half-kept",
     input: div("<p>the t<sub>½</sub> was approximately 18 hours</p>"),
@@ -3560,7 +3561,7 @@ export const xhtmlCases: XhtmlCase[] = [
     expected: "\n\nAUC₍₀₋∞₎ and AUC₀₋∞\n\n",
   },
   {
-    name: "sub-half-between-letter-and-break-kept",
+    name: "sub-half-life-between-word-and-break-kept",
     input: div("<p><em>t</em><sub>½</sub> 2, (t<sub>½</sub>) and t<sub>½</sub>.</p>"),
     expected: "\n\nt½ 2, (t½) and t½.\n\n",
   },
@@ -3681,8 +3682,10 @@ export const xhtmlCases: XhtmlCase[] = [
   },
   {
     name: "sub-half-before-other-breaks-kept",
-    input: div("<p>t<sub>½</sub>; t<sub>½</sub>: t<sub>½</sub><br/>t<sub>½</sub></p>"),
-    expected: "\n\nt½; t½: t½\nt½\n\n",
+    input: div(
+      "<p>t<sub>½</sub>; t<sub>½</sub>: t<sub>½</sub>, t<sub>½</sub><br/>t<sub>½</sub></p>",
+    ),
+    expected: "\n\nt½; t½: t½, t½\nt½\n\n",
   },
   {
     name: "rejects-sub-half-before-digit",
