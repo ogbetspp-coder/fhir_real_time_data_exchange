@@ -18,8 +18,10 @@ Round 16's sweep, in detail:
 
 1. Chrome on macOS, headless, drew each code point on a canvas. The faces were the defaults
    (`serif`, `sans-serif`, `monospace`), each in regular, bold, italic and bold italic.
-2. A code point is a blank glyph when a face draws it with no pixel of alpha above 40 while
-   advancing the pen.
+2. A code point is a blank glyph when a face draws it with no pixel of alpha above 40, whether
+   or not it advances the pen. (Round 16 counted only those that advance; round 17 swept the
+   zero-width ones too, in planes 0 to 2, 14 and part of 3, and found none outside the sets
+   below and the gaps, forbidden and reserved code points already listed.)
 3. Each hit, and every Cf, Zs, Zl and Zp code point, was checked again as DOM text in both HTML
    and XML documents, with screenshots.
 
@@ -74,7 +76,7 @@ const blanks = await page.evaluate((faces) => {
         const pixels = g.getImageData(0, 0, 160, 96).data;
         let ink = 0;
         for (let i = 3; i < pixels.length; i += 4) if (pixels[i] > 40) ink += 1;
-        if (ink === 0 && g.measureText(character).width > 0) {
+        if (ink === 0) {
           found.push({ codePoint: codePoint.toString(16), font });
         }
       }

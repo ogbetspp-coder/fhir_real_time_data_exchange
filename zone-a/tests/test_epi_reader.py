@@ -154,6 +154,16 @@ def test_colour_shading_and_faint_text_are_marked() -> None:
     ]
 
 
+def test_underline_is_marked() -> None:
+    # An underline turns a sign into another: "<" underlined is drawn "≤" (fidelity-norm/3.0.0
+    # review round 17), so a caller must see it.
+    body = (
+        '<p>CrCl <u>&lt;</u> 30 <a href="https://x.example/">&gt;</a> <a name="n">n</a> '
+        '<span style="text-decoration: underline">+</span></p>'
+    )
+    assert kinds(body) == [(5, 6, "underline"), (10, 11, "underline"), (14, 15, "underline")]
+
+
 # --- the Bundle -------------------------------------------------------------------------------
 
 

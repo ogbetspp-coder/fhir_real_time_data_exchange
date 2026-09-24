@@ -5,14 +5,23 @@
 // (agent/tests/test_quote_edge.py). One list, so the service's proof and the double's cannot
 // drift apart.
 
-export type QuoteEdgeCase = { text: string; cut: string[]; whole: string[] };
+// A case's section is `text`, a single paragraph, or `markup`, the narrative's inner XHTML (a
+// table, whose grid only markup can carry).
+export type QuoteEdgeCase = ({ text: string } | { markup: string }) & {
+  cut: string[];
+  whole: string[];
+};
 
-// Each text becomes the whole narrative of one section, as a single paragraph.
-export function quoteEdgeDiv(text: string): string {
-  return `<div xmlns="http://www.w3.org/1999/xhtml"><p>${text
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")}</p></div>`;
+// Each case becomes the whole narrative of one section.
+export function quoteEdgeDiv(section: QuoteEdgeCase): string {
+  const inner =
+    "markup" in section
+      ? section.markup
+      : `<p>${section.text
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")}</p>`;
+  return `<div xmlns="http://www.w3.org/1999/xhtml">${inner}</div>`;
 }
 
 export const quoteEdgeCases: QuoteEdgeCase[] = [
@@ -91,6 +100,22 @@ export const quoteEdgeCases: QuoteEdgeCase[] = [
     text: "Take 10\u2800 000 IU daily. Up to 5\u{E0020} 000 IU weekly.",
     cut: ["Take 10", "Take 10\u2800", "000 IU daily.", "Up to 5\u{E0020}", "000 IU weekly."],
     whole: ["Take 10\u2800 000 IU daily.", "Up to 5\u{E0020} 000 IU weekly."],
+  },
+  {
+    // Review round 17: table cells are drawn side by side, so a number or a sign split across
+    // cells reads as one, with an empty cell between too; a quote of a whole cell still matches.
+    markup:
+      "<table><tr><td>Adults</td><td>10</td><td>000 IU</td><td>daily</td></tr><tr><td>Children</td><td>&lt;</td><td>5 mg</td><td>daily</td></tr><tr><td>Elderly</td><td>20</td><td></td><td>000 IU</td></tr></table>",
+    cut: ["10", "000 IU", "5 mg", "20"],
+    whole: ["Adults", "Children", "Elderly", "IU"],
+  },
+  {
+    // A cell spanning rows is drawn level with any of them, and one spanning columns reaches
+    // the cell after its last column.
+    markup:
+      '<table><tr><td rowspan="3">10</td><td>Adults</td><td>x</td></tr><tr><td>000 IU</td><td>y</td></tr><tr><td>daily</td><td>z</td></tr><tr><td colspan="2">5</td><td>000 mg</td></tr><tr><td>Dose</td><td>20 mg</td><td>w</td></tr></table>',
+    cut: ["10", "000 IU", "5", "000 mg"],
+    whole: ["Adults", "daily", "Dose", "20 mg"],
   },
   {
     // Review round 16: a Mongolian or Yi letter the default serif face draws as a blank.

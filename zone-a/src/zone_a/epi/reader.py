@@ -35,9 +35,11 @@ super`` as superscript, ``sub`` and ``vertical-align: sub`` as subscript, ``s``,
 ``text-decoration: line-through`` as strike, a background other than white as
 ``shading-<colour>``, a text colour other than black as ``color-<colour>`` (white or a
 nearly white colour as faint instead, a nearly black one as nothing; ``#abc`` and ``rgb()`` are
-written as ``#aabbcc``, and any other colour notation refuses the section), and a font size
-under two points as faint. Bold, italic,
-underline, font family and every layout property are not reported.
+written as ``#aabbcc``, and any other colour notation refuses the section), a font size
+under two points as faint, and ``u``, ``a`` with an ``href`` and ``text-decoration: underline``
+as underline (an underline turns a sign into another: "<" underlined is drawn "≤", and "1"
+with an underlined "a" reads "1ª"). Bold, italic, font family and every layout property are
+not reported.
 
 What refuses a section (``SectionRefusal.code``):
 
@@ -303,6 +305,8 @@ def _style(style: str) -> set[str]:
             words = set(value.split())
             if "line-through" in words:
                 kinds.add("strike")
+            if "underline" in words:
+                kinds.add("underline")
             if words - {"underline", "none", "line-through", "solid"}:
                 raise _RefusedError("unsupported-style", f"text-decoration: {value}")
         else:
@@ -424,6 +428,8 @@ def _walk(element: ET.Element, builder: _Builder, marks: frozenset[str], depth: 
         kinds.add("subscript")
     elif name in ("s", "strike"):
         kinds.add("strike")
+    elif name == "u" or (name == "a" and element.get("href") is not None):
+        kinds.add("underline")
     here = frozenset(kinds)
     if name == "br":
         builder.line_break(here)

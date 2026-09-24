@@ -353,8 +353,9 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
   character the normalisation forbids — is `document-not-found` to the caller and
   `not-entitled` in the record. A quote that normalises to nothing, carries a character the
   normalisation forbids, or (from `fidelity-norm/3.0.0`) carries a table's grid marker or a
-  picture's U+FFFC or normalises to gaps alone (section 6 of the specification: whitespace, the
-  thin spaces, U+2800 and the Default_Ignorable code points) is `invalid-request`: such a quote
+  picture's U+FFFC or normalises to gaps alone (the gaps of section 6 of the specification:
+  whitespace, the thin spaces, the blank glyphs and the Default_Ignorable code points) is
+  `invalid-request`: such a quote
   could join two rows of a table, match between the groups of a number, or quote nothing a
   reader sees. It then counts `sectionsSearched` as the number of candidate
   sections that carry a narrative, normalises each candidate's text in turn, stops at the first
@@ -380,6 +381,15 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
     neither end with "10" or "10" U+2009 nor begin with "000" there; a quote
     preceded by a comparator or sign and a space (`<`, `>`, `≤`, `≥`, `±`, `∓`, `−`, `~`, `≈`
     and their variants) has lost it. Both are cuts;
+  - **across table cells** (from `fidelity-norm/3.0.0`): a renderer draws a row's cells side by
+    side with a gap about as wide as a space, so "10" | "000 IU" reads "10 000 IU", "<" | "5 mg"
+    reads "< 5 mg", and so do they with an empty cell between or beside a cell spanning rows
+    (drawn level with any of them). The normalised text carries the grid (U+FDD0 table, U+FDD1
+    end, U+FDD2 row, U+FDD3 cell, U+FDD4 and U+FDD5 slots covered from the left and from above),
+    so a quote that begins or ends at the edge of a cell's text is held to the two rules above
+    against the nearest cell with text on that side — found by rebuilding the grid, through
+    spans, skipping empty cells — in every row its cell covers. So neither "10" nor "000 IU"
+    matches there, nor "5 mg" after the "<" cell, while "10 mg" alone in a cell still does;
   - and a word character on either side (the fidelity library's own `isWordCharacter`) is a cut
     before any of this is consulted, so the rule is never looser than the gate's.
 

@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -153,6 +154,23 @@ def _optional(tokens: list[Token]) -> bool:
 # that is already in capitals change nothing and are allowed.
 _KEPT = {"highlight-lightGray", "shading-D9D9D9"}
 _CASE = {"caps", "smallCaps"}
+# An underline changes a sign ("<" underlined reads "≤", and "-" between digits reads "="), not
+# letters, digits, quotation marks or a hyphen inside a word, which is all the template
+# underlines (its links and headings: "Breast-feeding", "With Respect to “Pregnancy”"); nor the
+# template's own brackets, which the registry reads as markup, never as text ("<Traceability>").
+_TEMPLATE_BRACKETS = frozenset("<>[]{}")
+
+
+def _underline_safe(covered: str) -> bool:
+    for index, character in enumerate(covered):
+        category = unicodedata.category(character)
+        if category == "Sm" and character not in _TEMPLATE_BRACKETS:
+            return False
+        if category == "Pd":
+            around = covered[max(0, index - 1) : index + 2]
+            if any(c.isdigit() for c in around):
+                return False
+    return True
 
 
 def _check(paragraph: Paragraph, where: str, keeps_marks: bool = False) -> None:
@@ -163,8 +181,10 @@ def _check(paragraph: Paragraph, where: str, keeps_marks: bool = False) -> None:
         raise RegistryError(f"{where}: a numbered or bulleted paragraph")
     for mark in paragraph.marks:
         covered = paragraph.text[mark.start : mark.end]
-        if (keeps_marks and mark.kind in _KEPT) or (
-            mark.kind in _CASE and covered == covered.upper()
+        if (
+            (keeps_marks and mark.kind in _KEPT)
+            or (mark.kind in _CASE and covered == covered.upper())
+            or (mark.kind == "underline" and _underline_safe(covered))
         ):
             continue
         raise RegistryError(f"{where}: {mark.kind} changes what the text shows")

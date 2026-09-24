@@ -482,6 +482,9 @@ function decodeEntity(match: RegExpExecArray, offset: number): number {
   return codePoint;
 }
 
+// The elements a rule (`hr`) may not be drawn in (below).
+const RULE_BREAKS_FRACTION = new Set(["td", "th", "caption"]);
+
 // The parent check at a start tag: nothing but text inside `sup` and `sub`; each table part, and
 // `li`, in its own parent; nothing but table parts inside a table container, and nothing but `li`
 // inside a list.
@@ -827,6 +830,11 @@ export function xhtmlToText(div: string): string {
       if (!isRoot) checkNesting(name, stack, index);
       const parent = stack[stack.length - 1];
       checkParent(name, parent, index);
+      // A rule in a cell or a caption is as narrow as its column, so a renderer draws "1", the
+      // rule and "2" as a stacked fraction, ½, where the text says "1 2".
+      if (name === "hr" && stack.some((open) => RULE_BREAKS_FRACTION.has(open))) {
+        throw new XhtmlError("table-content", index);
+      }
       if (SPLITTING_INLINE.has(name)) splits.push(output.length);
       const table = tables[tables.length - 1];
       enterTableStructure(name, parent, table, index);

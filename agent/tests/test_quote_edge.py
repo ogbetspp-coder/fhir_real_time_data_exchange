@@ -19,7 +19,7 @@ from google.adk.agents.readonly_context import ReadonlyContext
 from google.adk.tools.tool_context import ToolContext
 
 from verifiable_answer_agent import quote_edge
-from verifiable_answer_agent.quote_edge import locate_quote
+from verifiable_answer_agent.quote_edge import is_gap, locate_quote
 from verifiable_answer_agent.tools import build_query_toolset, read_tool_result
 
 from .conftest import config_for, invocation_context
@@ -172,3 +172,23 @@ def test_the_fake_refuses_the_quotes_the_service_refuses() -> None:
     )
     for quote in accepted:
         assert not quote_is_refused(quote), repr(quote)
+
+
+# fidelity-norm/3.0.0 sections 2 and 6, as the specification writes them (the service is held to
+# the same lists in test/fidelity-lists.test.ts): dropping one entry from the double or the port
+# fails here.
+_FORBIDDEN_FROM_3_0_0 = (
+    0x0600, 0x0601, 0x0602, 0x0603, 0x0604, 0x0605, 0x06DD, 0x070F, 0x0890, 0x0891, 0x08E2,
+    0xFFF9, 0xFFFA, 0xFFFB, 0x110BD, 0x110CD,
+)  # fmt: skip
+_BLANK_GLYPHS = (0x1878, 0x18AA, 0x2800, 0xA4A2, 0xA4A3, 0xA4B4, 0xA4C1, 0xA4C5)
+
+
+def test_the_double_refuses_every_code_point_section_2_adds() -> None:
+    for code_point in _FORBIDDEN_FROM_3_0_0:
+        assert quote_is_refused(f"dose {chr(code_point)} is"), hex(code_point)
+
+
+def test_every_blank_glyph_is_a_gap() -> None:
+    for code_point in _BLANK_GLYPHS:
+        assert is_gap(chr(code_point)), hex(code_point)

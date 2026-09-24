@@ -412,6 +412,96 @@
       ]
     },
     {
+      "text": "﷐ ﷒ ﷓ Adults ﷓ 10 ﷓ 000 IU ﷓ daily ﷒ ﷓ Children ﷓ < ﷓ 5 mg ﷓ daily ﷒ ﷓ Elderly ﷓ 20 ﷓ ﷓ 000 IU ﷑",
+      "quotes": [
+        {
+          "quote": "10",
+          "result": "no-match"
+        },
+        {
+          "quote": "000 IU",
+          "result": "no-match"
+        },
+        {
+          "quote": "5 mg",
+          "result": "no-match"
+        },
+        {
+          "quote": "20",
+          "result": "no-match"
+        },
+        {
+          "quote": "Adults",
+          "result": "match",
+          "startOffset": 6,
+          "endOffset": 12
+        },
+        {
+          "quote": "Children",
+          "result": "match",
+          "startOffset": 39,
+          "endOffset": 47
+        },
+        {
+          "quote": "Elderly",
+          "result": "match",
+          "startOffset": 71,
+          "endOffset": 78
+        },
+        {
+          "quote": "IU",
+          "result": "match",
+          "startOffset": 24,
+          "endOffset": 26
+        }
+      ]
+    },
+    {
+      "text": "﷐ ﷒ ﷓ 10 ﷓ Adults ﷓ x ﷒ ﷕ ﷓ 000 IU ﷓ y ﷒ ﷕ ﷓ daily ﷓ z ﷒ ﷓ 5 ﷔ ﷓ 000 mg ﷒ ﷓ Dose ﷓ 20 mg ﷓ w ﷑",
+      "quotes": [
+        {
+          "quote": "10",
+          "result": "no-match"
+        },
+        {
+          "quote": "000 IU",
+          "result": "no-match"
+        },
+        {
+          "quote": "5",
+          "result": "no-match"
+        },
+        {
+          "quote": "000 mg",
+          "result": "no-match"
+        },
+        {
+          "quote": "Adults",
+          "result": "match",
+          "startOffset": 11,
+          "endOffset": 17
+        },
+        {
+          "quote": "daily",
+          "result": "match",
+          "startOffset": 45,
+          "endOffset": 50
+        },
+        {
+          "quote": "Dose",
+          "result": "match",
+          "startOffset": 76,
+          "endOffset": 80
+        },
+        {
+          "quote": "20 mg",
+          "result": "match",
+          "startOffset": 83,
+          "endOffset": 88
+        }
+      ]
+    },
+    {
       "text": "Take 10ᡸ 000 IU daily. Up to 5꓅ 000 IU weekly.",
       "quotes": [
         {

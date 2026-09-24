@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and sixteen reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and seventeen reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -828,3 +828,31 @@ Each fix is pinned by vectors on both sides, and a break of each is caught by th
 6. **Low.** The prepended concatenation marks (U+0600–U+0605, U+06DD, U+070F, U+0890, U+0891,
    U+08E2, U+110BD, U+110CD) draw across the digits after them (U+070F puts a bar over "000").
    Fixed: refused in section 2.
+
+## Seventeenth review (2026-09-23): findings and what changed
+
+1. **High.** A renderer draws a row's cells side by side with a gap about a space wide, so
+   "10" | "000 IU" is drawn "10 000 IU" (pixel-identical to the paragraph), "<" | "5 mg" reads
+   "< 5 mg", and so does a number with an empty cell between or beside a cell spanning rows; the
+   quote-edge rule matched either half. Fixed in the service and the agent: a quote beginning or
+   ending at a cell's edge is held to the digit and sign rules against the nearest cell with
+   text on that side, the grid rebuilt from the markers through spans, in every row its cell
+   covers. §6's span rules do not rebuild the grid; for a structured source a span covers the
+   whole page, which §6 now says. The agent's answer splitter reads only the text after its last
+   cut, so it cannot see a table's grid; today no chunk carrying a grid marker is ever sent (the
+   service refuses one), and quoting a table is the publishing step's work (PR 5), which must
+   give the splitter the whole table.
+2. **High.** An `hr` in a cell or caption is as narrow as its column, so `<td>1<hr/>2</td>` is
+   drawn as the fraction ½ while the text says "1 2". Fixed: `table-content`; the one older
+   vector with an `hr` in a cell drops it.
+3. **Medium.** ADR 0005's underline requirement covered `u` and links but not CSS underlines,
+   and did not say that adjacency is judged on the drawn text (`1<u>a</u>` "1ª"). Fixed.
+4. **Medium.** The ePI reader read an underlined "<" as "<". Fixed: both readers mark
+   underlines; the QRD registry accepts them only over text an underline cannot change.
+5. **Medium.** §5's `empty-narrative` wording and the query design omitted the seven blank
+   letters. Fixed: both refer to the gaps of §6.
+6. to 10. **Low.** A stale mutation row; stated lists with unpinned entries (now enumerated on
+   every side), and no page-side vector for a 3.0.0 §2 code point (added); `find_product` made
+   unavailable by one refused stored name (now a non-match); stale comments in the Python port
+   and ADR 0003; the sweep's zero-width criterion, and the platform the renderer claims were
+   checked on (Chrome on macOS; stated in §5).

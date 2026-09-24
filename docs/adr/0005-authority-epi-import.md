@@ -62,15 +62,23 @@ Three facts about that source meet three rules of the record:
      only as decision 3 allows); any
      other element the scanner refuses (`font`, `center`, `bdo`, `ruby`, `q`, `ins`, `del`, `s`)
      refuses the section.
-   - **Underlines are not unwrapped blindly.** The authority's viewer underlines a link and a
-     `u`, and an underline turns what it underlines into another sign or word: `<u>&lt;</u>` is
-     drawn "≤", `+` "±", `=` "≡", U+02C2 exactly "≤", and `1<u>a</u>` "1ª" (the review of
-     `fidelity-norm/3.0.0` that found it, round 16, is why §5 refuses `u` and `a` in a
-     narrative). Unwrapping would keep the "<" and lose the "≤" a reader sees. T unwraps a link
-     or a `u` only when its text, with any `sup` or `sub` in it, is on a closed allowlist that PR
-     3 sets against the renderer (letters and digits of the EU scripts, U+0020 and closed
-     punctuation, with no single letter next to a digit), and anything else refuses the
-     section.
+   - **Underlines are not unwrapped blindly.** The authority's viewer underlines a link with
+     a target, a `u`, and any text under `text-decoration: underline` or
+     `text-decoration-line: underline` on its element or an ancestor; and an underline turns what
+     it underlines into another sign or word: `<u>&lt;</u>` is drawn "≤", `+` "±", `=` "≡", `-`
+     nearly "=", U+02C2 exactly "≤", and `1<u>a</u>` "1ª" (the reviews of `fidelity-norm/3.0.0`
+     that found it, rounds 16 and 17, are why §5 refuses `u` and `a` in a narrative).
+     Unwrapping, or deleting the declaration, would keep the "<" and lose the "≤" a reader sees.
+     So wherever the authority's div draws an underline, from any of these sources, T removes it
+     only when every code point it covers is on a closed allowlist PR 3 sets against the
+     renderer, and anything else refuses the section. The allowlist starts from: letters and
+     decimal digits of the Latin, Greek and Cyrillic scripts; U+0020; and the punctuation
+     `. , ; : ( ) / ' " %` and the curly quotation marks; never a code point of category Sm
+     (mathematical symbols) or Pd (dashes), a modifier letter, or a symbol. Adjacency is judged
+     on the drawn text, the underlined run's neighbours outside the element included: an
+     underlined run of one or two letters with a digit directly before or after it on the drawn
+     line (`1<u>a</u>`, `2<u>nd</u>`) refuses, since an underline under a letter after a
+     number draws an ordinal indicator.
    - **Closed CSS list, by property and value, that can neither hide nor overprint text.** Font
      families only from a closed list of Unicode text fonts, every family in the list on it
      (symbol-encoded fonts such as Symbol and Wingdings refuse); font sizes in absolute units

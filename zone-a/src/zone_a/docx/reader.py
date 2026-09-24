@@ -20,10 +20,10 @@ What a paragraph carries:
   subscript, raised or lowered text, capitals and small capitals, single and double
   strike-through, highlight with its colour, shading with its fill (or its pattern, colour and
   fill) on the run or the paragraph, right-to-left, and faint text (white or a light theme
-  colour, under two points in any unit, or scaled under a fifth). ``text`` alone flattens
-  "10" with a superscript "9" to "109"; a caller that uses ``text`` must look at ``marks``.
-  Other appearance (other colours, font size, underline, bold, italic, borders) is not
-  reported.
+  colour, under two points in any unit, or scaled under a fifth), and underline of any style
+  (an underlined "<" is how "≤" is often typed). ``text`` alone flattens "10" with a
+  superscript "9" to "109"; a caller that uses ``text`` must look at ``marks``. Other
+  appearance (other colours, font size, bold, italic, borders) is not reported.
 - ``mark_hidden``: the paragraph mark is hidden (``vanish`` or ``specVanish``, directly or
   through the paragraph's styles), so Word shows this paragraph run on into the next one.
 - ``numbering``: the list the paragraph belongs to, directly or through its style. The number
@@ -248,8 +248,8 @@ class Mark:
     One of superscript, subscript, position, caps, smallCaps, strike, dstrike,
     ``highlight-<colour>`` (Word's colour name, e.g. ``highlight-lightGray``),
     ``shading-<FILL>`` (e.g. ``shading-D9D9D9``) or ``shading-<pattern>-<COLOUR>-<FILL>``, rtl
-    (right-to-left) and faint (white or a light theme colour, under two points, or scaled
-    under a fifth). Marks of one
+    (right-to-left), faint (white or a light theme colour, under two points, or scaled
+    under a fifth) and underline. Marks of one
     kind that touch are merged; marks of different kinds may overlap.
     """
 
@@ -760,6 +760,8 @@ class _ParagraphReader:
             kinds.append("rtl")
         if _faint(properties):
             kinds.append("faint")
+        if properties.value("u") not in (None, "none"):
+            kinds.append("underline")
         for kind in kinds:
             previous = next((m for m in reversed(self.marks) if m.kind == kind), None)
             if previous is not None and previous.end == start:

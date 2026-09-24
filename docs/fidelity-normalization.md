@@ -189,7 +189,10 @@ These are treated as content; a difference is a mismatch:
 
 The narrative `text.div` is scanned without a DOM. Any violation makes the section
 `malformed-narrative`. The rule behind every bullet is the same: markup may not change what a
-reader sees without the check seeing it. Where a renderer — usually an HTML parser given the
+reader sees without the check seeing it. The renderer each rule was checked against is Chrome on
+macOS with its default fonts, in HTML and XML modes; another platform's fonts can draw a code
+point differently (a Japanese or Korean face on Windows draws U+005C as "¥" or "₩" under a `ja`
+or `ko` root), which is a stated residual. Where a renderer — usually an HTML parser given the
 narrative as `innerHTML` — would draw markup differently from the text the scanner emits, the
 markup is folded into the text or rejected.
 
@@ -349,6 +352,9 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   number), `tfoot` (at most one), never both forms in one table. `caption`, `thead`, `tbody`,
   `tfoot` must be direct children of `table`; `tr` of `table` or a section; `td` and `th` of
   `tr`. Violations reject (`table-structure`, `table-section-order`, or `misnested-tag`).
+- An `hr` while a `td`, `th` or `caption` is open rejects (`table-content`, from 3.0.0): the
+  rule is only as wide as its column, so `<td>1<hr/>2</td>` is drawn as the stacked fraction ½
+  where the text says "1 2".
 - Nesting is bounded (`nesting-depth`, from 3.0.0): an element's start tag rejects when 32
   elements are already open below the root, a void element (`br`, `hr`, `img`) included at its
   own start tag, so at most 32 are open below the root (an HTML parser stops nesting at 512 open
@@ -399,8 +405,8 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   Each decoded code point is subject to section 2 on its own. Named HTML entities such as
   `&nbsp;` reject.
 - The extracted text is then normalised (section 3) by the verifier, which is where an empty
-  result is decided: a narrative whose normalised text holds nothing but gaps (section 6:
-  whitespace, the thin spaces, U+2800 and the Default_Ignorable code points) and the grid markers
+  result is decided: a narrative whose normalised text holds nothing but the gaps of section 6
+  (whitespace, the thin spaces, the blank glyphs and the Default_Ignorable code points) and the grid markers
   U+FDD0–U+FDD5 draws nothing inked, and is `malformed-narrative` with reason `empty-narrative`
   (a table of empty cells is empty, and so is a thin space alone; a list number, a picture and
   U+1680, drawn as a stroke, are drawn). The scanner itself never produces that reason. The
@@ -467,7 +473,7 @@ reason code is inside `reportHash`, so the order in which violations are decided
   table part (`caption`, `thead`, `tbody`, `tfoot`, `tr`, `td`, `th`) or an `li` in the wrong
   parent; else `table-content` for any other element whose parent is `table`, `thead`,
   `tbody`, `tfoot` or `tr`; else `list-content` for any other element whose parent is `ol` or
-  `ul`.
+  `ul`; then `table-content` for an `hr` while a `td`, `th` or `caption` is open.
 - At an end tag: `malformed-tag`, then `uppercase-element`, then `unbalanced-tag`, then
   `misnested-tag`, then `table-shape` (for `</tr>`, a row drawn at zero height; for `</thead>`,
   `</tbody>`, `</tfoot>` and `</table>`, a clipped row span, then at `</table>` the row widths,
@@ -562,6 +568,11 @@ The scanner's reason codes are, in the order of this section: `forbidden-charact
     joiners U+00A0 and U+2007 as well, although they are not edge whitespace: a span ending "10"
     U+00A0 before a space still ends inside the number.)
   - These rules apply together; any one of them makes a cut.
+  - They read the page's text and do not rebuild a table's grid, so a number split across two
+    cells drawn side by side ("10" | "000 IU") is not one number to them. For a structured
+    source, the only kind 3.0.0 qualifies, a span covers the whole page (section 7), so no span
+    edge falls between cells; the query service's quote-edge rule, whose quotes can, rebuilds
+    the grid (`docs/design/epi-mcp-query-service.md`).
 
   So "Maximum dose is 1" cannot be taken from "Maximum dose is 1.5 mg", nor "20 °C." from
   "−20 °C.", nor "5 mg." from "0.5 mg.", nor "is 10" from "is 10 000 IU"; a section cannot begin at "safe for pregnant women"
@@ -832,7 +843,7 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   emits U+FFFC, the SHA-256 of its `src` and U+FFFC; the tables of a narrative cover at most
   50 000 slots (`table-size`); a narrative of only grid markers is `empty-narrative`. U+FFFC and
   U+FDD0–U+FDEF reject in narrative
-  (`reserved-character`, one of the two rules applied to one side only). U+1680 OGHAM SPACE MARK, drawn as a stroke, and the spaces narrower than a quarter of an em (U+2006, U+2009, U+200A, U+202F, U+205F) leave the section 3 whitespace list and are content; narrative rejects U+00AD and U+200B (`invisible-character`, withdrawing `soft-hyphen-at-boundary`); nesting is bounded (`nesting-depth`); `]]>` in text rejects (`cdata`); a combining mark or a composition across inline markup rejects (`combining-across-markup`); `u` and `a` reject (`unknown-element`: an underline turns a sign into another, "<" into "≤"), and with them `href`; section 2 adds the interlinear annotation controls and the prepended concatenation marks; section 6's digit-group rule reads past every gap; and a narrative of gaps alone is `empty-narrative`. Section 7 qualifies structured sources only;
+  (`reserved-character`, one of the two rules applied to one side only). U+1680 OGHAM SPACE MARK, drawn as a stroke, and the spaces narrower than a quarter of an em (U+2006, U+2009, U+200A, U+202F, U+205F) leave the section 3 whitespace list and are content; narrative rejects U+00AD and U+200B (`invisible-character`, withdrawing `soft-hyphen-at-boundary`); nesting is bounded (`nesting-depth`); `]]>` in text rejects (`cdata`); a combining mark or a composition across inline markup rejects (`combining-across-markup`); `u` and `a` reject (`unknown-element`: an underline turns a sign into another, "<" into "≤"), and with them `href`; an `hr` in a table cell or caption rejects (`table-content`: it is drawn as a fraction bar); section 2 adds the interlinear annotation controls and the prepended concatenation marks; section 6's digit-group rule reads past every gap; and a narrative of gaps alone is `empty-narrative`. Section 7 qualifies structured sources only;
   drawn-document extraction is not qualified until a later version closes the open items the
   reviews recorded. The extractor contract (section 7) writes tables with their grid, numbered markers with a space, pictures with their hash, and
   a structured source as one page per section. Major under section 8: extractor output that

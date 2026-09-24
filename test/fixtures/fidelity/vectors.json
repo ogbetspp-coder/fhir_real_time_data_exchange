@@ -1685,8 +1685,8 @@
     },
     {
       "name": "cell-breaks-are-tabs",
-      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td><p>a</p>b<br/>c<hr/></td></tr></table></div>",
-      "expected": "\n\n﷐\n﷒\t﷓\t\ta\tb\tc\t\t\t\n\n﷑\n\n"
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td><p>a</p>b<br/>c</td></tr></table></div>",
+      "expected": "\n\n﷐\n﷒\t﷓\t\ta\tb\tc\t\n\n﷑\n\n"
     },
     {
       "name": "rejects-soft-hyphen-before-br-in-cell",
@@ -2481,6 +2481,39 @@
       "expected": {
         "error": "nesting-depth"
       }
+    },
+    {
+      "name": "rejects-rule-in-cell",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>Take</td><td>1<hr/>2</td><td>tablet daily</td></tr></table></div>",
+      "expected": {
+        "error": "table-content"
+      }
+    },
+    {
+      "name": "rejects-rule-in-header-cell",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><th>1<hr/>2</th></tr></table></div>",
+      "expected": {
+        "error": "table-content"
+      }
+    },
+    {
+      "name": "rejects-rule-in-caption",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><caption>1<hr/>4</caption><tr><td>x</td></tr></table></div>",
+      "expected": {
+        "error": "table-content"
+      }
+    },
+    {
+      "name": "rejects-rule-in-block-in-cell",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td><div>1<hr/>2</div></td></tr></table></div>",
+      "expected": {
+        "error": "table-content"
+      }
+    },
+    {
+      "name": "accepts-rule-after-table",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>1</td></tr></table><hr/><p>2</p></div>",
+      "expected": "\n\n﷐\n﷒\t﷓\t1\t\n\n﷑\n\n\n\n2\n\n"
     },
     {
       "name": "rejects-underline",
@@ -16090,6 +16123,74 @@
           "uncoveredGaps": 1
         },
         "reportHash": "aaee50d0192b93a1254dec30b0385f2e72fa32bbe5b4e9ba37c35ce1204d791b"
+      }
+    },
+    {
+      "name": "page-with-interlinear-annotation",
+      "input": {
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nTake 10 ￹000 IU daily. Dose information.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 76
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Dose information.</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 58,
+                "endOffset": 75,
+                "textSha256": "024e4fc601d3e4b0ea442bb5f90b6974e3513139692e2ffe54a33425bc215a2a"
+              }
+            ],
+            "narrativeDivSha256": "acc16b991ec4e52b1216450e4bdd53e92190cf9749a9b6fa6d0515dcac40396b",
+            "normalizedTextSha256": "024e4fc601d3e4b0ea442bb5f90b6974e3513139692e2ffe54a33425bc215a2a"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "extractedTextSha256": "2dc53f56aa34d5822ed5bfb8e2ae9d37bcd95ef805c698bbb4447408977ec99a",
+        "narrativeBindingSha256": "35ff71e4dbde1765946ea27de42df0bf30c846fbcf315cad7812b8014b4caf58",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "span-not-found",
+            "spanCount": 1,
+            "reason": "page-malformed",
+            "normalizedTextSha256": "024e4fc601d3e4b0ea442bb5f90b6974e3513139692e2ffe54a33425bc215a2a"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 87,
+          "bodyCodePoints": 41,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "d69bd7f39229fa4014a7fbb1520a625afb1c75b6f4b463187aee698ef7f1227a"
       }
     },
     {

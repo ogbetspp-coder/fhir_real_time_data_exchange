@@ -149,7 +149,14 @@ def test_every_chunk_of_every_worked_example_is_one_the_service_confirms() -> No
     # Every text the query service's own rule was exported over, split at every window width:
     # each chunk within the bound is a match under that rule, and a chunk over the bound exists
     # only where the window held no acceptable cut.
-    texts = [section["text"] for section in quote_edge_cases()["sections"]]
+    # A text carrying a table's grid markers is left out: the service refuses any quote holding
+    # one (``invalid-request``), so no chunk of it is ever sent, and quoting a table is the
+    # publishing step's work (roadmap 3a, PR 5).
+    texts = [
+        section["text"]
+        for section in quote_edge_cases()["sections"]
+        if not any(0xFDD0 <= ord(character) <= 0xFDEF for character in section["text"])
+    ]
     texts.append(long_section().text)
     for text in texts:
         for limit in [*range(4, min(len(text), 120)), VERIFY_QUOTE_MAX_UTF16]:

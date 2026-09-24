@@ -127,6 +127,17 @@ export function withNarratives(bundle: FhirBundle, divs: Record<string, string>)
   return copy;
 }
 
+// A copy of `bundle` naming its product `productName`, with identifier `identifierValue`.
+export function withProduct(
+  bundle: FhirBundle,
+  productName: string,
+  identifierValue: string,
+): FhirBundle {
+  const copy = structuredClone(bundle);
+  setProduct(copy, productName, identifierValue);
+  return copy;
+}
+
 function setProduct(bundle: FhirBundle, productName: string, identifierValue: string): void {
   const product = bundle.entry.find(
     ({ resource }) => resource.resourceType === "MedicinalProductDefinition",

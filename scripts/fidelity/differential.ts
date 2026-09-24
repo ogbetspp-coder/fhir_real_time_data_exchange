@@ -1099,6 +1099,19 @@ const VIOLATIONS: readonly Violation[] = [
     },
   },
   {
+    // A rule in a cell or a caption, drawn as a fraction bar (review round 17), and one outside.
+    className: "rule-in-table",
+    apply: (body, attrs, random) => {
+      const inner = pick(random, [
+        "<table><tr><td>1<hr/>2</td></tr></table>",
+        "<table><tr><th><p>1</p><hr/><p>2</p></th></tr></table>",
+        "<table><caption>1<hr/>4</caption><tr><td>x</td></tr></table>",
+        "<table><tr><td>1</td></tr></table><hr/><p>2</p>",
+      ]);
+      return root(`${body}${inner}`, attrs);
+    },
+  },
+  {
     className: "cdata-end-in-text",
     apply: (body, attrs, random) =>
       root(`${body}<p>a[b[0]${pick(random, ["]]>", "]]&gt;", "] ]>"])} 5</p>`, attrs),

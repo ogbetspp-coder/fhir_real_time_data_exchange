@@ -109,7 +109,10 @@ reader sees without the check seeing it._
   can key on to hide text is allowed: no `class`, no `id`, a language tag on the root only, no
   in-page link. `q` is not allowed because renderers generate visible characters for it; `ol`
   is allowed from fidelity-norm/3.0.0 because the numbers a renderer draws are folded into the
-  text; and table sections must appear in rendering order.
+  text; `u` and `a` are not allowed from fidelity-norm/3.0.0 because a renderer underlines them
+  and an underline turns a sign into another ("<" into "≤"); an `hr` in a table cell or caption
+  is refused from fidelity-norm/3.0.0 because it is drawn as a fraction bar; and table sections
+  must appear in rendering order.
 - Only `br` and `hr` (and, from `fidelity-norm/3.0.0`, `img`) may be self-closing, and must
   be, because an HTML parser ignores the `/` of any other element. Inside a tag only TAB, LF, CR and SPACE are whitespace, because an HTML
   parser reads any other code point there as part of the tag name. Tables contain only table

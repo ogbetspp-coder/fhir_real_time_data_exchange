@@ -27,8 +27,9 @@ const output = path.resolve("test/fixtures/contracts");
 await mkdir(output, { recursive: true });
 const prettierOptions = { ...(await resolveConfig(output)), parser: "json" as const };
 
-const sections = quoteEdgeCases.map(({ text, cut, whole }) => {
-  const normalized = normalizeText(xhtmlToText(quoteEdgeDiv(text)));
+const sections = quoteEdgeCases.map((section) => {
+  const { cut, whole } = section;
+  const normalized = normalizeText(xhtmlToText(quoteEdgeDiv(section)));
   const quotes = [...cut, ...whole].map((raw) => {
     const quote = normalizeText(raw);
     const located = locateQuote(normalized, quote);

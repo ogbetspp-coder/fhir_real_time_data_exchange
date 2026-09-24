@@ -300,6 +300,7 @@ def test_the_corpus_exercises_the_classes_the_review_named() -> None:
         "invisible-in-narrative",
         "nesting-bounds",
         "cdata-end-in-text",
+        "rule-in-table",
         "combining-across-markup",
         "underline-or-link",
         "content-space",

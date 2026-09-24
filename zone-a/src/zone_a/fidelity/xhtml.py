@@ -89,6 +89,9 @@ BLOCK_ELEMENTS: Final = frozenset(
     }
 )
 
+# `u` and `a` are excluded from 3.0.0: a renderer underlines both (`a` with a target), and an
+# underline turns a sign into another, "<" into "≤", ">" into "≥", "+" into "±", and "1" `u`"a"
+# into "1ª", which no closed list of code points can bound.
 INLINE_ELEMENTS: Final = frozenset(
     {"span", "b", "i", "em", "strong", "sup", "sub", "small", "abbr", "cite", "code", "img"}
 )
@@ -344,9 +347,9 @@ ENTITY: Final = re.compile(r"&(?:([A-Za-z]+)|#([0-9]{1,7})|#x([0-9A-Fa-f]{1,6}))
 ASCII_LETTER: Final = re.compile(r"[A-Za-z]")
 
 # Attribute values are never compared against the source, so they must not be able to carry
-# text: each allowed attribute is restricted to a short token alphabet or a safe link form, and to
-# the one element that needs it. Nothing a viewer's stylesheet or script could key on to hide text
-# (`class`, `id`, a language tag below the root, an in-page link) is allowed. These are
+# text: each allowed attribute is restricted to a short token alphabet, and to the one element that
+# needs it. Nothing a viewer's stylesheet or script could key on to hide text (`class`, `id`, a
+# language tag below the root, a link) is allowed. These are
 # whole-value grammars and are applied with `fullmatch`, so they carry no `^`/`$`: Python's `$`
 # would also match before a trailing newline, which is text this must not carry.
 TOKEN_VALUE: Final = re.compile(r"[A-Za-z0-9_.:-]{1,32}")
@@ -518,6 +521,10 @@ def _decode_entity(match: re.Match[str], offset: int) -> int:
     if _is_invisible_break(code_point):
         raise XhtmlError("invisible-character", offset)
     return code_point
+
+
+# The elements a rule (`hr`) may not be drawn in (below).
+RULE_BREAKS_FRACTION: Final = frozenset({"td", "th", "caption"})
 
 
 def _check_parent(name: str, parent: str | None, offset: int) -> None:
@@ -858,6 +865,10 @@ def xhtml_to_text(div: str) -> str:
                 _check_nesting(name, stack, index)
             parent = stack[-1] if stack else None
             _check_parent(name, parent, index)
+            # A rule in a cell or a caption is as narrow as its column, so a renderer draws "1",
+            # the rule and "2" as a stacked fraction, ½, where the text says "1 2".
+            if name == "hr" and any(open_name in RULE_BREAKS_FRACTION for open_name in stack):
+                raise XhtmlError("table-content", index)
             if name in SPLITTING_INLINE:
                 splits.append(len(output))
             table = tables[-1] if tables else None

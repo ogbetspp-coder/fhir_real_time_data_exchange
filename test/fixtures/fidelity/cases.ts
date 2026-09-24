@@ -499,6 +499,8 @@ const GROUPED_INVISIBLE_THEN_SPACE_SOURCE = customSource([GROUPED("\u2063 ")]);
 const GROUPED_BLANK_THEN_SPACE_SOURCE = customSource([GROUPED("\u2800 ")]);
 const GROUPED_TAG_SPACE_THEN_SPACE_SOURCE = customSource([GROUPED("\u{E0020} ")]);
 const OGHAM_ALONE_SOURCE = customSource(["\u1680"]);
+// Review round 17: a page carrying a code point section 2 adds in 3.0.0.
+const ANNOTATION_PAGE_SOURCE = customSource(["Take 10 \ufff9000 IU daily. Dose information."]);
 // Review round 16: letters the default serif face draws as an em-wide blank are gaps.
 const GROUPED_YI_BLANK_THEN_SPACE_SOURCE = customSource([GROUPED("\ua4c5 ")]);
 const SPANNED_DOSE_TABLE =
@@ -2735,6 +2737,20 @@ export const verifyCases: VerifyCase[] = [
     },
   },
   {
+    name: "page-with-interlinear-annotation",
+    input: toInput(
+      ANNOTATION_PAGE_SOURCE,
+      single("smpc.4.1", paragraphs("Dose information."), [
+        spanFor(ANNOTATION_PAGE_SOURCE, 1, "Dose information."),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.1": "span-not-found" },
+      reasons: { "smpc.4.1": "page-malformed" },
+    },
+  },
+  {
     name: "blank-letters-alone-are-empty",
     input: toInput(
       S,
@@ -4007,8 +4023,8 @@ export const xhtmlCases: XhtmlCase[] = [
   // Item 3: cells are U+0009-separated, and so is everything inside a cell.
   {
     name: "cell-breaks-are-tabs",
-    input: div("<table><tr><td><p>a</p>b<br/>c<hr/></td></tr></table>"),
-    expected: "\n\n\ufdd0\n\ufdd2\t\ufdd3\t\ta\tb\tc\t\t\t\n\n\ufdd1\n\n",
+    input: div("<table><tr><td><p>a</p>b<br/>c</td></tr></table>"),
+    expected: "\n\n\ufdd0\n\ufdd2\t\ufdd3\t\ta\tb\tc\t\n\n\ufdd1\n\n",
   },
   {
     name: "rejects-soft-hyphen-before-br-in-cell",
@@ -4688,6 +4704,32 @@ export const xhtmlCases: XhtmlCase[] = [
   },
   // Review round 16: underline and links are refused (an underline turns a sign into another,
   // and no closed list of code points bounds which), and a mark that is itself ignorable.
+  // Review round 17: a rule in a cell or a caption is drawn as a fraction bar.
+  {
+    name: "rejects-rule-in-cell",
+    input: div("<table><tr><td>Take</td><td>1<hr/>2</td><td>tablet daily</td></tr></table>"),
+    expected: { error: "table-content" },
+  },
+  {
+    name: "rejects-rule-in-header-cell",
+    input: div("<table><tr><th>1<hr/>2</th></tr></table>"),
+    expected: { error: "table-content" },
+  },
+  {
+    name: "rejects-rule-in-caption",
+    input: div("<table><caption>1<hr/>4</caption><tr><td>x</td></tr></table>"),
+    expected: { error: "table-content" },
+  },
+  {
+    name: "rejects-rule-in-block-in-cell",
+    input: div("<table><tr><td><div>1<hr/>2</div></td></tr></table>"),
+    expected: { error: "table-content" },
+  },
+  {
+    name: "accepts-rule-after-table",
+    input: div("<table><tr><td>1</td></tr></table><hr/><p>2</p>"),
+    expected: "\n\n\ufdd0\n\ufdd2\t\ufdd3\t1\t\n\n\ufdd1\n\n\n\n2\n\n",
+  },
   {
     name: "rejects-underline",
     input: div("<p>Contraindicated if CrCl <u>&lt;</u> 30 ml/min.</p>"),

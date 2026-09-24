@@ -355,6 +355,17 @@ def test_capitals_strike_highlight_and_shading_are_marked() -> None:
     ]
 
 
+def test_underline_is_marked_and_none_is_not() -> None:
+    # An underlined "<" is how "≤" is often typed in Word.
+    body = p(
+        r("<w:t>&lt;</w:t>", '<w:u w:val="single"/>')
+        + r("<w:t>x</w:t>", '<w:u w:val="none"/>')
+        + r("<w:t>=</w:t>", '<w:u w:val="double"/>')
+    )
+    marks = read_docx(docx(body))[0].marks
+    assert [(m.start, m.end, m.kind) for m in marks] == [(0, 1, "underline"), (2, 3, "underline")]
+
+
 def test_a_hidden_paragraph_mark_is_reported() -> None:
     paragraph = read_docx(docx(p(r("<w:t>x</w:t>"), "<w:rPr><w:vanish/></w:rPr>")))[0]
     assert paragraph.mark_hidden
