@@ -3541,6 +3541,53 @@ export const xhtmlCases: XhtmlCase[] = [
     input: div("<p><sup>½</sup></p>"),
     expected: { error: "unmappable-script" },
   },
+  // fidelity-norm/3.1.0: inside `sub`, ½ and ∞ are kept unchanged (the real labels' half-life
+  // and AUC); inside `sup` both still reject, and so does every other fraction inside `sub`.
+  {
+    name: "sub-vulgar-half-kept",
+    input: div("<p>the t<sub>½</sub> was approximately 18 hours</p>"),
+    expected: "\n\nthe t½ was approximately 18 hours\n\n",
+  },
+  {
+    name: "sub-vulgar-half-reference-kept",
+    input: div("<p>t<sub>&#189;</sub> and t<sub>&#xBD;</sub></p>"),
+    expected: "\n\nt½ and t½\n\n",
+  },
+  {
+    name: "sub-infinity-kept-among-folds",
+    input: div("<p>AUC<sub>(0-∞)</sub> and AUC<sub>0&#8211;&#x221E;</sub></p>"),
+    expected: "\n\nAUC₍₀₋∞₎ and AUC₀₋∞\n\n",
+  },
+  {
+    name: "sub-half-after-digit-kept",
+    input: div("<p>1<sub>½</sub></p>"),
+    expected: "\n\n1½\n\n",
+  },
+  {
+    name: "rejects-sup-infinity",
+    input: div("<p>10<sup>∞</sup></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sup-half-reference",
+    input: div("<p>2<sup>&#189;</sup></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-other-fraction",
+    input: div("<p>t<sub>¼</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-fraction-zero-thirds",
+    input: div("<p>t<sub>\u2189</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-infinity-look-alike-sign",
+    input: div("<p>x<sub>\u29dc</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
   {
     name: "rejects-sub-roman-numeral",
     input: div("<p><sub>Ⅳ</sub></p>"),

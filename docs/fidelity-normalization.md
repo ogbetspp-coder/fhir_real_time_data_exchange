@@ -1,6 +1,6 @@
 # Narrative fidelity normalisation specification
 
-Version: `fidelity-norm/3.0.0` (`NORMALIZATION_VERSION` in `src/fidelity/normalize.ts`; history
+Version: `fidelity-norm/3.1.0` (`NORMALIZATION_VERSION` in `src/fidelity/normalize.ts`; history
 in section 9)
 
 This document is the language-neutral specification of the text normalisation and XHTML
@@ -285,7 +285,12 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   Pe or Pd that is neither a source nor a target of the fold tables (`＝` U+FF1D, `﹙` U+FE59,
   `⸺` U+2E3A, `︱` U+FE31, `~`, `<`, `[`), and U+00B1 and U+2213, reject (`unmappable-script`).
   The element's own script digits and signs (U+2070, U+00B9, U+00B2, U+00B3, U+2074–U+207E
-  inside `sup`; U+2080–U+208E inside `sub`) are kept. Other code points (letters, footnote
+  inside `sup`; U+2080–U+208E inside `sub`) are kept. Inside `sub` only, U+00BD VULGAR FRACTION
+  ONE HALF and U+221E INFINITY are also kept unchanged, as in `t<sub>½</sub>` (`t½`) and
+  `AUC<sub>(0-∞)</sub>` (`AUC₍₀₋∞₎`): neither has a subscript form, and lowered, each reads as
+  it does on the line, as a lowered letter does (below). Inside `sup` both still reject:
+  `2<sup>½</sup>` is a square root, not "2½". Every other fraction, and every other symbol,
+  inside `sub` still rejects. Other code points (letters, footnote
   marks, ®, `/`) are kept unchanged. Raising a letter or a mark is taken not to change what it
   says, which is not always so: `10<sup>n</sup>` reads "10n" and verifies against a plain "10n"
   (a stated residual, as in ADR 0003),
@@ -832,6 +837,14 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
 
 ## 9. Version history
 
+- `fidelity-norm/3.1.0` (minor) — inside `sub`, U+00BD VULGAR FRACTION ONE HALF and U+221E
+  INFINITY are kept unchanged instead of rejecting (`unmappable-script`), so the half-life
+  `t<sub>½</sub>` and `AUC<sub>(0-∞)</sub>`, which the EMA's published labels write, read `t½`
+  and `AUC₍₀₋∞₎` (section 5; `docs/design/fidelity-norm-3-1-0.md`, ADR 0005). Nothing else
+  changes: every text 3.0.0 accepts reads the same, inside `sup` both still reject, and no text
+  arises that a narrative could not already write with the code points themselves. Nine
+  vectors are added; the existing ones change only in the version string and the hashes that
+  embed it.
 - `fidelity-norm/3.0.0` (major) — numbered lists, table grids and pictures, seen as a reader
   sees them (`docs/design/fidelity-norm-3-0-0.md`, as amended by its independent reviews; ADR
   0005). `ol` is allowed with `type` and `start`, and each of its items emits the marker a

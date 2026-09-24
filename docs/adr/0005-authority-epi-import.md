@@ -251,3 +251,17 @@ Three facts about that source meet three rules of the record:
   document and its List (the List changes whenever any document of the product changes);
   otherwise it is a new import of the current publication, and the earlier record is superseded
   or withdrawn under roadmap item 2.
+
+## Amendment (2026-09-24, `fidelity-norm/3.1.0`)
+
+Decision 1 left `t` with a lowered `½` and `AUC` with a lowered `(0-∞)` to "a proposed minor
+version of the fidelity contract". `fidelity-norm/3.1.0` (`docs/design/fidelity-norm-3-1-0.md`)
+is that version: inside `sub`, U+00BD and U+221E are kept unchanged, as letters and marks are,
+and inside `sup` both still refuse. Of the refusals decision 1 lists, those two are settled; the
+rest stay PR 3's work. The importer's version moves to 1.1.0 with it (D10's lock).
+
+One finding of the same survey is recorded here for PR 3: both Imatinib Teva SmPCs (capsules
+and film-coated tablets) underline "Posology for Ph+ ALL in adult patients" and "Posology for
+Ph+ ALL in" (4.2) and "Clinical studies in Ph+ ALL" (5.1). An underlined "+" is drawn "±"
+(decision 1's underline requirement), so under that requirement 4.2 and 5.1 refuse in both;
+PR 3's design of T settles it.

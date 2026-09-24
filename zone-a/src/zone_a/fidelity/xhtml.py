@@ -287,13 +287,24 @@ SUPERSCRIPT_LETTERS: Final = (0x2071, 0x207F)
 SUBSCRIPT_LETTERS: Final = tuple(range(0x2090, 0x209D))
 
 
+# Kept unchanged inside ``sub`` from fidelity-norm/3.1.0: U+00BD VULGAR FRACTION ONE HALF and
+# U+221E INFINITY, as in ``t<sub>½</sub>`` and ``AUC<sub>(0-∞)</sub>``. Neither has a subscript
+# form, and lowered each reads as it does on the line (section 5); raised, ``2<sup>½</sup>`` is a
+# root.
+KEPT_IN_SUBSCRIPT: Final = (0x00BD, 0x221E)
+
+
 class _ScriptRule:
     """Folding table, the element's own script digits and signs, the other script's."""
 
     __slots__ = ("folding", "foreign", "own")
 
     def __init__(
-        self, digits: tuple[int, ...], signs: tuple[int, ...], foreign: tuple[int, ...]
+        self,
+        digits: tuple[int, ...],
+        signs: tuple[int, ...],
+        foreign: tuple[int, ...],
+        kept: tuple[int, ...] = (),
     ) -> None:
         plus, minus, equals, open_, close = signs
         folding = {0x0030 + digit: target for digit, target in enumerate(digits)}
@@ -303,7 +314,7 @@ class _ScriptRule:
         folding[0x0028] = open_
         folding[0x0029] = close
         self.folding: dict[int, int] = folding
-        self.own: frozenset[int] = frozenset(digits + signs)
+        self.own: frozenset[int] = frozenset(digits + signs + kept)
         self.foreign: frozenset[int] = frozenset(foreign)
 
 
@@ -317,13 +328,14 @@ SCRIPT_RULES: Final[dict[str, _ScriptRule]] = {
         SUBSCRIPT_DIGITS,
         SUBSCRIPT_SIGNS,
         SUPERSCRIPT_DIGITS + SUPERSCRIPT_SIGNS + SUPERSCRIPT_LETTERS,
+        KEPT_IN_SUBSCRIPT,
     ),
 }
 
-# The element's own script digits and signs are kept; the other script's digits, signs and
-# letters, every other number (general category N), a plus-minus sign, and every other
-# mathematical symbol, bracket or dash (general category Sm, Ps, Pe, Pd) have no script form
-# there and reject.
+# The element's own script digits and signs are kept, and so are ½ and ∞ inside ``sub``; the
+# other script's digits, signs and letters, every other number (general category N), a
+# plus-minus sign, and every other mathematical symbol, bracket or dash (general category Sm, Ps,
+# Pe, Pd) have no script form there and reject.
 UNMAPPABLE_SIGNS: Final = frozenset({0x00B1, 0x2213})
 UNMAPPABLE_CATEGORIES: Final = frozenset({"Sm", "Ps", "Pe", "Pd"})
 

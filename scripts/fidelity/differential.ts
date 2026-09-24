@@ -515,6 +515,12 @@ const SCRIPT_PIECES: readonly { className: string; pool: readonly string[] }[] =
   },
   { className: "script-reference", pool: ["&#x2212;", "&#54;", "&#x2B;", "&#8315;", "&#x2082;"] },
   { className: "script-space", pool: [SPACE, TAB] },
+  // fidelity-norm/3.1.0: ½ and ∞ are kept inside `sub` and reject inside `sup`; ¼ and ⧜ are
+  // their neighbours that still reject in both.
+  {
+    className: "script-kept-in-subscript",
+    pool: [...CHARS(0x00bd, 0x221e, 0x00bc, 0x29dc), "&#189;", "&#x221E;"],
+  },
 ];
 // Drawn rarely, so the folding paths are not drowned by `unmappable-script`.
 const SCRIPT_UNMAPPABLE = {

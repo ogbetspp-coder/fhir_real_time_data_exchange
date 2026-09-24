@@ -324,9 +324,14 @@ const SUBSCRIPT_LETTERS = [
   0x209c,
 ];
 
+// Kept unchanged inside `sub` from fidelity-norm/3.1.0: U+00BD VULGAR FRACTION ONE HALF and
+// U+221E INFINITY, as in `t<sub>½</sub>` and `AUC<sub>(0-∞)</sub>`. Neither has a subscript form,
+// and lowered each reads as it does on the line (section 5); raised, `2<sup>½</sup>` is a root.
+const KEPT_IN_SUBSCRIPT = [0x00bd, 0x221e];
+
 type ScriptRule = {
   folding: ReadonlyMap<number, number>;
-  // The element's own script digits and signs, kept as they are.
+  // The element's own script digits and signs, and what it keeps unchanged, kept as they are.
   own: ReadonlySet<number>;
   // The other script's digits, signs and letters.
   foreign: ReadonlySet<number>;
@@ -336,6 +341,7 @@ function scriptRule(
   digits: readonly number[],
   signs: ScriptSigns,
   foreign: readonly number[],
+  kept: readonly number[] = [],
 ): ScriptRule {
   const [plus, minus, equals, open, close] = signs;
   const folding = new Map<number, number>();
@@ -345,7 +351,7 @@ function scriptRule(
   folding.set(0x003d, equals);
   folding.set(0x0028, open);
   folding.set(0x0029, close);
-  return { folding, own: new Set([...digits, ...signs]), foreign: new Set(foreign) };
+  return { folding, own: new Set([...digits, ...signs, ...kept]), foreign: new Set(foreign) };
 }
 
 const SCRIPT_RULES = new Map<string, ScriptRule>([
@@ -359,16 +365,17 @@ const SCRIPT_RULES = new Map<string, ScriptRule>([
   ],
   [
     "sub",
-    scriptRule(SUBSCRIPT_DIGITS, SUBSCRIPT_SIGNS, [
-      ...SUPERSCRIPT_DIGITS,
-      ...SUPERSCRIPT_SIGNS,
-      ...SUPERSCRIPT_LETTERS,
-    ]),
+    scriptRule(
+      SUBSCRIPT_DIGITS,
+      SUBSCRIPT_SIGNS,
+      [...SUPERSCRIPT_DIGITS, ...SUPERSCRIPT_SIGNS, ...SUPERSCRIPT_LETTERS],
+      KEPT_IN_SUBSCRIPT,
+    ),
   ],
 ]);
 
-// The element's own script digits and signs are kept; the other script's digits, signs and
-// letters, every other number (a non-ASCII digit, a fraction, a numeral), a plus-minus sign, and
+// The element's own script digits and signs are kept, and so are ½ and ∞ inside `sub`; the other
+// script's digits, signs and letters, every other number (a non-ASCII digit, a fraction, a numeral), a plus-minus sign, and
 // every other mathematical symbol, bracket or dash (general category Sm, Ps, Pe, Pd: `＝`, `﹙`,
 // `⸺`) have no script form here and reject.
 const UNMAPPABLE_SIGNS = new Set([0x00b1, 0x2213]);
