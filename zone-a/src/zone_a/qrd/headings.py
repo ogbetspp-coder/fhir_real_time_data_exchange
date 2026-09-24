@@ -28,12 +28,15 @@ class HeadingPatternError(ValueError):
 
 @dataclass(frozen=True)
 class HeadingMatch:
+    """A recognised heading: the registry section's key and its optional segments' flags."""
+
     key: str
     # One flag per optional segment of the title, in order: True where the segment is present.
     segments: tuple[bool, ...]
 
 
 def collapse(text: str) -> str:
+    """The text with each run of space, tab and no-break space as one space, ends trimmed."""
     return _SPACE.sub(" ", text).strip()
 
 
@@ -82,4 +85,5 @@ def index(registry: dict[str, Any]) -> dict[str, HeadingMatch]:
 
 
 def match_heading(text: str, table: dict[str, HeadingMatch]) -> HeadingMatch | None:
+    """The heading the line is, once collapsed, in a table from ``index``; else None."""
     return table.get(collapse(text))

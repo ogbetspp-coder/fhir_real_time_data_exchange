@@ -63,7 +63,7 @@ class _Tables(HTMLParser):
 
 
 def _normalise(text: str) -> str:
-    text = unicodedata.normalize("NFC", text.replace("­", "").replace("​", ""))
+    text = unicodedata.normalize("NFC", text.replace("\u00ad", "").replace("\u200b", ""))
     return re.sub(r"\s+", " ", text).strip()
 
 
@@ -96,6 +96,10 @@ def _sections(sections: list[dict[str, Any]]) -> Iterator[dict[str, Any]]:
 
 
 def main() -> None:
+    """Prints how many whole-cell quotes the table clause alone refuses on the pinned SmPCs.
+
+    It also prints how many of those begin with a letter.
+    """
     total = refused = refused_words = 0
     for name in LABELS:
         path = ROOT / "labels" / "ema-epi" / "sources" / f"{name}-smpc-en.json"

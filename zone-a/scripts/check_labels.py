@@ -25,6 +25,7 @@ MAPPING = ROOT / "fhir" / "mappings" / "cap-smpc-en.json"
 
 
 def expected() -> dict[Path, str]:
+    """The check result each pinned label should have, by the path it is committed at."""
     lock = json.loads((LABELS / "sources.lock.json").read_text(encoding="utf-8"))
     registry = json.loads(REGISTRY.read_text(encoding="utf-8"))
     mapping = json.loads(MAPPING.read_text(encoding="utf-8"))
@@ -36,6 +37,12 @@ def expected() -> dict[Path, str]:
 
 
 def main() -> int:
+    """Writes the check results, or with ``--check`` compares them with the committed files.
+
+    Returns:
+        The exit status: 0 when the results were written or are up to date, 1 when one is out
+        of date.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="fail if a result is out of date")
     arguments = parser.parse_args()

@@ -107,10 +107,12 @@ class CheckedAnswer:
 
     @property
     def verified_blocks(self) -> tuple[CheckedBlock, ...]:
+        """The blocks whose status is ``verified``."""
         return tuple(block for block in self.blocks if block.status == "verified")
 
     @property
     def flagged_blocks(self) -> tuple[CheckedBlock, ...]:
+        """Every block whose status is not ``verified``."""
         return tuple(block for block in self.blocks if block.status != "verified")
 
 

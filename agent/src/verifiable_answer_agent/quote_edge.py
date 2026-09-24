@@ -1,4 +1,4 @@
-"""The query service's quote-edge rule, so the agent never asks it about a quote it must refuse.
+r"""The query service's quote-edge rule, so the agent never asks it about a quote it must refuse.
 
 ``verify_quote`` answers ``match`` only when both edges of the quote fall on boundaries
 (``docs/design/epi-mcp-query-service.md``, "The quote-edge rule"; ``src/query/tools.ts``). A
@@ -14,7 +14,7 @@ contracts:check``), and ``tests/test_quote_edge.py`` holds this module to every 
 answer and offsets. The agent's fake query service decides ``verify_quote`` with it, so the
 tests exercise the rule the real service applies rather than a plain substring search.
 
-Everything is in code points, as the service's offsets are. Python has no ``\\p{..}`` classes;
+Everything is in code points, as the service's offsets are. Python has no ``\p{..}`` classes;
 ``unicodedata`` categories are the same Unicode properties, at Python's Unicode version rather
 than Node's ICU — a difference only for characters assigned between the two.
 """
@@ -91,8 +91,11 @@ def _skipped_opener(character: str) -> bool:
 
 
 def _is_sign(character: str | None) -> bool:
-    """``isSpacedSign``: anything but a letter, a number, a gap, a mark, a skipped opener, a
-    scanner marker, plain punctuation or a dash."""
+    """``isSpacedSign``: whether the character is a sign.
+
+    A sign is anything but a letter, a number, a gap, a mark, a skipped opener, a scanner
+    marker, plain punctuation or a dash.
+    """
     if character is None or _letter_or_number(character) or is_gap(character):
         return False
     category = unicodedata.category(character)
@@ -255,8 +258,11 @@ _STARTS_SIGN: Final = 8
 
 @dataclass
 class _Tables:
-    """For each index inside a cell's text, the cell's number; per cell, per row it covers, the
-    bits of every cell to its left and to its right."""
+    """The cell each index of a text lies in, and each cell's neighbours in the rows it covers.
+
+    For each index inside a cell's text, the cell's number; per cell, per row it covers, the
+    bits of every cell to its left and to its right.
+    """
 
     cell_at: list[int]
     left: list[list[int]] = field(default_factory=list)
@@ -434,8 +440,12 @@ def _cut_after_space(
     tables: _Tables | None,
     signs: _Signs | None,
 ) -> bool:
-    """``cutAfterSpace``: a sign before the space, read past gaps, marks and openers; a number
-    before it and a number first in the quote, read past gaps and marks only; a table."""
+    """``cutAfterSpace``: whether a quote's start after the space at ``space`` is a cut.
+
+    It is a cut when a sign stands before the space (read past gaps, marks and openers), when a
+    number stands before it and the quote starts with a number (read past gaps and marks only),
+    or when the space lies between cells of a table.
+    """
     if signs.at(space) if signs is not None else _sign_reached(text, space):
         return True
     if _is_digit(number_before(text, space)) and _is_digit(first):

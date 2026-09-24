@@ -25,6 +25,8 @@ __all__ = ["TurnResult", "answer_turn"]
 @final
 @dataclass(frozen=True, slots=True)
 class TurnResult:
+    """What one turn produced: the checked answer, its rendering and the turn's audit record."""
+
     answer: CheckedAnswer
     rendered: list[dict[str, Any]] | str
     audit: TurnAuditRecord

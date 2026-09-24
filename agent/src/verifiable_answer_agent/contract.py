@@ -71,12 +71,21 @@ UnavailableReason = Literal["schema-invalid", "tool-error", "transport-error", "
 
 
 class DocumentRef(TypedDict):
+    """One published version of a document Bundle in the validated store."""
+
     bundleId: str
     versionId: str
     lastUpdated: str
 
 
 class SectionContent(TypedDict):
+    """One QRD section, verbatim, as ``get_section`` answers.
+
+    ``div`` is the stored XHTML and ``text`` its normalised plain text; the hashes are
+    recomputable from ``div``. ``provenanceResourceId`` is given for the document's current
+    version only.
+    """
+
     document: DocumentRef
     sourceKey: str
     path: str
@@ -91,6 +100,8 @@ class SectionContent(TypedDict):
 
 
 class QuoteMatch(TypedDict):
+    """Where a quote matched: the section, and code-point offsets in its normalised text."""
+
     sourceKey: str
     startOffset: int
     endOffset: int
@@ -98,6 +109,8 @@ class QuoteMatch(TypedDict):
 
 
 class QuoteVerification(TypedDict):
+    """``verify_quote``'s answer: ``match``, with where the quote matched, or ``no-match``."""
+
     document: DocumentRef
     result: Literal["match", "no-match"]
     normalizationVersion: str
@@ -107,6 +120,8 @@ class QuoteVerification(TypedDict):
 
 
 class FindProductOutput(TypedDict):
+    """``find_product``'s answer: the products found, and whether the search was cut short."""
+
     products: list[dict[str, Any]]
     # True when the caller's entitlement holds more documents than the service searched in one
     # call. An empty ``products`` with ``truncated`` true is not "no such product"; the
@@ -115,6 +130,12 @@ class FindProductOutput(TypedDict):
 
 
 class ProvenanceDetail(TypedDict):
+    """``get_provenance``'s answer: who and what put the document in the store.
+
+    The hashes of the source document, the fidelity report and the approved content; the
+    extractor, model and approver; and, for a named section, its hashes recomputed live.
+    """
+
     document: DocumentRef
     provenanceResourceId: str
     recorded: str
@@ -138,6 +159,7 @@ class ToolResult:
 
     @property
     def available(self) -> bool:
+        """Whether the tool answered with a result that validated."""
         return self.value is not None
 
 

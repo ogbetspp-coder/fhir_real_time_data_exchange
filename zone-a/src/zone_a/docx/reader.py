@@ -260,6 +260,12 @@ class Mark:
 
 @dataclass(frozen=True)
 class Paragraph:
+    """One paragraph of the body, as the reader produced it.
+
+    The module docstring describes ``text``, ``marks``, ``mark_hidden``, ``numbering`` and
+    ``table``; ``style`` is the paragraph style id written on the paragraph, if any.
+    """
+
     text: str
     style: str | None
     numbering: Numbering | None
@@ -269,6 +275,7 @@ class Paragraph:
 
     @property
     def has_drawing(self) -> bool:
+        """Whether the text holds a picture (U+FFFC OBJECT REPLACEMENT CHARACTER)."""
         return OBJECT in self.text
 
 
@@ -367,9 +374,11 @@ class _Styles:
     symbol_encoded: set[str] = field(default_factory=set)
 
     def effective(self, style_id: str | None, kind: str) -> str | None:
-        """``style_id``, or the default style of ``kind`` when it is absent or unknown, as Word
-        falls back. A reference to a style of another kind is refused: what Word does with it
-        is not documented."""
+        """``style_id``, or the default style of ``kind`` when it is absent or unknown.
+
+        That is how Word falls back. A reference to a style of another kind is refused: what Word
+        does with it is not documented.
+        """
         if style_id is None or style_id not in self.styles:
             return self.defaults.get(kind)
         if self.styles[style_id].kind != kind:
@@ -771,8 +780,10 @@ class _ParagraphReader:
 
 
 def _shading(element: ET.Element | None) -> str | None:
-    """``shading-<fill>`` for a plain fill, ``shading-<pattern>-<colour>-<fill>`` for a pattern,
-    None for no shading or a white one."""
+    """The mark kind a shading element gives, or None for no shading or a white one.
+
+    ``shading-<fill>`` for a plain fill, ``shading-<pattern>-<colour>-<fill>`` for a pattern.
+    """
     if element is None:
         return None
     pattern = element.get(_w("val"))
@@ -790,8 +801,11 @@ _POINTS = {"pt": 1.0, "pc": 12.0, "pi": 12.0, "in": 72.0, "cm": 72 / 2.54, "mm":
 
 
 def _faint(properties: _Properties) -> bool:
-    """White text (or a light theme colour), text under two points, or text scaled under a
-    fifth: easy not to see. A size or scale the reader cannot parse counts as faint."""
+    """Whether text with these properties is easy not to see.
+
+    White text (or a light theme colour), text under two points, or text scaled under a fifth
+    is. A size or scale the reader cannot parse counts as faint.
+    """
     color = properties.element("color")
     if color is not None:
         theme = (color.get(_w("themeColor")) or "").lower()
@@ -856,7 +870,7 @@ def _int(value: str, where: str) -> int:
 
 
 def _numbering(levels: list[ET.Element | None]) -> Numbering | None:
-    """numId and ilvl, each from the nearest paragraph-properties level that sets it."""
+    """The numId and ilvl, each from the nearest paragraph-properties level that sets it."""
     found: dict[str, int] = {}
     for source in levels:
         numpr = source.find(_w("numPr")) if source is not None else None
@@ -914,8 +928,10 @@ def _paragraph(
 
 
 def _paragraph_marks(reader: _ParagraphReader, levels: list[ET.Element | None]) -> tuple[Mark, ...]:
-    """The runs' marks, and shading or right-to-left set on the paragraph (or its style), which
-    covers every character."""
+    """The runs' marks, and the shading and right-to-left marks of the paragraph itself.
+
+    Shading or right-to-left set on the paragraph (or its style) covers every character.
+    """
     marks = list(reader.marks)
 
     def nearest(name: str) -> ET.Element | None:

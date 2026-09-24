@@ -46,8 +46,11 @@ def _at(text: str, index: int) -> str:
 
 
 def _drawn_before(text: str, index: int) -> str:
-    """The first code point before ``index`` that a renderer draws (a Default_Ignorable code
-    point such as U+2063 is drawn as nothing); a space is drawn, and stops the reading."""
+    """The first code point before ``index`` that a renderer draws.
+
+    A Default_Ignorable code point such as U+2063 is drawn as nothing; a space is drawn, and
+    stops the reading.
+    """
     index -= 1
     while index >= 0 and is_default_ignorable(ord(text[index])):
         index -= 1

@@ -21,6 +21,12 @@ LOCK = Path(__file__).resolve().parents[2] / "qrd" / "sources.lock.json"
 
 
 def main() -> int:
+    """Downloads every locked QRD source and compares its SHA-256 with the lock.
+
+    Returns:
+        The exit status: 0 when every file is unchanged, 1 when one differs or could not be
+        fetched.
+    """
     lock = json.loads(LOCK.read_text(encoding="utf-8"))
     status = 0
     for entry in lock["sources"]:

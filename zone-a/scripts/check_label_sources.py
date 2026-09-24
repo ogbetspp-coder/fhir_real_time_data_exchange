@@ -1,5 +1,6 @@
-"""Compare the pinned EMA ePI labels with what the EMA ePI API serves today. On demand, never
-in CI.
+"""Compare the pinned EMA ePI labels with what the EMA ePI API serves today.
+
+On demand, never in CI.
 
     uv run --frozen python scripts/check_label_sources.py
 
@@ -22,6 +23,12 @@ LOCK = Path(__file__).resolve().parents[2] / "labels" / "ema-epi" / "sources.loc
 
 
 def main() -> int:
+    """Downloads every locked label and compares its SHA-256 with the lock.
+
+    Returns:
+        The exit status: 0 when every file is unchanged, 1 when one differs or could not be
+        fetched.
+    """
     lock = json.loads(LOCK.read_text(encoding="utf-8"))
     status = 0
     for entry in lock["sources"]:

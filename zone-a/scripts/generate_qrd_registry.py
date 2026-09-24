@@ -23,10 +23,17 @@ REGISTRY = ROOT / "qrd" / "registry" / "cap-smpc-en-10.4.json"
 
 
 def expected() -> str:
+    """The registry file's content, built from the pinned sources."""
     return serialise(build(SOURCES, json.loads(LOCK.read_text(encoding="utf-8"))))
 
 
 def main() -> int:
+    """Writes the registry, or with ``--check`` compares it with the committed file.
+
+    Returns:
+        The exit status: 0 when the registry was written or is up to date, 1 when it is out of
+        date.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="fail if the file is out of date")
     arguments = parser.parse_args()

@@ -65,7 +65,21 @@ select = [
   "ERA",
   "RUF",
   "T20",
+  # Google Python Style Guide (docs/python-style.md): no assert outside tests (it
+  # is stripped under -O), no blind except, pylint's error and warning checks, and Google
+  # docstrings.
+  "S101",
+  "BLE",
+  "PLE",
+  "PLW",
+  "PLC1802",
+  "D",
 ]
+# An __init__ is documented in its class's docstring (Google style).
+ignore = ["D107"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 # The deploy script and the contract sync script are operator tools: they report to a terminal.
@@ -73,6 +87,8 @@ select = [
 # refusing any print anywhere under src/.
 "deploy/*.py" = ["T201"]
 "scripts/*.py" = ["T201"]
+# Tests assert (pytest), and a test's name is its documentation.
+"tests/*.py" = ["S101", "D"]
 
 [tool.mypy]
 python_version = "3.14"

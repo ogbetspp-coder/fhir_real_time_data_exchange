@@ -143,10 +143,10 @@ def is_gap(code_point: int) -> bool:
 
 
 def is_word_character(character: str) -> bool:
-    """Section 6: letters, digits, combining marks, the step 1 invisibles, ZWNJ and ZWJ.
+    r"""Section 6: letters, digits, combining marks, the step 1 invisibles, ZWNJ and ZWJ.
 
-    ``\\p{L}``, ``\\p{N}`` and ``\\p{M}`` in the TypeScript are the Unicode general categories
-    whose first letter is L, N or M; ``re`` has no ``\\p{}``, so the category is read directly.
+    ``\p{L}``, ``\p{N}`` and ``\p{M}`` in the TypeScript are the Unicode general categories
+    whose first letter is L, N or M; ``re`` has no ``\p{}``, so the category is read directly.
     """
     if not character:
         return False

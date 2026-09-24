@@ -27,6 +27,15 @@ CONTRACTS: tuple[str, ...] = ("query-tools.schema.json", "agent-turn.schema.json
 
 
 def main(argv: list[str]) -> int:
+    """Copies the published contracts into the package, or with ``--check`` compares them.
+
+    Args:
+        argv: The command line, program name first.
+
+    Returns:
+        The exit status: 0 when every copy was written or is current, 1 when a vendored copy
+        differs from the published one, 2 when a published contract is missing.
+    """
     check = "--check" in argv[1:]
     status = 0
     for name in CONTRACTS:

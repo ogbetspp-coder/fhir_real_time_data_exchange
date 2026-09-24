@@ -1,4 +1,4 @@
-"""Create or update this agent on Vertex AI Agent Engine (Agent Runtime).
+r"""Create or update this agent on Vertex AI Agent Engine (Agent Runtime).
 
 First run against a real project 2026-09-22. It refuses to run without an explicit
 environment — no project inferred from Application Default Credentials, no region defaulted, no
@@ -9,8 +9,8 @@ Requirements are pinned from ``uv.lock``, so the runtime installs exactly the ve
 ran against. Read ``deploy/README.md`` before using this: the Agent Engine deploy is one of
 five steps, and the other four are console and Terraform work.
 
-    AGENT_ENGINE_PROJECT=... AGENT_ENGINE_LOCATION=... AGENT_ENGINE_STAGING_BUCKET=gs://... \\
-    QUERY_SERVICE_MCP_URL=... AGENT_MODEL=... AGENT_SERVICE_VERSION=... \\
+    AGENT_ENGINE_PROJECT=... AGENT_ENGINE_LOCATION=... AGENT_ENGINE_STAGING_BUCKET=gs://... \
+    QUERY_SERVICE_MCP_URL=... AGENT_MODEL=... AGENT_SERVICE_VERSION=... \
     uv run --frozen python deploy/deploy_agent_engine.py --dry-run
 """
 
@@ -121,6 +121,11 @@ def requirements_from_lock() -> list[str]:
 
 
 def read_environment() -> dict[str, str]:
+    """The deploy settings, every variable in ``REQUIRED_ENV`` read from the environment.
+
+    Raises:
+        SystemExit: A variable is unset or blank, or the staging bucket is not a ``gs://`` URL.
+    """
     missing = [name for name in REQUIRED_ENV if not os.environ.get(name, "").strip()]
     if missing:
         raise SystemExit(
@@ -157,6 +162,21 @@ def build_config(settings: dict[str, str], resource_name: str | None) -> dict[st
 
 
 def main(argv: list[str]) -> int:
+    """Checks the settings and the requirements, then creates or updates the agent.
+
+    With ``--dry-run`` it prints what would be sent and stops before contacting Google Cloud;
+    with ``--update`` it updates the named Agent Engine resource instead of creating one.
+
+    Args:
+        argv: The command line, program name first.
+
+    Returns:
+        The exit status: 0 after a dry run or once the agent is created or updated.
+
+    Raises:
+        SystemExit: The environment is incomplete, the requirements do not resolve, or the
+            Agent Platform SDK is not installed.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--dry-run",
