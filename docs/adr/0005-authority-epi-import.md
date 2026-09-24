@@ -38,7 +38,8 @@ Three facts about that source meet three rules of the record:
    lose the refusals below), and the page is exactly what §5's scanner code emits for T(div): one
    page per section, as `docs/fidelity-normalization.md` §7 defines for a structured source. T
    does only four things: it deletes attributes and CSS declarations on a closed list; it
-   unwraps a `span` left with no attributes, and a link, keeping their text; it rewrites a
+   unwraps a `span` left with no attributes, and a link or a `u` whose text an underline
+   cannot change (below), keeping their text; it rewrites a
    raised or lowered run as `sup` or `sub`; and it replaces a referenced picture with its pinned
    `data:` URI, or deletes it and records it (decision 3). Where the scanner refuses
    T(div), where T meets anything not on its lists, or where the div's text (character
@@ -55,11 +56,21 @@ Three facts about that source meet three rules of the record:
      particular `dir` other than `ltr` (`<p dir="rtl">10 mg or 20 mg</p>` draws "mg or 20 mg
      10"), `bgcolor`, `background`, `hidden`, `li@value`, `ol@reversed`, `type` outside a list,
      and `font@color`, `face` and `size`. No element is unwrapped or removed except a `span`
-     left with no attributes, and a link, whose text is kept and whose target is not drawn (and
+     left with no attributes, and a link or a `u`, whose text is kept and whose target is not
+     drawn (and
      beyond unwrapping, T renames a raised or lowered run as `sup` or `sub` and deletes a picture
      only as decision 3 allows); any
      other element the scanner refuses (`font`, `center`, `bdo`, `ruby`, `q`, `ins`, `del`, `s`)
      refuses the section.
+   - **Underlines are not unwrapped blindly.** The authority's viewer underlines a link and a
+     `u`, and an underline turns what it underlines into another sign or word: `<u>&lt;</u>` is
+     drawn "≤", `+` "±", `=` "≡", U+02C2 exactly "≤", and `1<u>a</u>` "1ª" (the review of
+     `fidelity-norm/3.0.0` that found it, round 16, is why §5 refuses `u` and `a` in a
+     narrative). Unwrapping would keep the "<" and lose the "≤" a reader sees. T unwraps a link
+     or a `u` only when its text, with any `sup` or `sub` in it, is on a closed allowlist that PR
+     3 sets against the renderer (letters and digits of the EU scripts, U+0020 and closed
+     punctuation, with no single letter next to a digit), and anything else refuses the
+     section.
    - **Closed CSS list, by property and value, that can neither hide nor overprint text.** Font
      families only from a closed list of Unicode text fonts, every family in the list on it
      (symbol-encoded fonts such as Symbol and Wingdings refuse); font sizes in absolute units
@@ -110,7 +121,7 @@ Three facts about that source meet three rules of the record:
    pinned Imatinib Teva SmPC through the scanner with its presentation loosely stripped: 6 of its
    32 sections refuse, and these requirements would add the QRD grey shading of the reporting
    section and two coloured passages. The refusals are a `span` left inside a `sup` (unwrapped
-   under the attribute rule above); the QRD Appendix V link, whose path is longer than §5's href
+   under the attribute rule above); the QRD Appendix V link, whose path was longer than §5's href
    grammar allows and which is in every EU SmPC, and an `http:` link in section 10 (links are
    unwrapped, so neither reaches the scanner); `t` with a lowered `½` and `AUC` with a lowered
    `(0-∞)`, which §5 refuses inside `sub` and which nearly every label has in 5.2; one

@@ -107,9 +107,19 @@ def is_whitespace(code_point: int) -> bool:
     return code_point in WHITESPACE
 
 
-# Code points drawn as an empty glyph that are neither whitespace nor Default_Ignorable: U+2800
-# BRAILLE PATTERN BLANK, drawn as wide as a letter with no dots.
-BLANK_GLYPHS: Final = frozenset({0x2800})
+# Code points drawn as an empty glyph that are neither whitespace nor Default_Ignorable, found by
+# rendering every assigned code point in Chrome's default fonts on macOS and measuring the ink:
+# U+2800 BRAILLE PATTERN BLANK, and Mongolian and Yi letters the default serif face lacks and draws
+# as an em-wide blank.
+BLANK_GLYPHS: Final = frozenset({0x1878, 0x18AA, 0x2800, 0xA4A2, 0xA4A3, 0xA4B4, 0xA4C1, 0xA4C5})
+
+# From fidelity-norm/3.0.0: the interlinear annotation controls, which Unicode reserves for
+# internal use and a renderer draws as a blank, and the prepended concatenation marks, which a
+# renderer draws across the digits after them (U+070F puts a bar over "000").
+FORBIDDEN_3_0_0: Final = frozenset(
+    {0x0600, 0x0601, 0x0602, 0x0603, 0x0604, 0x0605, 0x06DD, 0x070F, 0x0890, 0x0891, 0x08E2}
+    | {0xFFF9, 0xFFFA, 0xFFFB, 0x110BD, 0x110CD}
+)
 
 
 def is_default_ignorable(code_point: int) -> bool:
@@ -156,7 +166,7 @@ def is_forbidden(code_point: int) -> bool:
     U+000C because they are not XML characters; the bidirectional controls because their reach
     differs between a narrative block and page text.
     """
-    if code_point in (0xFFFD, 0xFFFE, 0xFFFF):
+    if code_point in (0xFFFD, 0xFFFE, 0xFFFF) or code_point in FORBIDDEN_3_0_0:
         return True
     if 0x007F <= code_point <= 0x009F:
         return True

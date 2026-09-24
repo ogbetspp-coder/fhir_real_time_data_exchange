@@ -59,14 +59,15 @@ def _is_digit(character: str | None) -> bool:
 
 
 # src/fidelity/normalize.ts ``isGap`` (fidelity-norm/3.0.0 section 6): section 3 whitespace, the
-# spaces narrower than a quarter of an em, U+2800 BRAILLE PATTERN BLANK, and
+# spaces narrower than a quarter of an em, the blank glyphs (U+2800 BRAILLE PATTERN BLANK and the
+# Mongolian and Yi letters Chrome's default serif face draws blank), and
 # Default_Ignorable_Code_Point (Unicode 16.0).
 _WHITESPACE: Final = frozenset(
     {0x09, 0x0A, 0x0D, 0x20, 0xA0, 0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2007, 0x2008}
     | {0x2028, 0x2029, 0x3000}
 )
 _THIN_SPACES: Final = frozenset((0x2006, 0x2009, 0x200A, 0x202F, 0x205F))
-_BLANK_GLYPHS: Final = frozenset((0x2800,))
+_BLANK_GLYPHS: Final = frozenset((0x1878, 0x18AA, 0x2800, 0xA4A2, 0xA4A3, 0xA4B4, 0xA4C1, 0xA4C5))
 _DEFAULT_IGNORABLE: Final = (
     (0x00AD, 0x00AD),
     (0x034F, 0x034F),

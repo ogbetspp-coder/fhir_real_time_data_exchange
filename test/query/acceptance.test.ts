@@ -263,7 +263,16 @@ describe("ePI query service, phase 1", () => {
 
       // A quote of gaps alone quotes nothing a reader sees (fidelity-norm/3.0.0 section 6), and
       // could match between the groups of a number.
-      for (const quote of ["\u2009", " \u2063 ", "\u2800", "\u205f\u200d", "\u{E0020}"]) {
+      for (const quote of [
+        "\u2009",
+        " \u2063 ",
+        "\u2800",
+        "\u205f\u200d",
+        "\u{E0020}",
+        "\u1878\ua4c5",
+        "Take 10 \ufff9000",
+        "10\u070f000",
+      ]) {
         const refused = await callTool(harness, "verify_quote", { bundleId: typography, quote });
         expect(refused.structured, JSON.stringify(quote)).toEqual({
           tool: "verify_quote",

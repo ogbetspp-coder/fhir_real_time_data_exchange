@@ -90,22 +90,7 @@ BLOCK_ELEMENTS: Final = frozenset(
 )
 
 INLINE_ELEMENTS: Final = frozenset(
-    {
-        "span",
-        "b",
-        "i",
-        "u",
-        "em",
-        "strong",
-        "sup",
-        "sub",
-        "small",
-        "a",
-        "abbr",
-        "cite",
-        "code",
-        "img",
-    }
+    {"span", "b", "i", "em", "strong", "sup", "sub", "small", "abbr", "cite", "code", "img"}
 )
 
 # `q` is excluded: a renderer draws quotation marks the source may not contain. `ol` is allowed
@@ -210,7 +195,7 @@ def _check_nesting(name: str, stack: list[str], offset: int) -> None:
 # The inline elements whose tags split text without emitting anything: a renderer draws the text on
 # each side in its own run, so a mark after the tag does not combine with the letter before it.
 SPLITTING_INLINE: Final = frozenset(
-    {"span", "b", "i", "u", "em", "strong", "sup", "sub", "small", "a", "abbr", "cite", "code"}
+    {"span", "b", "i", "em", "strong", "sup", "sub", "small", "abbr", "cite", "code"}
 )
 # How far each side of such a tag is composed to find a composition across it. A combining mark
 # right after the tag is refused whatever its distance from the letter, so the window only has to
@@ -365,7 +350,6 @@ ASCII_LETTER: Final = re.compile(r"[A-Za-z]")
 # whole-value grammars and are applied with `fullmatch`, so they carry no `^`/`$`: Python's `$`
 # would also match before a trailing newline, which is text this must not carry.
 TOKEN_VALUE: Final = re.compile(r"[A-Za-z0-9_.:-]{1,32}")
-HREF_VALUE: Final = re.compile(r"https://[A-Za-z0-9.-]{1,64}(?:/[A-Za-z0-9._~-]{0,32}){0,8}/?")
 LIST_TYPE_VALUE: Final = re.compile(r"[1aAiI]")
 LIST_START_VALUE: Final = re.compile(r"0|-?[1-9][0-9]{0,3}")
 SPAN_VALUE: Final = re.compile(r"[1-9][0-9]{0,2}|1000")
@@ -471,8 +455,6 @@ def _attribute_allowed(name: str, value: str, element: str, is_root: bool) -> bo
     # `$` would let a trailing U+000A (and anything after it) through.
     if name in ("xml:lang", "lang"):
         return is_root and TOKEN_VALUE.fullmatch(value) is not None
-    if name == "href":
-        return element == "a" and HREF_VALUE.fullmatch(value) is not None
     if name == "scope":
         return element == "th" and TOKEN_VALUE.fullmatch(value) is not None
     if name == "type":
@@ -723,23 +705,15 @@ def list_marker(style: str, ordinal: int) -> str:
     return f"{marker}. "
 
 
-# The elements a renderer underlines (`a` with a target, and `u`), and the signs an underline turns
-# into another sign: "<" underlined is drawn as "≤", ">" as "≥", "+" as "±", "=" as "≡", "-"
-# nearly as "=". A mathematical symbol or a dash inside either is refused (`underlined-sign`).
-UNDERLINING: Final = frozenset({"u", "a"})
-UNDERLINE_CHANGES: Final = frozenset({"Sm", "Pd"})
-
-
 def _emit_text(
-    code_point: int, stack: list[str], output: list[str], offset: int, is_reference: bool
+    code_point: int, parent: str | None, output: list[str], offset: int, is_reference: bool
 ) -> None:
     """One code point of text inside the root, raw or decoded, as the scanner emits it.
 
-    Rejected directly inside a table container unless it is raw whitespace; rejected if it is a
-    sign under an underline; folded or rejected inside ``sup`` and ``sub``; otherwise kept as it
-    is. General category N is read from ``unicodedata`` because ``re`` has no ``\\p{N}``.
+    Rejected directly inside a table container unless it is raw whitespace; folded or rejected
+    inside ``sup`` and ``sub``; otherwise kept as it is. General category N is read from
+    ``unicodedata`` because ``re`` has no ``\\p{N}``.
     """
-    parent = stack[-1] if stack else None
     character = chr(code_point)
     # A line feed or carriage return in text is a space to a renderer: only a block boundary or
     # `br` is a line break.
@@ -754,10 +728,6 @@ def _emit_text(
     if emitted != character:
         output.append(emitted)
         return
-    if unicodedata.category(character) in UNDERLINE_CHANGES and any(
-        open_name in UNDERLINING for open_name in stack
-    ):
-        raise XhtmlError("underlined-sign", offset)
     rule = SCRIPT_RULES.get(parent) if parent is not None else None
     if rule is not None:
         folded = rule.folding.get(code_point)
@@ -949,7 +919,7 @@ def xhtml_to_text(div: str) -> str:
             if not stack:
                 raise XhtmlError("text-outside-root", index)
             code_point = _decode_entity(entity, index)
-            _emit_text(code_point, stack, output, index, is_reference=True)
+            _emit_text(code_point, stack[-1], output, index, is_reference=True)
             index = entity.end()
             continue
 
@@ -967,7 +937,7 @@ def xhtml_to_text(div: str) -> str:
                 and parent not in LIST_CONTAINERS
             ):
                 raise XhtmlError("cdata", index)
-            _emit_text(ord(character), stack, output, index, is_reference=False)
+            _emit_text(ord(character), parent, output, index, is_reference=False)
         index += 1
 
     if not root_seen:

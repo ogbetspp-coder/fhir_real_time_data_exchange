@@ -499,6 +499,8 @@ const GROUPED_INVISIBLE_THEN_SPACE_SOURCE = customSource([GROUPED("\u2063 ")]);
 const GROUPED_BLANK_THEN_SPACE_SOURCE = customSource([GROUPED("\u2800 ")]);
 const GROUPED_TAG_SPACE_THEN_SPACE_SOURCE = customSource([GROUPED("\u{E0020} ")]);
 const OGHAM_ALONE_SOURCE = customSource(["\u1680"]);
+// Review round 16: letters the default serif face draws as an em-wide blank are gaps.
+const GROUPED_YI_BLANK_THEN_SPACE_SOURCE = customSource([GROUPED("\ua4c5 ")]);
 const SPANNED_DOSE_TABLE =
   '<table><tr><td>Adults</td><td rowspan="3">10 mg</td></tr><tr><td>Children</td></tr><tr><td>Elderly</td></tr></table>';
 const MID_LINE_BULLET = "Take 2 \u2022 10 mg daily.";
@@ -2719,6 +2721,32 @@ export const verifyCases: VerifyCase[] = [
     expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
   },
   {
+    name: "span-ends-with-yi-blank-inside-number",
+    input: toInput(
+      GROUPED_YI_BLANK_THEN_SPACE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("The maximum dose is 10&#xA4C5;"), [
+        spanFor(GROUPED_YI_BLANK_THEN_SPACE_SOURCE, 1, "The maximum dose is 10\ua4c5"),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
+    },
+  },
+  {
+    name: "blank-letters-alone-are-empty",
+    input: toInput(
+      S,
+      single("smpc.4.1", paragraphs("&#x1878;&#xA4C5;"), [spanFor(S, 1, INDICATIONS)]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.1": "malformed-narrative" },
+      reasons: { "smpc.4.1": "empty-narrative" },
+    },
+  },
+  {
     name: "medium-mathematical-space-against-a-space-mismatches",
     input: toInput(
       SPACE_SOURCE,
@@ -3000,6 +3028,11 @@ export const normalizationCases: NormalizationCase[] = [
   { name: "rejects-control", input: "ab", expected: { error: "forbidden-character" } },
   { name: "rejects-delete", input: "ab", expected: { error: "forbidden-character" } },
   { name: "rejects-lone-surrogate", input: "a\uD800b", expected: { error: "forbidden-character" } },
+  {
+    name: "rejects-interlinear-annotation-separator",
+    input: "a\ufffab",
+    expected: { error: "forbidden-character" },
+  },
   // 2.0.0: U+000B and U+000C are rejected on both sides (section 2); the name is kept so the
   // change is reviewable against the 1.1.1 vector of the same name.
   {
@@ -3013,14 +3046,14 @@ export const normalizationCases: NormalizationCase[] = [
 export const xhtmlCases: XhtmlCase[] = [
   // Attribute values are never compared against the source, so they are token-limited.
   {
-    name: "accepts-https-href",
+    name: "rejects-https-link",
     input: div('<p><a href="https://example.org/x/y.html">t</a></p>'),
-    expected: "\n\nt\n\n",
+    expected: { error: "unknown-element" },
   },
   {
     name: "rejects-href-with-query",
     input: div('<p><a href="https://example.org/x?q=text">t</a></p>'),
-    expected: { error: "forbidden-attribute" },
+    expected: { error: "unknown-element" },
   },
   {
     name: "rejects-four-class-tokens",
@@ -3043,7 +3076,7 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "rejects-href-with-trailing-newline",
     input: div('<p><a href="#x\n">t</a></p>'),
-    expected: { error: "forbidden-attribute" },
+    expected: { error: "unknown-element" },
   },
   // `\d` is ASCII in this dialect and Unicode-aware in Python's. A numeric character reference
   // written with fullwidth digits is not a character reference at all: the `&` is stray.
@@ -3137,7 +3170,7 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "rejects-javascript-href",
     input: div('<p><a href="javascript:alert(1)">t</a></p>'),
-    expected: { error: "forbidden-attribute" },
+    expected: { error: "unknown-element" },
   },
   {
     name: "rejects-duplicate-attribute",
@@ -3291,7 +3324,7 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "rejects-self-closing-anchor",
     input: div('<p><a href="https://example.org/"/>text</p>'),
-    expected: { error: "void-element" },
+    expected: { error: "unknown-element" },
   },
   {
     name: "rejects-self-closing-li",
@@ -3715,7 +3748,7 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "rejects-fragment-href",
     input: div('<p><a href="#x">t</a></p>'),
-    expected: { error: "forbidden-attribute" },
+    expected: { error: "unknown-element" },
   },
   {
     name: "rejects-scope-on-td",
@@ -4388,8 +4421,8 @@ export const xhtmlCases: XhtmlCase[] = [
   },
   {
     name: "accepts-near-reserved",
-    input: div("<p>&#xFDCF;&#xFDF0;&#xFFFB;</p>"),
-    expected: "\n\n\ufdcf\ufdf0\ufffb\n\n",
+    input: div("<p>&#xFDCF;&#xFDF0;&#xFFF8;</p>"),
+    expected: "\n\n\ufdcf\ufdf0\ufff8\n\n",
   },
   {
     // Review round 3: a row in which a cell starts, but every such cell spans down, is drawn at
@@ -4433,56 +4466,6 @@ export const xhtmlCases: XhtmlCase[] = [
     ),
     expected:
       "\n\n\ufdd0\n\ufdd2\t\ufdd3\ta\t\t\ufdd3\tb\t\t\ufdd3\tc\t\n\n\ufdd2\t\ufdd3\td\t\t\ufdd5\t\t\ufdd5\t\n\n\ufdd1\n\n",
-  },
-  // Review round 12: the href grammar, pinned at each boundary.
-  {
-    name: "href-host-of-64-accepted",
-    input: div(
-      '<p><a href="https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.org/">x</a></p>',
-    ),
-    expected: "\n\nx\n\n",
-  },
-  {
-    name: "href-host-of-65-rejected",
-    input: div(
-      '<p><a href="https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.org/">x</a></p>',
-    ),
-    expected: { error: "forbidden-attribute" },
-  },
-  {
-    name: "href-underscore-in-host-rejected",
-    input: div('<p><a href="https://ex_ample.org/">x</a></p>'),
-    expected: { error: "forbidden-attribute" },
-  },
-  {
-    name: "href-port-rejected",
-    input: div('<p><a href="https://example.org:443/">x</a></p>'),
-    expected: { error: "forbidden-attribute" },
-  },
-  {
-    name: "href-user-information-rejected",
-    input: div('<p><a href="https://user@example.org/">x</a></p>'),
-    expected: { error: "forbidden-attribute" },
-  },
-  {
-    name: "href-empty-segment-accepted",
-    input: div('<p><a href="https://example.org//x">x</a></p>'),
-    expected: "\n\nx\n\n",
-  },
-  {
-    name: "href-eight-segments-and-slash-accepted",
-    input: div('<p><a href="https://example.org/1/2/3/4/5/6/7/8/">x</a></p>'),
-    expected: "\n\nx\n\n",
-  },
-  {
-    name: "href-nine-segments-rejected",
-    input: div('<p><a href="https://example.org/1/2/3/4/5/6/7/8/9">x</a></p>'),
-    expected: { error: "forbidden-attribute" },
-  },
-  {
-    name: "href-segment-of-33-rejected",
-    input: div('<p><a href="https://example.org/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">x</a></p>'),
-    expected: { error: "forbidden-attribute" },
   },
   // Review round 13: nesting, "]]>", composition across inline markup, invisible breaks.
   {
@@ -4703,49 +4686,61 @@ export const xhtmlCases: XhtmlCase[] = [
     input: div("<h5>a<small>b</small></h5>"),
     expected: { error: "nesting-depth" },
   },
+  // Review round 16: underline and links are refused (an underline turns a sign into another,
+  // and no closed list of code points bounds which), and a mark that is itself ignorable.
   {
-    name: "rejects-underlined-less-than",
+    name: "rejects-underline",
     input: div("<p>Contraindicated if CrCl <u>&lt;</u> 30 ml/min.</p>"),
-    expected: { error: "underlined-sign" },
+    expected: { error: "unknown-element" },
   },
   {
-    name: "rejects-underlined-greater-than",
-    input: div("<p>Age <u>&gt;</u> 65 years</p>"),
-    expected: { error: "underlined-sign" },
+    name: "rejects-underlined-modifier-arrowhead",
+    input: div("<p>CrCl <u>&#x2C2;</u> 30 ml/min</p>"),
+    expected: { error: "unknown-element" },
   },
   {
-    name: "rejects-underlined-plus",
-    input: div("<p>10 <u>+</u> 2 mg</p>"),
-    expected: { error: "underlined-sign" },
-  },
-  {
-    name: "rejects-underlined-equals",
-    input: div("<p>a <u>=</u> b</p>"),
-    expected: { error: "underlined-sign" },
-  },
-  {
-    name: "rejects-underlined-hyphen",
-    input: div("<p>2<u>-</u>3</p>"),
-    expected: { error: "underlined-sign" },
-  },
-  {
-    name: "rejects-underlined-en-dash",
-    input: div("<p>2<u>&#x2013;</u>3</p>"),
-    expected: { error: "underlined-sign" },
-  },
-  {
-    name: "rejects-sign-in-link",
+    name: "rejects-link",
     input: div('<p>CrCl <a href="https://example.org/">&lt;</a> 30</p>'),
-    expected: { error: "underlined-sign" },
+    expected: { error: "unknown-element" },
   },
   {
-    name: "underlined-sign-before-unmappable-script",
-    input: div("<p><u>2<sup>=</sup></u></p>"),
-    expected: { error: "underlined-sign" },
+    name: "rejects-link-without-target",
+    input: div("<p><a>see section 4.4</a></p>"),
+    expected: { error: "unknown-element" },
   },
   {
-    name: "accepts-underlined-words",
-    input: div("<p><u>see section 4.4</u> &lt; 30</p>"),
-    expected: "\n\nsee section 4.4 < 30\n\n",
+    name: "rejects-grapheme-joiner-across-bold",
+    input: div("<p>q<b>&#x34F;x</b></p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "rejects-variation-selector-across-bold",
+    input: div("<p>&#x2764;<b>&#xFE0F;</b></p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "rejects-interlinear-annotation-anchor",
+    input: div("<p>Take 10 &#xFFF9;000 IU daily.</p>"),
+    expected: { error: "forbidden-character" },
+  },
+  {
+    name: "rejects-raw-interlinear-annotation-terminator",
+    input: div("<p>Take 10 \ufffb000 IU daily.</p>"),
+    expected: { error: "forbidden-character" },
+  },
+  {
+    name: "rejects-syriac-abbreviation-mark",
+    input: div("<p>10&#x70F;000</p>"),
+    expected: { error: "forbidden-character" },
+  },
+  {
+    name: "rejects-supplementary-concatenation-mark",
+    input: div("<p>10&#x110BD;000</p>"),
+    expected: { error: "forbidden-character" },
+  },
+  {
+    name: "accepts-neighbour-of-concatenation-marks",
+    input: div("<p>10&#x606;000</p>"),
+    expected: "\n\n10\u0606000\n\n",
   },
 ];

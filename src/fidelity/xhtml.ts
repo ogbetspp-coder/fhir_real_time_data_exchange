@@ -41,7 +41,6 @@ export type XhtmlErrorCode =
   | "invisible-character"
   | "nesting-depth"
   | "combining-across-markup"
-  | "underlined-sign"
   | "table-section-order"
   | "table-structure"
   | "table-shape"
@@ -91,21 +90,22 @@ const INLINE_ELEMENTS = new Set([
   "span",
   "b",
   "i",
-  "u",
   "em",
   "strong",
   "sup",
   "sub",
   "small",
-  "a",
   "abbr",
   "cite",
   "code",
   "img",
 ]);
 
-// `q` is excluded: a renderer draws quotation marks the source may not contain. `ol` is allowed
-// because the numbers a renderer draws are emitted as text (below).
+// `q` is excluded: a renderer draws quotation marks the source may not contain. `u` and `a` are
+// excluded from 3.0.0: a renderer underlines both (`a` with a target), and an underline turns a
+// sign into another, "<" into "≤", ">" into "≥", "+" into "±", and "1" `u`"a" into "1ª", which no
+// closed list of code points can bound. `ol` is allowed because the numbers a renderer draws are
+// emitted as text (below).
 
 // The only elements that may be, and must be, self-closing. An HTML parser ignores the `/` of
 // `<sup/>`, so any other element written that way opens around the text that follows it; and a
@@ -208,13 +208,11 @@ const SPLITTING_INLINE = new Set([
   "span",
   "b",
   "i",
-  "u",
   "em",
   "strong",
   "sup",
   "sub",
   "small",
-  "a",
   "abbr",
   "cite",
   "code",
@@ -391,11 +389,10 @@ function isAsciiWhitespace(character: string): boolean {
 }
 
 // Attribute values are never compared against the source, so they must not be able to carry
-// text: each allowed attribute is restricted to a short token alphabet or a safe link form, and
-// to the one element that needs it. Nothing a viewer's stylesheet or script could key on to hide
-// text (`class`, `id`, a language tag below the root, an in-page link) is allowed.
+// text: each allowed attribute is restricted to a short token alphabet, and to the one element
+// that needs it. Nothing a viewer's stylesheet or script could key on to hide text (`class`, `id`,
+// a language tag below the root, a link) is allowed.
 const TOKEN_VALUE = /^[A-Za-z0-9_.:-]{1,32}$/;
-const HREF_VALUE = /^https:\/\/[A-Za-z0-9.-]{1,64}(?:\/[A-Za-z0-9._~-]{0,32}){0,8}\/?$/;
 const LIST_TYPE_VALUE = /^[1aAiI]$/;
 const LIST_START_VALUE = /^(?:0|-?[1-9][0-9]{0,3})$/;
 const SPAN_VALUE = /^(?:[1-9][0-9]{0,2}|1000)$/;
@@ -421,7 +418,6 @@ function isPictureData(value: string): boolean {
 
 function attributeAllowed(name: string, value: string, element: string, isRoot: boolean): boolean {
   if (name === "xml:lang" || name === "lang") return isRoot && TOKEN_VALUE.test(value);
-  if (name === "href") return element === "a" && HREF_VALUE.test(value);
   if (name === "scope") return element === "th" && TOKEN_VALUE.test(value);
   if (name === "type") return element === "ol" && LIST_TYPE_VALUE.test(value);
   if (name === "start") return element === "ol" && LIST_START_VALUE.test(value);
@@ -692,23 +688,16 @@ export function listMarker(style: string, ordinal: number): string {
   return `${marker}. `;
 }
 
-// The elements a renderer underlines (`a` with a target, and `u`), and the signs an underline
-// turns into another sign: "<" underlined is drawn as "≤", ">" as "≥", "+" as "±", "=" as "≡",
-// "-" nearly as "=". A mathematical symbol or a dash inside either is refused (`underlined-sign`).
-const UNDERLINING = new Set(["u", "a"]);
-const UNDERLINE_CHANGES = /^[\p{Sm}\p{Pd}]$/u;
-
 // One code point of text inside the root, raw or decoded, as the scanner emits it: rejected
-// directly inside a table container unless it is raw whitespace, rejected if it is a sign under
-// an underline, folded or rejected inside `sup` and `sub`, and otherwise kept as it is.
+// directly inside a table container unless it is raw whitespace, folded or rejected inside
+// `sup` and `sub`, and otherwise kept as it is.
 function emitText(
   codePoint: number,
-  stack: readonly string[],
+  parent: string | undefined,
   output: string[],
   offset: number,
   isReference: boolean,
 ): void {
-  const parent = stack[stack.length - 1];
   const character = String.fromCodePoint(codePoint);
   // A line feed or carriage return in text is a space to a renderer: only a block boundary or
   // `br` is a line break. Emitting it as U+0020 keeps a bullet after it from reading as a list
@@ -724,9 +713,6 @@ function emitText(
   if (emitted !== character) {
     output.push(emitted);
     return;
-  }
-  if (UNDERLINE_CHANGES.test(character) && stack.some((open) => UNDERLINING.has(open))) {
-    throw new XhtmlError("underlined-sign", offset);
   }
   const rule = parent === undefined ? undefined : SCRIPT_RULES.get(parent);
   if (rule !== undefined) {
@@ -898,7 +884,7 @@ export function xhtmlToText(div: string): string {
       if (entity === null) throw new XhtmlError("stray-amp", index);
       if (stack.length === 0) throw new XhtmlError("text-outside-root", index);
       const codePoint = decodeEntity(entity, index);
-      emitText(codePoint, stack, output, index, true);
+      emitText(codePoint, stack[stack.length - 1], output, index, true);
       index = ENTITY.lastIndex;
       continue;
     }
@@ -919,7 +905,7 @@ export function xhtmlToText(div: string): string {
       ) {
         throw new XhtmlError("cdata", index);
       }
-      emitText(codePoint, stack, output, index, false);
+      emitText(codePoint, parent, output, index, false);
     }
     index += point.length;
   }

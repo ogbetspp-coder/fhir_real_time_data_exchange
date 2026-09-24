@@ -122,15 +122,24 @@ def _normalises_to_gaps(quote: str) -> bool:
     return True
 
 
+# What fidelity-norm/3.0.0 adds to section 2: the interlinear annotation controls and the
+# prepended concatenation marks.
+_FORBIDDEN_3_0_0: Final = frozenset(
+    {0x0600, 0x0601, 0x0602, 0x0603, 0x0604, 0x0605, 0x06DD, 0x070F, 0x0890, 0x0891, 0x08E2}
+    | {0xFFF9, 0xFFFA, 0xFFFB, 0x110BD, 0x110CD}
+)
+
+
 def quote_is_refused(quote: str) -> bool:
     """Whether the real service answers ``invalid-request`` for this quote before searching.
 
     ``src/query/tools.ts`` refuses a quote that normalises to nothing but gaps (section 6), one
     carrying a section 2 character of ``docs/fidelity-normalization.md`` (C0 controls other than
     tab, line feed and carriage return; DEL and the C1 controls; U+FFFD, U+FFFE, U+FFFF; the
-    bidirectional controls; a lone surrogate), and since fidelity-norm/3.0.0 one carrying a table's
-    grid marker or a picture's U+FFFC (U+FDD0-U+FDEF, U+FFFC), which the scanner writes and a reader
-    never sees.
+    bidirectional controls; a lone surrogate; from fidelity-norm/3.0.0 the interlinear annotation
+    controls and the prepended concatenation marks), and since fidelity-norm/3.0.0 one carrying a
+    table's grid marker or a picture's U+FFFC (U+FDD0-U+FDEF, U+FFFC), which the scanner writes and
+    a reader never sees.
     """
     for character in quote:
         point = ord(character)
@@ -141,6 +150,8 @@ def quote_is_refused(quote: str) -> bool:
         if 0x202A <= point <= 0x202E or 0x2066 <= point <= 0x2069 or 0xD800 <= point <= 0xDFFF:
             return True
         if point == 0xFFFC or 0xFDD0 <= point <= 0xFDEF:
+            return True
+        if point in _FORBIDDEN_3_0_0:
             return True
     return _normalises_to_gaps(quote)
 

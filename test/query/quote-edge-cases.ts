@@ -93,6 +93,12 @@ export const quoteEdgeCases: QuoteEdgeCase[] = [
     whole: ["Take 10\u2800 000 IU daily.", "Up to 5\u{E0020} 000 IU weekly."],
   },
   {
+    // Review round 16: a Mongolian or Yi letter the default serif face draws as a blank.
+    text: "Take 10\u1878 000 IU daily. Up to 5\ua4c5 000 IU weekly.",
+    cut: ["Take 10", "000 IU daily.", "Up to 5\ua4c5", "000 IU weekly."],
+    whole: ["Take 10\u1878 000 IU daily.", "Up to 5\ua4c5 000 IU weekly."],
+  },
+  {
     // Letters outside the Basic Multilingual Plane, before and after a quote, and before a
     // match, so that offsets are counted in code points, not in UTF-16 units.
     text: "Code \u{1D400}5 mg. Take 5 mg\u{1D400} now. Code \u{1D400} then \u{1D401} dose.",

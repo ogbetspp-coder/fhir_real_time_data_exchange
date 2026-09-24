@@ -147,6 +147,12 @@ def test_the_fake_refuses_the_quotes_the_service_refuses() -> None:
         "\u205f\u200d",
         "\U000e0020",
         "\n\u2022 \u2009",
+        "\u1878\ua4c5",
+        # Section 2 from fidelity-norm/3.0.0: the interlinear annotation controls and the
+        # prepended concatenation marks.
+        "Take 10 \ufff9000",
+        "10\u070f000",
+        "\U000110bd",
     )
     for quote in refused:
         assert quote_is_refused(quote), repr(quote)

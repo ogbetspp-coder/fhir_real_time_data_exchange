@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and fifteen reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and sixteen reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -801,3 +801,30 @@ Each fix is pinned by vectors on both sides, and a break of each is caught by th
 9. to 11. **Low.** Default_Ignorable code points are "said not to be drawn" (a few fonts draw
    some); the zone-a README's description of the vectors; a note that the agent's chunk cut
    reads further than the service, which only refuses more. Fixed.
+
+## Sixteenth review (2026-09-23): findings and what changed
+
+1. **High.** Round 15's `underlined-sign` refused mathematical symbols and dashes under `u` and
+   `a`, but a look-alike of another category passes: U+02C2 (a modifier letter) underlined is
+   drawn exactly "≤", Canadian syllabics U+1438 and U+1433 "≤" and "≥", and underlined letters
+   draw ordinal indicators (`1<u>a</u>` "1ª"). No closed list of code points bounds what an
+   underline changes. Fixed: `u` and `a` are refused (`unknown-element`), `href` goes with `a`,
+   and `underlined-sign` is withdrawn; item 2 of the fifteenth review is superseded. ADR 0005
+   now requires T to unwrap a link or a `u` only when its text is on a closed allowlist PR 3
+   sets against the renderer, since unwrapping `<u>&lt;</u>` would keep "<" and lose the "≤" a
+   reader sees.
+2. **High.** A sweep of every assigned code point in Chrome found blank glyphs outside the gap
+   set: U+FFF9–U+FFFB (drawn as a blank in every face) and seven Mongolian and Yi letters the
+   default serif face lacks (U+1878, U+18AA, U+A4A2, U+A4A3, U+A4B4, U+A4C1, U+A4C5). "Take 10"
+   could be quoted from "Take 10 " U+FFF9 "000", and a narrative of them alone was drawn text.
+   Fixed: U+FFF9–U+FFFB are refused in section 2; the seven letters are gaps, in every
+   consumer; the method is recorded in `scripts/fidelity/blank-glyph-sweep.md`.
+3. **High.** Whether the underline rule tested a sign before or after `sup`/`sub` folding was
+   ambiguous. Moot with item 1.
+4. **Medium.** No vector pinned that an ignorable code point that is itself a mark (U+034F,
+   U+FE0F) is not skipped by the mark rule, and none pinned the precedence of the underline
+   rule. Fixed: vectors for the first; the second is moot.
+5. **Low.** The spec said a renderer underlines `a`; it does so only with a target. Moot.
+6. **Low.** The prepended concatenation marks (U+0600–U+0605, U+06DD, U+070F, U+0890, U+0891,
+   U+08E2, U+110BD, U+110CD) draw across the digits after them (U+070F puts a bar over "000").
+   Fixed: refused in section 2.

@@ -110,7 +110,7 @@ const BULLET = CHARS(0x2022, 0x2023, 0x25a0, 0x25a1, 0x25aa, 0x25ab, 0x25cb, 0x2
 // rule reads past.
 const GROUP_SEPARATORS = CHARS(0x0020);
 const GROUP_JOINERS = CHARS(0x00a0, 0x2007);
-const GROUP_GAPS = CHARS(0x2009, 0x202f, 0x200a, 0x2063, 0x205f, 0x2800, 0xe0020);
+const GROUP_GAPS = CHARS(0x2009, 0x202f, 0x200a, 0x2063, 0x205f, 0x2800, 0xe0020, 0x1878, 0xa4c5);
 // What stands between two groups: one code point, or two (a span can then end or start inside
 // the run and still cut the number, review round 3).
 const GROUP_RUNS: readonly string[] = [
@@ -185,6 +185,18 @@ const FORBIDDEN_2_0_0: readonly string[] = CHARS(
   0x2066,
   0x2068,
   0x2069,
+  // And what 3.0.0 adds: the interlinear annotation controls and the prepended concatenation
+  // marks.
+  0x0600,
+  0x0605,
+  0x06dd,
+  0x070f,
+  0x0891,
+  0x08e2,
+  0xfff9,
+  0xfffb,
+  0x110bd,
+  0x110cd,
 );
 // The accepted neighbours of each range fidelity-norm/2.0.0 rejects.
 const NEAR_FORBIDDEN = CHARS(
@@ -388,7 +400,7 @@ const XMLNS = `xmlns="http://www.w3.org/1999/xhtml"`;
 // `pre` left the allowed elements in fidelity-norm/2.0.0 (it is a violation below); `sup` and
 // `sub` hold text only and have their own generator.
 const BLOCK_WRAPPERS = ["p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote"];
-const INLINE_WRAPPERS = ["span", "b", "i", "u", "em", "strong", "small", "abbr"];
+const INLINE_WRAPPERS = ["span", "b", "i", "em", "strong", "small", "abbr"];
 
 // Text that is safe inside markup: its own `<`, `&`, `>` and quotes are stripped, and entities
 // are added back explicitly so every accepted entity form appears.
@@ -446,18 +458,14 @@ function markupText(random: Random): Passage {
 
 type Markup = { markup: string; classes: Set<string> };
 
-// Only what fidelity-norm/2.0.0 allows: a language tag on the root, an `https://` link on `a`,
-// `scope` on `th`. Everything else is a violation below.
+// Only what fidelity-norm/3.0.0 allows here: a language tag on the root, `scope` on `th` (the
+// list and table attributes are drawn with their elements). Everything else is a violation below.
 function attributes(random: Random, element: string, isRoot = false): Markup {
   const classes = new Set<string>();
   let markup = "";
   if (isRoot && chance(random, 0.2)) {
     markup += ` ${pick(random, ["lang", "xml:lang"])}="${pick(random, ["en", "en-GB", "de"])}"`;
     classes.add("attribute-lang");
-  }
-  if (element === "a" && chance(random, 0.6)) {
-    markup += ` href="${pick(random, ["https://example.org/a/b", "https://example.org/"])}"`;
-    classes.add("attribute-href");
   }
   if (element === "th" && chance(random, 0.3)) {
     markup += ` scope="${pick(random, ["row", "col"])}"`;
@@ -877,13 +885,13 @@ const VIOLATIONS: readonly Violation[] = [
     className: "forbidden-attribute-value",
     apply: (body, attrs, random) => {
       const attribute = pick(random, [
-        `href="https://example.org/a?q=1"`,
-        `href="javascript:x"`,
-        `href="#x"`,
-        `href="https://example.org/a${LF}"`,
-        `href=""`,
+        `scope="row col"`,
+        `scope="row${LF}"`,
+        `scope=""`,
+        `scope="${"r".repeat(33)}"`,
+        `scope="&#x72;ow"`,
       ]);
-      return root(`${body}<p><a ${attribute}>x</a></p>`, attrs);
+      return root(`${body}<table><tr><th ${attribute}>x</th></tr></table>`, attrs);
     },
   },
   {
@@ -902,7 +910,7 @@ const VIOLATIONS: readonly Violation[] = [
   {
     className: "duplicate-attribute",
     apply: (body, attrs) =>
-      root(`${body}<p><a href="https://example.org/" href="https://example.org/">a</a></p>`, attrs),
+      root(`${body}<table><tr><th scope="row" scope="col">a</th></tr></table>`, attrs),
   },
   {
     className: "nested-xmlns",
@@ -1116,18 +1124,24 @@ const VIOLATIONS: readonly Violation[] = [
         "<p>&#x915;<b>&#x93E;</b></p>",
         "<p>1<b>&#x20DD;</b></p>",
         `<p>q<i>${CP(0xe0020)}${CP(0x0301)}</i></p>`,
+        // An ignorable code point that is itself a mark (review round 16).
+        "<p>q<b>&#x34F;x</b></p>",
+        "<p>&#x2764;<b>&#xFE0F;</b></p>",
+        `<p>q<b>${CP(0xe0100)}</b></p>`,
       ]);
       return root(`${body}${inner}`, attrs);
     },
   },
   {
-    // A sign under an underline, which a renderer turns into another sign ("<" drawn "≤").
-    className: "underlined-sign",
+    // An underline or a link, refused from 3.0.0: an underline turns a sign into another ("<"
+    // drawn "≤"), and a renderer underlines a link.
+    className: "underline-or-link",
     apply: (body, attrs, random) => {
       const element = pick(random, [
         ["<u>", "</u>"],
         ['<a href="https://example.org/">', "</a>"],
-        ["<u><b>", "</b></u>"],
+        ["<a>", "</a>"],
+        ["<b><u>", "</u></b>"],
         ["<b>", "</b>"],
       ]);
       const sign = pick(random, [
@@ -1138,6 +1152,7 @@ const VIOLATIONS: readonly Violation[] = [
         "-",
         "&#x2013;",
         "&#x2212;",
+        "&#x2C2;",
         "~",
         "x",
         "4.4",
@@ -1289,7 +1304,7 @@ const VIOLATIONS: readonly Violation[] = [
     // Code points next to the reserved ones, which are ordinary text.
     className: "near-reserved",
     apply: (body, attrs, random) => {
-      const near = pick(random, [CP(0xfdcf), CP(0xfdf0), CP(0xfffb), "&#xFFFB;", "&#xFDCF;"]);
+      const near = pick(random, [CP(0xfdcf), CP(0xfdf0), CP(0xfff8), "&#xFFF8;", "&#xFDCF;"]);
       return root(`${body}<p>a${near}b</p>`, attrs);
     },
   },
@@ -1421,7 +1436,7 @@ const VIOLATIONS: readonly Violation[] = [
     apply: (body, attrs, random) => {
       const inner = pick(random, [
         "<p>10<sup/>6 mg</p>",
-        '<p><a href="https://example.org/"/>text</p>',
+        "<p><b/>text</p>",
         "<p>Do<br>not</br> take</p>",
         "<p>a</p><hr><p>b</p>",
         "<hr></hr>",
@@ -1528,8 +1543,8 @@ const VIOLATIONS: readonly Violation[] = [
         `<p>a<br${space}/>b</p>`,
         `<table${space}><tr><td>a</td></tr></table>`,
         `<table><tr><td${space}>a</td></tr></table>`,
-        `<p><a${space}href="https://example.org/">a</a></p>`,
-        `<p><a href${space}="https://example.org/">a</a></p>`,
+        `<ol${space}start="2"><li>a</li></ol>`,
+        `<ol start${space}="2"><li>a</li></ol>`,
       ]);
       return root(`${body}${inner}`, attrs);
     },

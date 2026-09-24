@@ -301,7 +301,7 @@ def test_the_corpus_exercises_the_classes_the_review_named() -> None:
         "nesting-bounds",
         "cdata-end-in-text",
         "combining-across-markup",
-        "underlined-sign",
+        "underline-or-link",
         "content-space",
         "precedence-3-0-0",
         "table-size",

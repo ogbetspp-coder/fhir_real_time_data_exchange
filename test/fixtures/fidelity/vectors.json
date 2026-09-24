@@ -170,6 +170,13 @@
       }
     },
     {
+      "name": "rejects-interlinear-annotation-separator",
+      "input": "a￺b",
+      "expected": {
+        "error": "forbidden-character"
+      }
+    },
+    {
       "name": "allows-tab-lf-cr-ff-vt",
       "input": "a\tb\nc\rd\fe\u000bf",
       "expected": {
@@ -390,15 +397,17 @@
   ],
   "xhtml": [
     {
-      "name": "accepts-https-href",
+      "name": "rejects-https-link",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"https://example.org/x/y.html\">t</a></p></div>",
-      "expected": "\n\nt\n\n"
+      "expected": {
+        "error": "unknown-element"
+      }
     },
     {
       "name": "rejects-href-with-query",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"https://example.org/x?q=text\">t</a></p></div>",
       "expected": {
-        "error": "forbidden-attribute"
+        "error": "unknown-element"
       }
     },
     {
@@ -426,7 +435,7 @@
       "name": "rejects-href-with-trailing-newline",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"#x\n\">t</a></p></div>",
       "expected": {
-        "error": "forbidden-attribute"
+        "error": "unknown-element"
       }
     },
     {
@@ -544,7 +553,7 @@
       "name": "rejects-javascript-href",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"javascript:alert(1)\">t</a></p></div>",
       "expected": {
-        "error": "forbidden-attribute"
+        "error": "unknown-element"
       }
     },
     {
@@ -794,7 +803,7 @@
       "name": "rejects-self-closing-anchor",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"https://example.org/\"/>text</p></div>",
       "expected": {
-        "error": "void-element"
+        "error": "unknown-element"
       }
     },
     {
@@ -1361,7 +1370,7 @@
       "name": "rejects-fragment-href",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"#x\">t</a></p></div>",
       "expected": {
-        "error": "forbidden-attribute"
+        "error": "unknown-element"
       }
     },
     {
@@ -2168,8 +2177,8 @@
     },
     {
       "name": "accepts-near-reserved",
-      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>&#xFDCF;&#xFDF0;&#xFFFB;</p></div>",
-      "expected": "\n\n﷏ﷰ￻\n\n"
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>&#xFDCF;&#xFDF0;&#xFFF8;</p></div>",
+      "expected": "\n\n﷏ﷰ￸\n\n"
     },
     {
       "name": "rejects-row-whose-cells-all-span-down",
@@ -2208,63 +2217,6 @@
       "name": "accepts-two-trailing-covered-slots",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>a</td><td rowspan=\"2\">b</td><td rowspan=\"2\">c</td></tr><tr><td>d</td></tr></table></div>",
       "expected": "\n\n﷐\n﷒\t﷓\ta\t\t﷓\tb\t\t﷓\tc\t\n\n﷒\t﷓\td\t\t﷕\t\t﷕\t\n\n﷑\n\n"
-    },
-    {
-      "name": "href-host-of-64-accepted",
-      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.org/\">x</a></p></div>",
-      "expected": "\n\nx\n\n"
-    },
-    {
-      "name": "href-host-of-65-rejected",
-      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.org/\">x</a></p></div>",
-      "expected": {
-        "error": "forbidden-attribute"
-      }
-    },
-    {
-      "name": "href-underscore-in-host-rejected",
-      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"https://ex_ample.org/\">x</a></p></div>",
-      "expected": {
-        "error": "forbidden-attribute"
-      }
-    },
-    {
-      "name": "href-port-rejected",
-      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"https://example.org:443/\">x</a></p></div>",
-      "expected": {
-        "error": "forbidden-attribute"
-      }
-    },
-    {
-      "name": "href-user-information-rejected",
-      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"https://user@example.org/\">x</a></p></div>",
-      "expected": {
-        "error": "forbidden-attribute"
-      }
-    },
-    {
-      "name": "href-empty-segment-accepted",
-      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"https://example.org//x\">x</a></p></div>",
-      "expected": "\n\nx\n\n"
-    },
-    {
-      "name": "href-eight-segments-and-slash-accepted",
-      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"https://example.org/1/2/3/4/5/6/7/8/\">x</a></p></div>",
-      "expected": "\n\nx\n\n"
-    },
-    {
-      "name": "href-nine-segments-rejected",
-      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"https://example.org/1/2/3/4/5/6/7/8/9\">x</a></p></div>",
-      "expected": {
-        "error": "forbidden-attribute"
-      }
-    },
-    {
-      "name": "href-segment-of-33-rejected",
-      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"https://example.org/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\">x</a></p></div>",
-      "expected": {
-        "error": "forbidden-attribute"
-      }
     },
     {
       "name": "accepts-nesting-32-below-root",
@@ -2531,65 +2483,79 @@
       }
     },
     {
-      "name": "rejects-underlined-less-than",
+      "name": "rejects-underline",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Contraindicated if CrCl <u>&lt;</u> 30 ml/min.</p></div>",
       "expected": {
-        "error": "underlined-sign"
+        "error": "unknown-element"
       }
     },
     {
-      "name": "rejects-underlined-greater-than",
-      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Age <u>&gt;</u> 65 years</p></div>",
+      "name": "rejects-underlined-modifier-arrowhead",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>CrCl <u>&#x2C2;</u> 30 ml/min</p></div>",
       "expected": {
-        "error": "underlined-sign"
+        "error": "unknown-element"
       }
     },
     {
-      "name": "rejects-underlined-plus",
-      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>10 <u>+</u> 2 mg</p></div>",
-      "expected": {
-        "error": "underlined-sign"
-      }
-    },
-    {
-      "name": "rejects-underlined-equals",
-      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a <u>=</u> b</p></div>",
-      "expected": {
-        "error": "underlined-sign"
-      }
-    },
-    {
-      "name": "rejects-underlined-hyphen",
-      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>2<u>-</u>3</p></div>",
-      "expected": {
-        "error": "underlined-sign"
-      }
-    },
-    {
-      "name": "rejects-underlined-en-dash",
-      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>2<u>&#x2013;</u>3</p></div>",
-      "expected": {
-        "error": "underlined-sign"
-      }
-    },
-    {
-      "name": "rejects-sign-in-link",
+      "name": "rejects-link",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>CrCl <a href=\"https://example.org/\">&lt;</a> 30</p></div>",
       "expected": {
-        "error": "underlined-sign"
+        "error": "unknown-element"
       }
     },
     {
-      "name": "underlined-sign-before-unmappable-script",
-      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><u>2<sup>=</sup></u></p></div>",
+      "name": "rejects-link-without-target",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a>see section 4.4</a></p></div>",
       "expected": {
-        "error": "underlined-sign"
+        "error": "unknown-element"
       }
     },
     {
-      "name": "accepts-underlined-words",
-      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><u>see section 4.4</u> &lt; 30</p></div>",
-      "expected": "\n\nsee section 4.4 < 30\n\n"
+      "name": "rejects-grapheme-joiner-across-bold",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>q<b>&#x34F;x</b></p></div>",
+      "expected": {
+        "error": "combining-across-markup"
+      }
+    },
+    {
+      "name": "rejects-variation-selector-across-bold",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>&#x2764;<b>&#xFE0F;</b></p></div>",
+      "expected": {
+        "error": "combining-across-markup"
+      }
+    },
+    {
+      "name": "rejects-interlinear-annotation-anchor",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Take 10 &#xFFF9;000 IU daily.</p></div>",
+      "expected": {
+        "error": "forbidden-character"
+      }
+    },
+    {
+      "name": "rejects-raw-interlinear-annotation-terminator",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Take 10 ￻000 IU daily.</p></div>",
+      "expected": {
+        "error": "forbidden-character"
+      }
+    },
+    {
+      "name": "rejects-syriac-abbreviation-mark",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>10&#x70F;000</p></div>",
+      "expected": {
+        "error": "forbidden-character"
+      }
+    },
+    {
+      "name": "rejects-supplementary-concatenation-mark",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>10&#x110BD;000</p></div>",
+      "expected": {
+        "error": "forbidden-character"
+      }
+    },
+    {
+      "name": "accepts-neighbour-of-concatenation-marks",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>10&#x606;000</p></div>",
+      "expected": "\n\n10؆000\n\n"
     }
   ],
   "verify": [
@@ -16056,6 +16022,153 @@
           "uncoveredGaps": 0
         },
         "reportHash": "59fb54fbebfb7999f22eb1e21f13d1419333697adde636219271f1aa23b49b1f"
+      }
+    },
+    {
+      "name": "span-ends-with-yi-blank-inside-number",
+      "input": {
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\nThe maximum dose is 10꓅ 000 IU daily.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 73
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>The maximum dose is 10&#xA4C5;</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 35,
+                "endOffset": 58,
+                "textSha256": "14184334d7a3c7d939df1c1c18bb89a1cc0cd33693612d87279fe8d4fe7c140d"
+              }
+            ],
+            "narrativeDivSha256": "0c93a4f7d8376b068aaccc5c4051b646ecf96f5c40edf31625acdcf9ac31857f",
+            "normalizedTextSha256": "14184334d7a3c7d939df1c1c18bb89a1cc0cd33693612d87279fe8d4fe7c140d"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "extractedTextSha256": "81eea7022d027cd471867cd95e0f78c77a57f5d395a76ac4c00833f9b30f4527",
+        "narrativeBindingSha256": "5bbe34adecf858f6c309a35d696caf1ebc49dd693041efc1af861200206a9442",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.2.posology",
+            "path": "Composition.section[0].section[0]",
+            "status": "invalid-provenance",
+            "spanCount": 1,
+            "reason": "word-cut",
+            "normalizedTextSha256": "14184334d7a3c7d939df1c1c18bb89a1cc0cd33693612d87279fe8d4fe7c140d"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 84,
+          "bodyCodePoints": 38,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 1
+        },
+        "reportHash": "aaee50d0192b93a1254dec30b0385f2e72fa32bbe5b4e9ba37c35ce1204d791b"
+      }
+    },
+    {
+      "name": "blank-letters-alone-are-empty",
+      "input": {
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "source": {
+          "extractorVersion": "synthetic-extractor/1.0.0",
+          "pages": [
+            {
+              "page": 1,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.1 Therapeutic indications\nSynthetic demonstration content for section 4.1; not for clinical use.\nThe ﬁnal dose is given by intra­venous infusion over 10 minutes.\nBody surface area is expressed in m2 and the volume in H2O.\nThe ‘quoted’ phrase uses typographic quotes.\n4.2 Posology and method of administration\nPosology text part one continues on the next page.\nPage 1 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 397
+            },
+            {
+              "page": 2,
+              "text": "ACME Demo Product — Synthetic SmPC\nPart two of the posology text is on page two.\nThe recommended dose is 10 mg once daily for a long-\nterm course.\n4.3 Contraindications\nHypersensitivity to the active substance is a contraindication.\nPage 2 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 233
+            },
+            {
+              "page": 3,
+              "text": "ACME Demo Product — Synthetic SmPC\n4.4 Special warnings\n• first warning item\n• second warning item\n4.5 Interactions\n﷐\n﷒\t﷓\tDose\t﷓\tFrequency\n﷒\t﷓\t10 mg\t﷓\tOnce daily\n﷒\t﷓\t20 mg\t﷓\tTwice daily\n﷑\nPage 3 of 3",
+              "bodyStart": 35,
+              "bodyEnd": 188
+            }
+          ]
+        },
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>&#x1878;&#xA4C5;</p></div>"
+          }
+        ],
+        "provenance": [
+          {
+            "sourceKey": "smpc.4.1",
+            "spans": [
+              {
+                "page": 1,
+                "startOffset": 63,
+                "endOffset": 133,
+                "textSha256": "a8a3d17f642d7743b196327059447f5cbc29997214b427c4e57dd700492eef66"
+              }
+            ],
+            "narrativeDivSha256": "1ea905b7fb7653719c3c6fb413d009e1e7a8eecb0f97068e8d06217f6355ded3",
+            "normalizedTextSha256": "1f61a75d871c36d9be060c4afc1b981678229546fe632cd11b8a8df1745d1704"
+          }
+        ]
+      },
+      "expected": {
+        "reportVersion": "1.0.0",
+        "normalizationVersion": "fidelity-norm/3.0.0",
+        "extractedTextSha256": "b78edb4352eabb411236926113265e7bfd1dec14fc9746a3d37820f46dda4870",
+        "narrativeBindingSha256": "8aa7bf57fadce40e6874cc1889cfeaf8d2dd163d41e1d3cf0315b93e9476e6db",
+        "status": "failed",
+        "sections": [
+          {
+            "sourceKey": "smpc.4.1",
+            "path": "Composition.section[0].section[0]",
+            "status": "malformed-narrative",
+            "spanCount": 1,
+            "reason": "empty-narrative"
+          }
+        ],
+        "issues": [],
+        "summary": {
+          "total": 1,
+          "verified": 0
+        },
+        "coverage": {
+          "pageCodePoints": 851,
+          "bodyCodePoints": 713,
+          "coveredCodePoints": 0,
+          "uncoveredGaps": 3
+        },
+        "reportHash": "bb66eb17d8dfa57571c5e5a1c53a721d0a44916dd5389c1ec5a1f417ba37faa5"
       }
     },
     {

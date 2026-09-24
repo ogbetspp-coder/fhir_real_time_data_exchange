@@ -67,6 +67,9 @@ The input is malformed, and the section fails with `malformed-narrative` (reason
 - U+007F DELETE, and the C1 controls U+0080–U+009F;
 - U+FFFE or U+FFFF;
 - the bidirectional controls U+061C, U+200E, U+200F, U+202A–U+202E and U+2066–U+2069;
+- from 3.0.0, the interlinear annotation controls U+FFF9–U+FFFB and the prepended
+  concatenation marks U+0600–U+0605, U+06DD, U+070F, U+0890, U+0891, U+08E2, U+110BD and
+  U+110CD;
 - an unpaired UTF-16 surrogate (a code point in U+D800–U+DFFF).
 
 U+000B and U+000C reject on both sides (`forbidden-character`): they are not XML characters,
@@ -74,7 +77,10 @@ and a renderer draws them as nothing or as a box. The C1 controls reject because
 remaps them through windows-1252 (U+0085 is drawn as "…"), so a narrative carrying one shows
 a character the check does not see. The bidirectional controls reject because their reach
 differs between a narrative block and a line of page text, and no EU product-information
-language needs them.
+language needs them. The interlinear annotation controls are reserved by Unicode for internal
+use and drawn as a blank ("Take 10 " U+FFF9 "000" is drawn as one number with a gap in it), and a
+prepended concatenation mark is drawn across the digits after it (U+070F draws a bar over "000",
+which reads as a repeating decimal); no EU language needs them either.
 
 Rejection applies to page text as well; a page containing these characters makes every span on
 it `span-not-found`.
@@ -192,7 +198,7 @@ markup is folded into the text or rejected.
 - Element names are lower-case. Block elements emit a line break before their start tag and
   after their end tag: `div p h1 h2 h3 h4 h5 h6 ul ol li table thead tbody tfoot tr td th
 caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contribute only their
-  text: `span b i u em strong sup sub small a abbr cite code` (`sup` and `sub` fold theirs,
+  text: `span b i em strong sup sub small abbr cite code` (`sup` and `sub` fold theirs,
   below); `img` is inline and emits a picture (below).
 - The line break a block element or `br` emits is U+000A, except that the start and end tags
   of `td` and `th`, and every block element and `br` inside an open `td` or `th`, emit
@@ -207,12 +213,16 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
 - Only `br`, `hr` and `img` may be self-closing, and they must be: `<x/>` for any other
   element, and a `br`, `hr` or `img` written as a start tag without `/` (`<br>`, `<hr></hr>`,
   `<img src="x">`), reject (`void-element`). An HTML parser ignores the `/` on every other
-  element, so `<sup/>6`, `<a href="…"/>text` and `<li/>` open an element around the text that
+  element, so `<sup/>6`, `<b/>text` and `<li/>` open an element around the text that
   follows; and an XML renderer draws no children of a `br` written `<br>…</br>`.
 - Any other element (including `script`, `style`, `svg`, `object`, `iframe`, `del`, `s`,
   `strike`, `math`, form controls, and `q`, whose renderer generates quotation marks the source
   may not contain, and `pre`, which keeps whitespace a renderer draws as columns the check
-  cannot see) rejects (`unknown-element`).
+  cannot see) rejects (`unknown-element`). From 3.0.0 so do `u` and `a`: a renderer underlines
+  both (`a` when it has a target), and an underline turns what it underlines into another sign
+  or word — `CrCl <u>&lt;</u> 30` is drawn "CrCl ≤ 30", `&gt;` "≥", `+` "±", `=` "≡", the
+  modifier letter U+02C2 exactly "≤", and `1<u>a</u>` "1ª" — which no closed list of code
+  points bounds. A narrative keeps the words of a link, not its target (ADR 0005).
 - Lists. `li` is allowed only as a direct child of `ol` or `ul`; anywhere else it is
   `misnested-tag` (an HTML parser closes an open `li` at the next `<li>`, and an `li` nested
   anywhere inside an `ol`'s item continues its numbering). The only children of `ol` and `ul`
@@ -350,8 +360,8 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
 - The raw sequence `]]>` in text rejects (`cdata`): it ends a CDATA section to an XML parser,
   which then refuses the document and draws none of it.
 - A combining mark or a composition across inline markup rejects (`combining-across-markup`,
-  from 3.0.0): at each start or end tag of `span`, `b`, `i`, `u`, `em`, `strong`, `sup`, `sub`,
-  `small`, `a`, `abbr`, `cite` or `code`, the first code point emitted after the tag, read past
+  from 3.0.0): at each start or end tag of `span`, `b`, `i`, `em`, `strong`, `sup`, `sub`,
+  `small`, `abbr`, `cite` or `code`, the first code point emitted after the tag, read past
   every Default_Ignorable_Code_Point (section 6) that is not itself of category M, must not be of
   general category M; and the 64 code points of the emitted text before the tag and the 64 after
   it must give the same text through section 3 steps 1 to 3 together as separately (which
@@ -361,37 +371,28 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   is drawn "CrCl </ 30" while NFC reads "≮", and `caf<b>e</b>&#x301;` is drawn with a separate
   accent. A word joiner or a zero-width joiner between the tag and the mark is drawn as nothing
   and changes neither (`q<b>&#x2060;&#x301;</b>` is drawn "q ´").
-- A sign under an underline rejects (`underlined-sign`, from 3.0.0): a code point of general
-  category Sm (a mathematical symbol) or Pd (a dash), raw or by reference, emitted while `u` or
-  `a` is open. A renderer underlines both, and the underline turns the sign into another:
-  `CrCl <u>&lt;</u> 30` is drawn "CrCl ≤ 30", `&gt;` as "≥", `+` as "±", `=` as "≡", and
-  `2<u>-</u>3` nearly as "2=3". A source that writes "≤" as an underlined "<" is therefore
-  refused, a false failure.
 - A root language tag changes the font a renderer picks (`lang="ja"` draws Latin text, dashes
   and ellipses in a Japanese font) but not the text; it is not compared.
-- Allowed attributes: `xmlns` (root), `xml:lang` and `lang` (root `div` only), `href` (`a`
-  only, `https://` form only), `scope` (`th` only), `type` and `start` (`ol` only), `colspan`
+- Allowed attributes: `xmlns` (root), `xml:lang` and `lang` (root `div` only), `scope` (`th`
+  only), `type` and `start` (`ol` only), `colspan`
   and `rowspan` (`td` and `th` only), `src` (`img` only, required there). Values must be double-
   or single-quoted. Any other attribute — in particular `style`, `hidden`, `title`, `class`,
   `id`, `alt`, `reversed` and `value` — rejects, and so does an allowed attribute on any other
-  element and a repeated attribute name on one element. A viewer's stylesheet or script can key on a class, an id, a
-  language tag or an in-page link to hide content, and a narrative needs none of them below the
-  root.
+  element and a repeated attribute name on one element. A viewer's stylesheet or script can key
+  on a class, an id or a language tag to hide content, and a narrative needs none of them below
+  the root.
 - Attribute values are never compared against the source, so they must not be able to carry
   text. Each value must match its token form or the element rejects: `xml:lang`, `lang`,
-  `scope` — `[A-Za-z0-9_.:-]{1,32}`; `href` — the whole value matching
-  `https://[A-Za-z0-9.-]{1,64}(/[A-Za-z0-9._~-]{0,32}){0,8}/?` (so no port, user information,
-  underscore in the host, query or fragment; an empty path segment is allowed); `type` — exactly `1`, `a`, `A`, `i`
-  or `I`; `start` — `0|-?[1-9][0-9]{0,3}`; `colspan`, `rowspan` — `[1-9][0-9]{0,2}|1000`;
+  `scope` — `[A-Za-z0-9_.:-]{1,32}`; `type` — exactly `1`, `a`, `A`, `i` or `I`; `start` — `0|-?[1-9][0-9]{0,3}`; `colspan`, `rowspan` — `[1-9][0-9]{0,2}|1000`;
   `src` — `data:image/png;base64,` or `data:image/jpeg;base64,` followed by a body that is
   non-empty, at most 1 398 104 code points (the base64 length of 1 MiB), a multiple of 4 long,
   all `[A-Za-z0-9+/=]`, with `=` only as its last one or two code points (tested directly, not
   by one regular expression); a reference, `https:` and every other scheme are refused, because
   what they draw can change after approval or is nothing, and fetching it tracks the reader.
   `src` is the one value compared with the source, through the hash `img` emits. Anything else
-  (`javascript:` links,
-  `#` fragments, spaces, `<`, `&`, query strings) rejects. These bounds limit, but do not
-  eliminate, what attribute values can carry; narrative markup should not need links.
+  (spaces, `<`, `&`, other schemes) rejects. These bounds limit, but do not eliminate, what
+  attribute values can carry. (Up to 3.0.0 `a` was allowed with an `https://` `href`; 3.0.0
+  refuses the element, above.)
 - Comments, processing instructions, CDATA sections, DOCTYPE declarations, a stray `<`, a
   stray `&`, unbalanced or misnested tags reject.
 - Entities: `&amp; &lt; &gt; &quot; &apos;`, decimal `&#N;`, and hexadecimal `&#xH;` only.
@@ -473,10 +474,9 @@ reason code is inside `reportHash`, so the order in which violations are decided
   then a column drawn at zero width).
 - At `&`: `stray-amp`, then `text-outside-root`, then `unknown-entity`, then
   `forbidden-character`, then `reserved-character`, then `invisible-character`, then
-  `table-content`, then `list-content`, then `underlined-sign`, then `unmappable-script`.
+  `table-content`, then `list-content`, then `unmappable-script`.
 - At a raw code point: `text-outside-root`, `table-content` or `list-content` (whichever the
-  parent makes applicable), then `cdata` (the start of `]]>`), then `underlined-sign`, then
-  `unmappable-script`.
+  parent makes applicable), then `cdata` (the start of `]]>`), then `unmappable-script`.
 - After a clean scan: `combining-across-markup`, then `empty-narrative`.
 
 (So `<table><td>a</td></table>` is `misnested-tag`, `<iframe/>` is `unknown-element` and
@@ -489,7 +489,7 @@ The scanner's reason codes are, in the order of this section: `forbidden-charact
 `uppercase-element`, `unknown-element`, `void-element`, `list-content`, `script-content`,
 `unmappable-script`, `table-content`, `table-shape`, `table-size`, `table-structure`,
 `table-section-order`,
-`misnested-tag`, `nesting-depth`, `combining-across-markup`, `underlined-sign`,
+`misnested-tag`, `nesting-depth`, `combining-across-markup`,
 `forbidden-attribute`, `comment`, `processing-instruction`,
 `cdata`, `doctype`, `malformed-tag`, `stray-lt`, `stray-amp`, `unknown-entity`,
 `unbalanced-tag`.
@@ -529,8 +529,11 @@ The scanner's reason codes are, in the order of this section: `forbidden-charact
     the groups of a number (`10 000`), so for the edge rules they are not a boundary between
     tokens.
   - A gap is §3 step 5 whitespace; a space narrower than a quarter of an em (U+2006, U+2009,
-    U+200A, U+202F, U+205F), which §3 makes content; U+2800 BRAILLE PATTERN BLANK, drawn as an
-    empty cell as wide as a letter; or a Default_Ignorable_Code_Point of Unicode 16.0 (U+00AD,
+    U+200A, U+202F, U+205F), which §3 makes content; a blank glyph, drawn with no ink: U+2800
+    BRAILLE PATTERN BLANK, and U+1878, U+18AA, U+A4A2, U+A4A3, U+A4B4, U+A4C1 and U+A4C5,
+    Mongolian and Yi letters that Chrome's default serif face on macOS lacks and draws as an
+    em-wide blank (found by drawing every assigned code point in Chrome's default faces and
+    measuring the ink, `scripts/fidelity/blank-glyph-sweep.md`); or a Default_Ignorable_Code_Point of Unicode 16.0 (U+00AD,
     U+034F, U+061C, U+115F–U+1160, U+17B4–U+17B5, U+180B–U+180F, U+200B–U+200F, U+202A–U+202E,
     U+2060–U+206F, U+3164, U+FE00–U+FE0F, U+FEFF, U+FFA0, U+FFF0–U+FFF8, U+1BCA0–U+1BCA3,
     U+1D173–U+1D17A, U+E0000–U+E0FFF), which Unicode says a renderer should not draw (a few
@@ -765,7 +768,8 @@ An extractor must:
   page as its body, holding exactly the text section 5's scanner code emits for T(div), and
   nothing else (the scanner's text begins and ends with U+000A). T is ADR 0005's stated lexical
   transform of the div string: it deletes attributes and CSS declarations on closed lists,
-  unwraps a `span` left with no attributes and a link (keeping their text), rewrites a raised or
+  unwraps a `span` left with no attributes, and a link or a `u` whose text an underline cannot
+  change (ADR 0005), keeping their text; rewrites a raised or
   lowered run as `sup` or `sub`, and replaces a referenced picture with its pinned `data:` URI or
   deletes it; it does nothing else. A picture's token is the hash of its `src` exactly as T(div)
   holds it, not re-encoded. Where the scanner refuses T(div) (any
@@ -828,7 +832,7 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   emits U+FFFC, the SHA-256 of its `src` and U+FFFC; the tables of a narrative cover at most
   50 000 slots (`table-size`); a narrative of only grid markers is `empty-narrative`. U+FFFC and
   U+FDD0–U+FDEF reject in narrative
-  (`reserved-character`, one of the two rules applied to one side only). U+1680 OGHAM SPACE MARK, drawn as a stroke, and the spaces narrower than a quarter of an em (U+2006, U+2009, U+200A, U+202F, U+205F) leave the section 3 whitespace list and are content; narrative rejects U+00AD and U+200B (`invisible-character`, withdrawing `soft-hyphen-at-boundary`); nesting is bounded (`nesting-depth`); `]]>` in text rejects (`cdata`); a combining mark or a composition across inline markup rejects (`combining-across-markup`); a sign under an underline rejects (`underlined-sign`); section 6's digit-group rule reads past every gap; and a narrative of gaps alone is `empty-narrative`. Section 7 qualifies structured sources only;
+  (`reserved-character`, one of the two rules applied to one side only). U+1680 OGHAM SPACE MARK, drawn as a stroke, and the spaces narrower than a quarter of an em (U+2006, U+2009, U+200A, U+202F, U+205F) leave the section 3 whitespace list and are content; narrative rejects U+00AD and U+200B (`invisible-character`, withdrawing `soft-hyphen-at-boundary`); nesting is bounded (`nesting-depth`); `]]>` in text rejects (`cdata`); a combining mark or a composition across inline markup rejects (`combining-across-markup`); `u` and `a` reject (`unknown-element`: an underline turns a sign into another, "<" into "≤"), and with them `href`; section 2 adds the interlinear annotation controls and the prepended concatenation marks; section 6's digit-group rule reads past every gap; and a narrative of gaps alone is `empty-narrative`. Section 7 qualifies structured sources only;
   drawn-document extraction is not qualified until a later version closes the open items the
   reviews recorded. The extractor contract (section 7) writes tables with their grid, numbered markers with a space, pictures with their hash, and
   a structured source as one page per section. Major under section 8: extractor output that

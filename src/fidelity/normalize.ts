@@ -75,9 +75,11 @@ export function isDefaultIgnorable(codePoint: number): boolean {
   return DEFAULT_IGNORABLE.some(([low, high]) => codePoint >= low && codePoint <= high);
 }
 
-// Code points drawn as an empty glyph that are neither whitespace nor Default_Ignorable: U+2800
-// BRAILLE PATTERN BLANK, drawn as wide as a letter with no dots.
-const BLANK_GLYPHS = new Set([0x2800]);
+// Code points drawn as an empty glyph that are neither whitespace nor Default_Ignorable, found by
+// rendering every assigned code point in Chrome's default fonts on macOS and measuring the ink:
+// U+2800 BRAILLE PATTERN BLANK, and Mongolian and Yi letters the default serif face lacks and
+// draws as an em-wide blank.
+const BLANK_GLYPHS = new Set([0x1878, 0x18aa, 0x2800, 0xa4a2, 0xa4a3, 0xa4b4, 0xa4c1, 0xa4c5]);
 
 // A gap for the digit-group rules (section 6) and the quote-edge rule: section 3 whitespace, a
 // thin space, a blank glyph, or a code point Unicode says to ignore. Reading past these, "10"
@@ -108,10 +110,19 @@ export function isWordCharacter(character: string): boolean {
   );
 }
 
+// From fidelity-norm/3.0.0: the interlinear annotation controls, which Unicode reserves for
+// internal use and a renderer draws as a blank, and the prepended concatenation marks, which a
+// renderer draws across the digits after them (U+070F puts a bar over "000").
+const FORBIDDEN_3_0_0 = new Set([
+  0x0600, 0x0601, 0x0602, 0x0603, 0x0604, 0x0605, 0x06dd, 0x070f, 0x0890, 0x0891, 0x08e2, 0xfff9,
+  0xfffa, 0xfffb, 0x110bd, 0x110cd,
+]);
+
 // Section 2's closed rejection list. Bidirectional controls are here because their reach differs
 // between a narrative block and page text; C1 controls because a renderer remaps them through
 // windows-1252; U+000B and U+000C because they are not XML characters.
 export function isForbiddenCodePoint(codePoint: number): boolean {
+  if (FORBIDDEN_3_0_0.has(codePoint)) return true;
   if (codePoint === 0xfffd || codePoint === 0xfffe || codePoint === 0xffff) return true;
   if (codePoint >= 0x007f && codePoint <= 0x009f) return true;
   if (codePoint >= 0xd800 && codePoint <= 0xdfff) return true;
