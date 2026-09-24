@@ -58,22 +58,24 @@ select = [
   "PTH",
   "ERA",
   "RUF",
-  # Google Python Style Guide (docs/engineering/python-style.md): no assert outside tests (it
+  # Google Python Style Guide (docs/python-style.md): no assert outside tests (it
   # is stripped under -O), no blind except, pylint's error and warning checks, and Google
   # docstrings.
   "S101",
   "BLE",
   "PLE",
   "PLW",
+  "PLC1802",
   "D",
 ]
 # An __init__ is documented in its class's docstring (Google style).
 ignore = ["D107"]
 
-[tool.ruff.lint.pydocstyle]
-convention = "google"
 # T201 (print) is deliberately NOT selected globally: scripts/ print progress. Tests are
 # forbidden from printing by test_no_narrative_leak.py, which is a stronger, targeted check.
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 # Generated models: datamodel-code-generator owns the formatting and the field names.

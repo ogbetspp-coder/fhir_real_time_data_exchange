@@ -63,7 +63,7 @@ class _Tables(HTMLParser):
 
 
 def _normalise(text: str) -> str:
-    text = unicodedata.normalize("NFC", text.replace("­", "").replace("\u200b", ""))
+    text = unicodedata.normalize("NFC", text.replace("\u00ad", "").replace("\u200b", ""))
     return re.sub(r"\s+", " ", text).strip()
 
 

@@ -442,8 +442,9 @@ def _cut_after_space(
 ) -> bool:
     """``cutAfterSpace``: whether a quote's start after the space at ``space`` is a cut.
 
-    It is for a sign before the space, read past gaps, marks and openers; for a number before it
-    and a number first in the quote, read past gaps and marks only; and for a table.
+    It is a cut when a sign stands before the space (read past gaps, marks and openers), when a
+    number stands before it and the quote starts with a number (read past gaps and marks only),
+    or when the space lies between cells of a table.
     """
     if signs.at(space) if signs is not None else _sign_reached(text, space):
         return True

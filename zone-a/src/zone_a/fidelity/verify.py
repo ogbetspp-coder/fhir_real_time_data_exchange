@@ -257,7 +257,7 @@ def _is_blank_slice(index: PageIndex, start: int, end: int) -> bool:
         return True
     try:
         text = index.text[_from_line_start(index, start) : end]
-        return normalize_text(text, last_line_has_tab=_last_line_has_tab(index, end)) == ""
+        return not normalize_text(text, last_line_has_tab=_last_line_has_tab(index, end))
     except NormalizationError:
         return False
 

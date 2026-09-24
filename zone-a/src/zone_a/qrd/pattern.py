@@ -36,7 +36,7 @@ class Token(TypedDict):
 
 
 def children(token: Token) -> list[Token]:
-    """Returns the tokens inside an ``optional`` token.
+    """The tokens inside an ``optional`` token.
 
     Raises:
         TypeError: The token holds a string, not tokens (a pattern built wrongly).

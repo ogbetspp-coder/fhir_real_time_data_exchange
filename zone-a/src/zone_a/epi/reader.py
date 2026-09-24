@@ -279,8 +279,9 @@ _NAMED = {
 def _colour(value: str) -> str:
     """A colour in one spelling, or a refusal.
 
-    ``#abc`` and ``rgb(170, 187, 204)`` are written as ``#aabbcc``. Any other notation (alpha,
-    ``hsl()``, percentages) is refused: it could hide text unseen.
+    ``#abc`` and ``rgb(170, 187, 204)`` are written as ``#aabbcc``; ``#aabbcc`` and a named
+    colour pass as they are. Any other notation (alpha, ``hsl()``, percentages) is refused: it
+    could hide text unseen.
     """
     short = re.fullmatch(r"#([0-9a-f])([0-9a-f])([0-9a-f])", value)
     if short:
@@ -449,7 +450,7 @@ def _inline_borders(style: str) -> set[str]:
             per = {side: tokens[0]} if side in _SIDES else _per_side(tokens)
             for target in targets:
                 (styles if part == "style" else widths)[target] = per[target]
-        elif part == "":
+        elif not part:
             # The shorthand: at most one width, style and colour, in any order; missing ones
             # reset to the initial values.
             found_style = [t for t in tokens if t in _BORDER_STYLES]
@@ -686,8 +687,8 @@ _SMALLEST_LINE_POINTS: Final = 12.0
 def _nonzero_length(token: str) -> bool:
     """Whether a length token may be other than zero.
 
-    Anything but a parsed zero may be, a unit the reader cannot place (``rem``, ``ch``,
-    ``calc()``) included.
+    Only a length the reader parses as zero is certainly zero; any other token may not be, a
+    unit the reader cannot place (``rem``, ``ch``, ``calc()``) included.
     """
     points = _length_points(token)
     return points is None or points != 0

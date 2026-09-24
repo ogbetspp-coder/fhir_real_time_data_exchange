@@ -65,13 +65,14 @@ select = [
   "ERA",
   "RUF",
   "T20",
-  # Google Python Style Guide (docs/engineering/python-style.md): no assert outside tests (it
+  # Google Python Style Guide (docs/python-style.md): no assert outside tests (it
   # is stripped under -O), no blind except, pylint's error and warning checks, and Google
   # docstrings.
   "S101",
   "BLE",
   "PLE",
   "PLW",
+  "PLC1802",
   "D",
 ]
 # An __init__ is documented in its class's docstring (Google style).
