@@ -586,6 +586,70 @@
       ]
     },
     {
+      "text": "CrCl < ( 30 ml/min ). ClCr ≥ « 40 ml/min ». CrCl ˂ 50 ml/min. CrCl ≮ 60 ml/min. Age ＞ 65 years.",
+      "quotes": [
+        {
+          "quote": "30 ml/min",
+          "result": "no-match"
+        },
+        {
+          "quote": "40 ml/min",
+          "result": "no-match"
+        },
+        {
+          "quote": "50 ml/min.",
+          "result": "no-match"
+        },
+        {
+          "quote": "60 ml/min.",
+          "result": "no-match"
+        },
+        {
+          "quote": "65 years.",
+          "result": "no-match"
+        },
+        {
+          "quote": "CrCl",
+          "result": "match",
+          "startOffset": 0,
+          "endOffset": 4
+        },
+        {
+          "quote": "ClCr",
+          "result": "match",
+          "startOffset": 22,
+          "endOffset": 26
+        }
+      ]
+    },
+    {
+      "text": "﷐ ﷒ ﷓ < 30 ﷓ No dose adjustment ﷒ ﷓ CrCl < ﷓ (30 ml/min) ﷒ ﷓ CrCl <( ﷓ 40 ml/min) ﷒ ﷓ x ﷓ 000 IU ﷒ ﷓ 10 ﷕ ﷑",
+      "quotes": [
+        {
+          "quote": "No dose adjustment",
+          "result": "no-match"
+        },
+        {
+          "quote": "30 ml/min",
+          "result": "no-match"
+        },
+        {
+          "quote": "40 ml/min",
+          "result": "no-match"
+        },
+        {
+          "quote": "000 IU",
+          "result": "no-match"
+        },
+        {
+          "quote": "x",
+          "result": "match",
+          "startOffset": 86,
+          "endOffset": 87
+        }
+      ]
+    },
+    {
       "text": "Take 10ᡸ 000 IU daily. Up to 5꓅ 000 IU weekly.",
       "quotes": [
         {

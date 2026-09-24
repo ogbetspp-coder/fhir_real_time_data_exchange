@@ -106,9 +106,12 @@ closes the open items the reviews recorded (the blast radius below says why).
   section's table text now carries the grid markers and a picture's token. `verify_quote`
   matches a quote inside one cell, a list item with or without its number, and text separated
   from a picture by whitespace (text touching a picture is cut by the quote-edge rule). A quote
-  that begins or ends at a cell's edge is held to the digit and sign rules against the nearest
-  cell with text beside it, the grid rebuilt from the markers ("10" | "000 IU" is drawn as one
-  number, so neither half matches), and the agent's port follows. A quote that runs across two cells or across a picture is `no-match`, and a quote that
+  at a word boundary inside a table cell is held to the digit and sign rules against every word
+  of every cell on its side, in each row its cell covers, the grid rebuilt from the markers once
+  per search ("10" | "000 IU" is drawn as one number, and a cell's lines are centred, so any of
+  them can sit level with the quote); the agent's port follows. On the three pinned SmPCs this
+  refuses 185 of 789 whole-cell quotes that a reader might read apart (a fail-safe `no-match`,
+  stated in UR-22). A quote that runs across two cells or across a picture is `no-match`, and a quote that
   carries a grid marker or U+FFFC itself is `invalid-request` (it could join two rows, or quote
   nothing a reader sees): a
   false failure, and a correct one, because such a quote loses which cell a value is in or what
@@ -156,7 +159,9 @@ closes the open items the reviews recorded (the blast radius below says why).
   an underlined "<" is drawn "≤". What an underline can change is one rule,
   `zone-a/src/zone_a/underline.py` (ADR 0005's allowlist). The QRD registry accepts an underline
   only where it changes nothing (the template's brackets and a hyphen inside a word allowed); its
-  content is unchanged and only its reader version moved. The QRD check reports an underline
+  content is unchanged and only its reader version moved. The ePI reader marks a border on
+  another side of inline text as `border` (a bar beside or over it), which the check reports.
+  The QRD check (now `qrd-check/1.1.0`) reports an underline
   over what it can change as a formatting finding, which adds four to the committed checks:
   Brukinsa's 5.1 writes ">1", ">5" and ">2" with the ">" underlined (the EMA's viewer draws
   "≥"), and Jentadueto underlines a 5.1 heading holding "≥". The ePI reader becomes an extractor
@@ -205,6 +210,7 @@ whose outcome changed, each reviewed:
 | `empty-table-div` (verify, new)                                                                                                                                                                                                                                                                                                                                                                                                                                                               | —                                                    | `empty-narrative`                                                                                                             | Grid markers are not drawn text; a table of empty cells draws nothing.                                                                |
 | `accepts-https-href` → `rejects-https-link`, `rejects-href-with-query`, `rejects-href-with-trailing-newline`, `rejects-javascript-href`, `rejects-fragment-href`, `rejects-self-closing-anchor` (xhtml)                                                                                                                                                                                                                                                                                       | text, `forbidden-attribute` or `void-element`        | `unknown-element`                                                                                                             | `a` is refused from 3.0.0: a renderer underlines a link, and an underline turns a sign into another.                                  |
 | `cell-breaks-are-tabs` (xhtml)                                                                                                                                                                                                                                                                                                                                                                                                                                                                | text                                                 | text (the input drops its `hr`)                                                                                               | An `hr` in a cell is refused from 3.0.0; the vector still pins that a cell's breaks are tabs.                                         |
+| `span-ends-with-thin-space-inside-number`, `span-ends-with-narrow-no-break-space-inside-number` (verify)                                                                                                                                                                                                                                                                                                                                                                                      | `invalid-provenance` / `word-cut`                    | `invalid-provenance` / `word-cut` (the narrative now carries the U+2009 or U+202F)                                            | U+2009 and U+202F are content, so the narrative holds them to read as the page does; the cut, and the rule it pins, are unchanged.    |
 | `rejects-unknown-element`, `soft-hyphen-decided-after-scan`, `rejects-unknown-before-root` (xhtml)                                                                                                                                                                                                                                                                                                                                                                                            | `unknown-element`                                    | `unknown-element`                                                                                                             | Input changed from `img` to `iframe`, since `img` is now known; the rule each pins is unchanged.                                      |
 | 11 accepted tables (`table`, `accepts-table-section-order`, `accepts-caption-first`, `accepts-scope-on-th`, `accepts-whitespace-in-table-parts`, `accepts-header-and-data-cells`, `accepts-empty-table`, `accepts-caption-only-table`, `accepts-empty-rows`, `accepts-ascii-whitespace-in-tags`, `cell-breaks-are-tabs`) (xhtml)                                                                                                                                                              | text                                                 | the same text with the grid markers                                                                                           | Every table's text carries its grid; nothing else moved.                                                                              |
 | `spanned-cell-rejected` → `spanned-cell-against-separate-cells` (verify)                                                                                                                                                                                                                                                                                                                                                                                                                      | `malformed-narrative` / `forbidden-attribute`        | `mismatch`                                                                                                                    | A span is allowed; drawing two source cells as one spanned cell is a different table.                                                 |
@@ -380,7 +386,15 @@ restored.
   `hr` rule's place after the parent check; the QRD check ignoring underline marks and the ePI
   reader missing a border on inline text (the check now reports an underline over what it can
   change, the reader marks the border, and both readers' versions moved); and two stale rows in
-  the changed-vectors table.
+  the changed-vectors table. A nineteenth review found the sign rule stopping at an opening
+  bracket set off by spaces ("CrCl < ( 30 ml/min )", "ClCr ≥ « 30 ml/min »"; it now reads past
+  openers and gaps together) and missing look-alike and negated comparators (U+02C2, "≮",
+  fullwidth "＜"; now in the list, named in the query design); the query design understating
+  what the table rule refuses (now measured: 185 of 789 whole-cell quotes on the pinned
+  SmPCs, stated in UR-22); three branches of the rule no example pinned; the underline rule
+  missing Cyrillic and Greek look-alikes of an ordinal "a" or "o", a digit behind an invisible
+  code point and "Nº"; and, as lows, side borders marked as underlines (now `border`), the
+  checker's version (now 1.1.0) and a missing changed-vectors row.
 
 - **Every submission carrying 2.0.0 is refused by the worker gate** from the moment this change
   deploys. Nothing in the repository produces a 2.0.0 submission after it.

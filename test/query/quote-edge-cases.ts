@@ -134,6 +134,21 @@ export const quoteEdgeCases: QuoteEdgeCase[] = [
     whole: ["(section 4.4).", "section 4.4", "CrCl"],
   },
   {
+    // Review round 19: a sign binds across an opening bracket set off by spaces, and a
+    // look-alike or a negated comparator is a sign.
+    text: "CrCl < ( 30 ml/min ). ClCr ≥ « 40 ml/min ». CrCl \u02c2 50 ml/min. CrCl \u226e 60 ml/min. Age \uff1e 65 years.",
+    cut: ["30 ml/min", "40 ml/min", "50 ml/min.", "60 ml/min.", "65 years."],
+    whole: ["CrCl", "ClCr"],
+  },
+  {
+    // Every cell on the quote's side counts, a word not only a number, in every row a cell
+    // spans, and after an opening bracket too.
+    markup:
+      '<table><tr><td>&lt; 30</td><td>No dose adjustment</td></tr><tr><td>CrCl &lt;</td><td>(30 ml/min)</td></tr><tr><td>CrCl &lt;(</td><td>40 ml/min)</td></tr><tr><td>x</td><td rowspan="2">000 IU</td></tr><tr><td>10</td></tr></table>',
+    cut: ["No dose adjustment", "30 ml/min", "40 ml/min", "000 IU"],
+    whole: ["x"],
+  },
+  {
     // Review round 16: a Mongolian or Yi letter the default serif face draws as a blank.
     text: "Take 10\u1878 000 IU daily. Up to 5\ua4c5 000 IU weekly.",
     cut: ["Take 10", "000 IU daily.", "Up to 5\ua4c5", "000 IU weekly."],

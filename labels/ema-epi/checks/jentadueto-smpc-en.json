@@ -4,7 +4,7 @@
     "sha256": "544b2f24e69f410d3e792a80f3ee82c00ef60afcdf913526308e799db54a1ee4"
   },
   "reader": "epi-reader/1.1.0",
-  "checker": "qrd-check/1.0.0",
+  "checker": "qrd-check/1.1.0",
   "template": {
     "family": "EMA QRD product-information template, centralised procedure",
     "version": "10.4",

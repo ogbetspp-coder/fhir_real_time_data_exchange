@@ -41,8 +41,15 @@ QUOTE_OPENERS: Final = frozenset(
 QUOTE_CLOSERS: Final = frozenset(".,;:!?)]}\"'") | frozenset(
     map(chr, (0x2019, 0x201D, 0xBB, 0x203A, 0x2026))
 )
-SPACED_SIGNS: Final = frozenset("<>~") | frozenset(
-    map(chr, (0xB1, 0x2212, 0x2213, 0x223C, 0x2248, 0x2264, 0x2265, 0x2266, 0x2267, 0x2A7D, 0x2A7E))
+SPACED_SIGNS: Final = (
+    frozenset("<>~")
+    | frozenset(
+        map(chr, (0xB1, 0x2212, 0x2213, 0x223C, 0x2248, 0x2264, 0x2265, 0x2266, 0x2267, 0x2A7D))
+    )
+    | frozenset(map(chr, (0x2A7E,)))
+    # Look-alikes drawn as a comparator, and the negated and combined comparators.
+    | frozenset(map(chr, (0x02C2, 0x02C3, 0xFE64, 0xFE65, 0xFF1C, 0xFF1E, 0xFF5E)))
+    | frozenset(map(chr, (0x226E, 0x226F, 0x2270, 0x2271, 0x2272, 0x2273, 0x2276, 0x2277, 0x2260)))
 )
 
 # src/fidelity/normalize.ts: the invisible formatting characters of step 1 (soft hyphen, zero
@@ -147,13 +154,16 @@ class _Tables:
 
 
 def _word_bits(text: str) -> int:
+    """``wordBits``: a word ends in a sign when its last code point that is not opening
+    punctuation is a spaced sign."""
     bits = 0
     for word in _words(text):
         if _is_digit(word[0]):
             bits |= _STARTS_DIGIT
         if _is_digit(word[-1]):
             bits |= _ENDS_DIGIT
-        if word[-1] in SPACED_SIGNS:
+        signed = [character for character in word if character not in QUOTE_OPENERS]
+        if signed and signed[-1] in SPACED_SIGNS:
             bits |= _ENDS_SIGN
     return bits
 
@@ -265,12 +275,20 @@ def _cut_across_cell_after(tables: _Tables | None, end: int, last: str | None) -
     return any(bits & _STARTS_DIGIT for bits in tables.right[tables.cell_at[end]])
 
 
+def _sign_before(text: str, index: int) -> str | None:
+    """``signBefore``: the first code point from ``index`` back that is neither a gap nor opening
+    punctuation; a sign binds a number across both, a digit does not."""
+    while index >= 0 and (is_gap(text[index]) or text[index] in QUOTE_OPENERS):
+        index -= 1
+    return text[index] if index >= 0 else None
+
+
 def _cut_after_space(
     text: str, space: int, start: int, first: str | None, tables: _Tables | None
 ) -> bool:
     """``cutAfterSpace``: a sign before the space, read past gaps; a grouped number; a table."""
     beyond = non_gap(text, space - 1, -1)
-    if beyond is not None and beyond in SPACED_SIGNS:
+    if _sign_before(text, space - 1) in SPACED_SIGNS:
         return True
     if _is_digit(beyond) and _is_digit(first):
         return True

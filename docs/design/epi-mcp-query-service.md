@@ -381,9 +381,16 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
     digit on each side is read past every gap (from `fidelity-norm/3.0.0`, the specification's
     section 6), so "10" U+2009 " 000" and "5" U+2063 " 000" are one number, and a quote may
     neither end with "10" or "10" U+2009 nor begin with "000" there. A quote, or the opening
-    punctuation before it, preceded by a comparator or sign and a space (`<`, `>`, `≤`, `≥`,
-    `±`, `∓`, `−`, `~`, `≈` and their variants), the sign read past every gap too, has lost it:
-    "30 ml/min" is cut after "CrCl <" U+2063 " " and inside "CrCl < (30 ml/min)". Both are cuts;
+    punctuation before it, preceded by a comparator or sign and a space, the sign read past
+    every gap and every opening punctuation mark, has lost it: "30 ml/min" is cut after "CrCl <"
+    U+2063 " ", inside "CrCl < (30 ml/min)" and "CrCl < ( 30 ml/min )", and inside "ClCr ≥ « 30
+    ml/min »". The signs (`SPACED_SIGNS`): `<`, `>`, `~`, `±`, `−`, `∓`, `∼`, `≈`, `≤`, `≥`,
+    `≦`, `≧`, `⩽`, `⩾`; the look-alikes a renderer draws as one of them, U+02C2 and U+02C3
+    MODIFIER LETTER LEFT and RIGHT ARROWHEAD, U+FE64 and U+FE65 SMALL LESS-THAN and
+    GREATER-THAN SIGN, U+FF1C, U+FF1E and U+FF5E FULLWIDTH LESS-THAN SIGN, GREATER-THAN SIGN
+    and TILDE; and the negated and combined comparators `≮`, `≯`, `≰`, `≱`, `≲`, `≳`, `≶`, `≷`,
+    `≠` ("<" with U+0338 normalises to "≮"). A look-alike from another script (U+1438 CANADIAN
+    SYLLABICS PA, a letter) is not read as a sign, a stated residual. Both are cuts;
   - **across table cells** (from `fidelity-norm/3.0.0`): a renderer draws a row's cells side by
     side with a gap about as wide as a space and centres each cell's lines vertically, so any
     line of a cell can sit level with any line of another cell in the row, wherever the viewer's
@@ -396,9 +403,15 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
     word of every cell to its right, in every row its cell covers (a word being a run of code
     points that are not gaps; the grid is rebuilt once per search, through spans). So neither
     "10" nor "000 IU" matches there, nor "5 mg" after the "<" cell, while "10 mg" in a row whose
-    other cells hold no number still does. The price is a false failure: a number in a cell
-    beside another cell holding a number ("≥ 50" | "10 mg") cannot be quoted up to the cell
-    edge between them. Rows, captions and whole tables are separate lines, as a paragraph break
+    other cells hold no number still does. The price is a false failure, and it is not small: a
+    quote beginning with a digit is refused when any cell to its left in its rows holds a word
+    ending in a digit, any quote at a word boundary in a cell is refused when any cell to its
+    left holds a word ending in a sign, and a quote ending in a digit when any cell to its right
+    holds a word beginning with one. On the three pinned SmPCs 185 of 789 whole-cell quotes are
+    refused by this rule alone, 40 of them beginning with a word: in Jentadueto's renal table
+    `< 30` | "Metformin is contraindicated" | "No dose adjustment" refuses both right-hand
+    cells, and a footnote "±" after a word refuses what follows it. Quoting a table with its
+    structure is the publishing step's work (roadmap 3a, PR 5), which is to relieve this. Rows, captions and whole tables are separate lines, as a paragraph break
     is: the normalised text reads a block's line break as a space only because section 3 does,
     and the rule treats U+FDD2, U+FDD0 and U+FDD1 as ending a line;
   - and a word character on either side (the fidelity library's own `isWordCharacter`) is a cut

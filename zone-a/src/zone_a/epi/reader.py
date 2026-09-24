@@ -36,10 +36,10 @@ as superscript, ``sub`` and ``vertical-align: sub`` as subscript, ``s``, ``strik
 a text colour other than black as ``color-<colour>`` (white or a nearly white colour as faint
 instead, a nearly black one as nothing; ``#abc`` and ``rgb()`` are written as ``#aabbcc``, and any
 other colour notation refuses the section), a font size under two points as faint, and ``u``, ``a``
-with an ``href``, ``text-decoration: underline`` and a border on an inline element (drawn as a line
-along the text) as underline (an underline turns a sign into another: "<" underlined is drawn "≤",
-and "1" with an underlined "a" reads "1ª"). Bold, italic, font family and every layout property are
-not reported.
+with an ``href``, ``text-decoration: underline`` and a bottom border on an inline element as
+underline (an underline turns a sign into another: "<" underlined is drawn "≤", and "1" with an
+underlined "a" reads "1ª"), and a border on another side of an inline element as border (drawn as a
+bar beside or over the text). Bold, italic, font family and every layout property are not reported.
 
 What refuses a section (``SectionRefusal.code``):
 
@@ -269,16 +269,26 @@ def _points(value: str) -> float | None:
 _NO_BORDER: Final = frozenset({"none", "hidden", "0", "0pt", "0px", "0cm", "0mm", "0in"})
 
 
-def _inline_border(style: str) -> bool:
-    """Whether a style draws a border; on an inline element it is a line along the text."""
+def _inline_borders(style: str) -> set[str]:
+    """The marks a style's borders ask for on an inline element.
+
+    A border along the bottom is drawn as an underline; one on another side as a bar beside or
+    over the text ("|05 mg", "1⋮5"), which is its own mark, ``border``.
+    """
+    kinds: set[str] = set()
     for name, value in _declarations(style):
         if not name.startswith("border") or name in ("border-collapse", "border-spacing"):
             continue
-        if name.endswith(("-color", "-colour")):
+        if name.endswith(("-color", "-colour")) or set(value.split()) & _NO_BORDER:
             continue
-        if not set(value.split()) & _NO_BORDER:
-            return True
-    return False
+        side = name.removeprefix("border").removeprefix("-").split("-", 1)[0]
+        if side in ("", "width", "style"):
+            kinds |= {"underline", "border"}
+        elif side in ("bottom", "block"):
+            kinds.add("underline")
+        else:
+            kinds.add("border")
+    return kinds
 
 
 def _style(style: str) -> set[str]:
@@ -445,8 +455,8 @@ def _walk(element: ET.Element, builder: _Builder, marks: frozenset[str], depth: 
         kinds.add("strike")
     elif name == "u" or (name == "a" and element.get("href") is not None):
         kinds.add("underline")
-    if name in _INLINE and _inline_border(element.get("style", "")):
-        kinds.add("underline")
+    if name in _INLINE:
+        kinds |= _inline_borders(element.get("style", ""))
     here = frozenset(kinds)
     if name == "br":
         builder.line_break(here)

@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and eighteen reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and nineteen reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -885,3 +885,29 @@ Each fix is pinned by vectors on both sides, and a break of each is caught by th
 7. and 8. **Low.** Rows, captions and tables are separate lines to the quote rule, now stated;
    "nearest cell with text" wording, the adjacent-number refusal and `find_product`'s handling
    of a refused stored name are stated in the query design.
+
+## Nineteenth review (2026-09-23): findings and what changed
+
+1. **High.** The sign rule read past gaps but not past an opening bracket with a space inside
+   it: "CrCl < ( 30 ml/min )", "ClCr ≥ « 30 ml/min »" (French spacing), and a cell ending
+   "<(" before "30 ml/min)". Fixed: the sign is read past gaps and opening punctuation
+   together, in plain text and in a cell's words; the digit rule still reads past gaps only
+   ("10 (000" is not a number).
+2. **High.** The sign list missed look-alikes a renderer draws as a comparator (U+02C2 exactly
+   as "<", which §5 itself names, the small and fullwidth forms) and the negated and combined
+   comparators ("<" with U+0338 normalises to "≮"). Fixed: added, and listed by name in the
+   query design; a look-alike from another script (a letter) is a stated residual.
+3. **Medium.** The query design understated the table rule's cost. Measured on the three
+   pinned SmPCs: 185 of 789 whole-cell quotes are refused by it alone, 40 starting with a
+   word. Stated in the query design and UR-22; quoting a table with its structure is PR 5's.
+4. **Medium.** The change record and UR-22 described the round-17 rule. Fixed.
+5. **Medium.** Three branches of the rule had no example (the cross-cell sign for a quote
+   beginning with a word, the cell check after an opening bracket, a spanning cell's later
+   rows); each now has one, and breaking each fails a test.
+6. **Medium.** `underline_changes` missed Cyrillic and Greek look-alikes of an ordinal "a" or
+   "o", a digit behind a code point drawn as nothing, and an underlined "o" after "N" ("Nº").
+   Fixed, with tests; an underlined "o" before "C" after a number ("20ºC") counts too.
+7. to 11. **Low.** Side borders are their own mark, `border`, reported by the check; the
+   checker's version is `qrd-check/1.1.0`; the changed-vectors table gains the two thin-space
+   vectors whose narrative changed; text beside a picture still matches (stated, PR 5); the
+   check's comment on pictures under an underline is corrected.

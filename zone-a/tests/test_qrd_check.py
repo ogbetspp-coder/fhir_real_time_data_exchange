@@ -227,6 +227,7 @@ def test_a_refused_section_is_reported_and_its_statements_are_not_guessed() -> N
         ("shading-yellow", True),
         ("faint", True),
         ("strike", True),
+        ("border", True),
         ("superscript", False),
     ],
 )

@@ -284,6 +284,26 @@ const SPACED_SIGNS = new Set([
   "≧",
   "⩽",
   "⩾",
+  // Look-alikes a renderer draws as a comparator (MODIFIER LETTER LEFT and RIGHT ARROWHEAD,
+  // SMALL and FULLWIDTH LESS-THAN and GREATER-THAN SIGN, FULLWIDTH TILDE), and the negated and
+  // combined comparators ("<" with U+0338 normalises to "≮"). A look-alike from another script,
+  // such as U+1438 CANADIAN SYLLABICS PA, is a letter and is not read as a sign (a residual).
+  "˂",
+  "˃",
+  "﹤",
+  "﹥",
+  "＜",
+  "＞",
+  "～",
+  "≮",
+  "≯",
+  "≰",
+  "≱",
+  "≲",
+  "≳",
+  "≶",
+  "≷",
+  "≠",
 ]);
 
 const DECIMAL_DIGIT = /^\p{Nd}$/u;
@@ -360,26 +380,21 @@ type TableIndex = {
   cells: Cell[];
 };
 
+// A word ends in a sign when its last code point that is not opening punctuation is a spaced
+// sign ("<(" before "30 ml/min)" in the next cell): a bracket between them binds nothing less.
 function wordBits(text: string, start: number, end: number): number {
-  let bits = 0;
-  let previous: string | undefined;
-  let inWord = false;
+  const words: string[][] = [[]];
   for (const point of text.slice(start, end)) {
-    if (isGapPoint(point)) {
-      if (inWord) {
-        if (isDigit(previous)) bits |= ENDS_DIGIT;
-        if (previous !== undefined && SPACED_SIGNS.has(previous)) bits |= ENDS_SIGN;
-      }
-      inWord = false;
-    } else {
-      if (!inWord && isDigit(point)) bits |= STARTS_DIGIT;
-      inWord = true;
-    }
-    previous = point;
+    if (isGapPoint(point)) words.push([]);
+    else words[words.length - 1]?.push(point);
   }
-  if (inWord) {
-    if (isDigit(previous)) bits |= ENDS_DIGIT;
-    if (previous !== undefined && SPACED_SIGNS.has(previous)) bits |= ENDS_SIGN;
+  let bits = 0;
+  for (const points of words) {
+    if (points.length === 0) continue;
+    if (isDigit(points[0])) bits |= STARTS_DIGIT;
+    if (isDigit(points[points.length - 1])) bits |= ENDS_DIGIT;
+    const signed = points.filter((point) => !QUOTE_OPENERS.has(point));
+    if (SPACED_SIGNS.has(signed[signed.length - 1] ?? "")) bits |= ENDS_SIGN;
   }
   return bits;
 }
@@ -505,9 +520,22 @@ function cutAfterSpace(
   tables: TableIndex | undefined,
 ): boolean {
   const beyond = nonGapBefore(text, space);
-  if (beyond !== undefined && SPACED_SIGNS.has(beyond)) return true;
+  if (SPACED_SIGNS.has(signBefore(text, space) ?? "")) return true;
   if (isDigit(beyond) && isDigit(first)) return true;
   return cutAcrossCellBefore(tables, start, first);
+}
+
+// The first code point before UTF-16 index `index` that is neither a gap nor opening
+// punctuation: a sign binds a number across both ("<" " ( " "30", "≥ « 30 »"), while a digit
+// does not ("10 (000" is not one number).
+function signBefore(text: string, index: number): string | undefined {
+  let position = index;
+  let character = codePointBefore(text, position);
+  while (character !== undefined && (isGapPoint(character) || QUOTE_OPENERS.has(character))) {
+    position -= character.length;
+    character = codePointBefore(text, position);
+  }
+  return character;
 }
 
 function edgeBefore(

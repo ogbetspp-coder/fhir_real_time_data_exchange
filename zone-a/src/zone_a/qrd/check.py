@@ -85,7 +85,7 @@ from zone_a.qrd.headings import collapse, index, match_heading
 from zone_a.qrd.pattern import Token, parse
 from zone_a.underline import underline_changes
 
-CHECKER_VERSION = "qrd-check/1.0.0"
+CHECKER_VERSION = "qrd-check/1.1.0"
 SIMILARITY = 0.85
 MIN_LITERAL = 12
 FILL_LIMIT = 300
@@ -1241,7 +1241,8 @@ def _formatting(report: _Report, section: str, number: int, paragraph: Paragraph
         covered = paragraph.text[mark.start : mark.end]
         if mark.kind == "underline":
             # A sign alone under a line is the case that matters ("≥" typed as an underlined
-            # ">"); a picture under a link's line changes nothing.
+            # ">"). A picture under a line is left out: what it shows is never read here, and
+            # an underlined picture of a sign is one of the pictures ADR 0005 refuses on import.
             if underline_changes(
                 paragraph.text, mark.start, mark.end, also=_PICTURE, hyphens_in_words=True
             ):
@@ -1256,7 +1257,11 @@ def _formatting(report: _Report, section: str, number: int, paragraph: Paragraph
         if not any(c.isalnum() for c in covered):
             # A coloured picture or shaded space shows no text differently.
             continue
-        if mark.kind.startswith(("color-", "shading-")) or mark.kind in ("faint", "strike"):
+        if mark.kind.startswith(("color-", "shading-")) or mark.kind in (
+            "faint",
+            "strike",
+            "border",
+        ):
             report.finding(
                 "formatting",
                 section=section,

@@ -173,6 +173,15 @@ def test_a_border_on_inline_text_is_marked_as_underline() -> None:
     assert kinds(body) == [(0, 1, "underline")]
 
 
+def test_a_border_beside_inline_text_is_its_own_mark() -> None:
+    # A border on the left is drawn as a bar beside the text: "|05 mg" (review round 19).
+    body = (
+        '<p><span style="border-left: 1px solid">0</span>5 mg '
+        '<span style="border: 1px solid">x</span></p>'
+    )
+    assert kinds(body) == [(0, 1, "border"), (6, 7, "border"), (6, 7, "underline")]
+
+
 # --- the Bundle -------------------------------------------------------------------------------
 
 
