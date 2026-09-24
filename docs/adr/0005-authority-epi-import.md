@@ -33,14 +33,39 @@ Three facts about that source meet three rules of the record:
    raised and lowered text (as `sup` and `sub`), and bold, italic and underline. Every style,
    class and other presentational attribute is dropped. Nothing is added, reordered or reworded.
 
+   Presentation is dropped only from this closed list; any other property or value refuses
+   the section, because a text check cannot see what it does to the drawn page:
+   - `class` (the authority's stylesheet is not applied: a stated residual, below) and the
+     `mso-` properties a browser ignores;
+   - `font-family` naming a Unicode text font on a closed list kept with the reader (for
+     example Times New Roman, Arial, Calibri, Verdana, and the generic `serif` and
+     `sans-serif`); a symbol-encoded font (Symbol, Wingdings, Webdings, ZapfDingbats, MT Extra)
+     or any font not on the list refuses, because in Symbol `m` draws `μ`;
+   - `font-size` of two points or more, `font-weight`, `font-style` and underline (bold,
+     italic and underline are kept as `strong`, `em` and `u`);
+   - a text `color` that is black or nearly black, and a white or transparent background;
+   - `margin`, `padding` and `text-indent` within one inch either way, `border`, `line-height`,
+     `text-align`, `width` and `height`, and page-break properties;
+   - `vertical-align: baseline` anywhere, and `top`, `middle` or `bottom` on a table cell only.
+
    A mark that changes what the words say, or whether they are seen, is never dropped:
-   - raised and lowered runs are kept as `sup` and `sub`, and folded on both sides;
-   - a section with struck-through text, faint text (white, nearly white, or under two points),
-     a text colour or a shading refuses the import. Colour against shading can hide text as
-     surely as white on white, and a colour rule that proved contrast would be a new contract.
+   - raised and lowered runs (`sup`, `sub`, `vertical-align` other than `baseline` on inline
+     content, `position: relative` with a vertical offset) are kept as `sup` and `sub` and
+     folded on both sides, or refuse the section; PR 3 fixes the offsets that count, against
+     the pinned label and the renderer cross-check below;
+   - struck-through text, hidden text (`display: none`, a `visibility` other than `visible`),
+     faint text (white, nearly white, or under two points), a text colour or a shading refuses
+     the section. Colour against shading can hide text as surely as white on white, and a
+     colour rule that proved contrast would be a new contract. So do `opacity`, `clip`,
+     `overflow`, any other `position`, `content`, `text-transform` and `list-style-type`, which
+     would change the drawn text or the list numbers the check proves.
 
    The authority's div is read by the ePI reader (`zone_a.epi.reader`), acting as an extractor
-   under `docs/fidelity-normalization.md` §7 (fidelity-norm/3.0.0):
+   under `docs/fidelity-normalization.md` §7 (fidelity-norm/3.0.0). The page it writes for a
+   section is exactly the text §5's scanner emits for the section's div once the presentation
+   listed above is removed, and nothing else; where the scanner would refuse that div (any §5
+   reason, `soft-hyphen-at-boundary` included), or the div holds U+00AD or another §3 step 1
+   invisible character, the reader refuses the section. So:
    - it draws list numbers with §5's counter algorithm, and refuses an `li` that is not a
      direct child of `ol` or `ul`;
    - it lays tables out by the HTML table model and emits the grid markers;

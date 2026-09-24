@@ -233,15 +233,23 @@ specification states the rule directly. Each break was restored.
 
 **Blast radius.**
 
-- **Drawn documents are not qualified.** Section 7 is complete for a structured source only. Nine
-  review rounds found open cases in how an extractor of a drawn document (a PDF, or a Word
-  document read as laid out) must write wrapped lines, soft hyphens, page footnotes and a few
+- **Drawn documents are not qualified.** Section 7 is complete for a structured source only (an
+  FHIR ePI document Bundle with XHTML narratives; every other source, any Word document
+  included, is a drawn document). Nine
+  review rounds found open cases in how an extractor of a drawn document must write wrapped lines, soft hyphens, page footnotes and a few
   table and caption splits; several hold for 2.0.0 as well. They are recorded in the design note
   ("Drawn documents: open items"). No drawn-document extractor exists in the repository (the
   synthetic builder derives its page text from the narrative, and the Document AI adapter is a
   recorded spike), and none may support an approval until a later version closes them. Roadmap
   item 3a's canonical-contract change (PR 2) makes the gate accept a real source only through a
-  structured-source extractor.
+  structured-source extractor; until then the interim control is `AGENTS.md`'s synthetic-only
+  rule, under which no real drawn document enters. The synthetic fixture declares
+  `application/pdf` and carries an approval, so PR 2's gate must tell the synthetic extractor
+  apart from a real drawn source. A tenth review found that the structured-source rule itself
+  needed a closed definition (the page is exactly the scanner's text of the div with ADR 0005's
+  droppable presentation removed; a section the scanner refuses, or that holds a soft hyphen,
+  refuses), and that ADR 0005 needed a closed list of the presentation that may be dropped;
+  both are fixed, with a property test over every accepted XHTML vector.
 
 - **Every submission carrying 2.0.0 is refused by the worker gate** from the moment this change
   deploys. Nothing in the repository produces a 2.0.0 submission after it.

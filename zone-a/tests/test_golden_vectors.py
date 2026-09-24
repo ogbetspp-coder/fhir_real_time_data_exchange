@@ -22,6 +22,7 @@ import pytest
 
 from zone_a.canonical_json import canonical_json
 from zone_a.fidelity import (
+    NORMALIZATION_VERSION,
     NormalizationError,
     XhtmlError,
     normalize_text,
@@ -29,6 +30,7 @@ from zone_a.fidelity import (
     verify_report_hash,
     xhtml_to_text,
 )
+from zone_a.fidelity.xhtml import has_drawn_text
 
 from .conftest import VECTORS_PATH, load_json
 
@@ -172,3 +174,69 @@ def test_empty_rows_under_a_wide_row_scan_in_linear_time() -> None:
         xhtml_to_text(div)
     assert raised.value.code == "table-shape"
     assert time.monotonic() - started < 5
+
+
+# A structured source (section 7): one page per section, the page exactly the scanner's text for
+# the section's div, the whole page the body and the span. The accepted vectors that draw text and
+# hold no section 3 step 1 invisible character (the extractor refuses those) must verify one
+# section at a time and all together, a page each. The TypeScript twin is in test/fidelity.test.ts.
+_INVISIBLE = frozenset("\u00ad\u200b\ufeff\u2060")
+
+
+def _structured_source(divs: list[str]) -> dict[str, Any]:
+    texts = [xhtml_to_text(div) for div in divs]
+    return {
+        "normalizationVersion": NORMALIZATION_VERSION,
+        "source": {
+            "extractorVersion": "structured-source-property/1.0.0",
+            "pages": [
+                {"page": index + 1, "text": text, "bodyStart": 0, "bodyEnd": len(text)}
+                for index, text in enumerate(texts)
+            ],
+        },
+        "sections": [
+            {
+                "sourceKey": f"section.{index + 1}",
+                "path": f"Composition.section[{index}]",
+                "div": div,
+            }
+            for index, div in enumerate(divs)
+        ],
+        "provenance": [
+            {
+                "sourceKey": f"section.{index + 1}",
+                "spans": [
+                    {
+                        "page": index + 1,
+                        "startOffset": 0,
+                        "endOffset": len(text),
+                        "textSha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                    }
+                ],
+                "narrativeDivSha256": hashlib.sha256(divs[index].encode("utf-8")).hexdigest(),
+                "normalizedTextSha256": "0" * 64,
+            }
+            for index, text in enumerate(texts)
+        ],
+    }
+
+
+def _structured_divs() -> list[str]:
+    divs: list[str] = []
+    for case in _VECTORS["xhtml"]:
+        if not isinstance(case["expected"], str):
+            continue
+        text = xhtml_to_text(case["input"])
+        if _INVISIBLE.isdisjoint(text) and has_drawn_text(normalize_text(text)):
+            divs.append(case["input"])
+    return divs
+
+
+def test_a_structured_source_verifies_every_accepted_vector() -> None:
+    divs = _structured_divs()
+    assert len(divs) > 50
+    for div in divs:
+        assert verify_narrative_fidelity(_structured_source([div]))["status"] == "passed", div
+    together = verify_narrative_fidelity(_structured_source(divs))
+    assert [s for s in together["sections"] if s["status"] != "verified"] == []
+    assert together["status"] == "passed"

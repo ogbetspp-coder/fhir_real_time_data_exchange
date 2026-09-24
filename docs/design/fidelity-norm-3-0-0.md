@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and seven reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and eight reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -574,9 +574,11 @@ round has tried.
 **Decision.** Rounds 4 to 9 each found further drawn-document layout cases, several of them
 present since 2.0.0. Reading a laid-out page into text is a design problem of its own, and it
 belongs with the drawn-document extractor (roadmap: the engine, Word drafts), not with this
-change, whose purpose is the structured-source import of ADR 0005. A structured source has none of
-these cases: its text is the scanner's reading of its own markup, one section per page, with no
-wraps, page breaks inside a section or page furniture. So 3.0.0 qualifies structured-source
+change, whose purpose is the structured-source import of ADR 0005. A structured source avoids these cases
+only because §7 now defines its page as exactly the scanner's text for the section's div once
+ADR 0005's droppable presentation is removed, and refuses a section the scanner refuses or that
+holds a soft hyphen or another invisible character (round 10 found that a looser reading, "as a
+renderer draws it", let a soft hyphen or a typed bullet through on a structured page). So 3.0.0 qualifies structured-source
 extraction, and says in §7 that drawn-document extraction is not qualified and may not support an
 approval until a later version closes the items below. No drawn-document extractor exists in the
 repository.
@@ -623,3 +625,29 @@ fix its review proposed. They are the starting list for the drawn-document contr
    line-end hyphen is drawn as a hard hyphen or is discretionary should write it verbatim.
 7. **A section starting at a continuation line (round 9, Low).** It can never be matched by a
    narrative (a false failure §6 does not list).
+
+## Tenth review (2026-09-23, of the scoped version): findings and what changed
+
+The tenth review checked the structured-source path as scoped (one page per section; §1 and §6
+held for every scanner output it tried, 1 685 TS/Python replays identical), confirmed that
+deferring the gate's enforcement to PR 2 is safe (the only producer is the synthetic builder, and
+`AGENTS.md`'s synthetic-only rule bars real drawn content), and found:
+
+1. **High.** The structured-source rule read two ways ("the scanner's own reading" and "as a
+   renderer draws it under the rules of this section"); under the second, a soft hyphen before a
+   `br` or at a block end, and a typed bullet after a `br`, let a narrative verify that the source
+   does not draw. Fixed: the page is exactly the scanner's text for the div once ADR 0005's
+   droppable presentation is removed; a section the scanner refuses, or that holds a soft hyphen
+   or another invisible character, refuses; the drawn-document rules do not apply.
+2. **High.** ADR 0005 dropped "every style", with only a few exceptions named, so a symbol font
+   (`m` drawn as `μ`), `text-transform`, `list-style-type`, `vertical-align: top` on inline text or
+   a large margin could change the drawn text unseen. Fixed: ADR 0005 has a closed list of
+   droppable presentation; symbol fonts, hidden text and every unlisted property refuse.
+3. **Medium.** "Structured source" was an example, not a definition. Fixed: an FHIR ePI document
+   Bundle with XHTML narratives; every other source, any Word document included, is drawn.
+4. **Medium.** `AGENTS.md`, UR-09 and the demo script claimed the check without its scope. Fixed.
+5. **Medium.** No test covered the qualified path. Fixed: a property test on each side verifies
+   every accepted XHTML vector as a structured page of its own and all together.
+6. to 8. **Low.** A wrong cross-reference in §7, an unstated order-dependent false failure (closed
+   by refusing soft hyphens), the change-record index, the roadmap's engine item and the
+   change record's interim control. Fixed.

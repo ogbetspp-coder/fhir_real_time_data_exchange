@@ -10,8 +10,11 @@ Google Cloud Healthcare API and observe their native near-real-time BigQuery str
 
 - Never generate, summarize, or infer regulated clinical narrative. Preserve supplied XHTML. The
   fidelity check proves its words, list numbers, table grids and embedded pictures; paragraph
-  breaks, headings, bullets, list nesting and emphasis are kept, not proved. Presentation
-  (styles, classes) may be dropped only by an authority import under ADR 0005.
+  breaks, headings, bullets, list nesting and emphasis are kept, not proved. Its contract
+  (`fidelity-norm/3.0.0`) qualifies structured sources only (an FHIR ePI); over a drawn
+  document's text (PDF, Word) a report proves agreement with that text, not with the document,
+  and cannot support an approval. Presentation (styles, classes) may be dropped only by an
+  authority import under ADR 0005.
 - Fail closed on missing, duplicate, or ambiguous mandatory QRD sections.
 - Pin and checksum all external FHIR packages and examples.
 - Do not claim regulatory or GxP compliance. Produce qualification-supporting evidence.

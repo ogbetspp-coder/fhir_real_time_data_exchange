@@ -9,10 +9,12 @@ import {
   NormalizationError,
   XhtmlError,
   computeNarrativeBinding,
+  hasDrawnText,
   normalizeText,
   verifyNarrativeFidelity,
   verifyReportHash,
   xhtmlToText,
+  type FidelityInput,
   type FidelityReport,
 } from "../src/fidelity/index.js";
 import { canonicalJson, sha256Utf8 } from "../src/lib/hash.js";
@@ -113,6 +115,69 @@ describe("normalization", () => {
       expect(result, testCase.name).toEqual(testCase.expected);
       if (typeof result === "string") expect(normalizeText(result), testCase.name).toBe(result);
     }
+  });
+});
+
+// A structured source (section 7): one page per section, the page exactly the scanner's text
+// for the section's div, the whole page the body and the span. The accepted vectors that draw
+// text and hold no section 3 step 1 invisible character (the extractor refuses those) must verify
+// one section at a time and all together, a page each.
+const INVISIBLE = /[\u00ad\u200b\ufeff\u2060]/u;
+
+function structuredSource(divs: string[]): FidelityInput {
+  const texts = divs.map((div) => xhtmlToText(div));
+  return {
+    normalizationVersion: NORMALIZATION_VERSION,
+    source: {
+      extractorVersion: "structured-source-property/1.0.0",
+      pages: texts.map((text, index) => ({
+        page: index + 1,
+        text,
+        bodyStart: 0,
+        bodyEnd: Array.from(text).length,
+      })),
+    },
+    sections: divs.map((div, index) => ({
+      sourceKey: `section.${String(index + 1)}`,
+      path: `Composition.section[${String(index)}]`,
+      div,
+    })),
+    provenance: texts.map((text, index) => ({
+      sourceKey: `section.${String(index + 1)}`,
+      spans: [
+        {
+          page: index + 1,
+          startOffset: 0,
+          endOffset: Array.from(text).length,
+          textSha256: sha256Utf8(text),
+        },
+      ],
+      narrativeDivSha256: sha256Utf8(divs[index] ?? ""),
+      normalizedTextSha256: "0".repeat(64),
+    })),
+  };
+}
+
+describe("structured source (section 7)", () => {
+  const accepted = xhtmlCases
+    .filter(({ expected }) => typeof expected === "string")
+    .map(({ input }) => input)
+    .filter((div) => {
+      const text = xhtmlToText(div);
+      return !INVISIBLE.test(text) && hasDrawnText(normalizeText(text));
+    });
+
+  it("verifies every accepted vector as a page of its own", () => {
+    expect(accepted.length).toBeGreaterThan(50);
+    for (const div of accepted) {
+      expect(verifyNarrativeFidelity(structuredSource([div])).status, div).toBe("passed");
+    }
+  });
+
+  it("verifies every accepted vector together, one page per section", () => {
+    const report = verifyNarrativeFidelity(structuredSource(accepted));
+    expect(report.sections.filter(({ status }) => status !== "verified")).toEqual([]);
+    expect(report.status).toBe("passed");
   });
 });
 
