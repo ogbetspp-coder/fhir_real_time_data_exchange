@@ -31,13 +31,22 @@ the approval of that text, by a named person, and to no other approval.**
   id, never an e-mail address), `approverRole`, `approvedAt`, `method` (`api-attestation` |
   `manual-record`, described in the contract itself as "attestation placeholders"), `meaning`
   (`reviewed-fidelity-and-structure`) and `approvedContentSha256`, the hash of
-  `{ schemaVersion, bundle, provenance }` exactly as approved.
+  `{ schemaVersion, graphType, bundle, provenance }` exactly as approved.
+- Since `CanonicalSubmission` 2.0.0 (roadmap 3a, `docs/design/authority-import-contract.md`, D2
+  and D8) `Approval` is a union on `method`: the attestation above, or `authority-publication`,
+  an authority import's. Its meaning is `authority-publication-imported`: the approval is the
+  authority's publication (ePI id, document, List, version number, procedure number, the
+  Bundle's timestamp, `authorityStatus: pilot`), and the human decision is the request to import
+  it. `requestedBy` names who made that request and `requestedAt` when. Like `approverId`, it is
+  a placeholder that the submission's writer fills in and nothing verifies, until this design
+  binds it to a verified identity; the FHIR Provenance records it as the `enterer`, not as an
+  attester. An import runs only dry until roadmap 3a PR 5, so no import is yet served.
 - The ingress gate recomputes that hash and refuses content that does not match it
   (`src/contracts/canonical-submission.ts`). Approval is bound to the _submitted_ content; it is
   not bound to a person, and nothing binds it to what is later served.
-- The pipeline writes a `Provenance` whose target is the unversioned `Bundle/<id>`
-  (`src/fhir/provenance.ts`), in the same transaction as the Bundle, and signs its run manifest
-  with the worker's HSM key.
+- The pipeline writes a `Provenance` whose targets are the record's identifier and the
+  unversioned `Composition/<id>` and `Bundle/<id>` (`src/fhir/provenance.ts`), in the same
+  transaction as the Bundle, and signs its run manifest with the worker's HSM key.
 - The query service answers from the newest stored version and attaches the newest Provenance,
   whatever version was asked for. A separate fix in progress (branch `query-proof-fixes`) stops
   it attaching an approval to a version that is not current. This design replaces that rule.

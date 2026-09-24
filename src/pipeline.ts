@@ -430,12 +430,20 @@ export async function runPipeline(
     const sourceStore = config.SOURCE_FHIR_STORE_ID ?? "unknown";
     const targetStore = config.TARGET_FHIR_STORE_ID ?? "unknown";
     const lineage = new GcpLineagePublisher(config);
+    const importSource =
+      gate?.submission.provenance.sourceDocument.kind === "authority-publication"
+        ? gate.submission.provenance.sourceDocument
+        : undefined;
+    // An import's lineage names the authority's document it came from
+    // (docs/design/authority-import-contract.md, D12).
     const sourceFqn =
       input.sourceKind === "healthcare-api"
         ? `healthcare:${project}.${config.GCP_LOCATION}.${dataset}.${sourceStore}.${input.sourceResource.replace("/", ".")}`
         : gate === undefined
           ? `custom:ema-flow.${input.sourceResource}`
-          : `custom:zone-a.${gate.submission.submissionId}`;
+          : importSource !== undefined
+            ? `custom:authority-import.${importSource.authority === "EMA" ? "ema" : "synthetic"}.${importSource.document.id}`
+            : `custom:zone-a.${gate.submission.submissionId}`;
     const lineageResources = await lineage.publish({
       runId,
       startedAt,

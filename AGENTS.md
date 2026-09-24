@@ -13,7 +13,8 @@ Google Cloud Healthcare API and observe their native near-real-time BigQuery str
   breaks, headings, bullets, list nesting and emphasis are kept, not proved. Its contract
   (`fidelity-norm/3.0.0`) qualifies structured sources only (an FHIR ePI); over a drawn
   document's text (PDF, Word) a report proves agreement with that text, not with the document,
-  and cannot support an approval. Presentation (styles, classes) may be dropped only by an
+  and cannot support an approval (the gate accepts a drawn submission only as a synthetic one,
+  where `ALLOW_SYNTHETIC_SOURCES` is set). Presentation (styles, classes) may be dropped only by an
   authority import under ADR 0005.
 - Fail closed on missing, duplicate, or ambiguous mandatory QRD sections.
 - Pin and checksum all external FHIR packages and examples.
@@ -38,8 +39,10 @@ Google Cloud Healthcare API and observe their native near-real-time BigQuery str
 - Local deterministic demo: `npm run demo`
 - Service: `npm run dev`
 - Terraform: `terraform -chdir=infra fmt -check -recursive && terraform -chdir=infra validate`
-- Contracts and vectors: `npm run contracts:check` (regenerates `contracts/generated` and
-  `test/fixtures/fidelity/vectors.json` and fails on drift)
+- Contracts and vectors: `npm run contracts:check` (regenerates `contracts/generated`,
+  `test/fixtures/fidelity/vectors.json` and the importer's `test/fixtures/authority/vectors.json`
+  and fails on drift). A change to `src/authority/` changes `IMPORTER_VERSION`, then
+  `npm run authority:lock` (ADR 0004's amendment)
 
 ## Workflow
 

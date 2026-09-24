@@ -495,6 +495,8 @@ export function importPublication(
     sections: narratives,
     provenance: sectionProvenance,
   });
+  // Both hold by construction (each page is its own section's scanner text, and a section left
+  // without text draws nothing); they stay as a defence, and the gate checks the second again.
   if (fidelityReport.status !== "passed") refuse("record", "fidelity-not-passed");
   if (fidelityReport.coverage.uncoveredGaps !== 0) refuse("record", "uncovered-page-not-blank");
 

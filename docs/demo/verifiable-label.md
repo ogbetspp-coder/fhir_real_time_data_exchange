@@ -75,9 +75,11 @@ why it is write order rather than the approval date, is in
 `docs/design/epi-mcp-query-service.md` ("An approval is stated only for the current version").
 
 **Do not re-seed without rebuilding the store.** A second seed adds a second `Provenance` per
-document rather than replacing the first, because the resource id is derived from the
-submission id, and publishes the same content again as further versions. The section below is
-for a rebuilt store or a new environment.
+document rather than replacing the first, because the resource id is derived from the Bundle
+identifier and the submission id, and publishes the same content again as further versions. The
+first re-seed after `CanonicalSubmission` 2.0.0 also writes each product-graph resource under a new
+id beside the old one (`docs/validation/changes/2026-09-24-authority-import-contract.md`). The
+section below is for a rebuilt store or a new environment.
 
 Scenes 1 and 2 as written below use the console and BigQuery and do not depend on any of this;
 it matters for the `get_provenance` parts of the assistant scenes.

@@ -182,7 +182,8 @@ and the EMA output carry the document's title, and the EMA preflight accepts any
 
 **Pages** (fidelity §7): one per section at every depth, in pre-order; the whole page is the
 body; it holds exactly the scanner's text for T(div), or nothing for a section without `text`
-(`""`; one sentence added to §7, which is silent on it, as a patch documentation change). Then:
+(`""`; one sentence added to §7, which is silent on it: documentation of existing behaviour, no
+vector changes, not a new normalisation version). Then:
 
 - a section whose scanner text is `empty-narrative` (the EMA's `<div>&#160;</div>` headings)
   carries no `text` in the record; every other section carries T(div) and exactly one span, on
@@ -273,7 +274,7 @@ bytes. PR 2's T refuses every picture.
   The synthetic authority keeps the EMA's live form: its ids and document identifier are GUIDs
   from a reserved block (`00000000-5979-4e74-8000-` followed by twelve hex digits), its holder,
   agency and procedure values begin `SYNTHETIC-` in the EMA's and SPOR's own systems, and the gate
-  "fetches" it from committed test data in `src/authority/synthetic/`, an origin allowed only
+  "fetches" it from the code that builds it (`src/authority/synthetic.ts`), an origin allowed only
   when the flag is on.
   The marker matches as a case-sensitive substring of the scanner's text of each narrative that
   carries text. The importer refuses a synthetic publication that carries a real value (an id
@@ -397,7 +398,8 @@ and bytes (D1), Appendix A, D5, D4's tree, D4's titles, pictures (D6), then T an
 section in pre-order. The vectors include the pinned real labels as expected-refusal cases with
 the reasons the importer actually produces, recorded when it is built (in PR 2 the pictures stage
 should refuse Imatinib Teva, whose two `~/_entity` pictures in 5.1 have neither template nor
-evidence; Jentadueto fails the tree, Brukinsa its titles; Nuvaxovid's is recorded as found), and a
+evidence; Jentadueto fails the closed shape (its uncoded subheadings), Brukinsa its titles, Nuvaxovid its
+pictures), and a
 stage test that Imatinib Teva passes Appendix A, D5, and D4's tree and titles. The
 producer runs the same code; its identity is not trusted, which is D1's point.
 

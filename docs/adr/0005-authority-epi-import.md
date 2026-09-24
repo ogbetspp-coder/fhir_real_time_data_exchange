@@ -194,3 +194,60 @@ Three facts about that source meet three rules of the record:
   corrects it, or until PR 3's requirements above admit what it draws; Imatinib Teva was chosen
   because its sections are all coded correctly, and the refusals decision 1 records are PR 3's
   first work.
+
+## Amendment (2026-09-24, the canonical contract for an import)
+
+`docs/design/authority-import-contract.md` (roadmap 3a, PR 2) makes the contract hold an import
+(`CanonicalSubmission` 2.0.0, ADR 0002's amendment) and changes this ADR as follows.
+
+- **Where the importer runs (D1).** The importer is shared TypeScript (`src/authority/`, under
+  ADR 0004's amendment), not a Zone A component: a producer script (`scripts/authority/import.ts`)
+  runs it to write a submission, and Zone B fetches the authority's bytes itself and runs it again,
+  accepting only the submission it recomputes. The ePI reader stays in Zone A for the QRD
+  conformance check.
+- **Decision 1's T ships with empty closed lists.** In PR 2, T removes nothing: a section is
+  carried only if the scanner accepts its div as it stands, and every other refuses. PR 3 fills
+  the lists against the real label with the renderer cross-check; that changes the importer's
+  version and vectors, not the contract.
+- **The document must be the mapping's tree (D4).** Its section tree must equal the mapping's
+  rule tree: the same sections, each with exactly one code (the EMA's SPOR system URI is a stated
+  alias of the mapping's), under the same parent, in the same order, and nothing else. Each
+  heading must be one the QRD template permits for its rule (the mapping lists them from 1.3.0:
+  6.5 and 6.6 with and without their optional wording), and the record carries the document's
+  heading. There is one page per section at every depth, in pre-order; a section without `text`
+  has the empty page.
+- **Decision 3's qualifier.** An unmapped, uncoded or doubly coded section refuses, empty or not,
+  where decision 3 named only an unmapped code carrying narrative.
+- **The List binds the document (D5).** A document is imported only with the EMA List that lists
+  it: exactly one entry references `Bundle/<document id>`, its display is the document type's,
+  `Composition.title` equals `List.title`, and the List is `current`. Both files are read by a
+  closed shape enumerated from the four SmPCs and four Lists pinned in `labels/ema-epi/` (the
+  design's Appendix A); anything else refuses. The EMA serialises FHIR codes as integers of its
+  own (`language` `0` for English, `resourceType` and `status` `0`); the record's
+  `Composition.status` is `final` by rule from the publication, and what the EMA's `0` status
+  means is a stated residual.
+- **Pictures (D6).** A document names a picture in one of four forms: a `data:` URI in the div;
+  `#id` naming a `Binary` contained in the Composition (both in the document's bytes); a reference
+  the authority's viewer resolves, fetched by the importer's template for its grammar and pinned;
+  or a reference the viewer draws as nothing. A deletion is proven only by an evidence record of
+  the authority's own viewer, made in a pinned browser and reviewed into the importer's data,
+  never by a failed fetch: the EMA's service answers "Resource not found" for every unknown path,
+  its own root included. So decision 3's statement that Imatinib Teva's `~/_entity/annotation/…`
+  references are deleted on a not-found and a zero-size draw is withdrawn: whether its two
+  pictures are drawn is unsettled until PR 3 measures them in the EMA's viewer and reconciles this
+  ADR and `docs/design/fidelity-norm-3-0-0.md`. In PR 2 the importer refuses every picture, and
+  Imatinib Teva stops there.
+- **Decision 2's record (D9).** A Type 1 record is exactly one Composition,
+  MedicinalProductDefinition, Organization and RegulatedAuthorization. Every value comes from the
+  document or the List, or is a stated rule; none is derived from another value's content (the
+  EMA product number is not read out of the procedure number, and EU numbers, strengths and forms
+  stay in the narrative). The authority states no authorisation number in structured form, so the
+  procedure number stands in for `RegulatedAuthorization.identifier`, stated; the
+  MedicinalProductDefinition's identifier is the ePI's id, the product scope, not a product id.
+- **Decision 4's approval and re-import (D2, D8).** The approval's method is
+  `authority-publication`: it names the publication (ePI id, document, List, version number,
+  procedure number, the Bundle's timestamp) and who requested the import. A re-import after a
+  normalisation change is possible only while the authority still serves the same bytes for the
+  document and its List (the List changes whenever any document of the product changes);
+  otherwise it is a new import of the current publication, and the earlier record is superseded
+  or withdrawn under roadmap item 2.

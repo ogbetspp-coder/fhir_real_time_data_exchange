@@ -183,3 +183,56 @@ describe("the authority gate", () => {
     expect(found.length).toBeGreaterThan(0);
   });
 });
+
+describe("a structured source's uncovered pages", () => {
+  it("refuses a record that drops a section's words its page still holds", async () => {
+    const { verifyDocumentSubmission } = await import("../../src/contracts/index.js");
+    const { collectNarrativeSections, verifyNarrativeFidelity, NORMALIZATION_VERSION } =
+      await import("../../src/fidelity/index.js");
+    const input = imported();
+    const { submission } = input;
+    // Drop the narrative of the Composition's last leaf section, and its provenance, as a record
+    // that lost a section's words would; the page text keeps them.
+    const composition = submission.bundle.entry[0]?.resource as unknown as {
+      section: { section?: { text?: unknown }[] }[];
+    };
+    const leaves = composition.section[0]?.section ?? [];
+    const dropped = leaves.at(-1);
+    if (dropped === undefined) throw new Error("a leaf section");
+    delete dropped.text;
+    const narratives = collectNarrativeSections(composition as never, mapping.sourceCodeSystem);
+    const keys = new Set(narratives.map(({ sourceKey }) => sourceKey));
+    submission.provenance.sections = submission.provenance.sections.filter(({ sourceKey }) =>
+      keys.has(sourceKey),
+    );
+    const report = verifyNarrativeFidelity({
+      normalizationVersion: NORMALIZATION_VERSION,
+      source: input.sourceText as never,
+      sections: narratives,
+      provenance: submission.provenance.sections,
+    });
+    expect(report.coverage.uncoveredGaps).toBe(1);
+    Object.assign(submission.provenance.fidelity, {
+      sectionsChecked: report.summary.total,
+      sectionsMatched: report.summary.verified,
+      narrativeBindingSha256: report.narrativeBindingSha256,
+      reportSha256: report.reportHash,
+    });
+    reseal(submission);
+
+    let found: string[] = [];
+    try {
+      verifyDocumentSubmission(
+        { submission, fidelityReport: report, sourceText: input.sourceText },
+        mapping.sourceCodeSystem,
+        { allowSyntheticSources: true, recomputedImport: { submissionSha256: sha256(submission) } },
+      );
+    } catch (error) {
+      if (error instanceof SubmissionRejectedError) found = error.issues;
+      else throw error;
+    }
+    expect(found).toContain(
+      "A page of the authority's document that no narrative covers is not blank",
+    );
+  });
+});

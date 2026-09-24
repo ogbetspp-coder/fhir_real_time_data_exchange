@@ -71,3 +71,27 @@ Services are discrete in **identity and state**, never in code.
   audit records name the service and its image digest, as the worker's manifest already does.
 - What is _not_ done: no service mesh, no shared helper packages published to a registry, no
   per-service repositories, no splitting of the deterministic run.
+
+## Amendment (2026-09-24, ADR 0005: the authority importer)
+
+`src/authority/` joins decision 2's shared code (`docs/design/authority-import-contract.md`,
+D10), because it decides what text enters the record: the producer
+(`scripts/authority/import.ts`) and Zone B's gate run the same importer, and the gate accepts an
+import only as it recomputes it. The importer (`importPublication`) is pure: no clock, locale,
+`Intl` or network. Beside it are the gate's fetcher (`fetch.ts`, the network and the clock,
+injected into the gate) and the vector generator (`vectors.ts`, which reads the pinned labels);
+neither is on the importer's path.
+
+Its change control is its own, beside the procedure in `docs/validation/README.md`:
+
+- **Golden vectors.** `test/fixtures/authority/vectors.json` records what the importer makes of
+  the synthetic publication and where it refuses each pinned EMA label; `npm run contracts:check`
+  regenerates it (`npm run authority:vectors`) and fails on drift.
+- **The lock.** `src/authority/importer.lock.json` maps each `IMPORTER_VERSION` to the SHA-256 of
+  every file under `src/authority/` (code and data) and of the vectors.
+  `test/authority/lock.test.ts` fails when either changes while the recorded entry does not, and
+  `npm run authority:lock` refuses to rewrite an entry `main` already has, so a change of
+  behaviour or data after release must change the version.
+- The version is the importer's reviewed label. Its complete identity is the worker image digest
+  the run manifest records, which includes `src/fidelity/`, the hash library, the mapping and
+  the dependencies; the lock covers those only where the vectors exercise them.
