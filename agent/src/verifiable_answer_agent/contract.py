@@ -30,7 +30,7 @@ from typing import Any, Final, Literal, NotRequired, TypedDict, final
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 
-from .quote_edge import drawn_from, edge_after, edge_before, non_gap
+from .quote_edge import edge_after, edge_before, number_before, number_from
 
 __all__ = [
     "AGENT_TURN_RESOURCE",
@@ -252,7 +252,8 @@ def split_for_verification(text: str, limit: int = VERIFY_QUOTE_MAX_UTF16) -> tu
 def _acceptable_cut(text: str, index: int) -> bool:
     """A cut at the run of spaces starting at ``index``, leaving both new edges on a boundary.
 
-    The code point beyond each new edge is read past gaps through the whole answer text, where the
+    The number beyond each new edge is read past gaps and marks through the whole answer text (and
+    a sign past opening marks too), where the
     service reads only within the quote: this can refuse a cut the service would accept, never the
     reverse, so a chunk it keeps is still one the service locates.
     """
@@ -263,8 +264,8 @@ def _acceptable_cut(text: str, index: int) -> bool:
         resume += 1
     if resume == len(text):
         return False
-    return edge_after(text, index, non_gap(text, index - 1, -1)) and edge_before(
-        text, resume, drawn_from(text, resume)
+    return edge_after(text, index, number_before(text, index)) and edge_before(
+        text, resume, number_from(text, resume)
     )
 
 

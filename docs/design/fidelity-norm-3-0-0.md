@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and twenty-two reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and twenty-three reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -988,3 +988,23 @@ number before a sign, as intended.
 6. to 9. **Low.** Wording ("‹" is a sign, the scanner markers and modifier letters in UR-22),
    the bit constants' comment, pins for the rules that only loosen, and residuals (letters drawn
    like digits, « and », dashes drawn like signs, a spaced ratio colon).
+
+## Twenty-third review (2026-09-24): findings and what changed
+
+1. **High.** A combining mark between a number and the space ("Give 10" U+0332 " 000 IU",
+   drawn "10 000" with the last 0 underlined) hid the number before the space from the digit
+   rule: round 22 read the far side past marks, not the near side. Fixed: a number is read past
+   gaps and combining marks on both sides, in text, in cell words and in the agent's splitter.
+2. **Medium.** Round 22 read numbers past opening marks too, which the query design did not
+   say and which refused "0.52" before "(95% CI", a pack line "(28 × 1 …)" after a procedure
+   number, and 108 more five-word windows on the pinned SmPCs (round 22's note said 20; that
+   figure was measured before its fix). Fixed: numbers are read past gaps and marks only; signs
+   still past opening marks. The windows are back to 220 of 20 186 and the table figure to 196
+   of 789; paragraphs, sentences and clauses are unchanged.
+3. **Medium.** The ePI reader read layout that draws one text over another as plain text. Fixed:
+   a negative margin on inline text or at a block's top or bottom, padding on inline text over a
+   background, a height outside table parts and pictures, and a line height below normal refuse
+   the section. The pinned labels refuse nothing more (their heights are on table rows, their
+   line heights 12.65 pt or 115% and up, their negative margins at a paragraph's side).
+4. to 6. **Low.** Stale comments and docstrings; the right-edge wording in the query design and
+   UR-22 aligned; pins for "‰" and "…" as not signs before a quote.

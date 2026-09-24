@@ -39,7 +39,8 @@ other colour notation refuses the section), a font size under two points as fain
 with an ``href``, ``text-decoration: underline`` and a bottom border on an inline element as
 underline (an underline turns a sign into another: "<" underlined is drawn "≤", and "1" with an
 underlined "a" reads "1ª"), and a border on another side of an inline element as border (drawn as a
-bar beside or over the text). Bold, italic, font family and every layout property are not reported.
+bar beside or over the text). Bold, italic and layout are not reported, except the layout that
+draws other text, which refuses (below).
 
 What refuses a section (``SectionRefusal.code``):
 
@@ -61,7 +62,11 @@ Also refused as ``malformed-xhtml``: a CDATA section (an XML parser reads it as 
 parser as a comment). As ``unsupported-element``: text between the parts of a table, which a
 browser moves out of the table. As ``unsupported-style``: a margin or indent more than an inch
 to the left, which moves text off the page, or in a unit the reader does not know (``%``,
-``vw``, ``calc()``...).
+``vw``, ``calc()``...); layout that draws one text over another (a negative margin on inline text
+or at a block's top or bottom, padding on inline text over a background, a height outside table
+parts and pictures, a line height below normal); a font outside a closed list of Unicode text
+fonts (a symbol font draws other glyphs); and a border value a browser would not accept whole,
+or one inherited from the parent.
 
 What refuses the document (``EpiRefusedError``): not a document Bundle, not exactly one entry
 with sections, or a section without a title.
@@ -570,6 +575,60 @@ def _local(element: ET.Element) -> str:
     return name
 
 
+# The elements a height is layout on: table parts, and a picture, whose size it sets.
+_SIZED: Final = frozenset({"table", "thead", "tbody", "tfoot", "tr", "td", "th", "img"})
+
+
+def _length_points(value: str) -> float | None:
+    """A CSS length in points, or None for anything else (a percentage, a keyword)."""
+    match = re.fullmatch(r"(-?)([0-9]+(?:\.[0-9]+)?)(pt|px|pc|in|cm|mm|em)?", value)
+    if match is None:
+        return None
+    size = float(match.group(2)) * (
+        12.0 if match.group(3) in (None, "em") else _POINTS[match.group(3)]
+    )
+    return -size if match.group(1) else size
+
+
+def _refuse_overprint(name: str, style: str) -> None:
+    """Refuse layout a browser draws as other text (review round 23 of fidelity-norm/3.0.0).
+
+    A negative margin on inline text overprints its neighbour ("≥" drawn from ">" and "_"); a
+    negative top or bottom margin, a height outside table parts and a line height below normal
+    lay one line over another; padding on inline text with a background paints over the text
+    around it. ADR 0005 refuses the same on import.
+    """
+    declarations = _declarations(style)
+    inline = name in _INLINE
+    background = any(
+        key in ("background", "background-color") and value not in ("transparent", "none")
+        for key, value in declarations
+    )
+    for key, value in declarations:
+        tokens = value.split()
+        if key.startswith("margin"):
+            sides = _per_side(tokens) if key == "margin" else {key.removeprefix("margin-"): value}
+            for side, size in sides.items():
+                points = _length_points(size)
+                if points is not None and points < 0 and (inline or side in ("top", "bottom")):
+                    raise _RefusedError("unsupported-style", f"{name} {key}: {value}")
+        elif key.startswith("padding") and inline and background:
+            if any((_length_points(t) or 0) != 0 or t.endswith("%") for t in tokens):
+                raise _RefusedError("unsupported-style", f"{name} {key} over a background")
+        elif key in ("height", "max-height") and name not in _SIZED and value != "auto":
+            raise _RefusedError("unsupported-style", f"{name} {key}: {value}")
+        elif key == "line-height" and value != "normal":
+            if value.endswith("%"):
+                low = float(value[:-1] or 0) < 100
+            elif re.fullmatch(r"[0-9]+(\.[0-9]+)?", value):
+                low = float(value) < 1
+            else:
+                points = _length_points(value)
+                low = points is None or points < 8
+            if low:
+                raise _RefusedError("unsupported-style", f"{name} {key}: {value}")
+
+
 def _check_attributes(element: ET.Element, name: str) -> set[str]:
     allowed = _ATTRIBUTES.get(name, set())
     for attribute, value in element.attrib.items():
@@ -581,7 +640,9 @@ def _check_attributes(element: ET.Element, name: str) -> set[str]:
             raise _RefusedError("embedded-comment", f"{name} class {value!r}")
         if attribute == "class" and "MsoCommentReference" in value.split():
             raise _RefusedError("embedded-comment", f"{name} class {value!r}")
-    return _style(element.get("style", ""))
+    style = element.get("style", "")
+    _refuse_overprint(name, style)
+    return _style(style)
 
 
 def _walk(element: ET.Element, builder: _Builder, marks: frozenset[str], depth: int) -> None:

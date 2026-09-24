@@ -110,7 +110,7 @@ closes the open items the reviews recorded (the blast radius below says why).
   of every cell on its side, in each row its cell covers, the grid rebuilt from the markers once
   per search ("10" | "000 IU" is drawn as one number, and a cell's lines are centred, so any of
   them can sit level with the quote); the agent's port follows. On the three pinned SmPCs this
-  refuses 198 of 789 whole-cell quotes that a reader might read apart (a fail-safe `no-match`,
+  refuses 196 of 789 whole-cell quotes that a reader might read apart (a fail-safe `no-match`,
   stated in UR-22; `agent/scripts/measure_table_quotes.py`). A quote that runs across two cells or across a picture is `no-match`, and a quote that
   carries a grid marker or U+FFFC itself is `invalid-request` (it could join two rows, or quote
   nothing a reader sees): a
@@ -420,7 +420,13 @@ restored.
   isolating a cell that starts with a sign; the reader accepting border values a browser drops
   (a five-digit colour, a keyword among other values) and `inherit` (now refused), and any font
   (a closed list of Unicode text fonts now); and the check skipping shading over a sign (now
-  reported). The table figure is 198 of 789, 51 beginning with a letter.
+  reported). A twenty-third review found a combining mark between a number and the space
+  hiding it ("Give 10" U+0332 " 000 IU"): numbers are now read past gaps and combining marks on
+  both sides of the space, and past opening marks no longer (that, added in round 22, refused
+  "0.52" before "(95% CI" and 108 more five-word windows; signs are still read past them); and
+  the ePI reader reading layout that overprints text ("≥" drawn from ">" and a pulled-back "_",
+  a line laid over another), which now refuses. The table figure is 196 of 789, 51 beginning
+  with a letter, and paragraphs, sentences and clauses are refused as before.
 
 - **Every submission carrying 2.0.0 is refused by the worker gate** from the moment this change
   deploys. Nothing in the repository produces a 2.0.0 submission after it.

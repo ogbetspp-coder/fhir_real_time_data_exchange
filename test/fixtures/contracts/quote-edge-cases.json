@@ -947,6 +947,70 @@
       ]
     },
     {
+      "text": "Give 10̲ 000 IU weekly. Store at 30̲ % or less. Give 20⁣̲ 000 IU. The hazard ratio was 0.52 (95% CI 0.30, 0.88). EU/1/12/780/003 (28 × 1 film-coated tablets). In 12 ‰ 30 patients. Wait… 30 mg.",
+      "quotes": [
+        {
+          "quote": "000 IU weekly.",
+          "result": "no-match"
+        },
+        {
+          "quote": "Give 10̲",
+          "result": "no-match"
+        },
+        {
+          "quote": "Store at 30̲",
+          "result": "no-match"
+        },
+        {
+          "quote": "000 IU.",
+          "result": "no-match"
+        },
+        {
+          "quote": "The hazard ratio was 0.52",
+          "result": "match",
+          "startOffset": 66,
+          "endOffset": 91
+        },
+        {
+          "quote": "(28 × 1 film-coated tablets).",
+          "result": "match",
+          "startOffset": 129,
+          "endOffset": 158
+        },
+        {
+          "quote": "30 patients.",
+          "result": "match",
+          "startOffset": 167,
+          "endOffset": 179
+        },
+        {
+          "quote": "30 mg.",
+          "result": "match",
+          "startOffset": 186,
+          "endOffset": 192
+        }
+      ]
+    },
+    {
+      "text": "﷐ ﷒ ﷓ Up to 10̲ ﷓ 000 IU ﷑",
+      "quotes": [
+        {
+          "quote": "Up to 10̲",
+          "result": "no-match"
+        },
+        {
+          "quote": "000 IU",
+          "result": "no-match"
+        },
+        {
+          "quote": "Up to",
+          "result": "match",
+          "startOffset": 6,
+          "endOffset": 11
+        }
+      ]
+    },
+    {
       "text": "﷐ ﷒ ﷓ a (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((( ﷓ 30 mg ﷒ ﷓ 100 ﷓ × 10⁹/l ﷑",
       "quotes": [
         {

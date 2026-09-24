@@ -379,12 +379,11 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
   - **across a space**: a quote that begins with a number after a space preceded by a number, or
     ends with a number before a space followed by a number, has cut a space-grouped number; a
     number is any code point of general category N (a decimal digit of any script, and "½", "¹"
-    and "₂" too), and the one on each side is read past every gap (from `fidelity-norm/3.0.0`,
-    the specification's section 6), so "10" U+2009 " 000", "5" U+2063 " 000" and "1 ½" are one
+    and "₂" too), and the one on each side is read past every gap (from `fidelity-norm/3.0.0`, the specification's section 6) and every combining mark, but not past an opening mark ("0.52 (95%" is two numbers), so "10" U+2009 " 000", "5" U+2063 " 000" and "1 ½" are one
     number, and a quote may neither end with "10" or "10" U+2009 nor begin with "000" or "½"
     there. A quote, or the opening punctuation before it, preceded by a sign and a space has
     lost it: reading back from the space past gaps, combining marks and the opening marks, a run
-    of code points that are not letters, numbers or gaps holding a sign is a cut. And a quote ending in a number before a space and a sign, read past gaps, combining marks and opening marks as on the left ("100" of "100 (× 10⁹/l)", "10" of "10 " U+0332 "000"), has lost what the sign says of it ("30" of "30
+    of code points that are not letters, numbers or gaps holding a sign is a cut. And a quote ending in a number before a space and a number (read past gaps and combining marks) or a sign (past opening marks too, as on the left) ("100" of "100 (× 10⁹/l)", "10" of "10 " U+0332 "000", "10" U+0332 of "10" U+0332 " 000"), has lost it ("30" of "30
     %", "100" of "100 × 10⁹/l", "25" of "25 °C", "20" of "20 +/- 5"). A sign is anything that is not a letter (a modifier letter, Lm, is a sign), a number, a gap, a combining mark, an opening mark the reading skips (those of `QUOTE_OPENERS` but "‹", which is drawn like "<"), one of the scanner's markers (U+FFFC, U+FDD0–U+FDEF), a dash or hyphen (general category Pd, far more
     often a separator), or plain punctuation: `. , ; : ! ? ) ] } " ' ’ ” » …`, the marks `® ™ ©`,
     and the reference marks `* † ‡ § ¶ #`, which bind neither side. So a look-alike no list names
@@ -414,7 +413,7 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
     quote beginning with a digit is refused when any cell to its left in its rows holds a word
     ending in a digit, any quote at a word boundary in a cell is refused when any cell to its
     left holds a word ending in a sign, and a quote ending in a digit when any cell to its right
-    holds a word beginning with one, or a sign. On the three pinned SmPCs 198 of 789 whole-cell
+    holds a word beginning with one, or a sign. On the three pinned SmPCs 196 of 789 whole-cell
     quotes are refused by this rule alone, 51 of them beginning with a letter
     (`agent/scripts/measure_table_quotes.py`, which rebuilds each grid approximately): in Jentadueto's renal table
     `< 30` | "Metformin is contraindicated" | "No dose adjustment" refuses both right-hand

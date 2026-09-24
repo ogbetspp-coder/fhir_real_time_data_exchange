@@ -18,7 +18,13 @@ from verifiable_answer_agent.contract import (
     utf16_length,
     validate_tool_output,
 )
-from verifiable_answer_agent.quote_edge import edge_after, edge_before, locate_quote
+from verifiable_answer_agent.quote_edge import (
+    edge_after,
+    edge_before,
+    locate_quote,
+    number_before,
+    number_from,
+)
 
 from .fake_query_service import REPOSITORY_ROOT, load_sections, long_section, quote_edge_cases
 
@@ -173,8 +179,8 @@ def test_every_chunk_of_every_worked_example_is_one_the_service_confirms() -> No
                     at = start + offset
                     if text[at] == " ":
                         assert not (
-                            edge_after(text, at, text[at - 1])
-                            and edge_before(text, at + 1, text[at + 1])
+                            edge_after(text, at, number_before(text, at))
+                            and edge_before(text, at + 1, number_from(text, at + 1))
                         ), (limit, chunk, offset)
 
 

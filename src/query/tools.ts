@@ -359,18 +359,6 @@ function isGapPoint(character: string | undefined): boolean {
   return character !== undefined && isGap(character.codePointAt(0) ?? 0);
 }
 
-// The first code point before UTF-16 index `index` that is not a gap (section 6: whitespace, a
-// thin space, or a code point drawn as nothing), or undefined.
-function nonGapBefore(text: string, index: number): string | undefined {
-  let position = index;
-  let character = codePointBefore(text, position);
-  while (character !== undefined && isGapPoint(character)) {
-    position -= character.length;
-    character = codePointBefore(text, position);
-  }
-  return character;
-}
-
 // --- across table cells ---------------------------------------------------------------------
 //
 // A renderer draws a row's cells side by side with a gap about as wide as a space, and centres
@@ -425,11 +413,10 @@ function wordBits(text: string, start: number, end: number): number {
   let bits = 0;
   for (const points of words) {
     if (points.length === 0) continue;
-    const first = drawnFrom(points.join(""), 0);
-    if (isDigit(first)) bits |= STARTS_DIGIT;
-    if (isSpacedSign(first)) bits |= STARTS_SIGN;
-    if (isDigit(points[points.length - 1])) bits |= ENDS_DIGIT;
     const word = points.join("");
+    if (isDigit(numberFrom(word, 0))) bits |= STARTS_DIGIT;
+    if (isSpacedSign(drawnFrom(word, 0))) bits |= STARTS_SIGN;
+    if (isDigit(numberBefore(word, word.length))) bits |= ENDS_DIGIT;
     if (signsBefore(word)[word.length] === 1) bits |= ENDS_SIGN;
   }
   return bits;
@@ -519,7 +506,8 @@ function indexTables(text: string): TableIndex | undefined {
 }
 
 // Whether a quote beginning at UTF-16 index `start` inside a cell, whose first code point that
-// is not a gap is `first`, has lost a sign or cut a number drawn in a cell to its left.
+// is neither a gap nor a combining mark is `first`, has lost a sign or cut a number drawn in a
+// cell to its left.
 function cutAcrossCellBefore(
   tables: TableIndex | undefined,
   start: number,
@@ -576,7 +564,8 @@ function signsBefore(text: string): Uint8Array {
 // Whether a quote beginning at `start` (or its opening punctuation) set off by the space at
 // UTF-16 index `space` is cut: a sign before the space, read past gaps, marks and opening
 // punctuation, binds the number after it ("≥ 30", "<" U+2063 " 30", "< ( 30", "+/- 5"); a
-// number before it and a number first in the quote, read past gaps only, are one number grouped
+// number before it and a number first in the quote, read past gaps and combining marks (not
+// opening marks), are one number grouped
 // with spaces ("10 000", "10" U+2009 " 000", "1 ½", and "10 (000", a false failure); and so
 // across table cells (above).
 function cutAfterSpace(
@@ -587,12 +576,36 @@ function cutAfterSpace(
   context: SearchContext,
 ): boolean {
   if (context.signs[space] === 1) return true;
-  if (isDigit(nonGapBefore(text, space)) && isDigit(first)) return true;
+  if (isDigit(numberBefore(text, space)) && isDigit(first)) return true;
   return cutAcrossCellBefore(context.tables, start, first);
 }
 
 // What a search reads once from the section's text.
 type SearchContext = { tables: TableIndex | undefined; signs: Uint8Array };
+
+// The first code point before UTF-16 index `index`, and at or after it, that is neither a gap
+// nor a combining mark: the number a reader sees there ("10" U+0332 " 000" is "10 000" with a
+// mark set apart). Opening marks are read past for a sign only (drawnFrom): "0.52 (95%" is two
+// numbers.
+function numberBefore(text: string, index: number): string | undefined {
+  let position = index;
+  let character = codePointBefore(text, position);
+  while (character !== undefined && (isGapPoint(character) || MARK.test(character))) {
+    position -= character.length;
+    character = codePointBefore(text, position);
+  }
+  return character;
+}
+
+function numberFrom(text: string, index: number): string | undefined {
+  let position = index;
+  let character = codePointAtIndex(text, position);
+  while (character !== undefined && (isGapPoint(character) || MARK.test(character))) {
+    position += character.length;
+    character = codePointAtIndex(text, position);
+  }
+  return character;
+}
 
 // The first code point at or after UTF-16 index `index` that is not skipped when reading for a
 // sign (a gap, a combining mark, an opening mark): what the reader sees first there ("̲000" is
@@ -611,7 +624,7 @@ function edgeBefore(text: string, start: number, quote: string, context: SearchC
   let before = codePointBefore(text, start);
   if (before === undefined) return true;
   if (isWordCharacter(before)) return false;
-  const first = drawnFrom(quote, 0);
+  const first = numberFrom(quote, 0);
   if (before === " ") return !cutAfterSpace(text, start - 1, start, first, context);
   let index = start;
   while (before !== undefined && QUOTE_OPENERS.has(before)) {
@@ -630,10 +643,15 @@ function edgeAfter(text: string, end: number, quote: string, context: SearchCont
   if (after === undefined) return true;
   if (isWordCharacter(after)) return false;
   if (after === " ") {
-    const last = nonGapBefore(quote, quote.length);
-    // Read past what the left edge reads past: gaps, combining marks and opening marks.
-    const next = drawnFrom(text, end + 1);
-    if (isDigit(last) && (isDigit(next) || isSpacedSign(next))) return false;
+    // A number read past gaps and combining marks on both sides of the space; a sign past
+    // opening marks too, as on the left edge ("100 (× 10⁹/l)").
+    const last = numberBefore(quote, quote.length);
+    if (
+      isDigit(last) &&
+      (isDigit(numberFrom(text, end + 1)) || isSpacedSign(drawnFrom(text, end + 1)))
+    ) {
+      return false;
+    }
     return !cutAcrossCellAfter(context.tables, end, last);
   }
   let index = end;

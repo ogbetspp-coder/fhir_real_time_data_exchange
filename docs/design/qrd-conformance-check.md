@@ -142,7 +142,9 @@ Every finding below was confirmed by reading the source div.
   stated residual of the check (ADR 0005's closed CSS list governs the import). The reader
   refuses a section naming a font outside a closed list of Unicode text fonts (a symbol font
   draws other glyphs: Wingdings "J" is a smiling face) and a border value a browser would not
-  accept whole or that inherits from the parent.
+  accept whole or that inherits from the parent, and layout that draws one text over another (a
+  negative margin on inline text or at a block's top or bottom, padding on inline text over a
+  background, a height outside table parts and pictures, a line height below normal).
 
 The mapping lacks three EMA codes the labels use (Pregnancy, Breast-feeding and Fertility under
 4.6); the check reports them as `unmapped-code`, for information.

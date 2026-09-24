@@ -417,3 +417,25 @@ def test_a_font_outside_the_text_fonts_refuses(family: str, refused: bool) -> No
     # A symbol-encoded font draws other glyphs: Wingdings "J" is a smiling face (review round 22).
     _, refusal, _ = read_div(div(f'<p><span style="font-family: {family}">J</span></p>'))
     assert (refusal is not None and refusal.code == "unsupported-style") == refused
+
+
+@pytest.mark.parametrize(
+    ("inner", "refused"),
+    [
+        # Overprint: an underscore pulled under ">" is drawn "≥" (review round 23).
+        ('<p>CrCl &gt;<span style="margin-left:-12pt">_</span> 30</p>', True),
+        ('<p style="margin-top:-6pt">x</p>', True),
+        ('<p style="margin: 0cm -0.1pt 0cm 0cm">x</p>', False),
+        ('<p>&lt;<span style="background-color:white;padding-top:30px">x</span></p>', True),
+        ('<p><span style="padding-left:2pt">x</span></p>', False),
+        ('<p style="height:0pt">Take 10</p>', True),
+        ('<p style="line-height:4pt">x</p>', True),
+        ('<p style="line-height:80%">x</p>', True),
+        ('<p style="line-height:0.5">x</p>', True),
+        ('<p style="line-height:13pt">x</p>', False),
+        ('<p style="line-height:115%">x</p>', False),
+    ],
+)
+def test_layout_that_overprints_text_refuses(inner: str, refused: bool) -> None:
+    _, refusal, _ = read_div(div(inner))
+    assert (refusal is not None and refusal.code == "unsupported-style") == refused

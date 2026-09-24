@@ -32,6 +32,8 @@ __all__ = [
     "find_quote_occurrence",
     "is_word_character",
     "locate_quote",
+    "number_before",
+    "number_from",
 ]
 
 # src/query/tools.ts QUOTE_OPENERS, QUOTE_CLOSERS and PLAIN_PUNCTUATION, character for character,
@@ -265,12 +267,11 @@ def _word_bits(text: str) -> int:
     """``wordBits``: a word ends in a sign when reading back from its end reaches a sign's run."""
     bits = 0
     for word in _words(text):
-        first = drawn_from(word, 0)
-        if _is_digit(first):
+        if _is_digit(number_from(word, 0)):
             bits |= _STARTS_DIGIT
-        if _is_sign(first):
+        if _is_sign(drawn_from(word, 0)):
             bits |= _STARTS_SIGN
-        if _is_digit(word[-1]):
+        if _is_digit(number_before(word, len(word))):
             bits |= _ENDS_DIGIT
         # Exact, however long the word: it is read whole (``_sign_reached`` is for the splitter).
         if _signs_before(word)[len(word)]:
@@ -401,6 +402,23 @@ class _Signs:
         return self._reached[index]
 
 
+def number_before(text: str, index: int) -> str | None:
+    """``numberBefore``: the first code point before ``index`` neither a gap nor a mark."""
+    index -= 1
+    while index >= 0 and (is_gap(text[index]) or unicodedata.category(text[index])[0] == "M"):
+        index -= 1
+    return text[index] if index >= 0 else None
+
+
+def number_from(text: str, index: int) -> str | None:
+    """``numberFrom``: the first code point from ``index`` neither a gap nor a mark."""
+    while index < len(text) and (
+        is_gap(text[index]) or unicodedata.category(text[index])[0] == "M"
+    ):
+        index += 1
+    return text[index] if 0 <= index < len(text) else None
+
+
 def drawn_from(text: str, index: int) -> str | None:
     """``drawnFrom``: the first code point from ``index`` not skipped when reading for a sign."""
     while index < len(text) and _skipped_before_sign(text[index]):
@@ -417,10 +435,10 @@ def _cut_after_space(
     signs: _Signs | None,
 ) -> bool:
     """``cutAfterSpace``: a sign before the space, read past gaps, marks and openers; a number
-    before it and a number first in the quote, read past gaps only; a table."""
+    before it and a number first in the quote, read past gaps and marks only; a table."""
     if signs.at(space) if signs is not None else _sign_reached(text, space):
         return True
-    if _is_digit(non_gap(text, space - 1, -1)) and _is_digit(first):
+    if _is_digit(number_before(text, space)) and _is_digit(first):
         return True
     return _cut_across_cell_before(tables, start, first)
 
@@ -463,11 +481,11 @@ def edge_after(text: str, end: int, last: str | None, tables: _Tables | None = N
     if is_word_character(after):
         return False
     if after == " ":
-        # Read past what the left edge reads past: gaps, combining marks and opening marks.
-        following = drawn_from(text, end + 1)
-        # A number or a sign after a number binds it ("10 000", "30 %", "100" and a
-        # multiplication sign).
-        if _is_digit(last) and (_is_digit(following) or _is_sign(following)):
+        # A number read past gaps and marks, or a sign read past opening marks too, after a
+        # number binds it ("10 000", "30 %", "100" and a multiplication sign).
+        if _is_digit(last) and (
+            _is_digit(number_from(text, end + 1)) or _is_sign(drawn_from(text, end + 1))
+        ):
             return False
         return not _cut_across_cell_after(tables, end, last)
     index = end
@@ -487,8 +505,8 @@ def find_quote_occurrence(text: str, quote: str) -> int:
         return -1
     tables = _index_tables(text)
     signs = _Signs(text)
-    first = drawn_from(quote, 0)
-    last = non_gap(quote, len(quote) - 1, -1)
+    first = number_from(quote, 0)
+    last = number_before(quote, len(quote))
     found = text.find(quote)
     while found >= 0:
         if edge_before(text, found, first, tables, signs) and edge_after(

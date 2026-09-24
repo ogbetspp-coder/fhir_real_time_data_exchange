@@ -224,6 +224,24 @@ export const quoteEdgeCases: QuoteEdgeCase[] = [
     whole: ["80 mg.", "Range 10", "20 mg.", "30 mg.", "Loss"],
   },
   {
+    // Review round 23: a number is read past gaps and combining marks on both sides of the
+    // space, before the space too; an opening mark is read past for a sign only, so a number in
+    // brackets after another is a separate number.
+    text: "Give 10\u0332 000 IU weekly. Store at 30\u0332 % or less. Give 20\u2063\u0332 000 IU. The hazard ratio was 0.52 (95% CI 0.30, 0.88). EU/1/12/780/003 (28 \u00d7 1 film-coated tablets). In 12 \u2030 30 patients. Wait\u2026 30 mg.",
+    cut: ["000 IU weekly.", "Give 10\u0332", "Store at 30\u0332", "000 IU."],
+    whole: [
+      "The hazard ratio was 0.52",
+      "(28 \u00d7 1 film-coated tablets).",
+      "30 patients.",
+      "30 mg.",
+    ],
+  },
+  {
+    markup: "<table><tr><td>Up to 10&#x332;</td><td>000 IU</td></tr></table>",
+    cut: ["Up to 10\u0332", "000 IU"],
+    whole: ["Up to"],
+  },
+  {
     // A cell of a long run of brackets is read whole, however long; a sign starting the cell
     // after a number binds it.
     markup: `<table><tr><td>a ${"(".repeat(300)}</td><td>30 mg</td></tr><tr><td>100</td><td>&#xD7; 10&#x2079;/l</td></tr></table>`,
