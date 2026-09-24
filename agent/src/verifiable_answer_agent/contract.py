@@ -256,7 +256,8 @@ def _acceptable_cut(text: str, index: int) -> bool:
     a sign past opening marks too), where the service reads only within the quote: this can refuse
     a cut the service would accept, never the reverse. The answer's own two ends are not cuts: the
     service reads the section beyond them, so an answer that itself begins or ends inside a number
-    or before a sign is refused there (a false failure, never a false pass).
+    or before a sign, or whose last chunk reaches its end past an opening mark before a sign, is
+    refused at that chunk (a false failure, never a false pass).
     """
     if index <= 0 or text[index] != " " or text[index - 1] == " ":
         return False

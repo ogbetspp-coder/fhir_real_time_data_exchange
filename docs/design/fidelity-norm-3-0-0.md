@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and twenty-four reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and twenty-five reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -1005,7 +1005,7 @@ number before a sign, as intended.
    a negative margin on inline text or at a block's top or bottom, padding on inline text over a
    background, a height outside table parts and pictures, and a line height below normal refuse
    the section. The pinned labels refuse nothing more (their heights are on table rows, their
-   line heights 12.65 pt or 115% and up, their negative margins at a paragraph's side).
+   line heights 12.65 pt or 107% and up, their negative margins at a paragraph's side).
 4. to 6. **Low.** Stale comments and docstrings; the right-edge wording in the query design and
    UR-22 aligned; pins for "‰" and "…" as not signs before a quote.
 
@@ -1021,8 +1021,8 @@ bounds and in missing pins:
    height (a 40pt run under a 115% line hides the line above), padding in a unit the reader
    cannot place (read as zero), vertical padding lifting an inline border over the line above
    ("<" underlined, "≤"), and a negative margin on a picture. Fixed: a line height of 12pt, 100%
-   or 1em at least, a font of 14pt, 130% or 1.3em at most (the pinned labels set 12pt at most
-   and 12.65pt or 115% at least), an unplaceable padding counted as non-zero, vertical padding
+   or 1em at least, a font of 14pt at most (the pinned labels set 12pt at most and 12.65pt or
+   107% at least), an unplaceable padding counted as non-zero, vertical padding
    on inline text refused, a picture's margins read as inline text's.
 2. **Medium.** A block overflowing its table cell (a negative side margin, a narrow width)
    overprints the next cell; Nuvaxovid sets negative side margins inside cells, so it cannot be
@@ -1034,3 +1034,25 @@ bounds and in missing pins:
 4. to 10. **Low.** The splitter's docstring (an answer's own ends are not cuts), a combining
    mark on a space stated as a residual, and wording (numbers and opening marks, a stale
    comment, the QRD design's "layout properties are ignored", a round-22 sentence).
+
+## Twenty-fifth review (2026-09-24): findings and what changed
+
+The review found the quote-edge rule still clean (112 720 fresh quotes and every code point, the
+service, the agent's port and the oracle identical) and the reader's bounds short again:
+
+1. **High.** A border on inline text wider than a hairline paints a band over the lines around it
+   (an empty span with a 24pt white top border blanks the line above). Fixed: refused.
+2. **Medium.** A percentage or em line height is computed from the font of the element that sets
+   it and inherited as a length, so a 2pt paragraph's 100% line holds 12pt spans 2pt apart. Not
+   fixed by another bound: the reader does not lay the page out, and each round has found
+   another way CSS draws one text over another. Its claim now says so: the reader is exact for
+   text and marks, refuses the layout cases it lists, and states the rest (this one, a block
+   overflowing its table cell, a margin drawing a list item over its number, text at the bounds'
+   edge) as a residual of the check; ADR 0005's renderer cross-check draws each page and
+   compares, and is what secures the import.
+3. **Medium.** A regression: "1rem" and "x%" broke the reading with an uncaught error instead of
+   refusing the section. Fixed, with tests.
+4. **Medium.** "12.65pt or 115% at least" was wrong (Brukinsa sets 107%). Fixed.
+5. to 8. **Low.** Wording (the font bound's units, the refusal list, this note's numbering), the
+   splitter's docstring, the list-number overprint named in the residual, and a splitter mutant
+   no test can kill (equivalent).

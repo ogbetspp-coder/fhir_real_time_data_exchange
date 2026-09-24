@@ -342,12 +342,12 @@ def test_colour_keywords_are_not_marks_and_light_greys_are_faint() -> None:
         ("border: 1px solid", ["border", "underline"]),
         ("border: 1px", []),
         ("border: 0 solid", []),
-        ("border-style: solid", ["border", "underline"]),
+        ("border-width: 1px; border-style: solid", ["border", "underline"]),
         ("border-width: 1px", []),
         ("border-width: 0 0 1px 0; border-style: none none solid none", ["underline"]),
-        ("border-style: solid none", ["border", "underline"]),
-        ("border-style: none solid", ["border"]),
-        ("border-bottom-style: solid", ["underline"]),
+        ("border-width: 1px; border-style: solid none", ["border", "underline"]),
+        ("border-width: 1px; border-style: none solid", ["border"]),
+        ("border-bottom-width: 1px; border-bottom-style: solid", ["underline"]),
         ("border-bottom: none", []),
         ("border-color: red", []),
     ],
@@ -447,6 +447,15 @@ def test_a_font_outside_the_text_fonts_refuses(family: str, refused: bool) -> No
             '<p>Do not crush.<img style="margin-left:-66pt" src="data:image/png;base64,AA=="/></p>',
             True,
         ),
+        # Review round 25: a border wider than a hairline paints a band over the lines around;
+        # a value the reader cannot place refuses instead of breaking the reading.
+        ('<p>Keep<span style="border-top:24pt solid white"></span> dry.</p>', True),
+        ('<p>Keep<span style="border-bottom:24pt solid black"></span> dry.</p>', True),
+        ('<p>Keep<span style="border-bottom:solid"></span> dry.</p>', True),
+        ('<p><span style="border-bottom:1px solid">x</span></p>', False),
+        ('<p><span style="font-size:1rem">x</span></p>', True),
+        ('<p style="line-height:1.2rem">x</p>', True),
+        ('<p style="line-height:x%">x</p>', True),
     ],
 )
 def test_layout_that_overprints_text_refuses(inner: str, refused: bool) -> None:

@@ -431,7 +431,12 @@ restored.
   under its line, padding in an unknown unit, vertical padding lifting a border, a picture's
   negative margin): the reader now holds lines apart within stated bounds (line height, font
   size, margins, padding), a block overflowing its table cell is a stated residual of the check,
-  and ADR 0005's renderer cross-check is what secures the import.
+  and ADR 0005's renderer cross-check is what secures the import. A twenty-fifth review found the
+  quote-edge rule still clean; the reader now refuses a border on inline text wider than a
+  hairline and no longer breaks on a unit it cannot place, and its claim is restated: exact for
+  text and marks, the layout cases it lists refused, and the rest of what CSS can draw over text
+  (an inherited line height computed from a smaller font, among others) a stated residual of the
+  check until the renderer cross-check.
 
 - **Every submission carrying 2.0.0 is refused by the worker gate** from the moment this change
   deploys. Nothing in the repository produces a 2.0.0 submission after it.

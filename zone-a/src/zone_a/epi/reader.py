@@ -5,12 +5,17 @@ nested sections each carry a code, a title and an XHTML ``div``. This reader tur
 Bundle into sections of paragraphs, with the same ``Paragraph`` and ``Mark`` model as the Word
 reader (``zone_a.docx.reader``), so a checker does not care which reader produced the text.
 
-It is written to the same rule as the Word reader: the text a browser shows, exactly, or a
-refusal with a reason. It is not the fidelity scanner (``zone_a.fidelity.xhtml``), which is the
-contract for narrative this repository publishes and stays as strict as it is; the EMA's own
-divs carry inline CSS on nearly every element, which that scanner rightly refuses. Here each
-section is read on its own, so a section the reader cannot vouch for is refused (``Section.
-refusal``) without losing the rest of the document.
+It is written to the same rule as the Word reader: the text a browser shows, exactly, or a refusal
+with a reason, for the text and its marks. It does not lay the page out: where a section's CSS
+places or paints one text over another (a band of border or background over a line, a line height
+smaller than the text in it, a block overflowing its table cell, a margin drawing a paragraph over
+its list number), the reader refuses only the cases listed below, and the rest is a stated residual;
+rendering the page and comparing it with this reading is ADR 0005's renderer cross-check. It is not
+the fidelity scanner (``zone_a.fidelity.xhtml``), which is the contract for narrative this
+repository publishes and stays as strict as it is; the EMA's own divs carry inline CSS on nearly
+every element, which that scanner rightly refuses. Here each section is read on its own, so a
+section the reader cannot vouch for is refused (``Section. refusal``) without losing the rest of the
+document.
 
 What a section's text is:
 
@@ -63,10 +68,11 @@ parser as a comment). As ``unsupported-element``: text between the parts of a ta
 browser moves out of the table. As ``unsupported-style``: a margin or indent more than an inch
 to the left, which moves text off the page, or in a unit the reader does not know (``%``,
 ``vw``, ``calc()``...); layout that draws one text over another (a negative margin on inline text
-or at a block's top or bottom, padding on inline text over a background, a height outside table
-parts and pictures, a line height below normal); a font outside a closed list of Unicode text
-fonts (a symbol font draws other glyphs); and a border value a browser would not accept whole,
-or one inherited from the parent.
+or at a block's top or bottom, vertical padding on inline text and any padding on it over a
+background, a border on it wider than a hairline, a height outside table parts and pictures, a
+line height below 12pt, 100% or 1em, a font above 14pt); a font outside a closed list of Unicode
+text fonts (a symbol font draws other glyphs); and a border value a browser would not accept
+whole, or one inherited from the parent.
 
 What refuses the document (``EpiRefusedError``): not a document Bundle, not exactly one entry
 with sections, or a section without a title.
@@ -403,6 +409,11 @@ def _inline_borders(style: str) -> set[str]:
     for side in _SIDES:
         if styles[side] in ("none", "hidden") or _zero_width(widths[side]):
             continue
+        # A border wider than a hairline paints a band over the lines and words around the text
+        # (an empty span with a 24pt white border blanks the line above it).
+        width = 0.75 if widths[side] == "thin" else _length_points(widths[side])
+        if width is None or width > 0.75:
+            raise _RefusedError("unsupported-style", f"border-{side} wider than a hairline")
         kinds.add("underline" if side == "bottom" else "border")
     return kinds
 
@@ -591,7 +602,8 @@ def _length_points(value: str) -> float | None:
 
 
 # The bounds within which lines of text cannot be drawn over one another: the pinned labels set
-# fonts of 12pt at most and line heights of 12.65pt or 115% at least. Text larger than the line
+# fonts of 12pt at most and line heights of 12.65pt or 107% at least (Brukinsa's 107%; text in
+# them is at most 0.935 of its line). Text larger than the line
 # it sits on reaches into the next one (a 40pt run under a 115% line hides the line above).
 _LARGEST_FONT_POINTS: Final = 14.0
 _SMALLEST_LINE_POINTS: Final = 12.0
@@ -609,12 +621,11 @@ def _refuse_overprint(name: str, style: str) -> None:
 
     A negative margin on inline text or a picture overprints its neighbour ("≥" drawn from ">"
     and "_"); a negative top or bottom margin, a height outside table parts and pictures, a line
-    height below 12pt, 100% or 1em, and a font above 14pt, 130% or 1.3em lay one line over
-    another; padding on inline text paints its background or border over the lines around it
-    when it is vertical, or over its neighbours when it has a background. These are bounds, not
-    a layout engine: layout inside them that still draws one text over another (text at the
-    bounds' edge, a block overflowing its table cell) is a stated residual of the check, and ADR
-    0005's renderer cross-check is what secures the import.
+    height below 12pt, 100% or 1em, and a font above 14pt lay one line over another; padding on
+    inline text paints its background or border over the lines around it when it is vertical,
+    or over its neighbours when it has a background (a border wider than a hairline is refused
+    in ``_inline_borders``). These are bounds, not a layout engine: layout that still draws one
+    text over another (see the module docstring) is a stated residual of the check.
     """
     declarations = _declarations(style)
     inline = name in _INLINE or name == "img"
@@ -640,26 +651,19 @@ def _refuse_overprint(name: str, style: str) -> None:
         elif key in ("height", "max-height") and name not in _SIZED and value != "auto":
             raise _RefusedError("unsupported-style", f"{name} {key}: {value}")
         elif key == "line-height" and value != "normal":
-            if value.endswith("%"):
-                low = float(value[:-1] or 0) < 100
-            elif re.fullmatch(r"[0-9]+(\.[0-9]+)?", value):
-                low = float(value) < 1
-            elif value.endswith("em"):
-                low = float(value[:-2] or 0) < 1
+            relative = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)(%|em)?", value)
+            if relative is not None:
+                number = float(relative.group(1))
+                low = number < (100 if relative.group(2) == "%" else 1)
             else:
                 points = _length_points(value)
                 low = points is None or points < _SMALLEST_LINE_POINTS
             if low:
                 raise _RefusedError("unsupported-style", f"{name} {key}: {value}")
         elif key == "font-size":
-            if value.endswith("%"):
-                high = float(value[:-1] or 0) > 130
-            elif value.endswith("em"):
-                high = float(value[:-2] or 0) > 1.3
-            else:
-                points = _length_points(value)
-                high = points is not None and points > _LARGEST_FONT_POINTS
-            if high:
+            # `_style` refuses a font size in anything but an absolute unit.
+            points = _length_points(value)
+            if points is not None and points > _LARGEST_FONT_POINTS:
                 raise _RefusedError("unsupported-style", f"{name} {key}: {value}")
 
 
