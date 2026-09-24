@@ -126,8 +126,8 @@ closes the open items the reviews recorded (the blast radius below says why).
   (an 11 738-code-point `div` of one row of 1000 cells and 49 rows spanning them normalises to
   102 201), so a `div` of about 110 000 code points can be `unavailable` there too.
 - **Cost.** The scan and the normalisation are linear in the narrative's length, which no
-  per-section bound limits (the submission may be 64 MB). The TypeScript takes at most 0.42 s on
-  2 MB inputs of 45 000 pictures, 220 000 empty rows, 200 000 list items or deep lists; the Python
+  per-section bound limits (the submission may be 64 MB). The TypeScript takes about half a second
+  on 2 MB inputs (0.26 s for the scan, 0.47 to 0.52 s with the normalisation) of 45 000 pictures, 220 000 empty rows, 200 000 list items or deep lists; the Python
   port takes up to 1.5 s, and picture tokens make the text 1.65 times the markup. Recorded, not
   bounded: the Python runs offline in Zone A.
 - **Crosswalk, a bare list number.** `<ol start="2"><li></li></ol>` counts as narrative for a
@@ -439,7 +439,11 @@ restored.
   check until the renderer cross-check. A twenty-sixth review found nested margins and an
   inherited indent adding up past the reader's one-inch bound (now summed down the walk and
   refused past 12pt left of the container's start) and deep nesting raising an error (now a
-  refusal); the documents point to the reader's docstring for the list of bounds and residuals.
+  refusal); the documents point to the reader's docstring for the list of bounds and residuals. A
+  twenty-seventh review found the offset sum short of the cascade (`!important`, invalid values,
+  an indent on a table row or through an inline element): each offset is now the most negative
+  value any declaration names and is carried through rows and inline elements; and a Bundle of
+  the wrong shape, which raised an error, is refused.
 
 - **Every submission carrying 2.0.0 is refused by the worker gate** from the moment this change
   deploys. Nothing in the repository produces a 2.0.0 submission after it.

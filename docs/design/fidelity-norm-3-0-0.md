@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and twenty-six reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and twenty-seven reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -1073,3 +1073,24 @@ style attributes. Its findings were in the reader:
    document.
 3. and 4. **Low.** The documents now point to the reader's docstring as the one list of bounds
    and residuals, which names text moved far to the right, off a printed page.
+
+## Twenty-seventh review (2026-09-24): findings and what changed
+
+The review found the quote-edge rule and the fidelity contract clean again (86 649 quotes; the
+scanner's ports identical over 12 000 divs) and the round-26 offset sum short of the cascade:
+
+1. **High.** The sum took the last declaration, so an `!important` pull to the left, or a later
+   value a browser drops as invalid, hid it. Fixed: each block's margin and indent is read as
+   the most negative value any of its declarations names.
+2. **High.** An indent on a table row or row group reaches its cells in CSS, and the reader
+   reset it at the cell. Fixed: carried into the cell.
+3. **High.** An indent inherited through an inline element was dropped. Fixed: applied.
+4. **High (a crash, fails closed, older).** A Bundle of the wrong JSON shape raised an error.
+   Fixed: refused as `invalid-bundle`.
+5. to 9. **Low.** Chained tables each pulling left now add up; an em is 14pt in both bounds;
+   the docstring lists every refusal (the root, content in `br` or `img`, the document's own)
+   and the bottom border on a block among the residuals, and counts a table's row group and row
+   toward the nesting bound; a test pins the reading refused as nested too deeply to read; the
+   change record's TypeScript timing is stated as measured.
+
+With the fix, a differential of 1 800 random nested cases against Chrome gave no false pass.

@@ -45,7 +45,7 @@ not the fidelity scanner, which is the contract for narrative this repository pu
 rightly refuses the EMA's divs (inline CSS on nearly every element).
 
 Each section is read on its own, so a section the reader cannot vouch for is refused without
-losing the rest. CSS is checked against a closed list: layout properties are ignored within the bounds the reader's module docstring lists (the one list; in short: lines of text kept apart, nothing drawn left of its container's start, no band of padding or border over text), text colour, background and tiny text are marked, and anything else (`display`, `visibility:
+losing the rest. CSS is checked against a closed list: layout properties are ignored within the bounds the reader's module docstring lists (the one list; in short: lines of text kept apart, nothing drawn more than 12pt left of its container's start, no band of padding, border or background over a line), text colour, background and tiny text are marked, and anything else (`display`, `visibility:
 hidden`, an unknown property) refuses the section. Word comment markup refuses the section,
 because the comment's text would otherwise read as label text.
 

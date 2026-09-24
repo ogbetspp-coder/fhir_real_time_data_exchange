@@ -475,6 +475,17 @@ def test_layout_that_overprints_text_refuses(inner: str, refused: bool) -> None:
         # A hanging indent under its own margin, and a small pull-back in a cell, stay.
         ('<p style="margin-left:72pt;text-indent:-72pt">Take</p>', False),
         ('<table><tr><td><p style="margin-left:-9pt">x</p></td></tr></table>', False),
+        # Review round 27: a declaration a browser keeps (!important) or drops (invalid) cannot
+        # hide a pull to the left; an indent reaches a cell from its row or row group, and a
+        # block from an inline element; chained tables add up.
+        ('<p style="margin-left:-72pt !important;margin-left:0">Do not take</p>', True),
+        ('<p style="margin-left:-72pt;margin-left:0 0">Do not take</p>', True),
+        ('<p style="margin-left:-72pt;margin:0 0 0 0 0">Do not take</p>', True),
+        ('<p style="text-indent:-72pt;text-indent:auto">Do not take</p>', True),
+        ('<table><tr style="text-indent:-72pt"><td>Take</td></tr></table>', True),
+        ('<table><tbody style="text-indent:-72pt"><tr><td>Take</td></tr></tbody></table>', True),
+        ('<div><span style="text-indent:-72pt"><p>Do not take</p></span></div>', True),
+        ('<table style="margin-left:-11pt"><tr><td>' * 3 + "x" + "</td></tr></table>" * 3, True),
     ],
 )
 def test_text_drawn_left_of_its_container_refuses(inner: str, refused: bool) -> None:
@@ -494,3 +505,27 @@ def test_sections_nested_too_deep_to_read_refuse_the_document() -> None:
         section = {"title": "x", "section": [section]}
     with pytest.raises(EpiRefusedError):
         read_epi(bundle([section]))
+
+
+@pytest.mark.parametrize(
+    "sections",
+    [[1], ["s"], [{"title": "x", "code": "x"}], [{"title": "x", "text": "x"}],
+     [{"title": "x", "section": {"title": "y"}}], [{"title": "x", "code": {"coding": [1]}}]],
+)  # fmt: skip
+def test_a_bundle_of_the_wrong_shape_refuses_the_document(sections: list[Any]) -> None:
+    with pytest.raises(EpiRefusedError):
+        read_epi(bundle(sections))
+
+
+def test_nesting_the_interpreter_cannot_follow_refuses_the_section() -> None:
+    # Deep in a Bundle a div within the bound can still be too deep to read: a false failure.
+    import sys
+
+    limit = sys.getrecursionlimit()
+    sys.setrecursionlimit(120)
+    try:
+        _, refusal, _ = read_div(div("<p>" + "<span>" * 100 + "x" + "</span>" * 100 + "</p>"))
+    finally:
+        sys.setrecursionlimit(limit)
+    assert refusal is not None
+    assert refusal.detail == "nested too deeply to read"
