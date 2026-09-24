@@ -12,11 +12,16 @@ smaller than the text in it, a block overflowing its table cell, a margin drawin
 its list number, text at the bounds' edge, a combining mark on a space drawn as a stroke, text moved
 far to the right, off a printed page, a bottom border on a block or cell drawn under a lone sign as
 "≤"), the reader refuses only the cases listed below, and the rest is a stated residual; rendering
-the page and comparing it with this reading is ADR 0005's renderer cross-check. It is not the
-fidelity scanner (``zone_a.fidelity.xhtml``), which is the contract for narrative this repository
-publishes and stays as strict as it is; the EMA's own divs carry inline CSS on nearly every element,
-which that scanner rightly refuses. Here each section is read on its own, so a section the reader
-cannot vouch for is refused (``Section.refusal``) without losing the rest of the document.
+the page and comparing it with this reading is ADR 0005's renderer cross-check. Nor does it parse
+the div as a browser does: it parses XML, and a browser the EMA's div as HTML. Where the two build
+different trees it refuses the cases listed below (processing instructions, comments, prefixed
+elements, self-closing elements other than ``br``, ``hr`` and ``img``, and the rest); any other
+difference is a stated residual, and reading with an HTML5 parser, as a browser does, is a tracked
+follow-up (``docs/roadmap.md``, item 3a). It is not the fidelity scanner
+(``zone_a.fidelity.xhtml``), which is the contract for narrative this repository publishes and stays
+as strict as it is; the EMA's own divs carry inline CSS on nearly every element, which that scanner
+rightly refuses. Here each section is read on its own, so a section the reader cannot vouch for is
+refused (``Section.refusal``) without losing the rest of the document.
 
 What a section's text is:
 
@@ -65,25 +70,28 @@ What refuses a section (``SectionRefusal.code``):
   what it shows.
 
 Also refused as ``malformed-xhtml``: a root that is not a ``div``, a ``br``, ``img`` or ``hr`` with
-content, markup an HTML parser rebuilds (a block in an open ``p``, an ``li`` in an ``li``, an ``a``
-in an ``a``), elements nested deeper than 128 (a table's row group and row counted; a section deep
-in the Bundle can be refused as nested too deeply to read within that bound, a false failure), and a
-CDATA section (an XML parser reads it as text, an HTML parser as a comment). As
-``unsupported-element``: text between the parts of a table, which a browser moves out of the table.
-As ``unsupported-style``: a margin or indent more than an inch to the left, text drawn more than
-12pt left of its container's start (the blocks' margins and the indent inherited through blocks,
-inline elements and table rows summed, each read as the most negative value any of its declarations
-names; a table cell starts again from the table's own offset), which moves it off the page or over
-what lies there, or a margin or indent in a unit the reader does not know (``%``, ``vw``,
-``calc()``...); layout that draws one text over another (a negative margin on inline text or at a
-block's top or bottom, vertical padding on inline text and any padding on it over a background, a
-border on it wider than a hairline, a height outside table parts and pictures, a line height below
-12pt, 100% or 1em, a font above 14pt); a font outside a closed list of Unicode text fonts (a symbol
-font draws other glyphs); a border value on inline text a browser would not accept whole, or one
-inherited from the parent; a style CSS would split otherwise than the reader (a quote outside a font
-family name, a comment, an escape, a bracket outside ``rgb()``, a character outside plain ASCII
-punctuation); and a margin or indent with a value a browser drops (the wrong number of values,
-``text-indent: auto``).
+content, markup an HTML parser rebuilds or reads otherwise (a block in an open ``p``, an ``li`` in
+an ``li``, an ``a`` in an ``a``, a table part outside a table, a processing instruction or comment,
+an element with a namespace prefix, a self-closing element other than ``br``, ``hr`` and ``img``,
+``</br>``, a reference to U+0080 to U+009F, which HTML maps through windows-1252), elements nested
+deeper than 128 (a table's row group and row counted; a section deep in the Bundle can be refused as
+nested too deeply to read within that bound, a false failure), and a CDATA section (an XML parser
+reads it as text, an HTML parser as a comment). As ``unsupported-element``: text between the parts
+of a table, which a browser moves out of the table. As ``unsupported-style``: a margin or indent
+more than an inch to the left, text drawn more than 12pt left of its container's start (the blocks'
+margins and the indent inherited through blocks, inline elements and table rows summed, each read as
+the most negative value any of its declarations names; a table cell starts again from the table's
+own offset), which moves it off the page or over what lies there, or a margin or indent in a unit
+the reader does not know (``%``, ``vw``, ``calc()``...); layout that draws one text over another (a
+negative margin on inline text or at a block's top or bottom, vertical padding on inline text and
+any padding on it over a background, a border on it wider than a hairline, a height outside table
+parts and pictures, a line height below 12pt, 100% or 1em, a font above 14pt); a font outside a
+closed list of Unicode text fonts (a symbol font draws other glyphs); a border value on inline text
+a browser would not accept whole, or one inherited from the parent; a style CSS would split
+otherwise than the reader (a quote outside a font family name, a comment, an escape, a bracket
+outside ``rgb()``, a character outside letters, digits, whitespace and ``# % ! . , : ; ' " ( ) -``);
+and a margin or indent with a value a browser drops (the wrong number of values, ``text-indent:
+auto``).
 
 What refuses the document (``EpiRefusedError``): not UTF-8 JSON, not a document Bundle, not the
 shape of one (a section, code, text, div or entry of the wrong JSON type), not exactly one entry
@@ -197,9 +205,10 @@ _QUOTED_FAMILY = re.compile(r"'[^'\";]*'|\"[^'\";]*\"|[^'\";]*")
 
 
 def _declarations(style: str) -> list[tuple[str, str]]:
-    if not _STYLE_CHARS.fullmatch(style) or "/*" in style:
+    if not _STYLE_CHARS.fullmatch(style):
         raise _RefusedError("unsupported-style", "a character CSS tokenizes other than the reader")
-    if "(" in style.replace("rgb(", "") or ")" in re.sub(r"rgb\([0-9 ,]*\)", "", style):
+    stripped = re.sub(r"rgb\([0-9 ,]*\)", "", style)
+    if "(" in stripped or ")" in stripped:
         raise _RefusedError("unsupported-style", "a function or block")
     out: list[tuple[str, str]] = []
     for part in style.split(";"):
@@ -549,6 +558,7 @@ class _Builder:
     open_p: bool = False
     open_li: bool = False
     open_a: bool = False
+    cell: Any = None
 
     def text(self, text: str, marks: frozenset[str]) -> None:
         for character in text:
@@ -803,6 +813,10 @@ def _walk_element(
         raise _RefusedError("unsupported-element", name)
     if name not in _BLOCKS and name not in _INLINE and name not in ("img", "br"):
         raise _RefusedError("unsupported-element", name)
+    if name in ("td", "th", "tr", "thead", "tbody") and element is not builder.cell:
+        raise _RefusedError(
+            "malformed-xhtml", f"{name} outside a table, which an HTML parser drops"
+        )
     if builder.open_p and name in ("div", "p", "ul", "ol", "table", "hr", "li"):
         raise _RefusedError("malformed-xhtml", f"{name} in a p, which an HTML parser closes")
     if name == "li" and builder.open_li:
@@ -897,13 +911,13 @@ def _table_rows(element: ET.Element, builder: _Builder, marks: frozenset[str], d
         rows = [part] if part_name == "tr" else list(part)
         if part_name not in ("tr", "thead", "tbody"):
             raise _RefusedError("unsupported-element", f"{part_name} in a table")
-        _check_attributes(part, part_name)
+        part_marks = _check_attributes(part, part_name) if part_name != "tr" else set()
         _, own = _left_offsets(part.get("style", ""))
         part_indent = own if own is not None else builder.indent
         for row in rows:
             if _local(row) != "tr":
                 raise _RefusedError("unsupported-element", f"{_local(row)} in a table body")
-            row_marks = frozenset(set(marks) | _check_attributes(row, "tr"))
+            row_marks = frozenset(set(marks) | part_marks | _check_attributes(row, "tr"))
             _, own = _left_offsets(row.get("style", "") if row is not part else "")
             builder.part_indent = own if own is not None else part_indent
             _no_stray_text(row.text)
@@ -914,6 +928,7 @@ def _table_rows(element: ET.Element, builder: _Builder, marks: frozenset[str], d
                 if _local(cell) not in ("td", "th"):
                     raise _RefusedError("unsupported-element", f"{_local(cell)} in a row")
                 builder.table = outer or (index, row_index, cell_index)
+                builder.cell = cell
                 _walk(cell, builder, row_marks, depth)
                 builder.flush()
             row_index += 1
@@ -921,6 +936,10 @@ def _table_rows(element: ET.Element, builder: _Builder, marks: frozenset[str], d
     builder.part_indent = saved_part
 
 
+_HTML_OTHERWISE = re.compile(
+    r"<\?|<!--|xmlns:|</br\b|&#(12[89]|1[3-5][0-9]);|&#[xX]0*[89][0-9a-fA-F];"
+    r"|<(?!(?:br|hr|img)[\s/>])[A-Za-z][^\s/>]*(?:\s+[^\s=/>]+\s*=\s*(?:\"[^\"]*\"|'[^']*'))*\s*/>"
+)
 _BARE_LESS_THAN = re.compile(r"<(?![A-Za-z/!?])")
 
 
@@ -939,6 +958,8 @@ def read_div(div: str) -> tuple[tuple[Paragraph, ...], SectionRefusal | None, tu
     if "<![cdata[" in lowered:
         # An XML parser reads CDATA as text; an HTML parser reads it as a comment.
         return (), SectionRefusal("malformed-xhtml", "a CDATA section"), ()
+    if _HTML_OTHERWISE.search(div):
+        return (), SectionRefusal("malformed-xhtml", "markup an HTML parser reads otherwise"), ()
     notes: tuple[str, ...] = ()
     bare = len(_BARE_LESS_THAN.findall(div))
     if bare:

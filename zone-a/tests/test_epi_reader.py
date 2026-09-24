@@ -557,9 +557,52 @@ def test_nesting_the_interpreter_cannot_follow_refuses_the_section() -> None:
         ('<ul><li>a<li>b</li></li></ul>', "malformed-xhtml"),
         ('<p><a>x<a>y</a></a></p>', "malformed-xhtml"),
         ('<hr><p>x</p></hr>', "malformed-xhtml"),
+        # Review round 29: each block an HTML parser moves out of an open p; a count of margin
+        # values a browser drops; an unclosed function; markup an HTML parser reads otherwise.
+        ('<p><div>x</div></p>', "malformed-xhtml"),
+        ('<p><ul><li>x</li></ul></p>', "malformed-xhtml"),
+        ('<p><ol><li>x</li></ol></p>', "malformed-xhtml"),
+        ('<p><table><tr><td>x</td></tr></table></p>', "malformed-xhtml"),
+        ('<p>a<hr/>b</p>', "malformed-xhtml"),
+        ('<p><li>x</li></p>', "malformed-xhtml"),
+        ('<p style="margin:72pt 72pt 72pt 72pt 0">x</p>', "unsupported-style"),
+        ('<p><span style="border-bottom:1px solid black;mso-x:rgb(0;border-bottom:none">'
+         "&lt;</span></p>", "unsupported-style"),
+        ('<p>Hypersensitivity <?x >not<?y ?> to the active substances</p>', "malformed-xhtml"),
+        ('<p>Take 2<!-->0 mg--> tablets</p>', "malformed-xhtml"),
+        ('<p>eGFR <span style="border-bottom:1px solid black"/>&lt; 30</p>', "malformed-xhtml"),
+        ('<p>10<sup/>6 mg</p>', "malformed-xhtml"),
+        ('<h:div xmlns:h="http://www.w3.org/1999/xhtml"><p>x</p></h:div>', "malformed-xhtml"),
+        ('<p>a</br>b</p>', "malformed-xhtml"),
+        ('<p>&#150;</p>', "malformed-xhtml"),
+        ('<p><td>x</td></p>', "malformed-xhtml"),
     ],
 )  # fmt: skip
 def test_what_a_browser_reads_otherwise_refuses(inner: str, code: str) -> None:
     _, refusal, _ = read_div(div(inner))
     assert refusal is not None
     assert refusal.code == code
+
+
+@pytest.mark.parametrize(
+    "inner",
+    [
+        # What an HTML parser does not rebuild stays accepted: a list in a list item, a link in
+        # a cell inside a link's paragraph, a block after a closed p, and colour in rgb().
+        "<ul><li>a<ul><li>b</li></ul></li></ul>",
+        "<div><a>x</a><table><tr><td><a>y</a></td></tr></table></div>",
+        "<p>a</p><div>b</div>",
+        '<p style="color:rgb(0, 0, 0)">x</p>',
+    ],
+)
+def test_what_an_html_parser_keeps_is_read(inner: str) -> None:
+    _, refusal, _ = read_div(div(inner))
+    assert refusal is None
+
+
+def test_a_row_groups_style_marks_its_cells() -> None:
+    # A struck or white row group draws its cells so (review round 29).
+    marks = kinds(
+        '<table><tbody style="text-decoration:line-through"><tr><td>x</td></tr></tbody></table>'
+    )
+    assert (0, 1, "strike") in marks

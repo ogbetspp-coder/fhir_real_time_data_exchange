@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and twenty-eight reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and twenty-nine reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -1117,3 +1117,23 @@ found by hand, were in the reader:
 6. **Low.** The docstring's border refusal is on inline text; said so.
 
 The fix was prototyped by the reviewer and checked to leave the committed QRD checks unchanged.
+The pairwise structured-source test in `test/fidelity.test.ts`, which verifies every pair of
+accepted vectors, was given a 60 s timeout of its own: under machine load it passed 5 s.
+
+## Twenty-ninth review (2026-09-24): findings and what changed
+
+The fidelity contract and the quote-edge rule were clean for the sixth round running. Every
+finding was in the ePI reader and shared one cause: the reader parses the EMA's div as XML, a
+browser as HTML. A processing instruction or an abrupt comment hid text the browser shows; a
+self-closing `span` or `sup` stayed open over what followed; a namespace-prefixed `div` was
+credited as a block; an unclosed `rgb(` swallowed the declarations after it; a row group's style
+was dropped from its cells' marks. Each is fixed as the reviewer prototyped and checked (the
+committed QRD checks unchanged), with tests, together with a table part outside a table,
+`</br>`, a reference to U+0080–U+009F, and the round-28 sub-rules no test pinned.
+
+Most of these predate this change: they are the merged QRD reader's, not regressions of
+3.0.0. A closed list of refusals cannot finish them, so the reader's claim now states it: where
+XML and HTML parsing differ, it refuses the cases it lists, and the rest is a stated residual;
+reading with an HTML5 parser, as a browser does, is a tracked follow-up (roadmap item 3a). The
+reviews of this change continue on its own scope: the fidelity contract, the quote-edge rule,
+and what this change did to the reader.

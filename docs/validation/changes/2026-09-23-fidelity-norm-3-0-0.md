@@ -446,7 +446,12 @@ restored.
   the wrong shape, which raised an error, is refused. A twenty-eighth review found the reader
   crediting a positive em at 14pt, counting values a browser drops, splitting a style where CSS
   would not (a quote, a comment, an escape) and following the XML tree where an HTML parser
-  rebuilds it: each is now refused, and a section code or div of the wrong type too.
+  rebuilds it: each is now refused, and a section code or div of the wrong type too. A
+  twenty-ninth review found more places where the reader's XML parse differs from a browser's
+  HTML parse (a processing instruction, an abrupt comment, a self-closing `span`, a prefixed
+  element, an unclosed function, a row group's style): each is now refused or read, and the
+  reader's claim states the rest as a residual, with reading by an HTML5 parser tracked as a
+  follow-up (roadmap item 3a).
 
 - **Every submission carrying 2.0.0 is refused by the worker gate** from the moment this change
   deploys. Nothing in the repository produces a 2.0.0 submission after it.
