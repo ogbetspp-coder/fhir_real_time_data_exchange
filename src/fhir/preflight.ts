@@ -52,8 +52,10 @@ function referenceOf(value: unknown): string | undefined {
   return typeof reference === "string" ? reference : undefined;
 }
 
-function firstReference(value: unknown): string | undefined {
-  return Array.isArray(value) ? referenceOf(value[0]) : referenceOf(value);
+// The one reference a Type 1 link has: a list of exactly one, or a single Reference.
+function onlyReference(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return referenceOf(value);
+  return value.length === 1 ? referenceOf(value[0]) : undefined;
 }
 
 function hasIdentifier(resource: FhirResource): boolean {
@@ -105,10 +107,10 @@ function type1GraphIssues(bundle: FhirBundle): OperationOutcomeIssue[] {
       issues.push(issue("error", "value", `${where} must reference its Type 1 target`, where));
     }
   };
-  expectLink(firstReference(composition.resource.subject), product.fullUrl, "Composition.subject");
-  expectLink(firstReference(composition.resource.author), holder.fullUrl, "Composition.author");
+  expectLink(onlyReference(composition.resource.subject), product.fullUrl, "Composition.subject");
+  expectLink(onlyReference(composition.resource.author), holder.fullUrl, "Composition.author");
   expectLink(
-    firstReference(authorisation.resource.subject),
+    onlyReference(authorisation.resource.subject),
     product.fullUrl,
     "RegulatedAuthorization.subject",
   );

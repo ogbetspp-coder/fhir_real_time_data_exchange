@@ -31,6 +31,16 @@ function references(value: unknown): string[] {
   );
 }
 
+function issuesOf(action: () => unknown): string[] {
+  try {
+    action();
+  } catch (error) {
+    if (error instanceof TransformationError) return error.issues;
+    throw error;
+  }
+  return [];
+}
+
 function persisted(bundle: FhirBundle): { urls: Set<string>; refs: Set<string> } {
   const ema = transformType2ToEma(bundle, mapping);
   const transaction = buildPersistTransaction(ema.list, ema.documentBundle, "run");
@@ -103,6 +113,82 @@ describe("run namespaces", () => {
           source,
           sourceKind: "fixture",
           sourceResource: "fixture:test",
+        },
+        mapping,
+        config,
+      ),
+    ).rejects.toThrow("Source identifier is in the reserved authority-import namespace");
+  });
+
+  it("persists no reference but to an entry of the run's own output", () => {
+    const source = createSyntheticType2Bundle(mapping);
+    const organization = source.entry.find(
+      ({ resource }) => resource.resourceType === "Organization",
+    );
+    if (organization === undefined) throw new Error("fixture has an Organization");
+    // A reference in a Composition extension is rewritten like any other.
+    const composition = source.entry[0]?.resource;
+    if (composition === undefined) throw new Error("fixture has a Composition");
+    composition.extension = [
+      { url: "https://example.org/ext", valueReference: { reference: organization.fullUrl } },
+    ];
+    const ema = transformType2ToEma(source, mapping);
+    const transaction = buildPersistTransaction(ema.list, ema.documentBundle, "run");
+    const outputs = new Set([
+      ...ema.documentBundle.entry.map(({ fullUrl }) => fullUrl),
+      `urn:uuid:${ema.documentBundle.id ?? ""}`,
+    ]);
+    for (const { resource } of transaction.entry) {
+      for (const reference of references(resource))
+        expect(outputs.has(reference), reference).toBe(true);
+    }
+    const rewritten = ema.documentBundle.entry[0]?.resource.extension as {
+      valueReference?: unknown;
+    }[];
+    expect(outputs.has((rewritten[0]?.valueReference as { reference: string }).reference)).toBe(
+      true,
+    );
+  });
+
+  it("refuses a Bundle element or an entry element it does not carry", () => {
+    const signed: FhirBundle & Record<string, unknown> = createSyntheticType2Bundle(mapping);
+    signed.signature = { who: { reference: "Organization/another-runs-organization" } };
+    expect(issuesOf(() => transformType2ToEma(signed, mapping))).toEqual([
+      "Source Bundle carries signature, which the crosswalk does not carry",
+    ]);
+
+    const requested = createSyntheticType2Bundle(mapping);
+    const entry = requested.entry[1] as unknown as Record<string, unknown>;
+    entry.request = { method: "PUT", url: "Organization/another-runs-organization" };
+    expect(issuesOf(() => transformType2ToEma(requested, mapping))).toEqual([
+      "Source Bundle.entry[1] carries request, which the crosswalk does not carry",
+    ]);
+  });
+
+  it("refuses two entries with one fullUrl, and an empty identifier value", () => {
+    const duplicated = createSyntheticType2Bundle(mapping);
+    const [, second, third] = duplicated.entry;
+    if (second === undefined || third === undefined) throw new Error("fixture has entries");
+    third.fullUrl = second.fullUrl;
+    expect(() => transformType2ToEma(duplicated, mapping)).toThrow(/ambiguous/);
+
+    const empty = withIdentifier(createSyntheticType2Bundle(mapping), "");
+    expect(() => transformType2ToEma(empty, mapping)).toThrow(/no identifier value/);
+  });
+
+  it("refuses the authority-import namespace on the healthcare-api route too", async () => {
+    const config = loadConfig({ DRY_RUN: "true", ALLOW_SYNTHETIC_SOURCES: "true" });
+    const source = withIdentifier(
+      createSyntheticType2Bundle(mapping),
+      "authority-import:ema:00000000-0000-4000-8000-000000000001",
+    );
+    await expect(
+      runPipeline(
+        {
+          runId: "00000000-0000-4000-8000-00000000000b",
+          source,
+          sourceKind: "healthcare-api",
+          sourceResource: "Bundle/synthetic",
         },
         mapping,
         config,

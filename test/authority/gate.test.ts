@@ -146,6 +146,19 @@ describe("the authority gate", () => {
     expect(await issues(report)).toEqual(["The fidelity report is not the recomputed one"]);
   });
 
+  it("refuses an import another importer version made", async () => {
+    const input = imported();
+    const version = "0.9.0";
+    input.submission.provenance.extraction.parser.version = version;
+    const source = input.submission.provenance.sourceDocument;
+    if (source.kind !== "authority-publication") throw new Error("import");
+    source.extractedText.extractorVersion = `authority-import/${version}`;
+    reseal(input.submission);
+    expect(await issues(input)).toEqual([
+      "The submission is not what the importer makes of the authority's files",
+    ]);
+  });
+
   it("refuses an import requested after the gate fetched the files", async () => {
     const input = imported();
     if (input.submission.approval.method !== "authority-publication") throw new Error("import");

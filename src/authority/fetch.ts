@@ -68,14 +68,22 @@ export function emaFetcher(
     let length = 0;
     const reader = (body as ReadableStream<Uint8Array>).getReader();
     for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      length += value.length;
+      let read: Awaited<ReturnType<typeof reader.read>>;
+      try {
+        read = await reader.read();
+      } catch (error) {
+        // A body cut off or timed out mid-read is a refusal like any other, never an exception.
+        throw new AuthorityFetchError(
+          (error as { name?: unknown }).name === "TimeoutError" ? "timeout" : "unreachable",
+        );
+      }
+      if (read.done) break;
+      length += read.value.length;
       if (length > MAX_AUTHORITY_BYTES) {
         await reader.cancel();
         throw new AuthorityFetchError("too-large");
       }
-      chunks.push(value);
+      chunks.push(read.value);
     }
     const bytes = new Uint8Array(length);
     let offset = 0;

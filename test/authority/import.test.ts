@@ -247,3 +247,165 @@ describe("the pinned EMA labels", () => {
     }
   });
 });
+
+// The first item of a list, which the synthetic publication always has.
+function only(list: unknown): Json {
+  const [first] = list as (Json | undefined)[];
+  if (first === undefined) throw new Error("the synthetic publication has it");
+  return first;
+}
+
+describe("each stated rule, on its own", () => {
+  const subject = (list: Json) => list.subject as Json;
+  const extensions = (list: Json) => subject(list).extension as Json[];
+  const coding = (document: Json) =>
+    ((only(document.entry).resource as Json).type as Json).coding as Json[];
+
+  it("refuses the shape's closed values", () => {
+    expect(
+      refusal(
+        mutated(mapping, (document) => {
+          (only(document.entry).resource as Json).language = 5;
+        }),
+      ),
+    ).toBe("shape: document-shape");
+    expect(
+      refusal(
+        mutated(mapping, (document) => {
+          const entries = document.entry as Json[];
+          entries.push(structuredClone(only(entries)));
+        }),
+      ),
+    ).toBe("shape: document-shape");
+    expect(refusal(mutated(mapping, (_, list) => (list.title = "Synthetic\u0007")))).toBe(
+      "shape: list-shape",
+    );
+    const publication = syntheticPublication(mapping);
+    const text = new TextDecoder()
+      .decode(publication.document)
+      .replace('"language": 0', '"language": 0.0');
+    expect(refusal({ ...publication, document: new TextEncoder().encode(text) })).toBe(
+      "bytes: document-non-canonical-number",
+    );
+    expect(
+      refusal(
+        mutated(mapping, (_, list) => {
+          extensions(list).push(structuredClone(only(extensions(list))));
+        }),
+      ),
+    ).toBe("shape: list-extension-repeated");
+    expect(
+      refusal(
+        mutated(mapping, (_, list) => {
+          subject(list).extension = extensions(list).filter(
+            ({ url }) => !String(url).endsWith("versionNumber"),
+          );
+        }),
+      ),
+    ).toBe("shape: list-version-missing");
+  });
+
+  it("refuses a List other than the requested one, and synthetic values mixed with real ones", () => {
+    const publication = syntheticPublication(mapping);
+    expect(
+      refusal(publication, { ...publication.request, indexId: publication.request.documentId }),
+    ).toBe("shape: list-is-not-the-requested-one");
+    expect(
+      refusal(
+        mutated(mapping, (document) => {
+          (document.identifier as Json).value = "1286255d-f544-ef11-a317-000d3aaa05e0";
+        }),
+      ),
+    ).toBe("shape: synthetic-publication-with-a-real-id");
+    expect(
+      refusal(
+        mutated(mapping, (_, list) => {
+          const holder = extensions(list).find(({ url }) =>
+            String(url).endsWith("marketingAuthorisationHolder"),
+          );
+          (only([holder]).valueCoding as Json).code = "ORG-100001110";
+        }),
+      ),
+    ).toBe("shape: synthetic-publication-with-a-real-value");
+  });
+
+  it("refuses a document the List lists twice, or in another language", () => {
+    expect(
+      refusal(
+        mutated(mapping, (_, list) => {
+          const entries = list.entry as Json[];
+          entries.push(structuredClone(only(entries)));
+        }),
+      ),
+    ).toBe("binding: document-not-listed-once");
+    expect(
+      refusal(
+        mutated(mapping, (document, list) => {
+          const display = "Summary of Product Characteristics (Danish)";
+          only(coding(document)).display = display;
+          (only(list.entry).item as Json).display = display;
+        }),
+      ),
+    ).toBe("binding: language-differs-from-the-request");
+  });
+
+  it("refuses a mapping that does not alias the EMA's section system", () => {
+    const publication = syntheticPublication(mapping);
+    const unaliased = { ...mapping, targetCodeSystemAliases: [] };
+    try {
+      importPublication(publication.request, publication, unaliased, RUN);
+      throw new Error("imported");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ImportRefusedError);
+      expect((error as ImportRefusedError).reason).toBe("section-code-system-not-aliased");
+    }
+  });
+
+  it("refuses a leaf without text, and a section the mapping needs that draws nothing", () => {
+    expect(
+      refusal(
+        mutated(mapping, (document) => {
+          delete firstSubsection(document).text;
+        }),
+      ),
+    ).toBe("record: section-draws-nothing");
+    expect(
+      refusal(
+        mutated(mapping, (document) => {
+          const find = (list: Json[]): Json | undefined => {
+            for (const candidate of list) {
+              if (candidate.id === "smpc.4.8") return candidate;
+              const inner = find((candidate.section as Json[] | undefined) ?? []);
+              if (inner !== undefined) return inner;
+            }
+            return undefined;
+          };
+          const section = find(sections(document));
+          if (section === undefined) throw new Error("4.8");
+          section.text = {
+            status: "generated",
+            div: '<div xmlns="http://www.w3.org/1999/xhtml"><p>&#160;</p></div>',
+          };
+        }),
+      ),
+    ).toBe("record: section-draws-nothing");
+  });
+
+  it("records a decision for every value the record takes by rule", () => {
+    const publication = syntheticPublication(mapping);
+    const { submission } = importPublication(publication.request, publication, mapping, RUN);
+    const targets = new Set(submission.provenance.decisions.map(({ target }) => target));
+    for (const target of [
+      "Bundle.type",
+      "Bundle.id",
+      "Bundle.meta.profile",
+      "Bundle.entry[0].fullUrl",
+      "Composition.id",
+      "RegulatedAuthorization.meta.profile",
+      "Composition.section[0].id",
+      "Composition.section[0].text.status",
+    ]) {
+      expect(targets.has(target), target).toBe(true);
+    }
+  });
+});

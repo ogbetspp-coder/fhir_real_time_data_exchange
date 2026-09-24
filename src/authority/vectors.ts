@@ -66,7 +66,9 @@ export function importerVectors(mapping: EmaMapping): Vector[] {
     sources: { file: string; url: string; list: string; listFile: string }[];
   };
   const id = (url: string): string => url.split("/").at(-1) ?? "";
-  for (const source of [...lock.sources].sort((a, b) => a.file.localeCompare(b.file))) {
+  for (const source of [...lock.sources].sort((a, b) =>
+    a.file < b.file ? -1 : a.file > b.file ? 1 : 0,
+  )) {
     const document = readFileSync(`${LABELS}/sources/${source.file}`);
     const index = readFileSync(`${LABELS}/lists/${source.listFile}`);
     vectors.push({

@@ -5,6 +5,7 @@ import { z } from "zod";
 // List.subject under its own extension URLs; every other key, value type or value refuses.
 
 const GUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
+const BUNDLE_REFERENCE = /^Bundle\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
 const Guid = z.string().regex(GUID);
 
 // Every non-narrative string the importer carries: no lone surrogate, control or format
@@ -88,7 +89,10 @@ const Composition = z.strictObject({
     ]),
   }),
   date: Plain,
-  author: z.array(z.strictObject({ identifier: z.record(z.string(), z.unknown()) })).optional(),
+  author: z
+    .array(z.strictObject({ identifier: z.record(z.string(), z.unknown()) }))
+    .max(1)
+    .optional(),
   title: Plain,
   contained: z.array(ContainedBinary).optional(),
   section: z.array(Section).min(1),
@@ -146,7 +150,7 @@ export const EmaListSchema = z.strictObject({
     .array(
       z.strictObject({
         item: z.strictObject({
-          reference: z.string().regex(/^Bundle\/[0-9a-f-]{36}$/),
+          reference: z.string().regex(BUNDLE_REFERENCE),
           display: Plain,
         }),
       }),

@@ -79,6 +79,14 @@ describe("the Type 1 preflight", () => {
     twoHolders.entry.push({ ...structuredClone(holder), fullUrl: `${holder.fullUrl}-2` });
     expect(refused(twoHolders)).toBe(true);
 
+    const twoSubjects = type1();
+    const composition = resource(twoSubjects, "Composition");
+    composition.subject = [
+      ...(composition.subject as unknown[]),
+      ...(composition.subject as unknown[]),
+    ];
+    expect(refused(twoSubjects)).toBe(true);
+
     const unlinked = type1();
     resource(unlinked, "RegulatedAuthorization").holder = { reference: "urn:uuid:elsewhere" };
     expect(refused(unlinked)).toBe(true);
@@ -126,6 +134,23 @@ describe("the EMA List's product identity", () => {
 
     expect(list.extension).toBeUndefined();
     expect(list.title).toBe("Synthetic Paracetamol 500 mg tablets");
+  });
+
+  it("refuses a product with two names, and a graph with two authorisations", () => {
+    const named = type1();
+    resource(named, "MedicinalProductDefinition").name = [
+      { productName: "Synthetic A" },
+      { productName: "Synthetic B" },
+    ];
+    expect(() => transformType2ToEma(named, mapping)).toThrow(/ambiguous/);
+
+    const twice = type1();
+    const authorisation = twice.entry.find(
+      ({ resource: candidate }) => candidate.resourceType === "RegulatedAuthorization",
+    );
+    if (authorisation === undefined) throw new Error("fixture has an authorisation");
+    twice.entry.push({ ...structuredClone(authorisation), fullUrl: `${authorisation.fullUrl}-2` });
+    expect(() => transformType2ToEma(twice, mapping)).toThrow(/ambiguous/);
   });
 
   it("refuses a holder with two identifiers in the SPOR system", () => {

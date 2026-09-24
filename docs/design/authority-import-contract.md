@@ -84,9 +84,11 @@ submission; the gate runs it again:
 2. **Keep.** Zone B writes the bytes it fetched to the evidence bucket (CMEK, immutable, as the
    run's other evidence) and records their URIs, hashes, the fetch time and the worker image
    digest in the run manifest. Re-verification later is that same image run as a command
-   (`verify-import --manifest <uri>`) that reads only those copies and never the network. In PR 2
+   (`scripts/authority/verify-import.ts`, given the recorded submission, page text, report and the
+   copies of the fetched files) that reads only those copies and never the network. In PR 2
    an import runs only dry, which writes no evidence, manifest or ledger row, so this step and
-   D12's import evidence first run in PR 5; the `verify-import` test uses a constructed manifest.
+   D12's import evidence first run in PR 5; its test (`test/authority/gate.test.ts`) re-verifies a
+   recorded import from copies.
 3. **Recompute** with the importer version the submission names, which must be the version this
    build contains (an older import is re-imported, ADR 0005 decision 4).
 4. **Compare.** Every field of the submission is in one of three classes (D3's table): recomputed

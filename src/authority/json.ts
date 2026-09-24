@@ -86,6 +86,9 @@ export function parseStrictJson(text: string): Json {
   const number = (): number => {
     const match = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/.exec(text.slice(at));
     if (match === null) return fail("invalid-json");
+    // Only integers in their one spelling: the authority's files hold none but its enumeration
+    // codes, and "-0", "0.0" or "0e0" would read as the same 0 from other bytes.
+    if (!/^(?:0|-?[1-9]\d{0,14})$/.test(match[0])) return fail("non-canonical-number");
     at += match[0].length;
     return Number(match[0]);
   };

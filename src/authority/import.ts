@@ -147,7 +147,7 @@ function checkIdentity(
     identity.holder.code,
     identity.agency.code,
   ];
-  const ids = [document.id, list.id];
+  const ids = [document.id, document.identifier.value, list.id];
   if (request.authority === "synthetic") {
     if (!ids.every((id) => id.startsWith(SYNTHETIC_ID_BLOCK))) {
       refuse("shape", "synthetic-publication-with-a-real-id");
@@ -163,8 +163,21 @@ function checkIdentity(
   }
 }
 
+// The language the EMA's displays name, by their closed suffix (D9): the document type's display
+// and the List entry's must both name the requested language.
+const LANGUAGE_BY_DISPLAY_SUFFIX: Record<string, ImportRequest["language"]> = {
+  " (English)": "en",
+};
+
+function displayLanguage(display: string | undefined): string | undefined {
+  const suffix = Object.keys(LANGUAGE_BY_DISPLAY_SUFFIX).find((candidate) =>
+    display?.endsWith(candidate),
+  );
+  return suffix === undefined ? undefined : LANGUAGE_BY_DISPLAY_SUFFIX[suffix];
+}
+
 // D5: the document is imported only with the List that lists it.
-function checkBinding(document: EmaDocument, list: EmaList): void {
+function checkBinding(document: EmaDocument, list: EmaList, request: ImportRequest): void {
   const composition = document.entry[0].resource;
   const reference = `Bundle/${document.id}`;
   const entries = list.entry.filter(({ item }) => item.reference === reference);
@@ -173,6 +186,9 @@ function checkBinding(document: EmaDocument, list: EmaList): void {
     refuse("binding", "listed-as-another-document-type");
   }
   if (composition.title !== list.title) refuse("binding", "title-differs-from-the-list");
+  if (displayLanguage(composition.type.coding[0].display) !== request.language) {
+    refuse("binding", "language-differs-from-the-request");
+  }
 }
 
 type Placed = { section: EmaSection; rule: SectionRule; path: string };
@@ -250,13 +266,15 @@ type Page = { page: number; text: string; placed: Placed; div: string | undefine
 function buildPages(placed: Placed[]): Page[] {
   return placed.map((entry, index) => {
     const source = entry.section.text?.div;
-    if (source === undefined) return { page: index + 1, text: "", placed: entry, div: undefined };
-    const div = transform(source);
-    const drawn = "text" in normalizeNarrative(div);
+    const div = source === undefined ? undefined : transform(source);
+    const drawn = div !== undefined && "text" in normalizeNarrative(div);
     const leaf = (entry.rule.children ?? []).length === 0;
+    // A section that draws nothing refuses where the mapping needs its narrative, and a leaf
+    // anywhere (FHIR cmp-1), with or without a div (D4).
     if (!drawn && (leaf || entry.rule.narrative === "required")) {
       refuse("record", "section-draws-nothing");
     }
+    if (div === undefined) return { page: index + 1, text: "", placed: entry, div: undefined };
     return { page: index + 1, text: xhtmlToText(div), placed: entry, div: drawn ? div : undefined };
   });
 }
@@ -288,7 +306,7 @@ export function importPublication(
   const identity = listIdentity(list);
   if (typeof identity === "string") refuse("shape", identity);
   checkIdentity(request, document, list, identity);
-  checkBinding(document, list);
+  checkBinding(document, list, request);
   const placed = placeSections(document, mapping);
   checkPictures(placed);
   const pages = buildPages(placed);
@@ -304,6 +322,7 @@ export function importPublication(
     decision("Bundle.identifier", "defaulted-by-rule", rule("identifier")),
     decision("Bundle.language", "defaulted-by-rule", rule("language")),
     decision("Bundle.timestamp", "extracted-verbatim", { sourceField: "Bundle.timestamp" }),
+    decision("Bundle.type", "defaulted-by-rule", rule("document-bundle")),
     decision("Composition.identifier", "defaulted-by-rule", rule("identifier")),
     decision("Composition.relatesTo", "extracted-verbatim", { sourceField: "Bundle.identifier" }),
     decision("Composition.language", "defaulted-by-rule", rule("language")),
@@ -368,11 +387,21 @@ export function importPublication(
           sourceField: `${path}.title`,
         }),
       );
+      decisions.push(
+        decision(`${path}.id`, "defaulted-by-rule", {
+          sourceKey: sectionRule.sourceKey,
+          ...rule("section-id-from-identifier"),
+        }),
+      );
       if (page.div !== undefined) {
         decisions.push(
           decision(`${path}.text`, "extracted-verbatim", {
             sourceKey: sectionRule.sourceKey,
             sourceField: `${path}.text`,
+          }),
+          decision(`${path}.text.status`, "defaulted-by-rule", {
+            sourceKey: sectionRule.sourceKey,
+            ...rule("narrative-status-additional"),
           }),
         );
       }
@@ -464,6 +493,22 @@ export function importPublication(
       },
     ],
   };
+  // Each entry's fullUrl, id and profile are the importer's, by rule (D9).
+  bundle.entry.forEach(({ resource }, position) => {
+    decisions.push(
+      decision(
+        `Bundle.entry[${position}].fullUrl`,
+        "defaulted-by-rule",
+        rule("id-from-identifier"),
+      ),
+      decision(`${resource.resourceType}.id`, "defaulted-by-rule", rule("id-from-identifier")),
+      decision(`${resource.resourceType}.meta.profile`, "defaulted-by-rule", rule("epi-profile")),
+    );
+  });
+  decisions.push(
+    decision("Bundle.id", "defaulted-by-rule", rule("id-from-identifier")),
+    decision("Bundle.meta.profile", "defaulted-by-rule", rule("epi-profile")),
+  );
   const canonicalBundle = bundle as unknown as CanonicalBundle;
 
   const sourceText: SourceDocumentText = {

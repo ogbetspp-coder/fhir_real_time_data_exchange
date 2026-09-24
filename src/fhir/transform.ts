@@ -82,6 +82,20 @@ const ENGLISH_LANGUAGE = /^en(?:-latn)?(?:-(?:[a-z]{2}|\d{3}))?$/i;
 // orderedBy, mode — would be dropped, so a section carrying one is refused instead.
 const CARRIED_SECTION_ELEMENTS = new Set(["id", "title", "code", "text", "section"]);
 
+// The elements of a source Bundle the crosswalk carries or replaces; any other is refused
+// (docs/design/authority-import-contract.md, D7: every reference a run persists derives from its
+// identifier value).
+const CARRIED_BUNDLE_ELEMENTS = new Set([
+  "resourceType",
+  "id",
+  "meta",
+  "language",
+  "identifier",
+  "type",
+  "timestamp",
+  "entry",
+]);
+
 // What a reader sees inked, by the rule section 5 uses for `empty-narrative`: not a gap (section
 // 6: whitespace, a thin space, a blank glyph, a code point Unicode says to ignore) and not one of
 // the scanner's table-grid markers, which are structure (a table of empty cells shows nothing).
@@ -400,6 +414,11 @@ function listIdentity(sourceBundle: FhirBundle): ListIdentity {
     ({ resource }) => resource.resourceType === "MedicinalProductDefinition",
   );
   const names: unknown = products.length === 1 ? products[0]?.resource.name : undefined;
+  if (Array.isArray(names) && names.length > 1) {
+    throw new TransformationError("Product identity is ambiguous", [
+      "The product has more than one name",
+    ]);
+  }
   const productName = Array.isArray(names)
     ? ((names[0] as { productName?: unknown } | undefined)?.productName as string | undefined)
     : undefined;
@@ -615,14 +634,21 @@ export function transformType2ToEma(
   const bundleFullUrl = `urn:uuid:${bundleId}`;
   const copied = reidentifiedEntries(sourceBundle, sourceIdentifier, compositionFullUrl);
 
+  // The Composition with its references rewritten; everything below is built from this, never
+  // from the source, so no source reference reaches the output unrewritten.
+  const rewritten = rewriteReferences(
+    structuredClone(sourceComposition),
+    copied.fullUrls,
+    "Composition",
+  );
   const targetComposition: FhirComposition = {
-    ...rewriteReferences(structuredClone(sourceComposition), copied.fullUrls, "Composition"),
+    ...rewritten,
     id: compositionId,
     meta: { ...sourceComposition.meta, profile: mapping.profiles.composition },
     // Always English: a source declaring any other language, or none, has already failed above.
     language: "en",
     extension: [
-      ...((sourceComposition.extension as unknown[] | undefined) ?? []).filter(
+      ...((rewritten.extension as unknown[] | undefined) ?? []).filter(
         (extension) => (extension as { url?: string }).url !== QRD_TEMPLATE_EXTENSION,
       ),
       {
@@ -648,8 +674,27 @@ export function transformType2ToEma(
     section: [root],
   };
 
+  // The output Bundle carries only these elements; any other the source has (a signature, a link,
+  // an entry's request or search) is refused, not dropped and not copied: it could carry a
+  // reference or a URL outside the run's namespace.
+  const bundleIssues = [
+    ...Object.keys(sourceBundle)
+      .filter((key) => !CARRIED_BUNDLE_ELEMENTS.has(key))
+      .map((key) => `Source Bundle carries ${key}, which the crosswalk does not carry`),
+    ...sourceBundle.entry.flatMap((entry, position) =>
+      Object.keys(entry)
+        .filter((key) => key !== "fullUrl" && key !== "resource")
+        .map(
+          (key) =>
+            `Source Bundle.entry[${position}] carries ${key}, which the crosswalk does not carry`,
+        ),
+    ),
+  ];
+  if (bundleIssues.length > 0) {
+    throw new TransformationError("Source Bundle carries what the crosswalk refuses", bundleIssues);
+  }
   const targetBundle: FhirBundle = {
-    ...structuredClone(sourceBundle),
+    resourceType: "Bundle",
     id: bundleId,
     meta: { ...sourceBundle.meta, profile: [mapping.profiles.bundle] },
     // The source declared an English tag in some spelling ("EN", "en-GB"); the output says "en",
@@ -659,6 +704,7 @@ export function transformType2ToEma(
       system: "https://khs.dev/fhir/identifier/ema-document",
       value: bundleId,
     },
+    type: "document",
     timestamp: sourceBundle.timestamp,
     entry: [{ fullUrl: compositionFullUrl, resource: targetComposition }, ...copied.entries],
   };

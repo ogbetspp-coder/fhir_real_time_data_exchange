@@ -40,6 +40,7 @@ describe("the EMA fetcher", () => {
     );
     expect(seen?.init.headers).toEqual({ Accept: "application/fhir+json" });
     expect(seen?.init.redirect).toBe("error");
+    expect(seen?.init.signal).toBeInstanceOf(AbortSignal);
     expect([...result.bytes]).toEqual([1, 2, 3]);
     expect(result.fetchedAt).toBe("2026-09-24T12:00:00.000Z");
     expect(authorityUrl("EMA", { kind: "index", id: DOCUMENT.id })).toContain("/List/");
@@ -58,6 +59,18 @@ describe("the EMA fetcher", () => {
     expect(
       await reason(emaFetcher(() => Promise.reject(new Error("down")), NOW)("EMA", DOCUMENT)),
     ).toBe("unreachable");
+    expect(await reason(answering(new Response("x", { status: 201 }))("EMA", DOCUMENT))).toBe(
+      "http-201",
+    );
+    const broken = new Response(
+      new ReadableStream({
+        pull: (controller) => {
+          controller.error(new Error("connection reset"));
+        },
+      }),
+      { status: 200 },
+    );
+    expect(await reason(answering(broken)("EMA", DOCUMENT))).toBe("unreachable");
     expect(await reason(answering(new Response("x"))("synthetic", DOCUMENT))).toBe("not-the-ema");
     expect(
       await reason(answering(new Response("x"))("EMA", { kind: "document", id: "../x" })),

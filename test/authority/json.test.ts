@@ -50,7 +50,7 @@ describe("strict JSON", () => {
   it("reads every JSON value and escape", () => {
     expect(
       parseStrictJson(
-        ' { "s": "\\"\\\\\\/\\b\\f\\n\\r\\t\\u00e9", "n": -1.5e2, "t": true, "f": false, "z": null, "e": {}, "a": [] } ',
+        ' { "s": "\\"\\\\\\/\\b\\f\\n\\r\\t\\u00e9", "n": -150, "t": true, "f": false, "z": null, "e": {}, "a": [] } ',
       ),
     ).toEqual({ s: '"\\/\b\f\n\r\té', n: -150, t: true, f: false, z: null, e: {}, a: [] });
     expect(parseStrictJson("[1, [2, 3]]")).toEqual([1, [2, 3]]);
@@ -60,6 +60,16 @@ describe("strict JSON", () => {
     const parsed = parseStrictJson('{"__proto__":{"polluted":true}}') as Record<string, unknown>;
     expect(Object.keys(parsed)).toEqual(["__proto__"]);
     expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+
+  it("reads integers only in their one spelling", () => {
+    expect(parseStrictJson("[0, 7, -12]")).toEqual([0, 7, -12]);
+    for (const text of ["-0", "0.0", "0e0", "1.5", "1E2", "1234567890123456"]) {
+      expect(
+        reason(() => parseStrictJson(text)),
+        text,
+      ).toBe("non-canonical-number");
+    }
   });
 
   it("refuses what is not JSON, or nests too deeply", () => {
