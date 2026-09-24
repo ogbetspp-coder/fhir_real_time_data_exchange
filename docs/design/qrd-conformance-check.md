@@ -129,8 +129,9 @@ Every finding below was confirmed by reading the source div.
   all three. Red, yellow and other colours in the source fall only on pictures or spaces, which
   show no text differently; nearly black text (`#0d0d0d`) reads as black and nearly white
   shading (`#e6e6e6` behind a table heading) as none; none of these is reported. From
-  `epi-reader/1.1.0` an underline over text it can change (`zone_a.underline`) is a formatting
-  finding too: Brukinsa writes ">1", ">5" and ">2" in 5.1 with the ">" underlined, which the
+  `epi-reader/1.1.0` and `qrd-check/1.1.0` an underline over text it can change
+  (`zone_a.underline`) is a formatting finding too, and so is a border beside or over inline
+  text (the reader's `border` mark, read side by side as a browser cascades the styles): Brukinsa writes ">1", ">5" and ">2" in 5.1 with the ">" underlined, which the
   EMA's viewer draws as "≥" while the text says ">", and Jentadueto underlines a 5.1 heading
   holding "≥". Underlines over words, digits, e-mail addresses and plain punctuation (the
   Brukinsa 4.5 subheadings, for example) change nothing and are not reported.

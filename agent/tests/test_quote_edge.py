@@ -59,7 +59,7 @@ def test_the_export_is_at_the_fakes_normalisation_version_and_covers_both_answer
     [
         ("QUOTE_OPENERS", quote_edge.QUOTE_OPENERS),
         ("QUOTE_CLOSERS", quote_edge.QUOTE_CLOSERS),
-        ("SPACED_SIGNS", quote_edge.SPACED_SIGNS),
+        ("SIGN_LOOKALIKES", quote_edge.SIGN_LOOKALIKES),
     ],
 )
 def test_each_character_set_is_the_services_own(name: str, ported: frozenset[str]) -> None:
@@ -67,7 +67,9 @@ def test_each_character_set_is_the_services_own(name: str, ported: frozenset[str
     source = (REPOSITORY_ROOT / "src" / "query" / "tools.ts").read_text(encoding="utf-8")
     found = re.search(rf"const {name} = new Set\(\[(.*?)\]\);", source, re.DOTALL)
     assert found is not None, name
-    literals = re.findall(r"\"((?:[^\"\\]|\\.)*)\"|'((?:[^'\\]|\\.)*)'", found.group(1))
+    # Comments inside the set are not entries: a quoted character in one would hide a removal.
+    body = re.sub(r"//[^\n]*", "", found.group(1))
+    literals = re.findall(r"\"((?:[^\"\\]|\\.)*)\"|'((?:[^'\\]|\\.)*)'", body)
     assert frozenset(double or single for double, single in literals) == ported
 
 
@@ -192,3 +194,30 @@ def test_the_double_refuses_every_code_point_section_2_adds() -> None:
 def test_every_blank_glyph_is_a_gap() -> None:
     for code_point in _BLANK_GLYPHS:
         assert is_gap(chr(code_point)), hex(code_point)
+
+
+def test_a_long_run_of_brackets_and_spaces_is_read_in_one_pass() -> None:
+    # Past the bounded walk the one-pass reading takes over, and answers the same.
+    signed = "CrCl <" + " (" * 400 + " 30 ml/min"
+    assert locate_quote(signed, "30 ml/min") is None
+    plain = "Dose" + " (" * 400 + " 30 ml/min"
+    assert locate_quote(plain, "30 ml/min") is not None
+    # Without the whole text (the answer splitter) a walk that runs too long counts as a sign:
+    # refusing that cut is the safe side.
+    start = len(plain) - len("30 ml/min")
+    assert not quote_edge.edge_before(plain, start, "3")
+    walked = "Dose ( + (" + " (" * 300 + " 30"
+    assert not quote_edge.edge_before(walked, len(walked) - 2, "3")
+
+
+def test_the_rules_corners() -> None:
+    # An opening mark drawn like a comparator is a sign joined to the quote.
+    assert locate_quote("CrCl " + chr(0x2039) + "30 ml/min", "30 ml/min") is None
+    # Opening punctuation at the start of the text.
+    assert locate_quote("(see below)", "see below") == (1, 10)
+    # An empty quote is never found; a text of gaps alone has no number.
+    assert locate_quote("x", "") is None
+    assert quote_edge.non_gap(chr(0x2009) + " ", 0, 1) is None
+    # A cell whose text ends with a gap still holds its words.
+    table = "\ufdd0 \ufdd2 \ufdd3 10" + chr(0x2009) + " \ufdd3 000 IU \ufdd1"
+    assert locate_quote(table, "000 IU") is None

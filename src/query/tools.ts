@@ -237,7 +237,7 @@ function codePointAtIndex(text: string, index: number): string | undefined {
 // - Across a space. A quote that begins with a digit after a space preceded by a digit, or ends
 //   with a digit before a space followed by a digit, has cut a space-grouped number ("1 000"
 //   out of "1 000 000 IU"); a quote preceded by a comparator or sign and a space
-//   (SPACED_SIGNS: "≥ 30 ml/min") has lost it. Both are cuts.
+//   (isSpacedSign: "≥ 30 ml/min") has lost it. Both are cuts.
 //
 // It is never looser than the gate: a word character on either side is a cut before any of the
 // above is consulted, under the fidelity library's own isWordCharacter. It is not a grammar,
@@ -267,49 +267,28 @@ const QUOTE_CLOSERS = new Set([
   "…",
 ]);
 
-// Signs and comparators that still bind a number across a space. Hyphens and dashes are not
-// here: set off by spaces they are far more often separators than signs.
-const SPACED_SIGNS = new Set([
-  "<",
-  ">",
-  "~",
-  "±",
-  "−",
-  "∓",
-  "∼",
-  "≈",
-  "≤",
-  "≥",
-  "≦",
-  "≧",
-  "⩽",
-  "⩾",
-  // Look-alikes a renderer draws as a comparator (MODIFIER LETTER LEFT and RIGHT ARROWHEAD,
-  // SMALL and FULLWIDTH LESS-THAN and GREATER-THAN SIGN, FULLWIDTH TILDE), and the negated and
-  // combined comparators ("<" with U+0338 normalises to "≮"). A look-alike from another script,
-  // such as U+1438 CANADIAN SYLLABICS PA, is a letter and is not read as a sign (a residual).
-  "˂",
-  "˃",
-  "﹤",
-  "﹥",
-  "＜",
-  "＞",
-  "～",
-  "≮",
-  "≯",
-  "≰",
-  "≱",
-  "≲",
-  "≳",
-  "≶",
-  "≷",
-  "≠",
-]);
+// Signs and comparators that still bind a number across a space: every mathematical symbol
+// (general category Sm: "<", "≥", "±", "×", "=", "+", "~", "≮", "⋜" and the rest) and the
+// look-alikes of a comparator that are not (SIGN_LOOKALIKES: MODIFIER LETTER LEFT, RIGHT, UP and
+// DOWN ARROWHEAD, SINGLE ANGLE QUOTATION MARKS, and the CJK and mathematical angle brackets,
+// each drawn like "<" or ">"). Hyphens and dashes are not signs: set off by spaces they are far
+// more often separators. A letter that looks like a sign (U+1438 CANADIAN SYLLABICS PA) is not
+// read as one, a stated residual.
+const MATH_SYMBOL = /^\p{Sm}$/u;
+const SIGN_LOOKALIKES = new Set(["˂", "˃", "˄", "˅", "‹", "›", "〈", "〉", "⟨", "⟩"]);
 
-const DECIMAL_DIGIT = /^\p{Nd}$/u;
+function isSpacedSign(character: string | undefined): boolean {
+  return character !== undefined && (MATH_SYMBOL.test(character) || SIGN_LOOKALIKES.has(character));
+}
+
+// A number is any code point of general category N: a decimal digit of any script, and "½",
+// "¹" or "₂" as well, so "1 ½" and "10" | "₀₀₀" are each one number.
+const NUMBER = /^\p{N}$/u;
+const LETTER_OR_NUMBER = /^[\p{L}\p{N}]$/u;
+const MARK = /^\p{M}$/u;
 
 function isDigit(character: string | undefined): boolean {
-  return character !== undefined && DECIMAL_DIGIT.test(character);
+  return character !== undefined && NUMBER.test(character);
 }
 
 function isGapPoint(character: string | undefined): boolean {
@@ -380,8 +359,9 @@ type TableIndex = {
   cells: Cell[];
 };
 
-// A word ends in a sign when its last code point that is not opening punctuation is a spaced
-// sign ("<(" before "30 ml/min)" in the next cell): a bracket between them binds nothing less.
+// A word ends in a sign when reading back from its end, past opening punctuation that is not
+// itself a sign and past combining marks, reaches a run of symbols and punctuation holding a
+// sign ("<(" before "30 ml/min)" in the next cell, "<" with U+0332 drawn "≤", "+/-").
 function wordBits(text: string, start: number, end: number): number {
   const words: string[][] = [[]];
   for (const point of text.slice(start, end)) {
@@ -393,8 +373,8 @@ function wordBits(text: string, start: number, end: number): number {
     if (points.length === 0) continue;
     if (isDigit(points[0])) bits |= STARTS_DIGIT;
     if (isDigit(points[points.length - 1])) bits |= ENDS_DIGIT;
-    const signed = points.filter((point) => !QUOTE_OPENERS.has(point));
-    if (SPACED_SIGNS.has(signed[signed.length - 1] ?? "")) bits |= ENDS_SIGN;
+    const word = points.join("");
+    if (signsBefore(word)[word.length] === 1) bits |= ENDS_SIGN;
   }
   return bits;
 }
@@ -508,70 +488,85 @@ function cutAcrossCellAfter(
   return cell.right.some((bits) => (bits & STARTS_DIGIT) !== 0);
 }
 
-// Whether a quote beginning at `start` (or its opening punctuation) set off by the space ending
-// at UTF-16 index `space` is cut: a sign before the space, read past every gap, binds the number
-// after it ("≥ 30", "<" U+2063 " 30"); a digit before it and a digit first in the quote are one
-// number grouped with spaces ("10 000", "10" U+2009 " 000"); and so across table cells (above).
+// What reading back for a sign skips: gaps, combining marks, and opening punctuation that is not
+// itself a sign.
+function skippedBeforeSign(point: string): boolean {
+  return (
+    isGapPoint(point) || MARK.test(point) || (QUOTE_OPENERS.has(point) && !isSpacedSign(point))
+  );
+}
+
+// For each UTF-16 index of `text`: 1 when reading back from it, past what `skippedBeforeSign`
+// skips, reaches a run of symbols and punctuation (no letter, number or gap) holding a sign. One
+// pass over the text, so the rule stays linear however long a run of brackets and spaces is.
+function signsBefore(text: string): Uint8Array {
+  const reached = new Uint8Array(text.length + 1);
+  let runHasSign = false;
+  let current = 0;
+  let index = 0;
+  for (const point of text) {
+    if (isGapPoint(point)) {
+      runHasSign = false;
+    } else if (LETTER_OR_NUMBER.test(point)) {
+      runHasSign = false;
+      current = 0;
+    } else {
+      runHasSign ||= isSpacedSign(point);
+      if (!skippedBeforeSign(point)) current = runHasSign ? 1 : 0;
+    }
+    index += point.length;
+    reached[index] = current;
+  }
+  return reached;
+}
+
+// Whether a quote beginning at `start` (or its opening punctuation) set off by the space at
+// UTF-16 index `space` is cut: a sign before the space, read past gaps, marks and opening
+// punctuation, binds the number after it ("≥ 30", "<" U+2063 " 30", "< ( 30", "+/- 5"); a
+// number before it and a number first in the quote, read past gaps only, are one number grouped
+// with spaces ("10 000", "10" U+2009 " 000", "1 ½", and "10 (000", a false failure); and so
+// across table cells (above).
 function cutAfterSpace(
   text: string,
   space: number,
   start: number,
   first: string | undefined,
-  tables: TableIndex | undefined,
+  context: SearchContext,
 ): boolean {
-  const beyond = nonGapBefore(text, space);
-  if (SPACED_SIGNS.has(signBefore(text, space) ?? "")) return true;
-  if (isDigit(beyond) && isDigit(first)) return true;
-  return cutAcrossCellBefore(tables, start, first);
+  if (context.signs[space] === 1) return true;
+  if (isDigit(nonGapBefore(text, space)) && isDigit(first)) return true;
+  return cutAcrossCellBefore(context.tables, start, first);
 }
 
-// The first code point before UTF-16 index `index` that is neither a gap nor opening
-// punctuation: a sign binds a number across both ("<" " ( " "30", "≥ « 30 »"), while a digit
-// does not ("10 (000" is not one number).
-function signBefore(text: string, index: number): string | undefined {
-  let position = index;
-  let character = codePointBefore(text, position);
-  while (character !== undefined && (isGapPoint(character) || QUOTE_OPENERS.has(character))) {
-    position -= character.length;
-    character = codePointBefore(text, position);
-  }
-  return character;
-}
+// What a search reads once from the section's text.
+type SearchContext = { tables: TableIndex | undefined; signs: Uint8Array };
 
-function edgeBefore(
-  text: string,
-  start: number,
-  quote: string,
-  tables: TableIndex | undefined,
-): boolean {
+function edgeBefore(text: string, start: number, quote: string, context: SearchContext): boolean {
   let before = codePointBefore(text, start);
   if (before === undefined) return true;
   if (isWordCharacter(before)) return false;
   const first = nonGapFrom(quote, 0);
-  if (before === " ") return !cutAfterSpace(text, start - 1, start, first, tables);
+  if (before === " ") return !cutAfterSpace(text, start - 1, start, first, context);
   let index = start;
   while (before !== undefined && QUOTE_OPENERS.has(before)) {
+    // An opening mark drawn like a comparator ("‹30") is a sign joined to the quote.
+    if (isSpacedSign(before)) return false;
     index -= before.length;
     before = codePointBefore(text, index);
   }
   if (index === start) return false;
   if (before === undefined) return true;
-  return before === " " && !cutAfterSpace(text, index - 1, start, first, tables);
+  return before === " " && !cutAfterSpace(text, index - 1, start, first, context);
 }
 
-function edgeAfter(
-  text: string,
-  end: number,
-  quote: string,
-  tables: TableIndex | undefined,
-): boolean {
+function edgeAfter(text: string, end: number, quote: string, context: SearchContext): boolean {
   let after = codePointAtIndex(text, end);
   if (after === undefined) return true;
   if (isWordCharacter(after)) return false;
   if (after === " ") {
     const last = nonGapBefore(quote, quote.length);
     if (isDigit(nonGapFrom(text, end + 1)) && isDigit(last)) return false;
-    return !cutAcrossCellAfter(tables, end, last);
+    return !cutAcrossCellAfter(context.tables, end, last);
   }
   let index = end;
   while (after !== undefined && QUOTE_CLOSERS.has(after)) {
@@ -585,11 +580,11 @@ function edgeAfter(
 // UTF-16 index, or -1. An occurrence that is cut does not end the search: a later occurrence
 // whose edges hold still matches.
 function findQuoteOccurrence(text: string, quote: string): number {
-  const tables = indexTables(text);
+  const context: SearchContext = { tables: indexTables(text), signs: signsBefore(text) };
   for (let found = text.indexOf(quote); found >= 0; found = text.indexOf(quote, found + 1)) {
     if (
-      edgeBefore(text, found, quote, tables) &&
-      edgeAfter(text, found + quote.length, quote, tables)
+      edgeBefore(text, found, quote, context) &&
+      edgeAfter(text, found + quote.length, quote, context)
     ) {
       return found;
     }

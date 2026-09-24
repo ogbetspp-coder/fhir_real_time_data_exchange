@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and nineteen reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and twenty reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -911,3 +911,29 @@ Each fix is pinned by vectors on both sides, and a break of each is caught by th
    checker's version is `qrd-check/1.1.0`; the changed-vectors table gains the two thin-space
    vectors whose narrative changed; text beside a picture still matches (stated, PR 5); the
    check's comment on pictures under an underline is corrected.
+
+## Twentieth review (2026-09-24): findings and what changed
+
+1. **High.** A sign followed by a combining mark NFC leaves apart ("<" U+0332, drawn "≤") and
+   the negated forms outside the list (≉, ≁, ≴) were not signs. Fixed with item 2.
+2. **High.** The closed sign list missed real comparators and ASCII spellings ("<=", "×",
+   "+/-", "≪", "⋜", "‹"). Fixed: a sign is any mathematical symbol (category Sm) or a named
+   look-alike of a comparator, read past gaps, combining marks and opening punctuation, with the
+   whole run of symbols before the space ("+/-" through its "+"); an opening mark that is itself
+   a sign ("‹30") joins the quote.
+3. **High.** The number rule counted decimal digits only, so "1 ½" and "10" | "₀₀₀" let a half
+   be quoted. Fixed: any code point of category N.
+4. **Medium.** The ePI reader skipped a border declaration holding any zero or none token, so
+   `border-width: 0 0 1px 0` under a ">" was missed. Fixed: the shorthands are expanded per side
+   and cascaded as a browser does; a bottom border is an underline, another side a border.
+5. **Medium.** `underline_changes` missed ordinal look-alikes (small capital O, Greek alpha, a
+   digit of another script) and "N" look-alikes. Fixed: any underlined lower-case letter after a
+   number of any script, read past code points drawn as nothing but not past a space (an
+   underlined "mg" after "10 " is a unit), and Greek and fullwidth "N".
+6. **Medium.** Stated sub-rules without a test. Fixed: each has one.
+7. **Low.** Reading back through a long run of brackets and spaces was quadratic. Fixed: one
+   pass per search in the service; in the agent a bounded walk falling back to that pass, and a
+   bounded walk that counts as a cut in the answer splitter (the safe side).
+8. **Low.** Wording (the check's design, ADR 0005, the module docstring, "10 (000"), the
+   parity test reading comments as entries, a border over a sign not reported, and the 192 of
+   789 figure now reproducible (`agent/scripts/measure_table_quotes.py`).

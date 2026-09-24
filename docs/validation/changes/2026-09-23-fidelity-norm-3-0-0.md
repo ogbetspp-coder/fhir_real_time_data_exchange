@@ -110,8 +110,8 @@ closes the open items the reviews recorded (the blast radius below says why).
   of every cell on its side, in each row its cell covers, the grid rebuilt from the markers once
   per search ("10" | "000 IU" is drawn as one number, and a cell's lines are centred, so any of
   them can sit level with the quote); the agent's port follows. On the three pinned SmPCs this
-  refuses 185 of 789 whole-cell quotes that a reader might read apart (a fail-safe `no-match`,
-  stated in UR-22). A quote that runs across two cells or across a picture is `no-match`, and a quote that
+  refuses 192 of 789 whole-cell quotes that a reader might read apart (a fail-safe `no-match`,
+  stated in UR-22; `agent/scripts/measure_table_quotes.py`). A quote that runs across two cells or across a picture is `no-match`, and a quote that
   carries a grid marker or U+FFFC itself is `invalid-request` (it could join two rows, or quote
   nothing a reader sees): a
   false failure, and a correct one, because such a quote loses which cell a value is in or what
@@ -394,7 +394,15 @@ restored.
   SmPCs, stated in UR-22); three branches of the rule no example pinned; the underline rule
   missing Cyrillic and Greek look-alikes of an ordinal "a" or "o", a digit behind an invisible
   code point and "Nº"; and, as lows, side borders marked as underlines (now `border`), the
-  checker's version (now 1.1.0) and a missing changed-vectors row.
+  checker's version (now 1.1.0) and a missing changed-vectors row. A twentieth review found the
+  closed sign list still short (a sign with a combining mark, "<=", "×", "+/-", "‹", "≪") and the
+  number rule reading decimal digits only ("1 ½"): a sign is now any mathematical symbol or a
+  named look-alike, read past marks with the whole run of symbols before the space, a number
+  any code point of category N, and the sign is found in one pass over the text (a long run of
+  brackets and spaces was quadratic); the ePI reader now expands multi-value border shorthands
+  per side as a browser cascades them, and the check reports a border over any visible text;
+  `underline_changes` refuses any underlined lower-case letter after a number of any script
+  and the "N" look-alikes; the table figure is now 192 of 789 and its script is committed.
 
 - **Every submission carrying 2.0.0 is refused by the worker gate** from the moment this change
   deploys. Nothing in the repository produces a 2.0.0 submission after it.

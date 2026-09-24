@@ -77,8 +77,10 @@ Three facts about that source meet three rules of the record:
      # ! ? *` and the curly quotation marks; a hyphen only between two letters; never another
      code point of category Sm (mathematical symbols) or Pd (dashes), a modifier letter, or a
      symbol. Adjacency is judged on the drawn text, the underlined run's neighbours outside the
-     element included: a lone underlined "a" or "o" directly after a digit (`1<u>a</u>`)
-     refuses, since it is drawn as the ordinal indicator "ª" or "º". The QRD check already
+     element included: an underlined lower-case letter directly after a number of any script
+     (`1<u>a</u>`, `20<u>o</u>C`, read past code points drawn as nothing) refuses, since it is
+     drawn as an ordinal indicator ("1ª", "20ºC"), and so does an underlined "o" after an "N"
+     ("Nº"), look-alikes of each included. The QRD check already
      finds the case in a pinned label: Brukinsa's 5.1 writes ">1" with the ">" underlined,
      which the EMA's viewer draws as "≥1".
    - **Closed CSS list, by property and value, that can neither hide nor overprint text.** Font

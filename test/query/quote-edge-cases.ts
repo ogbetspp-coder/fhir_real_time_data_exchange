@@ -149,6 +149,29 @@ export const quoteEdgeCases: QuoteEdgeCase[] = [
     whole: ["x"],
   },
   {
+    // Review round 20: a sign is any mathematical symbol or a look-alike of a comparator, read
+    // past combining marks, with the whole run of symbols before the space ("<=", "+/-"); a
+    // number is any code point of category N ("1 ½").
+    text: "CrCl \u2249 30 ml/min. CrCl <\u0332 40 ml/min. CrCl <= 50 ml/min. Take 2 \u00d7 10 mg. Mean 20 +/- 5 mg. CrCl \u2039 60 ml/min. Take 1 \u00bd tablets daily.",
+    cut: [
+      "30 ml/min.",
+      "40 ml/min.",
+      "50 ml/min.",
+      "10 mg.",
+      "5 mg.",
+      "60 ml/min.",
+      "\u00bd tablets daily.",
+      "Take 1",
+    ],
+    whole: ["CrCl", "Mean 20"],
+  },
+  {
+    markup:
+      "<table><tr><td>10</td><td>&#x2080;&#x2080;&#x2080; IU</td></tr><tr><td>CrCl &lt;=</td><td>30 ml/min</td></tr></table>",
+    cut: ["10", "30 ml/min"],
+    whole: ["CrCl"],
+  },
+  {
     // Review round 16: a Mongolian or Yi letter the default serif face draws as a blank.
     text: "Take 10\u1878 000 IU daily. Up to 5\ua4c5 000 IU weekly.",
     cut: ["Take 10", "000 IU daily.", "Up to 5\ua4c5", "000 IU weekly."],

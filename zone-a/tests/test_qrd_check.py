@@ -238,6 +238,12 @@ def test_colour_shading_and_faint_marks_are_formatting_findings(mark: str, repor
     assert len(findings(result, "formatting")) == (1 if reported else 0)
 
 
+def test_a_border_over_a_sign_is_a_formatting_finding() -> None:
+    paragraph = Paragraph("CrCl < 30", None, None, None, marks=(Mark(5, 6, "border"),))
+    result = check(document(smpc_1=(paragraph,)), REGISTRY, MAPPING)
+    assert len(findings(result, "formatting")) == 1
+
+
 @pytest.mark.parametrize(
     ("text", "start", "end", "reported"),
     [

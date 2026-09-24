@@ -331,3 +331,28 @@ def test_colour_keywords_are_not_marks_and_light_greys_are_faint() -> None:
         '<span style="color: #EEECE1">e</span></p>'
     )
     assert kinds(body) == [(3, 5, "faint")]
+
+
+@pytest.mark.parametrize(
+    ("style", "expected"),
+    [
+        ("border-bottom: 1px solid", ["underline"]),
+        ("border-top: 1px solid", ["border"]),
+        ("border-left: 1px dotted", ["border"]),
+        ("border: 1px solid", ["border", "underline"]),
+        ("border: 1px", []),
+        ("border: 0 solid", []),
+        ("border-style: solid", ["border", "underline"]),
+        ("border-width: 1px", []),
+        ("border-width: 0 0 1px 0; border-style: none none solid none", ["underline"]),
+        ("border-style: solid none", ["border", "underline"]),
+        ("border-style: none solid", ["border"]),
+        ("border-bottom-style: solid", ["underline"]),
+        ("border-bottom: none", []),
+        ("border-color: red", []),
+    ],
+)
+def test_inline_borders_are_read_side_by_side(style: str, expected: list[str]) -> None:
+    # Review round 20: the 1-4 value shorthands are expanded per side, as a browser does.
+    marks = kinds(f'<p><span style="{style}">&lt;</span></p>')
+    assert sorted({kind for _, _, kind in marks}) == expected

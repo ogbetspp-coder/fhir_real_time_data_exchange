@@ -33,7 +33,7 @@ __all__ = [
     "locate_quote",
 ]
 
-# src/query/tools.ts QUOTE_OPENERS, QUOTE_CLOSERS and SPACED_SIGNS, character for character, by
+# src/query/tools.ts QUOTE_OPENERS, QUOTE_CLOSERS and SIGN_LOOKALIKES, character for character, by
 # code point: several are look-alikes of the ASCII characters they must not be confused with.
 QUOTE_OPENERS: Final = frozenset(
     map(chr, (0x28, 0x5B, 0x7B, 0x22, 0x27, 0x2018, 0x201C, 0x201E, 0xAB, 0x2039, 0xBF, 0xA1))
@@ -41,15 +41,11 @@ QUOTE_OPENERS: Final = frozenset(
 QUOTE_CLOSERS: Final = frozenset(".,;:!?)]}\"'") | frozenset(
     map(chr, (0x2019, 0x201D, 0xBB, 0x203A, 0x2026))
 )
-SPACED_SIGNS: Final = (
-    frozenset("<>~")
-    | frozenset(
-        map(chr, (0xB1, 0x2212, 0x2213, 0x223C, 0x2248, 0x2264, 0x2265, 0x2266, 0x2267, 0x2A7D))
-    )
-    | frozenset(map(chr, (0x2A7E,)))
-    # Look-alikes drawn as a comparator, and the negated and combined comparators.
-    | frozenset(map(chr, (0x02C2, 0x02C3, 0xFE64, 0xFE65, 0xFF1C, 0xFF1E, 0xFF5E)))
-    | frozenset(map(chr, (0x226E, 0x226F, 0x2270, 0x2271, 0x2272, 0x2273, 0x2276, 0x2277, 0x2260)))
+# ``isSpacedSign``: every mathematical symbol (category Sm) and these look-alikes of a comparator
+# that are not: the modifier letter arrowheads, the single angle quotation marks, and the CJK and
+# mathematical angle brackets.
+SIGN_LOOKALIKES: Final = frozenset(
+    map(chr, (0x02C2, 0x02C3, 0x02C4, 0x02C5, 0x2039, 0x203A, 0x3008, 0x3009, 0x27E8, 0x27E9))
 )
 
 # src/fidelity/normalize.ts: the invisible formatting characters of step 1 (soft hyphen, zero
@@ -63,7 +59,76 @@ def is_word_character(character: str) -> bool:
 
 
 def _is_digit(character: str | None) -> bool:
-    return character is not None and unicodedata.category(character) == "Nd"
+    """``isDigit``: any code point of category N, so "½", "¹" and "₂" are numbers too."""
+    return character is not None and unicodedata.category(character)[0] == "N"
+
+
+def _is_sign(character: str | None) -> bool:
+    """``isSpacedSign``: a mathematical symbol, or a look-alike of a comparator."""
+    return character is not None and (
+        unicodedata.category(character) == "Sm" or character in SIGN_LOOKALIKES
+    )
+
+
+def _skipped_before_sign(character: str) -> bool:
+    """What reading back for a sign skips: gaps, marks, and openers that are not signs."""
+    return (
+        is_gap(character)
+        or unicodedata.category(character)[0] == "M"
+        or (character in QUOTE_OPENERS and not _is_sign(character))
+    )
+
+
+def _signs_before(text: str) -> list[bool]:
+    """``signsBefore``: for each index, whether reading back from it reaches a sign's run."""
+    reached = [False] * (len(text) + 1)
+    run_has_sign = False
+    current = False
+    for index, character in enumerate(text):
+        if is_gap(character):
+            run_has_sign = False
+        elif unicodedata.category(character)[0] in "LN":
+            run_has_sign = False
+            current = False
+        else:
+            run_has_sign = run_has_sign or _is_sign(character)
+            if not _skipped_before_sign(character):
+                current = run_has_sign
+        reached[index + 1] = current
+    return reached
+
+
+# How far a single reading back goes before the one-pass index takes over (``_Signs``), or, for
+# a caller without the whole text, before the reading counts as a sign: refusing a cut there is
+# the safe side, and only a pathological run of brackets and spaces reaches it.
+_WALK_LIMIT: Final = 256
+
+
+def _sign_walk(text: str, index: int) -> bool | None:
+    """``signsBefore`` at one index read back directly, or None past ``_WALK_LIMIT`` steps."""
+    steps = 0
+    index -= 1
+    while index >= 0 and _skipped_before_sign(text[index]):
+        index -= 1
+        steps += 1
+        if steps > _WALK_LIMIT:
+            return None
+    while (
+        index >= 0 and not is_gap(text[index]) and unicodedata.category(text[index])[0] not in "LN"
+    ):
+        if _is_sign(text[index]):
+            return True
+        index -= 1
+        steps += 1
+        if steps > _WALK_LIMIT:
+            return None
+    return False
+
+
+def _sign_reached(text: str, index: int) -> bool:
+    """``_sign_walk`` for a caller without the whole text: a walk that runs too long is a sign."""
+    reached = _sign_walk(text, index)
+    return True if reached is None else reached
 
 
 # src/fidelity/normalize.ts ``isGap`` (fidelity-norm/3.0.0 section 6): section 3 whitespace, the
@@ -97,15 +162,18 @@ _DEFAULT_IGNORABLE: Final = (
 )
 
 
+# Every gap, as one set: ``is_gap`` is asked for nearly every code point of a section.
+_GAPS: Final = frozenset(
+    _WHITESPACE
+    | _THIN_SPACES
+    | _BLANK_GLYPHS
+    | {point for low, high in _DEFAULT_IGNORABLE for point in range(low, high + 1)}
+)
+
+
 def is_gap(character: str) -> bool:
     """Whether ``character`` is a gap (section 6): drawn as space or as nothing."""
-    point = ord(character)
-    return (
-        point in _WHITESPACE
-        or point in _THIN_SPACES
-        or point in _BLANK_GLYPHS
-        or any(low <= point <= high for low, high in _DEFAULT_IGNORABLE)
-    )
+    return ord(character) in _GAPS
 
 
 def non_gap(text: str, index: int, step: int) -> str | None:
@@ -154,16 +222,14 @@ class _Tables:
 
 
 def _word_bits(text: str) -> int:
-    """``wordBits``: a word ends in a sign when its last code point that is not opening
-    punctuation is a spaced sign."""
+    """``wordBits``: a word ends in a sign when reading back from its end reaches a sign's run."""
     bits = 0
     for word in _words(text):
         if _is_digit(word[0]):
             bits |= _STARTS_DIGIT
         if _is_digit(word[-1]):
             bits |= _ENDS_DIGIT
-        signed = [character for character in word if character not in QUOTE_OPENERS]
-        if signed and signed[-1] in SPACED_SIGNS:
+        if _sign_reached(word, len(word)):
             bits |= _ENDS_SIGN
     return bits
 
@@ -275,27 +341,46 @@ def _cut_across_cell_after(tables: _Tables | None, end: int, last: str | None) -
     return any(bits & _STARTS_DIGIT for bits in tables.right[tables.cell_at[end]])
 
 
-def _sign_before(text: str, index: int) -> str | None:
-    """``signBefore``: the first code point from ``index`` back that is neither a gap nor opening
-    punctuation; a sign binds a number across both, a digit does not."""
-    while index >= 0 and (is_gap(text[index]) or text[index] in QUOTE_OPENERS):
-        index -= 1
-    return text[index] if index >= 0 else None
+class _Signs:
+    """``signsBefore`` over one text, computed on first use: most searches never need it."""
+
+    def __init__(self, text: str) -> None:
+        self._text = text
+        self._reached: list[bool] | None = None
+
+    def at(self, index: int) -> bool:
+        if self._reached is None:
+            walked = _sign_walk(self._text, index)
+            if walked is not None:
+                return walked
+            self._reached = _signs_before(self._text)
+        return self._reached[index]
 
 
 def _cut_after_space(
-    text: str, space: int, start: int, first: str | None, tables: _Tables | None
+    text: str,
+    space: int,
+    start: int,
+    first: str | None,
+    tables: _Tables | None,
+    signs: _Signs | None,
 ) -> bool:
-    """``cutAfterSpace``: a sign before the space, read past gaps; a grouped number; a table."""
-    beyond = non_gap(text, space - 1, -1)
-    if _sign_before(text, space - 1) in SPACED_SIGNS:
+    """``cutAfterSpace``: a sign before the space, read past gaps, marks and openers; a number
+    before it and a number first in the quote, read past gaps only; a table."""
+    if signs.at(space) if signs is not None else _sign_reached(text, space):
         return True
-    if _is_digit(beyond) and _is_digit(first):
+    if _is_digit(non_gap(text, space - 1, -1)) and _is_digit(first):
         return True
     return _cut_across_cell_before(tables, start, first)
 
 
-def edge_before(text: str, start: int, first: str | None, tables: _Tables | None = None) -> bool:
+def edge_before(
+    text: str,
+    start: int,
+    first: str | None,
+    tables: _Tables | None = None,
+    signs: _Signs | None = None,
+) -> bool:
     """Does a quote whose first character is ``first`` begin on a boundary at ``start``?"""
     before = _at(text, start - 1)
     if before is None:
@@ -303,16 +388,20 @@ def edge_before(text: str, start: int, first: str | None, tables: _Tables | None
     if is_word_character(before):
         return False
     if before == " ":
-        return not _cut_after_space(text, start - 1, start, first, tables)
+        return not _cut_after_space(text, start - 1, start, first, tables, signs)
     index = start
     while before is not None and before in QUOTE_OPENERS:
+        if _is_sign(before):
+            # An opening mark drawn like a comparator (U+2039 before "30") is a sign joined to
+            # the quote.
+            return False
         index -= 1
         before = _at(text, index - 1)
     if index == start:
         return False
     if before is None:
         return True
-    return before == " " and not _cut_after_space(text, index - 1, start, first, tables)
+    return before == " " and not _cut_after_space(text, index - 1, start, first, tables, signs)
 
 
 def edge_after(text: str, end: int, last: str | None, tables: _Tables | None = None) -> bool:
@@ -342,11 +431,12 @@ def find_quote_occurrence(text: str, quote: str) -> int:
     if not quote:
         return -1
     tables = _index_tables(text)
+    signs = _Signs(text)
     first = non_gap(quote, 0, 1)
     last = non_gap(quote, len(quote) - 1, -1)
     found = text.find(quote)
     while found >= 0:
-        if edge_before(text, found, first, tables) and edge_after(
+        if edge_before(text, found, first, tables, signs) and edge_after(
             text, found + len(quote), last, tables
         ):
             return found

@@ -376,21 +376,26 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
     closing punctuation — `.`, `,`, `;`, `:`, `!`, `?`, `)`, `]`, `}`, straight and curly
     closing quotation marks and apostrophes, `»`, `›`, `…` — that is itself followed by a space
     or the end of the text;
-  - **across a space**: a quote that begins with a digit after a space preceded by a digit, or
-    ends with a digit before a space followed by a digit, has cut a space-grouped number; the
-    digit on each side is read past every gap (from `fidelity-norm/3.0.0`, the specification's
-    section 6), so "10" U+2009 " 000" and "5" U+2063 " 000" are one number, and a quote may
-    neither end with "10" or "10" U+2009 nor begin with "000" there. A quote, or the opening
-    punctuation before it, preceded by a comparator or sign and a space, the sign read past
-    every gap and every opening punctuation mark, has lost it: "30 ml/min" is cut after "CrCl <"
-    U+2063 " ", inside "CrCl < (30 ml/min)" and "CrCl < ( 30 ml/min )", and inside "ClCr ≥ « 30
-    ml/min »". The signs (`SPACED_SIGNS`): `<`, `>`, `~`, `±`, `−`, `∓`, `∼`, `≈`, `≤`, `≥`,
-    `≦`, `≧`, `⩽`, `⩾`; the look-alikes a renderer draws as one of them, U+02C2 and U+02C3
-    MODIFIER LETTER LEFT and RIGHT ARROWHEAD, U+FE64 and U+FE65 SMALL LESS-THAN and
-    GREATER-THAN SIGN, U+FF1C, U+FF1E and U+FF5E FULLWIDTH LESS-THAN SIGN, GREATER-THAN SIGN
-    and TILDE; and the negated and combined comparators `≮`, `≯`, `≰`, `≱`, `≲`, `≳`, `≶`, `≷`,
-    `≠` ("<" with U+0338 normalises to "≮"). A look-alike from another script (U+1438 CANADIAN
-    SYLLABICS PA, a letter) is not read as a sign, a stated residual. Both are cuts;
+  - **across a space**: a quote that begins with a number after a space preceded by a number, or
+    ends with a number before a space followed by a number, has cut a space-grouped number; a
+    number is any code point of general category N (a decimal digit of any script, and "½", "¹"
+    and "₂" too), and the one on each side is read past every gap (from `fidelity-norm/3.0.0`,
+    the specification's section 6), so "10" U+2009 " 000", "5" U+2063 " 000" and "1 ½" are one
+    number, and a quote may neither end with "10" or "10" U+2009 nor begin with "000" or "½"
+    there. A quote, or the opening punctuation before it, preceded by a sign and a space has
+    lost it: reading back from the space past gaps, combining marks and opening punctuation, a
+    run of symbols and punctuation (no letter, number or gap) holding a sign is a cut. A sign is
+    any mathematical symbol (general category Sm: `<`, `>`, `≤`, `≥`, `±`, `×`, `=`, `+`, `~`,
+    `≈`, `≠`, `≮`, `⋜` and the rest) or a look-alike of a comparator that is not one (U+02C2 to
+    U+02C5 MODIFIER LETTER ARROWHEADS, U+2039 and U+203A SINGLE ANGLE QUOTATION MARKS, U+3008 and
+    U+3009 and U+27E8 and U+27E9 ANGLE BRACKETS); an opening mark that is itself one of these
+    ("‹30") is a sign joined to the quote. So "30 ml/min" is cut after "CrCl <" U+2063 " ",
+    "CrCl <" U+0332 (drawn "≤"), "CrCl <=", inside "CrCl < ( 30 ml/min )" and "ClCr ≥ « 30 ml/min
+    »", "10 mg" after "Take 2 ×", and "5 mg" after "20 +/-". A number before an opening bracket
+    also joins one after it ("000 IU" in "Give 10 (000 IU)"), a false failure. Stated
+    residuals: a letter that looks like a sign (U+1438 CANADIAN SYLLABICS PA) is not read as one;
+    and a quote may end before a decimal separator set off by a space ("Take 1" of "Take 1 ,5
+    mg"), which the "nothing follows" residual below covers. Both are cuts;
   - **across table cells** (from `fidelity-norm/3.0.0`): a renderer draws a row's cells side by
     side with a gap about as wide as a space and centres each cell's lines vertically, so any
     line of a cell can sit level with any line of another cell in the row, wherever the viewer's
@@ -407,8 +412,9 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
     quote beginning with a digit is refused when any cell to its left in its rows holds a word
     ending in a digit, any quote at a word boundary in a cell is refused when any cell to its
     left holds a word ending in a sign, and a quote ending in a digit when any cell to its right
-    holds a word beginning with one. On the three pinned SmPCs 185 of 789 whole-cell quotes are
-    refused by this rule alone, 40 of them beginning with a word: in Jentadueto's renal table
+    holds a word beginning with one. On the three pinned SmPCs 192 of 789 whole-cell quotes are
+    refused by this rule alone, 47 of them beginning with a word
+    (`agent/scripts/measure_table_quotes.py`, which rebuilds each grid approximately): in Jentadueto's renal table
     `< 30` | "Metformin is contraindicated" | "No dose adjustment" refuses both right-hand
     cells, and a footnote "±" after a word refuses what follows it. Quoting a table with its
     structure is the publishing step's work (roadmap 3a, PR 5), which is to relieve this. Rows, captions and whole tables are separate lines, as a paragraph break

@@ -266,28 +266,70 @@ def _points(value: str) -> float | None:
     return float(match.group(1)) * _POINTS[match.group(2)] if match else None
 
 
-_NO_BORDER: Final = frozenset({"none", "hidden", "0", "0pt", "0px", "0cm", "0mm", "0in"})
+_SIDES: Final = ("top", "right", "bottom", "left")
+_BORDER_STYLES: Final = frozenset(
+    {"none", "hidden", "solid", "dotted", "dashed", "double", "groove", "ridge", "inset", "outset"}
+)
+
+
+def _per_side(values: list[str]) -> dict[str, str]:
+    """A 1-4 value box shorthand (top right bottom left), expanded per side."""
+    if not values:
+        return {}
+    top = values[0]
+    right = values[1] if len(values) > 1 else top
+    bottom = values[2] if len(values) > 2 else top
+    left = values[3] if len(values) > 3 else right
+    return dict(zip(_SIDES, (top, right, bottom, left), strict=True))
+
+
+def _zero_width(value: str) -> bool:
+    return re.fullmatch(r"0+(\.0+)?[a-z]*", value) is not None
 
 
 def _inline_borders(style: str) -> set[str]:
-    """The marks a style's borders ask for on an inline element.
+    """The marks a style's borders ask for on an inline element, read as a browser cascades them.
 
-    A border along the bottom is drawn as an underline; one on another side as a bar beside or
-    over the text ("|05 mg", "1⋮5"), which is its own mark, ``border``.
+    A side is drawn when its style is neither none nor hidden (the initial style is none) and
+    its width is not zero. A border along the bottom is drawn as an underline; one on another
+    side as a bar beside or over the text ("|05 mg", "1⋮5"), which is its own mark, ``border``.
+    A value the reader cannot place counts as drawn.
     """
-    kinds: set[str] = set()
+    styles = dict.fromkeys(_SIDES, "none")
+    widths = dict.fromkeys(_SIDES, "medium")
     for name, value in _declarations(style):
         if not name.startswith("border") or name in ("border-collapse", "border-spacing"):
             continue
-        if name.endswith(("-color", "-colour")) or set(value.split()) & _NO_BORDER:
-            continue
-        side = name.removeprefix("border").removeprefix("-").split("-", 1)[0]
-        if side in ("", "width", "style"):
-            kinds |= {"underline", "border"}
-        elif side in ("bottom", "block"):
-            kinds.add("underline")
+        tokens = value.lower().split()
+        # `_style` has already refused any border property but the physical sides, their
+        # width, style and colour, and the shorthands (`_LAYOUT`).
+        rest = name.removeprefix("border").removeprefix("-")
+        side, _, part = rest.partition("-")
+        if side in _SIDES:
+            targets = [side]
         else:
-            kinds.add("border")
+            targets, part = list(_SIDES), rest
+        if part == "style":
+            per = _per_side(tokens) if side not in _SIDES else {side: tokens[0] if tokens else ""}
+            for target in targets:
+                styles[target] = per.get(target, "")
+        elif part == "width":
+            per = _per_side(tokens) if side not in _SIDES else {side: tokens[0] if tokens else ""}
+            for target in targets:
+                widths[target] = per.get(target, "")
+        elif part == "":
+            # The shorthand: width, style and colour in any order, missing ones reset.
+            found_style = next((t for t in tokens if t in _BORDER_STYLES), "none")
+            found_width = next((t for t in tokens if _zero_width(t)), "medium")
+            for target in targets:
+                styles[target] = found_style
+                widths[target] = found_width
+        # Colour neither draws nor removes a border.
+    kinds: set[str] = set()
+    for side in _SIDES:
+        if styles[side] in ("none", "hidden") or _zero_width(widths[side]):
+            continue
+        kinds.add("underline" if side == "bottom" else "border")
     return kinds
 
 

@@ -1254,14 +1254,22 @@ def _formatting(report: _Report, section: str, number: int, paragraph: Paragraph
                     text=_excerpt(covered),
                 )
             continue
+        if mark.kind == "border":
+            # A bar beside or over text can join or change any of it ("|05 mg", a bar over
+            # "<"), a sign as well as a word.
+            if any(not c.isspace() and c not in _PICTURE for c in covered):
+                report.finding(
+                    "formatting",
+                    section=section,
+                    paragraph=number,
+                    mark=mark.kind,
+                    text=_excerpt(covered),
+                )
+            continue
         if not any(c.isalnum() for c in covered):
             # A coloured picture or shaded space shows no text differently.
             continue
-        if mark.kind.startswith(("color-", "shading-")) or mark.kind in (
-            "faint",
-            "strike",
-            "border",
-        ):
+        if mark.kind.startswith(("color-", "shading-")) or mark.kind in ("faint", "strike"):
             report.finding(
                 "formatting",
                 section=section,
