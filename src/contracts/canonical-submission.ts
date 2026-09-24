@@ -307,8 +307,13 @@ function unverifiedTextIssues(bundle: unknown, verifiedDivPaths: Set<string>): s
   return issues;
 }
 
-// What a deployment accepts (docs/design/authority-import-contract.md, D7).
-export type GateOptions = { allowSyntheticSources: boolean };
+// What a deployment accepts (docs/design/authority-import-contract.md, D7), and, for an
+// authority import, the proof that the gate recomputed this very submission from the
+// authority's bytes (D1): the submission's hash, set only by src/authority/gate.ts.
+export type GateOptions = {
+  allowSyntheticSources: boolean;
+  recomputedImport?: { submissionSha256: string } | undefined;
+};
 
 // The marker every synthetic narrative carries (test/synthetic-only.test.ts).
 export const SYNTHETIC_MARKER = "not for clinical use";
@@ -355,7 +360,9 @@ function syntheticIssues(
   }
   const issues: string[] = [];
   if (synthetic) {
-    if (terminology !== undefined && !marks.terminology) {
+    // A drawn synthetic submission names a synthetic terminology service; an import's is the
+    // mapping manifest, for synthetic and real publications alike (D7's table).
+    if (source.kind === "drawn" && terminology !== undefined && !marks.terminology) {
       issues.push("A synthetic submission's terminology service is synthetic");
     }
     if (!marks.identifier) issues.push("A synthetic submission's Bundle identifier is synthetic");
@@ -489,9 +496,10 @@ export function verifyDocumentSubmission(
     if (identifier !== `${AUTHORITY_IMPORT_PREFIX}${segment}:${source.document.id}`) {
       issues.push("An authority import's Bundle identifier is its authority-import value");
     }
-    // Zone B recomputes an import from the authority's bytes before trusting any of it (D1);
-    // until that recomputation is wired into this gate, no import is accepted.
-    issues.push("Authority imports are not accepted until the gate recomputes them");
+    // Zone B recomputes an import from the authority's bytes before trusting any of it (D1).
+    if (options.recomputedImport?.submissionSha256 !== sha256(submission)) {
+      issues.push("An authority import is accepted only as the gate recomputed it");
+    }
   }
 
   issues.push(

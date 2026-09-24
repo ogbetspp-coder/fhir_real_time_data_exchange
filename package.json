@@ -17,7 +17,7 @@
     "artifacts:check": "node scripts/ci/check-generated.mjs --run \"npm run artifacts:generate\" -- fhir/generated",
     "images:check": "node scripts/ci/check-dockerfiles.mjs",
     "artifacts:generate": "tsx scripts/fhir/generate-artifacts.ts",
-    "contracts:check": "node scripts/ci/check-generated.mjs --run \"npm run contracts:generate && npm run vectors:generate && npm run contracts:fixtures && npm run contracts:quote-edge && npm run differential:smoke\" -- contracts/generated test/fixtures/fidelity/vectors.json test/fixtures/contracts zone-a/tests/fixtures/differential-smoke.jsonl",
+    "contracts:check": "node scripts/ci/check-generated.mjs --run \"npm run contracts:generate && npm run vectors:generate && npm run contracts:fixtures && npm run contracts:quote-edge && npm run differential:smoke && npm run authority:vectors\" -- contracts/generated test/fixtures/fidelity/vectors.json test/fixtures/contracts zone-a/tests/fixtures/differential-smoke.jsonl test/fixtures/authority/vectors.json",
     "contracts:fixtures": "tsx scripts/contracts/export-fixtures.ts",
     "contracts:quote-edge": "tsx scripts/contracts/export-quote-edge-cases.ts",
     "contracts:generate": "tsx scripts/contracts/generate-schemas.ts",
@@ -35,7 +35,9 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "validate:official": "node scripts/ci/official-validate.mjs",
-    "demo": "tsx scripts/dev/run-demo.ts"
+    "demo": "tsx scripts/dev/run-demo.ts",
+    "authority:vectors": "tsx scripts/authority/generate-vectors.ts",
+    "authority:lock": "tsx scripts/authority/lock.ts"
   },
   "repository": {
     "type": "git",

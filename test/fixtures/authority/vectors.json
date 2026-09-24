@@ -1,0 +1,46 @@
+[
+  {
+    "name": "synthetic",
+    "documentSha256": "d41e0389e8df4658a8f658ce00fe10791fa9c5ea8b1441cc3101a7ae7ce7226c",
+    "indexSha256": "7b30f4e26bbfe85554dd9a88104efc00219886f17e34b35c9b1d1bb9e0ddbda4",
+    "outcome": {
+      "imported": {
+        "submissionSha256": "d4d43aafefea1717976f03cfe9e035fa8cb5ef10179933750100e429b396a693",
+        "sourceTextSha256": "7a554ccc2e4d554d7caf18bd8f49b8d01250cd0f62063e2574f90b9b7e9ec95f",
+        "reportSha256": "891a5235497eff1e53538355de8133556b422498dccb1bae6433f14b6a22944d"
+      }
+    }
+  },
+  {
+    "name": "brukinsa-smpc-en.json",
+    "documentSha256": "d16e72035623a42023d271a76e0ac124c41970af4b1131d0a18479224f4dea5e",
+    "indexSha256": "8060505c58c36baaaf437e281413bde7cbf9ae98f6fc6f3286a0706489c64a63",
+    "outcome": {
+      "refused": "titles: heading-not-permitted"
+    }
+  },
+  {
+    "name": "imatinib-teva-smpc-en.json",
+    "documentSha256": "b266a38b3a06e07f272b56da08d178198025d8d47761b70187b2c389b9f7e5e7",
+    "indexSha256": "e7eef4b4ff86cccf0dc03974726e7887491bbf3fe98c3a874717d4e8f193519b",
+    "outcome": {
+      "refused": "pictures: picture-reference-without-template-or-evidence"
+    }
+  },
+  {
+    "name": "jentadueto-smpc-en.json",
+    "documentSha256": "544b2f24e69f410d3e792a80f3ee82c00ef60afcdf913526308e799db54a1ee4",
+    "indexSha256": "3a4ac2e34a955ebeb0a128183b7ddf095e5b6150513d805f6582858ced9b47ea",
+    "outcome": {
+      "refused": "shape: document-shape"
+    }
+  },
+  {
+    "name": "nuvaxovid-smpc-en.json",
+    "documentSha256": "3256838d8d4a270581a4b41e9bf302b4cd2e073a9c3ad75f999563b731f73828",
+    "indexSha256": "2956503ab020d2cd6f50253a728877862b5a913912047a12744f9a27bf81c351",
+    "outcome": {
+      "refused": "pictures: pictures-not-enabled"
+    }
+  }
+]

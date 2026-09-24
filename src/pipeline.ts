@@ -26,6 +26,9 @@ import type { FhirBundle, FhirResource, OperationOutcome } from "./fhir/types.js
 import { GcpEvidenceStore, type RunManifest, type SignedManifest } from "./gcp/evidence.js";
 import { HealthcareApiClient } from "./gcp/healthcare.js";
 import { GcpLineagePublisher } from "./gcp/lineage.js";
+import { defaultFetcher, type AuthorityFetcher } from "./authority/fetch.js";
+import { verifyAuthorityImport, type AuthorityGateResult } from "./authority/gate.js";
+import { sha256Bytes } from "./authority/import.js";
 import { sha256 } from "./lib/hash.js";
 import { log } from "./lib/logger.js";
 
@@ -76,6 +79,7 @@ function ingestionEvidence(
   gate: DocumentGateResult,
   provenanceResourceId: string,
   allowSyntheticSources: boolean,
+  authority: AuthorityRun | undefined,
 ): IngestionEvidence {
   const { provenance, approval, submissionId, graphType } = gate.submission;
   const { parser, model, promptTemplate, extractionRunId } = provenance.extraction;
@@ -102,22 +106,58 @@ function ingestionEvidence(
       coverage: { ...gate.report.coverage },
     },
     approval,
+    ...(authority === undefined
+      ? {}
+      : {
+          authority: {
+            importerVersion: authority.importerVersion,
+            fetched: authority.fetched.map(({ url, bytes, fetchedAt }) => ({
+              url,
+              sha256: sha256Bytes(bytes),
+              byteLength: bytes.length,
+              fetchedAt,
+            })),
+          },
+        }),
     provenanceResourceId,
   };
 }
 
 type DocumentInput = Extract<PipelineInput, { sourceKind: "document" }>;
 
-function documentGate(
+// What the gate learnt about an authority import: the fetched files and the importer that ran.
+type AuthorityRun = Omit<AuthorityGateResult, "gate">;
+
+// Whether a submission, before it is parsed, says it is an authority's publication: only that
+// decides which gate it goes through; the gate itself parses and checks everything.
+function claimsAuthoritySource(submission: unknown): boolean {
+  const kind = (
+    submission as { provenance?: { sourceDocument?: { kind?: unknown } } } | null | undefined
+  )?.provenance?.sourceDocument?.kind;
+  return kind === "authority-publication";
+}
+
+async function documentGate(
   input: DocumentInput,
   mapping: EmaMapping,
   config: AppConfig,
   runId: string,
-): DocumentGateResult {
+  dependencies: PipelineDependencies,
+): Promise<{ gate: DocumentGateResult; authority?: AuthorityRun }> {
+  const options = { allowSyntheticSources: config.ALLOW_SYNTHETIC_SOURCES };
   try {
-    return verifyDocumentSubmission(input, mapping.sourceCodeSystem, {
-      allowSyntheticSources: config.ALLOW_SYNTHETIC_SOURCES,
-    });
+    if (claimsAuthoritySource(input.submission)) {
+      const fetcher =
+        dependencies.authorityFetcher ?? defaultFetcher(mapping, config.ALLOW_SYNTHETIC_SOURCES);
+      const { gate, ...authority } = await verifyAuthorityImport(
+        input,
+        mapping,
+        { ...options, dryRun: config.DRY_RUN },
+        fetcher,
+      );
+      return { gate, authority };
+    }
+    return { gate: verifyDocumentSubmission(input, mapping.sourceCodeSystem, options) };
   } catch (error) {
     if (error instanceof SubmissionRejectedError) {
       log("warning", "Canonical submission rejected", {
@@ -130,10 +170,14 @@ function documentGate(
   }
 }
 
+// What a run may be given instead of its production default; tests use it.
+export type PipelineDependencies = { authorityFetcher?: AuthorityFetcher };
+
 export async function runPipeline(
   input: PipelineInput,
   mapping: EmaMapping,
   config: AppConfig,
+  dependencies: PipelineDependencies = {},
 ): Promise<PipelineResult> {
   if (input.runId !== undefined && !Uuid.safeParse(input.runId).success) {
     throw new Error("runId must be a UUID");
@@ -148,9 +192,10 @@ export async function runPipeline(
   });
 
   let gate: DocumentGateResult | undefined;
+  let authority: AuthorityRun | undefined;
   let source: FhirBundle;
   if (input.sourceKind === "document") {
-    gate = documentGate(input, mapping, config, runId);
+    ({ gate, authority } = await documentGate(input, mapping, config, runId, dependencies));
     source = gate.bundle;
   } else {
     source = input.source;
@@ -166,10 +211,14 @@ export async function runPipeline(
     throw new Error("Canonical preflight failed");
   }
 
-  // The authority-import namespace is written only by the importer, whose route arrives with
-  // PR 2's gate; no source reaching the pipeline today may carry it
-  // (docs/design/authority-import-contract.md, D7).
-  if (sourceIdentifierValue(source).startsWith(AUTHORITY_IMPORT_PREFIX)) {
+  // The authority-import namespace is written only by the importer: only a submission the gate
+  // recomputed from the authority's files may carry it, and every other route, the ungated
+  // fixture and healthcare-api sources included, is refused (docs/design/authority-import-contract.md,
+  // D7).
+  if (
+    authority === undefined &&
+    sourceIdentifierValue(source).startsWith(AUTHORITY_IMPORT_PREFIX)
+  ) {
     throw new Error("Source identifier is in the reserved authority-import namespace");
   }
 
@@ -195,6 +244,9 @@ export async function runPipeline(
       : toProvenanceResource(gate.submission, gate.report, {
           bundleId: emaBundleId,
           compositionId: emaCompositionId,
+          ...(authority?.fetched[0] === undefined
+            ? {}
+            : { fetchedAt: authority.fetched[0].fetchedAt }),
         });
 
   let ingestion: IngestionEvidence | undefined;
@@ -203,7 +255,12 @@ export async function runPipeline(
     if (provenanceResourceId === undefined) {
       throw new Error("Ingestion Provenance requires an id");
     }
-    ingestion = ingestionEvidence(gate, provenanceResourceId, config.ALLOW_SYNTHETIC_SOURCES);
+    ingestion = ingestionEvidence(
+      gate,
+      provenanceResourceId,
+      config.ALLOW_SYNTHETIC_SOURCES,
+      authority,
+    );
   }
 
   const profiles = [

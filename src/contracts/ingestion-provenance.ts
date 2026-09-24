@@ -346,6 +346,7 @@ export const ApprovalSchema = z
 export type SourceDocument = z.infer<typeof SourceDocumentSchema>;
 export type DrawnSourceDocument = z.infer<typeof DrawnSourceDocumentSchema>;
 export type AuthoritySourceDocument = z.infer<typeof AuthoritySourceDocumentSchema>;
+export type ImportRequest = z.infer<typeof ImportRequestSchema>;
 export type AttestedApproval = z.infer<typeof AttestedApprovalSchema>;
 export type AuthorityApproval = z.infer<typeof AuthorityApprovalSchema>;
 export type ExtractionTooling = z.infer<typeof ExtractionToolingSchema>;

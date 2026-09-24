@@ -283,10 +283,16 @@ describe("source, graph and approval fit together", () => {
     );
   });
 
-  it("refuses every authority import until the gate recomputes it", () => {
+  it("refuses an authority import the gate did not recompute", () => {
     expect(issues(recast(fixture.submission))).toContain(
-      "Authority imports are not accepted until the gate recomputes them",
+      "An authority import is accepted only as the gate recomputed it",
     );
+    expect(
+      issues(recast(fixture.submission), {
+        allowSyntheticSources: true,
+        recomputedImport: { submissionSha256: sha256("another submission") },
+      }),
+    ).toContain("An authority import is accepted only as the gate recomputed it");
   });
 
   it("requires a structured source's pages to be one per section and wholly body", () => {
