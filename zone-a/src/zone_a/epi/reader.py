@@ -9,13 +9,14 @@ It is written to the same rule as the Word reader: the text a browser shows, exa
 with a reason, for the text and its marks. It does not lay the page out: where a section's CSS
 places or paints one text over another (a band of border or background over a line, a line height
 smaller than the text in it, a block overflowing its table cell, a margin drawing a paragraph over
-its list number), the reader refuses only the cases listed below, and the rest is a stated residual;
-rendering the page and comparing it with this reading is ADR 0005's renderer cross-check. It is not
-the fidelity scanner (``zone_a.fidelity.xhtml``), which is the contract for narrative this
-repository publishes and stays as strict as it is; the EMA's own divs carry inline CSS on nearly
-every element, which that scanner rightly refuses. Here each section is read on its own, so a
-section the reader cannot vouch for is refused (``Section. refusal``) without losing the rest of the
-document.
+its list number, text at the bounds' edge, a combining mark on a space drawn as a stroke, text moved
+far to the right, off a printed page), the reader refuses only the cases listed below, and the rest
+is a stated residual; rendering the page and comparing it with this reading is ADR 0005's renderer
+cross-check. It is not the fidelity scanner (``zone_a.fidelity.xhtml``), which is the contract for
+narrative this repository publishes and stays as strict as it is; the EMA's own divs carry inline
+CSS on nearly every element, which that scanner rightly refuses. Here each section is read on its
+own, so a section the reader cannot vouch for is refused (``Section.refusal``) without losing the
+rest of the document.
 
 What a section's text is:
 
@@ -63,16 +64,18 @@ What refuses a section (``SectionRefusal.code``):
   zero-width characters, bidirectional controls), which a browser hides or which reorders
   what it shows.
 
-Also refused as ``malformed-xhtml``: a CDATA section (an XML parser reads it as text, an HTML
-parser as a comment). As ``unsupported-element``: text between the parts of a table, which a
-browser moves out of the table. As ``unsupported-style``: a margin or indent more than an inch
-to the left, which moves text off the page, or in a unit the reader does not know (``%``,
-``vw``, ``calc()``...); layout that draws one text over another (a negative margin on inline text
-or at a block's top or bottom, vertical padding on inline text and any padding on it over a
-background, a border on it wider than a hairline, a height outside table parts and pictures, a
-line height below 12pt, 100% or 1em, a font above 14pt); a font outside a closed list of Unicode
-text fonts (a symbol font draws other glyphs); and a border value a browser would not accept
-whole, or one inherited from the parent.
+Also refused as ``malformed-xhtml``: elements nested deeper than 128, and a CDATA section (an XML
+parser reads it as text, an HTML parser as a comment). As ``unsupported-element``: text between the
+parts of a table, which a browser moves out of the table. As ``unsupported-style``: a margin or
+indent more than an inch to the left, text drawn more than 12pt left of its container's start (the
+blocks' margins and the inherited indent summed; a table cell starts again), which moves it off the
+page or over what lies there, or a margin or indent in a unit the reader does not know (``%``,
+``vw``, ``calc()``...); layout that draws one text over another (a negative margin on inline text or
+at a block's top or bottom, vertical padding on inline text and any padding on it over a background,
+a border on it wider than a hairline, a height outside table parts and pictures, a line height below
+12pt, 100% or 1em, a font above 14pt); a font outside a closed list of Unicode text fonts (a symbol
+font draws other glyphs); and a border value a browser would not accept whole, or one inherited from
+the parent.
 
 What refuses the document (``EpiRefusedError``): not a document Bundle, not exactly one entry
 with sections, or a section without a title.
@@ -513,6 +516,11 @@ class _Builder:
     # 1 inside ``ul`` (a bullet), 2 inside ``ol`` (a number the browser computes).
     list_kind: int = 1
     tables: int = 0
+    # How far the text's container starts left of the page's (or its cell's) content edge, in
+    # points: the blocks' left margins summed, and the first line's inherited indent.
+    left: float = 0.0
+    indent: float | None = None
+    nesting: int = 0
 
     def text(self, text: str, marks: frozenset[str]) -> None:
         for character in text:
@@ -683,7 +691,72 @@ def _check_attributes(element: ET.Element, name: str) -> set[str]:
     return _style(style)
 
 
+# How deep elements may nest (the fidelity scanner allows 32 below the root), and how far left of
+# its container's start text may be drawn: the pinned labels never go below 0 outside a table
+# cell or below -9pt inside one, and text further left is off the page or over what lies there.
+_MAX_NESTING: Final = 128
+_OFF_PAGE_BOUND_POINTS: Final = -12.0
+
+
+def _offset_points(value: str) -> float:
+    """A margin or indent in points, an em counted at the largest font the reader allows (14pt);
+    ``_style`` has refused any unit it cannot place."""
+    match = re.fullmatch(r"(-?)([0-9]+(?:\.[0-9]+)?)(pt|px|pc|in|cm|mm|em)", value.strip())
+    if match is None:
+        return 0.0
+    unit = match.group(3)
+    size = float(match.group(2)) * (_LARGEST_FONT_POINTS if unit == "em" else _POINTS[unit])
+    return -size if match.group(1) else size
+
+
+def _left_offsets(style: str) -> tuple[float, float | None]:
+    """A block's own left margin and text indent, in points (the last declaration winning)."""
+    margin = 0.0
+    indent: float | None = None
+    for key, value in _declarations(style):
+        if key == "margin":
+            margin = _offset_points(_per_side(value.split()).get("left", "0"))
+        elif key == "margin-left":
+            margin = _offset_points(value)
+        elif key == "text-indent":
+            indent = _offset_points(value)
+    return margin, indent
+
+
 def _walk(element: ET.Element, builder: _Builder, marks: frozenset[str], depth: int) -> None:
+    builder.nesting += 1
+    saved_left, saved_indent = builder.left, builder.indent
+    try:
+        _walk_element(element, builder, marks, depth)
+    finally:
+        builder.nesting -= 1
+        builder.left, builder.indent = saved_left, saved_indent
+
+
+def _enter_block(name: str, style: str, builder: _Builder) -> None:
+    """Carry the block's left offset down; refuse text drawn left of its container's start.
+
+    A table cell's content starts at the cell, so a cell starts again from zero (a block that
+    overflows its cell is a stated residual). Each declaration alone is also bounded by an inch
+    (``_on_page``); here the sum is: nested margins, and an indent inherited from a parent, add up.
+    """
+    if name in ("td", "th"):
+        builder.left, builder.indent = 0.0, None
+    margin, indent = _left_offsets(style)
+    if name not in ("td", "th", "tr", "thead", "tbody"):
+        builder.left += margin
+    if indent is not None:
+        builder.indent = indent
+    first_line = builder.left + min(0.0, builder.indent or 0.0)
+    if min(builder.left, first_line) < _OFF_PAGE_BOUND_POINTS:
+        raise _RefusedError("unsupported-style", f"{name} drawn left of its container's start")
+
+
+def _walk_element(
+    element: ET.Element, builder: _Builder, marks: frozenset[str], depth: int
+) -> None:
+    if builder.nesting > _MAX_NESTING:
+        raise _RefusedError("malformed-xhtml", f"elements nested deeper than {_MAX_NESTING}")
     name = _local(element)
     if name in ("ins", "del"):
         raise _RefusedError("unsupported-element", name)
@@ -701,6 +774,8 @@ def _walk(element: ET.Element, builder: _Builder, marks: frozenset[str], depth: 
     if name in _INLINE:
         kinds |= _inline_borders(element.get("style", ""))
     here = frozenset(kinds)
+    if name in _BLOCKS:
+        _enter_block(name, element.get("style", ""), builder)
     if name == "br":
         builder.line_break(here)
     elif name == "img":
@@ -802,6 +877,8 @@ def read_div(div: str) -> tuple[tuple[Paragraph, ...], SectionRefusal | None, tu
         builder.flush()
     except _RefusedError as refused:
         return (), refused.refusal, notes
+    except RecursionError:
+        return (), SectionRefusal("malformed-xhtml", "nested too deeply to read"), notes
     return tuple(builder.paragraphs), None, notes
 
 
@@ -829,6 +906,13 @@ def _section(raw: dict[str, Any]) -> Section:
 
 def read_epi(data: bytes) -> Document:
     """The sections of an EMA ePI document Bundle, or ``EpiRefusedError``."""
+    try:
+        return _read_epi(data)
+    except RecursionError as error:
+        raise EpiRefusedError("invalid-bundle", "nested too deeply to read") from error
+
+
+def _read_epi(data: bytes) -> Document:
     try:
         bundle = json.loads(data.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as error:

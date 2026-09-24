@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and twenty-five reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and twenty-six reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -1056,3 +1056,20 @@ service, the agent's port and the oracle identical) and the reader's bounds shor
 5. to 8. **Low.** Wording (the font bound's units, the refusal list, this note's numbering), the
    splitter's docstring, the list-number overprint named in the residual, and a splitter mutant
    no test can kill (equivalent).
+
+## Twenty-sixth review (2026-09-24): findings and what changed
+
+The review found the quote-edge rule clean again (272 728 quotes and every code point), the
+scanner's two ports agreeing on 22 000 fuzzed divs, and the reader crash-free over 360 000 fuzzed
+style attributes. Its findings were in the reader:
+
+1. **High.** The reader bounded each margin or indent to an inch, but nested margins and an
+   inherited indent add up: a doctored Jentadueto 4.7 drew "has no or negligible" off the page.
+   Fixed: the blocks' left margins and the inherited first-line indent are summed down the walk
+   (an em counted at 14pt; a table cell starting again), and text more than 12pt left of its
+   container's start refuses; the pinned labels never go below 0, or -9pt in a cell.
+2. **High (a crash; fails closed).** Deep nesting raised a recursion error. Fixed: elements
+   nested deeper than 128 refuse the section, and a Bundle nested too deeply to read refuses the
+   document.
+3. and 4. **Low.** The documents now point to the reader's docstring as the one list of bounds
+   and residuals, which names text moved far to the right, off a printed page.

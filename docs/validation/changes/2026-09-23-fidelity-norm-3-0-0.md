@@ -436,7 +436,10 @@ restored.
   hairline and no longer breaks on a unit it cannot place, and its claim is restated: exact for
   text and marks, the layout cases it lists refused, and the rest of what CSS can draw over text
   (an inherited line height computed from a smaller font, among others) a stated residual of the
-  check until the renderer cross-check.
+  check until the renderer cross-check. A twenty-sixth review found nested margins and an
+  inherited indent adding up past the reader's one-inch bound (now summed down the walk and
+  refused past 12pt left of the container's start) and deep nesting raising an error (now a
+  refusal); the documents point to the reader's docstring for the list of bounds and residuals.
 
 - **Every submission carrying 2.0.0 is refused by the worker gate** from the moment this change
   deploys. Nothing in the repository produces a 2.0.0 submission after it.

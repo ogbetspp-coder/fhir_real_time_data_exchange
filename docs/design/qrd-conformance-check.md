@@ -45,8 +45,7 @@ not the fidelity scanner, which is the contract for narrative this repository pu
 rightly refuses the EMA's divs (inline CSS on nearly every element).
 
 Each section is read on its own, so a section the reader cannot vouch for is refused without
-losing the rest. CSS is checked against a closed list: layout properties are ignored within bounds that
-keep lines of text apart (a line height of 12pt, 100% or 1em at least, a font of 14pt at most, no negative top or bottom margin, no negative margin on inline text or a picture, no vertical padding on inline text, no border on it wider than a hairline), text colour, background and tiny text are marked, and anything else (`display`, `visibility:
+losing the rest. CSS is checked against a closed list: layout properties are ignored within the bounds the reader's module docstring lists (the one list; in short: lines of text kept apart, nothing drawn left of its container's start, no band of padding or border over text), text colour, background and tiny text are marked, and anything else (`display`, `visibility:
 hidden`, an unknown property) refuses the section. Word comment markup refuses the section,
 because the comment's text would otherwise read as label text.
 
@@ -147,7 +146,7 @@ Every finding below was confirmed by reading the source div.
   draws other glyphs: Wingdings "J" is a smiling face) and a border value a browser would not
   accept whole or that inherits from the parent, and layout that draws one text over another (a
   negative margin on inline text or at a block's top or bottom, vertical padding on inline text, padding on it over a background, a border on it wider than a hairline, a height outside table parts and pictures, a line height or font outside the
-  bounds above). Those are bounds, not a layout engine. What they do not catch is a stated residual of the check: a line height computed from a smaller font than the text it holds (a 2pt paragraph's 100% line under 12pt spans), a block overflowing its table cell, a margin or indent drawing a list item's text over its number, text at the bounds' edge, and a combining mark on a space drawn as a stroke. ADR 0005's renderer cross-check, which draws each page and compares, is what secures the import.
+  bounds above). Those are bounds, not a layout engine. What they do not catch is a stated residual of the check, listed in the reader's module docstring (a line height computed from a smaller font than the text it holds, a block overflowing its table cell, a list item drawn over its number, text at the bounds' edge, a combining mark on a space drawn as a stroke, text moved far to the right, off a printed page). ADR 0005's renderer cross-check, which draws each page and compares, is what secures the import.
 
 The mapping lacks three EMA codes the labels use (Pregnancy, Breast-feeding and Fertility under
 4.6); the check reports them as `unmapped-code`, for information.

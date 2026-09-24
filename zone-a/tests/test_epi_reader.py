@@ -461,3 +461,36 @@ def test_a_font_outside_the_text_fonts_refuses(family: str, refused: bool) -> No
 def test_layout_that_overprints_text_refuses(inner: str, refused: bool) -> None:
     _, refusal, _ = read_div(div(inner))
     assert (refusal is not None and refusal.code == "unsupported-style") == refused
+
+
+@pytest.mark.parametrize(
+    ("inner", "refused"),
+    [
+        # Review round 26: margins and indents that add up move text off the page's left edge.
+        ('<div style="margin-left:-72pt"><p style="margin-left:-72pt">Do not take</p></div>', True),
+        ('<p style="margin-left:-72pt;text-indent:-72pt">Do not take</p>', True),
+        ('<div style="text-indent:-72pt"><p style="margin-left:-60pt">Do not take</p></div>', True),
+        ('<ul style="margin-left:-40pt"><li style="margin-left:-40pt">Do not take</li></ul>', True),
+        ('<p style="margin-left:-6em">Do not take</p>', True),
+        # A hanging indent under its own margin, and a small pull-back in a cell, stay.
+        ('<p style="margin-left:72pt;text-indent:-72pt">Take</p>', False),
+        ('<table><tr><td><p style="margin-left:-9pt">x</p></td></tr></table>', False),
+    ],
+)
+def test_text_drawn_left_of_its_container_refuses(inner: str, refused: bool) -> None:
+    _, refusal, _ = read_div(div(inner))
+    assert (refusal is not None and refusal.code == "unsupported-style") == refused
+
+
+def test_nesting_too_deep_to_read_refuses_the_section() -> None:
+    _, refusal, _ = read_div(div("<p>" + "<span>" * 1200 + "x" + "</span>" * 1200 + "</p>"))
+    assert refusal is not None
+    assert refusal.code == "malformed-xhtml"
+
+
+def test_sections_nested_too_deep_to_read_refuse_the_document() -> None:
+    section: dict[str, Any] = {"title": "leaf"}
+    for _ in range(900):
+        section = {"title": "x", "section": [section]}
+    with pytest.raises(EpiRefusedError):
+        read_epi(bundle([section]))
