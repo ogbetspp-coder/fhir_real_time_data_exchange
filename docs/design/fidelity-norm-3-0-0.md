@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and twenty-nine reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and thirty reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -1137,3 +1137,17 @@ XML and HTML parsing differ, it refuses the cases it lists, and the rest is a st
 reading with an HTML5 parser, as a browser does, is a tracked follow-up (roadmap item 3a). The
 reviews of this change continue on its own scope: the fidelity contract, the quote-edge rule,
 and what this change did to the reader.
+
+## Thirtieth review (2026-09-24): findings and what changed
+
+Scoped to this change (the fidelity contract, the quote-edge rule, and what this change did to
+the reader), the review found no false pass, divergence or crash:
+
+1. **Medium.** The reader's refusal of a reference to U+0080–U+009F missed a zero-padded decimal
+   reference (`&#0150;`). Fixed, with tests for the decimal and hexadecimal forms.
+2. **Medium.** Several stated reader rules had no test of their own (a well-formed `</br>`,
+   horizontal padding over a background, the nesting bound itself and a table's row group and
+   row counted toward it, a row's own indent, the bounds at their edge). Pinned; a mutant of
+   each now fails.
+3. and 4. **Low.** Wording (self-closing elements other than `br`, `hr` and `img`; ASCII
+   letters), and a literal C1 control named among the reader's residuals.

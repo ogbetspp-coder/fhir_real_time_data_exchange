@@ -451,7 +451,9 @@ restored.
   HTML parse (a processing instruction, an abrupt comment, a self-closing `span`, a prefixed
   element, an unclosed function, a row group's style): each is now refused or read, and the
   reader's claim states the rest as a residual, with reading by an HTML5 parser tracked as a
-  follow-up (roadmap item 3a).
+  follow-up (roadmap item 3a). A thirtieth review, scoped to this change, found no false pass,
+  divergence or crash: a zero-padded C1 reference now refuses, and the reader rules it named are
+  each pinned by a test.
 
 - **Every submission carrying 2.0.0 is refused by the worker gate** from the moment this change
   deploys. Nothing in the repository produces a 2.0.0 submission after it.

@@ -42,7 +42,8 @@ docstring lists every rule. It does not lay the page out: CSS that places or pai
 over another is refused only in the cases the reader lists, and the rest is a stated residual of
 the check (below). Nor does it parse as a browser does: it parses the div as XML, a browser as
 HTML, and where the two build different trees it refuses the cases it lists (processing
-instructions, comments, prefixed elements, self-closing elements, a block in an open paragraph
+instructions, comments, prefixed elements, self-closing elements other than `br`, `hr` and `img`,
+a block in an open paragraph
 and the rest); any other difference is a stated residual, and reading with an HTML5 parser is a
 tracked follow-up. It is
 not the fidelity scanner, which is the contract for narrative this repository publishes and

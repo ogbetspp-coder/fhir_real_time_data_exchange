@@ -16,12 +16,13 @@ the page and comparing it with this reading is ADR 0005's renderer cross-check. 
 the div as a browser does: it parses XML, and a browser the EMA's div as HTML. Where the two build
 different trees it refuses the cases listed below (processing instructions, comments, prefixed
 elements, self-closing elements other than ``br``, ``hr`` and ``img``, and the rest); any other
-difference is a stated residual, and reading with an HTML5 parser, as a browser does, is a tracked
-follow-up (``docs/roadmap.md``, item 3a). It is not the fidelity scanner
-(``zone_a.fidelity.xhtml``), which is the contract for narrative this repository publishes and stays
-as strict as it is; the EMA's own divs carry inline CSS on nearly every element, which that scanner
-rightly refuses. Here each section is read on its own, so a section the reader cannot vouch for is
-refused (``Section.refusal``) without losing the rest of the document.
+difference is a stated residual (among them a literal C1 control, which HTML maps through
+windows-1252 and the reader reads, and treats as whitespace, as itself), and reading with an HTML5
+parser, as a browser does, is a tracked follow-up (``docs/roadmap.md``, item 3a). It is not the
+fidelity scanner (``zone_a.fidelity.xhtml``), which is the contract for narrative this repository
+publishes and stays as strict as it is; the EMA's own divs carry inline CSS on nearly every element,
+which that scanner rightly refuses. Here each section is read on its own, so a section the reader
+cannot vouch for is refused (``Section.refusal``) without losing the rest of the document.
 
 What a section's text is:
 
@@ -89,9 +90,9 @@ parts and pictures, a line height below 12pt, 100% or 1em, a font above 14pt); a
 closed list of Unicode text fonts (a symbol font draws other glyphs); a border value on inline text
 a browser would not accept whole, or one inherited from the parent; a style CSS would split
 otherwise than the reader (a quote outside a font family name, a comment, an escape, a bracket
-outside ``rgb()``, a character outside letters, digits, whitespace and ``# % ! . , : ; ' " ( ) -``);
-and a margin or indent with a value a browser drops (the wrong number of values, ``text-indent:
-auto``).
+outside ``rgb()``, a character outside ASCII letters, digits, whitespace and ``# % ! . , : ; ' " ( )
+-``); and a margin or indent with a value a browser drops (the wrong number of values,
+``text-indent: auto``).
 
 What refuses the document (``EpiRefusedError``): not UTF-8 JSON, not a document Bundle, not the
 shape of one (a section, code, text, div or entry of the wrong JSON type), not exactly one entry
@@ -937,7 +938,7 @@ def _table_rows(element: ET.Element, builder: _Builder, marks: frozenset[str], d
 
 
 _HTML_OTHERWISE = re.compile(
-    r"<\?|<!--|xmlns:|</br\b|&#(12[89]|1[3-5][0-9]);|&#[xX]0*[89][0-9a-fA-F];"
+    r"<\?|<!--|xmlns:|</br\b|&#0*(12[89]|1[3-5][0-9]);|&#[xX]0*[89][0-9a-fA-F];"
     r"|<(?!(?:br|hr|img)[\s/>])[A-Za-z][^\s/>]*(?:\s+[^\s=/>]+\s*=\s*(?:\"[^\"]*\"|'[^']*'))*\s*/>"
 )
 _BARE_LESS_THAN = re.compile(r"<(?![A-Za-z/!?])")

@@ -576,6 +576,17 @@ def test_nesting_the_interpreter_cannot_follow_refuses_the_section() -> None:
         ('<p>a</br>b</p>', "malformed-xhtml"),
         ('<p>&#150;</p>', "malformed-xhtml"),
         ('<p><td>x</td></p>', "malformed-xhtml"),
+        # Review round 30: each stated rule pinned on its own, and the bounds at their edge.
+        ('<p>a<br></br>b</p>', "malformed-xhtml"),
+        ('<p>a&#0150;b</p>', "malformed-xhtml"),
+        ('<p>a&#x96;b</p>', "malformed-xhtml"),
+        ('<p>x<span style="background-color:yellow;padding-left:40pt">y</span></p>',
+         "unsupported-style"),
+        ('<table><tbody><tr style="text-indent:-50pt"><td>x</td></tr></tbody></table>',
+         "unsupported-style"),
+        ('<p style="font-size:15pt">x</p>', "unsupported-style"),
+        ('<p style="line-height:95%">x</p>', "unsupported-style"),
+        ('<p style="margin-left:-0.9em">x</p>', "unsupported-style"),
     ],
 )  # fmt: skip
 def test_what_a_browser_reads_otherwise_refuses(inner: str, code: str) -> None:
@@ -606,3 +617,23 @@ def test_a_row_groups_style_marks_its_cells() -> None:
         '<table><tbody style="text-decoration:line-through"><tr><td>x</td></tr></tbody></table>'
     )
     assert (0, 1, "strike") in marks
+
+
+def test_the_nesting_bound_counts_elements_and_a_tables_row_group_and_row() -> None:
+    # The bound refuses, not the interpreter's recursion limit (review round 30).
+    def spans(depth: int) -> str:
+        return "<p>" + "<span>" * depth + "x" + "</span>" * depth + "</p>"
+
+    assert read_div(div(spans(126)))[1] is None
+    refusal = read_div(div(spans(130)))[1]
+    assert refusal is not None
+    assert refusal.detail == "elements nested deeper than 128"
+
+    # A table is four levels to its cell's content: table, row group, row, cell.
+    def tables(depth: int) -> str:
+        return "<table><tr><td>" * depth + "x" + "</td></tr></table>" * depth
+
+    assert read_div(div(tables(30)))[1] is None
+    refusal = read_div(div(tables(33)))[1]
+    assert refusal is not None
+    assert refusal.detail == "elements nested deeper than 128"
