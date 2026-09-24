@@ -95,10 +95,10 @@ family name, a comment, an escape, a bracket outside ``rgb()``, a character outs
 digits, whitespace and ``# % ! . , : ; ' " ( ) -``); and a margin or indent with a value a browser
 drops (the wrong number of values, ``text-indent: auto``).
 
-What refuses the document (``EpiRefusedError``): not UTF-8 JSON, not a document Bundle, not the
-shape of one (a section, code, text, div or entry of the wrong JSON type), not exactly one entry
-with sections, a resource with sections that is not a Composition, a section without a title, or
-nesting too deep to read.
+What refuses the document (``EpiRefusedError``): not UTF-8 JSON, a lone surrogate anywhere in it,
+not a document Bundle, not the shape of one (a section, code, text, div or entry of the wrong JSON
+type), not exactly one entry with sections, a resource with sections that is not a Composition, a
+section without a title, or nesting too deep to read.
 """
 
 from __future__ import annotations
@@ -1028,6 +1028,11 @@ def _read_epi(data: bytes) -> Document:
         bundle = json.loads(data.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise EpiRefusedError("invalid-bundle", "not UTF-8 JSON") from error
+    try:
+        # A lone surrogate escape ("\\ud800") decodes to a string no UTF-8 writer can write.
+        json.dumps(bundle, ensure_ascii=False).encode("utf-8")
+    except UnicodeEncodeError as error:
+        raise EpiRefusedError("invalid-bundle", "a lone surrogate") from error
     if not isinstance(bundle, dict) or bundle.get("resourceType") != "Bundle":
         raise EpiRefusedError("invalid-bundle", "not a Bundle")
     if bundle.get("type") != "document":

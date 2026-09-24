@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and thirty-one reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and thirty-two reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -1169,3 +1169,16 @@ contract or the quote-edge rule (fresh fuzz and differential, 0 differences):
    Fixed, and the same rationale in section 2 of the specification (the rule is unchanged).
 4. and 5. **Low.** "Maps through windows-1252" holds for all but five of U+0080–U+009F; a lone
    surrogate in a div, which raised an error, now refuses the section.
+
+## Thirty-second review (2026-09-24): findings and what changed
+
+Scoped to this change, the review found no false pass, divergence or crash, and no refusal of a
+pinned label:
+
+1. **Medium.** An `img` holding a child element had no test (a mutant reading past the child
+   survived). Pinned.
+2. to 5. **Low.** An `hr` holding a space pinned; each bound now tested just past its edge, with
+   the bound itself accepted (round 31 had tested near the edge, not at it); the section 2
+   rationale reworded (all but five C1 references are remapped; a renderer shows something the
+   check does not see); a lone surrogate anywhere in a Bundle, which a UTF-8 writer cannot write,
+   refuses the document.

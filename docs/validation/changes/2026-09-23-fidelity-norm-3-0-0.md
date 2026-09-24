@@ -456,7 +456,10 @@ restored.
   each pinned by a test. A thirty-first review found the same: a `br`, `img` or `hr` holding only
   whitespace now refuses, four more stated reader rules are pinned, and the rationale for
   refusing a literal C1 control is corrected in the reader and in section 2 (a character
-  reference is remapped through windows-1252; a literal one is drawn as a blank or a box).
+  reference is remapped through windows-1252; a literal one is drawn as a blank or a box). A
+  thirty-second review found one untested rule (an `img` with a child element), now pinned with
+  each bound tested just past its edge, and a lone surrogate anywhere in a Bundle now refuses
+  the document.
 
 - **Every submission carrying 2.0.0 is refused by the worker gate** from the moment this change
   deploys. Nothing in the repository produces a 2.0.0 submission after it.

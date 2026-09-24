@@ -603,6 +603,14 @@ def test_nesting_the_interpreter_cannot_follow_refuses_the_section() -> None:
         ('<p><span style="border-bottom:1pt solid">x</span></p>', "unsupported-style"),
         ('<p style="line-height:11.5pt">x</p>', "unsupported-style"),
         ('<p>a&#x0096;b</p>', "malformed-xhtml"),
+        # Review round 32: a child in an img, a space in an hr, and each bound just past its edge.
+        ('<p>1<img src="data:image/png;base64,AA=="><b>0</b></img> mg</p>', "malformed-xhtml"),
+        ('<div>1<hr> </hr>0</div>', "malformed-xhtml"),
+        ('<p><span style="border-bottom:1.01px solid">x</span></p>', "unsupported-style"),
+        ('<p style="line-height:11.99pt">x</p>', "unsupported-style"),
+        ('<p style="line-height:99.9%">x</p>', "unsupported-style"),
+        ('<p style="font-size:14.01pt">x</p>', "unsupported-style"),
+        ('<p style="margin-left:-12.01pt">x</p>', "unsupported-style"),
     ],
 )  # fmt: skip
 def test_what_a_browser_reads_otherwise_refuses(inner: str, code: str) -> None:
@@ -620,6 +628,12 @@ def test_what_a_browser_reads_otherwise_refuses(inner: str, code: str) -> None:
         "<div><a>x</a><table><tr><td><a>y</a></td></tr></table></div>",
         "<p>a</p><div>b</div>",
         '<p style="color:rgb(0, 0, 0)">x</p>',
+        # Each bound itself is accepted: a hairline, 12pt and 100% lines, a 14pt font, 12pt left.
+        '<p><span style="border-bottom:1px solid">x</span></p>',
+        '<p style="line-height:12pt">x</p>',
+        '<p style="line-height:100%">x</p>',
+        '<p style="font-size:14pt">x</p>',
+        '<p style="margin-left:-12pt">x</p>',
     ],
 )
 def test_what_an_html_parser_keeps_is_read(inner: str) -> None:
@@ -669,3 +683,14 @@ def test_a_less_than_sign_before_a_digit_is_read_as_text() -> None:
     assert refusal is None
     assert paragraphs[0].text == "CrCl <30"
     assert notes
+
+
+@pytest.mark.parametrize("where", ["title", "code"])
+def test_a_lone_surrogate_anywhere_refuses_the_document(where: str) -> None:
+    section: dict[str, Any] = {"title": "x"}
+    if where == "title":
+        section["title"] = "a\ud800"
+    else:
+        section["code"] = {"coding": [{"code": "\udc00"}]}
+    with pytest.raises(EpiRefusedError):
+        read_epi(bundle([section]))
