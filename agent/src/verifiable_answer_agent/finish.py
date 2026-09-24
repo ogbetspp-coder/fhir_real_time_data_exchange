@@ -137,6 +137,13 @@ class TurnFinisher:
         self.hold = hold
 
     async def finish_turn(self, callback_context: CallbackContext) -> types.Content | None:
+        """Ends the turn with the checked, rendered answer, or with a notice saying it cannot.
+
+        The held draft is composed, post-checked through ``verify_quote`` and rendered as text,
+        and the turn's audit record is emitted. A model request without the query tools ends the
+        turn with ``TOOLS_UNAVAILABLE_NOTICE``; a failed model call, a missing turn id or any
+        failure while checking ends it with ``UNVERIFIABLE_NOTICE``.
+        """
         invocation = callback_context.get_invocation_context()
         held = self.hold.take(invocation.invocation_id)
         if held.tools_missing:
@@ -166,7 +173,7 @@ class TurnFinisher:
                 tool_calls=tool_calls,
             )
             emit(result.audit)
-        except Exception:
+        except Exception:  # noqa: BLE001 - fail safe: any failure shows the notice, never a draft
             return _text(UNVERIFIABLE_NOTICE)
         rendered = result.rendered
         return _text(rendered if isinstance(rendered, str) else UNVERIFIABLE_NOTICE)

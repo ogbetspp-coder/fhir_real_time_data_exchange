@@ -170,12 +170,20 @@ class EpiRefusedError(Exception):
 
 @dataclass(frozen=True)
 class SectionRefusal:
+    """Why the reader refused a section's div: a code the module docstring lists, and a detail."""
+
     code: str
     detail: str
 
 
 @dataclass(frozen=True)
 class Section:
+    """One section of the Composition, read: its code, title, paragraphs and nested sections.
+
+    ``code`` is the code of the section's first coding, if any. ``refusal`` is set when the
+    reader refused the section's div; the rest of the document is still read.
+    """
+
     code: str | None
     title: str
     paragraphs: tuple[Paragraph, ...]
@@ -187,6 +195,11 @@ class Section:
 
 @dataclass(frozen=True)
 class Document:
+    """The Composition of an ePI document Bundle, read: its title, date, type and sections.
+
+    ``document_type`` is the code of the Composition's first ``type`` coding, if any.
+    """
+
     title: str
     date: str | None
     document_type: str | None
@@ -264,8 +277,11 @@ _NAMED = {
 
 
 def _colour(value: str) -> str:
-    """A colour in one spelling (``#abc`` and ``rgb(170, 187, 204)`` as ``#aabbcc``), or a
-    refusal: any other notation (alpha, ``hsl()``, percentages) could hide text unseen."""
+    """A colour in one spelling, or a refusal.
+
+    ``#abc`` and ``rgb(170, 187, 204)`` are written as ``#aabbcc``. Any other notation (alpha,
+    ``hsl()``, percentages) is refused: it could hide text unseen.
+    """
     short = re.fullmatch(r"#([0-9a-f])([0-9a-f])([0-9a-f])", value)
     if short:
         return "#" + "".join(2 * digit for digit in short.groups())
@@ -296,8 +312,11 @@ def _dark(colour: str) -> bool:
 
 
 def _on_page(value: str) -> bool:
-    """Every part of a margin or indent is ``0``, ``auto`` or a length in a unit the reader
-    knows, and none moves text more than an inch to the left."""
+    """Whether a margin or indent keeps text on the page.
+
+    Every part of it is ``0``, ``auto`` or a length in a unit the reader knows, and none moves
+    text more than an inch to the left.
+    """
     for part in value.split():
         if part in ("0", "auto"):
             continue
@@ -345,8 +364,11 @@ _GLOBAL_KEYWORDS: Final = frozenset({"inherit", "initial", "unset", "revert", "r
 
 
 def _border_colour(token: str) -> bool:
-    """A colour a browser accepts in a border shorthand: a named colour, or #rgb, #rgba, #rrggbb
-    or #rrggbbaa (not ``none``, ``auto`` or a CSS-wide keyword, which ``_NAMED`` also holds)."""
+    """Whether the token is a colour a browser accepts in a border shorthand.
+
+    That is a named colour, or #rgb, #rgba, #rrggbb or #rrggbbaa (not ``none``, ``auto`` or a
+    CSS-wide keyword, which ``_NAMED`` also holds).
+    """
     return (
         token in _NAMED and token not in ("none", "auto") and token not in _GLOBAL_KEYWORDS
     ) or re.fullmatch(r"#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})", token) is not None
@@ -662,8 +684,11 @@ _SMALLEST_LINE_POINTS: Final = 12.0
 
 
 def _nonzero_length(token: str) -> bool:
-    """Whether a length token may be other than zero: anything but a parsed zero, a unit the
-    reader cannot place (``rem``, ``ch``, ``calc()``) included."""
+    """Whether a length token may be other than zero.
+
+    Anything but a parsed zero may be, a unit the reader cannot place (``rem``, ``ch``,
+    ``calc()``) included.
+    """
     points = _length_points(token)
     return points is None or points != 0
 
@@ -743,8 +768,10 @@ _OFF_PAGE_BOUND_POINTS: Final = -12.0
 
 
 def _offset_points(value: str) -> float:
-    """A margin or indent in points, an em counted at the largest font the reader allows (14pt);
-    ``_style`` has refused any unit it cannot place."""
+    """A margin or indent in points, an em counted at the largest font the reader allows (14pt).
+
+    ``_style`` has refused any unit it cannot place.
+    """
     match = re.fullmatch(r"(-?)([0-9]+(?:\.[0-9]+)?)(pt|px|pc|in|cm|mm|em)", value.strip())
     if match is None:
         return 0.0
@@ -962,8 +989,10 @@ def _no_stray_text(text: str | None) -> None:
 
 
 def read_div(div: str) -> tuple[tuple[Paragraph, ...], SectionRefusal | None, tuple[str, ...]]:
-    """The paragraphs of one section's XHTML div, or a refusal, and notes on defects read
-    through."""
+    """The paragraphs of one section's XHTML div, or a refusal.
+
+    With them, notes on the defects the reader read through (``Section.notes``).
+    """
     lowered = div.lower()
     if "<!doctype" in lowered or "<!entity" in lowered:
         return (), SectionRefusal("malformed-xhtml", "a DTD"), ()

@@ -50,10 +50,17 @@ committed module is out of date with ``contracts/generated/``.
 
 
 def module_name(contract: str) -> str:
+    """The Python module name for a contract: its schema name with ``_`` for ``-``."""
     return contract.replace("-", "_")
 
 
 def generate_into(destination: Path) -> None:
+    """Generates one formatted module per contract, and the package's ``__init__.py``.
+
+    Raises:
+        SystemExit: A contract schema is missing.
+        subprocess.CalledProcessError: The generator or the formatter failed.
+    """
     destination.mkdir(parents=True, exist_ok=True)
     for contract in CONTRACTS:
         schema = SCHEMAS / f"{contract}.schema.json"
@@ -120,6 +127,12 @@ def generate_into(destination: Path) -> None:
 
 
 def check() -> int:
+    """Regenerates into a temporary directory and compares it with the committed modules.
+
+    Returns:
+        The exit status: 0 when every committed module is up to date, 1 when a module is
+        missing, extra or different.
+    """
     with tempfile.TemporaryDirectory() as temporary:
         candidate = Path(temporary) / "contracts"
         generate_into(candidate)
@@ -141,6 +154,11 @@ def check() -> int:
 
 
 def main() -> int:
+    """Regenerates the models in place, or with ``--check`` fails if they are out of date.
+
+    Returns:
+        The exit status: 0 when the models were generated or are up to date, 1 otherwise.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--check",

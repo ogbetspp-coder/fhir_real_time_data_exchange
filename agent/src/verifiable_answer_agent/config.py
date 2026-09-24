@@ -26,6 +26,12 @@ class MissingConfigurationError(RuntimeError):
 @final
 @dataclass(frozen=True, slots=True)
 class AgentConfig:
+    """The agent's own configuration, read from its environment.
+
+    The query service's MCP URL, the model, this service's version, and the MCP timeout in
+    seconds (30 unless ``MCP_TIMEOUT_SECONDS`` sets it).
+    """
+
     query_service_url: str
     model: str
     service_version: str
@@ -33,6 +39,13 @@ class AgentConfig:
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> AgentConfig:
+        """The configuration read from ``env``, or from the process environment when it is None.
+
+        Raises:
+            MissingConfigurationError: ``QUERY_SERVICE_MCP_URL``, ``AGENT_MODEL`` or
+                ``AGENT_SERVICE_VERSION`` is unset or blank.
+            ValueError: ``MCP_TIMEOUT_SECONDS`` is set and is not a number.
+        """
         source = env if env is not None else os.environ
         timeout = source.get(MCP_TIMEOUT_SECONDS)
         return cls(

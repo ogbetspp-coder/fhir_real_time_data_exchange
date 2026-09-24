@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from zone_a.docx.reader import Paragraph, read_docx
-from zone_a.qrd.pattern import Token, UnbalancedTemplateError, is_balanced, parse
+from zone_a.qrd.pattern import Token, UnbalancedTemplateError, children, is_balanced, parse
 from zone_a.underline import underline_changes
 
 REGISTRY_VERSION = "1.0.0"
@@ -102,8 +102,7 @@ def _plain(tokens: list[Token]) -> str:
     for token in tokens:
         value = token["value"]
         if token["kind"] == "optional":
-            assert isinstance(value, list)
-            out.append(_plain(value))
+            out.append(_plain(children(token)))
         elif token["kind"] == "text":
             out.append(str(value))
     return "".join(out)
@@ -113,9 +112,7 @@ def _kind(tokens: list[Token]) -> str:
     """fill, guidance, subheading or statement. The rule is in docs/design/qrd-registry.md."""
     inner = tokens
     while len(inner) == 1 and inner[0]["kind"] == "optional":
-        value = inner[0]["value"]
-        assert isinstance(value, list)
-        inner = value
+        inner = children(inner[0])
     meaningful = [t for t in inner if not (t["kind"] == "text" and not str(t["value"]).strip())]
     if meaningful and all(t["kind"] == "guidance" for t in meaningful):
         return "guidance"
@@ -191,8 +188,7 @@ def _guard(tokens: list[Token], where: str) -> None:
     for token in tokens:
         value = token["value"]
         if token["kind"] == "optional":
-            assert isinstance(value, list)
-            _guard(value, where)
+            _guard(children(token), where)
         elif token["kind"] == "text" and ">" in str(value):
             raise RegistryError(f"{where}: a literal '>' makes the bracket reading ambiguous")
 
@@ -478,6 +474,17 @@ def _check_errata(items: list[dict[str, Any]]) -> None:
 
 
 def build(directory: Path, lock: dict[str, Any]) -> dict[str, Any]:
+    """The registry, built from the four pinned EMA files.
+
+    Args:
+        directory: The folder holding the pinned files (``qrd/sources/``).
+        lock: The parsed ``qrd/sources.lock.json``.
+
+    Raises:
+        RegistryError: A file does not match its lock entry, or the sources do not have the
+            shape the build relies on.
+        DocxRefusedError: The Word reader refuses a file.
+    """
     by_file = {entry["file"]: entry for entry in lock["sources"]}
     sources = {
         name: load_source(directory, name)
@@ -533,6 +540,7 @@ def build(directory: Path, lock: dict[str, Any]) -> dict[str, Any]:
 
 
 def serialise(registry: dict[str, Any]) -> str:
+    """The registry as its committed file holds it: JSON, indented by two, with a final newline."""
     return json.dumps(registry, ensure_ascii=False, indent=2) + "\n"
 
 

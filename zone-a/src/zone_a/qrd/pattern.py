@@ -28,9 +28,23 @@ WHITESPACE = {" ", "\t", "\u00a0"}
 
 
 class Token(TypedDict):
+    """One token of a template string: literal text, an optional segment, a fill-in or guidance."""
+
     kind: Literal["text", "optional", "fill", "guidance"]
     # "text", "fill" and "guidance" carry a string; "optional" carries tokens.
     value: str | list[Token]
+
+
+def children(token: Token) -> list[Token]:
+    """Returns the tokens inside an ``optional`` token.
+
+    Raises:
+        TypeError: The token holds a string, not tokens (a pattern built wrongly).
+    """
+    value = token["value"]
+    if not isinstance(value, list):
+        raise TypeError(f"a {token['kind']} token holds no tokens")
+    return value
 
 
 class UnbalancedTemplateError(ValueError):
@@ -110,8 +124,7 @@ def render(tokens: list[Token]) -> str:
     for token in tokens:
         value = token["value"]
         if token["kind"] == "optional":
-            assert isinstance(value, list)
-            out.append("<" + render(value) + ">")
+            out.append("<" + render(children(token)) + ">")
         elif token["kind"] == "fill":
             out.append("{" + str(value) + "}")
         elif token["kind"] == "guidance":
@@ -122,6 +135,7 @@ def render(tokens: list[Token]) -> str:
 
 
 def is_balanced(text: str) -> bool:
+    """Whether ``parse`` accepts the string without ``UnbalancedTemplateError``."""
     try:
         parse(text)
     except UnbalancedTemplateError:

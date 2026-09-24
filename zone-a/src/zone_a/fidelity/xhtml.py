@@ -1,4 +1,4 @@
-"""Fail-closed XHTML narrative scanner, ported from ``src/fidelity/xhtml.ts``.
+r"""Fail-closed XHTML narrative scanner, ported from ``src/fidelity/xhtml.ts``.
 
 The executable form of ``docs/fidelity-normalization.md`` section 5. Not a general HTML parser:
 it accepts only the closed lists below so that no element or attribute can hide, carry, or
@@ -8,18 +8,18 @@ Four Python-specific care points. Every one of them is a place where the two reg
 agree on the *syntax* and disagree on the *meaning*, which is exactly the kind of divergence a
 golden vector the TypeScript author wrote will never catch:
 
-* JavaScript's ``\\s`` and Python's ``\\s`` are different sets. JavaScript includes U+FEFF and
+* JavaScript's ``\s`` and Python's ``\s`` are different sets. JavaScript includes U+FEFF and
   excludes U+001C-U+001F and U+0085; Python is the reverse. Neither is used: since
-  fidelity-norm/2.0.0 whitespace inside a tag is ``[\\t\\n\\r ]`` on both sides (``_WS`` below),
+  fidelity-norm/2.0.0 whitespace inside a tag is ``[\t\n\r ]`` on both sides (``_WS`` below),
   because an HTML parser reads any other code point as part of the tag name.
-* JavaScript's ``\\d`` is ASCII ``[0-9]`` unless the ``v``/``u`` flag is combined with a Unicode
-  property escape; Python's ``\\d`` on a ``str`` pattern matches every Unicode decimal digit,
+* JavaScript's ``\d`` is ASCII ``[0-9]`` unless the ``v``/``u`` flag is combined with a Unicode
+  property escape; Python's ``\d`` on a ``str`` pattern matches every Unicode decimal digit,
   so a numeric character reference written with U+FF10-U+FF19 FULLWIDTH DIGIT would be decoded
-  here and be a stray ``&`` there. No ``\\d``, ``\\w`` or ``\\b`` appears in this module: the
+  here and be a stray ``&`` there. No ``\d``, ``\w`` or ``\b`` appears in this module: the
   classes are written out as ``[0-9]`` and ``[0-9A-Fa-f]``. ``re.ASCII`` is not used as a
   blanket flag, because it would also silently narrow a class someone adds later.
 * Python's ``$`` matches before a trailing newline and ``re.match`` is not anchored at the end,
-  so ``pattern.match(value)`` against a ``$``-anchored grammar accepts ``"a\\n"`` and every
+  so ``pattern.match(value)`` against a ``$``-anchored grammar accepts ``"a\n"`` and every
   value with text hidden after the last newline. Whole-value grammars use ``fullmatch`` and
   carry no anchors at all; the scan-position patterns (``END_TAG``, ``START_TAG``, ``ENTITY``)
   use ``match(div, index)``, which is the sticky ``/y`` flag of the TypeScript.
@@ -30,7 +30,7 @@ golden vector the TypeScript author wrote will never catch:
 fidelity-norm/2.0.0 adds three more, about strings rather than regexes. A string decoded from
 JSON holds a lone surrogate as a code point Python accepts, and so does ``chr(0xD835)`` for a
 character reference: both are checked against section 2 explicitly, the div before the scan and
-each reference as it is decoded. JavaScript's ``\\p{N}`` is the Unicode general category, read
+each reference as it is decoded. JavaScript's ``\p{N}`` is the Unicode general category, read
 here from ``unicodedata``. And the scan walks code points natively where the TypeScript has to
 step over surrogate pairs, so a supplementary digit inside ``sup`` is one code point on both
 sides.
@@ -692,6 +692,12 @@ ROMAN: Final = (
 
 
 def list_marker(style: str, ordinal: int) -> str:
+    """A list item's marker as a renderer draws it, followed by ``.`` and a space.
+
+    ``style`` is the list's type: ``a`` or ``A`` for letters from 1, ``i`` or ``I`` for roman
+    numerals from 1 to 3999, and decimal for anything else or an ordinal outside those ranges.
+    ``A`` and ``I`` are upper case.
+    """
     marker = str(ordinal)
     if style in ("a", "A") and ordinal >= 1:
         marker = ""
@@ -715,11 +721,11 @@ def list_marker(style: str, ordinal: int) -> str:
 def _emit_text(
     code_point: int, parent: str | None, output: list[str], offset: int, is_reference: bool
 ) -> None:
-    """One code point of text inside the root, raw or decoded, as the scanner emits it.
+    r"""One code point of text inside the root, raw or decoded, as the scanner emits it.
 
     Rejected directly inside a table container unless it is raw whitespace; folded or rejected
     inside ``sup`` and ``sub``; otherwise kept as it is. General category N is read from
-    ``unicodedata`` because ``re`` has no ``\\p{N}``.
+    ``unicodedata`` because ``re`` has no ``\p{N}``.
     """
     character = chr(code_point)
     # A line feed or carriage return in text is a space to a renderer: only a block boundary or

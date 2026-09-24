@@ -1,4 +1,4 @@
-"""Canonical JSON and the two digest functions, ported from ``src/lib/hash.ts``.
+r"""Canonical JSON and the two digest functions, ported from ``src/lib/hash.ts``.
 
 Every hash in the system is the SHA-256 of canonical JSON: object keys sorted by UTF-16 code
 unit order (RFC 8785), no insignificant whitespace, ``JSON.stringify`` number and string
@@ -23,7 +23,7 @@ Four places where Python's defaults are wrong and must not be relied on:
   the contracts cap every number at ``Number.MAX_SAFE_INTEGER`` for the same reason.
 * ``json.dumps(..., ensure_ascii=False)`` emits an unpaired surrogate raw, and encoding that to
   UTF-8 raises ``UnicodeEncodeError``. ``JSON.stringify`` is well-formed (ES2019): it writes
-  ``\\udXXX``, lower-case, for every unpaired surrogate. ``_escape_lone_surrogates`` does the
+  ``\udXXX``, lower-case, for every unpaired surrogate. ``_escape_lone_surrogates`` does the
   same, so canonical JSON is byte-identical for such a string and ``sha256_json`` cannot raise.
   A surrogate can only ever occur inside a string literal, so rewriting the serialised form is
   safe. A Python ``str`` decoded from JSON already carries a *pair* as one astral code point,
@@ -58,7 +58,7 @@ def _utf16_key(item: tuple[str, JsonValue]) -> bytes:
 
 
 def _escape_lone_surrogates(serialized: str) -> str:
-    """Rewrite every unpaired surrogate as ``JSON.stringify`` does: ``\\udXXX``, lower-case."""
+    r"""Rewrite every unpaired surrogate as ``JSON.stringify`` does: ``\udXXX``, lower-case."""
     return _LONE_SURROGATE.sub(lambda match: f"\\u{ord(match.group()):04x}", serialized)
 
 

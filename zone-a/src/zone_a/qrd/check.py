@@ -82,7 +82,7 @@ from typing import Any
 from zone_a.docx.reader import Paragraph
 from zone_a.epi.reader import READER_VERSION, Document, Section, read_epi, walk
 from zone_a.qrd.headings import collapse, index, match_heading
-from zone_a.qrd.pattern import Token, parse
+from zone_a.qrd.pattern import Token, children, parse
 from zone_a.underline import underline_changes
 
 CHECKER_VERSION = "qrd-check/1.1.0"
@@ -141,8 +141,10 @@ _SPACES = " \t\u00a0"
 
 
 def _collapse(text: str) -> tuple[str, tuple[int, ...]]:
-    """The text as ``headings.collapse`` gives it, with, for each character kept, its index in
-    ``text``."""
+    """The text as ``headings.collapse`` gives it, with where each kept character came from.
+
+    For each character kept, its index in ``text``.
+    """
     out: list[str] = []
     positions: list[int] = []
     pending: int | None = None
@@ -168,8 +170,10 @@ def _collapse(text: str) -> tuple[str, tuple[int, ...]]:
 
 @dataclass(frozen=True)
 class _Piece:
-    """A word of literal text, a fill-in or an optional segment, and the joint before it:
-    nothing, a space or a paragraph break."""
+    """A word of literal text, a fill-in or an optional segment, and the joint before it.
+
+    The joint is nothing, a space or a paragraph break.
+    """
 
     joint: str
     kind: str
@@ -203,7 +207,8 @@ def _pieces(tokens: list[Token]) -> tuple[list[_Piece], str, str]:
     optional segment is lifted out of it, so the segment owns the joint before it and the
     joint after it belongs to what follows. Two pieces the template writes together, one of
     them optional, with a letter or digit on each side ("<due to the rarity of the
-    disease><for scientific reasons>"), are joined by a space, as a person writes them."""
+    disease><for scientific reasons>"), are joined by a space, as a person writes them.
+    """
     out: list[_Piece] = []
     pending = ""
     leading: str | None = None
@@ -236,8 +241,7 @@ def _pieces(tokens: list[Token]) -> tuple[list[_Piece], str, str]:
         elif token["kind"] == "fill":
             add(_Piece("", "fill"))
         elif token["kind"] == "optional":
-            assert isinstance(value, list)
-            inner, lead, trail = _pieces(value)
+            inner, lead, trail = _pieces(children(token))
             if not inner:
                 pending = _stronger(pending, _stronger(lead, trail))
                 continue
@@ -248,9 +252,11 @@ def _pieces(tokens: list[Token]) -> tuple[list[_Piece], str, str]:
 
 
 def _statement(pattern: list[Token]) -> list[_Piece]:
-    """The pieces of a registry statement, without Appendix I's option letters: a capital
-    letter alone at the start of a paragraph, before an optional segment ("A <Studies in
-    animals have shown ...>"), names an option; the label does not carry it."""
+    """The pieces of a registry statement, without Appendix I's option letters.
+
+    A capital letter alone at the start of a paragraph, before an optional segment ("A <Studies
+    in animals have shown ...>"), names an option; the label does not carry it.
+    """
     pieces = _pieces(_content(pattern))[0]
     kept: list[_Piece] = []
     for position, piece in enumerate(pieces):
@@ -272,12 +278,14 @@ def _statement(pattern: list[Token]) -> list[_Piece]:
 
 
 def _regex(pieces: list[_Piece], at_end: bool = True, opening: bool = True) -> str:
-    """The pieces as a regular expression over collapsed text. An optional segment's joint is
-    inside it, so an absent segment leaves no extra space or break. While every piece so far
-    is optional and at the start of the pattern, the next joint may be absent too. A fill-in
-    takes as little as it can, except where nothing required follows it to the end of the
-    pattern: there it takes the rest of the line, so a reported span covers what was filled
-    in."""
+    """The pieces as a regular expression over collapsed text.
+
+    An optional segment's joint is inside it, so an absent segment leaves no extra space or
+    break. While every piece so far is optional and at the start of the pattern, the next joint
+    may be absent too. A fill-in takes as little as it can, except where nothing required
+    follows it to the end of the pattern: there it takes the rest of the line, so a reported
+    span covers what was filled in.
+    """
     out: list[str] = []
     for position, piece in enumerate(pieces):
         rest_optional = all(later.kind == "optional" for later in pieces[position + 1 :])
@@ -347,31 +355,32 @@ _NOTE_MARKER = re.compile(r"\*+")
 
 
 def _without_notes(tokens: list[Token]) -> list[Token]:
-    """The tokens with footnote markers removed: in the QRD templates a run of ``*`` only ever
-    points at a note (Appendix III writes "<Keep the {container}*** in the outer carton"), and
-    the label does not carry it."""
+    """The tokens with footnote markers removed.
+
+    In the QRD templates a run of ``*`` only ever points at a note (Appendix III writes "<Keep
+    the {container}*** in the outer carton"), and the label does not carry it.
+    """
     out: list[Token] = []
     for token in tokens:
         value = token["value"]
         if token["kind"] == "text":
             out.append({"kind": "text", "value": _NOTE_MARKER.sub("", str(value))})
         elif token["kind"] == "optional":
-            assert isinstance(value, list)
-            out.append({"kind": "optional", "value": _without_notes(value)})
+            out.append({"kind": "optional", "value": _without_notes(children(token))})
         else:
             out.append(token)
     return out
 
 
 def _content(item_pattern: list[Token]) -> list[Token]:
-    """A statement wholly in ``<...>`` is matched on its content, without footnote markers and
-    guidance."""
+    """The tokens a statement is matched on, without footnote markers and guidance.
+
+    A statement wholly in ``<...>`` is matched on its content.
+    """
     item_pattern = _without_notes(item_pattern)
     meaningful = [t for t in item_pattern if t["kind"] != "guidance" and str(t["value"]).strip()]
     if len(meaningful) == 1 and meaningful[0]["kind"] == "optional":
-        value = meaningful[0]["value"]
-        assert isinstance(value, list)
-        return _joined(value)
+        return _joined(children(meaningful[0]))
     return _joined(item_pattern)
 
 
@@ -382,13 +391,13 @@ def _joined(tokens: list[Token]) -> list[Token]:
         value = token["value"]
         if token["kind"] == "guidance":
             continue
+        kept: Token = token
         if token["kind"] == "optional":
-            assert isinstance(value, list)
-            token = {"kind": "optional", "value": _joined(value)}
-        if token["kind"] == "text" and out and out[-1]["kind"] == "text":
+            kept = {"kind": "optional", "value": _joined(children(token))}
+        if kept["kind"] == "text" and out and out[-1]["kind"] == "text":
             out[-1] = {"kind": "text", "value": str(out[-1]["value"]) + str(value)}
         else:
-            out.append(token)
+            out.append(kept)
     return out
 
 
@@ -397,8 +406,10 @@ def _joined(tokens: list[Token]) -> list[Token]:
 
 @dataclass(frozen=True)
 class _Line:
-    """One paragraph (or a subsection's title, ``paragraph`` -1), collapsed, with the characters
-    a reader cannot see masked."""
+    """One paragraph, collapsed, with the characters a reader cannot see masked.
+
+    A subsection's title is a line too, with ``paragraph`` -1.
+    """
 
     path: str
     paragraph: int
@@ -475,8 +486,9 @@ def _mask(lines: list[_Line], taken: dict[tuple[int, int], set[int]]) -> list[_L
         used = taken.get(line.key)
         if used:
             text = "".join(TAKEN if at in used else c for at, c in enumerate(line.text))
-            line = _Line(line.path, line.paragraph, text, line.positions, line.key)
-        out.append(line)
+            out.append(_Line(line.path, line.paragraph, text, line.positions, line.key))
+        else:
+            out.append(line)
     return out
 
 
@@ -489,8 +501,9 @@ class _Match:
     def location(self) -> dict[str, Any]:
         first = self.window.origin[self.start]
         last = self.window.origin[self.end - 1]
-        assert first is not None
-        assert last is not None
+        if first is None or last is None:
+            # A match is trimmed to text, so neither end is the break joining two lines.
+            raise ValueError("a match that starts or ends between two lines")
         head, tail = self.window.lines[first[0]], self.window.lines[last[0]]
         where: dict[str, Any] = {
             "in": head.path,
@@ -544,8 +557,10 @@ _TOKEN = re.compile(r"[^\W_]+\([sS]\)|[^\W_]+|[^\w\s]|_")
 
 @dataclass(frozen=True)
 class _Node:
-    """One step of a statement: a token, a fill-in, or the opening or closing of an optional
-    segment (``end`` is the index of an opening's closing in the whole list)."""
+    """One step of a statement: a token, a fill-in, or an optional segment's opening or closing.
+
+    ``end`` is the index of an opening's closing in the whole list.
+    """
 
     kind: str
     text: str = ""
@@ -609,8 +624,11 @@ class _Token:
 
 
 def _tokens(window: _Window) -> list[_Token]:
-    """The window's tokens; a run of struck or faint characters is one token, ``HIDDEN_WORD``,
-    and a character an exact match of a sibling explains is a token nothing matches."""
+    """The window's tokens.
+
+    A run of struck or faint characters is one token, ``HIDDEN_WORD``, and a character an exact
+    match of a sibling explains is a token nothing matches.
+    """
     out: list[_Token] = []
     pattern = re.compile(f"{HIDDEN}+|{TAKEN}|" + _TOKEN.pattern)
     for number, line in enumerate(window.lines):
@@ -661,7 +679,8 @@ def _align(nodes: list[_Node], tokens: list[_Token]) -> _Alignment | None:
     or is missing (cost 1); an optional segment, nested or not, is taken or skipped (cost 0). Of
     two alignments that cost the same, the one with more matched tokens is kept. The stretch may
     start and end anywhere, but not on a substitution: a first or last token the label does not
-    match is missing, not replaced by the word beside the stretch."""
+    match is missing, not replaced by the word beside the stretch.
+    """
     rows, columns = len(nodes) + 1, len(tokens) + 1
     # The first token of the statement, whose capital a label may drop mid-sentence.
     opening = next((n for n, node in enumerate(nodes) if node.kind == "token"), -1)
@@ -890,8 +909,10 @@ def _closest(nodes: list[_Node], lines: list[_Line], size: int) -> _Near | None:
 
 
 def _differences(near: _Near) -> list[dict[str, str]]:
-    """The alignment's substitutions, deletions and insertions, grouped into runs: the
-    template's tokens as the template spaces them, the label's as its text reads."""
+    """The alignment's substitutions, deletions and insertions, grouped into runs.
+
+    The template's tokens are given as the template spaces them, the label's as its text reads.
+    """
     out: list[dict[str, str]] = []
     run: list[tuple[str, int, int]] = []
 
@@ -1090,6 +1111,16 @@ def _near(report: _Report, job: _Job, near: _Near | None) -> None:
 
 
 def check(document: Document, registry: dict[str, Any], mapping: dict[str, Any]) -> dict[str, Any]:
+    """The findings and statement statuses for a document, by the rules in the module docstring.
+
+    The result also names the checker version, the template, the registry version and the
+    document's title and date, and counts the findings and statuses by kind.
+
+    Args:
+        document: The ePI as ``zone_a.epi.reader.read_epi`` returns it.
+        registry: The parsed QRD registry (``qrd/registry/cap-smpc-en-10.4.json``).
+        mapping: The parsed section mapping (``fhir/mappings/cap-smpc-en.json``).
+    """
     report = _Report()
     targets = _targets(mapping)
     registry_keys = {section["key"] for section in registry["sections"]}
@@ -1205,12 +1236,10 @@ def check(document: Document, registry: dict[str, Any], mapping: dict[str, Any])
     candidates = {job.identifier: _candidate(job, taken) for job in pending}
     claimed: dict[str, set[tuple[tuple[int, int], int]]] = {}
     ranked = sorted(
-        (job for job in pending if candidates[job.identifier] is not None),
-        key=lambda job: -candidates[job.identifier].alignment.score,  # type: ignore[union-attr]
+        ((job, near) for job in pending if (near := candidates[job.identifier]) is not None),
+        key=lambda pair: -pair[1].alignment.score,
     )
-    for job in ranked:
-        near = candidates[job.identifier]
-        assert near is not None
+    for job, near in ranked:
         covered = _claims(near)
         if covered & claimed.setdefault(job.group, set()):
             candidates[job.identifier] = None

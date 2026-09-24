@@ -56,6 +56,13 @@ class FidelityError(Exception):
 
 @dataclass(slots=True)
 class PageIndex:
+    """One page of the source document text, indexed for verification.
+
+    ``body_start`` and ``body_end`` bound the page's body in code points; ``malformed`` is set
+    when the page holds a forbidden character, and ``body_issue`` names what is wrong with the
+    body range, if anything.
+    """
+
     page: int
     text: str
     body_start: int
@@ -151,6 +158,14 @@ def _body_issue_for(text: str, body_start: int, body_end: int) -> str | None:
 
 
 def index_pages(source: Json) -> tuple[dict[int, PageIndex], list[str]]:
+    """The pages of a source document text by page number, and the body issues found.
+
+    Each issue reads ``Page <n>: <issue>``; a page with one is still indexed.
+
+    Raises:
+        FidelityError: A page is not numbered by its position (pages run 1..N in array order),
+            a number repeats, or a body range is invalid.
+    """
     pages: dict[int, PageIndex] = {}
     structural: list[str] = []
     issues: list[str] = []
@@ -260,7 +275,7 @@ def _is_edge_whitespace(character: str | None) -> bool:
 
 
 def _is_decimal_digit(character: str | None) -> bool:
-    """General category Nd, which is what JavaScript's ``\\p{Nd}`` tests."""
+    r"""General category Nd, which is what JavaScript's ``\p{Nd}`` tests."""
     return character is not None and unicodedata.category(character) == "Nd"
 
 
