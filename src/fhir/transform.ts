@@ -22,6 +22,9 @@ const EMA_LIST_CODE = "100000155539";
 const EMA_LIST_DISPLAY = "Combined File of all Documents";
 const QRD_TEMPLATE_EXTENSION =
   "http://ema.europa.eu/fhir/StructureDefinition/ext-epi-qrdtemplate-version";
+// An identifier value in this namespace is written only by the authority importer
+// (docs/design/authority-import-contract.md, D7). Every other path refuses a source that has one.
+export const AUTHORITY_IMPORT_PREFIX = "authority-import:";
 
 export type MappingDecision = {
   sourceKey: string;
@@ -381,6 +384,83 @@ function createEmaList(
   };
 }
 
+// The source Bundle's identifier value, the one key every persisted id derives from. Required:
+// a source without one is refused rather than keyed by something its producer chose less visibly.
+export function sourceIdentifierValue(sourceBundle: FhirBundle): string {
+  const value: unknown = (sourceBundle.identifier as { value?: unknown } | undefined)?.value;
+  if (typeof value !== "string" || value.length === 0) {
+    throw new TransformationError("Source Bundle has no identifier value", [
+      "Bundle.identifier.value is required: every persisted id derives from it",
+    ]);
+  }
+  return value;
+}
+
+type Reidentified = { entries: BundleEntry[]; fullUrls: Map<string, string> };
+
+// Gives every entry after the Composition a new id and `urn:uuid` fullUrl derived from the source
+// identifier value and its position, and rewrites the references between them. An entry keeps no
+// id or fullUrl its source chose, so a run cannot PUT into another run's resources.
+function reidentifiedEntries(
+  sourceBundle: FhirBundle,
+  sourceIdentifier: string,
+  compositionFullUrl: string,
+): Reidentified {
+  const fullUrls = new Map<string, string>();
+  const composition = sourceBundle.entry[0];
+  if (composition !== undefined) fullUrls.set(composition.fullUrl, compositionFullUrl);
+  const planned = sourceBundle.entry.slice(1).map((entry, offset) => {
+    const id = stableUuid(
+      `ema-entry:${entry.resource.resourceType}`,
+      `${sourceIdentifier}:${offset + 1}`,
+    );
+    const fullUrl = `urn:uuid:${id}`;
+    if (fullUrls.has(entry.fullUrl)) {
+      throw new TransformationError("Source Bundle entries are ambiguous", [
+        `Two entries share the fullUrl at Bundle.entry[${offset + 1}]`,
+      ]);
+    }
+    fullUrls.set(entry.fullUrl, fullUrl);
+    return { entry, id, fullUrl, position: offset + 1 };
+  });
+  const entries = planned.map(({ entry, id, fullUrl, position }) => ({
+    ...structuredClone(entry),
+    fullUrl,
+    resource: {
+      ...rewriteReferences(structuredClone(entry.resource), fullUrls, `Bundle.entry[${position}]`),
+      id,
+    },
+  }));
+  return { entries, fullUrls };
+}
+
+// Rewrites every string-valued `reference` to the new fullUrl of the entry it names. A reference
+// that names no entry of the Bundle (relative, versioned, `#contained`, external) is refused: it
+// could point into another run's resources. A Reference by identifier alone carries no
+// `reference` and is kept.
+function rewriteReferences<T>(value: T, fullUrls: Map<string, string>, at: string): T {
+  const walk = (node: unknown, path: string): unknown => {
+    if (Array.isArray(node)) return node.map((item, index) => walk(item, `${path}[${index}]`));
+    if (node === null || typeof node !== "object") return node;
+    const out: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(node as Record<string, unknown>)) {
+      if (key === "reference" && typeof child === "string") {
+        const target = fullUrls.get(child);
+        if (target === undefined) {
+          throw new TransformationError("Source reference names no entry of the Bundle", [
+            `${path}.reference names no entry of the Bundle`,
+          ]);
+        }
+        out[key] = target;
+      } else {
+        out[key] = walk(child, `${path}.${key}`);
+      }
+    }
+    return out;
+  };
+  return walk(value, at) as T;
+}
+
 export function transformType2ToEma(
   sourceBundle: FhirBundle,
   mapping: EmaMapping,
@@ -420,16 +500,18 @@ export function transformType2ToEma(
     ]);
   }
 
-  const sourceIdentifier =
-    sourceBundle.identifier.value ?? sourceBundle.id ?? sha256(sourceBundle).slice(0, 24);
+  // Every id the run persists derives from this one checked value, so a run writes only into its
+  // own namespace (docs/design/authority-import-contract.md, D7): no fallback to Bundle.id.
+  const sourceIdentifier = sourceIdentifierValue(sourceBundle);
   const packageId = `ema-${sourceIdentifier}`;
   const compositionId = stableUuid("ema-composition", sourceIdentifier);
   const bundleId = stableUuid("ema-bundle", sourceIdentifier);
   const compositionFullUrl = `urn:uuid:${compositionId}`;
   const bundleFullUrl = `urn:uuid:${bundleId}`;
+  const copied = reidentifiedEntries(sourceBundle, sourceIdentifier, compositionFullUrl);
 
   const targetComposition: FhirComposition = {
-    ...structuredClone(sourceComposition),
+    ...rewriteReferences(structuredClone(sourceComposition), copied.fullUrls, "Composition"),
     id: compositionId,
     meta: { ...sourceComposition.meta, profile: mapping.profiles.composition },
     // Always English: a source declaring any other language, or none, has already failed above.
@@ -473,10 +555,7 @@ export function transformType2ToEma(
       value: bundleId,
     },
     timestamp: sourceBundle.timestamp,
-    entry: [
-      { fullUrl: compositionFullUrl, resource: targetComposition },
-      ...sourceBundle.entry.slice(1).map((entry) => structuredClone(entry)),
-    ],
+    entry: [{ fullUrl: compositionFullUrl, resource: targetComposition }, ...copied.entries],
   };
 
   const list = createEmaList(mapping, packageId, bundleFullUrl, targetComposition.title);

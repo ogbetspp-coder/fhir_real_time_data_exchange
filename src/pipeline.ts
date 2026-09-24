@@ -18,8 +18,12 @@ import {
   validateEmaPreflight,
   validateType2Preflight,
 } from "./fhir/preflight.js";
-import { toProvenanceResource, withEmaTarget } from "./fhir/provenance.js";
-import { transformType2ToEma } from "./fhir/transform.js";
+import { toProvenanceResource } from "./fhir/provenance.js";
+import {
+  AUTHORITY_IMPORT_PREFIX,
+  sourceIdentifierValue,
+  transformType2ToEma,
+} from "./fhir/transform.js";
 import { mappingReference, type EmaMapping } from "./fhir/mapping.js";
 import type { FhirBundle, FhirResource, OperationOutcome } from "./fhir/types.js";
 import { GcpEvidenceStore, type RunManifest, type SignedManifest } from "./gcp/evidence.js";
@@ -158,6 +162,13 @@ export async function runPipeline(
     throw new Error("Canonical Type 2 preflight failed");
   }
 
+  // The authority-import namespace is written only by the importer, whose route arrives with
+  // PR 2's gate; no source reaching the pipeline today may carry it
+  // (docs/design/authority-import-contract.md, D7).
+  if (sourceIdentifierValue(source).startsWith(AUTHORITY_IMPORT_PREFIX)) {
+    throw new Error("Source identifier is in the reserved authority-import namespace");
+  }
+
   const transformed = transformType2ToEma(source, mapping);
   const emaPreflight = validateEmaPreflight(transformed.list, transformed.documentBundle, mapping);
   if (hasValidationErrors(emaPreflight)) {
@@ -169,13 +180,18 @@ export async function runPipeline(
     throw new Error("EMA structural preflight failed");
   }
 
+  const emaBundleId = transformed.documentBundle.id;
+  const emaCompositionId = transformed.documentBundle.entry[0]?.resource.id;
+  if (emaBundleId === undefined || emaCompositionId === undefined) {
+    throw new Error("The EMA document Bundle and Composition require ids");
+  }
   const provenanceResource =
     gate === undefined
       ? undefined
-      : withEmaTarget(
-          toProvenanceResource(gate.submission, gate.report),
-          transformed.documentBundle.id ?? "unknown",
-        );
+      : toProvenanceResource(gate.submission, gate.report, {
+          bundleId: emaBundleId,
+          compositionId: emaCompositionId,
+        });
 
   let ingestion: IngestionEvidence | undefined;
   if (gate !== undefined) {

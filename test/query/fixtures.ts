@@ -186,9 +186,14 @@ export function buildQueryStore(mapping: EmaMapping): QueryStore {
   const bundleIdA = ema.documentBundle.id;
   if (bundleIdA === undefined) throw new Error("EMA document Bundle requires an id");
 
-  // The Provenance exactly as the worker persists it (src/pipeline.ts): the projection, with
-  // the EMA Bundle appended as a target.
-  const provenanceA = withEmaTarget(toProvenanceResource(gate.submission, gate.report), bundleIdA);
+  // The Provenance exactly as the worker persists it (src/pipeline.ts): targeting the EMA
+  // Composition and Bundle the run wrote.
+  const compositionIdA = ema.documentBundle.entry[0]?.resource.id;
+  if (compositionIdA === undefined) throw new Error("EMA Composition requires an id");
+  const provenanceA = toProvenanceResource(gate.submission, gate.report, {
+    bundleId: bundleIdA,
+    compositionId: compositionIdA,
+  });
   const approverRole = gate.submission.approval.approverRole;
   const provenanceWithoutRole = withoutApproverRole(provenanceA);
 

@@ -144,6 +144,7 @@ export function createApp(overrides: AppOverrides = {}): Hono {
         "runId must be a UUID": "bad-run-id",
         "Canonical Type 2 preflight failed": "source-preflight-failed",
         "EMA structural preflight failed": "ema-preflight-failed",
+        "Source identifier is in the reserved authority-import namespace": "reserved-namespace",
         "Ingestion Provenance requires an id": "provenance-id-missing",
         "FHIR_VALIDATOR_URL is required": "validator-not-configured",
         "Transformed Composition is missing": "composition-missing",

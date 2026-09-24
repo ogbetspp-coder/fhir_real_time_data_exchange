@@ -48,29 +48,31 @@ function agent(code: string, who: AgentWho, role?: Coding): ProvenanceAgent {
   };
 }
 
+// The ids of what the run persisted, from the crosswalk's output: the Provenance points only at
+// them, never at a fullUrl the submission chose (docs/design/authority-import-contract.md, D7).
+export type ProvenanceOutput = { bundleId: string; compositionId: string };
+
 export function toProvenanceResource(
   submission: CanonicalSubmission,
   report: FidelityReport,
+  output: ProvenanceOutput,
 ): FhirResource {
   const { bundle, provenance, approval } = submission;
-  const first = bundle.entry[0];
-  if (first === undefined) throw new Error("Canonical submission Bundle requires an entry");
   const { parser, model } = provenance.extraction;
   const { sourceDocument } = provenance;
 
   const { system, value } = bundle.identifier;
+  if (value === undefined) throw new Error("Canonical submission Bundle requires an identifier");
   return {
     resourceType: "Provenance",
-    id: stableUuid("ingestion-provenance", submission.submissionId),
+    // One per approval of this record: the identifier value keeps it in the run's namespace, and
+    // the submission id keeps two approvals of the same content apart.
+    id: stableUuid("ingestion-provenance", `${value}:${submission.submissionId}`),
     recorded: approval.approvedAt,
     target: [
-      {
-        identifier: {
-          ...(system === undefined ? {} : { system }),
-          ...(value === undefined ? {} : { value }),
-        },
-      },
-      { reference: first.fullUrl },
+      { identifier: { ...(system === undefined ? {} : { system }), value } },
+      { reference: `Composition/${output.compositionId}` },
+      { reference: `Bundle/${output.bundleId}` },
     ],
     activity: { coding: [{ system: ACTIVITY_SYSTEM, code: "structuring" }] },
     agent: [

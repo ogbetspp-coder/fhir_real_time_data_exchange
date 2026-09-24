@@ -121,7 +121,12 @@ describe("document path narrative containment", () => {
       ["evidence", JSON.stringify(result.evidence)],
       ["fidelityReport", JSON.stringify(fidelityReport)],
       ["ingestionProvenance", JSON.stringify(submission.provenance)],
-      ["provenanceResource", JSON.stringify(toProvenanceResource(submission, fidelityReport))],
+      [
+        "provenanceResource",
+        JSON.stringify(
+          toProvenanceResource(submission, fidelityReport, { bundleId: "b", compositionId: "c" }),
+        ),
+      ],
       ["logs", capture.lines.join("\n")],
     ];
     for (const [name, haystack] of scanned) {
