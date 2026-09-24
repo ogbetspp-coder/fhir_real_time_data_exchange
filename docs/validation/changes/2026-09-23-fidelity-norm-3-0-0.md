@@ -30,18 +30,20 @@ amended by its independent reviews, prompted by roadmap item 3a and ADR 0005. In
   to one side only;
 - U+1680 and the spaces narrower than a quarter of an em (U+2006, U+2009, U+200A, U+202F,
   U+205F) leave the section 3 whitespace list, since a renderer draws them as a stroke or a few
-  pixels wide; section 6's digit-group rule and the quote-edge rule read past them, and past
-  every Default_Ignorable code point, as a gap;
+  pixels wide; section 6's digit-group rule and the quote-edge rule read past them, U+2800
+  BRAILLE PATTERN BLANK and every Default_Ignorable code point, as a gap; a narrative of gaps
+  alone is `empty-narrative`, and a quote of gaps alone `invalid-request`;
 - nesting is bounded (`nesting-depth`, with at most one of `small`, `code`, `h5` and `h6` open),
-  `]]>` in text rejects (`cdata`), and a combining mark after an inline tag, or a composition
-  across one, rejects (`combining-across-markup`);
+  `]]>` in text rejects (`cdata`), a combining mark after an inline tag (past any ignorable code
+  point), or a composition across one, rejects (`combining-across-markup`), and a mathematical
+  symbol or a dash inside `u` or `a` rejects (`underlined-sign`);
 - the extractor contract writes tables with their grid (and a table across pages as its logical
   text, split once per break), numbered markers with a space, pictures with their hash, a
   continuation line that begins with a bullet glyph with a leading U+0009, and a structured
   source as one page per section.
 
 `XhtmlErrorCode` gains `list-content`, `reserved-character`, `table-size`,
-`invisible-character`, `nesting-depth` and `combining-across-markup`, and loses
+`invisible-character`, `nesting-depth`, `combining-across-markup` and `underlined-sign`, and loses
 `soft-hyphen-at-boundary`.
 
 **Why.** Roadmap item 3a takes the EMA's own ePI for Imatinib Teva through the system. Its
@@ -147,7 +149,7 @@ closes the open items the reviews recorded (the blast radius below says why).
 **Steps 1–6.** 1: `NORMALIZATION_VERSION` is `fidelity-norm/3.0.0` on both sides. 2:
 `npm run contracts:generate` (no drift), `npm run vectors:generate`, `npm run contracts:fixtures`,
 `npm run contracts:quote-edge` and `npm run differential:smoke` regenerated
-`test/fixtures/fidelity/vectors.json` (411 → 561 vectors: normalisation 62 → 69, XHTML 214 → 321, verify 135 → 171; 159 added,
+`test/fixtures/fidelity/vectors.json` (411 → 587 vectors: normalisation 62 → 70, XHTML 214 → 340, verify 135 → 177; 185 added,
 9 removed or renamed), the four contract fixtures and the smoke corpus. 3: every changed vector,
 below. 4: the new vectors: every case the design names, both sides of every boundary (counter
 styles at 26/27, 703, 3999/4000 (702 in the differential), −1/0/1; `start` at `-0`, `007`, `9999`, `10000`; spans at
@@ -209,53 +211,64 @@ vectors):
 
 | Break                                                     | Differential    | Vectors |
 | --------------------------------------------------------- | --------------- | ------- |
-| alphabetic counter off by one                             | 7 / 9 / 4       | 3       |
-| roman range to 4000                                       | 4 / 2 / 2       | 1       |
-| ordinal not advanced                                      | 20 / 20 / 16    | 5       |
-| `li` allowed anywhere                                     | 101 / 104 / 100 | 26      |
-| an element allowed in a list                              | 0 / 2 / 0       | 1       |
-| text allowed in a list                                    | 3 / 0 / 5       | 2       |
-| overlap not checked                                       | 6 / 1 / 4       | 2       |
-| clipped row span not checked                              | 2 / 3 / 1       | 2       |
+| alphabetic counter off by one                             | 6 / 9 / 5       | 3       |
+| roman range to 4000                                       | 3 / 0 / 2       | 1       |
+| ordinal not advanced                                      | 18 / 16 / 19    | 5       |
+| `li` allowed anywhere                                     | 85 / 102 / 88   | 26      |
+| an element allowed in a list                              | 0 / 2 / 1       | 1       |
+| text allowed in a list                                    | 0 / 1 / 1       | 2       |
+| overlap not checked                                       | 2 / 3 / 2       | 2       |
+| clipped row span not checked                              | 5 / 1 / 1       | 2       |
 | a row with a hole not refused                             | 0 / 0 / 0       | 0       |
-| zero-height row not refused                               | 1 / 1 / 1       | 1       |
-| zero-width column not refused                             | 3 / 4 / 5       | 1       |
-| covered-left slots dropped                                | 7 / 4 / 9       | 4       |
-| covered-above slots before a cell dropped                 | 3 / 2 / 3       | 6       |
-| covered-above slots after a row dropped                   | 5 / 1 / 6       | 4       |
-| cell marker dropped                                       | 22 / 21 / 27    | 47      |
-| row marker dropped                                        | 31 / 38 / 42    | 48      |
-| end-of-table marker dropped                               | 35 / 43 / 49    | 50      |
-| nested table (in a cell or a caption) allowed             | 6 / 6 / 8       | 3       |
-| slot limit not checked                                    | 2 / 1 / 0       | 2       |
-| `table-size` decided before overlap                       | 1 / 0 / 0       | 1       |
-| picture hashed from another value                         | 15 / 13 / 14    | 4       |
-| picture token not closed                                  | 15 / 13 / 14    | 4       |
-| reference `src` accepted                                  | 4 / 5 / 4       | 6       |
-| reserved check of the whole `div` dropped                 | 2 / 2 / 4       | 2       |
-| `reserved-character` decided before `forbidden-character` | 2 / 1 / 3       | 1       |
-| reserved reference allowed                                | 3 / 3 / 2       | 4       |
-| reserved range narrowed to U+FDD0–U+FDD5                  | 1 / 1 / 4       | 1       |
-| span 1000 refused                                         | 5 / 3 / 2       | 4       |
-| `start="-0"` accepted                                     | 1 / 1 / 1       | 1       |
-| `data:` padding inside the body accepted                  | 1 / 3 / 0       | 1       |
-| `img` without `src` accepted                              | 2 / 3 / 2       | 2       |
-| `void-element` decided before a missing `src`             | 2 / 2 / 2       | 2       |
+| zero-height row not refused                               | 4 / 1 / 2       | 1       |
+| zero-width column not refused                             | 3 / 4 / 2       | 1       |
+| covered-left slots dropped                                | 9 / 3 / 5       | 4       |
+| covered-above slots before a cell dropped                 | 3 / 2 / 1       | 6       |
+| covered-above slots after a row dropped                   | 6 / 2 / 8       | 4       |
+| cell marker dropped                                       | 28 / 18 / 27    | 47      |
+| row marker dropped                                        | 38 / 33 / 38    | 48      |
+| end-of-table marker dropped                               | 41 / 37 / 41    | 50      |
+| nested table (in a cell or a caption) allowed             | 7 / 5 / 6       | 3       |
+| slot limit not checked                                    | 1 / 0 / 1       | 2       |
+| `table-size` decided before overlap                       | 0 / 1 / 1       | 1       |
+| picture hashed from another value                         | 10 / 15 / 14    | 4       |
+| picture token not closed                                  | 10 / 15 / 14    | 4       |
+| reference `src` accepted                                  | 3 / 4 / 5       | 6       |
+| reserved check of the whole `div` dropped                 | 0 / 3 / 2       | 2       |
+| `reserved-character` decided before `forbidden-character` | 1 / 1 / 1       | 1       |
+| reserved reference allowed                                | 4 / 4 / 3       | 4       |
+| reserved range narrowed to U+FDD0–U+FDD5                  | 3 / 4 / 2       | 1       |
+| span 1000 refused                                         | 3 / 5 / 3       | 4       |
+| `start="-0"` accepted                                     | 1 / 0 / 3       | 1       |
+| `data:` padding inside the body accepted                  | 1 / 2 / 2       | 1       |
+| `img` without `src` accepted                              | 2 / 2 / 3       | 2       |
+| `void-element` decided before a missing `src`             | 2 / 1 / 2       | 2       |
 | nesting depth not bounded                                 | 0 / 0 / 0       | 3       |
-| two shrinking elements allowed                            | 7 / 1 / 1       | 3       |
-| heading inside a heading allowed                          | 19 / 14 / 21    | 1       |
-| mark after an inline tag accepted                         | 0 / 0 / 0       | 3       |
+| two shrinking elements allowed                            | 6 / 4 / 1       | 4       |
+| heading inside a heading allowed                          | 13 / 13 / 13    | 1       |
+| mark after an inline tag accepted                         | 0 / 0 / 0       | 10      |
+| mark after an ignorable code point accepted               | 0 / 0 / 0       | 5       |
+| marks narrowed to Mn                                      | 0 / 0 / 0       | 2       |
+| `h5` not shrinking                                        | 0 / 1 / 0       | 1       |
+| underlined sign accepted                                  | 26 / 31 / 34    | 8       |
+| dashes allowed under an underline                         | 13 / 12 / 14    | 2       |
+| a link not counted as underlining                         | 15 / 25 / 24    | 1       |
+| narrative of gaps counted as drawn                        | 1 / 0 / 2       | 2       |
 | indenting containers not bounded                          | 1 / 1 / 1       | 2       |
-| `]]>` in text accepted                                    | 1 / 1 / 3       | 2       |
-| composition across markup not checked                     | 3 / 3 / 3       | 8       |
-| invisible break in the div accepted                       | 389 / 411 / 412 | 3       |
-| invisible break by reference accepted                     | 2 / 3 / 2       | 19      |
-| `img` not a void element                                  | 25 / 20 / 25    | 9       |
+| `]]>` in text accepted                                    | 0 / 2 / 3       | 2       |
+| composition across markup not checked                     | 2 / 2 / 2       | 15      |
+| invisible break in the div accepted                       | 389 / 393 / 398 | 3       |
+| invisible break by reference accepted                     | 2 / 3 / 3       | 19      |
+| U+2800 not a gap                                          | 0 / 0 / 1       | 2       |
+| U+205F whitespace again                                   | 27 / 28 / 34    | 2       |
+| supplementary-plane ignorables not gaps                   | 0 / 0 / 0       | 1       |
+| edge rules read only section 3 whitespace, not every gap  | 9 / 6 / 3       | 4       |
+| `img` not a void element                                  | 22 / 25 / 23    | 9       |
 | edge rules read only section 3 whitespace, not every gap  | 2 / 2 / 5       | 3       |
 
 Every break but one is caught by the vectors. The differential catches the frequent ones on all
-three seeds; the rarest (the nesting bound, a combining mark after an inline tag, which the
-differential's generator does not draw, the indent bound and `]]>`) are drawn rarely enough, or masked often enough by an
+three seeds; the rarest (the nesting bound, the mark rules, `h5`, U+2800, the supplementary-plane
+ignorable code points, the indent bound and `]]>`) are drawn rarely enough, or masked often enough by an
 earlier error in the same generated document, to be missed at some seeds, and the vectors pin
 each. The hole check is never decisive on its own: a row with a hole always also covers fewer
 slots than the row its row span starts in (a cell takes the first uncovered slot, so the span's
@@ -315,7 +328,14 @@ restored.
   `h6` shrinking text like `small` (at most one of the four open); and, from making thin spaces
   content, the digit-group and quote-edge rules no longer seeing "10" U+2009 " 000" as one
   number (both now read past every gap: whitespace, thin spaces and Default_Ignorable code
-  points).
+  points). A fifteenth review found a word joiner or zero-width joiner between the tag and the
+  mark still getting past the mark rule (the rule now reads past ignorable code points); an
+  underline turning a sign into another, present since 1.0.0 (`CrCl <u>&lt;</u> 30` drawn
+  "CrCl ≤ 30"; `underlined-sign`); U+2800 BRAILLE PATTERN BLANK drawn as a gap but not read as
+  one (now a gap); narrative and quotes of gaps alone accepted (now `empty-narrative` and
+  `invalid-request`, and the crosswalk's test for a mandatory section follows); the agent's test
+  double still treating U+205F as whitespace; stated rules no vector pinned; and the query
+  service's design document not describing the gap reading.
 
 - **Every submission carrying 2.0.0 is refused by the worker gate** from the moment this change
   deploys. Nothing in the repository produces a 2.0.0 submission after it.

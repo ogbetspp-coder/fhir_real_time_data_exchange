@@ -721,7 +721,9 @@ export async function verifyQuote(
   } catch {
     return fail("verify_quote", "invalid-request", { bundleId: input.bundleId });
   }
-  if (normalizedQuote.length === 0) {
+  // A quote of gaps alone (whitespace, thin spaces, blank glyphs, code points Unicode says to
+  // ignore) quotes nothing a reader sees, and could match between the groups of a number.
+  if (!Array.from(normalizedQuote).some((point) => !isGap(point.codePointAt(0) ?? 0))) {
     return fail("verify_quote", "invalid-request", { bundleId: input.bundleId });
   }
   // A table's grid markers and a picture's U+FFFC are the scanner's, never a reader's: a quote

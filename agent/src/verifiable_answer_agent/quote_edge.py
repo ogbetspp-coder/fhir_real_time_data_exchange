@@ -59,12 +59,14 @@ def _is_digit(character: str | None) -> bool:
 
 
 # src/fidelity/normalize.ts ``isGap`` (fidelity-norm/3.0.0 section 6): section 3 whitespace, the
-# spaces narrower than a quarter of an em, and Default_Ignorable_Code_Point (Unicode 16.0).
+# spaces narrower than a quarter of an em, U+2800 BRAILLE PATTERN BLANK, and
+# Default_Ignorable_Code_Point (Unicode 16.0).
 _WHITESPACE: Final = frozenset(
     {0x09, 0x0A, 0x0D, 0x20, 0xA0, 0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2007, 0x2008}
     | {0x2028, 0x2029, 0x3000}
 )
 _THIN_SPACES: Final = frozenset((0x2006, 0x2009, 0x200A, 0x202F, 0x205F))
+_BLANK_GLYPHS: Final = frozenset((0x2800,))
 _DEFAULT_IGNORABLE: Final = (
     (0x00AD, 0x00AD),
     (0x034F, 0x034F),
@@ -86,11 +88,13 @@ _DEFAULT_IGNORABLE: Final = (
 )
 
 
-def _is_gap(character: str) -> bool:
+def is_gap(character: str) -> bool:
+    """Whether ``character`` is a gap (section 6): drawn as space or as nothing."""
     point = ord(character)
     return (
         point in _WHITESPACE
         or point in _THIN_SPACES
+        or point in _BLANK_GLYPHS
         or any(low <= point <= high for low, high in _DEFAULT_IGNORABLE)
     )
 
@@ -98,7 +102,7 @@ def _is_gap(character: str) -> bool:
 def non_gap(text: str, index: int, step: int) -> str | None:
     """The first code point from ``index`` in direction ``step`` that is not a gap."""
     while 0 <= index < len(text):
-        if not _is_gap(text[index]):
+        if not is_gap(text[index]):
             return text[index]
         index += step
     return None

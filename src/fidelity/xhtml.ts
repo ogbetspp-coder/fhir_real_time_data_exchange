@@ -6,7 +6,13 @@
 // is either folded into the text or rejected.
 
 import { sha256Utf8 } from "../lib/hash.js";
-import { composeText, findForbiddenCharacter, isForbiddenCodePoint } from "./normalize.js";
+import {
+  composeText,
+  findForbiddenCharacter,
+  isDefaultIgnorable,
+  isForbiddenCodePoint,
+  isGap,
+} from "./normalize.js";
 
 export type XhtmlErrorCode =
   | "forbidden-character"
@@ -35,6 +41,7 @@ export type XhtmlErrorCode =
   | "invisible-character"
   | "nesting-depth"
   | "combining-across-markup"
+  | "underlined-sign"
   | "table-section-order"
   | "table-structure"
   | "table-shape"
@@ -139,11 +146,12 @@ export function isGridMarker(codePoint: number): boolean {
 }
 
 // Whether normalised narrative text holds anything a reader sees: a table of empty cells, whose
-// text is only grid markers, draws nothing (section 5, `empty-narrative`).
+// text is only grid markers, and text of only gaps (a thin space, a blank glyph, a code point
+// Unicode says to ignore) draw nothing inked (section 5, `empty-narrative`).
 export function hasDrawnText(normalized: string): boolean {
   for (const character of normalized) {
     const codePoint = character.codePointAt(0) ?? 0;
-    if (codePoint !== 0x0020 && !isGridMarker(codePoint)) return true;
+    if (!isGap(codePoint) && !isGridMarker(codePoint)) return true;
   }
   return false;
 }
@@ -217,11 +225,24 @@ const SPLITTING_INLINE = new Set([
 const COMPOSE_WINDOW = 64;
 const MARK = /^\p{M}$/u;
 
+// The first code point at or after `from` that is not a Default_Ignorable code point other than
+// a mark: a word joiner or a zero-width joiner between the tag and a mark is drawn as nothing,
+// and the mark after it is still drawn apart from the letter before the tag.
+function firstDrawnAfter(points: readonly string[], from: number): string {
+  let position = from;
+  for (; position < points.length; position += 1) {
+    const point = points[position] ?? "";
+    if (MARK.test(point) || !isDefaultIgnorable(point.codePointAt(0) ?? 0)) break;
+  }
+  return points[position] ?? "";
+}
+
 function checkComposition(text: string, boundaries: readonly number[]): void {
   const points = Array.from(text);
   for (const boundary of boundaries) {
-    if (MARK.test(points[boundary] ?? ""))
+    if (MARK.test(firstDrawnAfter(points, boundary))) {
       throw new XhtmlError("combining-across-markup", boundary);
+    }
     const before = points.slice(Math.max(0, boundary - COMPOSE_WINDOW), boundary).join("");
     const after = points.slice(boundary, boundary + COMPOSE_WINDOW).join("");
     if (composeText(before + after) !== composeText(before) + composeText(after)) {
@@ -671,16 +692,23 @@ export function listMarker(style: string, ordinal: number): string {
   return `${marker}. `;
 }
 
+// The elements a renderer underlines (`a` with a target, and `u`), and the signs an underline
+// turns into another sign: "<" underlined is drawn as "≤", ">" as "≥", "+" as "±", "=" as "≡",
+// "-" nearly as "=". A mathematical symbol or a dash inside either is refused (`underlined-sign`).
+const UNDERLINING = new Set(["u", "a"]);
+const UNDERLINE_CHANGES = /^[\p{Sm}\p{Pd}]$/u;
+
 // One code point of text inside the root, raw or decoded, as the scanner emits it: rejected
-// directly inside a table container unless it is raw whitespace, folded or rejected inside
-// `sup` and `sub`, and otherwise kept as it is.
+// directly inside a table container unless it is raw whitespace, rejected if it is a sign under
+// an underline, folded or rejected inside `sup` and `sub`, and otherwise kept as it is.
 function emitText(
   codePoint: number,
-  parent: string | undefined,
+  stack: readonly string[],
   output: string[],
   offset: number,
   isReference: boolean,
 ): void {
+  const parent = stack[stack.length - 1];
   const character = String.fromCodePoint(codePoint);
   // A line feed or carriage return in text is a space to a renderer: only a block boundary or
   // `br` is a line break. Emitting it as U+0020 keeps a bullet after it from reading as a list
@@ -696,6 +724,9 @@ function emitText(
   if (emitted !== character) {
     output.push(emitted);
     return;
+  }
+  if (UNDERLINE_CHANGES.test(character) && stack.some((open) => UNDERLINING.has(open))) {
+    throw new XhtmlError("underlined-sign", offset);
   }
   const rule = parent === undefined ? undefined : SCRIPT_RULES.get(parent);
   if (rule !== undefined) {
@@ -867,7 +898,7 @@ export function xhtmlToText(div: string): string {
       if (entity === null) throw new XhtmlError("stray-amp", index);
       if (stack.length === 0) throw new XhtmlError("text-outside-root", index);
       const codePoint = decodeEntity(entity, index);
-      emitText(codePoint, stack[stack.length - 1], output, index, true);
+      emitText(codePoint, stack, output, index, true);
       index = ENTITY.lastIndex;
       continue;
     }
@@ -888,7 +919,7 @@ export function xhtmlToText(div: string): string {
       ) {
         throw new XhtmlError("cdata", index);
       }
-      emitText(codePoint, parent, output, index, false);
+      emitText(codePoint, stack, output, index, false);
     }
     index += point.length;
   }

@@ -86,6 +86,13 @@ export const quoteEdgeCases: QuoteEdgeCase[] = [
     whole: ["The maximum dose is 10\u2009 000 IU daily.", "Up to 5\u2063 000 IU weekly."],
   },
   {
+    // fidelity-norm/3.0.0 review round 15: U+2800 BRAILLE PATTERN BLANK and a supplementary-plane
+    // tag character are gaps too.
+    text: "Take 10\u2800 000 IU daily. Up to 5\u{E0020} 000 IU weekly.",
+    cut: ["Take 10", "Take 10\u2800", "000 IU daily.", "Up to 5\u{E0020}", "000 IU weekly."],
+    whole: ["Take 10\u2800 000 IU daily.", "Up to 5\u{E0020} 000 IU weekly."],
+  },
+  {
     // Letters outside the Basic Multilingual Plane, before and after a quote, and before a
     // match, so that offsets are counted in code points, not in UTF-16 units.
     text: "Code \u{1D400}5 mg. Take 5 mg\u{1D400} now. Code \u{1D400} then \u{1D401} dose.",

@@ -353,8 +353,10 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
   character the normalisation forbids — is `document-not-found` to the caller and
   `not-entitled` in the record. A quote that normalises to nothing, carries a character the
   normalisation forbids, or (from `fidelity-norm/3.0.0`) carries a table's grid marker or a
-  picture's U+FFFC is `invalid-request`: such a quote could join two rows of a table, or quote
-  nothing a reader sees. It then counts `sectionsSearched` as the number of candidate
+  picture's U+FFFC or normalises to gaps alone (section 6 of the specification: whitespace, the
+  thin spaces, U+2800 and the Default_Ignorable code points) is `invalid-request`: such a quote
+  could join two rows of a table, match between the groups of a number, or quote nothing a
+  reader sees. It then counts `sectionsSearched` as the number of candidate
   sections that carry a narrative, normalises each candidate's text in turn, stops at the first
   match, and hashes only the matched section's text.
 - **The quote-edge rule.** A `verify_quote` match is a contiguous slice of a section's
@@ -372,7 +374,10 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
     closing quotation marks and apostrophes, `»`, `›`, `…` — that is itself followed by a space
     or the end of the text;
   - **across a space**: a quote that begins with a digit after a space preceded by a digit, or
-    ends with a digit before a space followed by a digit, has cut a space-grouped number; a quote
+    ends with a digit before a space followed by a digit, has cut a space-grouped number; the
+    digit on each side is read past every gap (from `fidelity-norm/3.0.0`, the specification's
+    section 6), so "10" U+2009 " 000" and "5" U+2063 " 000" are one number, and a quote may
+    neither end with "10" or "10" U+2009 nor begin with "000" there; a quote
     preceded by a comparator or sign and a space (`<`, `>`, `≤`, `≥`, `±`, `∓`, `−`, `~`, `≈`
     and their variants) has lost it. Both are cuts;
   - and a word character on either side (the fidelity library's own `isWordCharacter`) is a cut
@@ -382,7 +387,8 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
   against "Take 2.5 mg", "Take 10" against "Take 10,5 mg", "see section 4" against "(see section
   4.4)", "20 °C" against "-20 °C" or "−20 °C", "10 mg per day" against "<10 mg per day" or
   "≥10 mg per day", "diabetic patients" against "non-diabetic patients", "t take with food"
-  against "Don't take with food", "Up to 1 000" against "Up to 1 000 000 IU", "first dose is 5
+  against "Don't take with food", "Up to 1 000" against "Up to 1 000 000 IU", "The maximum dose is
+  10" against "The maximum dose is 10" U+2009 " 000 IU", "first dose is 5
   mg/m" against "5 mg/m²" and "max 10" against "max 100 mg" are all `no-match`; a quote that ends
   before a sentence's full stop, a comma, a colon or a closing parenthesis followed by a space,
   or that begins after an opening parenthesis or quotation mark set off by a space, or at a

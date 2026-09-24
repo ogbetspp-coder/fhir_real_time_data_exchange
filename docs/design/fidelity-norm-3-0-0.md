@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and fourteen reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and fifteen reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -774,3 +774,30 @@ The fourteenth review tested the thirteenth's fixes against Chrome and found the
    start tag.
 
 Each fix is pinned by vectors on both sides, and a break of each is caught by them.
+
+## Fifteenth review (2026-09-23): findings and what changed
+
+1. **High.** A word joiner, byte-order mark or zero-width joiner between an inline tag and a mark
+   got past the round-14 mark rule, which tested only the first code point after the tag;
+   Chrome draws `q<b>&#x2060;&#x301;</b>` "q ´". Fixed: the rule reads past Default_Ignorable
+   code points that are not themselves marks.
+2. **High (since 1.0.0).** An underline turns a sign into another: `<u>&lt;</u>` is drawn "≤",
+   `&gt;` "≥", `+` "±", `=` "≡", and a link (`a`) is underlined too. Fixed: a mathematical
+   symbol (Sm) or a dash (Pd) inside `u` or `a` rejects (`underlined-sign`). A source that
+   writes "≤" as an underlined "<" is refused, a false failure.
+3. **High.** U+2800 BRAILLE PATTERN BLANK is drawn as a blank as wide as a letter, so "10" U+2800
+   " 000" is one number to a reader, yet it was not a gap. Fixed: a gap, in the specification
+   and in every consumer.
+4. **High (test double).** The agent's test double still listed U+205F as whitespace. Fixed.
+5. **Medium.** Narrative of gaps alone (a thin space, U+2063, U+2800) was verified, and the
+   crosswalk counted a thin space as narrative in a mandatory section. Fixed: `empty-narrative`,
+   and the crosswalk uses the same test; U+1680, drawn as a stroke, is still drawn.
+6. **Medium.** U+205F, `h5` in the shrink bound, spacing and enclosing marks, and the
+   supplementary-plane ignorable code points had no vector. Fixed: each is pinned, and a break of
+   each fails a vector.
+7. **Medium.** A quote of gaps alone was accepted and could match between the groups of a
+   number. Fixed: `invalid-request`, in the service and the test double.
+8. **Medium.** The query service's design document did not describe the gap reading. Fixed.
+9. to 11. **Low.** Default_Ignorable code points are "said not to be drawn" (a few fonts draw
+   some); the zone-a README's description of the vectors; a note that the agent's chunk cut
+   reads further than the service, which only refuses more. Fixed.

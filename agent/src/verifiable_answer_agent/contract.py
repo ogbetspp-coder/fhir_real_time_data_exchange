@@ -250,7 +250,12 @@ def split_for_verification(text: str, limit: int = VERIFY_QUOTE_MAX_UTF16) -> tu
 
 
 def _acceptable_cut(text: str, index: int) -> bool:
-    """A cut at the run of spaces starting at ``index``, leaving both new edges on a boundary."""
+    """A cut at the run of spaces starting at ``index``, leaving both new edges on a boundary.
+
+    The code point beyond each new edge is read past gaps through the whole answer text, where the
+    service reads only within the quote: this can refuse a cut the service would accept, never the
+    reverse, so a chunk it keeps is still one the service locates.
+    """
     if index <= 0 or text[index] != " " or text[index - 1] == " ":
         return False
     resume = index

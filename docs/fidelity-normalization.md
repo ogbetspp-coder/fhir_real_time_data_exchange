@@ -351,13 +351,22 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   which then refuses the document and draws none of it.
 - A combining mark or a composition across inline markup rejects (`combining-across-markup`,
   from 3.0.0): at each start or end tag of `span`, `b`, `i`, `u`, `em`, `strong`, `sup`, `sub`,
-  `small`, `a`, `abbr`, `cite` or `code`, the first code point emitted after the tag must not be
-  of general category M, and the 64 code points of the emitted text before the tag and the 64
-  after it must give the same text through section 3 steps 1 to 3 together as separately (which
+  `small`, `a`, `abbr`, `cite` or `code`, the first code point emitted after the tag, read past
+  every Default_Ignorable_Code_Point (section 6) that is not itself of category M, must not be of
+  general category M; and the 64 code points of the emitted text before the tag and the 64 after
+  it must give the same text through section 3 steps 1 to 3 together as separately (which
   catches the Hangul jamo that compose without being marks). Its offset is in the emitted text,
-  not in the `div`. A renderer draws the text on each side of such a tag in its own run, so a combining mark after the tag does not
-  join the letter before it: `CrCl &lt;<b>&#x338;</b> 30` is drawn "CrCl </ 30" while NFC reads
-  "≮", and `caf<b>e</b>&#x301;` is drawn with a separate accent.
+  not in the `div`. A renderer draws the text on each side of such a tag in its own run, so a
+  combining mark after the tag does not join the letter before it: `CrCl &lt;<b>&#x338;</b> 30`
+  is drawn "CrCl </ 30" while NFC reads "≮", and `caf<b>e</b>&#x301;` is drawn with a separate
+  accent. A word joiner or a zero-width joiner between the tag and the mark is drawn as nothing
+  and changes neither (`q<b>&#x2060;&#x301;</b>` is drawn "q ´").
+- A sign under an underline rejects (`underlined-sign`, from 3.0.0): a code point of general
+  category Sm (a mathematical symbol) or Pd (a dash), raw or by reference, emitted while `u` or
+  `a` is open. A renderer underlines both, and the underline turns the sign into another:
+  `CrCl <u>&lt;</u> 30` is drawn "CrCl ≤ 30", `&gt;` as "≥", `+` as "±", `=` as "≡", and
+  `2<u>-</u>3` nearly as "2=3". A source that writes "≤" as an underlined "<" is therefore
+  refused, a false failure.
 - A root language tag changes the font a renderer picks (`lang="ja"` draws Latin text, dashes
   and ellipses in a Japanese font) but not the text; it is not compared.
 - Allowed attributes: `xmlns` (root), `xml:lang` and `lang` (root `div` only), `href` (`a`
@@ -389,15 +398,15 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   Each decoded code point is subject to section 2 on its own. Named HTML entities such as
   `&nbsp;` reject.
 - The extracted text is then normalised (section 3) by the verifier, which is where an empty
-  result is decided: a narrative whose normalised text holds nothing but U+0020 and the grid
-  markers U+FDD0–U+FDD5 draws nothing, and is `malformed-narrative` with reason
-  `empty-narrative` (a table of empty cells is empty; a list number or a picture is drawn). The
-  scanner itself never produces that reason. The crosswalk (`src/fhir/transform.ts`) decides
-  whether a mandatory section carries narrative by a rule of its own: it ignores whitespace and
-  invisible characters (U+200B, U+200C, U+200D, U+2060, U+FEFF, U+00AD) and, for a mandatory
-  section, pictures, but not a lone list bullet (which the fidelity check then reads as
-  `empty-narrative`), because a picture
-  can draw nothing and what one shows is never read.
+  result is decided: a narrative whose normalised text holds nothing but gaps (section 6:
+  whitespace, the thin spaces, U+2800 and the Default_Ignorable code points) and the grid markers
+  U+FDD0–U+FDD5 draws nothing inked, and is `malformed-narrative` with reason `empty-narrative`
+  (a table of empty cells is empty, and so is a thin space alone; a list number, a picture and
+  U+1680, drawn as a stroke, are drawn). The scanner itself never produces that reason. The
+  crosswalk (`src/fhir/transform.ts`) decides whether a mandatory section carries narrative by
+  the same test on the scanner's text, except that for a mandatory section it also ignores
+  pictures, because a picture can draw nothing and what one shows is never read; a lone list
+  bullet counts there (the fidelity check then reads it as `empty-narrative`).
 
 Because block boundaries become U+000A or U+0009 and the whitespace step collapses them,
 paragraph boundaries, headings and line breaks are structure, not content. A table's cells are
@@ -463,10 +472,11 @@ reason code is inside `reportHash`, so the order in which violations are decided
   `</tbody>`, `</tfoot>` and `</table>`, a clipped row span, then at `</table>` the row widths,
   then a column drawn at zero width).
 - At `&`: `stray-amp`, then `text-outside-root`, then `unknown-entity`, then
-  `forbidden-character`, then `reserved-character`, then `invisible-character`, then `table-content`, then `list-content`,
-  then `unmappable-script`.
+  `forbidden-character`, then `reserved-character`, then `invisible-character`, then
+  `table-content`, then `list-content`, then `underlined-sign`, then `unmappable-script`.
 - At a raw code point: `text-outside-root`, `table-content` or `list-content` (whichever the
-  parent makes applicable), then `cdata` (the start of `]]>`), then `unmappable-script`.
+  parent makes applicable), then `cdata` (the start of `]]>`), then `underlined-sign`, then
+  `unmappable-script`.
 - After a clean scan: `combining-across-markup`, then `empty-narrative`.
 
 (So `<table><td>a</td></table>` is `misnested-tag`, `<iframe/>` is `unknown-element` and
@@ -479,7 +489,8 @@ The scanner's reason codes are, in the order of this section: `forbidden-charact
 `uppercase-element`, `unknown-element`, `void-element`, `list-content`, `script-content`,
 `unmappable-script`, `table-content`, `table-shape`, `table-size`, `table-structure`,
 `table-section-order`,
-`misnested-tag`, `nesting-depth`, `combining-across-markup`, `forbidden-attribute`, `comment`, `processing-instruction`,
+`misnested-tag`, `nesting-depth`, `combining-across-markup`, `underlined-sign`,
+`forbidden-attribute`, `comment`, `processing-instruction`,
 `cdata`, `doctype`, `malformed-tag`, `stray-lt`, `stray-amp`, `unknown-entity`,
 `unbalanced-tag`.
 
@@ -518,12 +529,14 @@ The scanner's reason codes are, in the order of this section: `forbidden-charact
     the groups of a number (`10 000`), so for the edge rules they are not a boundary between
     tokens.
   - A gap is §3 step 5 whitespace; a space narrower than a quarter of an em (U+2006, U+2009,
-    U+200A, U+202F, U+205F), which §3 makes content; or a Default_Ignorable_Code_Point of
-    Unicode 16.0 (U+00AD, U+034F, U+061C, U+115F–U+1160, U+17B4–U+17B5, U+180B–U+180F,
-    U+200B–U+200F, U+202A–U+202E, U+2060–U+206F, U+3164, U+FE00–U+FE0F, U+FEFF, U+FFA0,
-    U+FFF0–U+FFF8, U+1BCA0–U+1BCA3, U+1D173–U+1D17A, U+E0000–U+E0FFF), drawn as nothing. The
-    digit-group rule below reads past every gap, so "10" U+2009 " 000" and "10" U+2063 " 000"
-    are each one number.
+    U+200A, U+202F, U+205F), which §3 makes content; U+2800 BRAILLE PATTERN BLANK, drawn as an
+    empty cell as wide as a letter; or a Default_Ignorable_Code_Point of Unicode 16.0 (U+00AD,
+    U+034F, U+061C, U+115F–U+1160, U+17B4–U+17B5, U+180B–U+180F, U+200B–U+200F, U+202A–U+202E,
+    U+2060–U+206F, U+3164, U+FE00–U+FE0F, U+FEFF, U+FFA0, U+FFF0–U+FFF8, U+1BCA0–U+1BCA3,
+    U+1D173–U+1D17A, U+E0000–U+E0FFF), which Unicode says a renderer should not draw (a few
+    fonts draw some of them, U+3164 or U+115F; since a digit is never a gap, reading past more
+    of them only refuses more). The digit-group rule below reads past every gap, so "10"
+    U+2009 " 000" and "10" U+2063 " 000" are each one number.
   - Start. Read backwards from the code point before the first span's start offset through
     page n's body. On passing its bodyStart, continue from the last code point of page n−1's
     body, and so on through earlier pages. Only body text is read, and earlier pages are read
@@ -815,7 +828,7 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   emits U+FFFC, the SHA-256 of its `src` and U+FFFC; the tables of a narrative cover at most
   50 000 slots (`table-size`); a narrative of only grid markers is `empty-narrative`. U+FFFC and
   U+FDD0–U+FDEF reject in narrative
-  (`reserved-character`, one of the two rules applied to one side only). U+1680 OGHAM SPACE MARK, drawn as a stroke, and the spaces narrower than a quarter of an em (U+2006, U+2009, U+200A, U+202F, U+205F) leave the section 3 whitespace list and are content; narrative rejects U+00AD and U+200B (`invisible-character`, withdrawing `soft-hyphen-at-boundary`); nesting is bounded (`nesting-depth`); `]]>` in text rejects (`cdata`); and a combining mark or a composition across inline markup rejects (`combining-across-markup`); section 6's digit-group rule reads past every gap. Section 7 qualifies structured sources only;
+  (`reserved-character`, one of the two rules applied to one side only). U+1680 OGHAM SPACE MARK, drawn as a stroke, and the spaces narrower than a quarter of an em (U+2006, U+2009, U+200A, U+202F, U+205F) leave the section 3 whitespace list and are content; narrative rejects U+00AD and U+200B (`invisible-character`, withdrawing `soft-hyphen-at-boundary`); nesting is bounded (`nesting-depth`); `]]>` in text rejects (`cdata`); a combining mark or a composition across inline markup rejects (`combining-across-markup`); a sign under an underline rejects (`underlined-sign`); section 6's digit-group rule reads past every gap; and a narrative of gaps alone is `empty-narrative`. Section 7 qualifies structured sources only;
   drawn-document extraction is not qualified until a later version closes the open items the
   reviews recorded. The extractor contract (section 7) writes tables with their grid, numbered markers with a space, pictures with their hash, and
   a structured source as one page per section. Major under section 8: extractor output that

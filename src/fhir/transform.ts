@@ -1,4 +1,5 @@
 import { sha256, stableUuid } from "../lib/hash.js";
+import { isGap } from "../fidelity/normalize.js";
 import { isGridMarker, xhtmlToText } from "../fidelity/xhtml.js";
 import { duplicateRuleIssues, type EmaMapping, type SectionRule } from "./mapping.js";
 import {
@@ -76,21 +77,13 @@ const ENGLISH_LANGUAGE = /^en(?:-latn)?(?:-(?:[a-z]{2}|\d{3}))?$/i;
 // orderedBy, mode — would be dropped, so a section carrying one is refused instead.
 const CARRIED_SECTION_ELEMENTS = new Set(["id", "title", "code", "text", "section"]);
 
-// Characters that show nothing on the page besides whitespace (which already covers U+00A0 and
-// U+FEFF): the zero-width space, the zero-width non-joiner and joiner, the word joiner and the
-// soft hyphen.
-const INVISIBLE_CODE_POINTS = new Set([0x200b, 0x200c, 0x200d, 0x2060, 0x00ad]);
-const DRAWN_SPACES = new Set([0x1680, 0x2006, 0x2009, 0x200a, 0x202f, 0x205f]);
-
-// The scanner's table-grid markers are structure, not text: a table of empty cells shows nothing
-// (the rule section 5 uses for `empty-narrative`). A picture and a list number are drawn.
+// What a reader sees inked, by the rule section 5 uses for `empty-narrative`: not a gap (section
+// 6: whitespace, a thin space, a blank glyph, a code point Unicode says to ignore) and not one of
+// the scanner's table-grid markers, which are structure (a table of empty cells shows nothing).
+// U+1680 OGHAM SPACE MARK, drawn as a stroke, is not a gap; a picture and a list number are drawn.
 function isVisible(character: string): boolean {
   const codePoint = character.codePointAt(0) ?? 0;
-  if (isGridMarker(codePoint)) return false;
-  // `\s` to JavaScript but content from fidelity-norm/3.0.0 (section 3 step 5): U+1680 OGHAM SPACE
-  // MARK, drawn as a stroke, and the spaces narrower than a quarter of an em.
-  if (DRAWN_SPACES.has(codePoint)) return true;
-  return !/\s/u.test(character) && !INVISIBLE_CODE_POINTS.has(codePoint);
+  return !isGap(codePoint) && !isGridMarker(codePoint);
 }
 
 type Narrative = "absent" | "present" | "unreadable";

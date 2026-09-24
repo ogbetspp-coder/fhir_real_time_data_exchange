@@ -49,7 +49,13 @@ import re
 import unicodedata
 from typing import Final
 
-from .normalize import compose_text, find_forbidden_character, is_forbidden
+from .normalize import (
+    compose_text,
+    find_forbidden_character,
+    is_default_ignorable,
+    is_forbidden,
+    is_gap,
+)
 
 XHTML_NAMESPACE: Final = "http://www.w3.org/1999/xhtml"
 
@@ -147,9 +153,10 @@ def is_grid_marker(code_point: int) -> bool:
 def has_drawn_text(normalized: str) -> bool:
     """Whether normalised narrative text holds anything a reader sees (section 5).
 
-    A table of empty cells, whose text is only grid markers, draws nothing: ``empty-narrative``.
+    A table of empty cells, whose text is only grid markers, and text of only gaps (a thin space, a
+    blank glyph, a code point Unicode says to ignore) draw nothing inked: ``empty-narrative``.
     """
-    return any(character != " " and not is_grid_marker(ord(character)) for character in normalized)
+    return any(not is_gap(ord(c)) and not is_grid_marker(ord(c)) for c in normalized)
 
 
 # The slots all tables of one narrative may cover together. A small table can span a large grid
@@ -211,9 +218,26 @@ SPLITTING_INLINE: Final = frozenset(
 COMPOSE_WINDOW: Final = 64
 
 
+def _is_mark(character: str) -> bool:
+    return unicodedata.category(character)[0] == "M"
+
+
+def _first_drawn_after(text: str, start: int) -> str | None:
+    """The first code point from ``start`` that is not a Default_Ignorable non-mark, or None.
+
+    A word joiner or a zero-width joiner between the tag and a mark is drawn as nothing, and the
+    mark after it is still drawn apart from the letter before the tag.
+    """
+    for character in text[start:]:
+        if _is_mark(character) or not is_default_ignorable(ord(character)):
+            return character
+    return None
+
+
 def _check_composition(text: str, boundaries: list[int]) -> None:
     for boundary in boundaries:
-        if boundary < len(text) and unicodedata.category(text[boundary])[0] == "M":
+        first = _first_drawn_after(text, boundary)
+        if first is not None and _is_mark(first):
             raise XhtmlError("combining-across-markup", boundary)
         before = text[max(0, boundary - COMPOSE_WINDOW) : boundary]
         after = text[boundary : boundary + COMPOSE_WINDOW]
@@ -699,15 +723,23 @@ def list_marker(style: str, ordinal: int) -> str:
     return f"{marker}. "
 
 
+# The elements a renderer underlines (`a` with a target, and `u`), and the signs an underline turns
+# into another sign: "<" underlined is drawn as "≤", ">" as "≥", "+" as "±", "=" as "≡", "-"
+# nearly as "=". A mathematical symbol or a dash inside either is refused (`underlined-sign`).
+UNDERLINING: Final = frozenset({"u", "a"})
+UNDERLINE_CHANGES: Final = frozenset({"Sm", "Pd"})
+
+
 def _emit_text(
-    code_point: int, parent: str | None, output: list[str], offset: int, is_reference: bool
+    code_point: int, stack: list[str], output: list[str], offset: int, is_reference: bool
 ) -> None:
     """One code point of text inside the root, raw or decoded, as the scanner emits it.
 
-    Rejected directly inside a table container unless it is raw whitespace; folded or rejected
-    inside ``sup`` and ``sub``; otherwise kept as it is. General category N is read from
-    ``unicodedata`` because ``re`` has no ``\\p{N}``.
+    Rejected directly inside a table container unless it is raw whitespace; rejected if it is a
+    sign under an underline; folded or rejected inside ``sup`` and ``sub``; otherwise kept as it
+    is. General category N is read from ``unicodedata`` because ``re`` has no ``\\p{N}``.
     """
+    parent = stack[-1] if stack else None
     character = chr(code_point)
     # A line feed or carriage return in text is a space to a renderer: only a block boundary or
     # `br` is a line break.
@@ -722,6 +754,10 @@ def _emit_text(
     if emitted != character:
         output.append(emitted)
         return
+    if unicodedata.category(character) in UNDERLINE_CHANGES and any(
+        open_name in UNDERLINING for open_name in stack
+    ):
+        raise XhtmlError("underlined-sign", offset)
     rule = SCRIPT_RULES.get(parent) if parent is not None else None
     if rule is not None:
         folded = rule.folding.get(code_point)
@@ -913,7 +949,7 @@ def xhtml_to_text(div: str) -> str:
             if not stack:
                 raise XhtmlError("text-outside-root", index)
             code_point = _decode_entity(entity, index)
-            _emit_text(code_point, stack[-1], output, index, is_reference=True)
+            _emit_text(code_point, stack, output, index, is_reference=True)
             index = entity.end()
             continue
 
@@ -931,7 +967,7 @@ def xhtml_to_text(div: str) -> str:
                 and parent not in LIST_CONTAINERS
             ):
                 raise XhtmlError("cdata", index)
-            _emit_text(ord(character), parent, output, index, is_reference=False)
+            _emit_text(ord(character), stack, output, index, is_reference=False)
         index += 1
 
     if not root_seen:

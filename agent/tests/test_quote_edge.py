@@ -116,7 +116,8 @@ def test_the_fake_refuses_the_quotes_the_service_refuses() -> None:
     """The test double answers ``invalid-request`` where ``src/query/tools.ts`` does.
 
     Since fidelity-norm/3.0.0 that includes a quote carrying a table's grid markers or a
-    picture's U+FFFC: such a quote could join two rows, or quote nothing a reader sees.
+    picture's U+FFFC, and a quote of gaps alone: such a quote could join two rows, or quote nothing
+    a reader sees.
     """
     table = "Dose table \ufdd0 \ufdd2 \ufdd3 Adults \ufdd3 10 mg \ufdd1 end."
     refused = (
@@ -138,6 +139,14 @@ def test_the_fake_refuses_the_quotes_the_service_refuses() -> None:
         "\n\u2022 ",
         "\n\u2022 \u25cf ",
         "\n\u2022\n",
+        # Quotes of gaps alone (section 6): content spaces, blank glyphs, ignorable code points.
+        "\u2009",
+        "\u205f",
+        " \u2063 ",
+        "\u2800",
+        "\u205f\u200d",
+        "\U000e0020",
+        "\n\u2022 \u2009",
     )
     for quote in refused:
         assert quote_is_refused(quote), repr(quote)
@@ -151,6 +160,9 @@ def test_the_fake_refuses_the_quotes_the_service_refuses() -> None:
         "\n\u2022",
         "\u2022 ",
         "\n\u2022\t",
+        # A bullet after a thin space is not at the line's start, so step 4 keeps it.
+        "\n\u2009\u2022 ",
+        "\u2009x",
     )
     for quote in accepted:
         assert not quote_is_refused(quote), repr(quote)

@@ -110,7 +110,7 @@ const BULLET = CHARS(0x2022, 0x2023, 0x25a0, 0x25a1, 0x25aa, 0x25ab, 0x25cb, 0x2
 // rule reads past.
 const GROUP_SEPARATORS = CHARS(0x0020);
 const GROUP_JOINERS = CHARS(0x00a0, 0x2007);
-const GROUP_GAPS = CHARS(0x2009, 0x202f, 0x200a, 0x2063);
+const GROUP_GAPS = CHARS(0x2009, 0x202f, 0x200a, 0x2063, 0x205f, 0x2800, 0xe0020);
 // What stands between two groups: one code point, or two (a span can then end or start inside
 // the run and still cut the number, review round 3).
 const GROUP_RUNS: readonly string[] = [
@@ -1083,6 +1083,9 @@ const VIOLATIONS: readonly Violation[] = [
         "<p>Do <small><small>not</small></small> exceed.</p>",
         "<p>Do <small>not</small> exceed.</p>",
         "<h1>a<h2>b</h2></h1>",
+        "<h5>a<small>b</small></h5>",
+        "<h6>a<code>b</code></h6>",
+        "<p><code>a</code><small>b</small></p>",
       ]);
       return root(`${body}${inner}`, attrs);
     },
@@ -1104,8 +1107,43 @@ const VIOLATIONS: readonly Violation[] = [
         "<p><b>cafe&#x301;</b></p>",
         "<p>a<b>b</b>c</p>",
         `<p>e<span>${CP(0x0301)}</span></p>`,
+        // A mark after code points drawn as nothing, and marks of each kind (review round 15).
+        "<p>q<b>&#x2060;&#x301;</b></p>",
+        "<p><b>q</b>&#xFEFF;&#x301;</p>",
+        "<p>q<b>&#x200D;&#x301;</b></p>",
+        "<p>q<b>&#x2060;x</b></p>",
+        "<p>q<b> &#x301;</b></p>",
+        "<p>&#x915;<b>&#x93E;</b></p>",
+        "<p>1<b>&#x20DD;</b></p>",
+        `<p>q<i>${CP(0xe0020)}${CP(0x0301)}</i></p>`,
       ]);
       return root(`${body}${inner}`, attrs);
+    },
+  },
+  {
+    // A sign under an underline, which a renderer turns into another sign ("<" drawn "≤").
+    className: "underlined-sign",
+    apply: (body, attrs, random) => {
+      const element = pick(random, [
+        ["<u>", "</u>"],
+        ['<a href="https://example.org/">', "</a>"],
+        ["<u><b>", "</b></u>"],
+        ["<b>", "</b>"],
+      ]);
+      const sign = pick(random, [
+        "&lt;",
+        "&gt;",
+        "+",
+        "=",
+        "-",
+        "&#x2013;",
+        "&#x2212;",
+        "~",
+        "x",
+        "4.4",
+        " ",
+      ]);
+      return root(`${body}<p>CrCl ${element[0]}${sign}${element[1]} 30</p>`, attrs);
     },
   },
   {

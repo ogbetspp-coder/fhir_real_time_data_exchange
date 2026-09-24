@@ -494,6 +494,11 @@ const HAIR_LINE = "Take 2 10 mg tablets.";
 const HAIR_SOURCE = customSource([HAIR_LINE]);
 // Review round 14: an invisible separator (U+2063, drawn as nothing) between the groups.
 const GROUPED_INVISIBLE_THEN_SPACE_SOURCE = customSource([GROUPED("\u2063 ")]);
+// Review round 15: U+2800 BRAILLE PATTERN BLANK is drawn as a blank, and a tag character from the
+// supplementary planes as nothing; each is a gap between the groups.
+const GROUPED_BLANK_THEN_SPACE_SOURCE = customSource([GROUPED("\u2800 ")]);
+const GROUPED_TAG_SPACE_THEN_SPACE_SOURCE = customSource([GROUPED("\u{E0020} ")]);
+const OGHAM_ALONE_SOURCE = customSource(["\u1680"]);
 const SPANNED_DOSE_TABLE =
   '<table><tr><td>Adults</td><td rowspan="3">10 mg</td></tr><tr><td>Children</td></tr><tr><td>Elderly</td></tr></table>';
 const MID_LINE_BULLET = "Take 2 \u2022 10 mg daily.";
@@ -2652,6 +2657,77 @@ export const verifyCases: VerifyCase[] = [
       reasons: { "smpc.4.2.posology": "word-cut" },
     },
   },
+  // Review round 15: U+2800 and a supplementary-plane Default_Ignorable code point are gaps;
+  // narrative of gaps alone draws nothing inked; U+1680, a stroke, is drawn; U+205F is content.
+  {
+    name: "span-ends-with-braille-blank-inside-number",
+    input: toInput(
+      GROUPED_BLANK_THEN_SPACE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("The maximum dose is 10&#x2800;"), [
+        spanFor(GROUPED_BLANK_THEN_SPACE_SOURCE, 1, "The maximum dose is 10\u2800"),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
+    },
+  },
+  {
+    name: "span-ends-with-tag-space-inside-number",
+    input: toInput(
+      GROUPED_TAG_SPACE_THEN_SPACE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("The maximum dose is 10&#xE0020;"), [
+        spanFor(GROUPED_TAG_SPACE_THEN_SPACE_SOURCE, 1, "The maximum dose is 10\u{E0020}"),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
+    },
+  },
+  {
+    name: "thin-space-alone-is-empty",
+    input: toInput(S, single("smpc.4.1", paragraphs("&#x2009;"), [spanFor(S, 1, INDICATIONS)])),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.1": "malformed-narrative" },
+      reasons: { "smpc.4.1": "empty-narrative" },
+    },
+  },
+  {
+    name: "invisible-separator-and-braille-blank-alone-are-empty",
+    input: toInput(
+      S,
+      single("smpc.4.1", paragraphs("&#x2063;&#x2800;&#x200D;"), [spanFor(S, 1, INDICATIONS)]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.1": "malformed-narrative" },
+      reasons: { "smpc.4.1": "empty-narrative" },
+    },
+  },
+  {
+    name: "ogham-space-mark-alone-is-drawn",
+    input: toInput(
+      OGHAM_ALONE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("&#x1680;"), [
+        spanFor(OGHAM_ALONE_SOURCE, 1, "\u1680"),
+      ]),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "medium-mathematical-space-against-a-space-mismatches",
+    input: toInput(
+      SPACE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("Take 2&#x205F;10 mg daily."), [
+        spanFor(SPACE_SOURCE, 1, SPACE_LINE),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
 ];
 
 export const throwCases: ThrowCase[] = [
@@ -2865,6 +2941,11 @@ export const normalizationCases: NormalizationCase[] = [
   { name: "hair-space-is-content", input: "Take 2\u200a10 mg", expected: "Take 2\u200a10 mg" },
   { name: "thin-space-is-content", input: "10\u2009000 IU", expected: "10\u2009000 IU" },
   { name: "six-per-em-space-is-content", input: "2\u200610", expected: "2\u200610" },
+  {
+    name: "medium-mathematical-space-is-content",
+    input: "Take 2\u205f10 mg",
+    expected: "Take 2\u205f10 mg",
+  },
   { name: "narrow-no-break-space-is-content", input: "10\u202f000", expected: "10\u202f000" },
   { name: "four-per-em-space-is-still-a-space", input: "2\u200510", expected: "2 10" },
   // U+1680 OGHAM SPACE MARK is drawn as a stroke, so it is content (fidelity-norm/3.0.0).
@@ -4570,5 +4651,101 @@ export const xhtmlCases: XhtmlCase[] = [
     name: "table-content-before-cdata-end",
     input: div("<table><tr>]]></tr></table>"),
     expected: { error: "table-content" },
+  }, // Review round 15: a mark after code points drawn as nothing, marks of every kind, the shrink
+  // bound for h5, and signs under an underline.
+  {
+    name: "rejects-mark-after-word-joiner-across-bold",
+    input: div("<p>q<b>&#x2060;&#x301;</b></p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "rejects-mark-after-bom-after-end-tag",
+    input: div("<p><b>q</b>&#xFEFF;&#x301;</p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "rejects-stroke-after-word-joiner-across-bold",
+    input: div("<p>&#x2A7D;<b>&#x2060;&#x338;</b> 30</p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "rejects-stroke-after-invisible-separator-across-bold",
+    input: div("<p>CrCl &lt;<b>&#x2063;&#x338;</b> 30</p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "rejects-mark-after-zero-width-joiner-across-bold",
+    input: div("<p>q<b>&#x200D;&#x301;</b></p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "accepts-word-joiner-then-letter-across-bold",
+    input: div("<p>q<b>&#x2060;x</b></p>"),
+    expected: "\n\nq\u2060x\n\n",
+  },
+  {
+    name: "accepts-space-then-mark-across-bold",
+    input: div("<p>q<b> &#x301;</b></p>"),
+    expected: "\n\nq \u0301\n\n",
+  },
+  {
+    name: "rejects-spacing-mark-across-bold",
+    input: div("<p>&#x915;<b>&#x93E;</b></p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "rejects-enclosing-mark-across-bold",
+    input: div("<p>1<b>&#x20DD;</b></p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "rejects-small-inside-h5",
+    input: div("<h5>a<small>b</small></h5>"),
+    expected: { error: "nesting-depth" },
+  },
+  {
+    name: "rejects-underlined-less-than",
+    input: div("<p>Contraindicated if CrCl <u>&lt;</u> 30 ml/min.</p>"),
+    expected: { error: "underlined-sign" },
+  },
+  {
+    name: "rejects-underlined-greater-than",
+    input: div("<p>Age <u>&gt;</u> 65 years</p>"),
+    expected: { error: "underlined-sign" },
+  },
+  {
+    name: "rejects-underlined-plus",
+    input: div("<p>10 <u>+</u> 2 mg</p>"),
+    expected: { error: "underlined-sign" },
+  },
+  {
+    name: "rejects-underlined-equals",
+    input: div("<p>a <u>=</u> b</p>"),
+    expected: { error: "underlined-sign" },
+  },
+  {
+    name: "rejects-underlined-hyphen",
+    input: div("<p>2<u>-</u>3</p>"),
+    expected: { error: "underlined-sign" },
+  },
+  {
+    name: "rejects-underlined-en-dash",
+    input: div("<p>2<u>&#x2013;</u>3</p>"),
+    expected: { error: "underlined-sign" },
+  },
+  {
+    name: "rejects-sign-in-link",
+    input: div('<p>CrCl <a href="https://example.org/">&lt;</a> 30</p>'),
+    expected: { error: "underlined-sign" },
+  },
+  {
+    name: "underlined-sign-before-unmappable-script",
+    input: div("<p><u>2<sup>=</sup></u></p>"),
+    expected: { error: "underlined-sign" },
+  },
+  {
+    name: "accepts-underlined-words",
+    input: div("<p><u>see section 4.4</u> &lt; 30</p>"),
+    expected: "\n\nsee section 4.4 < 30\n\n",
   },
 ];

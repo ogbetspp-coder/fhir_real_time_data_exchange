@@ -71,15 +71,24 @@ const DEFAULT_IGNORABLE: readonly (readonly [number, number])[] = [
   [0xe0000, 0xe0fff],
 ];
 
-function isDefaultIgnorable(codePoint: number): boolean {
+export function isDefaultIgnorable(codePoint: number): boolean {
   return DEFAULT_IGNORABLE.some(([low, high]) => codePoint >= low && codePoint <= high);
 }
 
+// Code points drawn as an empty glyph that are neither whitespace nor Default_Ignorable: U+2800
+// BRAILLE PATTERN BLANK, drawn as wide as a letter with no dots.
+const BLANK_GLYPHS = new Set([0x2800]);
+
 // A gap for the digit-group rules (section 6) and the quote-edge rule: section 3 whitespace, a
-// thin space, or a code point drawn as nothing. Reading past these, "10" U+2009 " 000" is one
-// number, however the gap between its groups is written.
+// thin space, a blank glyph, or a code point Unicode says to ignore. Reading past these, "10"
+// U+2009 " 000" is one number, however the gap between its groups is written.
 export function isGap(codePoint: number): boolean {
-  return isWhitespace(codePoint) || THIN_SPACES.has(codePoint) || isDefaultIgnorable(codePoint);
+  return (
+    isWhitespace(codePoint) ||
+    THIN_SPACES.has(codePoint) ||
+    BLANK_GLYPHS.has(codePoint) ||
+    isDefaultIgnorable(codePoint)
+  );
 }
 
 const WORD_CHARACTER = /^[\p{L}\p{N}\p{M}]$/u;

@@ -107,16 +107,28 @@ def is_whitespace(code_point: int) -> bool:
     return code_point in WHITESPACE
 
 
+# Code points drawn as an empty glyph that are neither whitespace nor Default_Ignorable: U+2800
+# BRAILLE PATTERN BLANK, drawn as wide as a letter with no dots.
+BLANK_GLYPHS: Final = frozenset({0x2800})
+
+
+def is_default_ignorable(code_point: int) -> bool:
+    """Unicode's Default_Ignorable_Code_Point (Unicode 16.0), from the table above."""
+    return any(low <= code_point <= high for low, high in DEFAULT_IGNORABLE)
+
+
 def is_gap(code_point: int) -> bool:
     """A gap for the digit-group rules (section 6) and the quote-edge rule.
 
-    Section 3 whitespace, a thin space, or a code point drawn as nothing: reading past these,
-    "10" U+2009 " 000" is one number, however the gap between its groups is written.
+    Section 3 whitespace, a thin space, a blank glyph, or a code point Unicode says to ignore:
+    reading past these, "10" U+2009 " 000" is one number, however the gap between its groups is
+    written.
     """
     return (
         code_point in WHITESPACE
         or code_point in THIN_SPACES
-        or any(low <= code_point <= high for low, high in DEFAULT_IGNORABLE)
+        or code_point in BLANK_GLYPHS
+        or is_default_ignorable(code_point)
     )
 
 

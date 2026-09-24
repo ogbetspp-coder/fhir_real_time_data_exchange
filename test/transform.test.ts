@@ -332,6 +332,12 @@ describe("deterministic Type 2 to EMA conversion", () => {
     // A picture can draw nothing (these bytes draw a broken-image icon), and what one shows is
     // never read, so a mandatory section needs text.
     ["a picture", '<p><img src="data:image/png;base64,AA=="/></p>', "has no narrative"],
+    // Gaps (fidelity-norm/3.0.0 section 6) draw nothing inked: a thin space, content to the
+    // comparison, is still no narrative, and so are a blank glyph and ignorable code points.
+    ["a thin space", "<p>&#x2009;</p>", "has no narrative"],
+    ["a medium mathematical space", "<p>&#x205F;</p>", "has no narrative"],
+    ["a braille blank and an invisible separator", "<p>&#x2800;&#x2063;</p>", "has no narrative"],
+    ["a zero-width joiner and a tag space", "<p>&#x200D;&#xE0020;</p>", "has no narrative"],
   ])("fails closed when a mandatory leaf section holds only %s", (_name, content, outcome) => {
     const source = createSyntheticType2Bundle(mapping);
     findSection(composition(source).section, "smpc.4.3").text = {
@@ -346,7 +352,6 @@ describe("deterministic Type 2 to EMA conversion", () => {
     ["a numbered item", '<ol start="2"><li></li></ol>'],
     ["a table with one filled cell", "<table><tr><td></td><td>x</td></tr></table>"],
     ["an Ogham space mark, which is drawn as a stroke", "<p>&#x1680;</p>"],
-    ["a thin space, which is content", "<p>&#x2009;</p>"],
   ])("counts %s as narrative a reader sees", (_name, content) => {
     const source = createSyntheticType2Bundle(mapping);
     findSection(composition(source).section, "smpc.4.3").text = {
