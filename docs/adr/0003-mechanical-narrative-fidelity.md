@@ -89,7 +89,11 @@ reader sees without the check seeing it._
   page break is the page record), and declare per-page `bodyStart`/`bodyEnd` so repeated
   headers and footers are excluded from spans, with every non-empty body ending in its own line
   feed. An extractor that cannot tell a glyph's baseline shift must refuse the document rather
-  than emit plain digits.
+  than emit plain digits. From `fidelity-norm/3.0.0` the contract also writes a table across pages
+  as its logical text and a continuation line that begins with a bullet glyph with a leading
+  tab, and it qualifies structured sources only: for drawn documents (PDF, or Word read as laid
+  out) its reviews recorded open cases (line wraps, undrawn soft hyphens, page footnotes), and no
+  drawn-document extractor may support an approval until a later version closes them.
 - Tail-of-page omissions are visible only through the report's coverage figures, which are
   recorded as evidence for reviewers but do not fail the check. Because the body range is
   declared by the extractor, it is bounded rather than trusted: bodies must sit on line

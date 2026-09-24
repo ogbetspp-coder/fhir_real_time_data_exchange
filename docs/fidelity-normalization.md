@@ -595,7 +595,26 @@ provenance <sourceKey>` for each provenance entry with no section, in provenance
 
 The page text an extractor produces is the reference the narrative is checked against, so the
 extractor is a controlled component: its name and version are recorded in
-`IngestionProvenance.extraction.parser`, pinned, and checksummed like the FHIR packages. It must:
+`IngestionProvenance.extraction.parser`, pinned, and checksummed like the FHIR packages.
+
+**What 3.0.0 qualifies.** The rules below are complete for a structured source (the last rule of
+this section): its text is the scanner's own reading of the source's markup, one source section
+per page, with no wrapped lines, no page breaks inside a section and no drawn page furniture, so
+none of the layout rules below comes into play. For a drawn document (a PDF, or a Word document
+read as laid out) they are not complete. The independent reviews of 3.0.0 found cases where text
+a conforming extractor may write lets a narrative verify that the document does not draw: a line
+wrapped at the space between the groups of a number or after a dash, which section 6's edge
+rules then read as a token boundary; an undrawn soft hyphen at the end of a block, which step 1
+joins to the next block; a bullet after an invisible character, or after a line break the
+document draws, at the start of a line; a page footnote or margin text drawn inside a continued
+paragraph; and a table caption split just after U+FDD0. Several of these hold for 2.0.0 too.
+They are listed, with the fixes the reviews proposed, in `docs/design/fidelity-norm-3-0-0.md`
+("Drawn documents: open items"). Until a later version closes them, no drawn-document extractor
+is qualified: a report over a drawn document's text proves agreement with that text, not with
+what the document draws, and must not support an approval. The drawn-document rules below stand
+as the start of that work.
+
+An extractor must:
 
 - take every character from the document's embedded text layer through a pinned,
   deterministic library, so that for a born-digital document the extracted text is
@@ -744,7 +763,9 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
   emits U+FFFC, the SHA-256 of its `src` and U+FFFC; the tables of a narrative cover at most
   50 000 slots (`table-size`); a narrative of only grid markers is `empty-narrative`. U+FFFC and
   U+FDD0–U+FDEF reject in narrative
-  (`reserved-character`, the one rule applied to one side only). The extractor contract (section 7) writes tables with their grid, numbered markers with a space, pictures with their hash, and
+  (`reserved-character`, the one rule applied to one side only). Section 7 qualifies structured sources only;
+  drawn-document extraction is not qualified until a later version closes the open items the
+  reviews recorded. The extractor contract (section 7) writes tables with their grid, numbered markers with a space, pictures with their hash, and
   a structured source as one page per section. Major under section 8: extractor output that
   conformed to 2.0.0 (tables without the grid) no longer does, every table's normalised text
   changes, and narratives with `li` outside a list or non-`li` content in a `ul`, accepted by

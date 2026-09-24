@@ -233,6 +233,16 @@ specification states the rule directly. Each break was restored.
 
 **Blast radius.**
 
+- **Drawn documents are not qualified.** Section 7 is complete for a structured source only. Nine
+  review rounds found open cases in how an extractor of a drawn document (a PDF, or a Word
+  document read as laid out) must write wrapped lines, soft hyphens, page footnotes and a few
+  table and caption splits; several hold for 2.0.0 as well. They are recorded in the design note
+  ("Drawn documents: open items"). No drawn-document extractor exists in the repository (the
+  synthetic builder derives its page text from the narrative, and the Document AI adapter is a
+  recorded spike), and none may support an approval until a later version closes them. Roadmap
+  item 3a's canonical-contract change (PR 2) makes the gate accept a real source only through a
+  structured-source extractor.
+
 - **Every submission carrying 2.0.0 is refused by the worker gate** from the moment this change
   deploys. Nothing in the repository produces a 2.0.0 submission after it.
 - **The persisted demonstration documents were approved under an earlier version** and are not

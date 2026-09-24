@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and six reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and seven reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -562,3 +562,64 @@ languages. Every case verified except a caption split before a bullet (finding 1
 Rounds 4 to 8 found every remaining case in the extractor contract (§7), not in the scanner or
 the verifier: their logic has not changed since round 3, and the two implementations have agreed
 on every input every round has tried.
+
+## Ninth review (2026-09-23, of the implementation): findings and the decision it led to
+
+The ninth review ran 60 targeted cases through both verifiers (identical report hashes) and found
+four more cases in how a drawn document's extractor must write its text, and three Medium ones.
+Like every finding since round 4, all are in §7, the extractor contract; the scanner and verifier
+logic has not changed since round 3, and the two implementations have agreed on every input any
+round has tried.
+
+**Decision.** Rounds 4 to 9 each found further drawn-document layout cases, several of them
+present since 2.0.0. Reading a laid-out page into text is a design problem of its own, and it
+belongs with the drawn-document extractor (roadmap: the engine, Word drafts), not with this
+change, whose purpose is the structured-source import of ADR 0005. A structured source has none of
+these cases: its text is the scanner's reading of its own markup, one section per page, with no
+wraps, page breaks inside a section or page furniture. So 3.0.0 qualifies structured-source
+extraction, and says in §7 that drawn-document extraction is not qualified and may not support an
+approval until a later version closes the items below. No drawn-document extractor exists in the
+repository.
+
+## Drawn documents: open items
+
+Each item is a case where text a conforming drawn-document extractor may write lets a narrative
+verify that the document does not draw, or admits two outputs with different verdicts, with the
+fix its review proposed. They are the starting list for the drawn-document contract.
+
+1. **Wrapped lines (round 9, High; since 2.0.0).** §7 does not say how a line the document wraps
+   inside a block is written. Written with U+000A, a wrap at the space between the groups of a
+   number (`10` / `000 IU`) or after a dash (`1–` / `2 tablets`) is a token boundary to §6, so a
+   section can end at "is 10" or start at "2 tablets". Proposed: join a wrap with U+0020 where the
+   document has whitespace and with nothing after a hard hyphen or dash (U+000A only for a block
+   boundary or a drawn line break; U+00AD U+000A for a discretionary hyphen), and restrict a page
+   split inside a block to whitespace that does not separate the groups of a number and never
+   directly after a hard hyphen or dash. This also confines the round-8 continuation rule to page
+   breaks. §6's sentence on "a number at the end of one line and a number at the start of the
+   next" then covers drawn line breaks only.
+2. **Undrawn soft hyphens (round 9, High).** A U+00AD the text layer holds at the end of a block
+   (a Word optional hyphen) is written before the block's line break, and step 1 joins the two
+   blocks ("The dose is 1" / "0 mg daily." reads "The dose is 10 mg daily."), also across a page
+   break. Proposed: U+00AD is followed by a line break only where the document breaks a word
+   across those lines; any other U+00AD there is not written.
+3. **Bullets at line starts (round 9, High, and round 8).** The continuation rule triggers on the
+   raw text, but step 4 reads text after steps 1 to 3: an invisible character before or after the
+   bullet, leading whitespace, or a lone bullet at the line's end escapes it. Proposed: trigger on
+   a line that step 4 would read as starting a list item. And the rule's two sentences disagree on
+   a line after a drawn line break and on a paragraph that starts with a typed bullet. Proposed: a
+   block's first line and a line after a drawn line break are written without U+0009, so the
+   bullet is list structure on both sides (as the vector `bullet-after-br-is-a-list-item`
+   expects). A vector for a paragraph continued across a page break with a bullet at the page
+   head is missing.
+4. **Text outside the block flow (round 9, Medium).** A page footnote, margin text or a
+   watermark drawn inside a continued paragraph or list is written in reading order, mid-sentence.
+   Proposed: text or pictures drawn between two parts of a block, and not part of it, are written
+   immediately after the block ends, in page order and then reading order; other out-of-flow text
+   is excluded within §1's bound or the document refused.
+5. **A caption split just after U+FDD0 (round 9, Medium).** The table rule does not say how the
+   later page begins when the split falls between U+FDD0 and the caption. Proposed: with the
+   caption on its own line, without U+0009.
+6. **Hard or discretionary hyphen (round 9, Low).** An extractor that cannot tell whether a
+   line-end hyphen is drawn as a hard hyphen or is discretionary should write it verbatim.
+7. **A section starting at a continuation line (round 9, Low).** It can never be matched by a
+   narrative (a false failure §6 does not list).
