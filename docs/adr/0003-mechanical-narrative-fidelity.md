@@ -148,8 +148,9 @@ reader sees without the check seeing it._
   states.) Also not closed: a text layer that
   flattens a superscript is outside the check, because the narrative is derived from it (only
   the extractor can close that); a letter exponent (`2<sup>n</sup>` against `2n`) still
-  verifies, and from `fidelity-norm/3.1.0` so do a lowered ½ and ∞ against the same code point
-  on the line (`t<sub>½</sub>` against `t½`; `docs/design/fidelity-norm-3-1-0.md`); strong right-to-left letters can reorder adjacent numbers, and no EU
+  verifies, and from `fidelity-norm/3.1.0` so do a lowered ∞, and a lowered ½ that is a `sub`'s
+  whole content after a letter and before no number, against the same code point on the line
+  (`t<sub>½</sub>` against `t½`; `docs/design/fidelity-norm-3-1-0.md`); strong right-to-left letters can reorder adjacent numbers, and no EU
   product-information language uses them; a viewer's own stylesheet or script can still act on
   the element names that remain.
 - Golden vectors are the fixed, reviewed floor of a re-implementation, not its proof. The first

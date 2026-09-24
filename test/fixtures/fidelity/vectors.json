@@ -1084,9 +1084,86 @@
       "expected": "\n\nAUC₍₀₋∞₎ and AUC₀₋∞\n\n"
     },
     {
-      "name": "sub-half-after-digit-kept",
+      "name": "sub-half-after-markup-and-joiner-kept",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><em>t</em><sub>½</sub> and t&#x2060;<sub>½</sub>x and t<sub>½</sub> 2</p></div>",
+      "expected": "\n\nt½ and t⁠½x and t½ 2\n\n"
+    },
+    {
+      "name": "rejects-sub-half-after-digit",
       "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>1<sub>½</sub></p></div>",
-      "expected": "\n\n1½\n\n"
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-half-joined-to-index",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>log<sub>2½</sub> x</p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-half-after-sign",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x<sub>-½</sub></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-half-in-formula",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>CaSO<sub>4·½</sub>H<sub>2</sub>O</p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-half-with-space",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>t<sub>½ </sub></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-half-at-line-start",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><sub>½</sub> dose</p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-half-before-digit-past-joiner",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>t<sub>½</sub>&#x2060;2</p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-half-before-subscript-digit",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>t<sub>½</sub><sub>2</sub></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "rejects-sub-half-before-superscript-sign",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>t<sub>½</sub><sup>+</sup></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
+    },
+    {
+      "name": "scan-error-after-sub-half-first",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>1<sub>½</sub> &bogus;</p></div>",
+      "expected": {
+        "error": "unknown-entity"
+      }
+    },
+    {
+      "name": "sub-half-before-combining-across-markup",
+      "input": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>1<sub>½</sub> q<b>&#x301;</b></p></div>",
+      "expected": {
+        "error": "unmappable-script"
+      }
     },
     {
       "name": "rejects-sup-infinity",

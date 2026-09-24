@@ -235,6 +235,56 @@ function firstDrawnAfter(points: readonly string[], from: number): string {
   return points[position] ?? "";
 }
 
+// Output positions (array indexes) to code point offsets in the joined text, for positions
+// asked in increasing order.
+function pointOffsets(output: readonly string[]): (position: number) => number {
+  let offset = 0;
+  let piece = 0;
+  return (position) => {
+    for (; piece < position; piece += 1) offset += Array.from(output[piece] ?? "").length;
+    return offset;
+  };
+}
+
+// A `sub` holding ½, by output positions (array indexes) of its content, and the offset of its
+// first ½ in the div.
+type LoweredHalf = { start: number; end: number; offset: number };
+const LETTER = /^\p{L}$/u;
+const NUMBER_OR_SCRIPT_SIGN = /^[\p{N}\u207a-\u207e\u208a-\u208e]$/u;
+
+// The first code point before `from` that is not a Default_Ignorable code point other than a
+// mark (firstDrawnAfter, read backwards).
+function firstDrawnBefore(points: readonly string[], from: number): string {
+  let position = from - 1;
+  for (; position >= 0; position -= 1) {
+    const point = points[position] ?? "";
+    if (MARK.test(point) || !isDefaultIgnorable(point.codePointAt(0) ?? 0)) break;
+  }
+  return points[position] ?? "";
+}
+
+// A lowered ½ is kept only as a `sub`'s whole content, after a letter and before no number or
+// script sign (section 5): `t<sub>½</sub>`. Anywhere else it can join a number, and the text
+// cannot say which: `log<sub>2½</sub>` and `log<sub>2</sub>½` both read `log₂½`.
+function checkLoweredHalves(
+  points: readonly string[],
+  halves: readonly LoweredHalf[],
+  pointOffset: (piece: number) => number,
+): void {
+  for (const { start, end, offset } of halves) {
+    const from = pointOffset(start);
+    const to = pointOffset(end);
+    if (
+      to - from !== 1 ||
+      points[from] !== String.fromCodePoint(HALF) ||
+      !LETTER.test(firstDrawnBefore(points, from)) ||
+      NUMBER_OR_SCRIPT_SIGN.test(firstDrawnAfter(points, to))
+    ) {
+      throw new XhtmlError("unmappable-script", offset);
+    }
+  }
+}
+
 function checkComposition(text: string, boundaries: readonly number[]): void {
   const points = Array.from(text);
   for (const boundary of boundaries) {
@@ -325,9 +375,11 @@ const SUBSCRIPT_LETTERS = [
 ];
 
 // Kept unchanged inside `sub` from fidelity-norm/3.1.0: U+00BD VULGAR FRACTION ONE HALF and
-// U+221E INFINITY, as in `t<sub>½</sub>` and `AUC<sub>(0-∞)</sub>`. Neither has a subscript form,
-// and lowered each reads as it does on the line (section 5); raised, `2<sup>½</sup>` is a root.
-const KEPT_IN_SUBSCRIPT = [0x00bd, 0x221e];
+// U+221E INFINITY, as in `t<sub>½</sub>` and `AUC<sub>(0-∞)</sub>`. Neither has a subscript form;
+// raised, `2<sup>½</sup>` is a root. ½ is a number, so it is kept only where it cannot join a
+// number on either side (checkLoweredHalves); ∞ has one reading wherever it is.
+const HALF = 0x00bd;
+const KEPT_IN_SUBSCRIPT = [HALF, 0x221e];
 
 type ScriptRule = {
   folding: ReadonlyMap<number, number>;
@@ -766,6 +818,9 @@ export function xhtmlToText(div: string): string {
   const output: string[] = [];
   // The output positions (array indexes) where an inline tag splits the text.
   const splits: number[] = [];
+  // Each `sub` holding ½, checked after the scan; and the one open now.
+  const halves: LoweredHalf[] = [];
+  let lowered: LoweredHalf | undefined;
   const stack: string[] = [];
   const tables: TableState[] = [];
   const lists: ListState[] = [];
@@ -794,6 +849,10 @@ export function xhtmlToText(div: string): string {
         if (open === undefined) throw new XhtmlError("unbalanced-tag", index);
         if (open !== name) throw new XhtmlError("misnested-tag", index);
         if (SPLITTING_INLINE.has(name)) splits.push(output.length);
+        if (name === "sub" && lowered !== undefined) {
+          if (lowered.offset >= 0) halves.push({ ...lowered, end: output.length });
+          lowered = undefined;
+        }
         const table = tables[tables.length - 1];
         if (table !== undefined && ROW_GROUPS.has(name)) endRowGroup(table, index);
         if (name === "table" && table !== undefined) {
@@ -880,6 +939,7 @@ export function xhtmlToText(div: string): string {
         if (BLOCK_ELEMENTS.has(name)) output.push(lineBreak);
       } else {
         stack.push(name);
+        if (name === "sub") lowered = { start: output.length, end: output.length, offset: -1 };
         if (name === "td" || name === "th") cellDepth += 1;
         if (name === "table") tables.push(newTable());
         if (name === "ol" || name === "ul") {
@@ -900,6 +960,7 @@ export function xhtmlToText(div: string): string {
       if (stack.length === 0) throw new XhtmlError("text-outside-root", index);
       const codePoint = decodeEntity(entity, index);
       emitText(codePoint, stack[stack.length - 1], output, index, true);
+      if (codePoint === HALF && lowered !== undefined && lowered.offset < 0) lowered.offset = index;
       index = ENTITY.lastIndex;
       continue;
     }
@@ -921,6 +982,7 @@ export function xhtmlToText(div: string): string {
         throw new XhtmlError("cdata", index);
       }
       emitText(codePoint, parent, output, index, false);
+      if (codePoint === HALF && lowered !== undefined && lowered.offset < 0) lowered.offset = index;
     }
     index += point.length;
   }
@@ -930,13 +992,7 @@ export function xhtmlToText(div: string): string {
   const text = output.join("");
   // A combining mark after an inline tag is drawn in its own run, apart from the letter before
   // the tag, while NFC would join them ("<" and U+0338 across `b` is drawn "</", read "≮").
-  let offset = 0;
-  let piece = 0;
-  const boundaries: number[] = [];
-  for (const split of splits) {
-    for (; piece < split; piece += 1) offset += Array.from(output[piece] ?? "").length;
-    boundaries.push(offset);
-  }
-  checkComposition(text, boundaries);
+  if (halves.length > 0) checkLoweredHalves(Array.from(text), halves, pointOffsets(output));
+  checkComposition(text, splits.map(pointOffsets(output)));
   return text;
 }

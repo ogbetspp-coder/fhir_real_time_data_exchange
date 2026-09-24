@@ -1,7 +1,8 @@
 # `fidelity-norm/3.1.0`: ½ and ∞ inside `sub`
 
 - Status: proposed, 2026-09-24 (roadmap 3a, PR 3's first step; ADR 0005 decision 1)
-- Changes: `docs/fidelity-normalization.md` section 5 (one rule) and section 9; nothing else
+- Changes: `docs/fidelity-normalization.md` section 5 (two rules and the error order), section 7
+  (one sentence) and section 9
 
 ## Why
 
@@ -29,15 +30,29 @@ other script refusal: with this change its narrative stops refusing in 4.5 and 5
 
 ## The change
 
-Inside `sub` only, U+00BD VULGAR FRACTION ONE HALF and U+221E INFINITY are kept unchanged, as
-letters and marks already are. `t<sub>½</sub>` reads `t½`; `AUC<sub>(0-∞)</sub>` reads
-`AUC₍₀₋∞₎` (the brackets, digit and hyphen fold as before). Inside `sup` both still refuse.
-Every other code point's treatment is unchanged, so every other fraction (¼, ¾, U+2189) and
-every other symbol (U+29DC INCOMPLETE INFINITY) inside `sub` still refuses.
+Inside `sub` only, U+221E INFINITY is kept unchanged, as letters and marks already are:
+`AUC<sub>(0-∞)</sub>` reads `AUC₍₀₋∞₎` (the brackets, digit and hyphen fold as before). U+00BD
+VULGAR FRACTION ONE HALF is kept too, but only under the **lowered-half rule**: the `sub`'s whole
+emitted content is the one code point ½, the first drawn code point before it is a letter, and the
+first drawn code point after it is neither a number nor a script sign (U+207A–U+207E,
+U+208A–U+208E). "Drawn" reads past Default_Ignorable code points that are not marks, as the mark
+rule of 3.0.0 does. `t<sub>½</sub>` reads `t½`; `1<sub>½</sub>`, `log<sub>2½</sub>`,
+`x<sub>-½</sub>`, `t<sub>½</sub>2` and `<sub>½</sub>` at a line start refuse
+(`unmappable-script`). The rule is checked after the scan, `sub` by `sub` in document order, and
+before `combining-across-markup`, so every error the scan finds wins over it, wherever it is.
+Inside `sup` both code points still refuse. Every other code point's treatment is unchanged: every
+other fraction (¼, ¾, U+2189) and every other symbol (U+29DC INCOMPLETE INFINITY) inside `sub`
+still refuses.
 
 In code: the sub rule's kept set (`own`) gains the two code points (`KEPT_IN_SUBSCRIPT` in
-`src/fidelity/xhtml.ts` and `zone-a/src/zone_a/fidelity/xhtml.py`). `NORMALIZATION_VERSION`
-becomes `fidelity-norm/3.1.0`.
+`src/fidelity/xhtml.ts` and `zone-a/src/zone_a/fidelity/xhtml.py`); the scanner records each
+`sub` holding ½ and `checkLoweredHalves` / `_check_lowered_halves` applies the rule after the
+scan. `NORMALIZATION_VERSION` becomes `fidelity-norm/3.1.0`.
+
+Section 7 gains one sentence: an extractor refuses a document whose raised or lowered run holds
+what section 5 refuses inside the corresponding element (a raised ½, a lowered ½ outside the
+rule), since the page text cannot carry its position. Drawn documents are not qualified, so this
+states the rule for the version that qualifies them.
 
 ## Why this is safe
 
@@ -51,47 +66,60 @@ or ∞ can make the check pass text a reader reads differently.
    `AUC₍₀₋∞₎` is text a narrative could already carry under 3.0.0 by writing the code points on
    the line. 3.1.0 adds a markup form for existing text, never a text. Sections 3 and 6 (the
    normalisation and every quote-edge, digit-group and sign rule) therefore see nothing they
-   have not seen; a lowered ½ or ∞ joins its neighbours exactly as the same code point on the
-   line does.
-2. **What is lost is only the lowering, and lowered they say the same.** The check now equates
-   `t<sub>½</sub>` with `t½` on the line, as it already equates `C<sub>max</sub>` with `Cmax`
-   (section 5's stated residual for letters and marks, ADR 0003). Neither ½ nor ∞ has a
-   subscript meaning of its own: no notation reads a lowered ½ as other than one half, or a
-   lowered ∞ as other than infinity. `1<sub>½</sub>` is drawn as "1" and a small low "½", which
-   reads as "1½" as the same text on the line does. Raised is different: `2<sup>½</sup>` is the
-   square root of 2, not "2½", and `10<sup>∞</sup>` is not "10∞"; both still refuse.
-3. **Every text 3.0.0 accepts reads the same.** The change only turns a refusal into text; no
-   accepted input's text, status or reason moves. The existing 600 vectors show it: none
-   changes except in the version string and the hashes that embed it.
-4. **The extractor contract already agrees.** Section 7 says an extractor emits, in a lowered
-   run, "every other character as it is"; so a drawn source that lowers ½ gives `t½`, the
-   scanner's reading of the narrative.
+   have not seen.
+2. **∞ has one reading wherever it is.** It is never part of a number, so which run it belongs to
+   does not change what is read: `AUC<sub>(0-</sub>∞<sub>)</sub>` and `AUC<sub>(0-∞)</sub>` say
+   the same.
+3. **½ is a number, so the danger is joining, and the rule removes it.** The first review found
+   that ½ kept anywhere in `sub` loses which run it belongs to: `log<sub>2½</sub>` (logarithm to
+   the base 2½) and `log<sub>2</sub>½` (log₂ of ½, that is −1) both read `log₂½`;
+   `CaSO<sub>4·½</sub>H` and the hemihydrate `CaSO<sub>4</sub>·½H` both read `CaSO₄·½H`. A ½
+   that is a `sub`'s whole content, after a letter and before no number or script sign, has no
+   number to join on either side, so the text `t½` has one reading: a lowered half after a
+   letter, which in a label is the half-life. Against a plain `t½` on the line it verifies, as
+   `C<sub>max</sub>` verifies against `Cmax` (section 5's stated residual for letters, ADR 0003).
+4. **Every narrative 3.0.0 accepts reads the same.** The change only turns refusals into text; no
+   accepted input's text, status or reason moves. The 591 vectors of 3.0.0 show it: none changes
+   except in the version string and the hashes that embed it.
 
 ## Alternatives rejected
 
+- **½ anywhere in `sub`** (this design's first draft). Refused by the first review: the joining
+  above.
 - **Every vulgar fraction, and every symbol, inside `sub`.** Not needed by any label, and each
-  would need its own argument (a lowered `⅟` or a lowered `′` may read differently). The list
-  stays closed and is widened only on evidence, as 3.0.0's lists were.
-- **Only after a letter** (`t<sub>½</sub>` but not `1<sub>½</sub>`). Point 2 finds no reading
-  that the adjacency would protect, and adjacency across markup is where fidelity-norm/3.0.0's
-  reviews found most of their defects (the mark rules, rounds 14 and 15). No real label has the
-  refused form, so the rule would guard nothing and cost a second rule in two languages.
+  would need its own argument. The list stays closed and is widened only on evidence, as 3.0.0's
+  lists were.
 - **T rewrites the source instead** (`t<sub>½</sub>` to `t½` in the import). T may drop only
   what cannot change the drawn page (ADR 0005), and the lowering is drawn; the contract is the
-  place to say that lowering these two code points changes nothing a reader reads.
+  place to say when lowering changes nothing a reader reads.
 - **± inside `sup`** (Brukinsa's footnote mark). A raised ± after a number is an exponent sign,
   and Brukinsa has other refusals; not taken.
 
 ## Consequences
 
-- Minor version (section 8: at least one vector's outcome changes). Nine vectors are added: ½
-  and ∞ kept inside `sub` (literal and as references, after a letter and after a digit, among
-  folded signs), and still refused inside `sup` (literal and reference), a neighbouring
-  fraction (¼, U+2189) and a neighbouring symbol (U+29DC) inside `sub`. The differential
-  generator gains a class drawing ½, ∞, ¼ and U+29DC (literal and as references) inside both
-  scripts.
+- Minor version (section 8): inputs refused under 3.0.0 now give text, pinned by new vectors.
+  Twenty XHTML vectors are added (591 → 611): ½ kept (literal, decimal and hex reference, after
+  markup and a word joiner, before a space) and refused (after a digit or a sign, at a line start, joined to an index, in a formula, with a space in the element, before a digit past
+  a word joiner, before a subscript digit and a superscript sign), ∞ kept among folded signs,
+  both refused inside `sup`, the neighbours ¼, U+2189 and U+29DC refused inside `sub`, and the
+  rule's place in the error order (a later scan error wins; the rule precedes
+  `combining-across-markup`). The differential generator gains two classes (the two code points
+  and their neighbours in both scripts; lowered halves between letters, digits, signs, spaces and
+  joiners), both required in the full corpus.
 - The authority importer's golden vectors embed the version, so its lock requires a new version:
   `IMPORTER_VERSION` 1.1.0 (it now also accepts the two forms).
 - Previously approved submissions need re-approval (section 8). The dev store's demonstration
   records were approved under 3.0.0; their narratives hold neither form, so their text is the
   same under 3.1.0 and re-seeding reproduces them.
+
+## Reviews
+
+1. **First independent review** (2026-09-24). High: ½ kept anywhere in `sub` joins a number
+   (`log<sub>2½</sub>` against `log<sub>2</sub>½`), and the query service's `verify_quote` would
+   match "log₂½" on the line against a label drawing log to the base 2½. Fixed: the lowered-half
+   rule. Medium: the spec's "every other fraction, and every other symbol" contradicted the kept
+   set (® and `/` are kept). Fixed: "every other code point of general category N, Sm, Ps, Pe or
+   Pd". Low: this note's claim that section 7 already agreed proved too much (it keeps a raised ½
+   too; section 7 now refuses it); the vector count; unreproducible figures in the change record;
+   the differential's new class not required and ½ still drawn in its "unmappable" pool; the
+   spec still saying "3.0.0 qualifies". Each fixed.

@@ -47,6 +47,7 @@ from __future__ import annotations
 import hashlib
 import re
 import unicodedata
+from collections.abc import Callable
 from typing import Final
 
 from .normalize import (
@@ -222,6 +223,72 @@ def _first_drawn_after(text: str, start: int) -> str | None:
     return None
 
 
+def _first_drawn_before(text: str, end: int) -> str | None:
+    """The first code point before ``end`` that is not a Default_Ignorable non-mark, or None."""
+    for position in range(end - 1, -1, -1):
+        character = text[position]
+        if _is_mark(character) or not is_default_ignorable(ord(character)):
+            return character
+    return None
+
+
+def _is_number_or_script_sign(character: str) -> bool:
+    code_point = ord(character)
+    return (
+        unicodedata.category(character)[0] == "N"
+        or 0x207A <= code_point <= 0x207E
+        or 0x208A <= code_point <= 0x208E
+    )
+
+
+class _LoweredHalf:
+    """A ``sub`` holding ½: its content's output positions and its first ½'s offset in the div."""
+
+    __slots__ = ("end", "offset", "start")
+
+    def __init__(self, start: int) -> None:
+        self.start = start
+        self.end = start
+        self.offset = -1
+
+
+def _check_lowered_halves(text: str, halves: list[_LoweredHalf], output: list[str]) -> None:
+    """Keep a lowered ½ only as a ``sub``'s whole content, after a letter, before no number.
+
+    Anywhere else it can join a number, and the text cannot say which: ``log<sub>2½</sub>`` and
+    ``log<sub>2</sub>½`` both read ``log₂½`` (section 5).
+    """
+    offsets = _point_offsets(output)
+    for half in halves:
+        start = offsets(half.start)
+        end = offsets(half.end)
+        before = _first_drawn_before(text, start)
+        after = _first_drawn_after(text, end)
+        if (
+            end - start != 1
+            or text[start] != chr(HALF)
+            or before is None
+            or unicodedata.category(before)[0] != "L"
+            or (after is not None and _is_number_or_script_sign(after))
+        ):
+            raise XhtmlError("unmappable-script", half.offset)
+
+
+def _point_offsets(output: list[str]) -> Callable[[int], int]:
+    """Map output positions, asked in increasing order, to offsets in the joined text."""
+    offset = 0
+    piece = 0
+
+    def at(position: int) -> int:
+        nonlocal offset, piece
+        while piece < position:
+            offset += len(output[piece])
+            piece += 1
+        return offset
+
+    return at
+
+
 def _check_composition(text: str, boundaries: list[int]) -> None:
     for boundary in boundaries:
         first = _first_drawn_after(text, boundary)
@@ -289,9 +356,10 @@ SUBSCRIPT_LETTERS: Final = tuple(range(0x2090, 0x209D))
 
 # Kept unchanged inside ``sub`` from fidelity-norm/3.1.0: U+00BD VULGAR FRACTION ONE HALF and
 # U+221E INFINITY, as in ``t<sub>½</sub>`` and ``AUC<sub>(0-∞)</sub>``. Neither has a subscript
-# form, and lowered each reads as it does on the line (section 5); raised, ``2<sup>½</sup>`` is a
-# root.
-KEPT_IN_SUBSCRIPT: Final = (0x00BD, 0x221E)
+# form; raised, ``2<sup>½</sup>`` is a root. ½ is a number, so it is kept only where it cannot
+# join a number on either side (_check_lowered_halves); ∞ has one reading wherever it is.
+HALF: Final = 0x00BD
+KEPT_IN_SUBSCRIPT: Final = (HALF, 0x221E)
 
 
 class _ScriptRule:
@@ -799,6 +867,9 @@ def xhtml_to_text(div: str) -> str:
     lists: list[_ListState] = []
     # The output positions (list indexes) where an inline tag splits the text.
     splits: list[int] = []
+    # Each ``sub`` holding ½, checked after the scan; and the one open now.
+    halves: list[_LoweredHalf] = []
+    lowered: _LoweredHalf | None = None
     # The slots every table so far covers, against TABLE_SLOT_LIMIT.
     grid = [0]
     root_seen = False
@@ -833,6 +904,11 @@ def xhtml_to_text(div: str) -> str:
                     raise XhtmlError("misnested-tag", index)
                 if name in SPLITTING_INLINE:
                     splits.append(len(output))
+                if name == "sub" and lowered is not None:
+                    if lowered.offset >= 0:
+                        lowered.end = len(output)
+                        halves.append(lowered)
+                    lowered = None
                 table = tables[-1] if tables else None
                 if table is not None and name in ROW_GROUPS:
                     _end_row_group(table, index)
@@ -930,6 +1006,8 @@ def xhtml_to_text(div: str) -> str:
                     output.append(line_break)
             else:
                 stack.append(name)
+                if name == "sub":
+                    lowered = _LoweredHalf(len(output))
                 if name in ("td", "th"):
                     cell_depth += 1
                 if name == "table":
@@ -949,6 +1027,8 @@ def xhtml_to_text(div: str) -> str:
                 raise XhtmlError("text-outside-root", index)
             code_point = _decode_entity(entity, index)
             _emit_text(code_point, stack[-1], output, index, is_reference=True)
+            if code_point == HALF and lowered is not None and lowered.offset < 0:
+                lowered.offset = index
             index = entity.end()
             continue
 
@@ -967,6 +1047,8 @@ def xhtml_to_text(div: str) -> str:
             ):
                 raise XhtmlError("cdata", index)
             _emit_text(ord(character), parent, output, index, is_reference=False)
+            if ord(character) == HALF and lowered is not None and lowered.offset < 0:
+                lowered.offset = index
         index += 1
 
     if not root_seen:
@@ -976,13 +1058,8 @@ def xhtml_to_text(div: str) -> str:
     text = "".join(output)
     # A combining mark after an inline tag is drawn in its own run, apart from the letter before
     # the tag, while NFC would join them ("<" and U+0338 across `b` is drawn "</", read as "≮").
-    boundaries: list[int] = []
-    offset = 0
-    piece = 0
-    for split in splits:
-        while piece < split:
-            offset += len(output[piece])
-            piece += 1
-        boundaries.append(offset)
-    _check_composition(text, boundaries)
+    if halves:
+        _check_lowered_halves(text, halves, output)
+    offsets = _point_offsets(output)
+    _check_composition(text, [offsets(split) for split in splits])
     return text

@@ -256,8 +256,9 @@ Three facts about that source meet three rules of the record:
 
 Decision 1 left `t` with a lowered `½` and `AUC` with a lowered `(0-∞)` to "a proposed minor
 version of the fidelity contract". `fidelity-norm/3.1.0` (`docs/design/fidelity-norm-3-1-0.md`)
-is that version: inside `sub`, U+00BD and U+221E are kept unchanged, as letters and marks are,
-and inside `sup` both still refuse. Of the refusals decision 1 lists, those two are settled; the
+is that version: inside `sub`, U+221E is kept unchanged, as letters and marks are, and U+00BD
+where it is the element's whole content after a letter and before no number (`t<sub>½</sub>`,
+every lowered ½ in the EMA's English labels); inside `sup` both still refuse. Of the refusals decision 1 lists, those two are settled; the
 rest stay PR 3's work. The importer's version moves to 1.1.0 with it (D10's lock).
 
 One finding of the same survey is recorded here for PR 3: both Imatinib Teva SmPCs (capsules

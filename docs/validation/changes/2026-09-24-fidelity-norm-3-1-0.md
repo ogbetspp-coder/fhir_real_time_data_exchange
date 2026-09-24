@@ -5,12 +5,16 @@ evidenced libraries". The UR- rows it cites are in that file._
 
 **What changed.** `NORMALIZATION_VERSION` moved from `fidelity-norm/3.0.0` to
 `fidelity-norm/3.1.0` in `src/fidelity/normalize.ts` and `zone-a/src/zone_a/fidelity/normalize.py`.
-`docs/fidelity-normalization.md` section 5 gains one rule, and section 9 an entry: inside `sub`
-only, U+00BD VULGAR FRACTION ONE HALF and U+221E INFINITY are kept unchanged instead of
-rejecting (`unmappable-script`). `t<sub>½</sub>` reads `t½` and `AUC<sub>(0-∞)</sub>` reads
-`AUC₍₀₋∞₎`. Inside `sup` both still reject, and so does every other fraction or symbol inside
-`sub`. In code, the `sub` rule's kept set gains the two code points (`KEPT_IN_SUBSCRIPT` in
-`src/fidelity/xhtml.ts` and `zone-a/src/zone_a/fidelity/xhtml.py`). The design is
+In `docs/fidelity-normalization.md`, section 5 gains two rules and a place in the error order,
+section 7 one sentence, and section 9 an entry. Inside `sub` only, U+221E INFINITY is kept
+unchanged instead of rejecting (`unmappable-script`), and U+00BD VULGAR FRACTION ONE HALF is kept
+under the lowered-half rule: only as the `sub`'s whole content, after a letter and before no
+number or script sign, checked after the scan and before `combining-across-markup`.
+`t<sub>½</sub>` reads `t½` and `AUC<sub>(0-∞)</sub>` reads `AUC₍₀₋∞₎`; `log<sub>2½</sub>` and
+`1<sub>½</sub>` still reject. Inside `sup` both still reject. Section 7 now says an extractor
+refuses a raised or lowered run holding what section 5 refuses there. In code:
+`KEPT_IN_SUBSCRIPT` and `checkLoweredHalves` in `src/fidelity/xhtml.ts`, and the same in
+`zone-a/src/zone_a/fidelity/xhtml.py`. The design, with its first review, is
 `docs/design/fidelity-norm-3-1-0.md`. The authority importer moves to 1.1.0 (`IMPORTER_VERSION`,
 `src/authority/importer.lock.json`), because its golden vectors carry the version.
 
@@ -19,9 +23,10 @@ minor version of the fidelity contract. A scan of every English SmPC the EMA's e
 (21 documents in 23 product Lists) found ½ lowered six times in four products and ∞ lowered twice,
 and no other refused script content except Brukinsa's raised ± footnote mark. Without this
 change no Imatinib Teva SmPC can be imported whole (4.5 and 5.2 refuse). The design explains why
-the change admits no false pass: it creates no text a narrative could not already carry, and a
-lowered ½ or ∞ reads as the same code point on the line, as a lowered letter already does
-(ADR 0003's stated residual). Raised, the two differ (`2<sup>½</sup>` is a root), so `sup` still
+the change admits no false pass: it creates no text a narrative could not already carry; ∞ has
+one reading wherever it is; and ½, a number, is kept only where it has no number to join (the
+first review showed `log<sub>2½</sub>` and `log<sub>2</sub>½` reading alike when ½ was kept
+anywhere). Raised, the two differ (`2<sup>½</sup>` is a root), so `sup` still
 refuses them.
 
 **Impact assessment (step 0).** Importers of `src/fidelity/`:
@@ -51,24 +56,31 @@ and none of it is re-evaluated.
 **Steps 1–6.** 1: `NORMALIZATION_VERSION` is `fidelity-norm/3.1.0` on both sides. 2:
 `npm run contracts:generate` (no drift), `npm run vectors:generate`, `npm run contracts:fixtures`,
 `npm run contracts:quote-edge`, `npm run differential:smoke` and `npm run authority:vectors`
-regenerated `test/fixtures/fidelity/vectors.json` (591 → 600: XHTML 340 → 349; normalisation 71
+regenerated `test/fixtures/fidelity/vectors.json` (591 → 611: XHTML 340 → 360; normalisation 71
 and verify 180 unchanged in number), the four contract fixtures, the quote-edge export, the
 smoke corpus and the importer's vectors; `npm run authority:lock` added importer 1.1.0. 3: below.
-4: nine new XHTML vectors: `t<sub>½</sub>` in a sentence, `&#189;` and `&#xBD;`, `(0-∞)` and
-`0&#8211;&#x221E;` among folded signs, ½ after a digit; and still refused: ∞ and `&#189;` in
-`sup`, ¼ and U+2189 in `sub`, U+29DC INCOMPLETE INFINITY in `sub`. 5: ADR 0003's residuals name
-the two code points; ADR 0005 amended (the two refusals of decision 1 settled, and the survey's
-underline finding recorded for PR 3). 6: UR-09 names 3.1.0; `AGENTS.md` names 3.1.0.
+4: twenty new XHTML vectors, listed in the design's "Consequences": ½ kept and refused on every
+side of the lowered-half rule, ∞ kept, both refused in `sup`, the neighbouring fractions and
+symbol refused, and the rule's place in the error order. 5: ADR 0003's residuals name the
+two forms; ADR 0005 amended (the two refusals of decision 1 settled, and the survey's underline
+finding recorded for PR 3). 6: UR-09 names 3.1.0; `AGENTS.md` names 3.1.0.
 
 **Changed vectors (step 3).** Compared by name with the 3.0.0 vectors: no normalisation or XHTML
-vector changed and none was removed; the nine above were added. All 180 verify vectors changed in
-exactly three fields and no other: `input.normalizationVersion`, `expected.normalizationVersion`
-and `expected.reportHash`. No status, reason, text or coverage figure moved.
+vector changed and none was removed; the twenty above were added. All 180 verify vectors changed
+in exactly three fields and no other: `input.normalizationVersion`,
+`expected.normalizationVersion` and `expected.reportHash`. No status, reason, text or coverage
+figure moved.
 
-**Differential proof.** `scripts/fidelity/differential.ts` gains a class drawing ½, ∞, ¼ and
-U+29DC, literal and as references, inside both `sup` and `sub`. TypeScript and Python agree on
-all 6000 cases at each of seeds 20260920, 1, 2, 3 and 4 (30 000 cases); across them, ½ or ∞ occurs
-inside `sub` 232 times and inside `sup` 227 times, each side reached both accepted and refused.
+**Differential proof.** `scripts/fidelity/differential.ts` gains two classes, both required in
+the full corpus (`zone-a/tests/test_differential.py`): `script-kept-in-subscript` draws ½, ∞, ¼
+and U+29DC, literal and as references, inside `sup` and `sub`; `script-lowered-half` writes a
+`sub` holding ½ between drawn neighbours on both sides of the rule (letters, digits, signs, a
+space, a word joiner, a script element). ½ left the `script-unmappable` pool. TypeScript and
+Python agree on all 6000 cases at each of seeds 20260920, 1, 2, 3, 4 and 77 (36 000 cases).
+Counted as generated documents carrying each class, by the TypeScript's outcome:
+`script-kept-in-subscript` 36 accepted and 749 refused, `script-lowered-half` 8 accepted and 221
+refused (most refusals come from other generated errors in the same document; the vectors pin
+each branch of the rule directly).
 
 **Blast radius.** Every approved hash that embeds the version moves (step 7). No accepted text
 changes. The newly accepted forms are two code points inside one element.
@@ -79,5 +91,5 @@ re-seeded; their narratives hold neither form.
 
 **Approval (step 8).** Not obtained: author and releaser are the same identity. This change
 touches an approved hash, so it needs a quality representative other than the author; until
-branch protection requires a second reviewer this is a procedural control only, and the
-independent reviews recorded in the design note stand in for it.
+branch protection requires a second reviewer this is a procedural control only. The independent
+reviews are recorded in the design note's "Reviews".
