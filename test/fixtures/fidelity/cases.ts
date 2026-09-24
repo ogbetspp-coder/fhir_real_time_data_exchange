@@ -3541,6 +3541,229 @@ export const xhtmlCases: XhtmlCase[] = [
     input: div("<p><sup>½</sup></p>"),
     expected: { error: "unmappable-script" },
   },
+  // fidelity-norm/3.1.0: inside `sub`, ∞ is kept unchanged, and ½ only as the half-life, the
+  // element's whole content right after a `t` that starts a word and right before a break, a
+  // space or `) . , ; :` (the real labels' half-life and AUC); inside `sup` both still reject, and
+  // so does every other number inside `sub`.
+  {
+    name: "sub-vulgar-half-kept",
+    input: div("<p>the t<sub>½</sub> was approximately 18 hours</p>"),
+    expected: "\n\nthe t½ was approximately 18 hours\n\n",
+  },
+  {
+    name: "sub-vulgar-half-reference-kept",
+    input: div("<p>t<sub>&#189;</sub> and t<sub>&#xBD;</sub></p>"),
+    expected: "\n\nt½ and t½\n\n",
+  },
+  {
+    name: "sub-infinity-kept-among-folds",
+    input: div("<p>AUC<sub>(0-∞)</sub> and AUC<sub>0&#8211;&#x221E;</sub></p>"),
+    expected: "\n\nAUC₍₀₋∞₎ and AUC₀₋∞\n\n",
+  },
+  {
+    name: "sub-half-life-between-word-and-break-kept",
+    input: div("<p><em>t</em><sub>½</sub> 2, (t<sub>½</sub>) and t<sub>½</sub>.</p>"),
+    expected: "\n\nt½ 2, (t½) and t½.\n\n",
+  },
+  {
+    name: "sub-half-at-cell-end-kept",
+    input: div("<table><tr><td>t<sub>½</sub></td></tr></table>"),
+    expected: "\n\n\ufdd0\n\ufdd2\t\ufdd3\tt½\t\n\n\ufdd1\n\n",
+  },
+  {
+    name: "rejects-sub-half-after-digit",
+    input: div("<p>1<sub>½</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-joined-to-index",
+    input: div("<p>log<sub>2½</sub> x</p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-after-sign",
+    input: div("<p>x<sub>-½</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-in-formula",
+    input: div("<p>CaSO<sub>4·½</sub>H<sub>2</sub>O</p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-with-space",
+    input: div("<p>t<sub>½ </sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-at-line-start",
+    input: div("<p><sub>½</sub> dose</p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-before-digit-past-joiner",
+    input: div("<p>t<sub>½</sub>&#x2060;2</p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-before-subscript-digit",
+    input: div("<p>t<sub>½</sub><sub>2</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-before-superscript-sign",
+    input: div("<p>t<sub>½</sub><sup>+</sup></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-after-joiner",
+    input: div("<p>t&#x2060;<sub>½</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-after-subscript-letter",
+    input: div("<p>log\u2099<sub>½</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-after-lowered-letter",
+    input: div("<p>log<sub>n</sub><sub>½</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-before-lowered-letter",
+    input: div("<p>x<sub>½</sub><sub>n</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-before-superscript-letter",
+    input: div("<p>t<sub>½</sub>\u207f</p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-before-thin-space",
+    input: div("<p>t<sub>½</sub>&#x200A;<sub>2</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-before-braille-blank",
+    input: div("<p>t<sub>½</sub>&#x2800;2</p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-after-blank-glyph-letter",
+    input: div("<p>log<sub>2</sub>&#x1878;<sub>½</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-after-modifier-letter",
+    input: div("<p>2\u02b9<sub>½</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-after-ordinal",
+    input: div("<p>1\u00aa<sub>½</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-after-ideograph-numeral",
+    input: div("<p>\u4e8c<sub>½</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-after-mathematical-letter",
+    input: div("<p>&#x1D4C9;<sub>½</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-before-mark",
+    input: div("<p>t<sub>½</sub>&#x301;</p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "sub-half-before-other-breaks-kept",
+    input: div(
+      "<p>t<sub>½</sub>; t<sub>½</sub>: t<sub>½</sub>, t<sub>½</sub><br/>t<sub>½</sub></p>",
+    ),
+    expected: "\n\nt½; t½: t½, t½\nt½\n\n",
+  },
+  {
+    name: "rejects-sub-half-before-digit",
+    input: div("<p>t<sub>½</sub>2</p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-after-operator-name",
+    input: div("<p>log<sub>½</sub> 8</p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-after-roman-numeral",
+    input: div("<p>VIII<sub>½</sub>.</p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-after-hex-digit",
+    input: div("<p>0xA<sub>½</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-after-t-in-word",
+    input: div("<p>at<sub>½</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-after-t-after-index",
+    input: div("<p>log<sub>2</sub>t<sub>½</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-half-after-lowered-t",
+    input: div("<p><sub>t</sub><sub>½</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  // Checked after the scan: an error the scan finds later wins, and it comes before
+  // combining-across-markup.
+  {
+    name: "scan-error-after-sub-half-first",
+    input: div("<p>1<sub>½</sub> &bogus;</p>"),
+    expected: { error: "unknown-entity" },
+  },
+  {
+    name: "sub-half-before-combining-across-markup",
+    input: div("<p>1<sub>½</sub> q<b>&#x301;</b></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "sub-half-after-earlier-combining-across-markup",
+    input: div("<p>q<b>&#x301;</b> t<sub>½</sub>2</p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sup-infinity",
+    input: div("<p>10<sup>∞</sup></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sup-half-reference",
+    input: div("<p>2<sup>&#189;</sup></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-other-fraction",
+    input: div("<p>t<sub>¼</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-fraction-zero-thirds",
+    input: div("<p>t<sub>\u2189</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
+  {
+    name: "rejects-sub-infinity-look-alike-sign",
+    input: div("<p>x<sub>\u29dc</sub></p>"),
+    expected: { error: "unmappable-script" },
+  },
   {
     name: "rejects-sub-roman-numeral",
     input: div("<p><sub>Ⅳ</sub></p>"),

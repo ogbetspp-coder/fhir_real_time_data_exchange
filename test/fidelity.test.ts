@@ -234,6 +234,21 @@ describe("xhtml scanner", () => {
     expect(performance.now() - started).toBeLessThan(2_000);
   });
 
+  // fidelity-norm/3.1.0 review round 2: the mark rule reads each run of ignorables once, and
+  // the lowered-half rule looks only at adjacent pieces. Twenty thousand tags before twenty
+  // thousand word joiners (a div of 160 057 code points) took about 72 s here before.
+  it("checks marks after many tags and many lowered halves in linear time", () => {
+    const root = (body: string): string =>
+      `<div xmlns="http://www.w3.org/1999/xhtml"><p>${body}</p></div>`;
+    const started = performance.now();
+    expect(typeof tryXhtml(root(`t${"<b></b>".repeat(20_000)}${"\u2060".repeat(20_000)}x`))).toBe(
+      "string",
+    );
+    expect(typeof tryXhtml(root("t<sub>½</sub> ".repeat(20_000)))).toBe("string");
+    // Well under the quadratic 72 s, with room for coverage instrumentation (about 3 s).
+    expect(performance.now() - started).toBeLessThan(20_000);
+  }, 30_000);
+
   // Section 2 applies to the div as decoded from JSON (RFC 8259). The vectors are written by
   // JSON.stringify, which never escapes a valid pair, so the escaped form is pinned here.
   it("reads an escaped surrogate pair in JSON as one code point", () => {

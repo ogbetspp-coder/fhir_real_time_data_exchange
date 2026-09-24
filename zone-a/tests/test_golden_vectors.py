@@ -176,6 +176,22 @@ def test_empty_rows_under_a_wide_row_scan_in_linear_time() -> None:
     assert time.monotonic() - started < 5
 
 
+def test_marks_after_many_tags_and_many_lowered_halves_scan_in_linear_time() -> None:
+    """The mark rule reads each run of ignorables once (fidelity-norm/3.1.0 review round 2).
+
+    The lowered-half rule looks only at adjacent pieces. The div of 20 000 tags before 20 000 word
+    joiners (160 057 code points) took 396 s here before.
+    """
+
+    def root(body: str) -> str:
+        return f'<div xmlns="http://www.w3.org/1999/xhtml"><p>{body}</p></div>'
+
+    started = time.monotonic()
+    assert isinstance(xhtml_to_text(root("t" + "<b></b>" * 20_000 + "\u2060" * 20_000 + "x")), str)
+    assert isinstance(xhtml_to_text(root("t<sub>½</sub> " * 20_000)), str)
+    assert time.monotonic() - started < 8
+
+
 # A structured source (section 7): one page per section, the page exactly the scanner's text for
 # the section's div, the whole page the body and the span. The accepted vectors that draw text and
 # hold no section 3 step 1 invisible character (the extractor refuses those) must verify one

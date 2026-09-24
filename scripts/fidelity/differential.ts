@@ -515,15 +515,17 @@ const SCRIPT_PIECES: readonly { className: string; pool: readonly string[] }[] =
   },
   { className: "script-reference", pool: ["&#x2212;", "&#54;", "&#x2B;", "&#8315;", "&#x2082;"] },
   { className: "script-space", pool: [SPACE, TAB] },
+  // fidelity-norm/3.1.0: ∞ is kept inside `sub`, ½ only as the half-life (scriptLoweredHalf);
+  // both reject inside `sup`; ¼ and ⧜ are their neighbours that still reject in both.
+  {
+    className: "script-kept-in-subscript",
+    pool: [...CHARS(0x00bd, 0x221e, 0x00bc, 0x29dc), "&#189;", "&#x221E;", "&#188;", "&#x29DC;"],
+  },
 ];
 // Drawn rarely, so the folding paths are not drowned by `unmappable-script`.
 const SCRIPT_UNMAPPABLE = {
   className: "script-unmappable",
-  pool: [
-    ...CHARS(0x00b1, 0x2213, 0x0663, 0xff12, 0x00bd, 0x2163, 0x1d7ce, 0x0966),
-    "&#xB1;",
-    "&#x1D7CE;",
-  ],
+  pool: [...CHARS(0x00b1, 0x2213, 0x0663, 0xff12, 0x2163, 0x1d7ce, 0x0966), "&#xB1;", "&#x1D7CE;"],
 };
 // Script letters of both kinds (an element's own are kept, the other's reject) and symbols,
 // brackets and dashes outside the fold tables (reject).
@@ -548,7 +550,35 @@ function scriptText(random: Random, classes: Set<string>): string {
   return text;
 }
 
+// fidelity-norm/3.1.0: a lowered ½ is kept only as the half-life, a `sub`'s whole content right
+// after a `t` that starts a word and right before a break, a space or `) . , ; :`; each part is
+// drawn from forms on both sides of that rule.
+const HALF_BEFORE = [
+  ...["t", "T", "x", "(t", "<em>t</em>", "<b>t</b>", "\u00e9", "t&#x2060;", "", "1", "-", " "],
+  ...["&#x2082;", "log\u2099", "log<sub>n</sub>", "t<sup>2</sup>", "&#x1878;", "2\u02b9"],
+  ...["1\u00aa", "\u4e8c", "&#x1D4C9;", "</p><p>t"],
+  ...["log", "VIII", "0xA", "log<sub>2</sub>t", "2t", "at", "&#x74;", "<sub>t</sub>", "<br/>t"],
+  ...[" t", "the t", "2(t", "x t", "&#9;t"],
+];
+const HALF_CONTENT = ["½", "&#189;", "&#xBD;", "½ ", "2½", "½½", "-½"];
+const HALF_AFTER = [
+  ...["", " x", ")", ".", ",", ";", ":", "x", "2", "&#x2060;2", "<sub>2</sub>", "<sup>+</sup>"],
+  ...["<sub>n</sub>", "\u207f", "&#x200A;<sub>2</sub>", "&#x2800;2", "&#x301;", " t<sub>½</sub>"],
+  ...["</p><p>2", " <sub>2</sub>", ".<sub>5</sub>", "\t", "<br/>"],
+];
+const LOWERED_HALF_CROSS = HALF_BEFORE.flatMap((before) =>
+  HALF_CONTENT.flatMap((half) => HALF_AFTER.map((after) => `${before}<sub>${half}</sub>${after}`)),
+);
+
+function scriptLoweredHalf(random: Random): Markup {
+  return {
+    markup: `${pick(random, HALF_BEFORE)}<sub>${pick(random, HALF_CONTENT)}</sub>${pick(random, HALF_AFTER)}`,
+    classes: new Set(["script-element", "script-lowered-half"]),
+  };
+}
+
 function scriptElement(random: Random): Markup {
+  if (chance(random, 0.1)) return scriptLoweredHalf(random);
   const classes = new Set<string>(["script-element"]);
   const element = pick(random, ["sup", "sub"]);
   let inner = scriptText(random, classes);
@@ -2213,7 +2243,37 @@ for (let index = 0; index < count; index += 1) {
   lines.push(JSON.stringify(generated));
 }
 
+// fidelity-norm/3.1.0: every lowered ½ between every neighbour on both sides of the rule, in an
+// otherwise clean paragraph, since the random documents rarely reach the rule clean. Appended to
+// a full corpus only (the smoke corpus stays small); it draws nothing from `random`.
+if (count >= 500) {
+  for (const markup of LOWERED_HALF_CROSS) {
+    const input = root(`<p>${markup}</p>`, "");
+    let expected: XhtmlExpectation;
+    try {
+      expected = { text: xhtmlToText(input) };
+    } catch (error) {
+      if (!(error instanceof XhtmlError)) throw error;
+      expected = { error: error.code };
+    }
+    lines.push(
+      JSON.stringify({
+        family: "xhtml",
+        index: lines.length,
+        seed,
+        tag: "error" in expected ? `xhtml/${expected.error}` : "xhtml/accepted",
+        classes: ["script-lowered-half-cross"],
+        input,
+        expected,
+      }),
+    );
+  }
+}
+
 const corpus = lines.length === 0 ? "" : `${lines.join(LF)}${LF}`;
 if (out === undefined) process.stdout.write(corpus);
 else writeFileSync(out, corpus, "utf8");
-process.stderr.write(`differential corpus: ${count} cases, seed ${seed}${LF}`);
+const cross = lines.length - count;
+process.stderr.write(
+  `differential corpus: ${count} cases${cross > 0 ? ` + ${cross} lowered-half cases` : ""}, seed ${seed}${LF}`,
+);

@@ -47,6 +47,7 @@ from __future__ import annotations
 import hashlib
 import re
 import unicodedata
+from collections.abc import Callable
 from typing import Final
 
 from .normalize import (
@@ -210,22 +211,102 @@ def _is_mark(character: str) -> bool:
     return unicodedata.category(character)[0] == "M"
 
 
-def _first_drawn_after(text: str, start: int) -> str | None:
-    """The first code point from ``start`` that is not a Default_Ignorable non-mark, or None.
+class _LoweredHalf:
+    """A ``sub`` holding ½: its content's output positions and its first ½'s offset in the div."""
 
-    A word joiner or a zero-width joiner between the tag and a mark is drawn as nothing, and the
-    mark after it is still drawn apart from the letter before the tag.
+    __slots__ = ("end", "offset", "start")
+
+    def __init__(self, start: int) -> None:
+        self.start = start
+        self.end = start
+        self.offset = -1
+
+
+# The neighbours of a kept lowered ½ (section 5): the half-life, ``t<sub>½</sub>``, as a word.
+_BEFORE_HALF_LIFE: Final = frozenset({"\n", "\t", " ", "("})
+_AFTER_HALF: Final = frozenset({"\n", "\t", " ", ")", ".", ",", ";", ":"})
+
+
+def _check_lowered_halves(
+    output: list[str], halves: list[_LoweredHalf], script_pieces: set[int]
+) -> None:
+    """Keep a lowered ½ only as the half-life, ``t<sub>½</sub>`` with ``t`` starting a word.
+
+    The ``sub``'s whole content is ½, right after a ``t`` that follows a break, a space, ``(`` or
+    nothing, and right before a break, a space, ``) . , ; :`` or nothing, every neighbour drawn on
+    the line (section 5). Anywhere else it can join a number or an index, and the text cannot say
+    which: ``log<sub>2½</sub>`` and ``log<sub>2</sub>½`` both read ``log₂½``, and a letter before
+    it can be a number or an operator (``VIII<sub>½</sub>``, ``log<sub>½</sub>``). Nothing is read
+    past: each neighbour is the adjacent emitted code point.
     """
-    for character in text[start:]:
-        if _is_mark(character) or not is_default_ignorable(ord(character)):
-            return character
-    return None
+    # A code point of the text as (piece, index in the piece), found by stepping over the pieces
+    # that emit nothing; a piece emitted inside ``sup`` or ``sub`` holds one code point. The steps
+    # of different halves do not overlap, so the rule stays linear without a copy of the text.
+
+    def last(piece: int) -> tuple[str, int, int] | None:
+        while piece >= 0 and output[piece] == "":
+            piece -= 1
+        if piece < 0:
+            return None
+        return output[piece][-1], piece, len(output[piece]) - 1
+
+    def previous(at: tuple[str, int, int]) -> tuple[str, int, int] | None:
+        _, piece, index = at
+        if index > 0:
+            return output[piece][index - 1], piece, index - 1
+        return last(piece - 1)
+
+    def following(piece: int) -> tuple[str, int, int] | None:
+        while piece < len(output) and output[piece] == "":
+            piece += 1
+        if piece >= len(output):
+            return None
+        return output[piece][0], piece, 0
+
+    def on_line(at: tuple[str, int, int] | None, allowed: frozenset[str]) -> bool:
+        return at is None or (at[0] in allowed and at[1] not in script_pieces)
+
+    for half in halves:
+        letter = last(half.start - 1)
+        if (
+            "".join(output[half.start : half.end]) != chr(HALF)
+            or letter is None
+            or letter[0] != "t"
+            or letter[1] in script_pieces
+            or not on_line(previous(letter), _BEFORE_HALF_LIFE)
+            or not on_line(following(half.end), _AFTER_HALF)
+        ):
+            raise XhtmlError("unmappable-script", half.offset)
+
+
+def _point_offsets(output: list[str]) -> Callable[[int], int]:
+    """Map output positions, asked in increasing order, to offsets in the joined text."""
+    offset = 0
+    piece = 0
+
+    def at(position: int) -> int:
+        nonlocal offset, piece
+        while piece < position:
+            offset += len(output[piece])
+            piece += 1
+        return offset
+
+    return at
 
 
 def _check_composition(text: str, boundaries: list[int]) -> None:
+    # The first code point at or after each boundary that is not a Default_Ignorable non-mark: a
+    # word joiner or a zero-width joiner between the tag and a mark is drawn as nothing, and the
+    # mark after it is still drawn apart from the letter before the tag. Boundaries only increase,
+    # so one cursor reads each run of ignorables once.
+    cursor = 0
     for boundary in boundaries:
-        first = _first_drawn_after(text, boundary)
-        if first is not None and _is_mark(first):
+        cursor = max(cursor, boundary)
+        while cursor < len(text) and not (
+            _is_mark(text[cursor]) or not is_default_ignorable(ord(text[cursor]))
+        ):
+            cursor += 1
+        if cursor < len(text) and _is_mark(text[cursor]):
             raise XhtmlError("combining-across-markup", boundary)
         before = text[max(0, boundary - COMPOSE_WINDOW) : boundary]
         after = text[boundary : boundary + COMPOSE_WINDOW]
@@ -287,13 +368,26 @@ SUPERSCRIPT_LETTERS: Final = (0x2071, 0x207F)
 SUBSCRIPT_LETTERS: Final = tuple(range(0x2090, 0x209D))
 
 
+# Kept unchanged inside ``sub`` from fidelity-norm/3.1.0: U+00BD VULGAR FRACTION ONE HALF and
+# U+221E INFINITY, as in ``t<sub>½</sub>`` and ``AUC<sub>(0-∞)</sub>``. Neither has a subscript
+# form; raised, ``2<sup>½</sup>`` is a root. ½ is a number, so it is kept only where it cannot
+# join a number on either side (_check_lowered_halves); ∞ never joins a number, and loses its
+# position as a letter does (section 5's stated residual).
+HALF: Final = 0x00BD
+KEPT_IN_SUBSCRIPT: Final = (HALF, 0x221E)
+
+
 class _ScriptRule:
     """Folding table, the element's own script digits and signs, the other script's."""
 
     __slots__ = ("folding", "foreign", "own")
 
     def __init__(
-        self, digits: tuple[int, ...], signs: tuple[int, ...], foreign: tuple[int, ...]
+        self,
+        digits: tuple[int, ...],
+        signs: tuple[int, ...],
+        foreign: tuple[int, ...],
+        kept: tuple[int, ...] = (),
     ) -> None:
         plus, minus, equals, open_, close = signs
         folding = {0x0030 + digit: target for digit, target in enumerate(digits)}
@@ -303,7 +397,7 @@ class _ScriptRule:
         folding[0x0028] = open_
         folding[0x0029] = close
         self.folding: dict[int, int] = folding
-        self.own: frozenset[int] = frozenset(digits + signs)
+        self.own: frozenset[int] = frozenset(digits + signs + kept)
         self.foreign: frozenset[int] = frozenset(foreign)
 
 
@@ -317,13 +411,14 @@ SCRIPT_RULES: Final[dict[str, _ScriptRule]] = {
         SUBSCRIPT_DIGITS,
         SUBSCRIPT_SIGNS,
         SUPERSCRIPT_DIGITS + SUPERSCRIPT_SIGNS + SUPERSCRIPT_LETTERS,
+        KEPT_IN_SUBSCRIPT,
     ),
 }
 
-# The element's own script digits and signs are kept; the other script's digits, signs and
-# letters, every other number (general category N), a plus-minus sign, and every other
-# mathematical symbol, bracket or dash (general category Sm, Ps, Pe, Pd) have no script form
-# there and reject.
+# The element's own script digits and signs are kept, and so is ∞ inside ``sub`` (and ½ there,
+# as the half-life only: _check_lowered_halves); the other script's digits, signs and letters,
+# every other number (general category N), a plus-minus sign, and every other mathematical symbol,
+# bracket or dash (general category Sm, Ps, Pe, Pd) have no script form there and reject.
 UNMAPPABLE_SIGNS: Final = frozenset({0x00B1, 0x2213})
 UNMAPPABLE_CATEGORIES: Final = frozenset({"Sm", "Ps", "Pe", "Pd"})
 
@@ -787,6 +882,11 @@ def xhtml_to_text(div: str) -> str:
     lists: list[_ListState] = []
     # The output positions (list indexes) where an inline tag splits the text.
     splits: list[int] = []
+    # Each ``sub`` holding ½, checked after the scan; and the one open now.
+    halves: list[_LoweredHalf] = []
+    lowered: _LoweredHalf | None = None
+    # The output positions of code points emitted inside ``sup`` or ``sub``.
+    script_pieces: set[int] = set()
     # The slots every table so far covers, against TABLE_SLOT_LIMIT.
     grid = [0]
     root_seen = False
@@ -821,6 +921,11 @@ def xhtml_to_text(div: str) -> str:
                     raise XhtmlError("misnested-tag", index)
                 if name in SPLITTING_INLINE:
                     splits.append(len(output))
+                if name == "sub" and lowered is not None:
+                    if lowered.offset >= 0:
+                        lowered.end = len(output)
+                        halves.append(lowered)
+                    lowered = None
                 table = tables[-1] if tables else None
                 if table is not None and name in ROW_GROUPS:
                     _end_row_group(table, index)
@@ -918,6 +1023,8 @@ def xhtml_to_text(div: str) -> str:
                     output.append(line_break)
             else:
                 stack.append(name)
+                if name == "sub":
+                    lowered = _LoweredHalf(len(output))
                 if name in ("td", "th"):
                     cell_depth += 1
                 if name == "table":
@@ -937,6 +1044,10 @@ def xhtml_to_text(div: str) -> str:
                 raise XhtmlError("text-outside-root", index)
             code_point = _decode_entity(entity, index)
             _emit_text(code_point, stack[-1], output, index, is_reference=True)
+            if stack[-1] in ("sup", "sub"):
+                script_pieces.add(len(output) - 1)
+            if code_point == HALF and lowered is not None and lowered.offset < 0:
+                lowered.offset = index
             index = entity.end()
             continue
 
@@ -955,6 +1066,10 @@ def xhtml_to_text(div: str) -> str:
             ):
                 raise XhtmlError("cdata", index)
             _emit_text(ord(character), parent, output, index, is_reference=False)
+            if parent in ("sup", "sub"):
+                script_pieces.add(len(output) - 1)
+            if ord(character) == HALF and lowered is not None and lowered.offset < 0:
+                lowered.offset = index
         index += 1
 
     if not root_seen:
@@ -964,13 +1079,8 @@ def xhtml_to_text(div: str) -> str:
     text = "".join(output)
     # A combining mark after an inline tag is drawn in its own run, apart from the letter before
     # the tag, while NFC would join them ("<" and U+0338 across `b` is drawn "</", read as "≮").
-    boundaries: list[int] = []
-    offset = 0
-    piece = 0
-    for split in splits:
-        while piece < split:
-            offset += len(output[piece])
-            piece += 1
-        boundaries.append(offset)
-    _check_composition(text, boundaries)
+    if halves:
+        _check_lowered_halves(output, halves, script_pieces)
+    offsets = _point_offsets(output)
+    _check_composition(text, [offsets(split) for split in splits])
     return text

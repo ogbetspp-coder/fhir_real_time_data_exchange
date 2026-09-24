@@ -223,22 +223,91 @@ const SPLITTING_INLINE = new Set([
 const COMPOSE_WINDOW = 64;
 const MARK = /^\p{M}$/u;
 
-// The first code point at or after `from` that is not a Default_Ignorable code point other than
-// a mark: a word joiner or a zero-width joiner between the tag and a mark is drawn as nothing,
-// and the mark after it is still drawn apart from the letter before the tag.
-function firstDrawnAfter(points: readonly string[], from: number): string {
-  let position = from;
-  for (; position < points.length; position += 1) {
-    const point = points[position] ?? "";
-    if (MARK.test(point) || !isDefaultIgnorable(point.codePointAt(0) ?? 0)) break;
+// Output positions (array indexes) to code point offsets in the joined text, for positions
+// asked in increasing order.
+function pointOffsets(output: readonly string[]): (position: number) => number {
+  let offset = 0;
+  let piece = 0;
+  return (position) => {
+    for (; piece < position; piece += 1) offset += Array.from(output[piece] ?? "").length;
+    return offset;
+  };
+}
+
+// A `sub` holding ½, by output positions (array indexes) of its content, and the offset in the div
+// of its first ½ (the character or its reference).
+type LoweredHalf = { start: number; end: number; offset: number };
+// The neighbours of a kept lowered ½ (section 5): the half-life, `t<sub>½</sub>`, as a word.
+const BEFORE_HALF_LIFE = new Set(["\n", "\t", " ", "("]);
+const AFTER_HALF = new Set(["\n", "\t", " ", ")", ".", ",", ";", ":"]);
+
+// A lowered ½ is kept only as the half-life: a `sub`'s whole content, right after a `t` that
+// starts a word (after a break, a space, `(` or nothing), and right before a break, a space,
+// `) . , ; :` or nothing, every neighbour drawn on the line (section 5). Anywhere else it can join
+// a number or an index, and the text cannot say which: `log<sub>2½</sub>` and `log<sub>2</sub>½`
+// both read `log₂½`, and a letter before it can be a number or an operator (`VIII<sub>½</sub>`,
+// `log<sub>½</sub>`). Nothing is read past: each neighbour is the adjacent emitted code point.
+function checkLoweredHalves(
+  output: readonly string[],
+  halves: readonly LoweredHalf[],
+  scriptPieces: ReadonlySet<number>,
+): void {
+  // A code point of the text as (piece, index in the piece), found by stepping over the pieces
+  // that emit nothing; a piece emitted inside `sup` or `sub` holds one code point. The steps of
+  // different halves do not overlap, so the rule stays linear without a copy of the text.
+  type At = { point: string; piece: number; index: number } | undefined;
+  const last = (piece: number): At => {
+    let position = piece;
+    while (position >= 0 && output[position] === "") position -= 1;
+    const points = Array.from(output[position] ?? "");
+    return position < 0
+      ? undefined
+      : { point: points.at(-1) ?? "", piece: position, index: points.length - 1 };
+  };
+  const previous = (at: NonNullable<At>): At =>
+    at.index > 0
+      ? {
+          point: Array.from(output[at.piece] ?? "")[at.index - 1] ?? "",
+          piece: at.piece,
+          index: at.index - 1,
+        }
+      : last(at.piece - 1);
+  const next = (piece: number): At => {
+    let position = piece;
+    while (position < output.length && output[position] === "") position += 1;
+    const point = Array.from(output[position] ?? "")[0];
+    return point === undefined ? undefined : { point, piece: position, index: 0 };
+  };
+  const onLine = (at: At, allowed: ReadonlySet<string>): boolean =>
+    at === undefined || (allowed.has(at.point) && !scriptPieces.has(at.piece));
+  for (const { start, end, offset } of halves) {
+    const letter = last(start - 1);
+    if (
+      output.slice(start, end).join("") !== String.fromCodePoint(HALF) ||
+      letter?.point !== "t" ||
+      scriptPieces.has(letter.piece) ||
+      !onLine(previous(letter), BEFORE_HALF_LIFE) ||
+      !onLine(next(end), AFTER_HALF)
+    ) {
+      throw new XhtmlError("unmappable-script", offset);
+    }
   }
-  return points[position] ?? "";
 }
 
 function checkComposition(text: string, boundaries: readonly number[]): void {
   const points = Array.from(text);
+  // The first code point at or after each boundary that is not a Default_Ignorable code point
+  // other than a mark: a word joiner or a zero-width joiner between the tag and a mark is drawn as
+  // nothing, and the mark after it is still drawn apart from the letter before the tag. Boundaries
+  // only increase, so one cursor reads each run of ignorables once.
+  let cursor = 0;
   for (const boundary of boundaries) {
-    if (MARK.test(firstDrawnAfter(points, boundary))) {
+    if (cursor < boundary) cursor = boundary;
+    for (; cursor < points.length; cursor += 1) {
+      const point = points[cursor] ?? "";
+      if (MARK.test(point) || !isDefaultIgnorable(point.codePointAt(0) ?? 0)) break;
+    }
+    if (MARK.test(points[cursor] ?? "")) {
       throw new XhtmlError("combining-across-markup", boundary);
     }
     const before = points.slice(Math.max(0, boundary - COMPOSE_WINDOW), boundary).join("");
@@ -324,9 +393,17 @@ const SUBSCRIPT_LETTERS = [
   0x209c,
 ];
 
+// Kept unchanged inside `sub` from fidelity-norm/3.1.0: U+00BD VULGAR FRACTION ONE HALF and
+// U+221E INFINITY, as in `t<sub>½</sub>` and `AUC<sub>(0-∞)</sub>`. Neither has a subscript form;
+// raised, `2<sup>½</sup>` is a root. ½ is a number, so it is kept only where it cannot join a
+// number on either side (checkLoweredHalves); ∞ never joins a number, and loses its position as
+// a letter does (section 5's stated residual).
+const HALF = 0x00bd;
+const KEPT_IN_SUBSCRIPT = [HALF, 0x221e];
+
 type ScriptRule = {
   folding: ReadonlyMap<number, number>;
-  // The element's own script digits and signs, kept as they are.
+  // The element's own script digits and signs, and what it keeps unchanged, kept as they are.
   own: ReadonlySet<number>;
   // The other script's digits, signs and letters.
   foreign: ReadonlySet<number>;
@@ -336,6 +413,7 @@ function scriptRule(
   digits: readonly number[],
   signs: ScriptSigns,
   foreign: readonly number[],
+  kept: readonly number[] = [],
 ): ScriptRule {
   const [plus, minus, equals, open, close] = signs;
   const folding = new Map<number, number>();
@@ -345,7 +423,7 @@ function scriptRule(
   folding.set(0x003d, equals);
   folding.set(0x0028, open);
   folding.set(0x0029, close);
-  return { folding, own: new Set([...digits, ...signs]), foreign: new Set(foreign) };
+  return { folding, own: new Set([...digits, ...signs, ...kept]), foreign: new Set(foreign) };
 }
 
 const SCRIPT_RULES = new Map<string, ScriptRule>([
@@ -359,18 +437,20 @@ const SCRIPT_RULES = new Map<string, ScriptRule>([
   ],
   [
     "sub",
-    scriptRule(SUBSCRIPT_DIGITS, SUBSCRIPT_SIGNS, [
-      ...SUPERSCRIPT_DIGITS,
-      ...SUPERSCRIPT_SIGNS,
-      ...SUPERSCRIPT_LETTERS,
-    ]),
+    scriptRule(
+      SUBSCRIPT_DIGITS,
+      SUBSCRIPT_SIGNS,
+      [...SUPERSCRIPT_DIGITS, ...SUPERSCRIPT_SIGNS, ...SUPERSCRIPT_LETTERS],
+      KEPT_IN_SUBSCRIPT,
+    ),
   ],
 ]);
 
-// The element's own script digits and signs are kept; the other script's digits, signs and
-// letters, every other number (a non-ASCII digit, a fraction, a numeral), a plus-minus sign, and
-// every other mathematical symbol, bracket or dash (general category Sm, Ps, Pe, Pd: `＝`, `﹙`,
-// `⸺`) have no script form here and reject.
+// The element's own script digits and signs are kept, and so is ∞ inside `sub` (and ½ there, as
+// the half-life only: checkLoweredHalves); the other script's digits, signs and letters, every
+// other number (a non-ASCII digit, another fraction, a numeral), a plus-minus sign, and every
+// other mathematical symbol, bracket or dash (general category Sm, Ps, Pe, Pd: `＝`, `﹙`, `⸺`)
+// have no script form here and reject.
 const UNMAPPABLE_SIGNS = new Set([0x00b1, 0x2213]);
 const NUMBER = /^\p{N}$/u;
 const SIGN_OR_BRACKET = /^[\p{Sm}\p{Ps}\p{Pe}\p{Pd}]$/u;
@@ -759,6 +839,11 @@ export function xhtmlToText(div: string): string {
   const output: string[] = [];
   // The output positions (array indexes) where an inline tag splits the text.
   const splits: number[] = [];
+  // Each `sub` holding ½, checked after the scan; and the one open now.
+  const halves: LoweredHalf[] = [];
+  let lowered: LoweredHalf | undefined;
+  // The output positions of code points emitted inside `sup` or `sub`.
+  const scriptPieces = new Set<number>();
   const stack: string[] = [];
   const tables: TableState[] = [];
   const lists: ListState[] = [];
@@ -787,6 +872,10 @@ export function xhtmlToText(div: string): string {
         if (open === undefined) throw new XhtmlError("unbalanced-tag", index);
         if (open !== name) throw new XhtmlError("misnested-tag", index);
         if (SPLITTING_INLINE.has(name)) splits.push(output.length);
+        if (name === "sub" && lowered !== undefined) {
+          if (lowered.offset >= 0) halves.push({ ...lowered, end: output.length });
+          lowered = undefined;
+        }
         const table = tables[tables.length - 1];
         if (table !== undefined && ROW_GROUPS.has(name)) endRowGroup(table, index);
         if (name === "table" && table !== undefined) {
@@ -873,6 +962,7 @@ export function xhtmlToText(div: string): string {
         if (BLOCK_ELEMENTS.has(name)) output.push(lineBreak);
       } else {
         stack.push(name);
+        if (name === "sub") lowered = { start: output.length, end: output.length, offset: -1 };
         if (name === "td" || name === "th") cellDepth += 1;
         if (name === "table") tables.push(newTable());
         if (name === "ol" || name === "ul") {
@@ -892,7 +982,10 @@ export function xhtmlToText(div: string): string {
       if (entity === null) throw new XhtmlError("stray-amp", index);
       if (stack.length === 0) throw new XhtmlError("text-outside-root", index);
       const codePoint = decodeEntity(entity, index);
-      emitText(codePoint, stack[stack.length - 1], output, index, true);
+      const parent = stack[stack.length - 1];
+      emitText(codePoint, parent, output, index, true);
+      if (parent === "sup" || parent === "sub") scriptPieces.add(output.length - 1);
+      if (codePoint === HALF && lowered !== undefined && lowered.offset < 0) lowered.offset = index;
       index = ENTITY.lastIndex;
       continue;
     }
@@ -914,6 +1007,8 @@ export function xhtmlToText(div: string): string {
         throw new XhtmlError("cdata", index);
       }
       emitText(codePoint, parent, output, index, false);
+      if (parent === "sup" || parent === "sub") scriptPieces.add(output.length - 1);
+      if (codePoint === HALF && lowered !== undefined && lowered.offset < 0) lowered.offset = index;
     }
     index += point.length;
   }
@@ -923,13 +1018,7 @@ export function xhtmlToText(div: string): string {
   const text = output.join("");
   // A combining mark after an inline tag is drawn in its own run, apart from the letter before
   // the tag, while NFC would join them ("<" and U+0338 across `b` is drawn "</", read "≮").
-  let offset = 0;
-  let piece = 0;
-  const boundaries: number[] = [];
-  for (const split of splits) {
-    for (; piece < split; piece += 1) offset += Array.from(output[piece] ?? "").length;
-    boundaries.push(offset);
-  }
-  checkComposition(text, boundaries);
+  if (halves.length > 0) checkLoweredHalves(output, halves, scriptPieces);
+  checkComposition(text, splits.map(pointOffsets(output)));
   return text;
 }

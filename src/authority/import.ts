@@ -53,7 +53,7 @@ import {
 
 // The importer's version: part of the extractor's name in every submission it writes, and locked
 // to the hash of this directory's code and data and of its golden vectors (D10).
-export const IMPORTER_VERSION = "1.0.0";
+export const IMPORTER_VERSION = "1.1.0";
 export const IMPORTER_EXTRACTOR = `${AUTHORITY_IMPORTER_NAME}/${IMPORTER_VERSION}`;
 
 export const AUTHORITY_IMPORT_IDENTIFIER_SYSTEM =

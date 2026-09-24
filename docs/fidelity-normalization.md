@@ -1,6 +1,6 @@
 # Narrative fidelity normalisation specification
 
-Version: `fidelity-norm/3.0.0` (`NORMALIZATION_VERSION` in `src/fidelity/normalize.ts`; history
+Version: `fidelity-norm/3.1.0` (`NORMALIZATION_VERSION` in `src/fidelity/normalize.ts`; history
 in section 9)
 
 This document is the language-neutral specification of the text normalisation and XHTML
@@ -285,10 +285,16 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   Pe or Pd that is neither a source nor a target of the fold tables (`＝` U+FF1D, `﹙` U+FE59,
   `⸺` U+2E3A, `︱` U+FE31, `~`, `<`, `[`), and U+00B1 and U+2213, reject (`unmappable-script`).
   The element's own script digits and signs (U+2070, U+00B9, U+00B2, U+00B3, U+2074–U+207E
-  inside `sup`; U+2080–U+208E inside `sub`) are kept. Other code points (letters, footnote
-  marks, ®, `/`) are kept unchanged. Raising a letter or a mark is taken not to change what it
-  says, which is not always so: `10<sup>n</sup>` reads "10n" and verifies against a plain "10n"
-  (a stated residual, as in ADR 0003),
+  inside `sup`; U+2080–U+208E inside `sub`) are kept. From 3.1.0, inside `sub` only, U+221E
+  INFINITY is also kept unchanged (`AUC<sub>(0-∞)</sub>` is `AUC₍₀₋∞₎`), and so is U+00BD
+  VULGAR FRACTION ONE HALF under the lowered-half rule below (`t<sub>½</sub>` is `t½`). Neither
+  has a subscript form. Inside `sup` both still reject: `2<sup>½</sup>` is a square root, not
+  "2½". Every other code point of general category N, Sm, Ps, Pe or Pd inside `sub` still
+  rejects as stated above. Other code points (letters, footnote
+  marks, ®, `/`) are kept unchanged. Raising a letter or a mark (or, from 3.1.0, lowering ∞ or
+  the half-life's ½) is taken not to change what it says, which is not always so:
+  `10<sup>n</sup>` reads "10n" and verifies against a plain "10n", and `x<sub>∞</sub>` against
+  "x∞" (a stated residual, as in ADR 0003),
   so `C<sub>max</sub>`, `<sup>a</sup>` and `<sup>®</sup>` are accepted, and `t<sub>1/2</sub>`
   is `t₁/₂`.
 - Tables contain only table parts. The only children of `table` are `caption`, `thead`,
@@ -366,6 +372,38 @@ caption blockquote dl dt dd hr`. `br` emits a line break. Inline elements contri
   more push the text off a narrow page).
 - The raw sequence `]]>` in text rejects (`cdata`): it ends a CDATA section to an XML parser,
   which then refuses the document and draws none of it.
+- The lowered-half rule (from 3.1.0). ½ is a number, and kept unfolded it can join a number or
+  an index on either side without the text saying which: `log<sub>2½</sub>` (base 2½) and
+  `log<sub>2</sub>½` (log₂ of ½) would both read `log₂½`, `logₙ<sub>½</sub>` and `logₙ½` alike,
+  and a letter before it can itself be a number or an operator (`VIII<sub>½</sub>`, a Roman
+  numeral with an index, against `VIII½`, eight and a half; `log<sub>½</sub>`, log to the base
+  ½). So ½ is kept only as the half-life, `t<sub>½</sub>`: a `sub` whose content holds U+00BD is
+  accepted only when all four hold, and otherwise rejects (`unmappable-script`; its offset is
+  that of the first U+00BD in the `sub`, as the character or its reference, in the div, like
+  every other `unmappable-script`):
+  - its emitted content is exactly the one code point U+00BD (so `<sub>½ </sub>`,
+    `<sub>2½</sub>` and `<sub>-½</sub>` reject);
+  - the code point emitted immediately before that content is `t` (U+0074), emitted outside `sup`
+    and `sub`;
+  - the code point emitted immediately before that `t`, if there is one, is U+000A, U+0009,
+    U+0020 or `(`, emitted outside `sup` and `sub` (so the `t` starts a word: `the t<sub>½</sub>`,
+    `(t<sub>½</sub>)`, `<em>t</em><sub>½</sub>` at a line start and `t<sub>½</sub>` in a cell are
+    accepted, and `1<sub>½</sub>`, `at<sub>½</sub>`, `log<sub>½</sub>`, `VIII<sub>½</sub>`,
+    `log<sub>2</sub>t<sub>½</sub>`, `<sub>t</sub><sub>½</sub>` and a word joiner before the `sub`
+    reject); and
+  - the code point emitted immediately after the `sub`'s content, if there is one, is U+000A,
+    U+0009, U+0020, `)`, `.`, `,`, `;` or `:`, emitted outside `sup` and `sub` (so
+    `t<sub>½</sub> was` and `(t<sub>½</sub>)` are accepted, and `t<sub>½</sub>2`,
+    `t<sub>½</sub>ⁿ`, `t<sub>½</sub><sub>2</sub>`, `t<sub>½</sub><sub> </sub>`, a thin space or a
+    word joiner after the `sub`, reject).
+
+  "Emitted" means in the scanner's text, across any markup (a tag that emits nothing is not a
+  neighbour; a block boundary's U+000A, a cell's U+0009, a grid marker or a list number is).
+  Nothing is read past: the neighbours are the adjacent code points. The rule is checked after
+  the scan, `sub` by `sub` in document order (the error order below). Every lowered ½ in the
+  EMA's published English labels (six, surveyed 2026-09-24) is `the t<sub>½</sub> was` or
+  `(t<sub>½</sub>)`.
+
 - A combining mark or a composition across inline markup rejects (`combining-across-markup`,
   from 3.0.0): at each start or end tag of `span`, `b`, `i`, `em`, `strong`, `sup`, `sub`,
   `small`, `abbr`, `cite` or `code`, the first code point emitted after the tag, read past
@@ -484,7 +522,8 @@ reason code is inside `reportHash`, so the order in which violations are decided
   `table-content`, then `list-content`, then `unmappable-script`.
 - At a raw code point: `text-outside-root`, `table-content` or `list-content` (whichever the
   parent makes applicable), then `cdata` (the start of `]]>`), then `unmappable-script`.
-- After a clean scan: `combining-across-markup`, then `empty-narrative`.
+- After a clean scan: `unmappable-script` (the lowered-half rule, in document order), then
+  `combining-across-markup`, then `empty-narrative`.
 
 (So `<table><td>a</td></table>` is `misnested-tag`, `<iframe/>` is `unknown-element` and
 `<img/>` is `forbidden-attribute`.) The section 2 checks of the whole `div`, which precede the
@@ -571,7 +610,7 @@ The scanner's reason codes are, in the order of this section: `forbidden-charact
   - These rules apply together; any one of them makes a cut.
   - They read the page's text and do not rebuild a table's grid, so a number split across two
     cells drawn side by side ("10" | "000 IU") is not one number to them. For a structured
-    source, the only kind 3.0.0 qualifies, a span covers the whole page (section 7), so no span
+    source, the only kind this version qualifies (from 3.0.0), a span covers the whole page (section 7), so no span
     edge falls between cells; the query service's quote-edge rule, whose quotes can, rebuilds
     the grid (`docs/design/epi-mcp-query-service.md`).
 
@@ -664,7 +703,7 @@ The page text an extractor produces is the reference the narrative is checked ag
 extractor is a controlled component: its name and version are recorded in
 `IngestionProvenance.extraction.parser`, pinned, and checksummed like the FHIR packages.
 
-**What 3.0.0 qualifies.** A structured source is an FHIR ePI document Bundle whose section
+**What this version qualifies (from 3.0.0).** A structured source is an FHIR ePI document Bundle whose section
 narratives are XHTML (ADR 0005); every other source, a Word document however it is read
 included, is a drawn document. The rules below are complete for a structured source (the
 structured-source rule below): its page text is exactly the scanner's text for each section,
@@ -799,7 +838,10 @@ An extractor must:
   U+2074–U+2079, `+`, U+FE62, U+FF0B and U+2795 as U+207A, `-`, U+2212, U+2010–U+2015,
   U+02D7, U+FE58, U+FE63, U+FF0D and U+2796 as U+207B, `=` as U+207C, `(` and `)` as U+207D
   and U+207E; lowered: the same characters as U+2080–U+2089 and U+208A–U+208E — and every
-  other character as it is. An
+  other character as it is, except that an extractor refuses the document where such a run holds
+  what section 5 refuses inside the corresponding element (stated from 3.1.0: a number with no
+  script form, a raised ½ or ∞, a lowered ½ outside the lowered-half rule), since the text
+  cannot carry its position. An
   extractor that cannot tell a glyph's baseline shift is unverifiable and must refuse the
   document (emit no SourceDocumentText) rather than emit plain digits: the narrative is
   derived from the page text, so if the text layer flattens `10⁹` to `109`, both sides say
@@ -832,6 +874,21 @@ looked. The vectors remain the fixed, reviewed floor; the differential run is th
 
 ## 9. Version history
 
+- `fidelity-norm/3.1.0` (minor) — inside `sub`, U+221E INFINITY is kept unchanged instead of
+  rejecting (`unmappable-script`), and U+00BD VULGAR FRACTION ONE HALF is kept under the
+  lowered-half rule: only as the half-life, a `sub`'s whole content right after a `t` that starts
+  a word and right before a break, a space, `) . , ; :` or nothing, none of them raised or
+  lowered. So `t<sub>½</sub>` and `AUC<sub>(0-∞)</sub>`, which the EMA's published labels write,
+  read `t½` and `AUC₍₀₋∞₎` (section 5; `docs/design/fidelity-norm-3-1-0.md`, ADR 0005). The
+  lowered-half rule is checked after the scan, before `combining-across-markup`. Section 7 states
+  that an extractor refuses a raised or lowered run holding what section 5 refuses in the
+  corresponding element. Nothing else changes: every narrative 3.0.0 accepts reads the same,
+  inside `sup` both still reject, and no text arises that a narrative could not already write
+  with the code points themselves. Section 7's new sentence only adds a refusal on a path no
+  qualified extractor takes, so it invalidates no extractor's output. Forty-three XHTML vectors
+  are added, each an input whose
+  outcome under 3.0.0 differs or which pins the new rule's edges; the existing vectors change only
+  in the version string and the hashes that embed it.
 - `fidelity-norm/3.0.0` (major) — numbered lists, table grids and pictures, seen as a reader
   sees them (`docs/design/fidelity-norm-3-0-0.md`, as amended by its independent reviews; ADR
   0005). `ol` is allowed with `type` and `start`, and each of its items emits the marker a
