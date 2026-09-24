@@ -349,6 +349,8 @@ def test_colour_keywords_are_not_marks_and_light_greys_are_faint() -> None:
         ("border-width: 1px; border-style: none solid", ["border"]),
         ("border-bottom-width: 1px; border-bottom-style: solid", ["underline"]),
         ("border-bottom: none", []),
+        # Review round 33: a border under a pixel is still drawn (at one pixel).
+        ("border-bottom: 0.5px solid", ["underline"]),
         ("border-color: red", []),
     ],
 )
@@ -394,6 +396,10 @@ def test_inline_borders_cascade_as_a_browser_does(style: str, expected: list[str
         "border-bottom: 1px solid; border-bottom: none initial",
         # "inherit" takes the parent's border, which the reader does not follow.
         "border-bottom: inherit",
+        # Two styles in one shorthand: a browser drops it and keeps the earlier border.
+        "border-bottom: 1px solid; border-bottom: none dotted",
+        # A lone closing bracket: a browser drops the declaration and keeps the earlier border.
+        "border-bottom: 1px solid; border-bottom: none)",
     ],
 )
 def test_a_border_value_the_reader_cannot_read_whole_refuses(style: str) -> None:
@@ -512,7 +518,8 @@ def test_sections_nested_too_deep_to_read_refuse_the_document() -> None:
     [[1], ["s"], [{"title": "x", "code": "x"}], [{"title": "x", "text": "x"}],
      [{"title": "x", "section": {"title": "y"}}], [{"title": "x", "code": {"coding": [1]}}],
      [{"title": "x", "code": {"coding": [{"code": ["x"]}]}}],
-     [{"title": "x", "text": {"div": 5}}]],
+     [{"title": "x", "text": {"div": 5}}], [{"title": "x", "section": 5}],
+     [{"title": "x", "code": {"coding": {"x": 1}}}]],
 )  # fmt: skip
 def test_a_bundle_of_the_wrong_shape_refuses_the_document(sections: list[Any]) -> None:
     with pytest.raises(EpiRefusedError):
@@ -611,6 +618,13 @@ def test_nesting_the_interpreter_cannot_follow_refuses_the_section() -> None:
         ('<p style="line-height:99.9%">x</p>', "unsupported-style"),
         ('<p style="font-size:14.01pt">x</p>', "unsupported-style"),
         ('<p style="margin-left:-12.01pt">x</p>', "unsupported-style"),
+        # Review round 33: a list moved out of an open p on its own; a border width in em; a
+        # table's positive offset not carried into its cells.
+        ('<p>a<ol>b</ol></p>', "malformed-xhtml"),
+        ('<p>a<ul>b</ul></p>', "malformed-xhtml"),
+        ('<p><span style="border-bottom:0.1em solid">x</span></p>', "unsupported-style"),
+        ('<div style="margin-left:20pt"><table><tr><td><p style="margin-left:-25pt">x</p>'
+         "</td></tr></table></div>", "unsupported-style"),
     ],
 )  # fmt: skip
 def test_what_a_browser_reads_otherwise_refuses(inner: str, code: str) -> None:
@@ -694,3 +708,15 @@ def test_a_lone_surrogate_anywhere_refuses_the_document(where: str) -> None:
         section["code"] = {"coding": [{"code": "\udc00"}]}
     with pytest.raises(EpiRefusedError):
         read_epi(bundle([section]))
+
+
+@pytest.mark.parametrize(
+    "document",
+    [
+        b'{"resourceType":"Bundle","type":"document","entry":5}',
+        b'{"resourceType":"Bundle","type":"document","x":' + b"1" * 5000 + b',"entry":[]}',
+    ],
+)
+def test_a_bundle_python_cannot_read_refuses_the_document(document: bytes) -> None:
+    with pytest.raises(EpiRefusedError):
+        read_epi(document)

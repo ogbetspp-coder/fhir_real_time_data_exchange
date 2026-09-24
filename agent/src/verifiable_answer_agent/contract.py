@@ -257,7 +257,8 @@ def _acceptable_cut(text: str, index: int) -> bool:
     a cut the service would accept, never the reverse. The answer's own two ends are not cuts: the
     service reads the section beyond them, so an answer that itself begins or ends inside a number
     or before a sign, or whose last chunk reaches its end past an opening mark before a sign, is
-    refused at that chunk (a false failure, never a false pass).
+    refused at that chunk; and so is a cut inside a table cell, where the service also reads the
+    cells beside it and the splitter sees no grid (each a false failure, never a false pass).
     """
     if index <= 0 or text[index] != " " or text[index - 1] == " ":
         return False

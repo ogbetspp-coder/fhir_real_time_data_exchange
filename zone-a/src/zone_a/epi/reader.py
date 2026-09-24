@@ -71,23 +71,24 @@ What refuses a section (``SectionRefusal.code``):
   zero-width characters, bidirectional controls), which a browser hides or which reorders
   what it shows.
 
-Also refused as ``malformed-xhtml``: a root that is not a ``div``, a lone surrogate, a ``br``,
-``img`` or ``hr`` with content, markup an HTML parser rebuilds or reads otherwise (a block in an
-open ``p``, an ``li`` in an ``li``, an ``a`` in an ``a``, a table part outside a table, a processing
-instruction or comment, an element with a namespace prefix, a self-closing element other than
-``br``, ``hr`` and ``img``, ``</br>``, a reference to U+0080 to U+009F, which HTML maps through
-windows-1252 (all but five of them)), elements nested deeper than 128 (a table's row group and row
-counted; a section deep in the Bundle can be refused as nested too deeply to read within that bound,
-a false failure), and a CDATA section (an XML parser reads it as text, an HTML parser as a comment).
-As ``unsupported-element``: text between the parts of a table, which a browser moves out of the
-table. As ``unsupported-style``: a margin or indent more than an inch to the left, text drawn more
-than 12pt left of its container's start (the blocks' margins and the indent inherited through
-blocks, inline elements and table rows summed, each read as the most negative value any of its
-declarations names; a table cell starts again from the table's own offset), which moves it off the
-page or over what lies there, or a margin or indent in a unit the reader does not know (``%``,
-``vw``, ``calc()``...); layout that draws one text over another (a negative margin on inline text or
-at a block's top or bottom, vertical padding on inline text and any padding on it over a background,
-a border on it wider than a hairline, a height outside table parts and pictures, a line height below
+Also refused as ``malformed-xhtml``: a root that is not a ``div``, a lone surrogate (in a div read
+on its own; in a Bundle the document refuses first), a ``br``, ``img`` or ``hr`` with content,
+markup an HTML parser rebuilds or reads otherwise (a block in an open ``p``, an ``li`` in an ``li``,
+an ``a`` in an ``a``, a table part outside a table, a processing instruction or comment, an element
+with a namespace prefix, a self-closing element other than ``br``, ``hr`` and ``img``, ``</br>``, a
+reference to U+0080 to U+009F, which HTML maps through windows-1252 (all but five of them)),
+elements nested deeper than 128 (a table's row group and row counted; a section deep in the Bundle
+can be refused as nested too deeply to read within that bound, a false failure), and a CDATA section
+(an XML parser reads it as text, an HTML parser as a comment). As ``unsupported-element``: text
+between the parts of a table, which a browser moves out of the table. As ``unsupported-style``: a
+margin or indent more than an inch to the left, text drawn more than 12pt left of its container's
+start (the blocks' margins and the indent inherited through blocks, inline elements and table rows
+summed, each read as the most negative value any of its declarations names; a table cell starts
+again from zero, or from the table's own offset when that is negative), which moves it off the page
+or over what lies there, or a margin or indent in a unit the reader does not know (``%``, ``vw``,
+``calc()``...); layout that draws one text over another (a negative margin on inline text or at a
+block's top or bottom, vertical padding on inline text and any padding on it over a background, a
+border on it wider than a hairline, a height outside table parts and pictures, a line height below
 12pt, 100% or 1em, a font above 14pt); a font outside a closed list of Unicode text fonts (a symbol
 font draws other glyphs); a border value on inline text a browser would not accept whole, or one
 inherited from the parent; a style CSS would split otherwise than the reader (a quote outside a font
@@ -766,7 +767,6 @@ def _left_offsets(style: str) -> tuple[float, float | None]:
         if key == "margin":
             if tokens:
                 margins.append(_offset_points(_per_side(tokens).get("left", "0")))
-                margins.extend(_offset_points(t) for t in tokens[4:])
         elif key == "margin-left":
             margins.extend(_offset_points(t) for t in tokens)
         elif key == "text-indent":
@@ -789,14 +789,16 @@ def _walk(element: ET.Element, builder: _Builder, marks: frozenset[str], depth: 
 def _enter_block(name: str, style: str, builder: _Builder) -> None:
     """Carry the block's left offset down; refuse text drawn left of its container's start.
 
-    A table cell's content starts at the cell, so a cell starts again from zero (a block that
-    overflows its cell is a stated residual). Each declaration alone is also bounded by an inch
+    A table cell's content starts at the cell, so a cell starts again from zero, or from the
+    table's own offset when that is negative (a block that overflows its cell is a stated
+    residual). Each declaration alone is also bounded by an inch
     (``_on_page``); here the sum is: nested margins, and an indent inherited from a parent, add up.
     """
     if name in ("td", "th"):
         builder.left, builder.indent = min(0.0, builder.left), builder.part_indent
     margin, indent = _left_offsets(style)
-    if name not in ("td", "th", "tr", "thead", "tbody"):
+    # A cell's margin does not apply (a table part never reaches here but through its cell).
+    if name not in ("td", "th"):
         builder.left += margin
     if indent is not None:
         builder.indent = indent
@@ -971,7 +973,8 @@ def read_div(div: str) -> tuple[tuple[Paragraph, ...], SectionRefusal | None, tu
     try:
         root = ET.fromstring(div)
     except (ET.ParseError, ValueError) as error:
-        # ValueError (UnicodeEncodeError among them): a lone surrogate the JSON decoded.
+        # ValueError (UnicodeEncodeError among them): a lone surrogate. ``read_epi`` refuses a
+        # Bundle holding one first; this is for a div read on its own.
         return (), SectionRefusal("malformed-xhtml", f"not well-formed: {error}"), notes
     builder = _Builder()
     try:
@@ -1026,8 +1029,9 @@ def read_epi(data: bytes) -> Document:
 def _read_epi(data: bytes) -> Document:
     try:
         bundle = json.loads(data.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise EpiRefusedError("invalid-bundle", "not UTF-8 JSON") from error
+    except (UnicodeDecodeError, ValueError) as error:
+        # ValueError: not JSON, or an integer past Python's digit limit.
+        raise EpiRefusedError("invalid-bundle", "not UTF-8 JSON Python can read") from error
     try:
         # A lone surrogate escape ("\\ud800") decodes to a string no UTF-8 writer can write.
         json.dumps(bundle, ensure_ascii=False).encode("utf-8")

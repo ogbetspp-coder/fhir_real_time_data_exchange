@@ -1,6 +1,6 @@
 # `fidelity-norm/3.0.0`: numbered lists, table grids and pictures, seen as a reader sees them
 
-_Proposal, 2026-09-23, amended after two independent design reviews and thirty-two reviews of the
+_Proposal, 2026-09-23, amended after two independent design reviews and thirty-three reviews of the
 implementation (findings listed at the end), and implemented. `docs/fidelity-normalization.md`
 (3.0.0) is the normative text; where this note and it differ, the specification wins. Prompted by roadmap item 3a (ADR 0005): the first real
 label to go through the system, the EMA's own ePI for Imatinib Teva, has six numbered lists, 46
@@ -1182,3 +1182,15 @@ pinned label:
    rationale reworded (all but five C1 references are remapped; a renderer shows something the
    check does not see); a lone surrogate anywhere in a Bundle, which a UTF-8 writer cannot write,
    refuses the document.
+
+## Thirty-third review (2026-09-24): findings and what changed
+
+Scoped to this change, the review found no false pass, divergence, crash or refusal of a pinned
+label. Its five Medium findings were stated reader rules no test pinned (a border under a pixel
+is drawn, a shorthand with two styles is dropped, a list alone moved out of an open `p`, a border
+width in em, a Bundle of the wrong shape through `TypeError` or `KeyError`): each is now pinned.
+Its Low findings are closed too: the agent splitter's docstring names a cut inside a table cell
+as a false failure; a JSON integer past Python's digit limit refuses the document; the docstrings
+agree on where a cell's offset starts (zero, or the table's own offset when negative), pinned by
+a test; two lines of unreachable code are removed. The review's mutation sweep of the reader (84
+mutants) now leaves only mutants that add refusals or change nothing.
