@@ -1,7 +1,12 @@
 import { sha256, stableUuid } from "../lib/hash.js";
 import { isGap } from "../fidelity/normalize.js";
 import { isGridMarker, xhtmlToText } from "../fidelity/xhtml.js";
-import { duplicateRuleIssues, type EmaMapping, type SectionRule } from "./mapping.js";
+import {
+  duplicateRuleIssues,
+  permittedTitles,
+  type EmaMapping,
+  type SectionRule,
+} from "./mapping.js";
 import {
   isComposition,
   type BundleEntry,
@@ -302,9 +307,16 @@ function mapSection(
     )
     .filter((child): child is CompositionSection => child !== undefined);
 
+  const heading: unknown = (match.section as { title?: unknown }).title;
+  const sourceTitle = typeof heading === "string" ? heading : undefined;
   const target: CompositionSection = {
     id: stableUuid("ema-qrd-section", rule.sourceKey),
-    title: rule.title,
+    // The heading the source carries when the QRD template permits it (a label may omit a
+    // heading's optional wording); otherwise the manifest's.
+    title:
+      sourceTitle !== undefined && permittedTitles(rule).includes(sourceTitle)
+        ? sourceTitle
+        : rule.title,
     code: {
       coding: [
         {
@@ -342,16 +354,110 @@ function findComposition(bundle: FhirBundle): { composition: FhirComposition; en
   return { composition: firstEntry.resource, entry: firstEntry };
 }
 
+const EXTENSION_BASE = "http://ema.europa.eu/fhir/StructureDefinition/";
+const SPOR_ORGANISATIONS = "https://spor.ema.europa.eu/v1/organisations/";
+export const PROCEDURE_NUMBER_SYSTEM = "http://ema.europa.eu/fhir/procedureIdentifierNumber";
+
+type Identifier = { system?: unknown; value?: unknown };
+
+function identifiersIn(value: unknown): Identifier[] {
+  if (Array.isArray(value)) return value as Identifier[];
+  return value === undefined || value === null ? [] : [value];
+}
+
+// The one identifier in `system`, or none; two are ambiguous and refused.
+function identifierInSystem(value: unknown, system: string, where: string): string | undefined {
+  const matches = identifiersIn(value).filter(
+    (identifier) => identifier.system === system && typeof identifier.value === "string",
+  );
+  if (matches.length > 1) {
+    throw new TransformationError("Product identity is ambiguous", [
+      `${where} has more than one identifier in ${system}`,
+    ]);
+  }
+  return matches[0]?.value as string | undefined;
+}
+
+type ListExtension = { url: string } & Record<string, unknown>;
+type ListIdentity = { productName: string | undefined; extensions: ListExtension[] };
+
+// What the EMA List states about the product (EUEpiList extensions and title), selected from
+// the graph by path and identifier system, and nothing it does not state
+// (docs/design/authority-import-contract.md, D11). The synthetic Type 2 graph has no value in
+// these systems, so it gets no extension.
+function listIdentity(sourceBundle: FhirBundle): ListIdentity {
+  const resources = sourceBundle.entry;
+  const byUrl = new Map(resources.map((entry) => [entry.fullUrl, entry.resource]));
+  const authorisations = resources.filter(
+    ({ resource }) => resource.resourceType === "RegulatedAuthorization",
+  );
+  if (authorisations.length > 1) {
+    throw new TransformationError("Product identity is ambiguous", [
+      "The graph has more than one RegulatedAuthorization",
+    ]);
+  }
+  const products = resources.filter(
+    ({ resource }) => resource.resourceType === "MedicinalProductDefinition",
+  );
+  const names: unknown = products.length === 1 ? products[0]?.resource.name : undefined;
+  const productName = Array.isArray(names)
+    ? ((names[0] as { productName?: unknown } | undefined)?.productName as string | undefined)
+    : undefined;
+
+  const extensions: ListExtension[] = [];
+  const authorisation = authorisations[0]?.resource;
+  if (authorisation === undefined) return { productName, extensions };
+  const add = (name: string, value: Record<string, unknown>): void => {
+    extensions.push({ url: `${EXTENSION_BASE}${name}`, ...value });
+  };
+
+  const holderUrl = (authorisation.holder as { reference?: unknown } | undefined)?.reference;
+  const holder = typeof holderUrl === "string" ? byUrl.get(holderUrl) : undefined;
+  const holderId = identifierInSystem(holder?.identifier, SPOR_ORGANISATIONS, "The holder");
+  if (holderId !== undefined) {
+    add("ext-epi-marketing-authorisation-holder", {
+      valueIdentifier: { system: SPOR_ORGANISATIONS, value: holderId },
+    });
+    if (typeof holder?.name === "string") {
+      add("ext-epi-marketing-authorisation-holder-display", { valueString: holder.name });
+    }
+  }
+  const regulator = authorisation.regulator as
+    { identifier?: unknown; display?: unknown } | undefined;
+  const agencyId = identifierInSystem(regulator?.identifier, SPOR_ORGANISATIONS, "The regulator");
+  if (agencyId !== undefined) {
+    add("ext-epi-regulatory-agency", {
+      valueIdentifier: { system: SPOR_ORGANISATIONS, value: agencyId },
+    });
+    if (typeof regulator?.display === "string") {
+      add("ext-epi-regulatory-agency-display", { valueString: regulator.display });
+    }
+  }
+  const procedure = identifierInSystem(
+    (authorisation.case as { identifier?: unknown } | undefined)?.identifier,
+    PROCEDURE_NUMBER_SYSTEM,
+    "The authorisation's procedure",
+  );
+  if (procedure !== undefined) {
+    add("ext-epi-procedure-number", {
+      valueIdentifier: { system: PROCEDURE_NUMBER_SYSTEM, value: procedure },
+    });
+  }
+  return { productName, extensions };
+}
+
 function createEmaList(
   mapping: EmaMapping,
   packageId: string,
   documentFullUrl: string,
   title: string,
+  identity: ListIdentity,
 ): FhirResource {
   return {
     resourceType: "List",
     id: stableUuid("ema-epi-list", packageId),
     meta: { profile: [mapping.profiles.list] },
+    ...(identity.extensions.length === 0 ? {} : { extension: identity.extensions }),
     identifier: [
       {
         system: "https://khs.dev/fhir/identifier/epi-package",
@@ -360,7 +466,9 @@ function createEmaList(
     ],
     status: "current",
     mode: "working",
-    title: `${title} — EMA ePI document index`,
+    // The product's name, as the EMA's own Lists are titled; the document's title where the
+    // graph names no product.
+    title: identity.productName ?? `${title} — EMA ePI document index`,
     code: {
       coding: [
         {
@@ -555,7 +663,13 @@ export function transformType2ToEma(
     entry: [{ fullUrl: compositionFullUrl, resource: targetComposition }, ...copied.entries],
   };
 
-  const list = createEmaList(mapping, packageId, bundleFullUrl, targetComposition.title);
+  const list = createEmaList(
+    mapping,
+    packageId,
+    bundleFullUrl,
+    targetComposition.title,
+    listIdentity(sourceBundle),
+  );
   const inputHash = sha256(sourceBundle);
   const outputHash = sha256({ list, documentBundle: targetBundle });
 

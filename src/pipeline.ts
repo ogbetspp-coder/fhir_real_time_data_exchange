@@ -17,7 +17,7 @@ import { OfficialFhirValidatorClient } from "./fhir/official-validator.js";
 import {
   hasValidationErrors,
   validateEmaPreflight,
-  validateType2Preflight,
+  validateCanonicalPreflight,
 } from "./fhir/preflight.js";
 import { toProvenanceResource } from "./fhir/provenance.js";
 import { sourceIdentifierValue, transformType2ToEma } from "./fhir/transform.js";
@@ -156,14 +156,14 @@ export async function runPipeline(
     source = input.source;
   }
 
-  const sourcePreflight = validateType2Preflight(source);
+  const sourcePreflight = validateCanonicalPreflight(source, gate?.submission.graphType ?? "type2");
   if (hasValidationErrors(sourcePreflight)) {
-    log("warning", "Canonical Type 2 preflight rejected", {
+    log("warning", "Canonical preflight rejected", {
       runId,
       stage: "source-preflight",
       errorCount: countErrors([sourcePreflight]),
     });
-    throw new Error("Canonical Type 2 preflight failed");
+    throw new Error("Canonical preflight failed");
   }
 
   // The authority-import namespace is written only by the importer, whose route arrives with
