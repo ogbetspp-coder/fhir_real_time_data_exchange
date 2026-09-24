@@ -19,7 +19,7 @@ from google.adk.agents.readonly_context import ReadonlyContext
 from google.adk.tools.tool_context import ToolContext
 
 from verifiable_answer_agent import quote_edge
-from verifiable_answer_agent.quote_edge import locate_quote
+from verifiable_answer_agent.quote_edge import is_gap, locate_quote
 from verifiable_answer_agent.tools import build_query_toolset, read_tool_result
 
 from .conftest import config_for, invocation_context
@@ -29,6 +29,7 @@ from .fake_query_service import (
     REPOSITORY_ROOT,
     FakeQueryService,
     quote_edge_cases,
+    quote_is_refused,
     synthetic_section,
 )
 
@@ -58,7 +59,8 @@ def test_the_export_is_at_the_fakes_normalisation_version_and_covers_both_answer
     [
         ("QUOTE_OPENERS", quote_edge.QUOTE_OPENERS),
         ("QUOTE_CLOSERS", quote_edge.QUOTE_CLOSERS),
-        ("SPACED_SIGNS", quote_edge.SPACED_SIGNS),
+        ("PLAIN_PUNCTUATION", quote_edge.PLAIN_PUNCTUATION),
+        ("POSTFIX_SIGNS", quote_edge.POSTFIX_SIGNS),
     ],
 )
 def test_each_character_set_is_the_services_own(name: str, ported: frozenset[str]) -> None:
@@ -66,7 +68,9 @@ def test_each_character_set_is_the_services_own(name: str, ported: frozenset[str
     source = (REPOSITORY_ROOT / "src" / "query" / "tools.ts").read_text(encoding="utf-8")
     found = re.search(rf"const {name} = new Set\(\[(.*?)\]\);", source, re.DOTALL)
     assert found is not None, name
-    literals = re.findall(r"\"((?:[^\"\\]|\\.)*)\"|'((?:[^'\\]|\\.)*)'", found.group(1))
+    # Comments inside the set are not entries: a quoted character in one would hide a removal.
+    body = re.sub(r"//[^\n]*", "", found.group(1))
+    literals = re.findall(r"\"((?:[^\"\\]|\\.)*)\"|'((?:[^'\\]|\\.)*)'", body)
     assert frozenset(double or single for double, single in literals) == ported
 
 
@@ -109,3 +113,112 @@ async def test_the_fakes_verify_quote_answers_as_the_service_did(
     finally:
         with contextlib.suppress(Exception):
             await toolset.close()
+
+
+def test_the_fake_refuses_the_quotes_the_service_refuses() -> None:
+    """The test double answers ``invalid-request`` where ``src/query/tools.ts`` does.
+
+    Since fidelity-norm/3.0.0 that includes a quote carrying a table's grid markers or a
+    picture's U+FFFC, and a quote of gaps alone: such a quote could join two rows, or quote nothing
+    a reader sees.
+    """
+    table = "Dose table \ufdd0 \ufdd2 \ufdd3 Adults \ufdd3 10 mg \ufdd1 end."
+    refused = (
+        table,
+        "\ufdd3",
+        "a \ufffc b",
+        "dose\x00 is",
+        "dose\u202e is",
+        "   ",
+        # Quotes that normalise to nothing: invisible characters, and a line-start bullet.
+        "\u00ad",
+        "\u200b",
+        "\u2060",
+        "\ufeff",
+        " \u00ad ",
+        "\u200b  ",
+        "\u00ad\n",
+        "\u00ad\r\n",
+        "\n\u2022 ",
+        "\n\u2022 \u25cf ",
+        "\n\u2022\n",
+        # Quotes of gaps alone (section 6): content spaces, blank glyphs, ignorable code points.
+        "\u2009",
+        "\u205f",
+        " \u2063 ",
+        "\u2800",
+        "\u205f\u200d",
+        "\U000e0020",
+        "\n\u2022 \u2009",
+        "\u1878\ua4c5",
+        # Section 2 from fidelity-norm/3.0.0: the interlinear annotation controls and the
+        # prepended concatenation marks.
+        "Take 10 \ufff9000",
+        "10\u070f000",
+        "\U000110bd",
+    )
+    for quote in refused:
+        assert quote_is_refused(quote), repr(quote)
+    accepted = (
+        "Adults",
+        "10 mg",
+        "\ufdcf x",
+        "\ufdf0",
+        "Take 2 \u2022 10 mg",
+        # A bullet that step 4 keeps: at the start of the text, at the end, or on a tab line.
+        "\n\u2022",
+        "\u2022 ",
+        "\n\u2022\t",
+        # A bullet after a thin space is not at the line's start, so step 4 keeps it.
+        "\n\u2009\u2022 ",
+        "\u2009x",
+    )
+    for quote in accepted:
+        assert not quote_is_refused(quote), repr(quote)
+
+
+# fidelity-norm/3.0.0 sections 2 and 6, as the specification writes them (the service is held to
+# the same lists in test/fidelity-lists.test.ts): dropping one entry from the double or the port
+# fails here.
+_FORBIDDEN_FROM_3_0_0 = (
+    0x0600, 0x0601, 0x0602, 0x0603, 0x0604, 0x0605, 0x06DD, 0x070F, 0x0890, 0x0891, 0x08E2,
+    0xFFF9, 0xFFFA, 0xFFFB, 0x110BD, 0x110CD,
+)  # fmt: skip
+_BLANK_GLYPHS = (0x1878, 0x18AA, 0x2800, 0xA4A2, 0xA4A3, 0xA4B4, 0xA4C1, 0xA4C5)
+
+
+def test_the_double_refuses_every_code_point_section_2_adds() -> None:
+    for code_point in _FORBIDDEN_FROM_3_0_0:
+        assert quote_is_refused(f"dose {chr(code_point)} is"), hex(code_point)
+
+
+def test_every_blank_glyph_is_a_gap() -> None:
+    for code_point in _BLANK_GLYPHS:
+        assert is_gap(chr(code_point)), hex(code_point)
+
+
+def test_a_long_run_of_brackets_and_spaces_is_read_in_one_pass() -> None:
+    # Past the bounded walk the one-pass reading takes over, and answers the same.
+    signed = "CrCl <" + " (" * 400 + " 30 ml/min"
+    assert locate_quote(signed, "30 ml/min") is None
+    plain = "Dose" + " (" * 400 + " 30 ml/min"
+    assert locate_quote(plain, "30 ml/min") is not None
+    # Without the whole text (the answer splitter) a walk that runs too long counts as a sign:
+    # refusing that cut is the safe side.
+    start = len(plain) - len("30 ml/min")
+    assert not quote_edge.edge_before(plain, start, "3")
+    walked = "Dose ( + (" + " (" * 300 + " 30"
+    assert not quote_edge.edge_before(walked, len(walked) - 2, "3")
+
+
+def test_the_rules_corners() -> None:
+    # An opening mark drawn like a comparator is a sign joined to the quote.
+    assert locate_quote("CrCl " + chr(0x2039) + "30 ml/min", "30 ml/min") is None
+    # Opening punctuation at the start of the text.
+    assert locate_quote("(see below)", "see below") == (1, 10)
+    # An empty quote is never found; a text of gaps alone has no number.
+    assert locate_quote("x", "") is None
+    assert quote_edge.non_gap(chr(0x2009) + " ", 0, 1) is None
+    # A cell whose text ends with a gap still holds its words.
+    table = "\ufdd0 \ufdd2 \ufdd3 10" + chr(0x2009) + " \ufdd3 000 IU \ufdd1"
+    assert locate_quote(table, "000 IU") is None

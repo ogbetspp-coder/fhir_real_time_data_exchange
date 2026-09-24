@@ -39,6 +39,7 @@ import {
   entitlementDirectory,
   narrativeDivOf,
   withNarratives,
+  withProduct,
   type Harness,
   type QueryStore,
   type SeededDocument,
@@ -245,6 +246,40 @@ describe("ePI query service, phase 1", () => {
           error: "invalid-request",
         });
       }
+
+      // fidelity-norm/3.0.0: a table's grid markers and a picture's U+FFFC are the scanner's,
+      // never a reader's, so a quote carrying one, even alone, is a bad request.
+      for (const codePoint of [0xfdd0, 0xfdd2, 0xfdd3, 0xfdd5, 0xfdef, 0xfffc]) {
+        for (const quote of [
+          `dose ${String.fromCodePoint(codePoint)} is`,
+          String.fromCodePoint(codePoint),
+        ]) {
+          const refused = await callTool(harness, "verify_quote", { bundleId: typography, quote });
+          expect(refused.structured, codePoint.toString(16)).toEqual({
+            tool: "verify_quote",
+            error: "invalid-request",
+          });
+        }
+      }
+
+      // A quote of gaps alone quotes nothing a reader sees (fidelity-norm/3.0.0 section 6), and
+      // could match between the groups of a number.
+      for (const quote of [
+        "\u2009",
+        " \u2063 ",
+        "\u2800",
+        "\u205f\u200d",
+        "\u{E0020}",
+        "\u1878\ua4c5",
+        "Take 10 \ufff9000",
+        "10\u070f000",
+      ]) {
+        const refused = await callTool(harness, "verify_quote", { bundleId: typography, quote });
+        expect(refused.structured, JSON.stringify(quote)).toEqual({
+          tool: "verify_quote",
+          error: "invalid-request",
+        });
+      }
     });
   });
 
@@ -328,16 +363,17 @@ describe("ePI query service, phase 1", () => {
     // `whole` must answer match at the offsets the text itself gives. The list is shared with
     // scripts/contracts/export-quote-edge-cases.ts, which publishes the rule's answers to it for
     // the agent's test double (test/fixtures/contracts/quote-edge-cases.json).
-    for (const { text, cut, whole } of quoteEdgeCases) {
+    for (const section of quoteEdgeCases) {
+      const { cut, whole } = section;
       const bundle = withNarratives(seeded.bundle, {
-        [TYPOGRAPHY_SECTION_KEY]: quoteEdgeDiv(text),
+        [TYPOGRAPHY_SECTION_KEY]: quoteEdgeDiv(section),
       });
       const harness = await harnessFor(
         PRINCIPAL_A,
         new Map([[store.bundleIdTypography, { ...seeded, bundle }]]),
       );
       try {
-        const normalized = normalizeText(text);
+        const normalized = normalizeText(xhtmlToText(quoteEdgeDiv(section)));
         const points = Array.from(normalized);
         for (const quote of [...cut, ...whole]) {
           // Every quote is a slice of the text: what decides the answer is where it stops.
@@ -708,6 +744,39 @@ describe("ePI query service, phase 1", () => {
       const products = (own.structured as { products: { productName: string }[] }).products;
       expect(products.map(({ productName }) => productName)).toEqual([store.productNameA]);
     });
+  });
+
+  it("find_product skips a stored name the normalisation refuses instead of failing", async () => {
+    const seeded = store.documents.get(store.bundleIdA);
+    if (seeded === undefined) throw new Error("expected a seeded document");
+    // fidelity-norm/3.0.0 section 2 refuses U+FFF9; a stored name carrying it matches nothing by
+    // name, and the other products are still found.
+    const refusedId = stableUuid("ema-bundle", "refused-product-name");
+    const refused = {
+      ...seeded,
+      bundle: withProduct(seeded.bundle, "Synthetic \ufff9Paracetamol", "SYN-REFUSED-001"),
+    };
+    const harness = await connectHarness({
+      store,
+      principal: PRINCIPAL_A,
+      entitlements: { bundles: [refusedId, store.bundleIdA] },
+      documents: new Map<string, SeededDocument>([
+        [refusedId, refused],
+        [store.bundleIdA, seeded],
+      ]),
+    });
+    try {
+      const found = await callTool(harness, "find_product", { query: "Paracetamol" });
+      expect(found.isError).toBe(false);
+      const output = FindProductOutputSchema.parse(found.structured);
+      expect(output.products.map(({ document }) => document.bundleId)).toEqual([store.bundleIdA]);
+      // Its identifier still matches.
+      const byIdentifier = await callTool(harness, "find_product", { query: "SYN-REFUSED" });
+      const matched = FindProductOutputSchema.parse(byIdentifier.structured).products;
+      expect(matched.map(({ document }) => document.bundleId)).toEqual([refusedId]);
+    } finally {
+      await harness.close();
+    }
   });
 
   it("find_product reads at most the scan horizon, and stops at the limit", async () => {

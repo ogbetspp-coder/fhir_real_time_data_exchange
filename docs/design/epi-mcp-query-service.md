@@ -336,7 +336,9 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
   Section lookup is by canonical `sourceKey`; the pinned mapping manifest translates to the
   store's coding where needed. No narrative and no result is cached across requests.
 - **`find_product`** has no search against the store in phase 1: it reads the caller's entitled
-  documents one by one and inspects each. The reads run through a pool of at most 8 in flight,
+  documents one by one and inspects each. A stored product name the normalisation refuses (a
+  section 2 character) matches nothing by name, and its identifiers still match; it does not
+  make the whole search `unavailable`. The reads run through a pool of at most 8 in flight,
   cover at most the first 200 entitled ids in entitlement order (`FIND_PRODUCT_SCAN_HORIZON`),
   stop being launched once `limit` matches are in hand, and stop when the request's read budget
   is spent. `truncated` covers both ways an answer can be shorter than what the entitlement
@@ -351,7 +353,13 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
 - **`verify_quote`** decides entitlement before it looks at the quote, so every argument shape
   naming a document outside the caller's entitlement — including one whose quote carries a
   character the normalisation forbids — is `document-not-found` to the caller and
-  `not-entitled` in the record. It then counts `sectionsSearched` as the number of candidate
+  `not-entitled` in the record. A quote that normalises to nothing, carries a character the
+  normalisation forbids, or (from `fidelity-norm/3.0.0`) carries a table's grid marker or a
+  picture's U+FFFC or normalises to gaps alone (the gaps of section 6 of the specification:
+  whitespace, the thin spaces, the blank glyphs and the Default_Ignorable code points) is
+  `invalid-request`: such a quote
+  could join two rows of a table, match between the groups of a number, or quote nothing a
+  reader sees. It then counts `sectionsSearched` as the number of candidate
   sections that carry a narrative, normalises each candidate's text in turn, stops at the first
   match, and hashes only the matched section's text.
 - **The quote-edge rule.** A `verify_quote` match is a contiguous slice of a section's
@@ -368,10 +376,51 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
     closing punctuation — `.`, `,`, `;`, `:`, `!`, `?`, `)`, `]`, `}`, straight and curly
     closing quotation marks and apostrophes, `»`, `›`, `…` — that is itself followed by a space
     or the end of the text;
-  - **across a space**: a quote that begins with a digit after a space preceded by a digit, or
-    ends with a digit before a space followed by a digit, has cut a space-grouped number; a quote
-    preceded by a comparator or sign and a space (`<`, `>`, `≤`, `≥`, `±`, `∓`, `−`, `~`, `≈`
-    and their variants) has lost it. Both are cuts;
+  - **across a space**: a quote that begins with a number after a space preceded by a number, or
+    ends with a number before a space followed by a number, has cut a space-grouped number; a
+    number is any code point of general category N (a decimal digit of any script, and "½", "¹"
+    and "₂" too), and the one on each side is read past every gap (from `fidelity-norm/3.0.0`, the specification's section 6) and every combining mark; an opening mark inside the quote or after the space separates two numbers ("0.52" of "0.52 (95%" matches), while one before the quote does not ("000 IU" of "Give 10 (000 IU)" is refused, a false failure), so "10" U+2009 " 000", "5" U+2063 " 000" and "1 ½" are one
+    number, and a quote may neither end with "10" or "10" U+2009 nor begin with "000" or "½"
+    there. A quote, or the opening punctuation before it, preceded by a sign and a space has
+    lost it: reading back from the space past gaps, combining marks and the opening marks, a run
+    of code points that are not letters, numbers or gaps holding a sign is a cut. And a quote ending in a number before a space and a number (read past gaps and combining marks) or a sign (past opening marks too, as on the left) ("100" of "100 (× 10⁹/l)", "10" of "10 " U+0332 "000", "10" U+0332 of "10" U+0332 " 000"), has lost it ("30" of "30
+    %", "100" of "100 × 10⁹/l", "25" of "25 °C", "20" of "20 +/- 5"). A sign is anything that is not a letter (a modifier letter, Lm, is a sign), a number, a gap, a combining mark, an opening mark the reading skips (those of `QUOTE_OPENERS` but "‹", which is drawn like "<"), one of the scanner's markers (U+FFFC, U+FDD0–U+FDEF), a dash or hyphen (general category Pd, far more
+    often a separator), or plain punctuation: `. , ; : ! ? ) ] } " ' ’ ” » …`, the marks `® ™ ©`,
+    and the reference marks `* † ‡ § ¶ #`, which bind neither side. So a look-alike no list names
+    (`˂`, `❮`, `⧼`, `⟪`, `➕`, a middle dot, a slash) is still a cut. The postfix signs `% ‰
+‱ ° ′ ″ ℃ ℉` bind the number before them only, so they count after a number and not before a
+    quote ("30 patients" in "12 % 30 patients" matches). So "30 ml/min" is cut after "CrCl <"
+    U+2063 " ", "CrCl <" U+0332 (drawn "≤"), "CrCl <=", inside "CrCl < ( 30 ml/min )", "CrCl <
+    （ 30 ml/min ）" and "ClCr ≥ « 30 ml/min »", "10 mg" after "Take 2 ×", "5 mg" after "20
+    +/-", and "10 cells" after "2 ·". A number before an opening bracket also joins one after it
+    ("000 IU" in "Give 10 (000 IU)"), a false failure. Stated residuals: a letter drawn like a
+    sign is not read as one ("x" or Cyrillic "х" for "×" in "Take 2 x 10 mg", U+1438 for "<");
+    an asterisk written for a multiplication is read as a reference mark ("2 * 10"); a quote may end before a decimal separator or a ratio's colon set off by a space ("Take 1" of "Take 1 ,5 mg", "dilute 1" of "dilute 1 : 10"); a letter drawn like a digit ("O" or Cyrillic "О" for 0, "l" for 1) is a letter; « and » are opening and plain punctuation although drawn like "≪" and "≫"; a dash drawn like a sign (U+30A0 and U+2E40 like "=", U+301C like "~") is a dash; and a combining mark on a space (U+0335, drawn as a stroke in some fonts) is read past, not as a sign. All are
+    cuts;
+  - **across table cells** (from `fidelity-norm/3.0.0`): a renderer draws a row's cells side by
+    side with a gap about as wide as a space and centres each cell's lines vertically, so any
+    line of a cell can sit level with any line of another cell in the row, wherever the viewer's
+    width wraps them: "10" | "000 IU" reads "10 000 IU", "<" | "5 mg" reads "< 5 mg", and "Up to
+    10" | "once" / "000 IU" / "weekly" draws "Up to 10 000 IU" on one line. The normalised text
+    carries the grid (U+FDD0 table, U+FDD1 end, U+FDD2 row, U+FDD3 cell, U+FDD4 and U+FDD5 slots
+    covered from the left and from above) but not which line a word is on, so a quote that
+    begins at a word boundary inside a cell is held to the two rules above against every word
+    of every cell to its left, and one that ends at a word boundary inside a cell against every
+    word of every cell to its right, in every row its cell covers (a word being a run of code
+    points that are not gaps; the grid is rebuilt once per search, through spans). So neither
+    "10" nor "000 IU" matches there, nor "5 mg" after the "<" cell, while "10 mg" in a row whose
+    other cells hold no number still does. The price is a false failure, and it is not small: a
+    quote beginning with a digit is refused when any cell to its left in its rows holds a word
+    ending in a digit, any quote at a word boundary in a cell is refused when any cell to its
+    left holds a word ending in a sign, and a quote ending in a digit when any cell to its right
+    holds a word beginning with one, or a sign. On the three pinned SmPCs 196 of 789 whole-cell
+    quotes are refused by this rule alone, 51 of them beginning with a letter
+    (`agent/scripts/measure_table_quotes.py`, which rebuilds each grid approximately): in Jentadueto's renal table
+    `< 30` | "Metformin is contraindicated" | "No dose adjustment" refuses both right-hand
+    cells, and a footnote "±" after a word refuses what follows it. Quoting a table with its
+    structure is the publishing step's work (roadmap 3a, PR 5), which is to relieve this. Rows, captions and whole tables are separate lines, as a paragraph break
+    is: the normalised text reads a block's line break as a space only because section 3 does,
+    and the rule treats U+FDD2, U+FDD0 and U+FDD1 as ending a line;
   - and a word character on either side (the fidelity library's own `isWordCharacter`) is a cut
     before any of this is consulted, so the rule is never looser than the gate's.
 
@@ -379,7 +428,8 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
   against "Take 2.5 mg", "Take 10" against "Take 10,5 mg", "see section 4" against "(see section
   4.4)", "20 °C" against "-20 °C" or "−20 °C", "10 mg per day" against "<10 mg per day" or
   "≥10 mg per day", "diabetic patients" against "non-diabetic patients", "t take with food"
-  against "Don't take with food", "Up to 1 000" against "Up to 1 000 000 IU", "first dose is 5
+  against "Don't take with food", "Up to 1 000" against "Up to 1 000 000 IU", "The maximum dose is
+  10" against "The maximum dose is 10" U+2009 " 000 IU", "first dose is 5
   mg/m" against "5 mg/m²" and "max 10" against "max 100 mg" are all `no-match`; a quote that ends
   before a sentence's full stop, a comma, a colon or a closing parenthesis followed by a space,
   or that begins after an opening parenthesis or quotation mark set off by a space, or at a
@@ -389,7 +439,9 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
 
   What the rule does not do, stated: it does not make a quote complete — a quote may stop
   before any following word, so "Take 5" matches "Take 5 mg daily" and a match proves the words
-  a quote contains, not that nothing follows them; a sign set off by a hyphen or dash and a space
+  a quote contains, not that nothing follows them, nor that nothing precedes them
+  ("recommended in patients" matches "not recommended in patients"); a sign set off by a hyphen
+  or dash and a space
   ("at - 20 °C") is not treated as a sign, because a spaced hyphen or dash is far more often a
   separator; two numbers genuinely separated only by a space cannot be quoted up to the space
   between them (fail-safe `no-match`); and text written without spaces between words — Chinese,

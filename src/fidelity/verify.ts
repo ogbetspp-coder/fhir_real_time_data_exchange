@@ -5,10 +5,11 @@ import {
   NormalizationError,
   countWords,
   findForbiddenCharacter,
+  isGap,
   isWhitespace,
   normalizeText,
 } from "./normalize.js";
-import { XhtmlError, xhtmlToText } from "./xhtml.js";
+import { hasDrawnText, XhtmlError, xhtmlToText } from "./xhtml.js";
 
 // Pure, synchronous verifier for ADR 0003. Per-section problems become statuses in the report;
 // only structurally unusable input (wrong normalisation version, duplicate keys, invalid pages)
@@ -312,16 +313,17 @@ function resolveSpans(
 
 // Whitespace for the edge rules: section 3 step 5's list without U+00A0, U+2007 and U+202F,
 // which join the groups of a number (`10 000`) and so are not a boundary between tokens.
-const NUMBER_JOINERS = new Set([0x00a0, 0x2007, 0x202f]);
+const NUMBER_JOINERS = new Set([0x00a0, 0x2007]);
 
 function isEdgeWhitespace(character: string | undefined): boolean {
   const codePoint = character?.codePointAt(0);
   return codePoint !== undefined && isWhitespace(codePoint) && !NUMBER_JOINERS.has(codePoint);
 }
 
-function isSpace(character: string | undefined): boolean {
+// A gap (section 6): whitespace, a thin space, or a code point drawn as nothing.
+function isGapCharacter(character: string | undefined): boolean {
   const codePoint = character?.codePointAt(0);
-  return codePoint !== undefined && isWhitespace(codePoint);
+  return codePoint !== undefined && isGap(codePoint);
 }
 
 const DECIMAL_DIGIT = /^\p{Nd}$/u;
@@ -330,14 +332,14 @@ function isDecimalDigit(character: string | undefined): boolean {
   return character !== undefined && DECIMAL_DIGIT.test(character);
 }
 
-// The first code point from `from` in direction `step` (+1 or -1) that is not section 3
-// whitespace, read inside the body and without crossing U+000A; undefined if there is none.
+// The first code point from `from` in direction `step` (+1 or -1) that is not a gap, read inside
+// the body and without crossing U+000A; undefined if there is none.
 function nextToken(index: PageIndex, from: number, step: 1 | -1): string | undefined {
   const { bodyStart, bodyEnd } = index.page;
   for (let position = from; position >= bodyStart && position < bodyEnd; position += step) {
     const character = index.codePoints[position] ?? "";
     if (character === "\n") return undefined;
-    if (!isWhitespace(character.codePointAt(0) ?? 0)) return character;
+    if (!isGap(character.codePointAt(0) ?? 0)) return character;
   }
   return undefined;
 }
@@ -358,10 +360,10 @@ function cutsDigitGroup(index: PageIndex, inner: number, beyond: number, step: 1
 function startCutsWord(pages: Map<number, PageIndex>, span: SourceSpan): boolean {
   const first = pages.get(span.page);
   if (first !== undefined) {
-    // The inner code point is the span's first that is not section 3 whitespace (a joiner
-    // such as U+202F is skipped here too: `\u202f 000` is inside the number).
+    // The inner code point is the span's first that is not a gap (a thin space such as U+202F
+    // is skipped too: `\u202f 000` is inside the number).
     let inner = span.startOffset;
-    while (inner < span.endOffset && isSpace(first.codePoints[inner])) inner += 1;
+    while (inner < span.endOffset && isGapCharacter(first.codePoints[inner])) inner += 1;
     if (inner < span.endOffset && cutsDigitGroup(first, inner, inner - 1, -1)) return true;
   }
   let skipped = false;
@@ -396,10 +398,10 @@ function endCutsWord(index: PageIndex, span: SourceSpan): boolean {
   if (end > span.startOffset && index.codePoints[end - 1] === SOFT_HYPHEN) return true;
   if (span.endOffset >= index.page.bodyEnd) return false;
   if (!isEdgeWhitespace(index.codePoints[span.endOffset])) return true;
-  // The inner code point is the span's last that is not section 3 whitespace (`10\u202f`
-  // before ` 000` ends inside the number).
+  // The inner code point is the span's last that is not a gap (`10\u202f` before ` 000` ends
+  // inside the number).
   let inner = end;
-  while (inner > span.startOffset && isSpace(index.codePoints[inner - 1])) inner -= 1;
+  while (inner > span.startOffset && isGapCharacter(index.codePoints[inner - 1])) inner -= 1;
   return inner > span.startOffset && cutsDigitGroup(index, inner - 1, inner, 1);
 }
 
@@ -445,7 +447,7 @@ function diffHint(expected: string, actual: string): DiffHint {
 export function normalizeNarrative(div: string): { text: string } | { reason: string } {
   try {
     const text = normalizeText(xhtmlToText(div));
-    return text === "" ? { reason: "empty-narrative" } : { text };
+    return hasDrawnText(text) ? { text } : { reason: "empty-narrative" };
   } catch (error) {
     if (error instanceof XhtmlError) return { reason: error.code };
     if (error instanceof NormalizationError) return { reason: error.code };

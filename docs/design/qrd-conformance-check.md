@@ -37,13 +37,20 @@ they were checked against. EPAR PDFs and the EMA's tracked-changes Word files ar
 
 `zone-a/src/zone_a/epi/reader.py` reads an ePI Bundle into sections of paragraphs, with the
 Word reader's `Paragraph` and `Mark` model. It is written to the Word reader's rule: the text a
-browser shows, exactly, or a refusal with a reason; its module docstring lists every rule. It is
+browser shows, exactly, or a refusal with a reason, for the text and its marks; its module
+docstring lists every rule. It does not lay the page out: CSS that places or paints one text
+over another is refused only in the cases the reader lists, and the rest is a stated residual of
+the check (below). Nor does it parse as a browser does: it parses the div as XML, a browser as
+HTML, and where the two build different trees it refuses the cases it lists (processing
+instructions, comments, prefixed elements, self-closing elements other than `br`, `hr` and `img`,
+a block in an open paragraph
+and the rest); any other difference is a stated residual, and reading with an HTML5 parser is a
+tracked follow-up. It is
 not the fidelity scanner, which is the contract for narrative this repository publishes and
 rightly refuses the EMA's divs (inline CSS on nearly every element).
 
 Each section is read on its own, so a section the reader cannot vouch for is refused without
-losing the rest. CSS is checked against a closed list: layout properties are ignored, text
-colour, background and tiny text are marked, and anything else (`display`, `visibility:
+losing the rest. CSS is checked against a closed list: layout properties are ignored within the bounds the reader's module docstring lists (the one list; in short: lines of text kept apart, nothing drawn more than 12pt left of its container's start, no band of padding, border or background over a line), text colour, background and tiny text are marked, and anything else (`display`, `visibility:
 hidden`, an unknown property) refuses the section. Word comment markup refuses the section,
 because the comment's text would otherwise read as label text.
 
@@ -128,7 +135,23 @@ Every finding below was confirmed by reading the source div.
   template's intended grey shading of "the national reporting system listed in Appendix V" in
   all three. Red, yellow and other colours in the source fall only on pictures or spaces, which
   show no text differently; nearly black text (`#0d0d0d`) reads as black and nearly white
-  shading (`#e6e6e6` behind a table heading) as none; none of these is reported.
+  shading (`#e6e6e6` behind a table heading) as none; none of these is reported. From
+  `epi-reader/1.1.0` and `qrd-check/1.1.0` an underline over text it can change
+  (`zone_a.underline`) is a formatting finding too, and so is a border beside or over inline
+  text (the reader's `border` mark, read side by side as a browser cascades the styles): Brukinsa writes ">1", ">5" and ">2" in 5.1 with the ">" underlined, which the
+  EMA's viewer draws as "≥" while the text says ">", and Jentadueto underlines a 5.1 heading
+  holding "≥". Underlines over words, digits, e-mail addresses and plain punctuation (the
+  Brukinsa 4.5 subheadings, for example) change nothing and are not reported. Faint and
+  struck text, and shaded text (dark or same-colour shading hides a sign), is reported over a
+  sign as well as a word (a white "-" before "20 °C" reads
+  "-20 °C" to the text and "20 °C" to a reader). A bottom border on a block or a table cell is
+  layout and is not marked: under a lone sign in a narrow cell or block it draws "≤", which is a
+  stated residual of the check (ADR 0005's closed CSS list governs the import). The reader
+  refuses a section naming a font outside a closed list of Unicode text fonts (a symbol font
+  draws other glyphs: Wingdings "J" is a smiling face) and a border value a browser would not
+  accept whole or that inherits from the parent, and layout that draws one text over another (a
+  negative margin on inline text or at a block's top or bottom, vertical padding on inline text, padding on it over a background, a border on it wider than a hairline, a height outside table parts and pictures, a line height or font outside the
+  bounds above). Those are bounds, not a layout engine. What they do not catch is a stated residual of the check, listed in the reader's module docstring (a line height computed from a smaller font than the text it holds, a block overflowing its table cell, a list item drawn over its number, text at the bounds' edge, a combining mark on a space drawn as a stroke, text moved far to the right, off a printed page). ADR 0005's renderer cross-check, which draws each page and compares, is what secures the import.
 
 The mapping lacks three EMA codes the labels use (Pregnancy, Breast-feeding and Fertility under
 4.6); the check reports them as `unmapped-code`, for information.

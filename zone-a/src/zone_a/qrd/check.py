@@ -65,7 +65,8 @@ with a refused part is ``not-checked``, not ``absent``: it may be in the part th
 read, and the checker never guesses around it. Defects the reader read through by a stated rule
 are ``xhtml-defect`` findings. Colour, shading, strike-through and faint marks over text are
 ``formatting`` findings: coloured, highlighted or struck text in a published SmPC is usually a
-left-over from review.
+left-over from review. So is an underline over text it can change (``zone_a.underline``: an
+underlined "<" is drawn "≤"), which the text alone reads as the plain sign.
 """
 
 from __future__ import annotations
@@ -82,8 +83,9 @@ from zone_a.docx.reader import Paragraph
 from zone_a.epi.reader import READER_VERSION, Document, Section, read_epi, walk
 from zone_a.qrd.headings import collapse, index, match_heading
 from zone_a.qrd.pattern import Token, parse
+from zone_a.underline import underline_changes
 
-CHECKER_VERSION = "qrd-check/1.0.0"
+CHECKER_VERSION = "qrd-check/1.1.0"
 SIMILARITY = 0.85
 MIN_LITERAL = 12
 FILL_LIMIT = 300
@@ -1231,13 +1233,44 @@ def check(document: Document, registry: dict[str, Any], mapping: dict[str, Any])
     }
 
 
+_PICTURE = frozenset("\ufffc")
+
+
 def _formatting(report: _Report, section: str, number: int, paragraph: Paragraph) -> None:
     for mark in paragraph.marks:
         covered = paragraph.text[mark.start : mark.end]
+        if mark.kind == "underline":
+            # A sign alone under a line is the case that matters ("≥" typed as an underlined
+            # ">"). A picture under a line is left out: what it shows is never read here, and
+            # an underlined picture of a sign is one of the pictures ADR 0005 refuses on import.
+            if underline_changes(
+                paragraph.text, mark.start, mark.end, also=_PICTURE, hyphens_in_words=True
+            ):
+                report.finding(
+                    "formatting",
+                    section=section,
+                    paragraph=number,
+                    mark=mark.kind,
+                    text=_excerpt(covered),
+                )
+            continue
+        if mark.kind in ("border", "faint", "strike") or mark.kind.startswith("shading-"):
+            # A bar beside or over text can join or change any of it ("|05 mg", a bar over
+            # "<"), and faint or struck text hides or withdraws any of it ("Store at" a white
+            # "-" "20 °C"), and so does dark or same-colour shading: a sign as well as a word.
+            if any(not c.isspace() and c not in _PICTURE for c in covered):
+                report.finding(
+                    "formatting",
+                    section=section,
+                    paragraph=number,
+                    mark=mark.kind,
+                    text=_excerpt(covered),
+                )
+            continue
         if not any(c.isalnum() for c in covered):
             # A coloured picture or shaded space shows no text differently.
             continue
-        if mark.kind.startswith(("color-", "shading-")) or mark.kind in ("faint", "strike"):
+        if mark.kind.startswith("color-"):
             report.finding(
                 "formatting",
                 section=section,

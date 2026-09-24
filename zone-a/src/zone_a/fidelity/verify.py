@@ -33,10 +33,11 @@ from .normalize import (
     NormalizationError,
     count_words,
     find_forbidden_character,
+    is_gap,
     is_whitespace,
     normalize_text,
 )
-from .xhtml import SOFT_HYPHEN, XhtmlError, xhtml_to_text
+from .xhtml import SOFT_HYPHEN, XhtmlError, has_drawn_text, xhtml_to_text
 
 # Most text a page may exclude as running header/footer. The body range is declared by the
 # extractor, so it is bounded and must sit on line boundaries rather than trusted outright.
@@ -246,9 +247,9 @@ def _is_blank_slice(index: PageIndex, start: int, end: int) -> bool:
         return False
 
 
-# Whitespace for the edge rules: section 3 step 5's list without U+00A0, U+2007 and U+202F, which
-# join the groups of a number (`10 000`) and so are not a boundary between tokens.
-NUMBER_JOINERS: Final = frozenset({0x00A0, 0x2007, 0x202F})
+# Whitespace for the edge rules: section 3 step 5's list without U+00A0 and U+2007, which join the
+# groups of a number (`10 000`) and so are not a boundary between tokens.
+NUMBER_JOINERS: Final = frozenset({0x00A0, 0x2007})
 
 
 def _is_edge_whitespace(character: str | None) -> bool:
@@ -264,7 +265,7 @@ def _is_decimal_digit(character: str | None) -> bool:
 
 
 def _next_token(index: PageIndex, start: int, step: int) -> str | None:
-    """The first non-whitespace code point from ``start`` in direction ``step``, in the body.
+    """The first code point from ``start`` in direction ``step`` that is not a gap, in the body.
 
     Reading stops at U+000A (``None``): a number is never read across a line break.
     """
@@ -273,7 +274,7 @@ def _next_token(index: PageIndex, start: int, step: int) -> str | None:
         character = index.text[position]
         if character == "\n":
             return None
-        if not is_whitespace(ord(character)):
+        if not is_gap(ord(character)):
             return character
         position += step
     return None
@@ -300,9 +301,9 @@ def _start_cuts_word(pages: dict[int, PageIndex], span: Json) -> bool:
     first = pages.get(span["page"])
     start = span["startOffset"]
     if first is not None:
-        # The span's first code point that is not section 3 whitespace (joiners included).
+        # The span's first code point that is not a gap (a thin space such as U+202F included).
         inner = start
-        while inner < span["endOffset"] and is_whitespace(ord(first.text[inner])):
+        while inner < span["endOffset"] and is_gap(ord(first.text[inner])):
             inner += 1
         if inner < span["endOffset"] and _cuts_digit_group(first, inner, inner - 1, -1):
             return True
@@ -344,9 +345,9 @@ def _end_cuts_word(index: PageIndex, span: Json) -> bool:
         return False
     if not _is_edge_whitespace(_at(index.text, end)):
         return True
-    # The span's last code point that is not section 3 whitespace (joiners included).
+    # The span's last code point that is not a gap (a thin space such as U+202F included).
     inner = trimmed
-    while inner > start and is_whitespace(ord(index.text[inner - 1])):
+    while inner > start and is_gap(ord(index.text[inner - 1])):
         inner -= 1
     return inner > start and _cuts_digit_group(index, inner - 1, inner, 1)
 
@@ -452,7 +453,7 @@ def normalize_narrative(div: str) -> dict[str, str]:
         return {"reason": error.code}
     except NormalizationError as error:
         return {"reason": error.code}
-    return {"reason": "empty-narrative"} if text == "" else {"text": text}
+    return {"text": text} if has_drawn_text(text) else {"reason": "empty-narrative"}
 
 
 def compute_narrative_binding(sections: list[Json]) -> tuple[list[Json], str]:

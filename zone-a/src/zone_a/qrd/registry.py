@@ -21,9 +21,10 @@ from typing import Any
 
 from zone_a.docx.reader import Paragraph, read_docx
 from zone_a.qrd.pattern import Token, UnbalancedTemplateError, is_balanced, parse
+from zone_a.underline import underline_changes
 
 REGISTRY_VERSION = "1.0.0"
-READER_VERSION = "docx-reader/1.0.0"
+READER_VERSION = "docx-reader/1.1.0"
 
 TEMPLATE_FILE = "qrd-product-information-template-version-104_en.docx"
 APPENDIX_I_FILE = (
@@ -153,6 +154,10 @@ def _optional(tokens: list[Token]) -> bool:
 # that is already in capitals change nothing and are allowed.
 _KEPT = {"highlight-lightGray", "shading-D9D9D9"}
 _CASE = {"caps", "smallCaps"}
+# An underline is accepted only where it changes nothing (zone_a.underline, ADR 0005): over
+# letters, digits, plain punctuation, a hyphen inside a word ("Breast-feeding") and the template's
+# own brackets, which the registry reads as markup, never as text ("<Traceability>").
+_TEMPLATE_BRACKETS = frozenset("<>[]{}")
 
 
 def _check(paragraph: Paragraph, where: str, keeps_marks: bool = False) -> None:
@@ -163,8 +168,19 @@ def _check(paragraph: Paragraph, where: str, keeps_marks: bool = False) -> None:
         raise RegistryError(f"{where}: a numbered or bulleted paragraph")
     for mark in paragraph.marks:
         covered = paragraph.text[mark.start : mark.end]
-        if (keeps_marks and mark.kind in _KEPT) or (
-            mark.kind in _CASE and covered == covered.upper()
+        if (
+            (keeps_marks and mark.kind in _KEPT)
+            or (mark.kind in _CASE and covered == covered.upper())
+            or (
+                mark.kind == "underline"
+                and not underline_changes(
+                    paragraph.text,
+                    mark.start,
+                    mark.end,
+                    also=_TEMPLATE_BRACKETS,
+                    hyphens_in_words=True,
+                )
+            )
         ):
             continue
         raise RegistryError(f"{where}: {mark.kind} changes what the text shows")

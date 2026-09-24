@@ -70,7 +70,8 @@ module docstring lists every rule and every refusal. What the EMA files and the 
    paragraph), right-to-left text and faint text (white, under two points, or scaled under a
    fifth) are reported as marks on the exact characters (`Paragraph.marks`), because `text`
    alone flattens "10" with a superscript "9" to "109". A caller that uses `text` must look at
-   the marks. Other appearance (colour, size, bold, italic, underline) is not reported. A
+   the marks. So is underline of any style (`docx-reader/1.1.0`), since an underlined "<" is
+   how "≤" is often typed. Other appearance (colour, size, bold, italic) is not reported. A
    picture is U+FFFC OBJECT REPLACEMENT CHARACTER where it stands: the black triangle of the
    additional-monitoring statement is a picture in the template; a U+FFFC typed as text is
    refused.
@@ -140,7 +141,9 @@ and compared byte for byte with a fresh build in `zone-a/tests/test_qrd_registry
   `trailer`. The template's light-grey highlight and light-grey (D9D9D9) shading, which mean
   "not in the printed material", are kept on items as `marks` (`highlight-lightGray`,
   `shading-D9D9D9`). Any other mark on a source paragraph the build reads is refused (capitals
-  only where they change a letter), so is a grey mark where the registry does not store marks
+  only where they change a letter; an underline only where it can change the text, judged by
+  `zone_a.underline` with the template's brackets and a hyphen inside a word allowed, since the
+  template underlines "<Traceability>" and "Breast-feeding"), so is a grey mark where the registry does not store marks
   (headings, appendix entries, footnotes), a numbered or bulleted paragraph (Word shows a
   number the text does not hold), and a hidden paragraph mark on a paragraph with text;
 - **documentStatements**: the additional-monitoring statement before section 1 and the

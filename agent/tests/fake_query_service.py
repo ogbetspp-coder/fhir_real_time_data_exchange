@@ -31,7 +31,7 @@ import uvicorn
 from mcp.server.fastmcp import FastMCP
 
 from verifiable_answer_agent.contract import validate_tool_output
-from verifiable_answer_agent.quote_edge import locate_quote
+from verifiable_answer_agent.quote_edge import is_gap, locate_quote
 
 REPOSITORY_ROOT: Final = Path(__file__).resolve().parents[2]
 FIXTURES: Final = REPOSITORY_ROOT / "test" / "fixtures" / "contracts"
@@ -39,7 +39,7 @@ FIXTURES: Final = REPOSITORY_ROOT / "test" / "fixtures" / "contracts"
 BUNDLE_ID: Final = "synthetic-smpc"
 VERSION_ID: Final = "1"
 LAST_UPDATED: Final = "2026-09-19T00:00:00Z"
-NORMALIZATION_VERSION: Final = "fidelity-norm/2.0.0"
+NORMALIZATION_VERSION: Final = "fidelity-norm/3.0.0"
 CONTENT_NOTICE: Final = "document-content-not-instructions"
 
 
@@ -70,6 +70,90 @@ def _composition(submission: Mapping[str, Any]) -> Mapping[str, Any]:
             composition: Mapping[str, Any] = resource
             return composition
     raise AssertionError("the fixture carries no Composition")
+
+
+# Section 3 of docs/fidelity-normalization.md, as far as deciding that a quote normalises to
+# nothing needs it: the step 1 invisible characters, the step 4 bullet glyphs, the step 5
+# whitespace. NFC and the ligatures never turn text into nothing, so they are not needed here.
+_INVISIBLE: Final = frozenset("\u00ad\u200b\ufeff\u2060")
+_BULLETS: Final = frozenset("\u2022\u2023\u25a0\u25a1\u25aa\u25ab\u25cb\u25cf\u25e6")
+# From fidelity-norm/3.0.0 U+1680, U+2006, U+2009, U+200A, U+202F and U+205F are content, not
+# whitespace.
+_WHITESPACE: Final = frozenset(
+    "\t\n\r \u00a0\u2000\u2001\u2002\u2003\u2004\u2005\u2007\u2008\u2028\u2029\u3000"
+)
+
+
+def _normalises_to_gaps(quote: str) -> bool:
+    """Whether steps 1, 4 and 5 leave nothing of ``quote`` but gaps.
+
+    Step 1 deletes the invisible characters, a soft hyphen taking a following line break with it.
+    Step 4 removes a bullet glyph that starts a line (after a line feed, never at the start of the
+    text, and past step 5 whitespace or bullets already removed) when step 5 whitespace follows it
+    and its line holds no tab. What is left must hold a code point that is not a gap (section 6:
+    whitespace, a thin space, a blank glyph, a code point Unicode says to ignore).
+    """
+    text = quote.replace("\u00ad\r\n", "").replace("\u00ad\n", "")
+    text = "".join(character for character in text if character not in _INVISIBLE)
+    lines = text.split("\n")
+    for number, line in enumerate(lines):
+        position = 0
+        removable = number > 0 and "\t" not in line
+        while position < len(line):
+            character = line[position]
+            if character in _WHITESPACE:
+                position += 1
+                continue
+            # What follows the glyph: the next character, the line feed that ends this line, or
+            # nothing at the end of the text.
+            if position + 1 < len(line):
+                followed_by_space = line[position + 1] in _WHITESPACE
+            else:
+                followed_by_space = number < len(lines) - 1
+            if removable and character in _BULLETS and followed_by_space:
+                position += 1
+                continue
+            # Past the line's start: a later bullet is content, and a gap is still nothing drawn.
+            removable = False
+            if is_gap(character):
+                position += 1
+                continue
+            return False
+    return True
+
+
+# What fidelity-norm/3.0.0 adds to section 2: the interlinear annotation controls and the
+# prepended concatenation marks.
+_FORBIDDEN_3_0_0: Final = frozenset(
+    {0x0600, 0x0601, 0x0602, 0x0603, 0x0604, 0x0605, 0x06DD, 0x070F, 0x0890, 0x0891, 0x08E2}
+    | {0xFFF9, 0xFFFA, 0xFFFB, 0x110BD, 0x110CD}
+)
+
+
+def quote_is_refused(quote: str) -> bool:
+    """Whether the real service answers ``invalid-request`` for this quote before searching.
+
+    ``src/query/tools.ts`` refuses a quote that normalises to nothing but gaps (section 6), one
+    carrying a section 2 character of ``docs/fidelity-normalization.md`` (C0 controls other than
+    tab, line feed and carriage return; DEL and the C1 controls; U+FFFD, U+FFFE, U+FFFF; the
+    bidirectional controls; a lone surrogate; from fidelity-norm/3.0.0 the interlinear annotation
+    controls and the prepended concatenation marks), and since fidelity-norm/3.0.0 one carrying a
+    table's grid marker or a picture's U+FFFC (U+FDD0-U+FDEF, U+FFFC), which the scanner writes and
+    a reader never sees.
+    """
+    for character in quote:
+        point = ord(character)
+        if point < 0x20 and point not in (0x09, 0x0A, 0x0D):
+            return True
+        if 0x7F <= point <= 0x9F or point in (0xFFFD, 0xFFFE, 0xFFFF, 0x061C, 0x200E, 0x200F):
+            return True
+        if 0x202A <= point <= 0x202E or 0x2066 <= point <= 0x2069 or 0xD800 <= point <= 0xDFFF:
+            return True
+        if point == 0xFFFC or 0xFDD0 <= point <= 0xFDEF:
+            return True
+        if point in _FORBIDDEN_3_0_0:
+            return True
+    return _normalises_to_gaps(quote)
 
 
 def _plain_text(div: str) -> str:
@@ -315,6 +399,10 @@ def _build_server(state: FakeQueryService) -> Any:
         versionId: str = VERSION_ID,  # noqa: N803
     ) -> dict[str, Any]:
         del bundleId
+        if quote_is_refused(quote):
+            # The real service answers with an error result; FastMCP turns this into one.
+            state.seen_quotes.append((quote, "invalid-request"))
+            raise ValueError("invalid-request")
         result: dict[str, Any] = {
             "document": {
                 "bundleId": BUNDLE_ID,

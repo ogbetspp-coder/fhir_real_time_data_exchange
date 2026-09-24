@@ -3,10 +3,18 @@ export {
   NormalizationError,
   countWords,
   findForbiddenCharacter,
+  isDefaultIgnorable,
+  isGap,
   isWordCharacter,
   normalizeText,
 } from "./normalize.js";
-export { XhtmlError, xhtmlToText, type XhtmlErrorCode } from "./xhtml.js";
+export {
+  XhtmlError,
+  hasDrawnText,
+  isReservedCodePoint,
+  xhtmlToText,
+  type XhtmlErrorCode,
+} from "./xhtml.js";
 export {
   FidelityError,
   collectNarrativeSections,

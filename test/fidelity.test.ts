@@ -9,10 +9,12 @@ import {
   NormalizationError,
   XhtmlError,
   computeNarrativeBinding,
+  hasDrawnText,
   normalizeText,
   verifyNarrativeFidelity,
   verifyReportHash,
   xhtmlToText,
+  type FidelityInput,
   type FidelityReport,
 } from "../src/fidelity/index.js";
 import { canonicalJson, sha256Utf8 } from "../src/lib/hash.js";
@@ -116,11 +118,120 @@ describe("normalization", () => {
   });
 });
 
+// A structured source (section 7): one page per section, the page exactly the scanner's text
+// for the section's div, the whole page the body and the span. The accepted vectors that draw
+// text and hold no section 3 step 1 invisible character (the extractor refuses those) must verify
+// one section at a time and all together, a page each.
+const INVISIBLE = /[\u00ad\u200b\ufeff\u2060]/u;
+
+function structuredSource(divs: string[]): FidelityInput {
+  const texts = divs.map((div) => xhtmlToText(div));
+  return {
+    normalizationVersion: NORMALIZATION_VERSION,
+    source: {
+      extractorVersion: "structured-source-property/1.0.0",
+      pages: texts.map((text, index) => ({
+        page: index + 1,
+        text,
+        bodyStart: 0,
+        bodyEnd: Array.from(text).length,
+      })),
+    },
+    sections: divs.map((div, index) => ({
+      sourceKey: `section.${String(index + 1)}`,
+      path: `Composition.section[${String(index)}]`,
+      div,
+    })),
+    provenance: texts.map((text, index) => ({
+      sourceKey: `section.${String(index + 1)}`,
+      spans: [
+        {
+          page: index + 1,
+          startOffset: 0,
+          endOffset: Array.from(text).length,
+          textSha256: sha256Utf8(text),
+        },
+      ],
+      narrativeDivSha256: sha256Utf8(divs[index] ?? ""),
+      normalizedTextSha256: "0".repeat(64),
+    })),
+  };
+}
+
+describe("structured source (section 7)", () => {
+  const accepted = xhtmlCases
+    .filter(({ expected }) => typeof expected === "string")
+    .map(({ input }) => input)
+    .filter((div) => {
+      const text = xhtmlToText(div);
+      return !INVISIBLE.test(text) && hasDrawnText(normalizeText(text));
+    });
+
+  it("verifies every accepted vector as a page of its own", () => {
+    expect(accepted.length).toBeGreaterThan(50);
+    for (const div of accepted) {
+      expect(verifyNarrativeFidelity(structuredSource([div])).status, div).toBe("passed");
+    }
+  });
+
+  // The other direction: a narrative verifies against another's structured page if and only if
+  // the two read the same after normalisation. Every pair of accepted vectors is verified (tens
+  // of thousands of runs), so the test has a timeout of its own: on a loaded machine or runner it
+  // takes longer than the default five seconds.
+  it(
+    "verifies a narrative against another's page only when both read the same",
+    { timeout: 60_000 },
+    () => {
+      for (const page of accepted) {
+        const input = structuredSource([page]);
+        const expected = normalizeText(xhtmlToText(page));
+        for (const narrative of accepted) {
+          const section = input.sections[0];
+          if (section === undefined) throw new Error("fixture");
+          const report = verifyNarrativeFidelity({
+            ...input,
+            sections: [{ ...section, div: narrative }],
+          });
+          const same = normalizeText(xhtmlToText(narrative)) === expected;
+          expect(report.status === "passed", `${narrative} against ${page}`).toBe(same);
+        }
+      }
+    },
+  );
+
+  it("verifies every accepted vector together, one page per section", () => {
+    const report = verifyNarrativeFidelity(structuredSource(accepted));
+    expect(report.sections.filter(({ status }) => status !== "verified")).toEqual([]);
+    expect(report.status).toBe("passed");
+  });
+});
+
 describe("xhtml scanner", () => {
   it("matches the case expectations", () => {
     for (const testCase of xhtmlCases) {
       expect(tryXhtml(testCase.input), testCase.name).toEqual(testCase.expected);
     }
+  });
+
+  // fidelity-norm/3.0.0: the tables of one narrative cover at most 50 000 slots. The accepted side
+  // is pinned here rather than as a vector, whose text would be 150 000 code points long.
+  it("accepts a grid of exactly the slot limit and refuses one slot more", () => {
+    // One row of 1000 single cells (so every column has one) and 49 rows spanning them all.
+    const grid = `<tr>${"<td>a</td>".repeat(1000)}</tr>${'<tr><td colspan="1000">a</td></tr>'.repeat(49)}`;
+    const div = (extra = ""): string =>
+      `<div xmlns="http://www.w3.org/1999/xhtml"><table>${grid}</table>${extra}</div>`;
+    expect(typeof tryXhtml(div())).toBe("string");
+    expect(tryXhtml(div("<table><tr><td>b</td></tr></table>"))).toEqual({ error: "table-size" });
+  });
+
+  // Review round 3: the grid is kept sparse, so a row costs only the slots it covers. Twenty
+  // thousand empty rows under a 50 000-slot row took 20 s here and 79 s in Python before.
+  it("scans empty rows under a wide row in linear time", () => {
+    const wide = `<tr>${'<td colspan="1000">a</td>'.repeat(50)}</tr>`;
+    const div = `<div xmlns="http://www.w3.org/1999/xhtml"><table>${wide}${"<tr></tr>".repeat(20_000)}</table></div>`;
+    const started = performance.now();
+    expect(tryXhtml(div)).toEqual({ error: "table-shape" });
+    expect(performance.now() - started).toBeLessThan(2_000);
   });
 
   // Section 2 applies to the div as decoded from JSON (RFC 8259). The vectors are written by

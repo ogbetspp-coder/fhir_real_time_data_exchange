@@ -5,7 +5,14 @@
 // a raised digit, content a table moves, a soft hyphen before a visible line break — the markup
 // is either folded into the text or rejected.
 
-import { findForbiddenCharacter, isForbiddenCodePoint } from "./normalize.js";
+import { sha256Utf8 } from "../lib/hash.js";
+import {
+  composeText,
+  findForbiddenCharacter,
+  isDefaultIgnorable,
+  isForbiddenCodePoint,
+  isGap,
+} from "./normalize.js";
 
 export type XhtmlErrorCode =
   | "forbidden-character"
@@ -29,10 +36,15 @@ export type XhtmlErrorCode =
   | "script-content"
   | "unmappable-script"
   | "table-content"
+  | "list-content"
+  | "reserved-character"
+  | "invisible-character"
+  | "nesting-depth"
+  | "combining-across-markup"
   | "table-section-order"
   | "table-structure"
   | "table-shape"
-  | "soft-hyphen-at-boundary";
+  | "table-size";
 
 export class XhtmlError extends Error {
   public constructor(
@@ -57,6 +69,7 @@ const BLOCK_ELEMENTS = new Set([
   "h5",
   "h6",
   "ul",
+  "ol",
   "li",
   "table",
   "thead",
@@ -77,25 +90,27 @@ const INLINE_ELEMENTS = new Set([
   "span",
   "b",
   "i",
-  "u",
   "em",
   "strong",
   "sup",
   "sub",
   "small",
-  "a",
   "abbr",
   "cite",
   "code",
+  "img",
 ]);
 
-// Elements whose renderer-generated characters (list numbers, quotation marks) would show text
-// the source does not contain are excluded above: `ol` and `q`.
+// `q` is excluded: a renderer draws quotation marks the source may not contain. `u` and `a` are
+// excluded from 3.0.0: a renderer underlines both (`a` with a target), and an underline turns a
+// sign into another, "<" into "≤", ">" into "≥", "+" into "±", and "1" `u`"a" into "1ª", which no
+// closed list of code points can bound. `ol` is allowed because the numbers a renderer draws are
+// emitted as text (below).
 
 // The only elements that may be, and must be, self-closing. An HTML parser ignores the `/` of
 // `<sup/>`, so any other element written that way opens around the text that follows it; and a
 // `<br>` without `/` is a start tag whose content an XML renderer does not draw.
-const VOID_ELEMENTS = new Set(["br", "hr"]);
+const VOID_ELEMENTS = new Set(["br", "hr", "img"]);
 
 // Table parts and the parents each may have. A renderer moves anything else it finds directly
 // inside a table container out of the table, so that is rejected (`table-content`).
@@ -109,6 +124,144 @@ const TABLE_PART_PARENTS = new Map<string, ReadonlySet<string>>([
   ["th", new Set(["tr"])],
 ]);
 const TABLE_CONTAINERS = new Set(["table", "thead", "tbody", "tfoot", "tr"]);
+const ROW_GROUPS = new Set(["thead", "tbody", "tfoot"]);
+
+// A renderer numbers only the `li` children of a list, and moves nothing out of it; anything else
+// directly inside `ol` or `ul` is drawn outside the numbering (`list-content`).
+const LIST_CONTAINERS = new Set(["ol", "ul"]);
+
+// Reserved code points (section 2 of 3.0.0's proposal, section 5): the scanner emits them for
+// table grids and pictures, so they never occur in narrative text itself.
+export const TABLE_START = "\ufdd0";
+export const TABLE_END = "\ufdd1";
+export const ROW_START = "\ufdd2";
+export const CELL_START = "\ufdd3";
+export const COVERED_LEFT = "\ufdd4";
+export const COVERED_ABOVE = "\ufdd5";
+export const PICTURE = "\ufffc";
+
+// The grid markers: structure, not text a reader sees.
+export function isGridMarker(codePoint: number): boolean {
+  return codePoint >= 0xfdd0 && codePoint <= 0xfdd5;
+}
+
+// Whether normalised narrative text holds anything a reader sees: a table of empty cells, whose
+// text is only grid markers, and text of only gaps (a thin space, a blank glyph, a code point
+// Unicode says to ignore) draw nothing inked (section 5, `empty-narrative`).
+export function hasDrawnText(normalized: string): boolean {
+  for (const character of normalized) {
+    const codePoint = character.codePointAt(0) ?? 0;
+    if (!isGap(codePoint) && !isGridMarker(codePoint)) return true;
+  }
+  return false;
+}
+
+// The slots all tables of one narrative may cover together. A small table can span a large grid
+// (`colspan="1000" rowspan="1000"` is a million slots, each a marker in the text), so the grid is
+// bounded, and a real table is far inside the bound (`table-size`).
+export const TABLE_SLOT_LIMIT = 50_000;
+
+// A soft hyphen and a zero-width space are break opportunities a renderer may use at a narrow
+// width, drawing "2-" / "10 mg" or "2" / "10 mg" where the check reads "210 mg", so narrative
+// holds neither (section 2; one-sided, since page text marks a hyphenated line end with U+00AD).
+function isInvisibleBreak(codePoint: number): boolean {
+  return codePoint === 0x00ad || codePoint === 0x200b;
+}
+
+function findInvisibleBreak(text: string): number | undefined {
+  let offset = 0;
+  for (const character of text) {
+    if (isInvisibleBreak(character.codePointAt(0) ?? 0)) return offset;
+    offset += 1;
+  }
+  return undefined;
+}
+
+// How deep markup may nest (section 5). An HTML parser stops nesting at 512 open elements and
+// moves what follows elsewhere; `small` inside `small` and a heading inside a heading shrink text
+// towards illegible; and every indenting container moves text further right, off a narrow page.
+const MAX_DEPTH = 32;
+const MAX_INDENTS = 6;
+const HEADINGS = new Set(["h1", "h2", "h3", "h4", "h5", "h6"]);
+// The elements a renderer draws smaller than the text around them: at most one open at once, so
+// `<h6><small>` (drawn at about 9 px, and 7 px with a `sup`) is refused.
+const SHRINKING = new Set(["small", "code", "h5", "h6"]);
+const INDENTING = new Set(["blockquote", "ul", "ol", "dd"]);
+
+function checkNesting(name: string, stack: readonly string[], offset: number): void {
+  if (stack.length > MAX_DEPTH) throw new XhtmlError("nesting-depth", offset);
+  if (SHRINKING.has(name) && stack.some((open) => SHRINKING.has(open))) {
+    throw new XhtmlError("nesting-depth", offset);
+  }
+  if (HEADINGS.has(name) && stack.some((open) => HEADINGS.has(open))) {
+    throw new XhtmlError("nesting-depth", offset);
+  }
+  if (INDENTING.has(name)) {
+    const indents = stack.filter((open) => INDENTING.has(open)).length + 1;
+    if (indents > MAX_INDENTS) throw new XhtmlError("nesting-depth", offset);
+  }
+}
+
+// The inline elements whose tags split text without emitting anything: a renderer draws the text
+// on each side in its own run, so a mark after the tag does not combine with the letter before it.
+const SPLITTING_INLINE = new Set([
+  "span",
+  "b",
+  "i",
+  "em",
+  "strong",
+  "sup",
+  "sub",
+  "small",
+  "abbr",
+  "cite",
+  "code",
+]);
+// How far each side of such a tag is composed to find a composition across it. A combining mark
+// right after the tag is refused whatever its distance from the letter, so the window only has
+// to catch the Hangul jamo that compose without being marks.
+const COMPOSE_WINDOW = 64;
+const MARK = /^\p{M}$/u;
+
+// The first code point at or after `from` that is not a Default_Ignorable code point other than
+// a mark: a word joiner or a zero-width joiner between the tag and a mark is drawn as nothing,
+// and the mark after it is still drawn apart from the letter before the tag.
+function firstDrawnAfter(points: readonly string[], from: number): string {
+  let position = from;
+  for (; position < points.length; position += 1) {
+    const point = points[position] ?? "";
+    if (MARK.test(point) || !isDefaultIgnorable(point.codePointAt(0) ?? 0)) break;
+  }
+  return points[position] ?? "";
+}
+
+function checkComposition(text: string, boundaries: readonly number[]): void {
+  const points = Array.from(text);
+  for (const boundary of boundaries) {
+    if (MARK.test(firstDrawnAfter(points, boundary))) {
+      throw new XhtmlError("combining-across-markup", boundary);
+    }
+    const before = points.slice(Math.max(0, boundary - COMPOSE_WINDOW), boundary).join("");
+    const after = points.slice(boundary, boundary + COMPOSE_WINDOW).join("");
+    if (composeText(before + after) !== composeText(before) + composeText(after)) {
+      throw new XhtmlError("combining-across-markup", boundary);
+    }
+  }
+}
+
+export function isReservedCodePoint(codePoint: number): boolean {
+  return codePoint === 0xfffc || (codePoint >= 0xfdd0 && codePoint <= 0xfdef);
+}
+
+// Code-point offset of the first reserved code point, if any.
+function findReservedCharacter(text: string): number | undefined {
+  let offset = 0;
+  for (const character of text) {
+    if (isReservedCodePoint(character.codePointAt(0) ?? 0)) return offset;
+    offset += 1;
+  }
+  return undefined;
+}
 
 type TableState = {
   caption: boolean;
@@ -116,9 +269,27 @@ type TableState = {
   body: boolean;
   foot: boolean;
   rows: boolean;
-  // Cell count (`td` and `th`) of every row of this table, in document order.
+  // The grid, laid out by the HTML table model, and kept sparse so that a row costs only the
+  // slots it covers: for each column a cell above still covers, how many rows from the current
+  // one it covers.
+  above: Map<number, number>;
+  // The current row: the slots covered, the highest of them, the next slot not yet emitted, for
+  // each column how many rows below it a cell placed in this row covers, and whether a cell that
+  // spans no rows starts in it.
+  covered: Set<number>;
+  last: number;
+  cursor: number;
+  down: Map<number, number>;
+  single: boolean;
+  // The columns in which a cell that spans no columns starts, over the whole table.
+  singleColumns: Set<number>;
+  // The colspan of the open cell, whose covered-left slots its end tag emits.
+  openSpan: number;
+  // Slots covered by every row of this table, or -1 for a row with a hole.
   widths: number[];
 };
+
+type ListState = { style: string; next: number };
 
 const NAMED_ENTITIES = new Map<string, string>([
   ["amp", "&"],
@@ -218,33 +389,62 @@ function isAsciiWhitespace(character: string): boolean {
 }
 
 // Attribute values are never compared against the source, so they must not be able to carry
-// text: each allowed attribute is restricted to a short token alphabet or a safe link form, and
-// to the one element that needs it. Nothing a viewer's stylesheet or script could key on to hide
-// text (`class`, `id`, a language tag below the root, an in-page link) is allowed.
+// text: each allowed attribute is restricted to a short token alphabet, and to the one element
+// that needs it. Nothing a viewer's stylesheet or script could key on to hide text (`class`, `id`,
+// a language tag below the root, a link) is allowed.
 const TOKEN_VALUE = /^[A-Za-z0-9_.:-]{1,32}$/;
-const HREF_VALUE = /^https:\/\/[A-Za-z0-9.-]{1,64}(?:\/[A-Za-z0-9._~-]{0,32}){0,8}\/?$/;
+const LIST_TYPE_VALUE = /^[1aAiI]$/;
+const LIST_START_VALUE = /^(?:0|-?[1-9][0-9]{0,3})$/;
+const SPAN_VALUE = /^(?:[1-9][0-9]{0,2}|1000)$/;
+// A picture's source is a PNG or JPEG `data:` URI: the picture's own bytes, compared with the
+// source through the hash `img` emits. A reference (a path or a URL) is refused: what it draws is
+// whatever the viewer's origin serves, or nothing, and neither is bound by the check.
+const PICTURE_DATA_PREFIXES = ["data:image/png;base64,", "data:image/jpeg;base64,"];
+// The base64 length of 1 MiB.
+const PICTURE_DATA_LIMIT = 1_398_104;
+const BASE64_ALPHABET = /^[A-Za-z0-9+/]*$/;
+
+// A `data:` body is counted and tested directly, not matched by one regular expression over a
+// value of up to 1.4 million code points: non-empty, at most the limit, a multiple of 4 long, the
+// base64 alphabet, and `=` only as the last one or two code points.
+function isPictureData(value: string): boolean {
+  const prefix = PICTURE_DATA_PREFIXES.find((candidate) => value.startsWith(candidate));
+  if (prefix === undefined) return false;
+  const body = value.slice(prefix.length);
+  if (body.length === 0 || body.length > PICTURE_DATA_LIMIT || body.length % 4 !== 0) return false;
+  const padding = body.endsWith("==") ? 2 : body.endsWith("=") ? 1 : 0;
+  return BASE64_ALPHABET.test(body.slice(0, body.length - padding));
+}
 
 function attributeAllowed(name: string, value: string, element: string, isRoot: boolean): boolean {
   if (name === "xml:lang" || name === "lang") return isRoot && TOKEN_VALUE.test(value);
-  if (name === "href") return element === "a" && HREF_VALUE.test(value);
   if (name === "scope") return element === "th" && TOKEN_VALUE.test(value);
+  if (name === "type") return element === "ol" && LIST_TYPE_VALUE.test(value);
+  if (name === "start") return element === "ol" && LIST_START_VALUE.test(value);
+  if (name === "colspan" || name === "rowspan") {
+    return (element === "td" || element === "th") && SPAN_VALUE.test(value);
+  }
+  if (name === "src") {
+    return element === "img" && isPictureData(value);
+  }
   return false;
 }
 
+// Checks the attributes in document order and returns their values.
 function checkAttributes(
   element: string,
   attributeSource: string,
   isRoot: boolean,
   offset: number,
-): void {
+): Map<string, string> {
   ATTRIBUTE.lastIndex = 0;
   let sawNamespace = false;
-  const seen = new Set<string>();
+  const values = new Map<string, string>();
   for (const match of attributeSource.matchAll(ATTRIBUTE)) {
     const name = match[1] ?? "";
     const value = match[2] ?? match[3] ?? "";
-    if (seen.has(name)) throw new XhtmlError("forbidden-attribute", offset);
-    seen.add(name);
+    if (values.has(name)) throw new XhtmlError("forbidden-attribute", offset);
+    values.set(name, value);
     if (name === "xmlns") {
       if (!isRoot || value !== XHTML_NAMESPACE) throw new XhtmlError("forbidden-attribute", offset);
       sawNamespace = true;
@@ -255,6 +455,9 @@ function checkAttributes(
     }
   }
   if (isRoot && !sawNamespace) throw new XhtmlError("root-not-div", offset);
+  // A picture without a source would be drawn as nothing, or as the renderer's broken-image mark.
+  if (element === "img" && !values.has("src")) throw new XhtmlError("forbidden-attribute", offset);
+  return values;
 }
 
 // The decoded code point of a character reference, checked on its own: a reference to half a
@@ -274,14 +477,20 @@ function decodeEntity(match: RegExpExecArray, offset: number): number {
     throw new XhtmlError("unknown-entity", offset);
   }
   if (isForbiddenCodePoint(codePoint)) throw new XhtmlError("forbidden-character", offset);
+  if (isReservedCodePoint(codePoint)) throw new XhtmlError("reserved-character", offset);
+  if (isInvisibleBreak(codePoint)) throw new XhtmlError("invisible-character", offset);
   return codePoint;
 }
 
-// The parent check at a start tag: nothing but text inside `sup` and `sub`; each table part in
-// its own parent; nothing but table parts inside a table container.
+// The elements a rule (`hr`) may not be drawn in (below).
+const RULE_BREAKS_FRACTION = new Set(["td", "th", "caption"]);
+
+// The parent check at a start tag: nothing but text inside `sup` and `sub`; each table part, and
+// `li`, in its own parent; nothing but table parts inside a table container, and nothing but `li`
+// inside a list.
 function checkParent(name: string, parent: string | undefined, offset: number): void {
   if (parent === "sup" || parent === "sub") throw new XhtmlError("script-content", offset);
-  const allowedParents = TABLE_PART_PARENTS.get(name);
+  const allowedParents = name === "li" ? LIST_CONTAINERS : TABLE_PART_PARENTS.get(name);
   if (allowedParents !== undefined) {
     if (parent === undefined || !allowedParents.has(parent)) {
       throw new XhtmlError("misnested-tag", offset);
@@ -291,35 +500,36 @@ function checkParent(name: string, parent: string | undefined, offset: number): 
   if (parent !== undefined && TABLE_CONTAINERS.has(parent)) {
     throw new XhtmlError("table-content", offset);
   }
+  if (parent !== undefined && LIST_CONTAINERS.has(parent)) {
+    throw new XhtmlError("list-content", offset);
+  }
 }
 
 // Renderers place table parts by role, not by document position: a caption always renders
 // first, sections render head → body → foot, and rows placed directly under `table` are
 // wrapped in an implicit body. Only the one document order that renders as written is
 // accepted, so displayed text order equals the order the source was verified in. Parents are
-// already checked; this also records rows and cells for the shape check at `</table>`.
-function enterTableElement(
+// already checked. A table inside an open table (in a cell or in a caption) is refused, so the
+// grid text below never nests.
+function enterTableStructure(
   name: string,
   parent: string | undefined,
-  tables: TableState[],
+  state: TableState | undefined,
   offset: number,
 ): void {
-  const state = tables[tables.length - 1];
-  if (state === undefined) return;
-  if (name === "td" || name === "th") {
-    const last = state.widths.length - 1;
-    state.widths[last] = (state.widths[last] ?? 0) + 1;
+  if (name === "table") {
+    if (state !== undefined) throw new XhtmlError("table-structure", offset);
     return;
   }
+  if (state === undefined) return;
   if (name === "tr") {
     if (parent === "table") {
       if (state.head || state.body || state.foot) throw new XhtmlError("table-structure", offset);
       state.rows = true;
     }
-    state.widths.push(0);
     return;
   }
-  if (name !== "caption" && name !== "thead" && name !== "tbody" && name !== "tfoot") return;
+  if (name !== "caption" && !ROW_GROUPS.has(name)) return;
   if (name === "caption") {
     if (state.caption || state.head || state.body || state.foot || state.rows) {
       throw new XhtmlError("table-structure", offset);
@@ -334,6 +544,151 @@ function enterTableElement(
   if (name === "tbody" && state.foot) throw new XhtmlError("table-section-order", offset);
   if (name === "tfoot" && state.foot) throw new XhtmlError("table-section-order", offset);
   state[name === "thead" ? "head" : name === "tbody" ? "body" : "foot"] = true;
+}
+
+function newTable(): TableState {
+  return {
+    caption: false,
+    head: false,
+    body: false,
+    foot: false,
+    rows: false,
+    above: new Map(),
+    covered: new Set(),
+    last: -1,
+    cursor: 0,
+    down: new Map(),
+    single: false,
+    singleColumns: new Set(),
+    openSpan: 1,
+    widths: [],
+  };
+}
+
+// One slot a cell covers but does not start in, as its own whitespace-delimited token.
+function coveredSlot(marker: string): string {
+  return `\t${marker}\t`;
+}
+
+function startRow(state: TableState): void {
+  state.covered = new Set(state.above.keys());
+  state.last = -1;
+  for (const column of state.above.keys()) state.last = Math.max(state.last, column);
+  state.cursor = 0;
+  state.down = new Map();
+  state.single = false;
+}
+
+// Places a cell by the HTML table model: in the first slot of its row that no cell covers. The
+// slots before it that a cell above covers are emitted first. A cell that would cover a slot
+// already covered overlaps it, which a renderer draws as two texts on top of each other.
+function placeCell(
+  state: TableState,
+  colspan: number,
+  rowspan: number,
+  grid: { slots: number },
+  offset: number,
+): string {
+  let before = "";
+  while (state.covered.has(state.cursor)) {
+    before += coveredSlot(COVERED_ABOVE);
+    state.cursor += 1;
+  }
+  for (let column = state.cursor; column < state.cursor + colspan; column += 1) {
+    if (state.covered.has(column)) throw new XhtmlError("table-shape", offset);
+  }
+  grid.slots += colspan * rowspan;
+  if (grid.slots > TABLE_SLOT_LIMIT) throw new XhtmlError("table-size", offset);
+  for (let column = state.cursor; column < state.cursor + colspan; column += 1) {
+    state.covered.add(column);
+    if (rowspan > 1) state.down.set(column, rowspan - 1);
+  }
+  if (rowspan === 1) state.single = true;
+  if (colspan === 1) state.singleColumns.add(state.cursor);
+  state.last = Math.max(state.last, state.cursor + colspan - 1);
+  state.cursor += colspan;
+  state.openSpan = colspan;
+  return before;
+}
+
+// Ends a row: the slots after its last cell that a cell above covers are emitted, and the row's
+// width is recorded, or -1 when a slot inside the row is covered by nothing. A row that covers a
+// slot but in which no cell spanning no rows starts is drawn at zero height, its cells' text in
+// the rows around it, so it rejects.
+function endRow(state: TableState, offset: number): string {
+  const trailing = [...state.above.keys()].filter((column) => column >= state.cursor);
+  trailing.sort((left, right) => left - right);
+  const after = trailing.map(() => coveredSlot(COVERED_ABOVE)).join("");
+  if (state.covered.size > 0 && !state.single) throw new XhtmlError("table-shape", offset);
+  const hole = state.last + 1 !== state.covered.size;
+  state.widths.push(hole ? -1 : state.covered.size);
+  const above = new Map<number, number>();
+  for (const [column, rows] of state.above) if (rows > 1) above.set(column, rows - 1);
+  for (const [column, rows] of state.down) above.set(column, rows);
+  state.above = above;
+  return after;
+}
+
+// The end of a row group: a cell whose rows run past its last row is clipped by a renderer,
+// silently, so it rejects.
+function endRowGroup(state: TableState, offset: number): void {
+  if (state.above.size > 0) throw new XhtmlError("table-shape", offset);
+}
+
+// The end of a table: every row as wide as the first, and in every column a cell that spans no
+// columns starts; a renderer draws a column without one at zero width, its cells' text in the
+// columns around it.
+function endTable(state: TableState, offset: number): void {
+  if (state.rows) endRowGroup(state, offset);
+  const width = state.widths[0] ?? 0;
+  if (state.widths.some((covered) => covered !== width || covered < 0)) {
+    throw new XhtmlError("table-shape", offset);
+  }
+  for (let column = 0; column < width; column += 1) {
+    if (!state.singleColumns.has(column)) throw new XhtmlError("table-shape", offset);
+  }
+}
+
+// A list item's marker as a renderer draws it (CSS counter styles decimal, lower- and
+// upper-alpha, lower- and upper-roman), followed by `.` and a space.
+const ROMAN: readonly (readonly [number, string])[] = [
+  [1000, "m"],
+  [900, "cm"],
+  [500, "d"],
+  [400, "cd"],
+  [100, "c"],
+  [90, "xc"],
+  [50, "l"],
+  [40, "xl"],
+  [10, "x"],
+  [9, "ix"],
+  [5, "v"],
+  [4, "iv"],
+  [1, "i"],
+];
+
+export function listMarker(style: string, ordinal: number): string {
+  let marker = String(ordinal);
+  if ((style === "a" || style === "A") && ordinal >= 1) {
+    marker = "";
+    let rest = ordinal;
+    while (rest > 0) {
+      rest -= 1;
+      marker = String.fromCodePoint(0x61 + (rest % 26)) + marker;
+      rest = Math.floor(rest / 26);
+    }
+  } else if ((style === "i" || style === "I") && ordinal >= 1 && ordinal <= 3999) {
+    marker = "";
+    let rest = ordinal;
+    for (const [value, letters] of ROMAN) {
+      while (rest >= value) {
+        marker += letters;
+        rest -= value;
+      }
+    }
+  }
+  if (style === "A" || style === "I") marker = marker.toUpperCase();
+  return `${marker}. `;
 }
 
 // One code point of text inside the root, raw or decoded, as the scanner emits it: rejected
@@ -351,9 +706,9 @@ function emitText(
   // `br` is a line break. Emitting it as U+0020 keeps a bullet after it from reading as a list
   // item (section 3 step 4) and keeps a soft hyphen before it from joining a word (step 1).
   const emitted = codePoint === 0x000a || codePoint === 0x000d ? " " : character;
-  if (parent !== undefined && TABLE_CONTAINERS.has(parent)) {
+  if (parent !== undefined && (TABLE_CONTAINERS.has(parent) || LIST_CONTAINERS.has(parent))) {
     if (isReference || !isAsciiWhitespace(character)) {
-      throw new XhtmlError("table-content", offset);
+      throw new XhtmlError(TABLE_CONTAINERS.has(parent) ? "table-content" : "list-content", offset);
     }
     output.push(emitted);
     return;
@@ -380,11 +735,6 @@ function emitText(
   output.push(character);
 }
 
-// U+00AD followed by U+000A in the emitted text: section 3 step 1 would join a word across what
-// a renderer draws as a line break. The emitted text has U+000A only from a block boundary or
-// `br`, and no U+000D at all (text line breaks are emitted as U+0020).
-const SOFT_HYPHEN_BEFORE_BREAK = /\u00ad\n/u;
-
 // A structural break: U+000A, except that a table cell and everything inside one is on one line
 // of U+0009-separated text, as the extractor writes a table row (section 7). A bullet in a cell
 // is therefore on a line with U+0009 and is never read as a list item (section 3 step 4).
@@ -400,10 +750,19 @@ export function xhtmlToText(div: string): string {
   // scan: an unpaired surrogate split by markup would otherwise be joined in the output.
   const forbidden = findForbiddenCharacter(div);
   if (forbidden !== undefined) throw new XhtmlError("forbidden-character", forbidden);
+  // The code points the scanner emits for grids and pictures never occur in the narrative itself.
+  const reserved = findReservedCharacter(div);
+  if (reserved !== undefined) throw new XhtmlError("reserved-character", reserved);
+  const invisible = findInvisibleBreak(div);
+  if (invisible !== undefined) throw new XhtmlError("invisible-character", invisible);
 
   const output: string[] = [];
+  // The output positions (array indexes) where an inline tag splits the text.
+  const splits: number[] = [];
   const stack: string[] = [];
   const tables: TableState[] = [];
+  const lists: ListState[] = [];
+  const grid = { slots: 0 };
   let rootSeen = false;
   let rootClosed = false;
   let cellDepth = 0;
@@ -427,14 +786,22 @@ export function xhtmlToText(div: string): string {
         const open = stack.pop();
         if (open === undefined) throw new XhtmlError("unbalanced-tag", index);
         if (open !== name) throw new XhtmlError("misnested-tag", index);
-        if (name === "table") {
-          const widths = tables.pop()?.widths ?? [];
-          if (widths.some((width) => width !== widths[0])) {
-            throw new XhtmlError("table-shape", index);
-          }
+        if (SPLITTING_INLINE.has(name)) splits.push(output.length);
+        const table = tables[tables.length - 1];
+        if (table !== undefined && ROW_GROUPS.has(name)) endRowGroup(table, index);
+        if (name === "table" && table !== undefined) {
+          endTable(table, index);
+          tables.pop();
+          // On a line of its own, so an empty table's two markers are two tokens.
+          output.push("\n", TABLE_END);
         }
+        if (name === "tr" && table !== undefined) output.push(endRow(table, index));
+        if (name === "ol" || name === "ul") lists.pop();
         if (name === "td" || name === "th") cellDepth -= 1;
         if (BLOCK_ELEMENTS.has(name)) output.push(structuralBreak(name, cellDepth));
+        if ((name === "td" || name === "th") && table !== undefined) {
+          output.push(coveredSlot(COVERED_LEFT).repeat(table.openSpan - 1));
+        }
         if (stack.length === 0) rootClosed = true;
         index = END_TAG.lastIndex;
         continue;
@@ -457,29 +824,61 @@ export function xhtmlToText(div: string): string {
         if (name !== "div") throw new XhtmlError("root-not-div", index);
         rootSeen = true;
       }
-      checkAttributes(name, start[2] ?? "", isRoot, index);
+      const attributes = checkAttributes(name, start[2] ?? "", isRoot, index);
       const selfClosing = (start[3] ?? "") === "/";
       if (VOID_ELEMENTS.has(name) !== selfClosing) throw new XhtmlError("void-element", index);
+      if (!isRoot) checkNesting(name, stack, index);
       const parent = stack[stack.length - 1];
       checkParent(name, parent, index);
-      enterTableElement(name, parent, tables, index);
+      // A rule in a cell or a caption is as narrow as its column, so a renderer draws "1", the
+      // rule and "2" as a stacked fraction, ½, where the text says "1 2".
+      if (name === "hr" && stack.some((open) => RULE_BREAKS_FRACTION.has(open))) {
+        throw new XhtmlError("table-content", index);
+      }
+      if (SPLITTING_INLINE.has(name)) splits.push(output.length);
+      const table = tables[tables.length - 1];
+      enterTableStructure(name, parent, table, index);
+      let slotsBefore = "";
+      if ((name === "td" || name === "th") && table !== undefined) {
+        slotsBefore = placeCell(
+          table,
+          Number(attributes.get("colspan") ?? "1"),
+          Number(attributes.get("rowspan") ?? "1"),
+          grid,
+          index,
+        );
+      }
 
       const lineBreak = structuralBreak(name, cellDepth);
+      output.push(slotsBefore);
       if (BLOCK_ELEMENTS.has(name) || name === "br") output.push(lineBreak);
-      // A self-closing element is `br` or `hr`; `hr`, a block, also emits its closing break.
+      // What a renderer draws for the element itself: the grid markers of a table, a row and a
+      // cell, a numbered item's marker, and a picture.
+      if (name === "table") output.push(TABLE_START);
+      if (name === "tr" && table !== undefined) {
+        startRow(table);
+        output.push(ROW_START);
+      }
+      if (name === "td" || name === "th") output.push(CELL_START, "\t");
+      const list = lists[lists.length - 1];
+      if (name === "li" && parent === "ol" && list !== undefined) {
+        output.push(listMarker(list.style, list.next));
+        list.next += 1;
+      }
+      // U+FFFC, the hash, U+FFFC: closed, so a combining mark after the picture cannot compose
+      // with its last digit.
+      if (name === "img") output.push(PICTURE, sha256Utf8(attributes.get("src") ?? ""), PICTURE);
+      // A self-closing element is `br`, `hr` or `img`; `hr`, a block, also emits its closing break.
       if (selfClosing) {
         if (BLOCK_ELEMENTS.has(name)) output.push(lineBreak);
       } else {
         stack.push(name);
         if (name === "td" || name === "th") cellDepth += 1;
-        if (name === "table") {
-          tables.push({
-            caption: false,
-            head: false,
-            body: false,
-            foot: false,
-            rows: false,
-            widths: [],
+        if (name === "table") tables.push(newTable());
+        if (name === "ol" || name === "ul") {
+          lists.push({
+            style: attributes.get("type") ?? "1",
+            next: Number(attributes.get("start") ?? "1"),
           });
         }
       }
@@ -504,7 +903,17 @@ export function xhtmlToText(div: string): string {
     if (stack.length === 0) {
       if (!isAsciiWhitespace(point)) throw new XhtmlError("text-outside-root", index);
     } else {
-      emitText(codePoint, stack[stack.length - 1], output, index, false);
+      const parent = stack[stack.length - 1] ?? "";
+      // "]]>" ends a CDATA section to an XML parser, which refuses the document: an XML renderer
+      // draws none of the narrative (text directly in a table or list part is refused first).
+      if (
+        div.startsWith("]]>", index) &&
+        !TABLE_CONTAINERS.has(parent) &&
+        !LIST_CONTAINERS.has(parent)
+      ) {
+        throw new XhtmlError("cdata", index);
+      }
+      emitText(codePoint, parent, output, index, false);
     }
     index += point.length;
   }
@@ -512,7 +921,15 @@ export function xhtmlToText(div: string): string {
   if (!rootSeen) throw new XhtmlError("root-not-div", 0);
   if (stack.length > 0) throw new XhtmlError("unbalanced-tag", div.length);
   const text = output.join("");
-  const softHyphen = SOFT_HYPHEN_BEFORE_BREAK.exec(text);
-  if (softHyphen !== null) throw new XhtmlError("soft-hyphen-at-boundary", softHyphen.index);
+  // A combining mark after an inline tag is drawn in its own run, apart from the letter before
+  // the tag, while NFC would join them ("<" and U+0338 across `b` is drawn "</", read "≮").
+  let offset = 0;
+  let piece = 0;
+  const boundaries: number[] = [];
+  for (const split of splits) {
+    for (; piece < split; piece += 1) offset += Array.from(output[piece] ?? "").length;
+    boundaries.push(offset);
+  }
+  checkComposition(text, boundaries);
   return text;
 }

@@ -34,15 +34,28 @@ each reference as it is decoded. JavaScript's ``\\p{N}`` is the Unicode general 
 here from ``unicodedata``. And the scan walks code points natively where the TypeScript has to
 step over surrogate pairs, so a supplementary digit inside ``sup`` is one code point on both
 sides.
+
+fidelity-norm/3.0.0 (numbered lists, table grids, pictures) adds two. A picture's token is the
+SHA-256 hex of its ``src`` as UTF-8, from ``hashlib`` here and ``node:crypto`` there, over the
+same code points: an attribute value can hold no character reference, so neither side decodes
+anything first. And ``str(-1)`` and JavaScript's ``String(-1)`` both write U+002D, which is the
+minus sign section 5 names for a negative list ordinal.
 """
 
 from __future__ import annotations
 
+import hashlib
 import re
 import unicodedata
 from typing import Final
 
-from .normalize import find_forbidden_character, is_forbidden
+from .normalize import (
+    compose_text,
+    find_forbidden_character,
+    is_default_ignorable,
+    is_forbidden,
+    is_gap,
+)
 
 XHTML_NAMESPACE: Final = "http://www.w3.org/1999/xhtml"
 
@@ -58,6 +71,7 @@ BLOCK_ELEMENTS: Final = frozenset(
         "h5",
         "h6",
         "ul",
+        "ol",
         "li",
         "table",
         "thead",
@@ -75,17 +89,20 @@ BLOCK_ELEMENTS: Final = frozenset(
     }
 )
 
+# `u` and `a` are excluded from 3.0.0: a renderer underlines both (`a` with a target), and an
+# underline turns a sign into another, "<" into "≤", ">" into "≥", "+" into "±", and "1" `u`"a"
+# into "1ª", which no closed list of code points can bound.
 INLINE_ELEMENTS: Final = frozenset(
-    {"span", "b", "i", "u", "em", "strong", "sup", "sub", "small", "a", "abbr", "cite", "code"}
+    {"span", "b", "i", "em", "strong", "sup", "sub", "small", "abbr", "cite", "code", "img"}
 )
 
-# `ol` and `q` are excluded on purpose: their renderers generate list numbers and quotation
-# marks that the source may not contain.
+# `q` is excluded: a renderer draws quotation marks the source may not contain. `ol` is allowed
+# because the numbers a renderer draws are emitted as text (below).
 
 # The only elements that may be, and must be, self-closing. An HTML parser ignores the `/` of
 # `<sup/>`, so any other element written that way opens around the text that follows it; and a
 # `<br>` without `/` is a start tag whose content an XML renderer does not draw.
-VOID_ELEMENTS: Final = frozenset({"br", "hr"})
+VOID_ELEMENTS: Final = frozenset({"br", "hr", "img"})
 
 # Table parts and the parents each may have. A renderer moves anything else it finds directly
 # inside a table container out of the table, so that is rejected (`table-content`).
@@ -99,6 +116,134 @@ TABLE_PART_PARENTS: Final[dict[str, frozenset[str]]] = {
     "th": frozenset({"tr"}),
 }
 TABLE_CONTAINERS: Final = frozenset({"table", "thead", "tbody", "tfoot", "tr"})
+ROW_GROUPS: Final = frozenset({"thead", "tbody", "tfoot"})
+
+# A renderer numbers only the `li` children of a list, and moves nothing out of it; anything else
+# directly inside `ol` or `ul` is drawn outside the numbering (`list-content`).
+LIST_CONTAINERS: Final = frozenset({"ol", "ul"})
+
+# Reserved code points: the scanner emits them for table grids and pictures, so they never occur
+# in narrative text itself.
+TABLE_START: Final = "\ufdd0"
+TABLE_END: Final = "\ufdd1"
+ROW_START: Final = "\ufdd2"
+CELL_START: Final = "\ufdd3"
+COVERED_LEFT: Final = "\ufdd4"
+COVERED_ABOVE: Final = "\ufdd5"
+PICTURE: Final = "\ufffc"
+
+
+def is_grid_marker(code_point: int) -> bool:
+    """The grid markers U+FDD0-U+FDD5: structure, not text a reader sees."""
+    return 0xFDD0 <= code_point <= 0xFDD5
+
+
+def has_drawn_text(normalized: str) -> bool:
+    """Whether normalised narrative text holds anything a reader sees (section 5).
+
+    A table of empty cells, whose text is only grid markers, and text of only gaps (a thin space, a
+    blank glyph, a code point Unicode says to ignore) draw nothing inked: ``empty-narrative``.
+    """
+    return any(not is_gap(ord(c)) and not is_grid_marker(ord(c)) for c in normalized)
+
+
+# The slots all tables of one narrative may cover together. A small table can span a large grid
+# (`colspan="1000" rowspan="1000"` is a million slots, each a marker in the text), so the grid is
+# bounded, and a real table is far inside the bound (`table-size`).
+TABLE_SLOT_LIMIT: Final = 50_000
+
+
+def _is_invisible_break(code_point: int) -> bool:
+    """A soft hyphen or a zero-width space: a break a renderer may draw that the check never reads.
+
+    At a narrow width "2" U+00AD "10" is drawn "2-" / "10" and "2" U+200B "10" as "2" / "10", where
+    the check reads "210", so narrative holds neither (section 2; one-sided, since page text marks
+    a hyphenated line end with U+00AD).
+    """
+    return code_point in (0x00AD, 0x200B)
+
+
+def _find_invisible_break(text: str) -> int | None:
+    for offset, character in enumerate(text):
+        if _is_invisible_break(ord(character)):
+            return offset
+    return None
+
+
+# How deep markup may nest (section 5). An HTML parser stops nesting at 512 open elements and moves
+# what follows elsewhere; `small` inside `small` and a heading inside a heading shrink text towards
+# illegible; and every indenting container moves text further right, off a narrow page.
+MAX_DEPTH: Final = 32
+MAX_INDENTS: Final = 6
+HEADINGS: Final = frozenset({"h1", "h2", "h3", "h4", "h5", "h6"})
+# The elements a renderer draws smaller than the text around them: at most one open at once, so
+# `<h6><small>` (drawn at about 9 px, and 7 px with a `sup`) is refused.
+SHRINKING: Final = frozenset({"small", "code", "h5", "h6"})
+INDENTING: Final = frozenset({"blockquote", "ul", "ol", "dd"})
+
+
+def _check_nesting(name: str, stack: list[str], offset: int) -> None:
+    if len(stack) > MAX_DEPTH:
+        raise XhtmlError("nesting-depth", offset)
+    if name in SHRINKING and any(open_name in SHRINKING for open_name in stack):
+        raise XhtmlError("nesting-depth", offset)
+    if name in HEADINGS and any(open_name in HEADINGS for open_name in stack):
+        raise XhtmlError("nesting-depth", offset)
+    if name in INDENTING:
+        indents = sum(1 for open_name in stack if open_name in INDENTING) + 1
+        if indents > MAX_INDENTS:
+            raise XhtmlError("nesting-depth", offset)
+
+
+# The inline elements whose tags split text without emitting anything: a renderer draws the text on
+# each side in its own run, so a mark after the tag does not combine with the letter before it.
+SPLITTING_INLINE: Final = frozenset(
+    {"span", "b", "i", "em", "strong", "sup", "sub", "small", "abbr", "cite", "code"}
+)
+# How far each side of such a tag is composed to find a composition across it. A combining mark
+# right after the tag is refused whatever its distance from the letter, so the window only has to
+# catch the Hangul jamo that compose without being marks.
+COMPOSE_WINDOW: Final = 64
+
+
+def _is_mark(character: str) -> bool:
+    return unicodedata.category(character)[0] == "M"
+
+
+def _first_drawn_after(text: str, start: int) -> str | None:
+    """The first code point from ``start`` that is not a Default_Ignorable non-mark, or None.
+
+    A word joiner or a zero-width joiner between the tag and a mark is drawn as nothing, and the
+    mark after it is still drawn apart from the letter before the tag.
+    """
+    for character in text[start:]:
+        if _is_mark(character) or not is_default_ignorable(ord(character)):
+            return character
+    return None
+
+
+def _check_composition(text: str, boundaries: list[int]) -> None:
+    for boundary in boundaries:
+        first = _first_drawn_after(text, boundary)
+        if first is not None and _is_mark(first):
+            raise XhtmlError("combining-across-markup", boundary)
+        before = text[max(0, boundary - COMPOSE_WINDOW) : boundary]
+        after = text[boundary : boundary + COMPOSE_WINDOW]
+        if compose_text(before + after) != compose_text(before) + compose_text(after):
+            raise XhtmlError("combining-across-markup", boundary)
+
+
+def is_reserved(code_point: int) -> bool:
+    """U+FFFC and the noncharacters U+FDD0-U+FDEF."""
+    return code_point == 0xFFFC or 0xFDD0 <= code_point <= 0xFDEF
+
+
+def _find_reserved_character(text: str) -> int | None:
+    for offset, character in enumerate(text):
+        if is_reserved(ord(character)):
+            return offset
+    return None
+
 
 NAMED_ENTITIES: Final[dict[str, str]] = {"amp": "&", "lt": "<", "gt": ">", "quot": '"', "apos": "'"}
 
@@ -202,18 +347,24 @@ ENTITY: Final = re.compile(r"&(?:([A-Za-z]+)|#([0-9]{1,7})|#x([0-9A-Fa-f]{1,6}))
 ASCII_LETTER: Final = re.compile(r"[A-Za-z]")
 
 # Attribute values are never compared against the source, so they must not be able to carry
-# text: each allowed attribute is restricted to a short token alphabet or a safe link form, and to
-# the one element that needs it. Nothing a viewer's stylesheet or script could key on to hide text
-# (`class`, `id`, a language tag below the root, an in-page link) is allowed. These are
+# text: each allowed attribute is restricted to a short token alphabet, and to the one element that
+# needs it. Nothing a viewer's stylesheet or script could key on to hide text (`class`, `id`, a
+# language tag below the root, a link) is allowed. These are
 # whole-value grammars and are applied with `fullmatch`, so they carry no `^`/`$`: Python's `$`
 # would also match before a trailing newline, which is text this must not carry.
 TOKEN_VALUE: Final = re.compile(r"[A-Za-z0-9_.:-]{1,32}")
-HREF_VALUE: Final = re.compile(r"https://[A-Za-z0-9.-]{1,64}(?:/[A-Za-z0-9._~-]{0,32}){0,8}/?")
+LIST_TYPE_VALUE: Final = re.compile(r"[1aAiI]")
+LIST_START_VALUE: Final = re.compile(r"0|-?[1-9][0-9]{0,3}")
+SPAN_VALUE: Final = re.compile(r"[1-9][0-9]{0,2}|1000")
+# A picture's source is a PNG or JPEG `data:` URI: the picture's own bytes, compared with the
+# source through the hash `img` emits. A reference (a path or a URL) is refused: what it draws is
+# whatever the viewer's origin serves, or nothing, and neither is bound by the check.
+PICTURE_DATA_PREFIXES: Final = ("data:image/png;base64,", "data:image/jpeg;base64,")
+# The base64 length of 1 MiB.
+PICTURE_DATA_LIMIT: Final = 1_398_104
+BASE64_ALPHABET: Final = re.compile(r"[A-Za-z0-9+/]*")
 
 SOFT_HYPHEN: Final = chr(0x00AD)
-# U+00AD followed by U+000A in the emitted text. The emitted text has U+000A only from a block
-# boundary or `br`, and no U+000D at all (text line breaks are emitted as U+0020).
-SOFT_HYPHEN_BEFORE_BREAK: Final = re.compile(SOFT_HYPHEN + "\n")
 
 
 def _structural_break(name: str, cell_depth: int) -> str:
@@ -231,7 +382,22 @@ class XhtmlError(ValueError):
 
 
 class _TableState:
-    __slots__ = ("body", "caption", "foot", "head", "rows", "widths")
+    __slots__ = (
+        "above",
+        "body",
+        "caption",
+        "covered",
+        "cursor",
+        "down",
+        "foot",
+        "head",
+        "last",
+        "open_span",
+        "rows",
+        "single",
+        "single_columns",
+        "widths",
+    )
 
     def __init__(self) -> None:
         self.caption = False
@@ -239,12 +405,52 @@ class _TableState:
         self.body = False
         self.foot = False
         self.rows = False
-        # Cell count (`td` and `th`) of every row of this table, in document order.
+        # The grid, laid out by the HTML table model, and kept sparse so that a row costs only the
+        # slots it covers: for each column a cell above still covers, how many rows from the
+        # current one it covers.
+        self.above: dict[int, int] = {}
+        # The current row: the slots covered, the highest of them, the next slot not yet emitted,
+        # for each column how many rows below it a cell placed in this row covers, and whether a
+        # cell that spans no rows starts in it.
+        self.covered: set[int] = set()
+        self.last = -1
+        self.cursor = 0
+        self.down: dict[int, int] = {}
+        self.single = False
+        # The columns in which a cell that spans no columns starts, over the whole table.
+        self.single_columns: set[int] = set()
+        # The colspan of the open cell, whose covered-left slots its end tag emits.
+        self.open_span = 1
+        # Slots covered by every row of this table, or -1 for a row with a hole.
         self.widths: list[int] = []
+
+
+class _ListState:
+    __slots__ = ("next", "style")
+
+    def __init__(self, style: str, start: int) -> None:
+        self.style = style
+        self.next = start
 
 
 def _is_ascii_whitespace(character: str) -> bool:
     return character in (" ", "\t", "\n", "\r")
+
+
+def _is_picture_data(value: str) -> bool:
+    """A PNG or JPEG ``data:`` URI, counted and tested directly rather than by one regex.
+
+    The body is non-empty, at most the limit, a multiple of 4 long, the base64 alphabet, and
+    ``=`` only as the last one or two code points.
+    """
+    prefix = next((p for p in PICTURE_DATA_PREFIXES if value.startswith(p)), None)
+    if prefix is None:
+        return False
+    body = value[len(prefix) :]
+    if not body or len(body) > PICTURE_DATA_LIMIT or len(body) % 4 != 0:
+        return False
+    padding = 2 if body.endswith("==") else 1 if body.endswith("=") else 0
+    return BASE64_ALPHABET.fullmatch(body[: len(body) - padding]) is not None
 
 
 def _attribute_allowed(name: str, value: str, element: str, is_root: bool) -> bool:
@@ -252,22 +458,31 @@ def _attribute_allowed(name: str, value: str, element: str, is_root: bool) -> bo
     # `$` would let a trailing U+000A (and anything after it) through.
     if name in ("xml:lang", "lang"):
         return is_root and TOKEN_VALUE.fullmatch(value) is not None
-    if name == "href":
-        return element == "a" and HREF_VALUE.fullmatch(value) is not None
     if name == "scope":
         return element == "th" and TOKEN_VALUE.fullmatch(value) is not None
+    if name == "type":
+        return element == "ol" and LIST_TYPE_VALUE.fullmatch(value) is not None
+    if name == "start":
+        return element == "ol" and LIST_START_VALUE.fullmatch(value) is not None
+    if name in ("colspan", "rowspan"):
+        return element in ("td", "th") and SPAN_VALUE.fullmatch(value) is not None
+    if name == "src":
+        return element == "img" and _is_picture_data(value)
     return False
 
 
-def _check_attributes(element: str, attribute_source: str, is_root: bool, offset: int) -> None:
+def _check_attributes(
+    element: str, attribute_source: str, is_root: bool, offset: int
+) -> dict[str, str]:
+    """Checks the attributes in document order and returns their values."""
     saw_namespace = False
-    seen: set[str] = set()
+    values: dict[str, str] = {}
     for match in ATTRIBUTE.finditer(attribute_source):
         name = match.group(1) or ""
         value = match.group(2) if match.group(2) is not None else (match.group(3) or "")
-        if name in seen:
+        if name in values:
             raise XhtmlError("forbidden-attribute", offset)
-        seen.add(name)
+        values[name] = value
         if name == "xmlns":
             if not is_root or value != XHTML_NAMESPACE:
                 raise XhtmlError("forbidden-attribute", offset)
@@ -277,6 +492,10 @@ def _check_attributes(element: str, attribute_source: str, is_root: bool, offset
             raise XhtmlError("forbidden-attribute", offset)
     if is_root and not saw_namespace:
         raise XhtmlError("root-not-div", offset)
+    # A picture without a source would be drawn as nothing, or as the broken-image mark.
+    if element == "img" and "src" not in values:
+        raise XhtmlError("forbidden-attribute", offset)
+    return values
 
 
 def _decode_entity(match: re.Match[str], offset: int) -> int:
@@ -297,47 +516,55 @@ def _decode_entity(match: re.Match[str], offset: int) -> int:
         raise XhtmlError("unknown-entity", offset)
     if is_forbidden(code_point):
         raise XhtmlError("forbidden-character", offset)
+    if is_reserved(code_point):
+        raise XhtmlError("reserved-character", offset)
+    if _is_invisible_break(code_point):
+        raise XhtmlError("invisible-character", offset)
     return code_point
 
 
+# The elements a rule (`hr`) may not be drawn in (below).
+RULE_BREAKS_FRACTION: Final = frozenset({"td", "th", "caption"})
+
+
 def _check_parent(name: str, parent: str | None, offset: int) -> None:
-    """Nothing but text in `sup`/`sub`; each table part in its parent; only parts in a table."""
+    """Nothing but text in `sup`/`sub`; table parts and `li` in their parents; only parts inside."""
     if parent in ("sup", "sub"):
         raise XhtmlError("script-content", offset)
-    allowed_parents = TABLE_PART_PARENTS.get(name)
+    allowed_parents = LIST_CONTAINERS if name == "li" else TABLE_PART_PARENTS.get(name)
     if allowed_parents is not None:
         if parent is None or parent not in allowed_parents:
             raise XhtmlError("misnested-tag", offset)
         return
     if parent is not None and parent in TABLE_CONTAINERS:
         raise XhtmlError("table-content", offset)
+    if parent is not None and parent in LIST_CONTAINERS:
+        raise XhtmlError("list-content", offset)
 
 
-def _enter_table_element(
-    name: str, parent: str | None, tables: list[_TableState], offset: int
+def _enter_table_structure(
+    name: str, parent: str | None, state: _TableState | None, offset: int
 ) -> None:
     """Only the one document order that renders as written is accepted.
 
     Renderers place table parts by role, not by document position: a caption always renders
     first and sections render head then body then foot, so displayed text order must equal the
-    order the source was verified in. Parents are already checked; this also records rows and
-    cells for the shape check at ``</table>``.
+    order the source was verified in. Parents are already checked. A table inside an open table
+    (in a cell or in a caption) is refused, so the grid text never nests.
     """
-    state = tables[-1] if tables else None
-    if state is None:
+    if name == "table":
+        if state is not None:
+            raise XhtmlError("table-structure", offset)
         return
-    if name in ("td", "th"):
-        if state.widths:
-            state.widths[-1] += 1
+    if state is None:
         return
     if name == "tr":
         if parent == "table":
             if state.head or state.body or state.foot:
                 raise XhtmlError("table-structure", offset)
             state.rows = True
-        state.widths.append(0)
         return
-    if name not in ("caption", "thead", "tbody", "tfoot"):
+    if name != "caption" and name not in ROW_GROUPS:
         return
     if name == "caption":
         if state.caption or state.head or state.body or state.foot or state.rows:
@@ -360,6 +587,131 @@ def _enter_table_element(
         state.foot = True
 
 
+def _covered_slot(marker: str) -> str:
+    """One slot a cell covers but does not start in, as its own whitespace-delimited token."""
+    return f"\t{marker}\t"
+
+
+def _start_row(state: _TableState) -> None:
+    state.covered = set(state.above)
+    state.last = max(state.above, default=-1)
+    state.cursor = 0
+    state.down = {}
+    state.single = False
+
+
+def _place_cell(
+    state: _TableState, colspan: int, rowspan: int, grid: list[int], offset: int
+) -> str:
+    """Place a cell by the HTML table model, in the first slot of its row no cell covers.
+
+    The slots before it that a cell above covers are emitted first. A cell that would cover a
+    slot already covered overlaps it, which a renderer draws as two texts on top of each other.
+    """
+    before = ""
+    while state.cursor in state.covered:
+        before += _covered_slot(COVERED_ABOVE)
+        state.cursor += 1
+    columns = range(state.cursor, state.cursor + colspan)
+    if any(column in state.covered for column in columns):
+        raise XhtmlError("table-shape", offset)
+    grid[0] += colspan * rowspan
+    if grid[0] > TABLE_SLOT_LIMIT:
+        raise XhtmlError("table-size", offset)
+    for column in columns:
+        state.covered.add(column)
+        if rowspan > 1:
+            state.down[column] = rowspan - 1
+    if rowspan == 1:
+        state.single = True
+    if colspan == 1:
+        state.single_columns.add(state.cursor)
+    state.last = max(state.last, columns.stop - 1)
+    state.cursor += colspan
+    state.open_span = colspan
+    return before
+
+
+def _end_row(state: _TableState, offset: int) -> str:
+    """End a row: emit the covered slots after its last cell and record its width.
+
+    The width is -1 when a slot inside the row is covered by nothing. A row that covers a slot
+    but in which no cell spanning no rows starts is drawn at zero height, its cells' text in the
+    rows around it, so it rejects.
+    """
+    trailing = sorted(column for column in state.above if column >= state.cursor)
+    after = "".join(_covered_slot(COVERED_ABOVE) for _ in trailing)
+    if state.covered and not state.single:
+        raise XhtmlError("table-shape", offset)
+    hole = state.last + 1 != len(state.covered)
+    state.widths.append(-1 if hole else len(state.covered))
+    above = {column: rows - 1 for column, rows in state.above.items() if rows > 1}
+    above.update(state.down)
+    state.above = above
+    return after
+
+
+def _end_row_group(state: _TableState, offset: int) -> None:
+    """A cell whose rows run past its group's last row is clipped by a renderer, silently."""
+    if state.above:
+        raise XhtmlError("table-shape", offset)
+
+
+def _end_table(state: _TableState, offset: int) -> None:
+    """Every row as wide as the first, and a cell spanning no columns starts in every column.
+
+    A renderer draws a column without one at zero width, its cells' text in the columns around
+    it.
+    """
+    if state.rows:
+        _end_row_group(state, offset)
+    width = state.widths[0] if state.widths else 0
+    if any(covered != width or covered < 0 for covered in state.widths):
+        raise XhtmlError("table-shape", offset)
+    if any(column not in state.single_columns for column in range(width)):
+        raise XhtmlError("table-shape", offset)
+
+
+# A list item's marker as a renderer draws it (CSS counter styles decimal, lower- and
+# upper-alpha, lower- and upper-roman), followed by `.` and a space.
+ROMAN: Final = (
+    (1000, "m"),
+    (900, "cm"),
+    (500, "d"),
+    (400, "cd"),
+    (100, "c"),
+    (90, "xc"),
+    (50, "l"),
+    (40, "xl"),
+    (10, "x"),
+    (9, "ix"),
+    (5, "v"),
+    (4, "iv"),
+    (1, "i"),
+)
+
+
+def list_marker(style: str, ordinal: int) -> str:
+    marker = str(ordinal)
+    if style in ("a", "A") and ordinal >= 1:
+        marker = ""
+        rest = ordinal
+        while rest > 0:
+            rest -= 1
+            marker = chr(0x61 + rest % 26) + marker
+            rest //= 26
+    elif style in ("i", "I") and 1 <= ordinal <= 3999:
+        marker = ""
+        rest = ordinal
+        for value, letters in ROMAN:
+            while rest >= value:
+                marker += letters
+                rest -= value
+    if style in ("A", "I"):
+        marker = marker.upper()
+    return f"{marker}. "
+
+
 def _emit_text(
     code_point: int, parent: str | None, output: list[str], offset: int, is_reference: bool
 ) -> None:
@@ -373,9 +725,11 @@ def _emit_text(
     # A line feed or carriage return in text is a space to a renderer: only a block boundary or
     # `br` is a line break.
     emitted = " " if code_point in (0x000A, 0x000D) else character
-    if parent is not None and parent in TABLE_CONTAINERS:
+    if parent is not None and (parent in TABLE_CONTAINERS or parent in LIST_CONTAINERS):
         if is_reference or not _is_ascii_whitespace(character):
-            raise XhtmlError("table-content", offset)
+            raise XhtmlError(
+                "table-content" if parent in TABLE_CONTAINERS else "list-content", offset
+            )
         output.append(emitted)
         return
     if emitted != character:
@@ -413,10 +767,22 @@ def xhtml_to_text(div: str) -> str:
     forbidden = find_forbidden_character(div)
     if forbidden is not None:
         raise XhtmlError("forbidden-character", forbidden)
+    # The code points the scanner emits for grids and pictures never occur in the narrative.
+    reserved = _find_reserved_character(div)
+    if reserved is not None:
+        raise XhtmlError("reserved-character", reserved)
+    invisible = _find_invisible_break(div)
+    if invisible is not None:
+        raise XhtmlError("invisible-character", invisible)
 
     output: list[str] = []
     stack: list[str] = []
     tables: list[_TableState] = []
+    lists: list[_ListState] = []
+    # The output positions (list indexes) where an inline tag splits the text.
+    splits: list[int] = []
+    # The slots every table so far covers, against TABLE_SLOT_LIMIT.
+    grid = [0]
     root_seen = False
     root_closed = False
     cell_depth = 0
@@ -447,14 +813,26 @@ def xhtml_to_text(div: str) -> str:
                 open_name = stack.pop()
                 if open_name != name:
                     raise XhtmlError("misnested-tag", index)
-                if name == "table":
-                    widths = tables.pop().widths if tables else []
-                    if any(width != widths[0] for width in widths):
-                        raise XhtmlError("table-shape", index)
+                if name in SPLITTING_INLINE:
+                    splits.append(len(output))
+                table = tables[-1] if tables else None
+                if table is not None and name in ROW_GROUPS:
+                    _end_row_group(table, index)
+                if name == "table" and table is not None:
+                    _end_table(table, index)
+                    tables.pop()
+                    # On a line of its own, so an empty table's two markers are two tokens.
+                    output.append("\n" + TABLE_END)
+                if name == "tr" and table is not None:
+                    output.append(_end_row(table, index))
+                if name in LIST_CONTAINERS:
+                    lists.pop()
                 if name in ("td", "th"):
                     cell_depth -= 1
                 if name in BLOCK_ELEMENTS:
                     output.append(_structural_break(name, cell_depth))
+                if name in ("td", "th") and table is not None:
+                    output.append(_covered_slot(COVERED_LEFT) * (table.open_span - 1))
                 if not stack:
                     root_closed = True
                 index = end.end()
@@ -479,18 +857,56 @@ def xhtml_to_text(div: str) -> str:
                 if name != "div":
                     raise XhtmlError("root-not-div", index)
                 root_seen = True
-            _check_attributes(name, start.group(2) or "", is_root, index)
+            attributes = _check_attributes(name, start.group(2) or "", is_root, index)
             self_closing = (start.group(3) or "") == "/"
             if (name in VOID_ELEMENTS) != self_closing:
                 raise XhtmlError("void-element", index)
+            if not is_root:
+                _check_nesting(name, stack, index)
             parent = stack[-1] if stack else None
             _check_parent(name, parent, index)
-            _enter_table_element(name, parent, tables, index)
+            # A rule in a cell or a caption is as narrow as its column, so a renderer draws "1",
+            # the rule and "2" as a stacked fraction, ½, where the text says "1 2".
+            if name == "hr" and any(open_name in RULE_BREAKS_FRACTION for open_name in stack):
+                raise XhtmlError("table-content", index)
+            if name in SPLITTING_INLINE:
+                splits.append(len(output))
+            table = tables[-1] if tables else None
+            _enter_table_structure(name, parent, table, index)
+            if name in ("td", "th") and table is not None:
+                output.append(
+                    _place_cell(
+                        table,
+                        int(attributes.get("colspan", "1")),
+                        int(attributes.get("rowspan", "1")),
+                        grid,
+                        index,
+                    )
+                )
 
             line_break = _structural_break(name, cell_depth)
             if name in BLOCK_ELEMENTS or name == "br":
                 output.append(line_break)
-            # A self-closing element is `br` or `hr`; `hr`, a block, also emits its closing break.
+            # What a renderer draws for the element itself: the grid markers of a table, a row
+            # and a cell, a numbered item's marker, and a picture.
+            if name == "table":
+                output.append(TABLE_START)
+            if name == "tr" and table is not None:
+                _start_row(table)
+                output.append(ROW_START)
+            if name in ("td", "th"):
+                output.append(CELL_START + "\t")
+            if name == "li" and parent == "ol" and lists:
+                output.append(list_marker(lists[-1].style, lists[-1].next))
+                lists[-1].next += 1
+            if name == "img":
+                src = attributes.get("src", "")
+                # U+FFFC, the hash, U+FFFC: closed, so a combining mark after the picture
+                # cannot compose with its last digit.
+                digest = hashlib.sha256(src.encode("utf-8")).hexdigest()
+                output.append(PICTURE + digest + PICTURE)
+            # A self-closing element is `br`, `hr` or `img`; `hr`, a block, also emits its
+            # closing break.
             if self_closing:
                 if name in BLOCK_ELEMENTS:
                     output.append(line_break)
@@ -500,6 +916,10 @@ def xhtml_to_text(div: str) -> str:
                     cell_depth += 1
                 if name == "table":
                     tables.append(_TableState())
+                if name in LIST_CONTAINERS:
+                    lists.append(
+                        _ListState(attributes.get("type", "1"), int(attributes.get("start", "1")))
+                    )
             index = start.end()
             continue
 
@@ -518,7 +938,17 @@ def xhtml_to_text(div: str) -> str:
             if not _is_ascii_whitespace(character):
                 raise XhtmlError("text-outside-root", index)
         else:
-            _emit_text(ord(character), stack[-1], output, index, is_reference=False)
+            parent = stack[-1]
+            # "]]>" ends a CDATA section to an XML parser, which refuses the document: an XML
+            # renderer draws none of the narrative (text directly in a table or list part is
+            # refused first).
+            if (
+                div.startswith("]]>", index)
+                and parent not in TABLE_CONTAINERS
+                and parent not in LIST_CONTAINERS
+            ):
+                raise XhtmlError("cdata", index)
+            _emit_text(ord(character), parent, output, index, is_reference=False)
         index += 1
 
     if not root_seen:
@@ -526,7 +956,15 @@ def xhtml_to_text(div: str) -> str:
     if stack:
         raise XhtmlError("unbalanced-tag", len(div))
     text = "".join(output)
-    soft_hyphen = SOFT_HYPHEN_BEFORE_BREAK.search(text)
-    if soft_hyphen is not None:
-        raise XhtmlError("soft-hyphen-at-boundary", soft_hyphen.start())
+    # A combining mark after an inline tag is drawn in its own run, apart from the letter before
+    # the tag, while NFC would join them ("<" and U+0338 across `b` is drawn "</", read as "≮").
+    boundaries: list[int] = []
+    offset = 0
+    piece = 0
+    for split in splits:
+        while piece < split:
+            offset += len(output[piece])
+            piece += 1
+        boundaries.append(offset)
+    _check_composition(text, boundaries)
     return text

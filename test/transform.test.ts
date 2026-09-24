@@ -163,6 +163,23 @@ describe("deterministic Type 2 to EMA conversion", () => {
     ]);
   });
 
+  it("fails closed when a section without a source code carries only a picture", () => {
+    // Dropping the section would drop the picture with it.
+    const source = createSyntheticType2Bundle(mapping);
+    findSection(composition(source).section, "smpc.6").section?.push({
+      title: "6.7 Additional information",
+      code: { coding: [{ system: "https://khs.dev/fhir/CodeSystem/other", code: "extra" }] },
+      text: {
+        status: "generated",
+        div: '<div xmlns="http://www.w3.org/1999/xhtml"><p><img src="data:image/png;base64,AA=="/></p></div>',
+      },
+    });
+
+    expect(transformIssues(source)).toEqual([
+      "Uncoded source section with narrative at Composition.section[0].section[5].section[6]",
+    ]);
+  });
+
   it.each([
     ["CDATA", "<p><![CDATA[Do not use in children]]></p>"],
     ["a comment", "<!-- Do not use in children -->"],
@@ -290,22 +307,37 @@ describe("deterministic Type 2 to EMA conversion", () => {
 
   it.each([
     ["a non-breaking space by number", "<p>&#160;</p>", "has no narrative"],
-    ["a zero-width space by number", "<p>&#x200B;</p>", "has no narrative"],
+    // fidelity-norm/3.0.0: narrative holds no zero-width space or soft hyphen, so the scanner
+    // refuses these; either way a mandatory section fails closed.
+    ["a zero-width space by number", "<p>&#x200B;</p>", "has unreadable narrative"],
+    ["a byte-order mark and a word joiner", "<p>&#xFEFF;&#x2060; </p>", "has no narrative"],
     [
       "a zero-width space as a character",
       `<p>${String.fromCodePoint(0x200b)}</p>`,
-      "has no narrative",
+      "has unreadable narrative",
     ],
     [
       "a byte-order mark, a word joiner and a soft hyphen",
       "<p>&#xFEFF;&#x2060;&#xAD; </p>",
-      "has no narrative",
+      "has unreadable narrative",
     ],
     ["a named entity the scanner does not know", "<p>&nbsp;</p>", "has unreadable narrative"],
     ["a comment holding a >", "<!-- a > b -->", "has unreadable narrative"],
     ["an attribute holding a >", '<p title="x>y"></p>', "has unreadable narrative"],
     ["a comment holding an img", "<!-- <img> -->", "has unreadable narrative"],
     ["an image only", '<img src="https://khs.dev/pictogram.png"/>', "has unreadable narrative"],
+    // fidelity-norm/3.0.0: a table's grid markers are structure, not text.
+    ["a table of empty cells", "<table><tr><td></td><td> </td></tr></table>", "has no narrative"],
+    ["a picture by reference", '<p><img src="images/logo.png"/></p>', "has unreadable narrative"],
+    // A picture can draw nothing (these bytes draw a broken-image icon), and what one shows is
+    // never read, so a mandatory section needs text.
+    ["a picture", '<p><img src="data:image/png;base64,AA=="/></p>', "has no narrative"],
+    // Gaps (fidelity-norm/3.0.0 section 6) draw nothing inked: a thin space, content to the
+    // comparison, is still no narrative, and so are a blank glyph and ignorable code points.
+    ["a thin space", "<p>&#x2009;</p>", "has no narrative"],
+    ["a medium mathematical space", "<p>&#x205F;</p>", "has no narrative"],
+    ["a braille blank and an invisible separator", "<p>&#x2800;&#x2063;</p>", "has no narrative"],
+    ["a zero-width joiner and a tag space", "<p>&#x200D;&#xE0020;</p>", "has no narrative"],
   ])("fails closed when a mandatory leaf section holds only %s", (_name, content, outcome) => {
     const source = createSyntheticType2Bundle(mapping);
     findSection(composition(source).section, "smpc.4.3").text = {
@@ -314,6 +346,20 @@ describe("deterministic Type 2 to EMA conversion", () => {
     };
 
     expect(transformIssues(source)).toEqual([`Mandatory source section smpc.4.3 ${outcome}`]);
+  });
+
+  it.each([
+    ["a numbered item", '<ol start="2"><li></li></ol>'],
+    ["a table with one filled cell", "<table><tr><td></td><td>x</td></tr></table>"],
+    ["an Ogham space mark, which is drawn as a stroke", "<p>&#x1680;</p>"],
+  ])("counts %s as narrative a reader sees", (_name, content) => {
+    const source = createSyntheticType2Bundle(mapping);
+    findSection(composition(source).section, "smpc.4.3").text = {
+      status: "generated",
+      div: div(content),
+    };
+
+    expect(() => transformType2ToEma(source, mapping)).not.toThrow();
   });
 
   it("fails closed when 4.8 has no narrative above its reporting subsection", () => {

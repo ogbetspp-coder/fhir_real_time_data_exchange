@@ -70,7 +70,9 @@ _Amended 2026-09-23 for `fidelity-norm/2.0.0`
 (`docs/validation/changes/2026-09-23-fidelity-norm-2-0-0.md`): markup may not change what a
 reader sees without the check seeing it._
 
-- Structure is free (paragraph and cell boundaries flatten to spaces); words are checked. A
+- Structure is free (paragraph boundaries, headings, line breaks, list nesting and bullets
+  flatten to spaces; from `fidelity-norm/3.0.0` a table's grid, an `ol`'s numbers and a
+  picture's bytes are folded into the text and checked); words are checked. A
   bullet glyph is structure only where it starts a list item (after a line feed, before
   whitespace, on a line without a tab); mid-line or in a table cell it is content, and U+2219
   and U+2043 are never bullets. A line feed in the narrative's text is a space, as a renderer
@@ -80,13 +82,17 @@ reader sees without the check seeing it._
   fold to their script code points, so `10<sup>6</sup>` is `10⁶` and never equals a source's
   `106`; a number there with no script form, and U+00B1 or U+2213, rejects.
 - The extractor contract is explicit: emit discretionary hyphens as U+00AD, hard hyphens
-  verbatim, table cells row-major separated by TAB and rows by LF with the same number of cells
-  in every row (a spanned cell's text once, in its first slot, and empty cells for the slots it
-  covers), raised and lowered digits and signs as script code points, no U+000B or U+000C (a
+  verbatim, each table with its grid (from `fidelity-norm/3.0.0`: table, row, cell and
+  covered-slot markers, the slots a merged cell covers marked as covered, never as empty cells),
+  numbered-list markers as drawn with a space, pictures as the hash of their bytes, raised and
+  lowered digits and signs as script code points, no U+000B or U+000C (a
   page break is the page record), and declare per-page `bodyStart`/`bodyEnd` so repeated
   headers and footers are excluded from spans, with every non-empty body ending in its own line
   feed. An extractor that cannot tell a glyph's baseline shift must refuse the document rather
-  than emit plain digits.
+  than emit plain digits. From `fidelity-norm/3.0.0` the contract also writes a table across pages
+  as its logical text and a continuation line that begins with a bullet glyph with a leading
+  tab, and it qualifies structured sources only: for drawn documents (a PDF, or a Word document however it is read) its reviews recorded open cases (line wraps, undrawn soft hyphens, page footnotes), and no
+  drawn-document extractor may support an approval until a later version closes them.
 - Tail-of-page omissions are visible only through the report's coverage figures, which are
   recorded as evidence for reviewers but do not fail the check. Because the body range is
   declared by the extractor, it is bounded rather than trusted: bodies must sit on line
@@ -101,21 +107,27 @@ reader sees without the check seeing it._
   section 5) because they are never compared against the source. The bounds limit the
   capacity of that channel; they do not eliminate it. Nothing a viewer's stylesheet or script
   can key on to hide text is allowed: no `class`, no `id`, a language tag on the root only, no
-  in-page link. `ol` and `q` are not allowed because renderers generate visible characters for
-  them, and table sections must appear in rendering order.
-- Only `br` and `hr` may be self-closing, and must be, because an HTML parser ignores the `/`
-  of any other element. Inside a tag only TAB, LF, CR and SPACE are whitespace, because an HTML
+  in-page link. `q` is not allowed because renderers generate visible characters for it; `ol`
+  is allowed from fidelity-norm/3.0.0 because the numbers a renderer draws are folded into the
+  text; `u` and `a` are not allowed from fidelity-norm/3.0.0 because a renderer underlines them
+  and an underline turns a sign into another ("<" into "≤"); an `hr` in a table cell or caption
+  is refused from fidelity-norm/3.0.0 because it is drawn as a fraction bar; and table sections
+  must appear in rendering order.
+- Only `br` and `hr` (and, from `fidelity-norm/3.0.0`, `img`) may be self-closing, and must
+  be, because an HTML parser ignores the `/` of any other element. Inside a tag only TAB, LF, CR and SPACE are whitespace, because an HTML
   parser reads any other code point there as part of the tag name. Tables contain only table
-  parts and whitespace, every row has the same number of cells, and `colspan`, `rowspan` and
-  `pre` are not allowed, because a renderer moves other content out of a table and draws
-  spanned cells and preformatted columns the check cannot see. This does not check which cell
-  a value is in (below).
+  parts and whitespace, and `pre` is not allowed, because a renderer moves other content out of
+  a table and draws preformatted columns the check cannot see. From fidelity-norm/3.0.0 the
+  text carries each table's grid (rows, cells, and the slots a `colspan` or `rowspan` covers),
+  so which cell a value is in is checked, and a picture is carried as the hash of its source
+  (`docs/design/fidelity-norm-3-0-0.md`).
 - A section may omit whole whitespace-delimited tokens but never begin or end inside one: the
   outer span edges must touch whitespace (or a body edge), read back through whitespace and
   across pages (`docs/fidelity-normalization.md` section 6, reason `word-cut`). Punctuation is
   not a boundary, because inside a number it is part of the number (`1` of `1.5`, `20` of
   `−20`), and neither is a space between the groups of a number (`10` of `10 000`) or a
-  no-break space. A soft hyphen directly before a block boundary or `br` rejects, and a line
+  no-break space. A soft hyphen or a zero-width space in narrative rejects (from
+  `fidelity-norm/3.0.0`; before it, a soft hyphen before a block boundary or `br`), and a line
   feed in text is a space, so a token can be neither truncated at a section edge nor joined
   across markup. The rule proves that edges touch whitespace, not that
   they end a sentence or a clause: "Take 5" can still be taken from "Take 5 mg twice".
@@ -130,7 +142,10 @@ reader sees without the check seeing it._
   in a different cell from the source — a dose can move from the Adults column to the Children
   column and verify. The empty slots the extractor contract requires for a spanned source cell
   make that easier, because an empty narrative cell costs nothing. Closing it needs a table
-  extractor contract and is the next major version. Also not closed: a text layer that
+  extractor contract and is the next major version. (Closed by `fidelity-norm/3.0.0`, whose
+  text carries each table's grid and whose extractor contract emits it, apart from the line a
+  value sits on inside a multi-line cell and how high or wide a row or column is drawn, which it
+  states.) Also not closed: a text layer that
   flattens a superscript is outside the check, because the narrative is derived from it (only
   the extractor can close that); a letter exponent (`2<sup>n</sup>` against `2n`) still
   verifies; strong right-to-left letters can reorder adjacent numbers, and no EU

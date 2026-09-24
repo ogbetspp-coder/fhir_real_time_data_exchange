@@ -18,7 +18,13 @@ from verifiable_answer_agent.contract import (
     utf16_length,
     validate_tool_output,
 )
-from verifiable_answer_agent.quote_edge import edge_after, edge_before, locate_quote
+from verifiable_answer_agent.quote_edge import (
+    edge_after,
+    edge_before,
+    locate_quote,
+    number_before,
+    number_from,
+)
 
 from .fake_query_service import REPOSITORY_ROOT, load_sections, long_section, quote_edge_cases
 
@@ -119,11 +125,12 @@ def test_a_token_longer_than_the_window_is_one_longer_chunk_not_a_cut_inside_it(
 
 
 def test_an_astral_character_is_measured_as_two_units_and_never_split() -> None:
-    # U+1F600 costs two UTF-16 code units; a window of three fits one and the space after it,
-    # not two.
-    text = "\U0001f600 \U0001f600 \U0001f600"
+    # U+1D400 MATHEMATICAL BOLD CAPITAL A costs two UTF-16 code units; a window of three fits one
+    # and the space after it, not two. (A letter: an emoji is a symbol, which the quote-edge
+    # rule reads as a sign binding what follows.)
+    text = "\U0001d400 \U0001d400 \U0001d400"
     chunks = split_for_verification(text, limit=3)
-    assert chunks == ("\U0001f600", "\U0001f600", "\U0001f600")
+    assert chunks == ("\U0001d400", "\U0001d400", "\U0001d400")
     assert all(utf16_length(chunk) <= 3 for chunk in chunks)
 
 
@@ -149,7 +156,14 @@ def test_every_chunk_of_every_worked_example_is_one_the_service_confirms() -> No
     # Every text the query service's own rule was exported over, split at every window width:
     # each chunk within the bound is a match under that rule, and a chunk over the bound exists
     # only where the window held no acceptable cut.
-    texts = [section["text"] for section in quote_edge_cases()["sections"]]
+    # A text carrying a table's grid markers is left out: the service refuses any quote holding
+    # one (``invalid-request``), so no chunk of it is ever sent, and quoting a table is the
+    # publishing step's work (roadmap 3a, PR 5).
+    texts = [
+        section["text"]
+        for section in quote_edge_cases()["sections"]
+        if not any(0xFDD0 <= ord(character) <= 0xFDEF for character in section["text"])
+    ]
     texts.append(long_section().text)
     for text in texts:
         for limit in [*range(4, min(len(text), 120)), VERIFY_QUOTE_MAX_UTF16]:
@@ -165,8 +179,8 @@ def test_every_chunk_of_every_worked_example_is_one_the_service_confirms() -> No
                     at = start + offset
                     if text[at] == " ":
                         assert not (
-                            edge_after(text, at, text[at - 1])
-                            and edge_before(text, at + 1, text[at + 1])
+                            edge_after(text, at, number_before(text, at))
+                            and edge_before(text, at + 1, number_from(text, at + 1))
                         ), (limit, chunk, offset)
 
 

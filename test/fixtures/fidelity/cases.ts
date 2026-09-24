@@ -61,6 +61,11 @@ export function paragraphs(...texts: string[]): string {
 const HEADER = "ACME Demo Product — Synthetic SmPC\n";
 const FOOTER = (page: number): string => `Page ${page} of 3`;
 
+// U+FDD0 table, U+FDD1 end of table, U+FDD2 row, U+FDD3 cell (fidelity-norm/3.0.0).
+const TABLE =
+  "\ufdd0\n\ufdd2\t\ufdd3\tDose\t\ufdd3\tFrequency\n\ufdd2\t\ufdd3\t10 mg\t\ufdd3\tOnce daily\n" +
+  "\ufdd2\t\ufdd3\t20 mg\t\ufdd3\tTwice daily\n\ufdd1";
+
 const PAGE_BODIES = [
   [
     "4.1 Therapeutic indications",
@@ -82,7 +87,9 @@ const PAGE_BODIES = [
     "• first warning item",
     "• second warning item",
     "4.5 Interactions",
-    "Dose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily",
+    // A table as the extractor writes it (section 7, fidelity-norm/3.0.0): its grid markers,
+    // then each row, then each cell's slot and text.
+    TABLE,
   ].join("\n"),
 ];
 
@@ -167,7 +174,6 @@ const POSOLOGY_TWO = "Part two of the posology text is on page two.";
 const DOSE = "The recommended dose is 10 mg once daily for a long-\nterm course.";
 const CONTRA = "Hypersensitivity to the active substance is a contraindication.";
 const WARNINGS = "• first warning item\n• second warning item";
-const TABLE = "Dose\tFrequency\n10 mg\tOnce daily\n20 mg\tTwice daily";
 
 const baseSpecs = (): SectionSpec[] => [
   {
@@ -366,14 +372,139 @@ const LIST_SPACE_ITEM = "\u2022 Adults: 10 mg";
 const LIST_SPACE_ITEM_SOURCE = customSource([LIST_SPACE_ITEM]);
 const NUMBER_AT_LINE_END = "Take 2\n10 mg is the daily dose.";
 const NUMBER_AT_LINE_END_SOURCE = customSource([NUMBER_AT_LINE_END]);
-const ROW = "2\t10";
+// One-row tables as the extractor writes them (section 7, fidelity-norm/3.0.0).
+const gridRow = (...cells: string[]): string =>
+  `\ufdd0\n\ufdd2${cells.map((cell) => `\t\ufdd3\t${cell}`).join("")}\n\ufdd1`;
+const ROW = gridRow("2", "10");
 const ROW_SOURCE = customSource([ROW]);
-const BULLET_ROW = "2\t\u2022 10";
+const BULLET_ROW = gridRow("2", "\u2022 10");
 const BULLET_ROW_SOURCE = customSource([BULLET_ROW]);
-const FIRST_CELL_BULLET_ROW = "\u2022 10\t2";
+const FIRST_CELL_BULLET_ROW = gridRow("\u2022 10", "2");
 const FIRST_CELL_BULLET_SOURCE = customSource([FIRST_CELL_BULLET_ROW]);
-const FIRST_CELL_ROW = "10\t2";
+const FIRST_CELL_ROW = gridRow("10", "2");
 const FIRST_CELL_ROW_SOURCE = customSource([FIRST_CELL_ROW]);
+// fidelity-norm/3.0.0: numbered lists, table grids and pictures, as the extractor writes them.
+const NUMBERED_ITEM = "3. Take one tablet.";
+const NUMBERED_ITEM_SOURCE = customSource([NUMBERED_ITEM]);
+// A dose drawn against every age group (a row span), and the same words with empty cells.
+const SPANNED_DOSE =
+  "\ufdd0\n\ufdd2\t\ufdd3\tAdults\t\ufdd3\t10 mg\n\ufdd2\t\ufdd3\tChildren\t\ufdd5\t\n" +
+  "\ufdd2\t\ufdd3\tElderly\t\ufdd5\t\n\ufdd1";
+const SPANNED_DOSE_SOURCE = customSource([SPANNED_DOSE]);
+const EMPTY_CELLS_DOSE =
+  "\ufdd0\n\ufdd2\t\ufdd3\tAdults\t\ufdd3\t10 mg\n\ufdd2\t\ufdd3\tChildren\t\ufdd3\t\n" +
+  "\ufdd2\t\ufdd3\tElderly\t\ufdd3\t\n\ufdd1";
+const EMPTY_CELLS_DOSE_SOURCE = customSource([EMPTY_CELLS_DOSE]);
+const DOSE_IN_SECOND_COLUMN = gridRow("Adults", "10 mg", "");
+const DOSE_IN_SECOND_COLUMN_SOURCE = customSource([DOSE_IN_SECOND_COLUMN]);
+// A picture is its `data:` URI's hash between two U+FFFC (section 5).
+const PICTURE_SOURCE = "data:image/png;base64,iVBORw0KGgo=";
+const PICTURE_LINE = `See \ufffc${sha256Utf8(PICTURE_SOURCE)}\ufffc below.`;
+const PICTURE_LINE_SOURCE = customSource([PICTURE_LINE]);
+// A row whose last cell continues on the next page (section 7): the continuation begins with
+// U+0009, so the bullet at its start is content, as in any cell.
+const CELL_ACROSS_PAGES = ["\ufdd0\n\ufdd2\t\ufdd3\tDose\t\ufdd3\t2", "\t\u2022 10\n\ufdd1"];
+const CELL_ACROSS_PAGES_SOURCE = customSource(CELL_ACROSS_PAGES);
+const cellAcrossPagesSpans = (): SourceSpan[] =>
+  CELL_ACROSS_PAGES.map((body, index) => spanFor(CELL_ACROSS_PAGES_SOURCE, index + 1, body));
+// A word in a cell hyphenated at a page break (section 7): the continuation begins with the rest
+// of the word, which section 3 step 1 joins across the soft hyphen and the line feed.
+const CELL_WORD_ACROSS_PAGES = [
+  "\ufdd0\n\ufdd2\t\ufdd3\tDose\t\ufdd3\tAdults with renal impair\u00ad",
+  "ment\t\ufdd3\t10 mg\n\ufdd1",
+];
+const CELL_WORD_ACROSS_PAGES_SOURCE = customSource(CELL_WORD_ACROSS_PAGES);
+const cellWordAcrossPagesSpans = (): SourceSpan[] =>
+  CELL_WORD_ACROSS_PAGES.map((body, index) =>
+    spanFor(CELL_WORD_ACROSS_PAGES_SOURCE, index + 1, body),
+  );
+// A row broken across a page in two cells (section 7): the earlier page holds the row up to the
+// break in its first continued cell; the rest of that cell and every later slot, including "Oral",
+// which the earlier page draws, are on the later page.
+const ROW_ACROSS_PAGES = [
+  "\ufdd0\n\ufdd2\t\ufdd3\tDose\t\ufdd3\tAdults with renal",
+  "\timpairment\t\ufdd3\t10 mg once daily\t\ufdd3\tOral\n\ufdd1",
+];
+const ROW_ACROSS_PAGES_SOURCE = customSource(ROW_ACROSS_PAGES);
+const rowAcrossPagesSpans = (): SourceSpan[] =>
+  ROW_ACROSS_PAGES.map((body, index) => spanFor(ROW_ACROSS_PAGES_SOURCE, index + 1, body));
+// Review round 7 (section 7, tables across a page break). A page footnote drawn between the table's
+// parts is written after the table.
+const FOOTNOTE_ACROSS_PAGES = [
+  "\ufdd0\n\ufdd2\t\ufdd3\tAdults\t\ufdd3\t10 mg\u00b9",
+  "\ufdd2\t\ufdd3\tChildren\t\ufdd3\t5 mg\n\ufdd1\n\u00b9 Not studied in hepatic impairment.",
+];
+const FOOTNOTE_ACROSS_PAGES_SOURCE = customSource(FOOTNOTE_ACROSS_PAGES);
+// A cell that spans rows, broken at the page: its text stays in its own slot, and the later row,
+// which the earlier page draws, follows it on the later page.
+const SPAN_ACROSS_PAGES = [
+  "\ufdd0\n\ufdd2\t\ufdd3\tAdults with renal",
+  "\timpairment\t\ufdd3\t10 mg\n\ufdd2\t\ufdd5\t\t\ufdd3\t5 mg\n\ufdd1",
+];
+const SPAN_ACROSS_PAGES_SOURCE = customSource(SPAN_ACROSS_PAGES);
+// A footer row repeated on every page is written where the table last has it.
+const FOOTER_ACROSS_PAGES = [
+  "\ufdd0\n\ufdd2\t\ufdd3\ta\t\ufdd3\t1",
+  "\ufdd2\t\ufdd3\tb\t\ufdd3\t1\n\ufdd2\t\ufdd3\tTotal\t\ufdd3\t2\n\ufdd1",
+];
+const FOOTER_ACROSS_PAGES_SOURCE = customSource(FOOTER_ACROSS_PAGES);
+const spansOf = (bodies: string[], source: SourceDocumentText): SourceSpan[] =>
+  bodies.map((body, index) => spanFor(source, index + 1, body));
+// Review round 8 (section 7). A caption continued across a page break: the extractor inserts
+// U+0009 before the continuation, so a bullet at its start is content.
+const CAPTION_ACROSS_PAGES = ["\ufdd0\nDose 2", "\t\u2022 10 mg\n\ufdd2\t\ufdd3\tA\n\ufdd1"];
+const CAPTION_ACROSS_PAGES_SOURCE = customSource(CAPTION_ACROSS_PAGES);
+// A paragraph the document wraps just before a mid-line bullet: the continuation line begins with
+// U+0009, so "Take 2 • 10 mg" does not read "Take 2 10 mg".
+const WRAP_BEFORE_BULLET = "Take 2\n\t\u2022 10 mg daily.";
+const WRAP_BEFORE_BULLET_SOURCE = customSource([WRAP_BEFORE_BULLET]);
+// A header row the document repeats on page 2 is excluded from that page's body, after the
+// running header.
+const REPEATED_HEADER_ROW = "\ufdd2\t\ufdd3\tPopulation\t\ufdd3\tDose\n";
+const REPEATED_HEADER_BODIES = [
+  `\ufdd0\n${REPEATED_HEADER_ROW}\ufdd2\t\ufdd3\tAdults\t\ufdd3\t10 mg`,
+  "\ufdd2\t\ufdd3\tChildren\t\ufdd3\t5 mg\n\ufdd1",
+];
+const REPEATED_HEADER_SOURCE: SourceDocumentText = (() => {
+  const [first, second] = REPEATED_HEADER_BODIES.map((body, index) => buildPage(index + 1, body));
+  if (first === undefined || second === undefined) throw new Error("fixture");
+  const excluded = `${HEADER}${REPEATED_HEADER_ROW}`;
+  const body = `${REPEATED_HEADER_BODIES[1] ?? ""}\n`;
+  const bodyStart = Array.from(excluded).length;
+  return {
+    extractorVersion: "synthetic-extractor/1.0.0",
+    pages: [
+      first,
+      {
+        page: 2,
+        text: `${excluded}${body}${FOOTER(2)}`,
+        bodyStart,
+        bodyEnd: bodyStart + Array.from(body).length,
+      },
+    ],
+  };
+})();
+// Review round 12: U+1680 draws as a stroke, "Take 2-10 mg", not as a space.
+const OGHAM_LINE = "Take 2\u168010 mg daily.";
+const OGHAM_SOURCE = customSource([OGHAM_LINE]);
+const SPACE_LINE = "Take 2 10 mg daily.";
+const SPACE_SOURCE = customSource([SPACE_LINE]);
+// Review round 13: U+200A HAIR SPACE is drawn about a pixel wide, "210 mg", so it is content.
+const HAIR_LINE = "Take 2 10 mg tablets.";
+const HAIR_SOURCE = customSource([HAIR_LINE]);
+// Review round 14: an invisible separator (U+2063, drawn as nothing) between the groups.
+const GROUPED_INVISIBLE_THEN_SPACE_SOURCE = customSource([GROUPED("\u2063 ")]);
+// Review round 15: U+2800 BRAILLE PATTERN BLANK is drawn as a blank, and a tag character from the
+// supplementary planes as nothing; each is a gap between the groups.
+const GROUPED_BLANK_THEN_SPACE_SOURCE = customSource([GROUPED("\u2800 ")]);
+const GROUPED_TAG_SPACE_THEN_SPACE_SOURCE = customSource([GROUPED("\u{E0020} ")]);
+const OGHAM_ALONE_SOURCE = customSource(["\u1680"]);
+// Review round 17: a page carrying a code point section 2 adds in 3.0.0.
+const ANNOTATION_PAGE_SOURCE = customSource(["Take 10 \ufff9000 IU daily. Dose information."]);
+// Review round 16: letters the default serif face draws as an em-wide blank are gaps.
+const GROUPED_YI_BLANK_THEN_SPACE_SOURCE = customSource([GROUPED("\ua4c5 ")]);
+const SPANNED_DOSE_TABLE =
+  '<table><tr><td>Adults</td><td rowspan="3">10 mg</td></tr><tr><td>Children</td></tr><tr><td>Elderly</td></tr></table>';
 const MID_LINE_BULLET = "Take 2 \u2022 10 mg daily.";
 const MID_LINE_BULLET_SOURCE = customSource([MID_LINE_BULLET]);
 const LIST_ITEM = "\u2022 Keep in the outer carton.";
@@ -661,7 +792,11 @@ export const verifyCases: VerifyCase[] = [
         [spanFor(S, 1, INFUSION)],
       ),
     ),
-    expect: { status: "passed", sections: { "smpc.4.1": "verified" } },
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.1": "malformed-narrative" },
+      reasons: { "smpc.4.1": "invisible-character" },
+    },
   },
   // 2.0.0: digits inside `sup` and `sub` fold to script code points, so markup can no longer
   // raise a digit the source prints on the line.
@@ -918,6 +1053,22 @@ export const verifyCases: VerifyCase[] = [
   {
     name: "whitespace-only-div",
     input: toInput(S, single("smpc.4.1", div("<p> \n </p>"), [spanFor(S, 1, INDICATIONS)])),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.1": "malformed-narrative" },
+      reasons: { "smpc.4.1": "empty-narrative" },
+    },
+  },
+  {
+    // fidelity-norm/3.0.0: grid markers are not text a reader sees, so an empty table draws
+    // nothing and a narrative of one is empty.
+    name: "empty-table-div",
+    input: toInput(
+      S,
+      single("smpc.4.1", div("<table><tr><td></td><td> </td></tr></table>"), [
+        spanFor(S, 1, INDICATIONS),
+      ]),
+    ),
     expect: {
       status: "failed",
       sections: { "smpc.4.1": "malformed-narrative" },
@@ -1280,7 +1431,11 @@ export const verifyCases: VerifyCase[] = [
         spanFor(SMOKERS_SOURCE, 1, SMOKERS),
       ]),
     ),
-    expect: { status: "failed", sections: { "smpc.4.4": "mismatch" } },
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.4": "malformed-narrative" },
+      reasons: { "smpc.4.4": "invisible-character" },
+    },
   },
   {
     name: "soft-hyphen-before-raw-line-feed",
@@ -1290,7 +1445,11 @@ export const verifyCases: VerifyCase[] = [
         spanFor(SMOKERS_SOURCE, 1, SMOKERS),
       ]),
     ),
-    expect: { status: "failed", sections: { "smpc.4.4": "mismatch" } },
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.4": "malformed-narrative" },
+      reasons: { "smpc.4.4": "invisible-character" },
+    },
   },
   {
     name: "soft-hyphen-before-raw-line-feed-against-split-word",
@@ -1300,7 +1459,11 @@ export const verifyCases: VerifyCase[] = [
         spanFor(UNSAFE_SPLIT_SOURCE, 1, UNSAFE_SPLIT),
       ]),
     ),
-    expect: { status: "passed", sections: { "smpc.4.4": "verified" } },
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.4": "malformed-narrative" },
+      reasons: { "smpc.4.4": "invisible-character" },
+    },
   },
   {
     name: "soft-hyphen-before-raw-line-feed-against-joined-word",
@@ -1310,7 +1473,11 @@ export const verifyCases: VerifyCase[] = [
         spanFor(UNSAFE_SOURCE, 1, UNSAFE),
       ]),
     ),
-    expect: { status: "failed", sections: { "smpc.4.4": "mismatch" } },
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.4": "malformed-narrative" },
+      reasons: { "smpc.4.4": "invisible-character" },
+    },
   },
   // Row 5: section 2 on the div as received and on each reference as decoded.
   {
@@ -1386,7 +1553,9 @@ export const verifyCases: VerifyCase[] = [
     },
   },
   {
-    name: "spanned-cell-rejected",
+    // fidelity-norm/3.0.0: a span is allowed, and the grid is compared. Two source cells drawn as
+    // one spanned cell is a different table, so it is a mismatch (it rejected in 2.0.0).
+    name: "spanned-cell-against-separate-cells",
     input: toInput(
       S,
       single(
@@ -1397,11 +1566,7 @@ export const verifyCases: VerifyCase[] = [
         [spanFor(S, 3, TABLE)],
       ),
     ),
-    expect: {
-      status: "failed",
-      sections: { "smpc.4.5": "malformed-narrative" },
-      reasons: { "smpc.4.5": "forbidden-attribute" },
-    },
+    expect: { status: "failed", sections: { "smpc.4.5": "mismatch" } },
   },
   {
     name: "merged-cells-uneven-rows-rejected",
@@ -1964,7 +2129,7 @@ export const verifyCases: VerifyCase[] = [
     name: "span-ends-with-thin-space-inside-number",
     input: toInput(
       GROUPED_THIN_THEN_SPACE_SOURCE,
-      single("smpc.4.2.posology", paragraphs("The maximum dose is 10"), [
+      single("smpc.4.2.posology", paragraphs("The maximum dose is 10\u2009"), [
         spanFor(GROUPED_THIN_THEN_SPACE_SOURCE, 1, "The maximum dose is 10\u2009"),
       ]),
     ),
@@ -1975,12 +2140,12 @@ export const verifyCases: VerifyCase[] = [
     },
   },
   {
-    // The inner code point skips every section 3 whitespace code point, the joiners too: a span
-    // ending in U+202F before a space still ends inside the number.
+    // The inner code point skips every gap (section 6), a thin space too: a span ending in U+202F
+    // before a space still ends inside the number, even with the U+202F in the narrative.
     name: "span-ends-with-narrow-no-break-space-inside-number",
     input: toInput(
       GROUPED_NNBSP_THEN_SPACE_SOURCE,
-      single("smpc.4.2.posology", paragraphs("The maximum dose is 10"), [
+      single("smpc.4.2.posology", paragraphs("The maximum dose is 10\u202f"), [
         spanFor(GROUPED_NNBSP_THEN_SPACE_SOURCE, 1, "The maximum dose is 10\u202f"),
       ]),
     ),
@@ -2027,6 +2192,8 @@ export const verifyCases: VerifyCase[] = [
     expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
   },
   {
+    // Since fidelity-norm/3.0.0 a narrative table carries its grid, so it verifies only against a
+    // page that carries the same grid, which this 2.0.0-shaped row does not.
     name: "row-cell-cut-before-tab-against-cell",
     input: toInput(
       INTRO_THEN_ROW_SOURCE,
@@ -2034,7 +2201,7 @@ export const verifyCases: VerifyCase[] = [
         spanFor(INTRO_THEN_ROW_SOURCE, 1, "\u2022 Adults"),
       ]),
     ),
-    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
   },
   // Fix 3 (section 7): a list bullet must be followed by U+0020, not U+0009; with U+0009 the
   // line reads as a table row and a list narrative fails (safe, a false failure).
@@ -2057,6 +2224,553 @@ export const verifyCases: VerifyCase[] = [
       ]),
     ),
     expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  // -------------------------------------------------------------------------------------------
+  // fidelity-norm/3.0.0: an `ol`'s numbers, a table's grid and a picture's source are compared.
+  {
+    name: "ordered-list-number-verifies",
+    input: toInput(
+      NUMBERED_ITEM_SOURCE,
+      single("smpc.4.2.posology", div('<ol start="3"><li>Take one tablet.</li></ol>'), [
+        spanFor(NUMBERED_ITEM_SOURCE, 1, NUMBERED_ITEM),
+      ]),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "ordered-list-other-number-mismatches",
+    input: toInput(
+      NUMBERED_ITEM_SOURCE,
+      single("smpc.4.2.posology", div("<ol><li>Take one tablet.</li></ol>"), [
+        spanFor(NUMBERED_ITEM_SOURCE, 1, NUMBERED_ITEM),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "ordered-list-other-style-mismatches",
+    input: toInput(
+      NUMBERED_ITEM_SOURCE,
+      single("smpc.4.2.posology", div('<ol type="i" start="3"><li>Take one tablet.</li></ol>'), [
+        spanFor(NUMBERED_ITEM_SOURCE, 1, NUMBERED_ITEM),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "row-span-against-row-span-verifies",
+    input: toInput(
+      SPANNED_DOSE_SOURCE,
+      single("smpc.4.2.posology", div(SPANNED_DOSE_TABLE), [
+        spanFor(SPANNED_DOSE_SOURCE, 1, SPANNED_DOSE),
+      ]),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    // The first review's case 3: the same words, but the span draws the dose against every row.
+    name: "row-span-against-empty-cells-mismatches",
+    input: toInput(
+      EMPTY_CELLS_DOSE_SOURCE,
+      single("smpc.4.2.posology", div(SPANNED_DOSE_TABLE), [
+        spanFor(EMPTY_CELLS_DOSE_SOURCE, 1, EMPTY_CELLS_DOSE),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "empty-cells-against-row-span-mismatches",
+    input: toInput(
+      SPANNED_DOSE_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div(
+          "<table><tr><td>Adults</td><td>10 mg</td></tr><tr><td>Children</td><td></td></tr><tr><td>Elderly</td><td></td></tr></table>",
+        ),
+        [spanFor(SPANNED_DOSE_SOURCE, 1, SPANNED_DOSE)],
+      ),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    // 2.0.0's stated residual, closed: a value in another column is a different table.
+    name: "value-in-another-column-mismatches",
+    input: toInput(
+      DOSE_IN_SECOND_COLUMN_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div("<table><tr><td>Adults</td><td></td><td>10 mg</td></tr></table>"),
+        [spanFor(DOSE_IN_SECOND_COLUMN_SOURCE, 1, DOSE_IN_SECOND_COLUMN)],
+      ),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "picture-with-source-bytes-verifies",
+    input: toInput(
+      PICTURE_LINE_SOURCE,
+      single("smpc.4.2.posology", div(`<p>See <img src="${PICTURE_SOURCE}"/> below.</p>`), [
+        spanFor(PICTURE_LINE_SOURCE, 1, PICTURE_LINE),
+      ]),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "picture-with-other-bytes-mismatches",
+    input: toInput(
+      PICTURE_LINE_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div('<p>See <img src="data:image/png;base64,AA=="/> below.</p>'),
+        [spanFor(PICTURE_LINE_SOURCE, 1, PICTURE_LINE)],
+      ),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "picture-missing-mismatches",
+    input: toInput(
+      PICTURE_LINE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("See below."), [
+        spanFor(PICTURE_LINE_SOURCE, 1, PICTURE_LINE),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  // Review round 4: a cell continued across a page break keeps its bullet as content.
+  {
+    name: "cell-across-page-break-keeps-its-bullet",
+    input: toInput(
+      CELL_ACROSS_PAGES_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div("<table><tr><td>Dose</td><td>2 \u2022 10</td></tr></table>"),
+        cellAcrossPagesSpans(),
+      ),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "cell-across-page-break-without-its-bullet-mismatches",
+    input: toInput(
+      CELL_ACROSS_PAGES_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div("<table><tr><td>Dose</td><td>2 10</td></tr></table>"),
+        cellAcrossPagesSpans(),
+      ),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  // Review round 5: a word in a cell hyphenated at a page break is one word.
+  {
+    name: "cell-word-hyphenated-across-page-break-joins",
+    input: toInput(
+      CELL_WORD_ACROSS_PAGES_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div(
+          "<table><tr><td>Dose</td><td>Adults with renal impairment</td><td>10 mg</td></tr></table>",
+        ),
+        cellWordAcrossPagesSpans(),
+      ),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "cell-word-hyphenated-across-page-break-split-mismatches",
+    input: toInput(
+      CELL_WORD_ACROSS_PAGES_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div(
+          "<table><tr><td>Dose</td><td>Adults with renal impair ment</td><td>10 mg</td></tr></table>",
+        ),
+        cellWordAcrossPagesSpans(),
+      ),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  // Review round 6: a row broken across a page keeps each cell's text whole and in slot order.
+  {
+    name: "row-broken-across-page-keeps-its-cells",
+    input: toInput(
+      ROW_ACROSS_PAGES_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div(
+          "<table><tr><td>Dose</td><td>Adults with renal impairment</td><td>10 mg once daily</td><td>Oral</td></tr></table>",
+        ),
+        rowAcrossPagesSpans(),
+      ),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "row-broken-across-page-with-a-word-in-the-next-cell-mismatches",
+    input: toInput(
+      ROW_ACROSS_PAGES_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div(
+          "<table><tr><td>Dose</td><td>Adults with renal</td><td>impairment 10 mg once daily</td><td>Oral</td></tr></table>",
+        ),
+        rowAcrossPagesSpans(),
+      ),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  // Review round 7: tables across a page break (section 7).
+  {
+    name: "page-footnote-between-table-parts-after-the-table",
+    input: toInput(
+      FOOTNOTE_ACROSS_PAGES_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div(
+          "<table><tr><td>Adults</td><td>10 mg\u00b9</td></tr><tr><td>Children</td><td>5 mg</td></tr></table><p>\u00b9 Not studied in hepatic impairment.</p>",
+        ),
+        spansOf(FOOTNOTE_ACROSS_PAGES, FOOTNOTE_ACROSS_PAGES_SOURCE),
+      ),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "page-footnote-moved-into-a-cell-mismatches",
+    input: toInput(
+      FOOTNOTE_ACROSS_PAGES_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div(
+          "<table><tr><td>Adults</td><td>10 mg\u00b9 \u00b9 Not studied in hepatic impairment.</td></tr><tr><td>Children</td><td>5 mg</td></tr></table>",
+        ),
+        spansOf(FOOTNOTE_ACROSS_PAGES, FOOTNOTE_ACROSS_PAGES_SOURCE),
+      ),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "row-span-broken-across-page-keeps-its-slot",
+    input: toInput(
+      SPAN_ACROSS_PAGES_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div(
+          '<table><tr><td rowspan="2">Adults with renal impairment</td><td>10 mg</td></tr><tr><td>5 mg</td></tr></table>',
+        ),
+        spansOf(SPAN_ACROSS_PAGES, SPAN_ACROSS_PAGES_SOURCE),
+      ),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "row-span-word-moved-to-the-next-row-mismatches",
+    input: toInput(
+      SPAN_ACROSS_PAGES_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div(
+          '<table><tr><td rowspan="2">Adults with renal</td><td>10 mg</td></tr><tr><td>impairment 5 mg</td></tr></table>',
+        ),
+        spansOf(SPAN_ACROSS_PAGES, SPAN_ACROSS_PAGES_SOURCE),
+      ),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "repeated-footer-row-where-the-table-last-has-it",
+    input: toInput(
+      FOOTER_ACROSS_PAGES_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div(
+          "<table><tbody><tr><td>a</td><td>1</td></tr><tr><td>b</td><td>1</td></tr></tbody><tfoot><tr><td>Total</td><td>2</td></tr></tfoot></table>",
+        ),
+        spansOf(FOOTER_ACROSS_PAGES, FOOTER_ACROSS_PAGES_SOURCE),
+      ),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "repeated-footer-row-mid-table-mismatches",
+    input: toInput(
+      FOOTER_ACROSS_PAGES_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div(
+          "<table><tr><td>a</td><td>1</td></tr><tr><td>Total</td><td>2</td></tr><tr><td>b</td><td>1</td></tr></table>",
+        ),
+        spansOf(FOOTER_ACROSS_PAGES, FOOTER_ACROSS_PAGES_SOURCE),
+      ),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  // Review round 8: a caption across a page break, a wrap before a bullet, a repeated header row.
+  {
+    name: "caption-across-page-break-keeps-its-bullet",
+    input: toInput(
+      CAPTION_ACROSS_PAGES_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div("<table><caption>Dose 2 \u2022 10 mg</caption><tr><td>A</td></tr></table>"),
+        spansOf(CAPTION_ACROSS_PAGES, CAPTION_ACROSS_PAGES_SOURCE),
+      ),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "caption-across-page-break-without-its-bullet-mismatches",
+    input: toInput(
+      CAPTION_ACROSS_PAGES_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div("<table><caption>Dose 2 10 mg</caption><tr><td>A</td></tr></table>"),
+        spansOf(CAPTION_ACROSS_PAGES, CAPTION_ACROSS_PAGES_SOURCE),
+      ),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "wrap-before-mid-line-bullet-keeps-it",
+    input: toInput(
+      WRAP_BEFORE_BULLET_SOURCE,
+      single("smpc.4.2.posology", paragraphs("Take 2 \u2022 10 mg daily."), [
+        spanFor(WRAP_BEFORE_BULLET_SOURCE, 1, WRAP_BEFORE_BULLET),
+      ]),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "wrap-before-mid-line-bullet-dropped-mismatches",
+    input: toInput(
+      WRAP_BEFORE_BULLET_SOURCE,
+      single("smpc.4.2.posology", paragraphs("Take 2 10 mg daily."), [
+        spanFor(WRAP_BEFORE_BULLET_SOURCE, 1, WRAP_BEFORE_BULLET),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "wrap-before-mid-line-bullet-as-a-list-item-mismatches",
+    input: toInput(
+      WRAP_BEFORE_BULLET_SOURCE,
+      single("smpc.4.2.posology", div("<p>Take 2</p><ul><li>10 mg daily.</li></ul>"), [
+        spanFor(WRAP_BEFORE_BULLET_SOURCE, 1, WRAP_BEFORE_BULLET),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "repeated-header-row-excluded-verifies-once",
+    input: toInput(
+      REPEATED_HEADER_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div(
+          "<table><thead><tr><th>Population</th><th>Dose</th></tr></thead><tbody><tr><td>Adults</td><td>10 mg</td></tr><tr><td>Children</td><td>5 mg</td></tr></tbody></table>",
+        ),
+        spansOf(REPEATED_HEADER_BODIES, REPEATED_HEADER_SOURCE),
+      ),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "repeated-header-row-written-twice-mismatches",
+    input: toInput(
+      REPEATED_HEADER_SOURCE,
+      single(
+        "smpc.4.2.posology",
+        div(
+          "<table><tr><th>Population</th><th>Dose</th></tr><tr><td>Adults</td><td>10 mg</td></tr><tr><th>Population</th><th>Dose</th></tr><tr><td>Children</td><td>5 mg</td></tr></table>",
+        ),
+        spansOf(REPEATED_HEADER_BODIES, REPEATED_HEADER_SOURCE),
+      ),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  // Review round 12: U+1680 is content, drawn as a stroke.
+  {
+    name: "ogham-space-mark-against-a-space-mismatches",
+    input: toInput(
+      OGHAM_SOURCE,
+      single("smpc.4.2.posology", paragraphs(SPACE_LINE), [spanFor(OGHAM_SOURCE, 1, OGHAM_LINE)]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "space-against-an-ogham-space-mark-mismatches",
+    input: toInput(
+      SPACE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("Take 2&#x1680;10 mg daily."), [
+        spanFor(SPACE_SOURCE, 1, SPACE_LINE),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  {
+    name: "hair-space-against-a-space-mismatches",
+    input: toInput(
+      HAIR_SOURCE,
+      single("smpc.4.2.posology", paragraphs("Take 2&#x200A;10 mg tablets."), [
+        spanFor(HAIR_SOURCE, 1, HAIR_LINE),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
+  },
+  // Review round 14: the digit-group rule reads past every gap, content spaces and code points
+  // drawn as nothing included, on both edges.
+  {
+    name: "span-starts-after-thin-space-inside-number",
+    input: toInput(
+      GROUPED_THIN_THEN_SPACE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("000 IU daily."), [
+        spanFor(GROUPED_THIN_THEN_SPACE_SOURCE, 1, " 000 IU daily."),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
+    },
+  },
+  {
+    name: "span-ends-with-invisible-separator-inside-number",
+    input: toInput(
+      GROUPED_INVISIBLE_THEN_SPACE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("The maximum dose is 10&#x2063;"), [
+        spanFor(GROUPED_INVISIBLE_THEN_SPACE_SOURCE, 1, "The maximum dose is 10\u2063"),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
+    },
+  },
+  {
+    name: "span-starts-after-invisible-separator-inside-number",
+    input: toInput(
+      GROUPED_INVISIBLE_THEN_SPACE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("000 IU daily."), [
+        spanFor(GROUPED_INVISIBLE_THEN_SPACE_SOURCE, 1, " 000 IU daily."),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
+    },
+  },
+  // Review round 15: U+2800 and a supplementary-plane Default_Ignorable code point are gaps;
+  // narrative of gaps alone draws nothing inked; U+1680, a stroke, is drawn; U+205F is content.
+  {
+    name: "span-ends-with-braille-blank-inside-number",
+    input: toInput(
+      GROUPED_BLANK_THEN_SPACE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("The maximum dose is 10&#x2800;"), [
+        spanFor(GROUPED_BLANK_THEN_SPACE_SOURCE, 1, "The maximum dose is 10\u2800"),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
+    },
+  },
+  {
+    name: "span-ends-with-tag-space-inside-number",
+    input: toInput(
+      GROUPED_TAG_SPACE_THEN_SPACE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("The maximum dose is 10&#xE0020;"), [
+        spanFor(GROUPED_TAG_SPACE_THEN_SPACE_SOURCE, 1, "The maximum dose is 10\u{E0020}"),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
+    },
+  },
+  {
+    name: "thin-space-alone-is-empty",
+    input: toInput(S, single("smpc.4.1", paragraphs("&#x2009;"), [spanFor(S, 1, INDICATIONS)])),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.1": "malformed-narrative" },
+      reasons: { "smpc.4.1": "empty-narrative" },
+    },
+  },
+  {
+    name: "invisible-separator-and-braille-blank-alone-are-empty",
+    input: toInput(
+      S,
+      single("smpc.4.1", paragraphs("&#x2063;&#x2800;&#x200D;"), [spanFor(S, 1, INDICATIONS)]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.1": "malformed-narrative" },
+      reasons: { "smpc.4.1": "empty-narrative" },
+    },
+  },
+  {
+    name: "ogham-space-mark-alone-is-drawn",
+    input: toInput(
+      OGHAM_ALONE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("&#x1680;"), [
+        spanFor(OGHAM_ALONE_SOURCE, 1, "\u1680"),
+      ]),
+    ),
+    expect: { status: "passed", sections: { "smpc.4.2.posology": "verified" } },
+  },
+  {
+    name: "span-ends-with-yi-blank-inside-number",
+    input: toInput(
+      GROUPED_YI_BLANK_THEN_SPACE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("The maximum dose is 10&#xA4C5;"), [
+        spanFor(GROUPED_YI_BLANK_THEN_SPACE_SOURCE, 1, "The maximum dose is 10\ua4c5"),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.2.posology": "invalid-provenance" },
+      reasons: { "smpc.4.2.posology": "word-cut" },
+    },
+  },
+  {
+    name: "page-with-interlinear-annotation",
+    input: toInput(
+      ANNOTATION_PAGE_SOURCE,
+      single("smpc.4.1", paragraphs("Dose information."), [
+        spanFor(ANNOTATION_PAGE_SOURCE, 1, "Dose information."),
+      ]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.1": "span-not-found" },
+      reasons: { "smpc.4.1": "page-malformed" },
+    },
+  },
+  {
+    name: "blank-letters-alone-are-empty",
+    input: toInput(
+      S,
+      single("smpc.4.1", paragraphs("&#x1878;&#xA4C5;"), [spanFor(S, 1, INDICATIONS)]),
+    ),
+    expect: {
+      status: "failed",
+      sections: { "smpc.4.1": "malformed-narrative" },
+      reasons: { "smpc.4.1": "empty-narrative" },
+    },
+  },
+  {
+    name: "medium-mathematical-space-against-a-space-mismatches",
+    input: toInput(
+      SPACE_SOURCE,
+      single("smpc.4.2.posology", paragraphs("Take 2&#x205F;10 mg daily."), [
+        spanFor(SPACE_SOURCE, 1, SPACE_LINE),
+      ]),
+    ),
+    expect: { status: "failed", sections: { "smpc.4.2.posology": "mismatch" } },
   },
 ];
 
@@ -2243,7 +2957,8 @@ const NORMALIZATION_CASES_2_0_0: NormalizationCase[] = [
     input: "a\u202eb",
     expected: { error: "forbidden-character" },
   },
-  { name: "narrow-no-break-space-after-overrides", input: "a\u202fb", expected: "a b" },
+  // Accepted next to the forbidden overrides; content from fidelity-norm/3.0.0, not a space.
+  { name: "narrow-no-break-space-after-overrides", input: "a\u202fb", expected: "a\u202fb" },
   {
     name: "rejects-bidi-isolate-first",
     input: "a\u2066b",
@@ -2265,13 +2980,38 @@ export const normalizationCases: NormalizationCase[] = [
   { name: "soft-hyphen-crlf", input: "intra­\r\nvenous", expected: "intravenous" },
   { name: "soft-hyphen-then-space-stays", input: "intra­ venous", expected: "intra venous" },
   { name: "ligature-then-combining", input: "ﬁ́", expected: "fí" },
+  // Spaces drawn one or two pixels wide are content (fidelity-norm/3.0.0): "2" U+200A "10" looks
+  // like "210".
+  { name: "hair-space-is-content", input: "Take 2\u200a10 mg", expected: "Take 2\u200a10 mg" },
+  { name: "thin-space-is-content", input: "10\u2009000 IU", expected: "10\u2009000 IU" },
+  { name: "six-per-em-space-is-content", input: "2\u200610", expected: "2\u200610" },
+  {
+    name: "medium-mathematical-space-is-content",
+    input: "Take 2\u205f10 mg",
+    expected: "Take 2\u205f10 mg",
+  },
+  { name: "narrow-no-break-space-is-content", input: "10\u202f000", expected: "10\u202f000" },
+  { name: "four-per-em-space-is-still-a-space", input: "2\u200510", expected: "2 10" },
+  // U+1680 OGHAM SPACE MARK is drawn as a stroke, so it is content (fidelity-norm/3.0.0).
+  {
+    name: "ogham-space-mark-is-content",
+    input: "Take 2\u168010 mg",
+    expected: "Take 2\u168010 mg",
+  },
+  // A picture token is closed by U+FFFC, which composes with nothing, so NFC leaves its digits.
+  {
+    name: "combining-mark-after-picture-token",
+    input: `\ufffc${"e".repeat(64)}\ufffc\u0301x`,
+    expected: `\ufffc${"e".repeat(64)}\ufffc\u0301x`,
+  },
   { name: "plain", input: "Take one tablet daily.", expected: "Take one tablet daily." },
   {
     name: "collapse-whitespace",
     input: "  Take \t one\n\ntablet daily.  ",
     expected: "Take one tablet daily.",
   },
-  { name: "unicode-spaces", input: "a\u2003b\u202fc\u3000d\u2028e", expected: "a b c d e" },
+  // U+202F is content from fidelity-norm/3.0.0 (drawn a pixel or two wide); the others are spaces.
+  { name: "unicode-spaces", input: "a\u2003b\u202fc\u3000d\u2028e", expected: "a b\u202fc d e" },
   { name: "nfc", input: "café", expected: "café" },
   { name: "soft-hyphen", input: "intra­venous", expected: "intravenous" },
   { name: "zero-width", input: "a​b﻿c⁠d", expected: "abcd" },
@@ -2304,6 +3044,11 @@ export const normalizationCases: NormalizationCase[] = [
   { name: "rejects-control", input: "ab", expected: { error: "forbidden-character" } },
   { name: "rejects-delete", input: "ab", expected: { error: "forbidden-character" } },
   { name: "rejects-lone-surrogate", input: "a\uD800b", expected: { error: "forbidden-character" } },
+  {
+    name: "rejects-interlinear-annotation-separator",
+    input: "a\ufffab",
+    expected: { error: "forbidden-character" },
+  },
   // 2.0.0: U+000B and U+000C are rejected on both sides (section 2); the name is kept so the
   // change is reviewable against the 1.1.1 vector of the same name.
   {
@@ -2317,14 +3062,14 @@ export const normalizationCases: NormalizationCase[] = [
 export const xhtmlCases: XhtmlCase[] = [
   // Attribute values are never compared against the source, so they are token-limited.
   {
-    name: "accepts-https-href",
+    name: "rejects-https-link",
     input: div('<p><a href="https://example.org/x/y.html">t</a></p>'),
-    expected: "\n\nt\n\n",
+    expected: { error: "unknown-element" },
   },
   {
     name: "rejects-href-with-query",
     input: div('<p><a href="https://example.org/x?q=text">t</a></p>'),
-    expected: { error: "forbidden-attribute" },
+    expected: { error: "unknown-element" },
   },
   {
     name: "rejects-four-class-tokens",
@@ -2347,7 +3092,7 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "rejects-href-with-trailing-newline",
     input: div('<p><a href="#x\n">t</a></p>'),
-    expected: { error: "forbidden-attribute" },
+    expected: { error: "unknown-element" },
   },
   // `\d` is ASCII in this dialect and Unicode-aware in Python's. A numeric character reference
   // written with fullwidth digits is not a character reference at all: the `&` is stray.
@@ -2364,14 +3109,16 @@ export const xhtmlCases: XhtmlCase[] = [
   { name: "accepts-decimal-entity", input: div("<p>&#65;</p>"), expected: "\n\nA\n\n" },
   // Renderer-generated characters (list numbers, quotation marks) and table sections placed
   // out of document order would show text or an order the source does not contain.
-  { name: "rejects-ol", input: div("<ol><li>a</li></ol>"), expected: { error: "unknown-element" } },
+  // An `ol`'s numbers are emitted as text (fidelity-norm/3.0.0).
+  { name: "accepts-ol", input: div("<ol><li>a</li></ol>"), expected: "\n\n\n1. a\n\n\n" },
   { name: "rejects-q", input: div("<p><q>a</q></p>"), expected: { error: "unknown-element" } },
   {
     name: "accepts-table-section-order",
     input: div(
       "<table><thead><tr><th>h</th></tr></thead><tbody><tr><td>b</td></tr></tbody><tfoot><tr><td>f</td></tr></tfoot></table>",
     ),
-    expected: "\n\n\n\n\th\t\n\n\n\n\tb\t\n\n\n\n\tf\t\n\n\n\n",
+    expected:
+      "\n\n\ufdd0\n\n\ufdd2\t\ufdd3\th\t\n\n\n\n\ufdd2\t\ufdd3\tb\t\n\n\n\n\ufdd2\t\ufdd3\tf\t\n\n\n\ufdd1\n\n",
   },
   {
     name: "rejects-tfoot-before-tbody",
@@ -2412,7 +3159,7 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "accepts-caption-first",
     input: div("<table><caption>c</caption><tr><td>a</td></tr></table>"),
-    expected: "\n\n\nc\n\n\ta\t\n\n\n",
+    expected: "\n\n\ufdd0\nc\n\n\ufdd2\t\ufdd3\ta\t\n\n\ufdd1\n\n",
   },
   {
     name: "rejects-cell-outside-row",
@@ -2424,22 +3171,22 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "rejects-soft-hyphen-before-br",
     input: div("<p>intra&#173;<br/>venous</p>"),
-    expected: { error: "soft-hyphen-at-boundary" },
+    expected: { error: "invisible-character" },
   },
   {
     name: "rejects-soft-hyphen-before-block-end",
     input: div("<h2>intra&#173;</h2><p>venous</p>"),
-    expected: { error: "soft-hyphen-at-boundary" },
+    expected: { error: "invisible-character" },
   },
   {
-    name: "accepts-soft-hyphen-inside-text",
+    name: "rejects-soft-hyphen-inside-text",
     input: div("<p>intra&#173;venous</p>"),
-    expected: "\n\nintra­venous\n\n",
+    expected: { error: "invisible-character" },
   },
   {
     name: "rejects-javascript-href",
     input: div('<p><a href="javascript:alert(1)">t</a></p>'),
-    expected: { error: "forbidden-attribute" },
+    expected: { error: "unknown-element" },
   },
   {
     name: "rejects-duplicate-attribute",
@@ -2469,7 +3216,7 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "table",
     input: div("<table><tr><td>a</td><td>b</td></tr></table>"),
-    expected: "\n\n\n\ta\t\tb\t\n\n\n",
+    expected: "\n\n\ufdd0\n\ufdd2\t\ufdd3\ta\t\t\ufdd3\tb\t\n\n\ufdd1\n\n",
   },
   {
     name: "entities",
@@ -2507,7 +3254,7 @@ export const xhtmlCases: XhtmlCase[] = [
   },
   {
     name: "rejects-unknown-element",
-    input: div("<p>a</p><img/>"),
+    input: div("<p>a</p><iframe/>"),
     expected: { error: "unknown-element" },
   },
   {
@@ -2593,7 +3340,7 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "rejects-self-closing-anchor",
     input: div('<p><a href="https://example.org/"/>text</p>'),
-    expected: { error: "void-element" },
+    expected: { error: "unknown-element" },
   },
   {
     name: "rejects-self-closing-li",
@@ -2833,47 +3580,47 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "soft-hyphen-before-raw-lf-is-a-space",
     input: div("<p>non&#173;\nsmokers</p>"),
-    expected: "\n\nnon\u00ad smokers\n\n",
+    expected: { error: "invisible-character" },
   },
   {
     name: "soft-hyphen-before-lf-reference-is-a-space",
     input: div("<p>non&#173;&#10;smokers</p>"),
-    expected: "\n\nnon\u00ad smokers\n\n",
+    expected: { error: "invisible-character" },
   },
   {
     name: "soft-hyphen-cr-then-br-is-a-space",
     input: div("<p>non&#173;&#13;<br/>smokers</p>"),
-    expected: "\n\nnon\u00ad \nsmokers\n\n",
+    expected: { error: "invisible-character" },
   },
   {
     name: "raw-soft-hyphen-before-crlf-is-a-space",
     input: div("<p>non\u00ad\r\nsmokers</p>"),
-    expected: "\n\nnon\u00ad  smokers\n\n",
+    expected: { error: "invisible-character" },
   },
   {
     name: "rejects-soft-hyphen-before-hr",
     input: div("<p>non\u00ad<hr/>smokers</p>"),
-    expected: { error: "soft-hyphen-at-boundary" },
+    expected: { error: "invisible-character" },
   },
   {
-    name: "accepts-soft-hyphen-before-cr-alone",
+    name: "rejects-soft-hyphen-before-cr-alone",
     input: div("<p>non&#173;&#13;smokers</p>"),
-    expected: "\n\nnon\u00ad smokers\n\n",
+    expected: { error: "invisible-character" },
   },
   {
-    name: "accepts-soft-hyphen-before-space",
+    name: "rejects-soft-hyphen-before-space",
     input: div("<p>non&#173; smokers</p>"),
-    expected: "\n\nnon\u00ad smokers\n\n",
+    expected: { error: "invisible-character" },
   },
   {
     name: "soft-hyphen-decided-after-scan",
-    input: div("<p>non&#173;</p><img/>"),
-    expected: { error: "unknown-element" },
+    input: div("<p>non&#173;</p><iframe/>"),
+    expected: { error: "invisible-character" },
   },
   {
     name: "unbalanced-before-soft-hyphen",
     input: `<div ${XHTML}><p>non&#173;</p>`,
-    expected: { error: "unbalanced-tag" },
+    expected: { error: "invisible-character" },
   },
   // Section 2 on the div as received, markup included, and on each reference as decoded.
   {
@@ -3017,7 +3764,7 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "rejects-fragment-href",
     input: div('<p><a href="#x">t</a></p>'),
-    expected: { error: "forbidden-attribute" },
+    expected: { error: "unknown-element" },
   },
   {
     name: "rejects-scope-on-td",
@@ -3027,17 +3774,25 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "accepts-scope-on-th",
     input: div('<table><tr><th scope="row">h</th><td>a</td></tr></table>'),
-    expected: "\n\n\n\th\t\ta\t\n\n\n",
+    expected: "\n\n\ufdd0\n\ufdd2\t\ufdd3\th\t\t\ufdd3\ta\t\n\n\ufdd1\n\n",
   },
   {
-    name: "rejects-colspan",
+    name: "accepts-colspan",
+    input: div('<table><tr><td colspan="2">a</td></tr><tr><td>b</td><td>c</td></tr></table>'),
+    expected:
+      "\n\n\ufdd0\n\ufdd2\t\ufdd3\ta\t\t\ufdd4\t\n\n\ufdd2\t\ufdd3\tb\t\t\ufdd3\tc\t\n\n\ufdd1\n\n",
+  },
+  {
+    // A column in which no cell spanning one column starts is drawn at zero width.
+    name: "rejects-column-no-single-cell-starts-in",
     input: div('<table><tr><td colspan="2">a</td></tr></table>'),
-    expected: { error: "forbidden-attribute" },
+    expected: { error: "table-shape" },
   },
   {
-    name: "rejects-rowspan",
+    // A renderer clips a row span that runs past its row group.
+    name: "rejects-rowspan-past-group",
     input: div('<table><tr><td rowspan="2">a</td></tr></table>'),
-    expected: { error: "forbidden-attribute" },
+    expected: { error: "table-shape" },
   },
   {
     name: "rejects-root-attribute-before-missing-namespace",
@@ -3090,7 +3845,8 @@ export const xhtmlCases: XhtmlCase[] = [
     input: div(
       "<table>\n <thead>\t<tr>\r\n<th>h</th> </tr></thead>\n<tbody> <tr><td>a</td></tr> </tbody></table>",
     ),
-    expected: "\n\n  \n\t\n  \th\t \n\n \n \n\ta\t\n \n\n\n",
+    expected:
+      "\n\n\ufdd0  \n\t\n\ufdd2  \t\ufdd3\th\t \n\n \n \n\ufdd2\t\ufdd3\ta\t\n \n\n\ufdd1\n\n",
   },
   {
     name: "rejects-span-in-table",
@@ -3123,11 +3879,12 @@ export const xhtmlCases: XhtmlCase[] = [
     expected: { error: "misnested-tag" },
   },
   {
-    name: "accepts-nested-table-in-cell",
+    // A table inside a cell is refused, so the grid text never nests (fidelity-norm/3.0.0).
+    name: "rejects-nested-table-in-cell",
     input: div(
       "<table><tr><td><table><tr><td>a</td><td>b</td></tr></table></td></tr><tr><td>c</td></tr></table>",
     ),
-    expected: "\n\n\n\t\t\t\ta\t\tb\t\t\t\t\n\n\tc\t\n\n\n",
+    expected: { error: "table-structure" },
   },
   {
     name: "rejects-uneven-rows",
@@ -3144,23 +3901,28 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "rejects-uneven-nested-table",
     input: div("<table><tr><td><table><tr><td>a</td></tr><tr></tr></table></td></tr></table>"),
-    expected: { error: "table-shape" },
+    expected: { error: "table-structure" },
   },
   {
     name: "accepts-header-and-data-cells",
     input: div("<table><tr><th>h</th><td>a</td></tr><tr><td>b</td><td>c</td></tr></table>"),
-    expected: "\n\n\n\th\t\ta\t\n\n\tb\t\tc\t\n\n\n",
+    expected:
+      "\n\n\ufdd0\n\ufdd2\t\ufdd3\th\t\t\ufdd3\ta\t\n\n\ufdd2\t\ufdd3\tb\t\t\ufdd3\tc\t\n\n\ufdd1\n\n",
   },
-  { name: "accepts-empty-table", input: div("<table></table>"), expected: "\n\n\n\n" },
+  {
+    name: "accepts-empty-table",
+    input: div("<table></table>"),
+    expected: "\n\n\ufdd0\n\ufdd1\n\n",
+  },
   {
     name: "accepts-caption-only-table",
     input: div("<table><caption>c</caption></table>"),
-    expected: "\n\n\nc\n\n\n",
+    expected: "\n\n\ufdd0\nc\n\n\ufdd1\n\n",
   },
   {
     name: "accepts-empty-rows",
     input: div("<table><tr></tr><tr></tr></table>"),
-    expected: "\n\n\n\n\n\n\n\n",
+    expected: "\n\n\ufdd0\n\ufdd2\n\n\ufdd2\n\n\ufdd1\n\n",
   },
   {
     name: "rejects-empty-and-full-row",
@@ -3176,7 +3938,7 @@ export const xhtmlCases: XhtmlCase[] = [
   },
   {
     name: "rejects-unknown-before-root",
-    input: `<img ${XHTML}/>`,
+    input: `<iframe ${XHTML}/>`,
     expected: { error: "unknown-element" },
   },
   {
@@ -3225,7 +3987,7 @@ export const xhtmlCases: XhtmlCase[] = [
   {
     name: "accepts-ascii-whitespace-in-tags",
     input: `<div\n${XHTML}\r\n><p\t>a<br\t/>b</p ><table\n><tr ><td\r>c</td\n></tr></table></div\t>`,
-    expected: "\n\na\nb\n\n\n\tc\t\n\n\n",
+    expected: "\n\na\nb\n\n\ufdd0\n\ufdd2\t\ufdd3\tc\t\n\n\ufdd1\n\n",
   },
   // Second review, round 2, item 1: a line break in text is emitted as a space.
   {
@@ -3261,18 +4023,18 @@ export const xhtmlCases: XhtmlCase[] = [
   // Item 3: cells are U+0009-separated, and so is everything inside a cell.
   {
     name: "cell-breaks-are-tabs",
-    input: div("<table><tr><td><p>a</p>b<br/>c<hr/></td></tr></table>"),
-    expected: "\n\n\n\t\ta\tb\tc\t\t\t\n\n\n",
+    input: div("<table><tr><td><p>a</p>b<br/>c</td></tr></table>"),
+    expected: "\n\n\ufdd0\n\ufdd2\t\ufdd3\t\ta\tb\tc\t\n\n\ufdd1\n\n",
   },
   {
-    name: "accepts-soft-hyphen-before-br-in-cell",
+    name: "rejects-soft-hyphen-before-br-in-cell",
     input: div("<table><tr><td>intra&#173;<br/>venous</td></tr></table>"),
-    expected: "\n\n\n\tintra\u00ad\tvenous\t\n\n\n",
+    expected: { error: "invisible-character" },
   },
   {
     name: "rejects-soft-hyphen-before-caption-end",
     input: div("<table><caption>intra&#173;</caption></table>"),
-    expected: { error: "soft-hyphen-at-boundary" },
+    expected: { error: "invisible-character" },
   },
   // Item 4: the other kind of script letter, and any other symbol, bracket or dash, rejects.
   {
@@ -3339,5 +4101,699 @@ export const xhtmlCases: XhtmlCase[] = [
     name: "sup-slash-kept",
     input: div("<p><sup>1/2</sup></p>"),
     expected: "\n\n\u00b9/\u00b2\n\n",
+  },
+  // -------------------------------------------------------------------------------------------
+  // fidelity-norm/3.0.0: numbered lists, table grids and pictures.
+  {
+    name: "accepts-ol-start",
+    input: div('<ol start="3"><li>Take</li></ol>'),
+    expected: "\n\n\n3. Take\n\n\n",
+  },
+  {
+    name: "accepts-ol-alpha-past-z",
+    input: div(
+      '<ol type="a"><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li><li>x</li></ol>',
+    ),
+    expected:
+      "\n\n\na. x\n\nb. x\n\nc. x\n\nd. x\n\ne. x\n\nf. x\n\ng. x\n\nh. x\n\ni. x\n\nj. x\n\nk. x\n\nl. x\n\nm. x\n\nn. x\n\no. x\n\np. x\n\nq. x\n\nr. x\n\ns. x\n\nt. x\n\nu. x\n\nv. x\n\nw. x\n\nx. x\n\ny. x\n\nz. x\n\naa. x\n\n\n",
+  },
+  {
+    name: "accepts-ol-upper-roman-from-negative",
+    input: div('<ol type="I" start="-1"><li>a</li><li>b</li><li>c</li></ol>'),
+    expected: "\n\n\n-1. a\n\n0. b\n\nI. c\n\n\n",
+  },
+  {
+    name: "accepts-ol-roman-past-range",
+    input: div('<ol type="i" start="3998"><li>a</li><li>b</li><li>c</li></ol>'),
+    expected: "\n\n\nmmmcmxcviii. a\n\nmmmcmxcix. b\n\n4000. c\n\n\n",
+  },
+  {
+    name: "accepts-ol-upper-alpha-large",
+    input: div('<ol type="A" start="703"><li>a</li></ol>'),
+    expected: "\n\n\nAAA. a\n\n\n",
+  },
+  {
+    name: "accepts-ol-nested-restarts-decimal",
+    input: div('<ol type="a"><li>x<ol><li>y</li></ol></li><li>z</li></ol>'),
+    expected: "\n\n\na. x\n\n1. y\n\n\n\nb. z\n\n\n",
+  },
+  {
+    name: "accepts-ol-in-cell",
+    input: div('<table><tr><td><ol start="2"><li>a</li></ol></td></tr></table>'),
+    expected: "\n\n\ufdd0\n\ufdd2\t\ufdd3\t\t\t2. a\t\t\t\n\n\ufdd1\n\n",
+  },
+  {
+    name: "accepts-ol-whitespace-between-items",
+    input: div("<ol>\n <li>a</li>\t<li>b</li>\r\n</ol>"),
+    expected: "\n\n  \n1. a\n\t\n2. b\n  \n\n",
+  },
+  {
+    name: "accepts-ul-items-emit-nothing",
+    input: div("<ul><li>a</li><li>b</li></ul>"),
+    expected: "\n\n\na\n\nb\n\n\n",
+  },
+  {
+    name: "rejects-text-in-ol",
+    input: div("<ol> text <li>x</li></ol>"),
+    expected: { error: "list-content" },
+  },
+  {
+    name: "rejects-p-in-ul",
+    input: div("<ul><p>x</p></ul>"),
+    expected: { error: "list-content" },
+  },
+  {
+    name: "rejects-reference-in-ol",
+    input: div("<ol>&#32;<li>a</li></ol>"),
+    expected: { error: "list-content" },
+  },
+  {
+    name: "rejects-li-in-li",
+    input: div("<ol><li>a<li>b</li></li></ol>"),
+    expected: { error: "misnested-tag" },
+  },
+  {
+    name: "rejects-li-in-div",
+    input: div("<div><li>x</li></div>"),
+    expected: { error: "misnested-tag" },
+  },
+  {
+    name: "rejects-li-in-blockquote-in-li",
+    input: div("<ol><li>a<blockquote><li>b</li></blockquote></li></ol>"),
+    expected: { error: "misnested-tag" },
+  },
+  {
+    name: "rejects-ol-reversed",
+    input: div('<ol reversed="reversed"><li>a</li></ol>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-ol-start-negative-zero",
+    input: div('<ol start="-0"><li>a</li></ol>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-ol-start-leading-zero",
+    input: div('<ol start="007"><li>a</li></ol>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-ol-start-five-digits",
+    input: div('<ol start="10000"><li>a</li></ol>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-ol-type-disc",
+    input: div('<ol type="disc"><li>a</li></ol>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-li-value",
+    input: div('<ol><li value="3">a</li></ol>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-ul-start",
+    input: div('<ul start="2"><li>a</li></ul>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "accepts-rowspan-grid",
+    input: div(
+      '<table><tr><td rowspan="2">A</td><td>B</td><td>C</td></tr><tr><td>D</td><td>E</td></tr></table>',
+    ),
+    expected:
+      "\n\n\ufdd0\n\ufdd2\t\ufdd3\tA\t\t\ufdd3\tB\t\t\ufdd3\tC\t\n\n\ufdd2\t\ufdd5\t\t\ufdd3\tD\t\t\ufdd3\tE\t\n\n\ufdd1\n\n",
+  },
+  {
+    name: "accepts-rowspan-trailing-slot",
+    input: div(
+      '<table><tr><td>a</td><td>b</td><td rowspan="2">c</td></tr><tr><td>d</td><td>e</td></tr></table>',
+    ),
+    expected:
+      "\n\n\ufdd0\n\ufdd2\t\ufdd3\ta\t\t\ufdd3\tb\t\t\ufdd3\tc\t\n\n\ufdd2\t\ufdd3\td\t\t\ufdd3\te\t\t\ufdd5\t\n\n\ufdd1\n\n",
+  },
+  {
+    name: "accepts-colspan-and-rowspan",
+    input: div(
+      '<table><caption>Cap</caption><tr><td colspan="2" rowspan="2">X</td><td>a</td></tr><tr><td>b</td></tr><tr><td>c</td><td></td><td>d</td></tr></table>',
+    ),
+    expected:
+      "\n\n\ufdd0\nCap\n\n\ufdd2\t\ufdd3\tX\t\t\ufdd4\t\t\ufdd3\ta\t\n\n\ufdd2\t\ufdd5\t\t\ufdd5\t\t\ufdd3\tb\t\n\n\ufdd2\t\ufdd3\tc\t\t\ufdd3\t\t\t\ufdd3\td\t\n\n\ufdd1\n\n",
+  },
+  {
+    name: "accepts-rowspan-to-group-end",
+    input: div(
+      '<table><thead><tr><th>h</th><th>i</th></tr></thead><tbody><tr><td rowspan="2">a</td><td>b</td></tr><tr><td>c</td></tr></tbody></table>',
+    ),
+    expected:
+      "\n\n\ufdd0\n\n\ufdd2\t\ufdd3\th\t\t\ufdd3\ti\t\n\n\n\n\ufdd2\t\ufdd3\ta\t\t\ufdd3\tb\t\n\n\ufdd2\t\ufdd5\t\t\ufdd3\tc\t\n\n\n\ufdd1\n\n",
+  },
+  {
+    name: "rejects-colspan-1001",
+    input: div('<table><tr><td colspan="1001">a</td></tr></table>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-colspan-zero",
+    input: div('<table><tr><td colspan="0">a</td></tr></table>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-rowspan-leading-zero",
+    input: div('<table><tr><td rowspan="02">a</td></tr></table>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-span-overlap",
+    input: div(
+      '<table><tr><td>Adults</td><td rowspan="2">10 mg</td></tr><tr><td colspan="2">Children</td></tr></table>',
+    ),
+    expected: { error: "table-shape" },
+  },
+  {
+    name: "rejects-rowspan-into-tbody",
+    input: div(
+      '<table><thead><tr><td rowspan="2">a</td><td>b</td></tr></thead><tbody><tr><td>c</td></tr></tbody></table>',
+    ),
+    expected: { error: "table-shape" },
+  },
+  {
+    name: "rejects-rowspan-past-bare-rows",
+    input: div('<table><tr><td rowspan="3">a</td><td>b</td></tr><tr><td>c</td></tr></table>'),
+    expected: { error: "table-shape" },
+  },
+  {
+    name: "accepts-colspan-counted-in-width",
+    input: div(
+      '<table><tr><td colspan="2">a</td><td>b</td></tr><tr><td>1</td><td>2</td><td>3</td></tr></table>',
+    ),
+    expected:
+      "\n\n\ufdd0\n\ufdd2\t\ufdd3\ta\t\t\ufdd4\t\t\ufdd3\tb\t\n\n\ufdd2\t\ufdd3\t1\t\t\ufdd3\t2\t\t\ufdd3\t3\t\n\n\ufdd1\n\n",
+  },
+  {
+    name: "rejects-colspan-ragged",
+    input: div(
+      '<table><tr><td colspan="2">a</td><td>b</td></tr><tr><td>1</td><td>2</td></tr></table>',
+    ),
+    expected: { error: "table-shape" },
+  },
+  {
+    name: "rejects-row-with-hole",
+    input: div(
+      '<table><tr><td>a</td><td>b</td><td rowspan="2">c</td></tr><tr><td>d</td></tr></table>',
+    ),
+    expected: { error: "table-shape" },
+  },
+  {
+    // A reference draws whatever the viewer's origin serves, or nothing: only `data:` is bound.
+    name: "rejects-picture-reference",
+    input: div('<p>see <img src="~/_entity/annotation/0c1d"/> here</p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-picture-relative-path",
+    input: div('<p><img src="images/logo.png"/></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "accepts-picture-data",
+    input: div('<p><img src="data:image/png;base64,AA=="/>x</p>'),
+    expected:
+      "\n\n\ufffce2c4bf98685a8d0674e42fe055e6768d7da848691d4fa7c9dbd5b0703d9dfaf4\ufffcx\n\n",
+  },
+  {
+    name: "accepts-combining-mark-after-picture",
+    input: div('<p><img src="data:image/png;base64,AA=="/>&#x301;x</p>'),
+    expected:
+      "\n\n\ufffce2c4bf98685a8d0674e42fe055e6768d7da848691d4fa7c9dbd5b0703d9dfaf4\ufffc\u0301x\n\n",
+  },
+  {
+    name: "rejects-table-in-caption",
+    input: div(
+      "<table><caption>X<table><tr><td>y</td></tr></table></caption><tr><td>z</td></tr></table>",
+    ),
+    expected: { error: "table-structure" },
+  },
+  {
+    name: "rejects-table-over-slot-limit",
+    input: div(`<table>${'<tr><td colspan="1000">a</td></tr>'.repeat(51)}</table>`),
+    expected: { error: "table-size" },
+  },
+  {
+    name: "rejects-picture-alt",
+    input: div('<p><img src="data:image/png;base64,AA==" alt="Take 10 mg"/></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-picture-without-source",
+    input: div("<p><img/></p>"),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-picture-start-tag",
+    input: div('<p><img src="data:image/png;base64,AA=="></img></p>'),
+    expected: { error: "void-element" },
+  },
+  {
+    name: "rejects-picture-javascript",
+    input: div('<p><img src="javascript:x"/></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-picture-protocol-relative",
+    input: div('<p><img src="//evil/x"/></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-picture-parent-segment",
+    input: div('<p><img src="a/../x"/></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-picture-dot-segment",
+    input: div('<p><img src="./x"/></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-picture-absolute-path",
+    input: div('<p><img src="/x"/></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-picture-https",
+    input: div('<p><img src="https://example.org/x"/></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-picture-svg-data",
+    input: div('<p><img src="data:image/svg+xml;base64,AAAA"/></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-picture-data-length",
+    input: div('<p><img src="data:image/png;base64,AAAAA"/></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-picture-data-inner-padding",
+    input: div('<p><img src="data:image/png;base64,AA=A"/></p>'),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "rejects-picture-in-sup",
+    input: div('<p>10<sup><img src="data:image/png;base64,AA=="/></sup></p>'),
+    expected: { error: "script-content" },
+  },
+  {
+    name: "rejects-picture-in-row",
+    input: div('<table><tr><img src="data:image/png;base64,AA=="/></tr></table>'),
+    expected: { error: "table-content" },
+  },
+  {
+    name: "rejects-reserved-object-replacement",
+    input: div("<p>&#xFFFC;</p>"),
+    expected: { error: "reserved-character" },
+  },
+  {
+    name: "rejects-reserved-raw-cell-marker",
+    input: div("<p>\ufdd3</p>"),
+    expected: { error: "reserved-character" },
+  },
+  {
+    name: "rejects-reserved-before-table-content",
+    input: div("<table><tr>&#xFFFC;</tr></table>"),
+    expected: { error: "reserved-character" },
+  },
+  {
+    name: "rejects-reserved-before-unmappable",
+    input: div("<p><sup>&#xFDD0;</sup></p>"),
+    expected: { error: "reserved-character" },
+  },
+  {
+    name: "rejects-reserved-last-noncharacter",
+    input: div("<p>&#xFDEF;</p>"),
+    expected: { error: "reserved-character" },
+  },
+  {
+    name: "accepts-near-reserved",
+    input: div("<p>&#xFDCF;&#xFDF0;&#xFFF8;</p>"),
+    expected: "\n\n\ufdcf\ufdf0\ufff8\n\n",
+  },
+  {
+    // Review round 3: a row in which a cell starts, but every such cell spans down, is drawn at
+    // zero height, so 600 mg reads against Children only.
+    name: "rejects-row-whose-cells-all-span-down",
+    input: div(
+      '<table><tr><th>Population</th><th>Dose</th></tr><tr><td rowspan="2">Adults</td><td>400 mg</td></tr><tr><td rowspan="2">600 mg</td></tr><tr><td>Children</td></tr></table>',
+    ),
+    expected: { error: "table-shape" },
+  },
+  {
+    name: "accepts-row-with-a-single-row-cell-beside-a-span",
+    input: div(
+      '<table><tr><td rowspan="2">Adults</td><td>400 mg</td></tr><tr><td>600 mg</td></tr></table>',
+    ),
+    expected:
+      "\n\n\ufdd0\n\ufdd2\t\ufdd3\tAdults\t\t\ufdd3\t400 mg\t\n\n\ufdd2\t\ufdd5\t\t\ufdd3\t600 mg\t\n\n\ufdd1\n\n",
+  },
+  // Review round 3: the precedence rules section 5 states, each pinned.
+  {
+    name: "forbidden-character-before-reserved-character",
+    input: div("<p>\ufdd0\u0001</p>"),
+    expected: { error: "forbidden-character" },
+  },
+  {
+    name: "missing-picture-source-before-void-element",
+    input: div("<p><img></img></p>"),
+    expected: { error: "forbidden-attribute" },
+  },
+  {
+    name: "overlap-before-table-size",
+    input: div(
+      `<table><tr><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td><td>a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr><tr><td colspan="1000">a</td></tr></table><table><tr><td>a</td><td rowspan="2">b</td></tr><tr><td colspan="1000">c</td></tr></table>`,
+    ),
+    expected: { error: "table-shape" },
+  },
+  {
+    name: "accepts-two-trailing-covered-slots",
+    input: div(
+      '<table><tr><td>a</td><td rowspan="2">b</td><td rowspan="2">c</td></tr><tr><td>d</td></tr></table>',
+    ),
+    expected:
+      "\n\n\ufdd0\n\ufdd2\t\ufdd3\ta\t\t\ufdd3\tb\t\t\ufdd3\tc\t\n\n\ufdd2\t\ufdd3\td\t\t\ufdd5\t\t\ufdd5\t\n\n\ufdd1\n\n",
+  },
+  // Review round 13: nesting, "]]>", composition across inline markup, invisible breaks.
+  {
+    name: "accepts-nesting-32-below-root",
+    input: div(
+      "<span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span>x</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span>",
+    ),
+    expected: "\nx\n",
+  },
+  {
+    name: "rejects-nesting-33-below-root",
+    input: div(
+      "<span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span>x</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span>",
+    ),
+    expected: { error: "nesting-depth" },
+  },
+  {
+    name: "rejects-small-inside-small",
+    input: div("<p>Do <small><small>not</small></small> exceed.</p>"),
+    expected: { error: "nesting-depth" },
+  },
+  {
+    name: "rejects-heading-inside-heading",
+    input: div("<h1>a<h2>b</h2></h1>"),
+    expected: { error: "nesting-depth" },
+  },
+  {
+    name: "accepts-six-indenting-containers",
+    input: div(
+      "<blockquote><blockquote><blockquote><blockquote><blockquote><blockquote><p>x</p></blockquote></blockquote></blockquote></blockquote></blockquote></blockquote>",
+    ),
+    expected: "\n\n\n\n\n\n\n\nx\n\n\n\n\n\n\n\n",
+  },
+  {
+    name: "rejects-seven-indenting-containers",
+    input: div(
+      "<blockquote><blockquote><blockquote><blockquote><blockquote><blockquote><blockquote><p>x</p></blockquote></blockquote></blockquote></blockquote></blockquote></blockquote></blockquote>",
+    ),
+    expected: { error: "nesting-depth" },
+  },
+  {
+    name: "rejects-seven-indents-mixing-lists",
+    input: div(
+      "<ul><li><ol><li><blockquote><ul><li><ol><li><dl><dd><blockquote>x</blockquote></dd></dl></li></ol></li></ul></blockquote></li></ol></li></ul>",
+    ),
+    expected: { error: "nesting-depth" },
+  },
+  {
+    name: "rejects-cdata-end-in-text",
+    input: div("<p>a[b[0]]> 5</p>"),
+    expected: { error: "cdata" },
+  },
+  {
+    name: "accepts-cdata-end-escaped",
+    input: div("<p>a[b[0]]&gt; 5</p>"),
+    expected: "\n\na[b[0]]> 5\n\n",
+  },
+  {
+    name: "rejects-not-less-than-across-bold",
+    input: div("<p>CrCl &lt;<b>&#x338;</b> 30 ml/min</p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "rejects-not-equal-across-sup",
+    input: div("<p>x =<sup>&#x338;</sup> y</p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "rejects-acute-across-bold",
+    input: div("<p>caf<b>e</b>&#x301;</p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "rejects-acute-after-ligature-across-bold",
+    input: div("<p>\ufb01<b>&#x301;</b></p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "accepts-acute-inside-one-run",
+    input: div("<p><b>cafe&#x301;</b></p>"),
+    expected: "\n\ncafe\u0301\n\n",
+  },
+  {
+    name: "rejects-zero-width-space",
+    input: div("<p>Take 2\u200b10 mg</p>"),
+    expected: { error: "invisible-character" },
+  },
+  {
+    name: "rejects-zero-width-space-reference",
+    input: div("<p>Take 2&#x200B;10 mg</p>"),
+    expected: { error: "invisible-character" },
+  },
+  {
+    name: "rejects-soft-hyphen-in-a-number",
+    input: div("<p>Take 2&#xAD;10 mg</p>"),
+    expected: { error: "invisible-character" },
+  },
+  // Review round 14: marks after inline tags, the shrink bound, and precedence pinned.
+  {
+    name: "rejects-mark-that-does-not-compose-after-bold",
+    input: div("<p>CrCl &#x2A7D;<b>&#x338;</b> 30</p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "rejects-acute-after-q-across-bold",
+    input: div("<p>q<b>&#x301;</b></p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "rejects-mark-after-a-long-run-across-bold",
+    input: div(
+      "<p>e&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;&#x316;<b>&#x301;</b></p>",
+    ),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "rejects-hangul-vowel-across-bold",
+    input: div("<p>&#x1100;<b>&#x1161;</b></p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "accepts-mark-before-an-end-tag",
+    input: div("<p><b>e&#x301;</b>x</p>"),
+    expected: "\n\ne\u0301x\n\n",
+  },
+  {
+    name: "rejects-small-inside-code",
+    input: div("<p><code>a<small>b</small></code></p>"),
+    expected: { error: "nesting-depth" },
+  },
+  {
+    name: "rejects-small-inside-h6",
+    input: div("<h6>a<small>b</small></h6>"),
+    expected: { error: "nesting-depth" },
+  },
+  {
+    name: "accepts-sup-inside-h6",
+    input: div("<h6>10<sup>9</sup></h6>"),
+    expected: "\n\n10\u2079\n\n",
+  },
+  {
+    name: "nesting-depth-before-parent-check",
+    input: div(
+      "<span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><li>x</li></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span>",
+    ),
+    expected: { error: "nesting-depth" },
+  },
+  {
+    name: "void-element-counts-toward-depth",
+    input: div(
+      "<span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><span><br/></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span>",
+    ),
+    expected: { error: "nesting-depth" },
+  },
+  {
+    name: "reserved-before-invisible-character",
+    input: div("<p>\u00ad\ufffc</p>"),
+    expected: { error: "reserved-character" },
+  },
+  {
+    name: "cdata-end-before-unmappable-script",
+    input: div("<p><sup>]]></sup></p>"),
+    expected: { error: "cdata" },
+  },
+  {
+    name: "table-content-before-cdata-end",
+    input: div("<table><tr>]]></tr></table>"),
+    expected: { error: "table-content" },
+  }, // Review round 15: a mark after code points drawn as nothing, marks of every kind, the shrink
+  // bound for h5, and signs under an underline.
+  {
+    name: "rejects-mark-after-word-joiner-across-bold",
+    input: div("<p>q<b>&#x2060;&#x301;</b></p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "rejects-mark-after-bom-after-end-tag",
+    input: div("<p><b>q</b>&#xFEFF;&#x301;</p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "rejects-stroke-after-word-joiner-across-bold",
+    input: div("<p>&#x2A7D;<b>&#x2060;&#x338;</b> 30</p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "rejects-stroke-after-invisible-separator-across-bold",
+    input: div("<p>CrCl &lt;<b>&#x2063;&#x338;</b> 30</p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "rejects-mark-after-zero-width-joiner-across-bold",
+    input: div("<p>q<b>&#x200D;&#x301;</b></p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "accepts-word-joiner-then-letter-across-bold",
+    input: div("<p>q<b>&#x2060;x</b></p>"),
+    expected: "\n\nq\u2060x\n\n",
+  },
+  {
+    name: "accepts-space-then-mark-across-bold",
+    input: div("<p>q<b> &#x301;</b></p>"),
+    expected: "\n\nq \u0301\n\n",
+  },
+  {
+    name: "rejects-spacing-mark-across-bold",
+    input: div("<p>&#x915;<b>&#x93E;</b></p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "rejects-enclosing-mark-across-bold",
+    input: div("<p>1<b>&#x20DD;</b></p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "rejects-small-inside-h5",
+    input: div("<h5>a<small>b</small></h5>"),
+    expected: { error: "nesting-depth" },
+  },
+  // Review round 16: underline and links are refused (an underline turns a sign into another,
+  // and no closed list of code points bounds which), and a mark that is itself ignorable.
+  // Review round 17: a rule in a cell or a caption is drawn as a fraction bar.
+  {
+    name: "rejects-rule-in-cell",
+    input: div("<table><tr><td>Take</td><td>1<hr/>2</td><td>tablet daily</td></tr></table>"),
+    expected: { error: "table-content" },
+  },
+  {
+    name: "rejects-rule-in-header-cell",
+    input: div("<table><tr><th>1<hr/>2</th></tr></table>"),
+    expected: { error: "table-content" },
+  },
+  {
+    name: "rejects-rule-in-caption",
+    input: div("<table><caption>1<hr/>4</caption><tr><td>x</td></tr></table>"),
+    expected: { error: "table-content" },
+  },
+  {
+    name: "rejects-rule-in-block-in-cell",
+    input: div("<table><tr><td><div>1<hr/>2</div></td></tr></table>"),
+    expected: { error: "table-content" },
+  },
+  {
+    // The rule is decided after the parent check (review round 18).
+    name: "list-content-before-rule-in-cell",
+    input: div("<table><tr><td><ul><hr/></ul></td></tr></table>"),
+    expected: { error: "list-content" },
+  },
+  {
+    name: "script-content-before-rule-in-cell",
+    input: div("<table><tr><td><sup><hr/></sup></td></tr></table>"),
+    expected: { error: "script-content" },
+  },
+  {
+    name: "accepts-rule-after-table",
+    input: div("<table><tr><td>1</td></tr></table><hr/><p>2</p>"),
+    expected: "\n\n\ufdd0\n\ufdd2\t\ufdd3\t1\t\n\n\ufdd1\n\n\n\n2\n\n",
+  },
+  {
+    name: "rejects-underline",
+    input: div("<p>Contraindicated if CrCl <u>&lt;</u> 30 ml/min.</p>"),
+    expected: { error: "unknown-element" },
+  },
+  {
+    name: "rejects-underlined-modifier-arrowhead",
+    input: div("<p>CrCl <u>&#x2C2;</u> 30 ml/min</p>"),
+    expected: { error: "unknown-element" },
+  },
+  {
+    name: "rejects-link",
+    input: div('<p>CrCl <a href="https://example.org/">&lt;</a> 30</p>'),
+    expected: { error: "unknown-element" },
+  },
+  {
+    name: "rejects-link-without-target",
+    input: div("<p><a>see section 4.4</a></p>"),
+    expected: { error: "unknown-element" },
+  },
+  {
+    name: "rejects-grapheme-joiner-across-bold",
+    input: div("<p>q<b>&#x34F;x</b></p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "rejects-variation-selector-across-bold",
+    input: div("<p>&#x2764;<b>&#xFE0F;</b></p>"),
+    expected: { error: "combining-across-markup" },
+  },
+  {
+    name: "rejects-interlinear-annotation-anchor",
+    input: div("<p>Take 10 &#xFFF9;000 IU daily.</p>"),
+    expected: { error: "forbidden-character" },
+  },
+  {
+    name: "rejects-raw-interlinear-annotation-terminator",
+    input: div("<p>Take 10 \ufffb000 IU daily.</p>"),
+    expected: { error: "forbidden-character" },
+  },
+  {
+    name: "rejects-syriac-abbreviation-mark",
+    input: div("<p>10&#x70F;000</p>"),
+    expected: { error: "forbidden-character" },
+  },
+  {
+    name: "rejects-supplementary-concatenation-mark",
+    input: div("<p>10&#x110BD;000</p>"),
+    expected: { error: "forbidden-character" },
+  },
+  {
+    name: "accepts-neighbour-of-concatenation-marks",
+    input: div("<p>10&#x606;000</p>"),
+    expected: "\n\n10\u0606000\n\n",
   },
 ];

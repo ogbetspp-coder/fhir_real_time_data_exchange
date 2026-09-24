@@ -227,6 +227,7 @@ def test_a_refused_section_is_reported_and_its_statements_are_not_guessed() -> N
         ("shading-yellow", True),
         ("faint", True),
         ("strike", True),
+        ("border", True),
         ("superscript", False),
     ],
 )
@@ -234,6 +235,32 @@ def test_colour_shading_and_faint_marks_are_formatting_findings(mark: str, repor
     paragraph = Paragraph("see below", None, None, None, marks=(Mark(0, 3, mark), Mark(3, 4, mark)))
     result = check(document(smpc_1=(paragraph,)), REGISTRY, MAPPING)
     # The mark over the space alone shows no text and is not reported.
+    assert len(findings(result, "formatting")) == (1 if reported else 0)
+
+
+@pytest.mark.parametrize("kind", ["border", "faint", "strike", "shading-black"])
+def test_a_bar_faint_or_struck_sign_is_a_formatting_finding(kind: str) -> None:
+    # "Store at" a white "-" "20 °C" reads "-20 °C" to the check and "20 °C" to a reader.
+    paragraph = Paragraph("Store at -20 °C", None, None, None, marks=(Mark(9, 10, kind),))
+    result = check(document(smpc_1=(paragraph,)), REGISTRY, MAPPING)
+    assert len(findings(result, "formatting")) == 1
+
+
+@pytest.mark.parametrize(
+    ("text", "start", "end", "reported"),
+    [
+        # "≥ 1" typed as an underlined ">": the text reads ">", the viewer shows "≥".
+        ("defined as >1 target", 11, 12, True),
+        ("see section 4.4", 4, 15, False),
+        ("1a dose", 1, 2, True),
+        ("Strong CYP3A inhibitors", 0, 23, False),
+    ],
+)
+def test_an_underline_over_what_it_changes_is_a_formatting_finding(
+    text: str, start: int, end: int, reported: bool
+) -> None:
+    paragraph = Paragraph(text, None, None, None, marks=(Mark(start, end, "underline"),))
+    result = check(document(smpc_1=(paragraph,)), REGISTRY, MAPPING)
     assert len(findings(result, "formatting")) == (1 if reported else 0)
 
 

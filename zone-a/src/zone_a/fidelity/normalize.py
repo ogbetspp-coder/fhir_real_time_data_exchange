@@ -16,7 +16,7 @@ from __future__ import annotations
 import unicodedata
 from typing import Final
 
-NORMALIZATION_VERSION: Final = "fidelity-norm/2.0.0"
+NORMALIZATION_VERSION: Final = "fidelity-norm/3.0.0"
 
 # ADR 0003: NFC output depends on the Unicode Character Database of the runtime, so the UCD is
 # pinned as tightly as the code. Zone B runs node:22.22.0 (ICU 77.1, Unicode 16.0).
@@ -39,10 +39,55 @@ BULLET_GLYPHS: Final = frozenset(
     {0x2022, 0x2023, 0x25A0, 0x25A1, 0x25AA, 0x25AB, 0x25CB, 0x25CF, 0x25E6}
 )
 
-# Closed list, section 3 step 5. U+2000-U+200A is a range, handled in is_whitespace(). U+000B,
-# U+000C and U+0085 are not here: since fidelity-norm/2.0.0 section 2 rejects them.
+# Closed list, section 3 step 5. U+000B, U+000C and U+0085 are not here: since fidelity-norm/2.0.0
+# section 2 rejects them. Nor, from 3.0.0, are the spaces a renderer does not draw as a gap: U+1680
+# OGHAM SPACE MARK is drawn as a stroke, and U+2006, U+2009, U+200A and U+202F one or two pixels
+# wide, so "2" U+200A "10" looks like "210". They are content.
 WHITESPACE: Final = frozenset(
-    {0x0009, 0x000A, 0x000D, 0x0020, 0x00A0, 0x1680, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000}
+    {
+        0x0009,
+        0x000A,
+        0x000D,
+        0x0020,
+        0x00A0,
+        0x2000,
+        0x2001,
+        0x2002,
+        0x2003,
+        0x2004,
+        0x2005,
+        0x2007,
+        0x2008,
+        0x2028,
+        0x2029,
+        0x3000,
+    }
+)
+
+# The spaces narrower than a quarter of an em: SIX-PER-EM, THIN, HAIR, NARROW NO-BREAK and MEDIUM
+# MATHEMATICAL SPACE. Content (section 3 step 5), yet drawn as a gap.
+THIN_SPACES: Final = frozenset({0x2006, 0x2009, 0x200A, 0x202F, 0x205F})
+
+# Unicode's Default_Ignorable_Code_Point, spelled out (Unicode 16.0, DerivedCoreProperties.txt):
+# code points a renderer draws as nothing. Python's unicodedata does not expose the property.
+DEFAULT_IGNORABLE: Final = (
+    (0x00AD, 0x00AD),
+    (0x034F, 0x034F),
+    (0x061C, 0x061C),
+    (0x115F, 0x1160),
+    (0x17B4, 0x17B5),
+    (0x180B, 0x180F),
+    (0x200B, 0x200F),
+    (0x202A, 0x202E),
+    (0x2060, 0x206F),
+    (0x3164, 0x3164),
+    (0xFE00, 0xFE0F),
+    (0xFEFF, 0xFEFF),
+    (0xFFA0, 0xFFA0),
+    (0xFFF0, 0xFFF8),
+    (0x1BCA0, 0x1BCA3),
+    (0x1D173, 0x1D17A),
+    (0xE0000, 0xE0FFF),
 )
 
 SOFT_HYPHEN: Final = chr(0x00AD)
@@ -59,7 +104,42 @@ class NormalizationError(ValueError):
 
 def is_whitespace(code_point: int) -> bool:
     """True for the closed whitespace list of section 3 step 5, and nothing else."""
-    return code_point in WHITESPACE or 0x2000 <= code_point <= 0x200A
+    return code_point in WHITESPACE
+
+
+# Code points drawn as an empty glyph that are neither whitespace nor Default_Ignorable, found by
+# rendering every assigned code point in Chrome's default fonts on macOS and measuring the ink:
+# U+2800 BRAILLE PATTERN BLANK, and Mongolian and Yi letters the default serif face lacks and draws
+# as an em-wide blank.
+BLANK_GLYPHS: Final = frozenset({0x1878, 0x18AA, 0x2800, 0xA4A2, 0xA4A3, 0xA4B4, 0xA4C1, 0xA4C5})
+
+# From fidelity-norm/3.0.0: the interlinear annotation controls, which Unicode reserves for
+# internal use and a renderer draws as a blank, and the prepended concatenation marks, which a
+# renderer draws across the digits after them (U+070F puts a bar over "000").
+FORBIDDEN_3_0_0: Final = frozenset(
+    {0x0600, 0x0601, 0x0602, 0x0603, 0x0604, 0x0605, 0x06DD, 0x070F, 0x0890, 0x0891, 0x08E2}
+    | {0xFFF9, 0xFFFA, 0xFFFB, 0x110BD, 0x110CD}
+)
+
+
+def is_default_ignorable(code_point: int) -> bool:
+    """Unicode's Default_Ignorable_Code_Point (Unicode 16.0), from the table above."""
+    return any(low <= code_point <= high for low, high in DEFAULT_IGNORABLE)
+
+
+def is_gap(code_point: int) -> bool:
+    """A gap for the digit-group rules (section 6) and the quote-edge rule.
+
+    Section 3 whitespace, a thin space, a blank glyph, or a code point Unicode says to ignore:
+    reading past these, "10" U+2009 " 000" is one number, however the gap between its groups is
+    written.
+    """
+    return (
+        code_point in WHITESPACE
+        or code_point in THIN_SPACES
+        or code_point in BLANK_GLYPHS
+        or is_default_ignorable(code_point)
+    )
 
 
 def is_word_character(character: str) -> bool:
@@ -86,7 +166,7 @@ def is_forbidden(code_point: int) -> bool:
     U+000C because they are not XML characters; the bidirectional controls because their reach
     differs between a narrative block and page text.
     """
-    if code_point in (0xFFFD, 0xFFFE, 0xFFFF):
+    if code_point in (0xFFFD, 0xFFFE, 0xFFFF) or code_point in FORBIDDEN_3_0_0:
         return True
     if 0x007F <= code_point <= 0x009F:
         return True
@@ -119,15 +199,14 @@ def _lines_with_tab(text: str) -> list[bool]:
     return result
 
 
-def normalize_text(text: str, *, last_line_has_tab: bool = False) -> str:
-    """Apply section 3's five ordered steps. Raises NormalizationError on a section 2 character."""
-    forbidden = find_forbidden_character(text)
-    if forbidden is not None:
-        raise NormalizationError("forbidden-character", forbidden)
+def compose_text(text: str) -> str:
+    """Steps 1 to 3.
 
-    # Steps 1 and 2 run before NFC so that a composition an invisible character or a ligature
-    # would otherwise block ("e" + ZWSP + combining acute) is applied in the first pass; that is
-    # what makes the whole procedure idempotent.
+    Steps 1 and 2 run before NFC so that a composition an invisible character or a ligature would
+    otherwise block ("e" + ZWSP + combining acute) is applied in the first pass; that is what makes
+    the whole procedure idempotent. The scanner uses it too, to refuse a composition across inline
+    markup (section 5).
+    """
     expanded: list[str] = []
     position = 0
     length = len(text)
@@ -145,6 +224,14 @@ def normalize_text(text: str, *, last_line_has_tab: bool = False) -> str:
             continue
         expanded.append(LIGATURES.get(code_point, character))
         position += 1
+    return unicodedata.normalize("NFC", "".join(expanded))
+
+
+def normalize_text(text: str, *, last_line_has_tab: bool = False) -> str:
+    """Apply section 3's five ordered steps. Raises NormalizationError on a section 2 character."""
+    forbidden = find_forbidden_character(text)
+    if forbidden is not None:
+        raise NormalizationError("forbidden-character", forbidden)
 
     # Steps 4 and 5, with the space collapse folded into the same pass: a space is emitted only
     # when the previous emitted character was not one, which drops runs and the leading space.
@@ -154,7 +241,7 @@ def normalize_text(text: str, *, last_line_has_tab: bool = False) -> str:
     # start, so normalising the result again (it has no U+000A) replaces nothing: idempotence. A
     # bullet replaced here counts as whitespace for the bullet after it.
     output: list[str] = []
-    composed = unicodedata.normalize("NFC", "".join(expanded))
+    composed = compose_text(text)
     on_tab_line = _lines_with_tab(composed)
     if last_line_has_tab:
         # A page slice whose last line continues past it on a page line with U+0009 (section 6).

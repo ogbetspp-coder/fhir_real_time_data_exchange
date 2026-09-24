@@ -24,6 +24,8 @@ import {
 } from "../contracts/query-tools.js";
 import {
   NORMALIZATION_VERSION,
+  isGap,
+  isReservedCodePoint,
   isWordCharacter,
   normalizeText,
   xhtmlToText,
@@ -232,10 +234,11 @@ function codePointAtIndex(text: string, index: number): string | undefined {
 //   punctuation (QUOTE_CLOSERS) that is itself followed by a space or the end of the text. So a
 //   quote may end before a sentence's full stop, a comma, a colon or a closing parenthesis
 //   followed by a space, and not before "." or "," or "/" followed by a digit or a letter.
-// - Across a space. A quote that begins with a digit after a space preceded by a digit, or ends
-//   with a digit before a space followed by a digit, has cut a space-grouped number ("1 000"
-//   out of "1 000 000 IU"); a quote preceded by a comparator or sign and a space
-//   (SPACED_SIGNS: "≥ 30 ml/min") has lost it. Both are cuts.
+// - Across a space. A quote that begins with a number after a space preceded by a number, or
+//   ends with a number before a space followed by a number, has cut a space-grouped number
+//   ("1 000" out of "1 000 000 IU"); a quote preceded by a sign and a space (isSpacedSign:
+//   "≥ 30 ml/min"), or ending in a number before a space and a sign ("30 %", "100 × 10⁹/l"),
+//   has lost it. All are cuts.
 //
 // It is never looser than the gate: a word character on either side is a cut before any of the
 // above is consulted, under the fidelity library's own isWordCharacter. It is not a grammar,
@@ -265,55 +268,392 @@ const QUOTE_CLOSERS = new Set([
   "…",
 ]);
 
-// Signs and comparators that still bind a number across a space. Hyphens and dashes are not
-// here: set off by spaces they are far more often separators than signs.
-const SPACED_SIGNS = new Set([
-  "<",
-  ">",
-  "~",
-  "±",
-  "−",
-  "∓",
-  "∼",
-  "≈",
-  "≤",
-  "≥",
-  "≦",
-  "≧",
-  "⩽",
-  "⩾",
+// What may stand between a number and a quote's edge across a space without binding them: plain
+// punctuation (PLAIN_PUNCTUATION: sentence marks, closing brackets and quotation marks, and "®",
+// "™", "©"), and dashes and hyphens (general category Pd: set off by spaces they are far more
+// often separators than signs). Every other code point that is not a letter, a number, a gap, a
+// combining mark, an opening mark reading back skips, or one of the scanner's own markers is
+// read as a sign: a mathematical symbol, a comparator's look-alike from any block ("˂", "❮",
+// "⧼", "⟪", "‹"), a dingbat ("➕"), a middle dot, a slash, "%", "°". A look-alike no list names
+// is therefore still a cut. A letter drawn like a sign ("x" or Cyrillic "х" for "×", U+1438 for
+// "<") is not read as one, a stated residual; modifier letters (Lm, "ˍ") are signs here.
+const PLAIN_PUNCTUATION = new Set([
+  ".",
+  ",",
+  ";",
+  ":",
+  "!",
+  "?",
+  ")",
+  "]",
+  "}",
+  '"',
+  "'",
+  "’",
+  "”",
+  "»",
+  "…",
+  "®",
+  "™",
+  "©",
+  // Reference marks: a footnote's mark after a word or a number binds neither ("decreased†",
+  // "Grade 3*"). An asterisk written for a multiplication ("2 * 10") is not read as one, a
+  // stated residual.
+  "*",
+  "†",
+  "‡",
+  "§",
+  "¶",
+  "#",
 ]);
+// Signs that bind the number before them only ("30 %", "25 °C"): read after a number, never as
+// a sign before a quote.
+const POSTFIX_SIGNS = new Set(["%", "‰", "‱", "°", "′", "″", "℃", "℉"]);
+const DASH = /^\p{Pd}$/u;
+const LETTER = /^\p{L}$/u;
+const MODIFIER_LETTER = /^\p{Lm}$/u;
+const MARK = /^\p{M}$/u;
 
-const DECIMAL_DIGIT = /^\p{Nd}$/u;
+// A number is any code point of general category N: a decimal digit of any script, and "½",
+// "¹" or "₂" as well, so "1 ½" and "10" | "₀₀₀" are each one number.
+const NUMBER = /^\p{N}$/u;
 
 function isDigit(character: string | undefined): boolean {
-  return character !== undefined && DECIMAL_DIGIT.test(character);
+  return character !== undefined && NUMBER.test(character);
 }
 
-function edgeBefore(text: string, start: number, quote: string): boolean {
+function isLetterOrNumber(character: string): boolean {
+  return (LETTER.test(character) && !MODIFIER_LETTER.test(character)) || NUMBER.test(character);
+}
+
+// The scanner's grid markers and picture token delimiters: structure, never a sign.
+function isScannerMarker(character: string): boolean {
+  const codePoint = character.codePointAt(0) ?? 0;
+  return codePoint === 0xfffc || (codePoint >= 0xfdd0 && codePoint <= 0xfdef);
+}
+
+// The opening marks reading back for a sign skips: QUOTE_OPENERS but "‹", drawn like "<".
+function isSkippedOpener(character: string): boolean {
+  return QUOTE_OPENERS.has(character) && character !== "‹";
+}
+
+// A sign before a quote binds the number after it: a postfix sign does not.
+function isSignBefore(character: string): boolean {
+  return isSpacedSign(character) && !POSTFIX_SIGNS.has(character);
+}
+
+function isSpacedSign(character: string | undefined): boolean {
+  return (
+    character !== undefined &&
+    !isLetterOrNumber(character) &&
+    !isGapPoint(character) &&
+    !MARK.test(character) &&
+    !isScannerMarker(character) &&
+    !isSkippedOpener(character) &&
+    !PLAIN_PUNCTUATION.has(character) &&
+    !DASH.test(character)
+  );
+}
+
+function isGapPoint(character: string | undefined): boolean {
+  return character !== undefined && isGap(character.codePointAt(0) ?? 0);
+}
+
+// --- across table cells ---------------------------------------------------------------------
+//
+// A renderer draws a row's cells side by side with a gap about as wide as a space, and centres
+// each cell's lines vertically, so any line of a cell can sit level with any line of another
+// cell in the same row: "Up to 10" | "once" / "000 IU" / "weekly" is drawn with "Up to 10 000
+// IU" on one line, and "<" | "5 mg" reads "< 5 mg". Where a cell's lines fall depends on the
+// viewer's width, which the text cannot say. So a quote that begins at a word boundary inside a
+// cell is held to the digit and sign rules against every word of every cell to its left, and one
+// that ends at a word boundary inside a cell against every word of every cell to its right, in
+// each row its cell covers (fidelity-norm/3.0.0 section 5 writes the grid: U+FDD0 table, U+FDD1
+// end, U+FDD2 row, U+FDD3 cell, U+FDD4 and U+FDD5 slots covered from the left and from above).
+// A word is a run of code points that are not gaps. The grid of every table in a section is
+// read once per search.
+
+const TABLE_START = "﷐";
+const TABLE_END = "﷑";
+const ROW_START = "﷒";
+const CELL_START = "﷓";
+const COVERED_LEFT = "﷔";
+const COVERED_ABOVE = "﷕";
+const SLOT_MARKERS = new Set([CELL_START, COVERED_LEFT, COVERED_ABOVE]);
+
+// What a cell's words hold, as bits: a word ending in a sign, a word ending in a number, a word
+// beginning with a number, a word beginning with a sign (read past marks and opening marks).
+const ENDS_SIGN = 1;
+const ENDS_DIGIT = 2;
+const STARTS_DIGIT = 4;
+const STARTS_SIGN = 8;
+
+type Cell = {
+  // For each row the cell covers, from its first: the bits of every cell to its left in that
+  // row, and of every cell to its right.
+  left: number[];
+  right: number[];
+};
+
+type TableIndex = {
+  // For each UTF-16 index inside a cell's text, the cell's number; -1 elsewhere.
+  cellAt: Int32Array;
+  cells: Cell[];
+};
+
+// A word ends in a sign when reading back from its end, past opening punctuation that is not
+// itself a sign and past combining marks, reaches a run of symbols and punctuation holding a
+// sign ("<(" before "30 ml/min)" in the next cell, "<" with U+0332 drawn "≤", "+/-").
+function wordBits(text: string, start: number, end: number): number {
+  const words: string[][] = [[]];
+  for (const point of text.slice(start, end)) {
+    if (isGapPoint(point)) words.push([]);
+    else words[words.length - 1]?.push(point);
+  }
+  let bits = 0;
+  for (const points of words) {
+    if (points.length === 0) continue;
+    const word = points.join("");
+    if (isDigit(numberFrom(word, 0))) bits |= STARTS_DIGIT;
+    if (isSpacedSign(drawnFrom(word, 0))) bits |= STARTS_SIGN;
+    if (isDigit(numberBefore(word, word.length))) bits |= ENDS_DIGIT;
+    if (signsBefore(word)[word.length] === 1) bits |= ENDS_SIGN;
+  }
+  return bits;
+}
+
+type Slot = { marker: string; start: number; end: number };
+
+function indexTable(text: string, open: number, index: TableIndex): number {
+  const close = text.indexOf(TABLE_END, open);
+  const stop = close < 0 ? text.length : close;
+  const rows: Slot[][] = [];
+  let slot: Slot | undefined;
+  // Grid markers are single UTF-16 units, so the text is walked by unit here.
+  for (let at = open + 1; at <= stop; at += 1) {
+    const unit = text[at] ?? "";
+    const isMarker = at === stop || unit === ROW_START || SLOT_MARKERS.has(unit);
+    if (isMarker && slot !== undefined) {
+      slot.end = at;
+      slot = undefined;
+    }
+    if (at === stop) break;
+    if (unit === ROW_START) rows.push([]);
+    else if (SLOT_MARKERS.has(unit)) {
+      slot = { marker: unit, start: at + 1, end: at + 1 };
+      rows[rows.length - 1]?.push(slot);
+    }
+  }
+  // Which cell owns each slot, and each cell's position and bits.
+  const owner: number[][] = rows.map(() => []);
+  const placed: { row: number; column: number; columns: number; rows: number; bits: number }[] = [];
+  rows.forEach((slots, row) => {
+    slots.forEach((current, column) => {
+      let id: number;
+      if (current.marker === CELL_START) {
+        id = placed.length;
+        placed.push({ row, column, columns: 1, rows: 1, bits: 0 });
+        const entry = placed[id];
+        if (entry !== undefined) {
+          entry.bits = wordBits(text, current.start, current.end);
+          while (rows[row]?.[column + entry.columns]?.marker === COVERED_LEFT) entry.columns += 1;
+          while (rows[row + entry.rows]?.[column]?.marker === COVERED_ABOVE) entry.rows += 1;
+        }
+        index.cellAt.fill(index.cells.length + id, current.start, current.end);
+      } else if (current.marker === COVERED_LEFT) {
+        id = owner[row]?.[column - 1] ?? -1;
+      } else {
+        id = owner[row - 1]?.[column] ?? -1;
+      }
+      owner[row]?.push(id);
+    });
+  });
+  // For each row, the bits of the cells before each column and from each column on.
+  const before = owner.map((ids) => {
+    const out = [0];
+    for (const id of ids) out.push((out[out.length - 1] ?? 0) | (placed[id]?.bits ?? 0));
+    return out;
+  });
+  const after = owner.map((ids) => {
+    const out = Array<number>(ids.length + 1).fill(0);
+    for (let column = ids.length - 1; column >= 0; column -= 1) {
+      out[column] = (out[column + 1] ?? 0) | (placed[ids[column] ?? -1]?.bits ?? 0);
+    }
+    return out;
+  });
+  for (const entry of placed) {
+    const left: number[] = [];
+    const right: number[] = [];
+    for (let row = entry.row; row < entry.row + entry.rows; row += 1) {
+      left.push(before[row]?.[entry.column] ?? 0);
+      right.push(after[row]?.[entry.column + entry.columns] ?? 0);
+    }
+    index.cells.push({ left, right });
+  }
+  return stop;
+}
+
+// Every table of a normalised section text, or undefined when it holds none.
+function indexTables(text: string): TableIndex | undefined {
+  let open = text.indexOf(TABLE_START);
+  if (open < 0) return undefined;
+  const index: TableIndex = { cellAt: new Int32Array(text.length + 1).fill(-1), cells: [] };
+  while (open >= 0) {
+    const stop = indexTable(text, open, index);
+    open = text.indexOf(TABLE_START, stop);
+  }
+  return index;
+}
+
+// Whether a quote beginning at UTF-16 index `start` inside a cell, whose first code point that
+// is neither a gap nor a combining mark is `first`, has lost a sign or cut a number drawn in a
+// cell to its left.
+function cutAcrossCellBefore(
+  tables: TableIndex | undefined,
+  start: number,
+  first: string | undefined,
+): boolean {
+  const cell = tables?.cells[tables.cellAt[start] ?? -1];
+  if (cell === undefined) return false;
+  return cell.left.some(
+    (bits) => (bits & ENDS_SIGN) !== 0 || ((bits & ENDS_DIGIT) !== 0 && isDigit(first)),
+  );
+}
+
+// Whether a quote ending at UTF-16 index `end` inside a cell, whose last code point that is
+// neither a gap nor a combining mark is `last`, has cut a number drawn on, or lost a sign after
+// it, in a cell to its right.
+function cutAcrossCellAfter(
+  tables: TableIndex | undefined,
+  end: number,
+  last: string | undefined,
+): boolean {
+  const cell = tables?.cells[tables.cellAt[end] ?? -1];
+  if (cell === undefined || !isDigit(last)) return false;
+  return cell.right.some((bits) => (bits & (STARTS_DIGIT | STARTS_SIGN)) !== 0);
+}
+
+// What reading back for a sign skips: gaps, combining marks, and the opening marks.
+function skippedBeforeSign(point: string): boolean {
+  return isGapPoint(point) || MARK.test(point) || isSkippedOpener(point);
+}
+
+// For each UTF-16 index of `text`: 1 when reading back from it, past what `skippedBeforeSign`
+// skips, reaches a run of code points (no letter, number, gap or scanner marker) holding a sign.
+// One pass over the text, so the rule stays linear however long a run of brackets and spaces is.
+function signsBefore(text: string): Uint8Array {
+  const reached = new Uint8Array(text.length + 1);
+  let runHasSign = false;
+  let current = 0;
+  let index = 0;
+  for (const point of text) {
+    if (isGapPoint(point)) {
+      runHasSign = false;
+    } else if (isLetterOrNumber(point) || isScannerMarker(point)) {
+      runHasSign = false;
+      current = 0;
+    } else {
+      runHasSign ||= isSignBefore(point);
+      if (!skippedBeforeSign(point)) current = runHasSign ? 1 : 0;
+    }
+    index += point.length;
+    reached[index] = current;
+  }
+  return reached;
+}
+
+// Whether a quote beginning at `start` (or its opening punctuation) set off by the space at
+// UTF-16 index `space` is cut: a sign before the space, read past gaps, marks and opening
+// punctuation, binds the number after it ("≥ 30", "<" U+2063 " 30", "< ( 30", "+/- 5"); a
+// number before it and a number first in the quote, read past gaps and combining marks (not
+// opening marks), are one number grouped
+// with spaces ("10 000", "10" U+2009 " 000", "1 ½", and "10 (000", a false failure); and so
+// across table cells (above).
+function cutAfterSpace(
+  text: string,
+  space: number,
+  start: number,
+  first: string | undefined,
+  context: SearchContext,
+): boolean {
+  if (context.signs[space] === 1) return true;
+  if (isDigit(numberBefore(text, space)) && isDigit(first)) return true;
+  return cutAcrossCellBefore(context.tables, start, first);
+}
+
+// What a search reads once from the section's text.
+type SearchContext = { tables: TableIndex | undefined; signs: Uint8Array };
+
+// The first code point before UTF-16 index `index`, and at or after it, that is neither a gap
+// nor a combining mark: the number a reader sees there ("10" U+0332 " 000" is "10 000" with a
+// mark set apart). Opening marks are read past for a sign only (drawnFrom): "0.52 (95%" is two
+// numbers.
+function numberBefore(text: string, index: number): string | undefined {
+  let position = index;
+  let character = codePointBefore(text, position);
+  while (character !== undefined && (isGapPoint(character) || MARK.test(character))) {
+    position -= character.length;
+    character = codePointBefore(text, position);
+  }
+  return character;
+}
+
+function numberFrom(text: string, index: number): string | undefined {
+  let position = index;
+  let character = codePointAtIndex(text, position);
+  while (character !== undefined && (isGapPoint(character) || MARK.test(character))) {
+    position += character.length;
+    character = codePointAtIndex(text, position);
+  }
+  return character;
+}
+
+// The first code point at or after UTF-16 index `index` that is not skipped when reading for a
+// sign (a gap, a combining mark, an opening mark): what the reader sees first there ("̲000" is
+// "000" with a mark set apart, "(× 10⁹/l)" a sign in brackets).
+function drawnFrom(text: string, index: number): string | undefined {
+  let position = index;
+  let character = codePointAtIndex(text, position);
+  while (character !== undefined && skippedBeforeSign(character)) {
+    position += character.length;
+    character = codePointAtIndex(text, position);
+  }
+  return character;
+}
+
+function edgeBefore(text: string, start: number, quote: string, context: SearchContext): boolean {
   let before = codePointBefore(text, start);
   if (before === undefined) return true;
   if (isWordCharacter(before)) return false;
-  if (before === " ") {
-    const beyond = codePointBefore(text, start - 1);
-    if (beyond !== undefined && SPACED_SIGNS.has(beyond)) return false;
-    return !(isDigit(beyond) && isDigit(codePointAtIndex(quote, 0)));
-  }
+  const first = numberFrom(quote, 0);
+  if (before === " ") return !cutAfterSpace(text, start - 1, start, first, context);
   let index = start;
   while (before !== undefined && QUOTE_OPENERS.has(before)) {
+    // An opening mark drawn like a comparator ("‹30") is a sign joined to the quote.
+    if (!isSkippedOpener(before)) return false;
     index -= before.length;
     before = codePointBefore(text, index);
   }
-  return index < start && (before === undefined || before === " ");
+  if (index === start) return false;
+  if (before === undefined) return true;
+  return before === " " && !cutAfterSpace(text, index - 1, start, first, context);
 }
 
-function edgeAfter(text: string, end: number, quote: string): boolean {
+function edgeAfter(text: string, end: number, quote: string, context: SearchContext): boolean {
   let after = codePointAtIndex(text, end);
   if (after === undefined) return true;
   if (isWordCharacter(after)) return false;
   if (after === " ") {
-    const beyond = codePointAtIndex(text, end + 1);
-    return !(isDigit(beyond) && isDigit(codePointBefore(quote, quote.length)));
+    // A number read past gaps and combining marks on both sides of the space; a sign past
+    // opening marks too, as on the left edge ("100 (× 10⁹/l)").
+    const last = numberBefore(quote, quote.length);
+    if (
+      isDigit(last) &&
+      (isDigit(numberFrom(text, end + 1)) || isSpacedSign(drawnFrom(text, end + 1)))
+    ) {
+      return false;
+    }
+    return !cutAcrossCellAfter(context.tables, end, last);
   }
   let index = end;
   while (after !== undefined && QUOTE_CLOSERS.has(after)) {
@@ -327,8 +667,12 @@ function edgeAfter(text: string, end: number, quote: string): boolean {
 // UTF-16 index, or -1. An occurrence that is cut does not end the search: a later occurrence
 // whose edges hold still matches.
 function findQuoteOccurrence(text: string, quote: string): number {
+  const context: SearchContext = { tables: indexTables(text), signs: signsBefore(text) };
   for (let found = text.indexOf(quote); found >= 0; found = text.indexOf(quote, found + 1)) {
-    if (edgeBefore(text, found, quote) && edgeAfter(text, found + quote.length, quote)) {
+    if (
+      edgeBefore(text, found, quote, context) &&
+      edgeAfter(text, found + quote.length, quote, context)
+    ) {
       return found;
     }
   }
@@ -691,7 +1035,15 @@ export async function verifyQuote(
   } catch {
     return fail("verify_quote", "invalid-request", { bundleId: input.bundleId });
   }
-  if (normalizedQuote.length === 0) {
+  // A quote of gaps alone (whitespace, thin spaces, blank glyphs, code points Unicode says to
+  // ignore) quotes nothing a reader sees, and could match between the groups of a number.
+  if (!Array.from(normalizedQuote).some((point) => !isGap(point.codePointAt(0) ?? 0))) {
+    return fail("verify_quote", "invalid-request", { bundleId: input.bundleId });
+  }
+  // A table's grid markers and a picture's U+FFFC are the scanner's, never a reader's: a quote
+  // carrying one could join two rows or quote nothing a reader sees (fidelity-norm/3.0.0 section
+  // 2, the rule narratives follow).
+  if (Array.from(normalizedQuote).some((point) => isReservedCodePoint(point.codePointAt(0) ?? 0))) {
     return fail("verify_quote", "invalid-request", { bundleId: input.bundleId });
   }
 
@@ -813,8 +1165,19 @@ function productSummary(loaded: LoadedDocument, index: MappingIndex): ProductSum
   return summary.success ? summary.data : undefined;
 }
 
+// A stored product name the normalisation refuses (a section 2 character) cannot match by name;
+// it is not an error for the whole search, which would hide every other product from the
+// caller. Its identifiers still match.
+function nameMatches(needle: string, productName: string): boolean {
+  try {
+    return normalizeText(productName).toLowerCase().includes(needle);
+  } catch {
+    return false;
+  }
+}
+
 function matches(needle: string, summary: ProductSummary): boolean {
-  if (normalizeText(summary.productName).toLowerCase().includes(needle)) return true;
+  if (nameMatches(needle, summary.productName)) return true;
   return summary.identifiers.some(({ value }) => value.toLowerCase().includes(needle));
 }
 

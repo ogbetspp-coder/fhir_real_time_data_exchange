@@ -15,12 +15,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 from typing import Any
 
 import pytest
 
 from zone_a.canonical_json import canonical_json
 from zone_a.fidelity import (
+    NORMALIZATION_VERSION,
     NormalizationError,
     XhtmlError,
     normalize_text,
@@ -28,6 +30,7 @@ from zone_a.fidelity import (
     verify_report_hash,
     xhtml_to_text,
 )
+from zone_a.fidelity.xhtml import has_drawn_text
 
 from .conftest import VECTORS_PATH, load_json
 
@@ -138,3 +141,116 @@ def test_an_escaped_surrogate_pair_in_json_is_one_code_point() -> None:
         with pytest.raises(XhtmlError) as raised:
             xhtml_to_text(_div_from_json(rejected))
         assert raised.value.code == "forbidden-character"
+
+
+def test_a_grid_of_exactly_the_slot_limit_is_accepted() -> None:
+    """The tables of one narrative cover at most 50 000 slots (fidelity-norm/3.0.0).
+
+    The accepted side is pinned here rather than as a vector, whose text would be 150 000 code
+    points long; the refused side is the vector ``rejects-table-over-slot-limit``. One row of
+    1000 single cells gives every column one; 49 rows then span them all.
+    """
+    grid = "<tr>" + "<td>a</td>" * 1000 + "</tr>" + '<tr><td colspan="1000">a</td></tr>' * 49
+
+    def div(extra: str = "") -> str:
+        return f'<div xmlns="http://www.w3.org/1999/xhtml"><table>{grid}</table>{extra}</div>'
+
+    assert isinstance(xhtml_to_text(div()), str)
+    with pytest.raises(XhtmlError) as raised:
+        xhtml_to_text(div("<table><tr><td>b</td></tr></table>"))
+    assert raised.value.code == "table-size"
+
+
+def test_empty_rows_under_a_wide_row_scan_in_linear_time() -> None:
+    """The grid is sparse, so a row costs only the slots it covers (review round 3).
+
+    Twenty thousand empty rows under a 50 000-slot row took 79 s here before.
+    """
+    wide = "<tr>" + '<td colspan="1000">a</td>' * 50 + "</tr>"
+    empty = "<tr></tr>" * 20_000
+    div = f'<div xmlns="http://www.w3.org/1999/xhtml"><table>{wide}{empty}</table></div>'
+    started = time.monotonic()
+    with pytest.raises(XhtmlError) as raised:
+        xhtml_to_text(div)
+    assert raised.value.code == "table-shape"
+    assert time.monotonic() - started < 5
+
+
+# A structured source (section 7): one page per section, the page exactly the scanner's text for
+# the section's div, the whole page the body and the span. The accepted vectors that draw text and
+# hold no section 3 step 1 invisible character (the extractor refuses those) must verify one
+# section at a time and all together, a page each. The TypeScript twin is in test/fidelity.test.ts.
+_INVISIBLE = frozenset("\u00ad\u200b\ufeff\u2060")
+
+
+def _structured_source(divs: list[str]) -> dict[str, Any]:
+    texts = [xhtml_to_text(div) for div in divs]
+    return {
+        "normalizationVersion": NORMALIZATION_VERSION,
+        "source": {
+            "extractorVersion": "structured-source-property/1.0.0",
+            "pages": [
+                {"page": index + 1, "text": text, "bodyStart": 0, "bodyEnd": len(text)}
+                for index, text in enumerate(texts)
+            ],
+        },
+        "sections": [
+            {
+                "sourceKey": f"section.{index + 1}",
+                "path": f"Composition.section[{index}]",
+                "div": div,
+            }
+            for index, div in enumerate(divs)
+        ],
+        "provenance": [
+            {
+                "sourceKey": f"section.{index + 1}",
+                "spans": [
+                    {
+                        "page": index + 1,
+                        "startOffset": 0,
+                        "endOffset": len(text),
+                        "textSha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                    }
+                ],
+                "narrativeDivSha256": hashlib.sha256(divs[index].encode("utf-8")).hexdigest(),
+                "normalizedTextSha256": "0" * 64,
+            }
+            for index, text in enumerate(texts)
+        ],
+    }
+
+
+def _structured_divs() -> list[str]:
+    divs: list[str] = []
+    for case in _VECTORS["xhtml"]:
+        if not isinstance(case["expected"], str):
+            continue
+        text = xhtml_to_text(case["input"])
+        if _INVISIBLE.isdisjoint(text) and has_drawn_text(normalize_text(text)):
+            divs.append(case["input"])
+    return divs
+
+
+def test_a_structured_source_verifies_every_accepted_vector() -> None:
+    divs = _structured_divs()
+    assert len(divs) > 50
+    for div in divs:
+        assert verify_narrative_fidelity(_structured_source([div]))["status"] == "passed", div
+    together = verify_narrative_fidelity(_structured_source(divs))
+    assert [s for s in together["sections"] if s["status"] != "verified"] == []
+    assert together["status"] == "passed"
+
+
+def test_a_narrative_verifies_against_another_page_only_when_both_read_the_same() -> None:
+    divs = _structured_divs()
+    for page in divs:
+        source = _structured_source([page])
+        expected = normalize_text(xhtml_to_text(page))
+        for narrative in divs:
+            source["sections"][0]["div"] = narrative
+            passed = verify_narrative_fidelity(source)["status"] == "passed"
+            assert passed == (normalize_text(xhtml_to_text(narrative)) == expected), (
+                narrative,
+                page,
+            )

@@ -30,7 +30,7 @@ from typing import Any, Final, Literal, NotRequired, TypedDict, final
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 
-from .quote_edge import edge_after, edge_before
+from .quote_edge import edge_after, edge_before, number_before, number_from
 
 __all__ = [
     "AGENT_TURN_RESOURCE",
@@ -250,7 +250,16 @@ def split_for_verification(text: str, limit: int = VERIFY_QUOTE_MAX_UTF16) -> tu
 
 
 def _acceptable_cut(text: str, index: int) -> bool:
-    """A cut at the run of spaces starting at ``index``, leaving both new edges on a boundary."""
+    """A cut at the run of spaces starting at ``index``, leaving both new edges on a boundary.
+
+    The number beyond each new edge is read past gaps and marks through the whole answer text (and
+    a sign past opening marks too), where the service reads only within the quote: this can refuse
+    a cut the service would accept, never the reverse. The answer's own two ends are not cuts: the
+    service reads the section beyond them, so an answer that itself begins or ends inside a number
+    or before a sign, or whose last chunk reaches its end past an opening mark before a sign, is
+    refused at that chunk; and so is a cut inside a table cell, where the service also reads the
+    cells beside it and the splitter sees no grid (each a false failure, never a false pass).
+    """
     if index <= 0 or text[index] != " " or text[index - 1] == " ":
         return False
     resume = index
@@ -258,7 +267,9 @@ def _acceptable_cut(text: str, index: int) -> bool:
         resume += 1
     if resume == len(text):
         return False
-    return edge_after(text, index, text[index - 1]) and edge_before(text, resume, text[resume])
+    return edge_after(text, index, number_before(text, index)) and edge_before(
+        text, resume, number_from(text, resume)
+    )
 
 
 def _last_cut(text: str, fits: int) -> int | None:
