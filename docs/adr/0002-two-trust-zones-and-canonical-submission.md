@@ -256,8 +256,10 @@ and a fixed notice, `Composition.status` `partial`. Invariants 4 and 6 change fo
   fidelity counts add `sectionsWithheld`, and `sectionsChecked` is verified plus withheld.
 - **6.** The notice is the one `text.div` outside the verified narratives that is accepted, and only
   on a section the recomputed provenance of an `authority-publication` source lists as withheld,
-  byte for byte the constant; anywhere else, on any source, it refuses, as does any `emptyReason`
-  or `generated` narrative.
+  byte for byte the constant; anywhere else, on any source, it refuses, as does any `emptyReason`,
+  and on an `authority-publication` source any `generated` narrative.
+- **3.** The binding recomputed from the Bundle takes the recomputed withheld list as its second
+  input; a withheld section's entry uses the sentinel fidelity §7 defines (`fidelity-norm/3.2.0`).
 
 The human decision that withholds is the import request's, hash-bound in the approved content as
 every request is (invariant 2); before PR 5 lifts the dry run it is bound to an attested identity.

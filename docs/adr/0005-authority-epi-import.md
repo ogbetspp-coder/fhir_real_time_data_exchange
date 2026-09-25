@@ -298,25 +298,26 @@ independent reviews, and changes this ADR as follows.
 `docs/design/authority-import-renderer.md` and `docs/design/authority-import-withheld.md`
 (roadmap 3a, PR 3c; owner decisions of 2026-09-25) change this ADR as follows.
 
-- **The renderer cross-check is a store of reproduced records.** CI draws every publication in a
-  pinned image (Chrome for Testing's headless shell, pinned metric-compatible fonts), and writes a
-  small evidence record into its own store outside the importer's data; the image build that
-  every deploy runs draws every record again, and the worker image carries only records its own
-  code reproduced. The importer's `rendering` stage looks the
-  record up by the document's hash and each carried section's T(div) hash, and the run manifest
-  pins the record's hash. The consequence "the importer's CI job needs a headless browser" is
-  that job.
-- **Decision 3 is narrowed: a withheld section.** A leaf section whose drawing, as the
-  authority's div draws with its inline styles, the renderer gate shows unsound by lower-bound
-  evidence from the browser's own boxes (two cells' text touching, text off the page, a line
-  through text), with no refusal of the gate's own, may be **withheld** by the person who requests
-  the import; never a safety section (4.2 to 4.9), and never on a refusal or a conservative
-  failure of ours. It keeps its heading and code, carries none of the authority's content, and
-  carries our own `emptyReason` code and a fixed notice; the Composition is `partial` and the
-  record is marked incomplete wherever it is read. The import refuses if a listed section is not
-  shown unsound or a failing one is not listed, and a document-level refusal still refuses it. A
-  withheld section is never repaired, answered from or quoted. Imatinib Teva's 5.1 is the first
-  (owner decisions of 2026-09-25).
+- **The renderer cross-check is a store of attested records.** A dedicated Cloud Build
+  configuration, under its own identity, draws every publication in a pinned image (Chrome for
+  Testing's headless shell, pinned metric-compatible fonts) from the importer's own pinned bytes,
+  regenerates each committed record twice and signs an attestation only if both reproduce it. The
+  image build that every deploy runs verifies each record's attestation offline against pinned
+  public keys and drops a record without one. The importer's `rendering` stage looks the record up
+  by the document's hash and each carried section's three output hashes (T(div), T's model output,
+  the scanner's text) and pictures; the run manifest pins the record's hash. The consequence "the
+  importer's CI job needs a headless browser" is that build, with a pre-check in CI.
+- **Decision 3 is narrowed: a withheld section.** A leaf section whose drawing, as the authority's
+  div draws with its inline styles, the renderer gate records as misleading a reader (two cells'
+  text running together, a line through the body of a letter, a character wholly off the page),
+  with no refusal of the gate's own, may be **withheld** by the person who requests the import;
+  never a safety section (4.2 to 4.9), and never on a refusal or a conservative failure of ours.
+  It keeps its heading and code, carries none of the authority's content, and carries our own
+  `emptyReason` code and a fixed notice; the Composition is `partial` and the record is marked
+  incomplete wherever it is read. The import refuses if a listed section is not shown so or a
+  failing one is not listed, and a document-level refusal still refuses it. A withheld section is
+  never repaired, answered from or quoted. Imatinib Teva's 5.1, whose at-risk table runs its
+  values together, is the first.
 - **Decision 3's pictures.** The EMA's viewer draws Imatinib Teva's two `~/_entity/annotation/…`
   pictures as broken images, and the EMA's FHIR export of the same List carries them as contained
   Binaries under the same ids. A reference is carried from the authority's own export of the same
