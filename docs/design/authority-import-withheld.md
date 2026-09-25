@@ -1,6 +1,6 @@
 # A withheld section: importing a publication with an authority's defect recorded in place (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25; tenth draft, after nine design reviews
+- Status: proposed, 2026-09-25; eleventh draft, after ten design reviews
 - Owner decisions (2026-09-25): withhold the Imatinib Teva tablets SmPC's 5.1 and import the
   other 31 sections; a section may be withheld only on reviewed, measured evidence of the
   authority's defect, the whole record is marked incomplete everywhere it is read, and the safety
@@ -48,7 +48,7 @@ the authority's content, and the gap stated wherever the record is read.
 
 A section may be withheld only when all hold:
 
-1. **A person asks, having reviewed the evidence.** The import request (D2) gains
+1. **A person asks, having reviewed the evidence.** The import request (D2)
    names, as every authority import request does (the renderer note's R5), the evidence reviewed,
    `renderEvidence: { recordSha256, environment, capturesSha256 }`: the renderer record (one per
    document) and the index of the render build's captures of it, which its attestation names (R1),
@@ -151,10 +151,11 @@ automatic and never silent. For a synthetic publication, a withheld section need
   can return them; the run manifest's ingestion evidence, the ledger row (its BigQuery schema) and every
   query result carry `incomplete: true` and the codes.
 - **Provenance.** The source record gains `withheldSections: [{ path, code, page, confirmed,
-rejected }]` (checked against the request and the record) and, when anything is withheld, `rendering: { gateVersion, gateSha256, recordSha256 }`
+rejected }]` (checked against the request and the record); `rendering` (below) is now carried by
+  every authority import, withheld or not (the renderer note's R1) and, when anything is withheld, `rendering: { gateVersion, gateSha256, recordSha256 }`
   (checked: the record the lookup used; the run's evidence keeps its bytes). Such a submission
-  re-verifies in its own worker image, whose store and gate it used (the renderer note's R10). The record thus shapes approved content only when something is
-  withheld, and is then named in it.
+  re-verifies in its own worker image, whose store and gate it used (the renderer note's R10). The record shapes the approved content of every authority import
+  (the contacts acknowledged, and what is withheld), and is named in it.
 - **Structuring decisions (D9).** `Composition.status` becomes a decision by rule
   (`status-from-publication` or `partial-when-withheld`); one `defaulted-by-rule` decision per
   withheld section for its `emptyReason` and one for its notice (`rule: withheld-section`).
@@ -230,8 +231,8 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
 - **The agent**: a question about a withheld section is answered with the fact that it is withheld
   and why, never from memory or another section; every answer from an incomplete record says so.
 - **Before persistence.** D1's dry run is lifted for a publication with a withheld section only once
-  the query service and the agent do the above, and once the request that withholds is bound to an
-  attested person (D2 names who requests an import; withholding is a decision about content, so its
+  the query service and the agent do the above, and for any request that withholds a section or
+  acknowledges a contact (the renderer note's R5) only once it is bound to an attested person (D2 names who requests an import; withholding is a decision about content, so its
   requester must be an identity, not D8's placeholder): PR 5's preconditions.
 - **The round trip** (PR 4) reports the withheld section as an expected, recorded difference.
 - **The defect is recorded** in `docs/design/qrd-conformance-check.md` with its measurements, as
@@ -246,17 +247,17 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
 
 ### W7. Versions
 
-- `CanonicalSubmission` 2.1.0: the request's `renderEvidence`, `acknowledgedContacts` (the renderer
+- `CanonicalSubmission` 3.0.0 (a major: required fields for an authority import): the request's `renderEvidence`, `acknowledgedContacts` (the renderer
   note's R5) and `withheld`, the source record's `withheldSections` and
   `rendering`, `Composition.status` `partial`. `schemaVersion` is a literal, so a 2.0.0 submission
-  does not read as 2.1.0: 2.0.0 authority imports (dry runs only; none approved) are re-imported,
+  does not read as 3.0.0: 2.0.0 authority imports (dry runs only; none approved) are re-imported,
   and readers that must keep reading old documents accept both (the run manifest's
   `contractVersion`, D13), as `AnyRunManifestSchema` does for manifests.
 - `fidelity-norm/3.2.0` and the fidelity report's version (W5); one minor version of the run
   manifest, shared with the renderer note's R10; `QUERY_TOOLS_VERSION`; the ledger's schema; the
   importer's version (D10's lock). Generated schemas and Zone A models are regenerated.
 - `AGENTS.md`: "An authority import may carry a mandatory section as withheld only under
-  `docs/design/authority-import-withheld.md` (measured evidence of the authority's defect, never a
+  `docs/design/authority-import-withheld.md` (reviewed, measured evidence of the authority's defect, never a
   safety section 4.2–4.9, the record marked incomplete)."
 
 ## What this is not
@@ -278,9 +279,9 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
 - A synthetic publication with a withheld section can be imported only against a test store: the
   render build draws only publications pinned in `labels/`, so the deployed gate refuses it.
 - The record named in a request changes whenever any section's outputs, the pins (3c-E's export
-  among them) or the gate change, and its captures whenever it is attested again (a new key
-  version); each change needs a new review and a new request, in each environment, before the
-  publication can be imported again with a section withheld.
+  among them) or the gate change; each change needs a new review and a new request, in each
+  environment, before the publication can be imported again, withheld section or not (a
+  re-import after a normalisation change included, ADR 0005 decision 4).
 
 ## Verification
 
@@ -293,7 +294,7 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
   `tree`; a document-level refusal refuses whatever is listed; a withheld section's picture is not
   fetched; a section whose only T5 evidence is withheld refuses; listing 4.2 Posology refuses.
 - The gate's recomputation reproduces the withheld list, the defects and the status.
-- The review tool (delivered with 3c-W) refuses a tampered capture, index or attestation, and one of
+- The review tool (delivered with 3c-D, which first requires reviewed evidence) refuses a tampered capture, index or attestation, and one of
   another environment.
 - `fidelity-norm/3.2.0`'s vectors and differential cases; the verifier refuses the notice, an
   `emptyReason` or a `generated` narrative on any other source or section.
@@ -393,3 +394,14 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
    renderer note's tenth: every authority import request names the evidence reviewed
    (`renderEvidence`, replacing `withheldEvidence`) and acknowledges each contact, which the owner
    decided (2026-09-25); the judge's own index space; the rest as found.
+10. **Tenth independent review** (2026-09-25). Medium: a contact's identity had no section path, and a
+    withheld section's contacts were unsettled; acknowledging a contact, a judgement of content,
+    needed no attested identity. Low: when `renderEvidence` is required; statements left from when
+    only withheld imports named the record; the review tool's delivery; the sidecar's choice among
+    key versions; acknowledged contacts in no consumer; the contract's version against ADR 0002's
+    rule; amendment lists; P9's touch; HTML-to-XML character mapping. Fixed in this draft, with the
+    renderer note's eleventh (which, on the owner's decision of the same day, makes every contact the
+    gate cannot prove harmless an acknowledged one): contacts identified by section; an attested
+    requester for any acknowledgement; `rendering` in every authority import; the rest as found. The
+    contract's version: `CanonicalSubmission` 3.0.0, a major, since new fields are required for an
+    authority import and 2.0.0 submissions do not read as it (ADR 0002's rule).

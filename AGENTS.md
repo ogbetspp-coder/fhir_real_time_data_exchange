@@ -18,8 +18,8 @@ Google Cloud Healthcare API and observe their native near-real-time BigQuery str
   authority import under ADR 0005.
 - Fail closed on missing, duplicate, or ambiguous mandatory QRD sections. The one exception: an
   authority import may carry a mandatory section as withheld only under
-  `docs/design/authority-import-withheld.md` (measured evidence of the authority's defect, never a
-  safety section 4.2–4.9, the record marked incomplete).
+  `docs/design/authority-import-withheld.md` (reviewed, measured evidence of the authority's defect,
+  never a safety section 4.2–4.9, the record marked incomplete).
 - Pin and checksum all external FHIR packages and examples.
 - Do not claim regulatory or GxP compliance. Produce qualification-supporting evidence.
 - Never log FHIR payloads, credentials, tokens, or clinical text.

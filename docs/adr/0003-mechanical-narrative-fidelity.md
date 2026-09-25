@@ -190,13 +190,13 @@ written, confirmed by the
 person who requests the import, never on a refusal of ours, so no false pass
 of the authority's text enters the record by it: none of the section's text enters at all.
 
-## Amendment (2026-09-25, a raised number against the tail above)
+## Amendment (2026-09-25, contacts acknowledged)
 
 A second stated exception to "false passes are not" (owner decisions of 2026-09-25;
-`docs/design/authority-import-renderer.md`, P9): in the renderer gate, a digit T folded as raised
-may touch, or share a stated fraction of its pixels with, a glyph on the line directly above, within
-the raised digit's top third and at or below that glyph's baseline, one contact per glyph, and only
-once the person who requests the import has acknowledged that contact, legible, in the gate's
-captures of the record they name. No automatic limit alone decides it. The EMA's Imatinib Teva SmPC
-draws the 9 of "10⁹/l" in 4.2 against letters, a bracket and a digit of the line above at some
-widths; the finding is reported to the authority.
+`docs/design/authority-import-renderer.md`, R4): the renderer gate sorts what it draws into clear,
+failures (clear misreadings, which refuse) and **contacts**, glyphs or lines that touch or stand
+closer than the gate can prove harmless, which pass only once the person who requests the import,
+an attested identity before anything is persisted, has seen each one in the gate's captures of the
+record they name and acknowledged it legible. No automatic limit alone decides a contact. The EMA's
+Imatinib Teva SmPC has contacts in 4.2 (the raised 9 of "10⁹/l" against the line above) and 4.8 ("V"
+of "Appendix V" past its grey background); the findings are reported to the authority.

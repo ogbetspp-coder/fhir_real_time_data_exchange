@@ -320,9 +320,10 @@ independent reviews, and changes this ADR as follows.
   failing one is not listed, and a document-level refusal still refuses it. A withheld section is
   never repaired, answered from or quoted. Imatinib Teva's 5.1, whose at-risk table runs its
   values together, is the first.
-- **A second stated exception** (ADR 0003, amended): a raised digit may touch the line directly above
-  (4.2's "10⁹/l") within stated limits, each contact acknowledged by the person who requests the
-  import, who names the record and captures reviewed.
+- **A second stated exception** (ADR 0003, amended): a contact the renderer gate cannot prove harmless
+  (4.2's raised "10⁹/l" against the line above; 4.8's "Appendix V" past its grey background) passes
+  only once the person who requests the import acknowledges it, legible, in the gate's captures of
+  the record they name; clear misreadings refuse.
 - **Decision 3's pictures.** The EMA's viewer draws Imatinib Teva's two `~/_entity/annotation/…`
   pictures as broken images, and the EMA's FHIR export of the same List carries them as contained
   Binaries under the same ids. A reference is carried from the authority's own export of the same
