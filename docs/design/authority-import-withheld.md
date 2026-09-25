@@ -1,6 +1,6 @@
 # A withheld section: importing a publication with an authority's defect recorded in place (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25; fifteenth draft, after fourteen design reviews
+- Status: proposed, 2026-09-25; sixteenth draft, after fifteen design reviews
 - Owner decisions (2026-09-25): withhold the Imatinib Teva tablets SmPC's 5.1 and import the
   other 31 sections; a section may be withheld only on reviewed, measured evidence of the
   authority's defect, the whole record is marked incomplete everywhere it is read, and the safety
@@ -231,13 +231,13 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
   write order; for the current version, `get_provenance` cross-checks the Provenance's extension,
   and a disagreement fails closed. `get_section` on a withheld section returns a new outcome,
   `section-withheld`, a validated success variant of its output (not an error, which the agent treats
-  as unavailable), with its confirmed defect kinds for the current version only when the
-  Provenance's extension agrees with the version read (the same cross-check as `get_provenance`;
-  otherwise, and for a superseded version, without them), never the notice as document content; `verify_quote`
+  as unavailable), with its confirmed defect kinds read from the signed request statement (for every
+  version, `docs/design/approval.md`), never the notice as document content; `verify_quote`
   reports the withheld sections as not searched, so a `no-match` on an incomplete record never
   reads as absence; `get_provenance` returns the withheld sections; every result about the
-  document carries `incomplete`; `get_provenance` also returns the record's hash and, per section,
-  the contacts acknowledged and the attested requester (the renderer note's R10).
+  document carries `incomplete`; `get_provenance` also returns the record's hash, the request statement's kind and hash, the
+  attested requester once, and per section the number of contacts acknowledged (the renderer note's
+  R10).
 - **The agent**: a question about a withheld section is answered with the fact that it is withheld
   and why, never from memory or another section; every answer from an incomplete record carries a
   line saying so, rendered deterministically from `incomplete`, not written by the model.
@@ -249,8 +249,8 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
   record that shows every acknowledged contact and every withheld section's confirmed and rejected
   defects, in the approver map's `content-reviewer` role, which alone may acknowledge a contact or
   withhold a section; the statement pins the withheld set, which the query service requires the
-  served version to match exactly; the requester should not be the person who proposed the record,
-  a separation that is a stated residual while the project has one named person (D2 names who requests an import; withholding is a decision about content, so its
+  served version to match exactly; a request is one person's judgement, attested, with
+  D7's known gap while the project has one named person (D2 names who requests an import; withholding is a decision about content, so its
   requester must be an identity, not D8's placeholder): PR 5's preconditions.
 - **The round trip** (PR 4) reports the withheld section as an expected, recorded difference.
 - **The defect is recorded** in `docs/design/qrd-conformance-check.md` with its measurements, as
@@ -265,7 +265,7 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
 
 ### W7. Versions
 
-- `CanonicalSubmission` 3.0.0 (a major, ADR 0002's rule: fields required for an authority import, and
+- `CanonicalSubmission`'s next major, 3.0.0 unless item 2's lands first (ADR 0002's rule: fields required for an authority import, and
   enums the gate branches on): the request's `renderEvidence`, `acknowledgedContacts` (the renderer
   note's R5) and `withheld`, the source record's `withheldSections` and `rendering`,
   `Composition.status` `partial`, `SectionProvenanceSchema.spans` allowing none for a withheld
@@ -275,7 +275,7 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
 - `ApprovalStatement`'s next version (the `request` kind and its meaning code; `docs/design/approval.md`),
   and version 1.0.0 of our `withheld-reason` CodeSystem and `ext-record-incomplete` extension, defined
   as FHIR artefacts beside the mapping.
-- `QUERY_TOOLS_VERSION` 3.0.0, a major (`incomplete` required; the `record-inconsistent` error code; `get_section`'s `section-withheld`
+- `QUERY_TOOLS_VERSION`'s next major (3.0.0 unless item 2's lands first) (`incomplete` required; the `record-inconsistent` error code; `get_section`'s `section-withheld`
   variant with its defect kinds; `get_provenance`'s withheld sections, record hash, contacts
   acknowledged and requester); the agent's turn record's next major (`AGENT_TURN_VERSION`, a required
   `incomplete`); the `ingestion-provenance` schema's published `$id`, its next major, from a constant
@@ -483,3 +483,14 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
     failures; the withheld review's claim; width units. Fixed in this draft: approval.md amended with a
     `request` statement kind, its review, sections (the withheld set pinned and checked by D9), role,
     segregation and phase; `record-inconsistent`; the rest as found.
+15. **Fifteenth independent review** (2026-09-25). Medium: the request's review flow contradicted
+    itself (a separate review tool writing decisions, a signer rebuilding a review of the
+    submission), so a producer could add a decision the person never opened; the defect kinds were
+    read from a Provenance lookup item 2 retires. Low: D8's head for requests; which error comes
+    first; which statement kind for which document; segregation that could not be enforced; where
+    `requestedBy` goes; colliding version numbers; section coverage; "per section"; roadmap item 2's
+    row; the head moving before publish. Fixed in this draft, with approval.md's amendment rewritten:
+    the flow (the requester drafts, the signer verifies the attestation and builds and stores the
+    review, a Chat card links to it in Cloud Storage's authenticated viewer, the person signs); the
+    kind derived from the source; the defect kinds signed in the statement; the head, the error order,
+    segregation, versions and build order stated.

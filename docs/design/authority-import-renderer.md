@@ -1,7 +1,7 @@
 # The renderer gate: a pinned browser's evidence for every authority import (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25 (architecture approved by the owner the same day); fifteenth draft,
-  after fourteen design reviews; R4's thresholds provisional, settled by 3c-C's measured design
+- Status: proposed, 2026-09-25 (architecture approved by the owner the same day); sixteenth draft,
+  after fifteen design reviews; R4's thresholds provisional, settled by 3c-C's measured design
 - Decides: what `docs/design/authority-import-t.md`'s "What waits for PR 3c" left open: who draws,
   what is drawn and measured, the evidence record and its store, and the `rendering` stage
 - Amends: ADR 0003 (the second stated exception, contacts acknowledged); ADR 0005 (decision 1's
@@ -347,13 +347,16 @@ clear. Geometry from layout (advances, boxes) is compared exactly, in Chrome's l
 - **P4. What a font draws is not a contact.** Two characters adjacent in logical order on one line
   fragment (one line box of one block, never across cells), in whatever text nodes, neither shifted
   relative to the other (a raised "14" beside the "C" of "¹⁴C" is checked), are not checked against
-  each other; an unshifted glyph whose pixels stay clear of the drawn pixels of its own run's
-  underline on its own line (or meet it only at a gap skip-ink cuts) is not a contact with it (P5
-  still judges that underline, and a shifted glyph keeps P6's rule); a glyph that touches those drawn
-  pixels is a contact, cleared only as P8(a) clears a descender on its border (the closed letter
-  list, two rows), and a part of a glyph hidden in its own underline is P3's failure (an underscore
-  under its own underline, drawn as nothing); the underline of another line of the same run is a
-  foreign line; and the judge asserts that each line's visual order is its logical order; a
+  each other; an unshifted glyph and its own run's underline on its own line are judged only on
+  the glyph's ink below the lowest baseline R4 allows plus one anti-aliasing row (what descends into
+  the line: a tail, a cedilla, a comma), never on the letter's body resting above it (P5 still judges
+  that underline as an underline, and a shifted glyph keeps P6's rule). For that descending ink, the
+  gaps skip-ink cuts count as line, except for P8(a)'s letters, whose tails the cut lets through: a
+  touch of the drawn line or a cut is a contact, cleared only by P8(a); and a whole component of a
+  glyph lying within the underline's band, drawn or cut, or within one device pixel of it, is P3's
+  failure (a comma merged into its underline, "1,5" read as "1.5"). A low-line character under a
+  decoration (U+005F, U+02CD, U+2017, U+0332 and the closed list 3c-C states) is a refusal of ours.
+  The underline of another line of the same run is a foreign line; and the judge asserts that each line's visual order is its logical order; a
   combining mark that draws a line through or under its base (U+0332 among them, a closed list 3c-C
   states) is a refusal of ours; a run's own decoration is the one drawn by its decorating box, and
   the collinear decorations of adjacent runs are one line; T5's waived `+` is exempt, under its own
@@ -383,7 +386,9 @@ clear. Geometry from layout (advances, boxes) is compared exactly, in Chrome's l
   (a) a descender of one of a closed list of letters (lowercase Latin g, j, p, q, y; lowercase Greek
   β, γ, ζ, η, μ, ξ, ρ, φ, χ, ψ; with no mark below, never a capital, a digit, a punctuation mark or a
   symbol, since a comma's tail on a line can read as a full stop and a cedilla's as nothing) touching,
-  or standing within the glyph–line clearance of, its own cell's bottom border, with no shared pixel,
+  or standing within the glyph–line clearance of, its own cell's bottom border or its own run's
+  underline on its own line (or passing through the gap skip-ink cuts in that underline), with no
+  shared pixel,
   where the descender keeps at least two rows of pixels at 40 % coverage or more that are not
   8-adjacent to the border, its rows counted from the lowest baseline R4's one-pixel uncertainty
   allows (so a tail small enough to fuse into the line, "y" read as "v" at 7 pt, stays a contact); and
@@ -406,7 +411,8 @@ narrow for the label. On the tablets label the twelfth review counted, at sample
 carried sections before P8 (178 descenders on their own borders in 4.8 and 9 in 4.2; 39 at the
 reporting box's grey edges; 65 pairs of 4.2's raised 9 against the line above; two brackets on their
 own borders in 4.8; one in 5.2) and about 70 after it, 65 of them the raised 9's, in some 100 to 250
-distinct drawings; every integer width adds more. 3c-C measures the counts at every width and sets
+distinct drawings; every integer width adds more, and the own-underline rule of this draft is
+recounted by 3c-C before the cap is set. 3c-C measures the counts at every width and sets
 a cap, one gate constant in the record's `tolerances` (so changing it is a new gate version), on the
 number of contact identities and of distinct drawings across a record's carried sections; the lookup
 refuses above it (`renderer-contacts-exceeded`, a failure, never a refusal of ours), so
@@ -415,7 +421,8 @@ contact the gate cannot prove harmless passes only by a person's acknowledgement
 
 **Seeded cases (binding).** Each is a case of the judge's tests in both modes and at every ratio.
 Must be failures: a descender covered by a later line's inline background; an underscore under
-its own underline ("a_b"); a "<" on a shaded bar that is not its own frame's background (P5, "≤"); a colon shifted across
+its own underline ("a_b", a refusal of ours at any size); a comma or cedilla lying in its own
+underline's band ("1,5" read as "1.5"); a "<" one blank device row above a shaded bar that is not its own frame's background (P5, "≤"); a colon shifted across
 its cell's bottom border ("10:1" drawn "10.1"); a colon's
 lower dot inside a thick bottom border ("10·1"); a raised 7 folded by 2.8 pt, its bar inside its
 cell's top border; two cells' numbers 0.19 px apart (5.1's table 9 at 504 px); a glyph's pixels on a
@@ -428,7 +435,8 @@ against the underline of the line above; a raised 7 folded by 2.4 pt abutting it
 border ("x 10⁷/l"); a descender touching a picture on the next line; a comma's tail touching its
 own cell's bottom border; a "ç" whose cedilla touches its own cell's bottom border; a 7 pt "y" and
 "μ" touching their own cells' bottom borders at ratio 1; an underlined "1,5" and "ç" at 5 pt, their
-comma and cedilla touching their own underline; an accent on a run's second line touching the
+comma and cedilla touching their own underline or standing in a gap skip-ink cuts in it; the
+reporting box's final "." and a descender of the line above touching the grey fragment's edge; an accent on a run's second line touching the
 underline of its first at `line-height: 1em`; 5.2's raised "14" against the "C" of
 "¹⁴C"; `<u>AUC<sub>0-24</sub></u>` where the lowered hyphen abuts its underline or sits
 in a skip-ink gap; 4.2's "10⁹/l" against the line above.
@@ -438,8 +446,8 @@ measured 0.39 em in the original) as an underline question (P5); a descender ove
 (4.2's "Posology for Ph+ ALL in children"); the waived `+` of 4.2's headings; an underlined
 "Posology" and 4.8's underlined link "Appendix V", their descenders breaking the underline (P4).
 Must be clear by rule (P8): 4.2's and 4.8's letter descenders touching their own cells' bottom
-borders; 4.8's reporting box text meeting its grey background's edges, "Appendix V" past it
-included.
+borders; the grey text's own glyphs in 4.8's reporting box meeting their grey background's edges,
+"Appendix V" past it included; an underlined "o" at ratio 1.25, resting on its underline.
 
 **Provisional checks** (the second draft's list, kept as 3c-C's starting point, each to be restated
 under the three classes and P1–P7 with measured thresholds): overlap; every drawn line as ink (0.5 CSS px); a line under
@@ -456,10 +464,11 @@ a withheld section's contacts are neither acknowledged nor checked, and acknowle
 withheld section's confirmations are the withheld note's. Acknowledging a contact is a judgement of
 content, so, as for withholding, PR 5 lifts the dry run for a request that acknowledges any only once
 its requester is an attested identity (every Imatinib Teva import acknowledges some, so PR 5 needs that
-identity before any real label is persisted). The review tool (delivered with 3c-D) verifies the
-attestation, the index and each capture's hash before showing the captures, deduplicates identical
-masks, and writes the request's acknowledgements; that the requester opened them is a claim, not
-proven, a residual stated below. When several attestations of a record verify (key versions
+identity before any real label is persisted). The review the requester is shown is item 2's (`docs/design/approval.md`, its amendment of
+2026-09-25): the signer verifies the attestation, the index and each capture's hash, builds a review
+of every acknowledged contact (identical masks once, each with every identity it stands for) and
+stores it, and a Chat card links to it; that the requester opened it is a claim, not proven, a
+residual stated below. When several attestations of a record verify (key versions
 not revoked), the image build takes the one of the highest key version, and its captures are those a
 request names. The image build places, beside each record it keeps,
 the verified attestation's `{ environment, capturesSha256 }`
@@ -633,7 +642,7 @@ and the attestation names their index (R1).
 
 `AuthorityFetchSchema` gains `authority` and `rendering: { gateVersion, gateSha256, recordSha256,
 contactsAcknowledged }`, the latter required when `authority` is not `synthetic` or something is
-withheld, and absent otherwise. `RUN_MANIFEST_VERSION` moves to 3.0.0, a major, with the withheld
+withheld, and absent otherwise. `RUN_MANIFEST_VERSION` moves a major (3.0.0 unless item 2's lands first), with the withheld
 note's fields and the submission's 3.0.0 (`contractVersion` follows it, D13); the 2.0.0 ingestion
 block is frozen with the literal `"2.0.0"` in `AnyRunManifestSchema`, as 1.0.0's was, and a 2.0.0
 manifest fixture is read through it in a test. The FHIR Provenance carries `rendering.recordSha256`, the
@@ -665,8 +674,8 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
    format's addendum.
 2. **3c-C**: its measured design of R4 (reviewed first), then R4, R7, R8, R9, R11; the render build,
    its trigger and attestations; the records of the pinned labels.
-3. **3c-D**: R5 and R10: the lookup, the image build's verification, the review tool, the manifest,
-   re-verification.
+3. **3c-D**: R5 and R10: the lookup, the image build's verification, the manifest, re-verification
+   (the review a requester signs is item 2's, before PR 5).
 4. **3c-W**: the withheld section (its note), including the lookup's withheld part.
 5. **3c-E**: pictures from the authority's export (the owner's decision of 2026-09-25; its own
    note), needed by every pinned label but Imatinib Teva once 5.1 is withheld.
@@ -678,13 +687,14 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
 - The authority's viewer applies a stylesheet the gate does not, and its page margin may differ
   from the gate's 16 px, which `off-page` and check 6 depend on.
 - The visited link colour is judged statically (T3a).
+- A letter of P8(a) whose tail tip hides in its own underline at some layouts (a "y" in an underlined
+  heading) is P3's failure though it reads as "y"; 3c-C measures how often, on the pinned labels.
 - A shifted glyph crossed through its body by its own run's underline (a lowered "2" in an
   underlined "AUC₀₋₂₄") is P3's failure even where it stays readable; 3c-C measures how often an
   underlined heading with a subscript is refused.
 - That a requester opened the captures of every contact they acknowledge is their claim; the review
   tool records what it showed them, but not that they looked.
-- The person who acknowledges a record's contacts should not be the one who proposed it (R1); while
-  the project has one named person they are the same, as the change records already state.
+- A request is one person's judgement (item 2's D7 gap while the project has one named person).
 - Chrome runs without its sandbox inside the render container; an exploit in authority content
   could forge both draws of one build (the container has no network and no credentials).
 - Re-verifying an old import needs its worker image, which carries the store, to persist.
@@ -901,3 +911,13 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
     pixels on its own line, a touch a contact (P8(a)'s letters clear), a part hidden in it a failure,
     another line's underline foreign; P8(b) only for the glyph's own frame's backgrounds, and an edge
     below a glyph always judged by P5; the estimator stated; seeds per class and size.
+15. **Fifteenth independent reviews** (2026-09-25). High: the skip-ink carve-out cleared a comma or
+    cedilla lying in its own underline's row between the cuts ("1,5" read as "1.5", "ç" as "c"), and a
+    glyph filling a cut, deeper passing where shallower was a contact. Medium: "a touch is a contact"
+    caught ordinary letters resting on their own underline (about 680 identities, breaking the cap and
+    the must-be-clear seeds); the "a_b" seed could not be a failure at 5 pt. Low: the reporting box's
+    foreign contacts; P8(a) silent on the own underline; a P8(a) tail hidden in its underline; the
+    shaded-bar seed's geometry. Fixed in this draft: the own underline judged only on ink below the
+    baseline, the cut counted as line but for P8(a)'s letters, a component within the band or a pixel
+    of it a failure, low-line characters under a decoration refusals of ours; P8(a) names the own
+    underline; seeds restated.

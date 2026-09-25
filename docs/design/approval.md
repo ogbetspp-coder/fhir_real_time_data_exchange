@@ -323,32 +323,63 @@ which sections are withheld on a confirmed defect. PR 5 persists an authority im
 person is attested, so phase 1 of this design gains the following, without changing what it
 decides for a Type 2 approval.
 
-- **A statement kind, `request`,** with its own meaning code ("I reviewed the renderer gate's
+- **A statement kind, `request`,** with its own meaning code ("I was shown the renderer gate's
   captures of this publication's record; each listed contact is legible; each listed defect is
-  confirmed or rejected as stated; I request this import"). For an authority import it is the
-  statement D5 links and D9 verifies; there is no second `approve`, since the content's approval is
-  the authority's publication (ADR 0005 decision 4). `document` is generalised to the canonical
-  `Bundle.identifier` (an import's is `authority-import:ema:<id>`).
-- **Its review (D6)** is a pure function of the submission and the attested renderer record: the
-  record and captures named by `renderEvidence`, every acknowledged contact with its captures' mask
-  hashes and every identity each drawing stands for, and each withheld section's confirmed and
-  rejected defects with their captures. The renderer note's review tool is this review's surface; the
-  signer rebuilds it and binds its hash in `reviewSha256`, so what was shown is what is signed.
-- **Its `sections`** list every carried section's `narrativeDivSha256` and every withheld section,
-  with `status: withheld` and the notice's hash. D9 requires the served version's withheld set to
-  equal the statement's exactly and every statement section to be present, and the query service
-  fails closed on a withheld section that is a safety section (4.2 to 4.9, or under one) or is not a
-  leaf, so no store write can plant a withholding behind a valid approval.
+  confirmed or rejected as stated; I request this import"). The signer derives the kind from the
+  submission's source: `request` for an authority import (a document in the `authority-import:`
+  namespace), `approve` for any other; D9 and the pipeline require exactly that pairing, and
+  `get_provenance` and the audit record carry the kind and its meaning, so a requester is never
+  shown as the text's approver. For an authority import the request is the statement D5 links and
+  D9 verifies; there is no second `approve`, since the content's approval is the authority's
+  publication (ADR 0005 decision 4). `document` is generalised to the canonical `Bundle.identifier`
+  (an import's is `authority-import:ema:<id>`).
+- **The flow.** (1) The requester drafts the decisions: the producer writes the submission, whose
+  request lists every contact of the record (the lookup requires exactly those) and each withheld
+  section's confirmed and rejected defects. (2) The signer verifies the renderer record's
+  attestation against its pinned public keys, and builds the review (D6) as a pure function of the
+  submission and the attested record: the record and captures named by `renderEvidence`, every
+  acknowledged contact with its captures, every identity each drawing stands for, and each withheld
+  section's confirmed and rejected defects with their captures; it stores the review, with its
+  captures, as an immutable file under `reviews/`. (3) The Chat card links to that file, opened in
+  Google Cloud Storage's authenticated viewer (a Google surface, no custom interface), and carries
+  its hash. (4) The person opens it and clicks; to change a drafted decision they sign `reject` and a
+  new draft is made. What was shown is what is signed. The signer's service account gains read on
+  the renderer records, their attestations and captures.
+- **The request's review has no diff.** D6 shows the diff from the document's current head; a
+  request's content is the authority's publication, not an edit, so its review shows the decisions,
+  not a diff, and says so.
+- **Its `sections`** list every carried section with narrative, by its `narrativeDivSha256`, and
+  every withheld section, with `status: withheld`, the notice's hash and its confirmed defect kinds.
+  D9 requires the served version's withheld set to equal the statement's exactly, every statement
+  section to be present, and every served section with text to be listed; a hash that does not match
+  is `not-approved`, and only then is a withheld set or a status that disagrees `record-inconsistent`.
+  The query service fails closed on a withheld section that is a safety section (4.2 to 4.9, or under
+  one) or is not a leaf, so no store write can plant a withholding behind a valid approval, and it
+  reads a withheld section's defect kinds from the signed statement, for every version.
+- **The head (D8) applies to requests.** A request's `sequence` and `previousStatementSha256` chain
+  per document, keyed by the canonical `Bundle.identifier`, which the authority's document id
+  determines; whether a new id from the authority supersedes an older import is PR 5's decision. If
+  the authority replaces the publication between the signature and the pipeline's fetch, the head
+  names a statement that can never publish, and the earlier version is no longer current: closed, not
+  open.
 - **The role.** The signer requires `content-reviewer` for a request that acknowledges a contact or
   withholds a section.
-- **Segregation (D7) for a request.** The requester may be the principal that ran the producer, but
-  may not be the person who proposed or committed the renderer record (the renderer note's R1);
-  while the project has one named person this is the known gap D7 already records.
+- **Segregation (D7) for a request.** A request is one person's judgement, attested. The renderer
+  record it rests on is regenerated deterministically on `main` (the renderer note's R1), so its
+  proposer has no discretion over it; D7's rules otherwise stand, with the known gap D7 records while
+  the project has one named person.
 - **Where the publication's approval goes.** Item 2 removes `approval` from the submission. For an
   authority import the publication's fields (ePI id, document, List, version number, procedure
-  number, timestamp) and `authorityStatus: pilot` move into the source record
-  (`provenance.sourceDocument`), which already carries the request; the request statement signs over
-  them through `approvedContentSha256`.
-- **Versions.** `ApprovalStatement` gains the kind and the meaning code (its `statementVersion`
-  moves), and `ReviewRecord` the import review's shape; item 2's build order places them in phase 1,
-  before PR 5.
+  number, the Bundle's timestamp) and `authorityStatus: pilot` move into the source record
+  (`provenance.sourceDocument`, which gains the procedure number and timestamp), and `requestedBy`
+  and `requestedAt` give way to the statement's approver and `signedAt`; the request statement signs
+  over them through `approvedContentSha256`. ADR 0005 decision 4 and the contract design's D8 point
+  here.
+- **Versions.** `ApprovalStatement` and `ReviewRecord` are new, so their 1.0.0 includes the `request`
+  kind, its meaning code and the import review's shape. Item 2's majors of `CanonicalSubmission` and
+  the query tools and roadmap 3a's (the renderer and withheld notes' 3.0.0) are one major each if
+  they land together, and consecutive otherwise; whichever lands second takes the next number. The
+  contract table above gains the `request` kind, `ReviewRecord`'s import review, `record-inconsistent`
+  and `get_section`'s `section-withheld`.
+- **Build order.** Steps 2 and 5 of phase 1 add request cases: a request statement signed over an
+  authority import's review, and the query service verifying it, before PR 5.
