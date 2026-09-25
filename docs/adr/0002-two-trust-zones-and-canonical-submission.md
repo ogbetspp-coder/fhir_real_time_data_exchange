@@ -260,6 +260,8 @@ and a fixed notice, `Composition.status` `partial`. Invariants 4 and 6 change fo
   and on an `authority-publication` source any `generated` narrative.
 - **3.** The binding recomputed from the Bundle takes the recomputed withheld list as its second
   input; a withheld section's entry uses the sentinel fidelity §7 defines (`fidelity-norm/3.2.0`).
+- **10.** The notice is not narrative, so the rule that every synthetic narrative carrying text says
+  "not for clinical use" does not apply to it; it applies to every other narrative as before.
 
 The human decision that withholds is the import request's, hash-bound in the approved content as
 every request is (invariant 2); before PR 5 lifts the dry run it is bound to an attested identity.

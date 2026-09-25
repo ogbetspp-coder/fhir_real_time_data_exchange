@@ -1,6 +1,6 @@
 # A withheld section: importing a publication with an authority's defect recorded in place (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25; fifth draft, after four design reviews
+- Status: proposed, 2026-09-25; sixth draft, after five design reviews
 - Owner decisions (2026-09-25): withhold the Imatinib Teva tablets SmPC's 5.1 and import the
   other 31 sections; a section may be withheld only on reviewed, measured evidence of the
   authority's defect, the whole record is marked incomplete everywhere it is read, and the safety
@@ -26,13 +26,14 @@ again in the pinned image):
 - The at-risk tables under the two Kaplan-Meier figures put up to three values in one cell. At
   800 px, table 8's "182:8" and "177:12" stand 2.33 px apart (0.19 em). At 360 px, 18 of its cell
   pairs touch, drawing "10:842:840:84" (from 281 to 419 px they touch at every width), and table
-  9's values stand as little as 0.19 px apart at 537 px and below ("64:2246:2327:25"). The EMA's
+  9's values stand as little as 0.19 px apart at content widths of 504 px and below
+  ("64:2246:2327:25"). The EMA's
   PDF draws each value under its own axis tick.
 - The row heading "At-risk : Events" has `margin-left: -14.6pt`; at 593 px and below "Events"
   wraps to a line starting 19.45 px left of the table, off a page without a margin ("vents").
 - In table 2, twelve paragraphs with a −1 pt right margin in unpadded, bordered cells cross the
-  cell edge by up to 1.28 px at some widths (at 561 px the border runs through the "n" of
-  "evaluation").
+  cell edge by up to 1.28 px at some widths (the border touches a serif pixel of an "n" at 561 px,
+  a contact, not a line through the letter).
 
 ADR 0005 decision 3 refuses such a publication. Of the EMA ePI API's public corpus (268 Bundles;
 English SmPCs for five centrally authorised products) no English SmPC gets past T, pictures and
@@ -46,9 +47,15 @@ the authority's content, and the gap stated wherever the record is read.
 
 A section may be withheld only when all hold:
 
-1. **A person asks.** The import request (D2) gains `withheld`: a list of `{ path, code }` in the
-   document's pre-order, `path` the section's `SourcePath` and `code` its code as served. The
-   request is approved content (D2), covered by `approvedContentSha256` (D8).
+1. **A person asks, having reviewed the evidence.** The import request (D2) gains `withheld`: a list
+   of `{ path, code, recordSha256, defects }` in the document's pre-order, `path` the section's
+   `SourcePath`, `code` its code as served, `recordSha256` the renderer record the person reviewed
+   (its drawing published with the record's pull request, R1) and `defects` the kinds they
+   confirmed there (a split number such as "12" beside ".5" is geometrically a run-together and
+   must not be confirmed). The request is approved content (D2), covered by
+   `approvedContentSha256` (D8); the lookup refuses if the record it uses is not the one named, or
+   its defects for the section are not the ones confirmed (`withheld-evidence-changed`), so a later
+   record, drawn under another gate, never stands in for the one reviewed.
 2. **Its drawing is shown unsound, by evidence that is not ours.** The renderer gate's record for
    the document (`docs/design/authority-import-renderer.md` R8), attested by the render build and
    verified by the image build (R1), holds for the section:
@@ -56,14 +63,14 @@ A section may be withheld only when all hold:
      it has no pinned face for, a missing glyph, a model difference, a script or mark it cannot
      bound, a calibration failure, an XML `parsererror`); the font check runs on every section,
      T's or not, so no defect is measured in a substitute font;
-     - **at least one defect** (the renderer note's R8): evidence that the drawing misleads a reader,
-       from what Chrome lays out exactly and paints, never from a content area, a widened bound or a
-       threshold of ours: two cells' text on one line with nothing between them, their facing
-       advances abutting or overlapping (`cells-run-together`: "182:8" beside "177:12" read as one
-       run); a line through the body of a letter, not a touch at a tail or serif
-       (`line-through-letter`); or a character wholly off the page beyond any overhang (`off-page`);
-       none resting on the box of a picture the import does not carry. Every defect is also a
-       failure of the gate's checks.
+     **and** at least one defect (the renderer note's R8), a geometric finding that a reader cannot
+     read the drawing as written, never taken from a content area or a threshold of ours: two cells'
+     text on one line with no more space between them than between two letters of a word, their
+     facing advances abutting or overlapping (`cells-run-together`: "182:8" beside "177:12" read as
+     one run); a line through the body of a letter, not a touch at a tail or serif
+     (`line-through-letter`); or a character whose every possible ink lies off the page
+     (`off-page`); none involving a picture's box. Every defect is also a failure of the gate's
+     checks.
 
    A failure of the gate's conservative checks (a 0.25 em gap, a 0.5 px clearance, a contrast
    margin) is not a defect: it shows the gate cannot prove the drawing sound, not that it is
@@ -91,8 +98,8 @@ automatic and never silent. For a synthetic publication, a withheld section need
 ### W2. Where the checks sit (D10)
 
 - At `tree`, once the sections are placed: each listed path names a section with that code
-  (`withheld-section-unknown`), the list is in pre-order with no repeat
-  (`withheld-section-duplicate`), and no listed section has subsections or is a safety section or
+  (`withheld-section-unknown`), none is listed twice (`withheld-section-duplicate`), the list is in
+  pre-order (`withheld-section-order`), and no listed section has subsections or is a safety section or
   under one (`withheld-section-not-permitted`).
 - At `pictures`, `narrative` and `record`: a listed section is skipped. Its pictures are neither
   checked, fetched nor listed in `pictures` (D6), T and the scanner do not read it, and it gives T5
@@ -189,10 +196,12 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
   (never inferred from the Bundle), carries a withheld section's `emptyReason` and notice and the
   Composition's `partial`, and refuses `emptyReason` anywhere else. Its mandatory-narrative check
   does not count the notice as narrative: a withheld section passes it only as withheld.
-- **The query service**: `incomplete` and the withheld sections are read from the version actually
-  read (its `Composition.status` `partial` and our `emptyReason` code), never from the latest
-  Provenance by write order; for the current version they are cross-checked with the Provenance's
-  extension, and a disagreement fails closed. `get_section` on a withheld section returns a new outcome,
+- **The query service**: every tool reads the version it answers from whole (`loadDocument`), and
+  takes `incomplete` from it: a version is incomplete when its `Composition.status` is `partial`,
+  and its withheld sections are those carrying our `emptyReason` code; `partial` without such a
+  section, or such a section without `partial`, fails closed. Never from the latest Provenance by
+  write order; for the current version, `get_provenance` cross-checks the Provenance's extension,
+  and a disagreement fails closed. `get_section` on a withheld section returns a new outcome,
   `section-withheld`, with its defects, never the notice as document content; `verify_quote`
   reports the withheld sections as not searched, so a `no-match` on an incomplete record never
   reads as absence; `get_provenance` returns the withheld sections; every result about the
@@ -206,7 +215,10 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
 - **The round trip** (PR 4) reports the withheld section as an expected, recorded difference.
 - **The defect is recorded** in `docs/design/qrd-conformance-check.md` with its measurements, as
   a finding reportable to the authority; the record's pull request publishes the defects' captures
-  for its reviewer (the renderer note's R1).
+  for its reviewer (the renderer note's R1), and the request names what was reviewed (W1.1).
+- **Forward pointers.** `docs/design/authority-import-contract.md` (D2, D3, D4, D6, D9, D12, D13),
+  `docs/design/epi-mcp-query-service.md` and `docs/design/verifiable-answers.md` gain a line
+  pointing here, in the change that implements each part.
 
 ### W7. Versions
 
@@ -251,9 +263,9 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
 - `fidelity-norm/3.2.0`'s vectors and differential cases; the verifier refuses the notice, an
   `emptyReason` or a `generated` narrative on any other source or section.
 - The EMA output passes official validation (`cmp-1`, `cmp-2`, `partial`) with a withheld section.
-- The Imatinib Teva tablets SmPC imports in dry run with 5.1 withheld, its defects including
-  `cells-run-together` (table 8, from 320 to 419 px at ratio 1), once the renderer gate draws the
-  document; no carried section of any pinned label shows a defect; the Greek letters of 4.1, 5.1
+- The Imatinib Teva tablets SmPC imports in dry run with 5.1 withheld on `cells-run-together`
+  (table 8, from 320 to 419 px, and at 671 px, at ratio 1; 320 to 418 px at the other ratios), once
+  the renderer gate draws the document and a person has reviewed the record; no carried section of any pinned label shows a defect; the Greek letters of 4.1, 5.1
   and 5.2 are bounded, not refused.
 
 ## Reviews
@@ -299,3 +311,13 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
    `cells-run-together` on exact horizontal advances and `line-through-letter` through a glyph's
    body, with seeded controls; Greek bounded; the `generated` rule scoped to authority sources;
    `incomplete` from the version read; the bookkeeping stated.
+5. **Fifth independent review** (2026-09-25). Medium: check 2's rounded-out bounds failed descenders
+   a pixel above their own cells' borders in 4.2 and 4.8, safety sections that can never be
+   withheld, so the label could not have been imported (the renderer note's fifth draft judges a
+   glyph's own frame on pixels); the evidence "reviewed" was bound to nothing, so a later record
+   could satisfy a request made against another. Low: a split number is the same geometry as a
+   run-together; figures of table 9 and the 561 px "n"; shared definitions; where the defects are
+   computed and what `incomplete` is; a withheld section's pictures; ADR 0002's invariant 10, ADR
+   0003's wording and the forward pointers; the list's order. Fixed in this draft: the request names
+   the record reviewed and the defects confirmed, and the lookup refuses a change; the reviewer
+   rejects a split number; the rest as found.
