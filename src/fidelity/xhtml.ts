@@ -360,7 +360,7 @@ type TableState = {
 
 type ListState = { style: string; next: number };
 
-const NAMED_ENTITIES = new Map<string, string>([
+export const NAMED_ENTITIES: ReadonlyMap<string, string> = new Map<string, string>([
   ["amp", "&"],
   ["lt", "<"],
   ["gt", ">"],
@@ -463,6 +463,15 @@ const START_TAG =
   /<([A-Za-z][A-Za-z0-9]*)((?:[\t\n\r ]+[A-Za-z_:][-A-Za-z0-9_:.]*[\t\n\r ]*=[\t\n\r ]*(?:"[^"<]*"|'[^'<]*'))*)[\t\n\r ]*(\/?)>/y;
 const ATTRIBUTE = /([A-Za-z_:][-A-Za-z0-9_:.]*)[\t\n\r ]*=[\t\n\r ]*(?:"([^"<]*)"|'([^'<]*)')/g;
 const ENTITY = /&(?:([A-Za-z]+)|#(\d{1,7})|#x([0-9A-Fa-f]{1,6}));/y;
+
+// The tokeniser's grammar, for the authority importer's T (src/authority/t), which must read a div
+// exactly as this scanner does. Sources, not the objects: each reader keeps its own `lastIndex`.
+export const XHTML_TOKENS = {
+  endTag: END_TAG.source,
+  startTag: START_TAG.source,
+  attribute: ATTRIBUTE.source,
+  entity: ENTITY.source,
+} as const;
 
 function isAsciiWhitespace(character: string): boolean {
   return character === " " || character === "\t" || character === "\n" || character === "\r";

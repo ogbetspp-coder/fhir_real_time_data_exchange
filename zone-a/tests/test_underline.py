@@ -99,3 +99,19 @@ def test_a_whole_underlined_word_after_n_is_not_a_numero_sign() -> None:
 )
 def test_ordinal_and_numero_look_alikes_change(text: str, start: int, end: int) -> None:
     assert underline_changes(text, start, end)
+
+
+def test_the_typescript_ports_data_and_cases_are_current() -> None:
+    # src/authority/underline.ts reads the letters table and is tested against the shared cases;
+    # both are written from this module and must follow any change to it.
+    import importlib.util
+    from pathlib import Path
+
+    scripts = Path(__file__).resolve().parents[1] / "scripts"
+    for name in ("generate_underline_letters", "generate_underline_cases"):
+        spec = importlib.util.spec_from_file_location(name, scripts / f"{name}.py")
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        assert module.TARGET.read_text(encoding="utf-8") == module.render(), name

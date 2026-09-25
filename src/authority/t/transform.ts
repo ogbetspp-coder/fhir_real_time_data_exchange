@@ -1,0 +1,936 @@
+import { listMarker } from "../../fidelity/xhtml.js";
+import { isDefaultIgnorable } from "../../fidelity/normalize.js";
+import { isUnderlineLetter, underlineChanges } from "../underline.js";
+import { contrast, CssRefusal, type Rgb } from "./css.js";
+import {
+  BLOCKS,
+  computeStyle,
+  type ComputedStyle,
+  LINK_COLOURS,
+  ROOT_BACKGROUND,
+  rootStyle,
+  type Size,
+  TABLE_PARTS,
+} from "./style.js";
+import {
+  descendants,
+  type ElementNode,
+  MarkupRefusal,
+  readTree,
+  type TextNode,
+  type TreeNode,
+} from "./tree.js";
+
+// T, the authority import's lexical transform (docs/design/authority-import-t.md). It reads a
+// section's div into a tree over the scanner's own tokens, judges it by T1–T5's closed lists and
+// model, and writes T(div) by editing the div string: attributes deleted, `span`, `u` and `a`
+// unwrapped, a folded `span` renamed `sup` or `sub`. Text and character references are never
+// touched. The scanner reads T(div) afterwards (src/authority/import.ts).
+
+export class TRefusal extends Error {
+  public constructor(public readonly reason: string) {
+    super(reason);
+    this.name = "TRefusal";
+  }
+}
+
+function refuse(reason: string): never {
+  throw new TRefusal(reason);
+}
+
+// The elements T accepts: the scanner's, but `code` (T2).
+const ELEMENTS = new Set([
+  ...BLOCKS,
+  "span",
+  "b",
+  "i",
+  "u",
+  "em",
+  "strong",
+  "sup",
+  "sub",
+  "small",
+  "a",
+  "abbr",
+  "cite",
+  "img",
+]);
+const UNWRAPPED = new Set(["span", "u", "a"]);
+const HEADINGS = new Set(["h1", "h2", "h3", "h4", "h5", "h6"]);
+const ROW_LEVEL = new Set(["tr", "thead", "tbody", "tfoot"]);
+const CELLS = new Set(["td", "th", "caption"]);
+const EU_LANGUAGES = new Set([
+  "bg",
+  "cs",
+  "da",
+  "de",
+  "el",
+  "en",
+  "es",
+  "et",
+  "fi",
+  "fr",
+  "ga",
+  "hr",
+  "hu",
+  "it",
+  "lt",
+  "lv",
+  "mt",
+  "nl",
+  "pl",
+  "pt",
+  "ro",
+  "sk",
+  "sl",
+  "sv",
+]);
+// Right-to-left and Arabic-number code points, by block (a superset of bidi classes R, AL, AN).
+const RIGHT_TO_LEFT =
+  /[\u0590-\u08ff\ufb1d-\ufdff\ufe70-\ufeff\u{10800}-\u{10fff}\u{1e800}-\u{1efff}]/u;
+const DASHES_UNDER_UNDERLINE = new Set(["-", "\u2010", "\u2011"]);
+const MARK = /^\p{M}$/u;
+const WHITE: Rgb = ROOT_BACKGROUND;
+const SPACE_OR_NBSP = new Set([" ", "\u00a0"]);
+
+type Info = {
+  element: ElementNode;
+  style: ComputedStyle;
+  blockSize: Size;
+  // T3b: offsets from the frame's origin, and whether the frame is a table cell.
+  s: number;
+  sr: number;
+  inCell: boolean;
+  inTable: boolean;
+  inList: boolean;
+  inScript: boolean;
+  // Shifted ancestors, nearest first (T4).
+  shiftedAncestors: ElementNode[];
+  positionedAncestor: boolean;
+};
+
+// One code point of the section as the scanner emits it, with what T4 and T5 need to know of it.
+type Point = {
+  point: string;
+  element: ElementNode | undefined;
+  underlined: boolean;
+  inScript: boolean;
+  // A block, `br` or cell boundary, or a list marker: not text of any element.
+  boundary: boolean;
+};
+
+export type SectionResult = {
+  div: string;
+  // Tokens such as `Ph+` the section writes with a plain `+` outside every underline (T5).
+  plainTokens: ReadonlySet<string>;
+};
+
+function attribute(element: ElementNode, name: string): string | undefined {
+  return element.attributes.find((candidate) => candidate.name === name)?.value;
+}
+
+function isBlock(name: string): boolean {
+  return BLOCKS.has(name);
+}
+
+// --- the tag-tied checks ---------------------------------------------------------------------
+
+function checkAttributes(element: ElementNode, isRoot: boolean, rightToLeft: boolean): void {
+  const { name } = element;
+  for (const { name: attributeName, value } of element.attributes) {
+    const lower = value.trim().toLowerCase();
+    switch (attributeName) {
+      case "xmlns":
+        if (!isRoot) refuse("attribute");
+        break;
+      case "lang":
+      case "xml:lang":
+        if (!isRoot && !EU_LANGUAGES.has((lower.split("-")[0] ?? "").toLowerCase())) {
+          refuse("attribute");
+        }
+        break;
+      case "style":
+      case "class":
+      case "id":
+        break;
+      case "name":
+        if (name !== "a") refuse("attribute");
+        break;
+      case "title":
+        if (name === "abbr") refuse("attribute");
+        break;
+      case "dir":
+        if (lower !== "ltr" || rightToLeft) refuse("attribute");
+        break;
+      case "valign":
+        if (!(CELLS.has(name) || ROW_LEVEL.has(name)) || name === "caption") refuse("attribute");
+        if (!["top", "middle", "bottom", "baseline"].includes(lower)) refuse("attribute");
+        break;
+      case "width":
+      case "height":
+      case "nowrap":
+        if (!TABLE_PARTS.has(name) || name === "caption") refuse("attribute");
+        break;
+      case "align":
+        if (name === "table") {
+          if (lower !== "center") refuse("attribute");
+        } else if (
+          !(
+            name === "td" ||
+            name === "th" ||
+            name === "tr" ||
+            name === "p" ||
+            name === "div" ||
+            HEADINGS.has(name)
+          ) ||
+          !["left", "right", "center", "justify"].includes(lower)
+        ) {
+          refuse("attribute");
+        }
+        break;
+      case "border":
+      case "cellspacing":
+      case "cellpadding":
+      case "summary":
+        if (name !== "table") refuse("attribute");
+        if (attributeName !== "summary" && !/^\d+$/u.test(value.trim())) refuse("attribute");
+        break;
+      case "href":
+        if (name !== "a") refuse("attribute");
+        break;
+      case "src":
+        if (name !== "img") refuse("attribute");
+        break;
+      case "colspan":
+      case "rowspan":
+        if (name !== "td" && name !== "th") refuse("attribute");
+        break;
+      case "scope":
+        if (name !== "th") refuse("attribute");
+        break;
+      case "type":
+      case "start":
+        if (name !== "ol") refuse("attribute");
+        break;
+      default:
+        refuse("attribute");
+    }
+  }
+}
+
+// The attributes T(div) keeps (T2); every other is deleted.
+function kept(element: ElementNode, isRoot: boolean): boolean[] {
+  return element.attributes.map(({ name }) => {
+    if (isRoot) return name === "xmlns" || name === "lang" || name === "xml:lang";
+    if (name === "colspan" || name === "rowspan")
+      return element.name === "td" || element.name === "th";
+    if (name === "scope") return element.name === "th";
+    if (name === "type" || name === "start") return element.name === "ol";
+    return name === "src" && element.name === "img";
+  });
+}
+
+function lineHeightAtLeast(style: ComputedStyle, size: Size, times: number): boolean {
+  const lineHeight = style.lineHeight;
+  // `normal` passes both bounds T judges (T3c's 1 em; an inline background's, T3's row).
+  if (lineHeight.kind === "normal") return true;
+  if (lineHeight.kind === "number") return lineHeight.value >= times;
+  if (lineHeight.of === size && lineHeight.factor !== undefined) return lineHeight.factor >= times;
+  return lineHeight.lo >= times * size.hi;
+}
+
+function colours(style: ComputedStyle): Rgb[] {
+  if (style.underLink && !style.colourSinceLink) return [...LINK_COLOURS];
+  return [style.colour ?? [0, 0, 0]];
+}
+
+// T3a, T3c and the font-size rules at a text node or a list marker drawn in `style`.
+function checkDrawn(style: ComputedStyle, blockSize: Size): void {
+  for (const text of colours(style)) {
+    for (const background of [...style.backgrounds, WHITE]) {
+      if (contrast(text, background) < 4.5) refuse("contrast");
+    }
+  }
+  if (!lineHeightAtLeast(style, style.size, 1)) refuse("line-height");
+  if (style.size.lo < 5 || style.size.hi > 24) refuse("font-size");
+  if (style.size !== blockSize && style.size.lo < 0.5 * blockSize.hi) refuse("font-size");
+}
+
+function hasDrawnText(node: TextNode): boolean {
+  return node.points.some((point) => !/^[\t\n\r\f ]$/u.test(point));
+}
+
+// --- the section -----------------------------------------------------------------------------
+
+type Walk = {
+  infos: Map<ElementNode, Info>;
+  points: Point[];
+  // The index of each element's first and one-past-last point, for T4 and T5.
+  ranges: Map<ElementNode, { start: number; end: number }>;
+};
+
+function walkSection(root: ElementNode, rightToLeft: boolean): Walk {
+  const infos = new Map<ElementNode, Info>();
+  const points: Point[] = [];
+  const ranges = new Map<ElementNode, { start: number; end: number }>();
+
+  const visit = (element: ElementNode, parent: Info | undefined): void => {
+    const isRoot = parent === undefined;
+    const { name } = element;
+    if (isRoot ? name !== "div" : !ELEMENTS.has(name)) refuse(isRoot ? "markup" : "element");
+    checkAttributes(element, isRoot, rightToLeft);
+    let cellPadding: number | undefined;
+    if ((name === "td" || name === "th") && parent !== undefined) {
+      let ancestor: ElementNode | undefined = element.parent;
+      while (ancestor !== undefined && ancestor.name !== "table") ancestor = ancestor.parent;
+      const padding = ancestor === undefined ? undefined : attribute(ancestor, "cellpadding");
+      if (padding !== undefined) cellPadding = Number(padding) * 0.75;
+    }
+    let style: ComputedStyle;
+    try {
+      style = computeStyle({
+        name,
+        parent: parent?.style ?? rootStyle(),
+        isLink: name === "a" && attribute(element, "href") !== undefined,
+        cellPadding,
+        style: attribute(element, "style"),
+      });
+    } catch (error) {
+      if (error instanceof CssRefusal) refuse(error.reason);
+      throw error;
+    }
+    const block = isBlock(name);
+    // Inline elements take no offsets (T3).
+    if (!block) {
+      for (const side of ["top", "right", "bottom", "left"] as const) {
+        if (style.margin[side] !== 0 || style.padding[side] !== 0) refuse("offset");
+      }
+      if (
+        style.declared.has("text-indent") &&
+        style.textIndent !== (parent?.style.textIndent ?? 0)
+      ) {
+        refuse("offset");
+      }
+    }
+    // T3b's bounds on the element's own values.
+    for (const side of ["top", "right", "bottom", "left"] as const) {
+      if (style.margin[side] > 144 || style.padding[side] > 144) refuse("offset");
+      if (style.padding[side] < 0) refuse(name === "li" ? "list" : "offset");
+    }
+    if (style.margin.top < 0 || style.margin.bottom < 0) refuse(name === "li" ? "list" : "offset");
+    if (Math.abs(style.textIndent) > 144) refuse("offset");
+    if (isRoot && (style.margin.left < 0 || style.margin.right < 0)) refuse("offset");
+    // Row-level table parts take no box offsets (a browser ignores them): refuse any.
+    if (ROW_LEVEL.has(name)) {
+      for (const side of ["top", "right", "bottom", "left"] as const) {
+        if (style.margin[side] !== 0 || style.padding[side] !== 0) refuse("offset");
+      }
+    }
+    // T3d: a list keeps its marker padding.
+    if (
+      (name === "ol" || name === "ul") &&
+      (style.declared.has("padding-left") || style.margin.left < 0)
+    ) {
+      refuse("list");
+    }
+
+    const entersCell = CELLS.has(name);
+    const inCell = entersCell || (parent?.inCell ?? false);
+    const inTable = name === "table" || (parent?.inTable ?? false);
+    const inList = name === "ol" || name === "ul" || name === "li" || (parent?.inList ?? false);
+    const counts =
+      block && !entersCell && !ROW_LEVEL.has(name) && !isRoot && name !== "br" && name !== "hr";
+    const baseS = entersCell || parent === undefined ? 0 : parent.s;
+    const baseSR = entersCell || parent === undefined ? 0 : parent.sr;
+    const s = counts ? baseS + style.margin.left + style.padding.left : baseS;
+    const sr = counts ? baseSR + style.margin.right + style.padding.right : baseSR;
+    if (counts) {
+      const indent = style.textIndent;
+      if (s > 144 || s + indent > 144 || sr > 144) refuse("offset");
+      const insideLi = hasLiAncestor(element);
+      if (name === "li") {
+        if (style.margin.left < 0 || style.margin.right < 0 || indent !== 0) refuse("list");
+      } else if (insideLi && (style.margin.left < 0 || style.margin.right < 0 || indent < 0)) {
+        refuse("list");
+      } else if (inCell) {
+        if (s < 0 || s + indent < 0 || sr < 0 || indent > 0) refuse("offset");
+      } else if (s < 0 || s + indent < 0 || sr < -1.2) {
+        refuse("offset");
+      }
+    }
+    const info: Info = {
+      element,
+      style,
+      blockSize: block ? style.size : (parent?.blockSize ?? style.size),
+      s,
+      sr,
+      inCell,
+      inTable,
+      inList,
+      inScript: name === "sup" || name === "sub" || (parent?.inScript ?? false),
+      shiftedAncestors:
+        parent === undefined
+          ? []
+          : [...(isShifted(parent) ? [parent.element] : []), ...parent.shiftedAncestors],
+      positionedAncestor:
+        (parent?.style.declaredPosition ?? false) || (parent?.positionedAncestor ?? false),
+    };
+    infos.set(element, info);
+
+    const start = points.length;
+    if (block)
+      points.push({
+        point: "\n",
+        element: undefined,
+        underlined: false,
+        inScript: false,
+        boundary: true,
+      });
+    if (name === "li" && parent?.element.name === "ol") {
+      const marker = markerFor(element);
+      for (const point of marker) {
+        points.push({
+          point,
+          element: undefined,
+          underlined: false,
+          inScript: false,
+          boundary: true,
+        });
+      }
+    }
+    for (const child of element.children) {
+      if (child.kind === "text") {
+        if (hasDrawnText(child)) checkDrawn(style, info.blockSize);
+        for (const point of child.points) {
+          points.push({
+            point,
+            element,
+            underlined: style.underline,
+            inScript: info.inScript,
+            boundary: false,
+          });
+        }
+      } else {
+        visit(child, info);
+      }
+    }
+    if (block)
+      points.push({
+        point: "\n",
+        element: undefined,
+        underlined: false,
+        inScript: false,
+        boundary: true,
+      });
+    ranges.set(element, { start, end: points.length });
+  };
+  visit(root, undefined);
+  return { infos, points, ranges };
+}
+
+function hasLiAncestor(element: ElementNode): boolean {
+  for (let node = element.parent; node !== undefined; node = node.parent) {
+    if (node.name === "li") return true;
+    if (CELLS.has(node.name)) return false;
+  }
+  return false;
+}
+
+function isShifted(info: Info): boolean {
+  return (
+    info.style.shift.kind !== "none" && info.element.name !== "sup" && info.element.name !== "sub"
+  );
+}
+
+// The marker an `li` of an `ol` draws, as the scanner writes it.
+function markerFor(li: ElementNode): string {
+  const list = li.parent;
+  if (list === undefined) return "";
+  const items = list.children.filter(
+    (child): child is ElementNode => child.kind === "element" && child.name === "li",
+  );
+  const start = Number(attribute(list, "start") ?? "1");
+  return listMarker(attribute(list, "type") ?? "1", start + items.indexOf(li));
+}
+
+// --- T4 ----------------------------------------------------------------------------------------
+
+type Interval = { lo: number; hi: number };
+
+// The magnitude of an element's own shift, signed by direction.
+function shiftOf(info: Info, parentSize: Size): { raise: Interval; em?: number } {
+  const shift = info.style.shift;
+  switch (shift.kind) {
+    case "points":
+      return { raise: { lo: shift.raise, hi: shift.raise } };
+    case "em":
+      return {
+        raise: { lo: shift.raise * info.style.size.lo, hi: shift.raise * info.style.size.hi },
+        em: shift.raise,
+      };
+    case "super":
+      return { raise: { lo: parentSize.lo / 3 + 0.75, hi: parentSize.hi / 3 + 0.75 } };
+    case "sub":
+      return { raise: { lo: -(parentSize.hi / 5 + 0.75), hi: -(parentSize.lo / 5 + 0.75) } };
+    default:
+      return { raise: { lo: 0, hi: 0 } };
+  }
+}
+
+function magnitudeHi(raise: Interval): number {
+  return Math.max(Math.abs(raise.lo), Math.abs(raise.hi));
+}
+
+function magnitudeLo(raise: Interval): number {
+  if (raise.lo <= 0 && raise.hi >= 0) return 0;
+  return Math.min(Math.abs(raise.lo), Math.abs(raise.hi));
+}
+
+function textNodesUnder(element: ElementNode): { node: TextNode; parent: ElementNode }[] {
+  const found: { node: TextNode; parent: ElementNode }[] = [];
+  const visit = (node: TreeNode, parent: ElementNode): void => {
+    if (node.kind === "text") found.push({ node, parent });
+    else for (const child of node.children) visit(child, node);
+  };
+  for (const child of element.children) visit(child, element);
+  return found;
+}
+
+function containsImage(element: ElementNode): boolean {
+  return element.children.some(
+    (child) => child.kind === "element" && (child.name === "img" || containsImage(child)),
+  );
+}
+
+type ShiftDecision = "delete" | "sup" | "sub";
+
+function decideShifts(walk: Walk): Map<ElementNode, ShiftDecision> {
+  const decisions = new Map<ElementNode, ShiftDecision>();
+  const shifted = [...walk.infos.values()].filter(isShifted);
+  // First: which shifts are deleted (every text node under them moves by under 0.1 of its size).
+  const deletable = (info: Info): boolean => {
+    const texts = textNodesUnder(info.element);
+    if (texts.length === 0 || containsImage(info.element)) return false;
+    for (const { parent } of texts) {
+      const textInfo = walk.infos.get(parent);
+      if (textInfo === undefined) return false;
+      const size = textInfo.style.size;
+      const chain = [
+        ...(isShifted(textInfo) ? [textInfo] : []),
+        ...textInfo.shiftedAncestors
+          .map((element) => walk.infos.get(element))
+          .filter((x): x is Info => x !== undefined),
+      ];
+      // Exact where every shift in the chain is `em` of this very size (T1).
+      if (chain.every((link) => link.style.shift.kind === "em" && link.style.size === size)) {
+        const sum = chain.reduce(
+          (total, link) => total + (link.style.shift.kind === "em" ? link.style.shift.raise : 0),
+          0,
+        );
+        if (Math.abs(sum) >= 0.1) return false;
+        continue;
+      }
+      let lo = 0;
+      let hi = 0;
+      for (const link of chain) {
+        const parentSize =
+          walk.infos.get(link.element.parent ?? link.element)?.style.size ?? link.style.size;
+        const { raise } = shiftOf(link, parentSize);
+        lo += raise.lo;
+        hi += raise.hi;
+      }
+      if (magnitudeHi({ lo, hi }) >= 0.1 * size.lo) return false;
+    }
+    return true;
+  };
+  for (const info of shifted) {
+    if (deletable(info)) decisions.set(info.element, "delete");
+  }
+  for (const info of shifted) {
+    if (decisions.get(info.element) === "delete") continue;
+    const { element } = info;
+    const parent = element.parent === undefined ? undefined : walk.infos.get(element.parent);
+    if (parent === undefined || element.name !== "span" || info.inScript) refuse("baseline-shift");
+    // No ancestor and no descendant carries a shift.
+    if (info.shiftedAncestors.length > 0) refuse("baseline-shift");
+    const texts = textNodesUnder(element);
+    if (texts.length === 0 || containsImage(element)) refuse("baseline-shift");
+    for (const node of descendants(element)) {
+      if (node.kind !== "element") continue;
+      const nodeInfo = walk.infos.get(node);
+      if (nodeInfo === undefined || isShifted(nodeInfo) || !UNWRAPPED.has(node.name))
+        refuse("baseline-shift");
+    }
+    const { raise, em } = shiftOf(info, parent.style.size);
+    const kind = info.style.shift.kind;
+    for (const { parent: textParent } of texts) {
+      const size = walk.infos.get(textParent)?.style.size;
+      if (size === undefined) refuse("baseline-shift");
+      if (size !== parent.style.size && size.hi > parent.style.size.lo) refuse("baseline-shift");
+      if (kind !== "super" && kind !== "sub") {
+        const floor =
+          em !== undefined && size === info.style.size
+            ? Math.abs(em) >= 0.2
+            : magnitudeLo(raise) >= 0.2 * size.hi;
+        if (!floor) refuse("baseline-shift");
+      }
+    }
+    if (magnitudeHi(raise) > 0.5 * parent.style.size.lo) refuse("baseline-shift");
+    const range = walk.ranges.get(element);
+    if (range === undefined) refuse("baseline-shift");
+    const own = walk.points.slice(range.start, range.end).map((point) => point.point);
+    const drawn = own.filter((point) => !/^[\t\n\r\f \u00a0]$/u.test(point));
+    if (drawn.length < 1 || drawn.length > 4) refuse("baseline-shift");
+    if (!hasUnshiftedNeighbour(walk, range, decisions)) refuse("baseline-shift");
+    decisions.set(
+      element,
+      raise.hi > 0 && raise.lo >= 0 ? "sup" : raise.hi <= 0 ? "sub" : refuse("baseline-shift"),
+    );
+  }
+  return decisions;
+}
+
+// T4's neighbour: the code point before the run's first non-whitespace code point, or after its
+// last, is unshifted text, or one U+0020 or U+00A0 away from it, in the same block.
+function hasUnshiftedNeighbour(
+  walk: Walk,
+  range: { start: number; end: number },
+  decisions: ReadonlyMap<ElementNode, ShiftDecision>,
+): boolean {
+  const { points } = walk;
+  const isWhite = (index: number): boolean =>
+    /^[\t\n\r\f \u00a0]$/u.test(points[index]?.point ?? "");
+  let first = range.start;
+  while (first < range.end && isWhite(first)) first += 1;
+  let last = range.end - 1;
+  while (last >= range.start && isWhite(last)) last -= 1;
+  const unshifted = (index: number): boolean => {
+    const point = points[index];
+    if (point === undefined || point.boundary || point.element === undefined) return false;
+    if (isWhite(index)) return false;
+    const info = walk.infos.get(point.element);
+    if (info === undefined) return false;
+    const chain = [...(isShifted(info) ? [info.element] : []), ...info.shiftedAncestors];
+    return chain.every((element) => decisions.get(element) === "delete");
+  };
+  const look = (from: number, step: number): boolean => {
+    let index = from;
+    const point = points[index];
+    if (point !== undefined && !point.boundary && SPACE_OR_NBSP.has(point.point)) index += step;
+    return unshifted(index);
+  };
+  return look(first - 1, -1) || look(last + 1, 1);
+}
+
+// --- T3d, T3e ----------------------------------------------------------------------------------
+
+function markerWidth(marker: string): number {
+  let width = 1.25; // ". "
+  for (const point of marker.replace(/\. $/u, "")) width += /[0-9-]/u.test(point) ? 0.65 : 1;
+  return width;
+}
+
+function checkLists(walk: Walk): void {
+  for (const info of walk.infos.values()) {
+    if (info.element.name !== "li") continue;
+    checkDrawn(info.style, info.blockSize);
+    const list = info.element.parent;
+    const width =
+      list?.name === "ol"
+        ? Math.max(
+            ...list.children
+              .filter(
+                (child): child is ElementNode => child.kind === "element" && child.name === "li",
+              )
+              .map((li) => markerWidth(markerFor(li))),
+          )
+        : 1;
+    if (info.s - width * info.style.size.hi < 0) refuse("list");
+  }
+}
+
+type Placed = { cell: ElementNode; info: Info };
+
+function drawnEdge(first: Info, second: Info, firstSide: "right" | "left"): boolean {
+  const backgrounds = [...first.style.backgrounds, ...second.style.backgrounds, WHITE];
+  for (const [info, side] of [
+    [first, firstSide],
+    [second, firstSide === "right" ? "left" : "right"],
+  ] as const) {
+    const border = info.style.borders[side];
+    if (border === undefined) continue;
+    if (!["solid", "double", "dotted", "dashed"].includes(border.style) || border.widthPt <= 0)
+      continue;
+    const colour = border.colour ?? info.style.colour ?? [0, 0, 0];
+    if (backgrounds.every((background) => contrast(colour, background) >= 3)) return true;
+  }
+  return false;
+}
+
+function largestSize(walk: Walk, cell: ElementNode): number {
+  let largest = walk.infos.get(cell)?.style.size.hi ?? 0;
+  for (const node of descendants(cell)) {
+    if (node.kind === "element") {
+      const info = walk.infos.get(node);
+      if (
+        info !== undefined &&
+        (node.name === "li" ||
+          node.children.some((child) => child.kind === "text" && hasDrawnText(child)))
+      ) {
+        largest = Math.max(largest, info.style.size.hi);
+      }
+    }
+  }
+  return largest;
+}
+
+function checkTables(walk: Walk): void {
+  for (const info of walk.infos.values()) {
+    if (info.element.name !== "table") continue;
+    const table = info.element;
+    const collapse = info.style.borderCollapse === "collapse";
+    const spacingAttribute = attribute(table, "cellspacing");
+    const spacing = collapse
+      ? 0
+      : spacingAttribute === undefined
+        ? 1.5
+        : Number(spacingAttribute) * 0.75;
+    const rows: ElementNode[] = [];
+    for (const child of table.children) {
+      if (child.kind !== "element") continue;
+      if (child.name === "tr") rows.push(child);
+      else if (ROW_LEVEL.has(child.name)) {
+        for (const row of child.children)
+          if (row.kind === "element" && row.name === "tr") rows.push(row);
+      }
+    }
+    // The grid, by the HTML table model: each cell covers colspan × rowspan slots.
+    const grid: (Placed | undefined)[][] = [];
+    rows.forEach((row, rowIndex) => {
+      const current = (grid[rowIndex] ??= []);
+      let column = 0;
+      for (const cell of row.children) {
+        // A row holds only cells (T1's one tree).
+        if (cell.kind !== "element") continue;
+        const cellInfo = walk.infos.get(cell);
+        if (cellInfo === undefined) continue;
+        while (current[column] !== undefined) column += 1;
+        const colspan = Number(attribute(cell, "colspan") ?? "1");
+        const rowspan = Number(attribute(cell, "rowspan") ?? "1");
+        for (let down = 0; down < rowspan; down += 1) {
+          grid[rowIndex + down] ??= [];
+          for (let across = 0; across < colspan; across += 1) {
+            const target = grid[rowIndex + down];
+            if (target !== undefined) target[column + across] = { cell, info: cellInfo };
+          }
+        }
+        column += colspan;
+      }
+    });
+    for (const row of grid) {
+      for (let column = 1; column < row.length; column += 1) {
+        const left = row[column - 1];
+        const right = row[column];
+        if (left === undefined || right === undefined || left.cell === right.cell) continue;
+        if (drawnEdge(left.info, right.info, "right")) continue;
+        const gap = left.info.style.padding.right + right.info.style.padding.left + spacing;
+        const larger = Math.max(largestSize(walk, left.cell), largestSize(walk, right.cell));
+        if (gap < 0.25 * larger) refuse("table-edge");
+      }
+    }
+  }
+}
+
+// --- T5 ----------------------------------------------------------------------------------------
+
+type Run = { start: number; end: number };
+
+function underlineRuns(points: readonly Point[]): Run[] {
+  const runs: Run[] = [];
+  let start = -1;
+  points.forEach((point, index) => {
+    const underlined = point.underlined && !point.boundary;
+    if (underlined && start === -1) start = index;
+    if (!underlined && start !== -1) {
+      runs.push({ start, end: index });
+      start = -1;
+    }
+  });
+  if (start !== -1) runs.push({ start, end: points.length });
+  return runs;
+}
+
+function blockOf(element: ElementNode | undefined): ElementNode | undefined {
+  for (let node = element; node !== undefined; node = node.parent)
+    if (isBlock(node.name)) return node;
+  return undefined;
+}
+
+// A `+` T5 may waive: after at least two letters, before a space, a no-break space or the end of
+// its block, with no mark or default-ignorable next to it. Returns its token (`Ph+`), if any.
+function plusToken(points: readonly Point[], index: number): string | undefined {
+  if (points[index]?.point !== "+") return undefined;
+  let start = index;
+  while (
+    start > 0 &&
+    isUnderlineLetter(points[start - 1]?.point ?? "") &&
+    !points[start - 1]?.boundary
+  )
+    start -= 1;
+  if (index - start < 2) return undefined;
+  const before = points[start - 1];
+  if (before !== undefined && !before.boundary && isUnderlineLetter(before.point)) return undefined;
+  const after = points[index + 1];
+  if (after !== undefined && !after.boundary && !SPACE_OR_NBSP.has(after.point)) return undefined;
+  const next = after?.point ?? "";
+  if (MARK.test(next) || isDefaultIgnorable(next.codePointAt(0) ?? 0)) return undefined;
+  return points
+    .slice(start, index + 1)
+    .map((point) => point.point)
+    .join("");
+}
+
+export function plainTokens(points: readonly Point[]): Set<string> {
+  const tokens = new Set<string>();
+  points.forEach((point, index) => {
+    if (point.point !== "+" || point.underlined || point.inScript || point.boundary) return;
+    const token = plusToken(points, index);
+    if (token === undefined) return;
+    const letters = points.slice(index - (Array.from(token).length - 1), index);
+    if (letters.some((letter) => letter.underlined || letter.inScript)) return;
+    tokens.add(token);
+  });
+  return tokens;
+}
+
+function waivable(walk: Walk, run: Run, evidence: ReadonlySet<string>): boolean {
+  const { points } = walk;
+  const first = points[run.start];
+  const block = blockOf(first?.element);
+  if (block === undefined || !(block.name === "p" || HEADINGS.has(block.name))) return false;
+  const blockInfo = walk.infos.get(block);
+  if (blockInfo === undefined || blockInfo.inTable || blockInfo.inList) return false;
+  if ([...descendants(block)].some((node) => node.kind === "element" && isBlock(node.name)))
+    return false;
+  const range = walk.ranges.get(block);
+  if (range === undefined) return false;
+  for (let index = range.start; index < range.end; index += 1) {
+    const point = points[index];
+    if (point === undefined || point.boundary || /^[\t\n\r\f \u00a0]$/u.test(point.point)) continue;
+    if (index < run.start || index >= run.end) return false;
+  }
+  const masked = points.map((point) => point.point);
+  let waived = false;
+  for (let index = run.start; index < run.end; index += 1) {
+    if (masked[index] !== "+") continue;
+    const token = plusToken(points, index);
+    if (token === undefined || !evidence.has(token)) return false;
+    masked[index] = " ";
+    waived = true;
+  }
+  return waived && !underlineChanges(masked, run.start, run.end, { hyphensInWords: true });
+}
+
+function checkUnderlines(walk: Walk, evidence: ReadonlySet<string> | undefined): void {
+  const { points } = walk;
+  const text = points.map((point) => point.point);
+  for (const run of underlineRuns(points)) {
+    for (let index = run.start; index < run.end; index += 1) {
+      const point = points[index];
+      if (point?.inScript === true) refuse("underline");
+      if (/^\p{Pd}$/u.test(point?.point ?? "") && !DASHES_UNDER_UNDERLINE.has(point?.point ?? "")) {
+        refuse("underline");
+      }
+    }
+    if (!underlineChanges(text, run.start, run.end, { hyphensInWords: true })) continue;
+    if (evidence === undefined || !waivable(walk, run, evidence)) refuse("underline");
+  }
+}
+
+// --- the edits -------------------------------------------------------------------------------
+
+function edit(
+  div: string,
+  root: ElementNode,
+  shifts: ReadonlyMap<ElementNode, ShiftDecision>,
+): string {
+  const replacements: { start: number; end: number; text: string }[] = [];
+  const visit = (element: ElementNode, isRoot: boolean): void => {
+    const decision = shifts.get(element);
+    const folded = decision === "sup" || decision === "sub" ? decision : undefined;
+    if (folded !== undefined) {
+      replacements.push({ ...element.startTag, text: `<${folded}>` });
+      if (element.endTag !== undefined)
+        replacements.push({ ...element.endTag, text: `</${folded}>` });
+    } else if (UNWRAPPED.has(element.name)) {
+      replacements.push({ ...element.startTag, text: "" });
+      if (element.endTag !== undefined) replacements.push({ ...element.endTag, text: "" });
+    } else {
+      const keep = kept(element, isRoot);
+      const selfClosing = element.endTag === undefined;
+      const attributes = element.attributes
+        .filter((_, index) => keep[index] === true)
+        .map(({ span }) => ` ${div.slice(span.start, span.end)}`)
+        .join("");
+      const text = `<${element.name}${attributes}${selfClosing ? "/" : ""}>`;
+      if (text !== div.slice(element.startTag.start, element.startTag.end)) {
+        replacements.push({ ...element.startTag, text });
+      }
+    }
+    for (const child of element.children) if (child.kind === "element") visit(child, false);
+  };
+  visit(root, true);
+  replacements.sort((first, second) => first.start - second.start);
+  let output = "";
+  let cursor = 0;
+  for (const { start, end, text } of replacements) {
+    output += div.slice(cursor, start) + text;
+    cursor = end;
+  }
+  return output + div.slice(cursor);
+}
+
+// The block tags of a div, in order (ADR 0005's line check: T never adds, removes or renames one).
+function blockTags(root: ElementNode): string[] {
+  const tags: string[] = [];
+  const visit = (element: ElementNode): void => {
+    if (isBlock(element.name)) tags.push(element.name);
+    for (const child of element.children) if (child.kind === "element") visit(child);
+  };
+  visit(root);
+  return tags;
+}
+
+// T for one section's div. `evidence` is given in the waiver's second pass (T5): the tokens the
+// document writes with a plain `+` in the sections the first pass accepted.
+export function transformSection(div: string, evidence?: ReadonlySet<string>): SectionResult {
+  let root: ElementNode;
+  try {
+    root = readTree(div);
+  } catch (error) {
+    if (error instanceof MarkupRefusal) refuse(error.reason);
+    throw error;
+  }
+  const rightToLeft = RIGHT_TO_LEFT.test(div);
+  const walk = walkSection(root, rightToLeft);
+  // The inline backgrounds (T3), judged with their descendants' sizes known.
+  for (const info of walk.infos.values()) {
+    if (info.style.background === undefined || isBlock(info.element.name)) continue;
+    if (info.style.declaredPosition || info.positionedAncestor) refuse("css-value");
+    let largest = info.style.size;
+    for (const node of descendants(info.element)) {
+      if (node.kind !== "element") continue;
+      const size = walk.infos.get(node)?.style.size;
+      if (size !== undefined && size.hi > largest.hi) largest = size;
+    }
+    if (!lineHeightAtLeast(info.style, largest, 1.2)) refuse("line-height");
+  }
+  const shifts = decideShifts(walk);
+  checkLists(walk);
+  checkTables(walk);
+  checkUnderlines(walk, evidence);
+  const output = edit(div, root, shifts);
+  const after = readTree(output);
+  if (blockTags(after).join(" ") !== blockTags(root).join(" ")) refuse("markup");
+  return { div: output, plainTokens: plainTokens(walk.points) };
+}

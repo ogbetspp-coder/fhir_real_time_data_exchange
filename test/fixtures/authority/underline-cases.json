@@ -1,0 +1,815 @@
+[
+ {
+  "text": "see section 4.4",
+  "start": 0,
+  "end": 15,
+  "changes": false
+ },
+ {
+  "text": "Strong CYP3A inhibitors",
+  "start": 0,
+  "end": 23,
+  "changes": false
+ },
+ {
+  "text": "CYP2C19",
+  "start": 0,
+  "end": 7,
+  "changes": false
+ },
+ {
+  "text": "bg.ireland@beigene.com",
+  "start": 0,
+  "end": 22,
+  "changes": false
+ },
+ {
+  "text": "“Pregnancy”",
+  "start": 0,
+  "end": 11,
+  "changes": false
+ },
+ {
+  "text": "<",
+  "start": 0,
+  "end": 1,
+  "changes": true
+ },
+ {
+  "text": ">",
+  "start": 0,
+  "end": 1,
+  "changes": true
+ },
+ {
+  "text": "+",
+  "start": 0,
+  "end": 1,
+  "changes": true
+ },
+ {
+  "text": "=",
+  "start": 0,
+  "end": 1,
+  "changes": true
+ },
+ {
+  "text": "-",
+  "start": 0,
+  "end": 1,
+  "changes": true
+ },
+ {
+  "text": "~",
+  "start": 0,
+  "end": 1,
+  "changes": true
+ },
+ {
+  "text": "–",
+  "start": 0,
+  "end": 1,
+  "changes": true
+ },
+ {
+  "text": "−",
+  "start": 0,
+  "end": 1,
+  "changes": true
+ },
+ {
+  "text": "˂",
+  "start": 0,
+  "end": 1,
+  "changes": true
+ },
+ {
+  "text": "ᐸ",
+  "start": 0,
+  "end": 1,
+  "changes": true
+ },
+ {
+  "text": "≥",
+  "start": 0,
+  "end": 1,
+  "changes": true
+ },
+ {
+  "text": "Ph+ ALL",
+  "start": 0,
+  "end": 7,
+  "changes": true
+ },
+ {
+  "text": "ª",
+  "start": 0,
+  "end": 1,
+  "changes": true
+ },
+ {
+  "text": "º",
+  "start": 0,
+  "end": 1,
+  "changes": true
+ },
+ {
+  "text": "ᵃ",
+  "start": 0,
+  "end": 1,
+  "changes": true
+ },
+ {
+  "text": "10 mg",
+  "start": 0,
+  "end": 5,
+  "changes": false
+ },
+ {
+  "text": "film‑coated",
+  "start": 0,
+  "end": 11,
+  "changes": true
+ },
+ {
+  "text": "",
+  "start": 0,
+  "end": 0,
+  "changes": false
+ },
+ {
+  "text": "1a",
+  "start": 1,
+  "end": 2,
+  "changes": true
+ },
+ {
+  "text": "40o",
+  "start": 2,
+  "end": 3,
+  "changes": true
+ },
+ {
+  "text": "3A",
+  "start": 1,
+  "end": 2,
+  "changes": false
+ },
+ {
+  "text": "1 a",
+  "start": 2,
+  "end": 3,
+  "changes": false
+ },
+ {
+  "text": "10 mg",
+  "start": 3,
+  "end": 5,
+  "changes": false
+ },
+ {
+  "text": "1ab",
+  "start": 1,
+  "end": 3,
+  "changes": true
+ },
+ {
+  "text": "Breast-feeding",
+  "start": 0,
+  "end": 14,
+  "changes": true
+ },
+ {
+  "text": "Breast-feeding",
+  "start": 0,
+  "end": 14,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "film‑coated",
+  "start": 0,
+  "end": 11,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "2-3",
+  "start": 0,
+  "end": 3,
+  "hyphensInWords": true,
+  "changes": true
+ },
+ {
+  "text": "2-3",
+  "start": 1,
+  "end": 2,
+  "hyphensInWords": true,
+  "changes": true
+ },
+ {
+  "text": "-a",
+  "start": 0,
+  "end": 2,
+  "hyphensInWords": true,
+  "changes": true
+ },
+ {
+  "text": "a-",
+  "start": 0,
+  "end": 2,
+  "hyphensInWords": true,
+  "changes": true
+ },
+ {
+  "text": "<Traceability>",
+  "start": 0,
+  "end": 14,
+  "also": [
+   "<",
+   ">"
+  ],
+  "changes": false
+ },
+ {
+  "text": "1а",
+  "start": 1,
+  "end": 2,
+  "changes": true
+ },
+ {
+  "text": "20оC",
+  "start": 2,
+  "end": 3,
+  "changes": true
+ },
+ {
+  "text": "20οC",
+  "start": 2,
+  "end": 3,
+  "changes": true
+ },
+ {
+  "text": "1⁣a",
+  "start": 2,
+  "end": 3,
+  "changes": true
+ },
+ {
+  "text": "1​a",
+  "start": 2,
+  "end": 3,
+  "changes": true
+ },
+ {
+  "text": "No 5",
+  "start": 1,
+  "end": 2,
+  "changes": true
+ },
+ {
+  "text": "No dose adjustment",
+  "start": 0,
+  "end": 18,
+  "changes": false
+ },
+ {
+  "text": "1ɑ",
+  "start": 1,
+  "end": 2,
+  "changes": true
+ },
+ {
+  "text": "1ᴏ",
+  "start": 1,
+  "end": 2,
+  "changes": true
+ },
+ {
+  "text": "20ᴏC",
+  "start": 2,
+  "end": 3,
+  "changes": true
+ },
+ {
+  "text": "1α",
+  "start": 1,
+  "end": 2,
+  "changes": true
+ },
+ {
+  "text": "１a",
+  "start": 1,
+  "end": 2,
+  "changes": true
+ },
+ {
+  "text": "𝟙a",
+  "start": 1,
+  "end": 2,
+  "changes": true
+ },
+ {
+  "text": "٣o",
+  "start": 1,
+  "end": 2,
+  "changes": true
+ },
+ {
+  "text": "no 5",
+  "start": 1,
+  "end": 2,
+  "changes": true
+ },
+ {
+  "text": "Νo 5",
+  "start": 1,
+  "end": 2,
+  "changes": true
+ },
+ {
+  "text": "Ｎo 5",
+  "start": 1,
+  "end": 2,
+  "changes": true
+ },
+ {
+  "text": "Nо 5",
+  "start": 1,
+  "end": 2,
+  "changes": true
+ },
+ {
+  "text": "Nο 5",
+  "start": 1,
+  "end": 2,
+  "changes": true
+ },
+ {
+  "text": "Nᴏ 5",
+  "start": 1,
+  "end": 2,
+  "changes": true
+ },
+ {
+  "text": "x𝓉y",
+  "start": 0,
+  "end": 3,
+  "changes": true
+ },
+ {
+  "text": "Imatinib Teva 100 mg film‑coated tablets\nEach fi",
+  "start": 0,
+  "end": 40,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "ate).\n \nImatinib Teva 400 mg film‑coated tablets\nEach fi",
+  "start": 8,
+  "end": 48,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "blet.\n \nImatinib Teva 100 mg film‑coated tablets\nDark ye",
+  "start": 8,
+  "end": 48,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "oses.\n \nImatinib Teva 400 mg film‑coated tablets\nDark ye",
+  "start": 8,
+  "end": 48,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "Imatinib Teva 100 mg film‑coated tablets\nFor dos",
+  "start": 0,
+  "end": 40,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "able.\n \nImatinib Teva 400 mg film‑coated tablets\nFor dos",
+  "start": 8,
+  "end": 48,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "able.\n \nPosology for CML in adult patients\nThe rec",
+  "start": 8,
+  "end": 42,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "ages.\n \nPosology for CML in children\nDosing ",
+  "start": 8,
+  "end": 36,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "ages.\n \nPosology for Ph+ ALL in adult patients\nThe rec",
+  "start": 8,
+  "end": 46,
+  "hyphensInWords": true,
+  "changes": true
+ },
+ {
+  "text": "curs.\n \nPosology for Ph+ ALL in children",
+  "start": 8,
+  "end": 32,
+  "hyphensInWords": true,
+  "changes": true
+ },
+ {
+  "text": " ALL in children\nDosing ",
+  "start": 8,
+  "end": 16,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": " mg).\n \nPosology for MDS/MPD\nThe rec",
+  "start": 8,
+  "end": 28,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "ths).\n \nPosology for HES/CEL\nThe rec",
+  "start": 8,
+  "end": 28,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "fit. \n \nPosology for GIST\nThe rec",
+  "start": 8,
+  "end": 25,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "5.1).\n \nPosology for DFSP\nThe rec",
+  "start": 8,
+  "end": 25,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "DFSP.\n \nDose adjustment for adverse reactions\n \nNon‑h",
+  "start": 8,
+  "end": 45,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "\n\n\n\n \n \nSpecial populations\n \nPaedi",
+  "start": 8,
+  "end": 27,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "4.5).\n \nHypothyroidism\nClinica",
+  "start": 8,
+  "end": 22,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "ents.\n \nHepatotoxicity\nMetabol",
+  "start": 8,
+  "end": 22,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "4.8).\n \nFluid retention\nOccurre",
+  "start": 8,
+  "end": 23,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "tion.\n \nPatients with cardiac disease\nPatient",
+  "start": 8,
+  "end": 37,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "rapy.\n \nGastrointestinal haemorrhage\nIn the ",
+  "start": 8,
+  "end": 36,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "ered.\n \nTumour lysis syndrome\nDue to ",
+  "start": 8,
+  "end": 29,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "4.8).\n \nHepatitis B reactivation\nReactiv",
+  "start": 8,
+  "end": 32,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "4.8).\n \nPhototoxicity\nExposur",
+  "start": 8,
+  "end": 21,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "SPF).\n \nThrombotic microangiopathy\nBCR-ABL",
+  "start": 8,
+  "end": 34,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "umed.\n \nLaboratory tests\nComplet",
+  "start": 8,
+  "end": 24,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "ines.\n \nPaediatric population\nThere h",
+  "start": 8,
+  "end": 29,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "Active substances that may increase imatinib plasma concentrations\nSubstan",
+  "start": 0,
+  "end": 66,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "mily.\n \nActive substances that may decrease imatinib plasma concentrations\nSubstan",
+  "start": 8,
+  "end": 74,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "ided.\n \nActive substances that may have their plasma concentration altered by imatinib\nImatini",
+  "start": 8,
+  "end": 86,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "Women of childbearing potential\nWomen o",
+  "start": 0,
+  "end": 31,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "Teva.\n \nPregnancy\nThere a",
+  "start": 8,
+  "end": 17,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "etus.\n \nBreast-feeding\nThere i",
+  "start": 8,
+  "end": 22,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "Teva.\n \nFertility\nIn non-",
+  "start": 8,
+  "end": 17,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "Summary of the safety profile\nPatient",
+  "start": 0,
+  "end": 29,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "ials.\n \nAdverse reactions\nAdverse",
+  "start": 8,
+  "end": 25,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "osum.\n \nDescription of selected adverse reactions\n \nHepat",
+  "start": 8,
+  "end": 49,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "4.4).\n \nLaboratory test abnormalities\n \nHaema",
+  "start": 8,
+  "end": 37,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "lows:\n \nAdult population\n1200 mg",
+  "start": 8,
+  "end": 24,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "rted.\n \nPaediatric population\nOne 3‑y",
+  "start": 8,
+  "end": 29,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "1EA01\n \nMechanism of action\nImatini",
+  "start": 8,
+  "end": 27,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "ases.\n \nPharmacodynamic effects\nImatini",
+  "start": 8,
+  "end": 31,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "vity.\n \nClinical studies in chronic myeloid leukaemia\nThe eff",
+  "start": 8,
+  "end": 53,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "use).\n \nClinical studies in Ph+ ALL\n \nNewly",
+  "start": 8,
+  "end": 35,
+  "hyphensInWords": true,
+  "changes": true
+ },
+ {
+  "text": "Ph+ ALL\n \nNewly d",
+  "start": 8,
+  "end": 9,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "lder.\n \nClinical studies in MDS/MPD\nExperie",
+  "start": 8,
+  "end": 35,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "onse.\n \nClinical studies in HES/CEL\nOne ope",
+  "start": 8,
+  "end": 35,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "onse.\n \nClinical studies in unresectable and/or metastatic GIST\nOne pha",
+  "start": 8,
+  "end": 63,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "inib.\n \nClinical studies in adjuvant GIST\nIn the ",
+  "start": 8,
+  "end": 41,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "omes.\n \nClinical studies in DFSP\nOne pha",
+  "start": 8,
+  "end": 32,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "Pharmacokinetics of imatinib\nThe pha",
+  "start": 0,
+  "end": 28,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "tate.\n \nAbsorption\nMean ab",
+  "start": 8,
+  "end": 18,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "ated.\n \nDistribution\nAt clin",
+  "start": 8,
+  "end": 20,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "tein.\n \nBiotransformation\nThe mai",
+  "start": 8,
+  "end": 25,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "inib.\n \nElimination\nBased o",
+  "start": 8,
+  "end": 19,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "ites.\n \nPlasma pharmacokinetics\nFollowi",
+  "start": 8,
+  "end": 31,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "aily.\n \nPharmacokinetics in GIST patients\nIn pati",
+  "start": 8,
+  "end": 41,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "lism.\n \nPopulation pharmacokinetics\nBased o",
+  "start": 8,
+  "end": 35,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "inib.\n \nPharmacokinetics in paediatric population\nAs in a",
+  "start": 8,
+  "end": 49,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "aily.\n \nOrgan function impairment\nImatini",
+  "start": 8,
+  "end": 33,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "Tablet core\nCalcium",
+  "start": 0,
+  "end": 11,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "arate\n \nTablet coat\nPolyvin",
+  "start": 8,
+  "end": 19,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "sters\n \nImatinib Teva 100 mg film‑coated tablets\nPack si",
+  "start": 8,
+  "end": 48,
+  "hyphensInWords": true,
+  "changes": false
+ },
+ {
+  "text": "ters.\n \nImatinib Teva 400 mg film‑coated tablets\nPack si",
+  "start": 8,
+  "end": 48,
+  "hyphensInWords": true,
+  "changes": false
+ }
+]

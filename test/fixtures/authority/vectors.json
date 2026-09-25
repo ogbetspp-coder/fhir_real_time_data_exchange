@@ -1,46 +1,2567 @@
-[
-  {
-    "name": "synthetic",
-    "documentSha256": "d41e0389e8df4658a8f658ce00fe10791fa9c5ea8b1441cc3101a7ae7ce7226c",
-    "indexSha256": "7b30f4e26bbfe85554dd9a88104efc00219886f17e34b35c9b1d1bb9e0ddbda4",
-    "outcome": {
-      "imported": {
-        "submissionSha256": "2358e4d106834d8c832ab174c335d11e582f029c083299ca9ae9bd686ee7c899",
-        "sourceTextSha256": "0d8ae6f23a1710f7e54a4da100d23682b2e29512eea05f28096825e033f8d118",
-        "reportSha256": "b862d99d823e181d8ff8100e451fb64de4986c1d97786a40d7e5559bb8e51472"
+{
+  "imports": [
+    {
+      "name": "synthetic",
+      "documentSha256": "d41e0389e8df4658a8f658ce00fe10791fa9c5ea8b1441cc3101a7ae7ce7226c",
+      "indexSha256": "7b30f4e26bbfe85554dd9a88104efc00219886f17e34b35c9b1d1bb9e0ddbda4",
+      "outcome": {
+        "imported": {
+          "submissionSha256": "818a6a83aa207b60c64db13e1e8073dae0053e46e992458aea18bc239e3fc4d5",
+          "sourceTextSha256": "42215e19aa7da102720cb15a0396fcb4ce05470b4d0013e91d5fe59188b73b96",
+          "reportSha256": "28b41c75241cf65a65db2f3712793acde193335ee5f523a2602fc8ed36952da0"
+        }
+      }
+    },
+    {
+      "name": "brukinsa-smpc-en.json",
+      "documentSha256": "d16e72035623a42023d271a76e0ac124c41970af4b1131d0a18479224f4dea5e",
+      "indexSha256": "8060505c58c36baaaf437e281413bde7cbf9ae98f6fc6f3286a0706489c64a63",
+      "outcome": {
+        "refused": "titles: heading-not-permitted"
+      }
+    },
+    {
+      "name": "imatinib-teva-smpc-en.json",
+      "documentSha256": "b266a38b3a06e07f272b56da08d178198025d8d47761b70187b2c389b9f7e5e7",
+      "indexSha256": "e7eef4b4ff86cccf0dc03974726e7887491bbf3fe98c3a874717d4e8f193519b",
+      "outcome": {
+        "refused": "pictures: picture-reference-without-template-or-evidence"
+      }
+    },
+    {
+      "name": "imatinib-teva-tablets-smpc-en.json",
+      "documentSha256": "0cad9db87d0b60ac0d589d6cfb611efcacda0ce6d36b0c0f15182157af582037",
+      "indexSha256": "e7eef4b4ff86cccf0dc03974726e7887491bbf3fe98c3a874717d4e8f193519b",
+      "outcome": {
+        "refused": "pictures: picture-reference-without-template-or-evidence"
+      }
+    },
+    {
+      "name": "jentadueto-smpc-en.json",
+      "documentSha256": "544b2f24e69f410d3e792a80f3ee82c00ef60afcdf913526308e799db54a1ee4",
+      "indexSha256": "3a4ac2e34a955ebeb0a128183b7ddf095e5b6150513d805f6582858ced9b47ea",
+      "outcome": {
+        "refused": "shape: document-shape"
+      }
+    },
+    {
+      "name": "nuvaxovid-smpc-en.json",
+      "documentSha256": "3256838d8d4a270581a4b41e9bf302b4cd2e073a9c3ad75f999563b731f73828",
+      "indexSha256": "2956503ab020d2cd6f50253a728877862b5a913912047a12744f9a27bf81c351",
+      "outcome": {
+        "refused": "pictures: pictures-not-enabled"
       }
     }
-  },
-  {
-    "name": "brukinsa-smpc-en.json",
-    "documentSha256": "d16e72035623a42023d271a76e0ac124c41970af4b1131d0a18479224f4dea5e",
-    "indexSha256": "8060505c58c36baaaf437e281413bde7cbf9ae98f6fc6f3286a0706489c64a63",
-    "outcome": {
-      "refused": "titles: heading-not-permitted"
+  ],
+  "sections": [
+    {
+      "name": "brukinsa-smpc-en.json",
+      "sections": [
+        {
+          "path": "Composition.section[0]",
+          "outcome": {
+            "refused": "css-property"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[0]",
+          "outcome": {
+            "refused": "font"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[1]",
+          "outcome": {
+            "refused": "font"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[2]",
+          "outcome": {
+            "refused": "font"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[0]",
+          "outcome": {
+            "refused": "font"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[1]",
+          "outcome": {
+            "refused": "font"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[1].section[0]",
+          "outcome": {
+            "refused": "font"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[1].section[1]",
+          "outcome": {
+            "refused": "font"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[2]",
+          "outcome": {
+            "refused": "font"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[3]",
+          "outcome": {
+            "refused": "font"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[4]",
+          "outcome": {
+            "refused": "font"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[5]",
+          "outcome": {
+            "refused": "font"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[6]",
+          "outcome": {
+            "refused": "font"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[7]",
+          "outcome": {
+            "refused": "font"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[7].section[0]",
+          "outcome": {
+            "refused": "font"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[8]",
+          "outcome": {
+            "refused": "font"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[0]",
+          "outcome": {
+            "refused": "font"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[1]",
+          "outcome": {
+            "refused": "font"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[2]",
+          "outcome": {
+            "refused": "font"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[0]",
+          "outcome": {
+            "refused": "font"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[1]",
+          "outcome": {
+            "refused": "font"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[2]",
+          "outcome": {
+            "refused": "font"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[3]",
+          "outcome": {
+            "refused": "font"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[4]",
+          "outcome": {
+            "divSha256": "531fd444188004849e5a49ee4b56d245e65100e7a34f0ffb36216bc8952b755c"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[5]",
+          "outcome": {
+            "refused": "font"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[6]",
+          "outcome": {
+            "refused": "font"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[7]",
+          "outcome": {
+            "refused": "font"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[8]",
+          "outcome": {
+            "refused": "font"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[9]",
+          "outcome": {
+            "refused": "font"
+          }
+        }
+      ]
+    },
+    {
+      "name": "imatinib-teva-smpc-en.json",
+      "sections": [
+        {
+          "path": "Composition.section[0]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[0]",
+          "outcome": {
+            "divSha256": "e9c4d61f6818b3376fae27f7a2335de17e271f7bde93cf0e5a5aa701f01f6f07"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[1]",
+          "outcome": {
+            "divSha256": "29ac5c2eae60593ab156f5196fe1d37c403f74452809eb32a7d01572371d9db9"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[2]",
+          "outcome": {
+            "divSha256": "81c5a8779f7f0c08aa811be43f3d890d0174f29c130d09cb8affffa3188b1c83"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[0]",
+          "outcome": {
+            "divSha256": "0d0e6ae937efc1aa45eb85515dd974c09499e984df0c7dcd2949475e3b59a6cb"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[1]",
+          "outcome": {
+            "divSha256": "9270be3663c48b5243a865a80aa12ca8c8000efdce581bee858fe45c59555ed2"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[1].section[0]",
+          "outcome": {
+            "divSha256": "923cc07d19f75b5bf0a91b08f388fe6b0c640f957796b12c44e7db2a137130a9"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[1].section[1]",
+          "outcome": {
+            "divSha256": "e670b14e6744ffcc188212564e4db59c69d6829432eb29f2bdf5273192dee965"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[2]",
+          "outcome": {
+            "divSha256": "e4782dc58faf6a26ff2bd9a64e8166bd47b47890d0e54db9b52480194c7602a2"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[3]",
+          "outcome": {
+            "divSha256": "4c2425bb78f42b469cbca703ece3d52e130f1363617a3d87693e64f4ffb1e93e"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[4]",
+          "outcome": {
+            "divSha256": "7280cdadb6bb4d120d51f61682f031d29f02e52e12c5b0f105da0561b9f82a46"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[5]",
+          "outcome": {
+            "divSha256": "f4e7def3ecb94cc5eda6467e0110b7cefffea56235680c2d75fe57310d6a8c73"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[6]",
+          "outcome": {
+            "divSha256": "78b4a0e265b9a590ca616eb0696eecc5fbfc9224123d962496fad01a8c8d57b0"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[7]",
+          "outcome": {
+            "divSha256": "edf66401124d2bddc4d1392f6b77dd2b34f258b5fc2007939dad4c9b340ee378"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[7].section[0]",
+          "outcome": {
+            "divSha256": "767ba1683b71107668b5e374db657b7e3ccdbd264e1234551c9d205467f8c072"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[8]",
+          "outcome": {
+            "divSha256": "7a1e92b1b3fb79a22b184dc610583ab8e1ddb75bf0e707fd64eae5067a706cde"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[0]",
+          "outcome": {
+            "refused": "offset"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[1]",
+          "outcome": {
+            "divSha256": "c5bad33a436da831b2422d6ad06dfd6a1694ade22c58cd992bc01444e93c0960"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[2]",
+          "outcome": {
+            "divSha256": "d8775180f6231b3d408e2350b22035cba1101944beb69e2b9bc02453ace0ccd0"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[0]",
+          "outcome": {
+            "divSha256": "78fe0da693e2ca15832ab5312f00a02366777fa001ef600d6313dd33099cdf55"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[1]",
+          "outcome": {
+            "divSha256": "561ffc3d435a09eb2f0cbb6dc74bca7cb568b99235eda1e7c7f128063087302e"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[2]",
+          "outcome": {
+            "divSha256": "5ac70e1c051ac7e2174aef695590e9e7453f885a522c0213a1b1638e50c9a20b"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[3]",
+          "outcome": {
+            "divSha256": "4cba7cbe5ccc53639f976ee8daae58a776cbfc2a45d16b00c0387fd5ad53f098"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[4]",
+          "outcome": {
+            "divSha256": "8262a803cff70f5f95ffbc967904016ee08f70bb92f8ea5c2457e81a89988e8e"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[5]",
+          "outcome": {
+            "divSha256": "c5c8f44291502c04fc1ca3ff244e22ca5b7bb80410c4795b2be5555c6385cda5"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[6]",
+          "outcome": {
+            "divSha256": "d99640be99deb88926b1655ebf3957da6d63531402a8f666ac83b8877804dfdf"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[7]",
+          "outcome": {
+            "divSha256": "e2035793bc619d1581a45bf5d78788d769a7f064a79942f3396d435d68e35a05"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[8]",
+          "outcome": {
+            "divSha256": "214586a6c4dde61602eaf9b11b05be64801af72638d752e116b24bb1838c3f54"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[9]",
+          "outcome": {
+            "divSha256": "1b256957dd3c48dfe802ebdac4c385201b9818c4865bb28958671c810e71bd19"
+          }
+        }
+      ]
+    },
+    {
+      "name": "imatinib-teva-tablets-smpc-en.json",
+      "sections": [
+        {
+          "path": "Composition.section[0]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[0]",
+          "outcome": {
+            "divSha256": "56c310838f4e5aaca38764cdc4af3c175d999e8ee0fc83341a446b80a2419cd8"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[1]",
+          "outcome": {
+            "divSha256": "93ff505771ca038521de20bf97bdb01d9a73e188a22f7a5828343357ffd550e5"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[2]",
+          "outcome": {
+            "divSha256": "f51e29bc27cc8a64c8fe2bf6cb623e38c2fabb2f338313f48d3e52a958cdb753"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[0]",
+          "outcome": {
+            "divSha256": "0d0e6ae937efc1aa45eb85515dd974c09499e984df0c7dcd2949475e3b59a6cb"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[1]",
+          "outcome": {
+            "divSha256": "9270be3663c48b5243a865a80aa12ca8c8000efdce581bee858fe45c59555ed2"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[1].section[0]",
+          "outcome": {
+            "divSha256": "a2c016623231b6663f686dcf7c846d8c8c1b4086960a6b23e0b966626afd4de6"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[1].section[1]",
+          "outcome": {
+            "divSha256": "8e49d3354a9fbd271ead42ffdfe550d32cd9873cba9ebd382d4003a07eb94f6e"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[2]",
+          "outcome": {
+            "divSha256": "e4782dc58faf6a26ff2bd9a64e8166bd47b47890d0e54db9b52480194c7602a2"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[3]",
+          "outcome": {
+            "divSha256": "4c2425bb78f42b469cbca703ece3d52e130f1363617a3d87693e64f4ffb1e93e"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[4]",
+          "outcome": {
+            "divSha256": "7280cdadb6bb4d120d51f61682f031d29f02e52e12c5b0f105da0561b9f82a46"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[5]",
+          "outcome": {
+            "divSha256": "f4e7def3ecb94cc5eda6467e0110b7cefffea56235680c2d75fe57310d6a8c73"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[6]",
+          "outcome": {
+            "divSha256": "78b4a0e265b9a590ca616eb0696eecc5fbfc9224123d962496fad01a8c8d57b0"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[7]",
+          "outcome": {
+            "divSha256": "edf66401124d2bddc4d1392f6b77dd2b34f258b5fc2007939dad4c9b340ee378"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[7].section[0]",
+          "outcome": {
+            "divSha256": "53747052fdb32d6876531b2b2e2ee5a220ed59e7a309a17c100a69deff863d24"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[8]",
+          "outcome": {
+            "divSha256": "7a1e92b1b3fb79a22b184dc610583ab8e1ddb75bf0e707fd64eae5067a706cde"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[0]",
+          "outcome": {
+            "refused": "offset"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[1]",
+          "outcome": {
+            "divSha256": "47a3e11687e7cc888bfd0a23a50d85b508f626271ab902a8f1dcab8e36f3a493"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[2]",
+          "outcome": {
+            "divSha256": "d8775180f6231b3d408e2350b22035cba1101944beb69e2b9bc02453ace0ccd0"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[0]",
+          "outcome": {
+            "divSha256": "383f60ee934f606ad60bad04c93cb9cd0decdb030ef66b7b6564065a31c00e3e"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[1]",
+          "outcome": {
+            "divSha256": "561ffc3d435a09eb2f0cbb6dc74bca7cb568b99235eda1e7c7f128063087302e"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[2]",
+          "outcome": {
+            "divSha256": "5ac70e1c051ac7e2174aef695590e9e7453f885a522c0213a1b1638e50c9a20b"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[3]",
+          "outcome": {
+            "divSha256": "4cba7cbe5ccc53639f976ee8daae58a776cbfc2a45d16b00c0387fd5ad53f098"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[4]",
+          "outcome": {
+            "divSha256": "a4b2a8adab60ed299e0845d182b4b00f91aca7fa0e8a405e671d29834c1df39c"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[5]",
+          "outcome": {
+            "divSha256": "c5c8f44291502c04fc1ca3ff244e22ca5b7bb80410c4795b2be5555c6385cda5"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[6]",
+          "outcome": {
+            "divSha256": "d99640be99deb88926b1655ebf3957da6d63531402a8f666ac83b8877804dfdf"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[7]",
+          "outcome": {
+            "divSha256": "b99b1f78a9e18fb4805949909dfa5e22005be9d92d480a0c4de053c3528ee408"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[8]",
+          "outcome": {
+            "divSha256": "214586a6c4dde61602eaf9b11b05be64801af72638d752e116b24bb1838c3f54"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[9]",
+          "outcome": {
+            "divSha256": "1b256957dd3c48dfe802ebdac4c385201b9818c4865bb28958671c810e71bd19"
+          }
+        }
+      ]
+    },
+    {
+      "name": "jentadueto-smpc-en.json",
+      "sections": [
+        {
+          "path": "Composition.section[0]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[0]",
+          "outcome": {
+            "divSha256": "912b63a8ded47ba7b91ace66d8e44479b3c48d04dbcb798727c003717e61cd36"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[1]",
+          "outcome": {
+            "divSha256": "ac0d108c977b8e6ccab44bcfcba2d5884b5c0b9a8334a278ab81a158fb12dd4e"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[2]",
+          "outcome": {
+            "divSha256": "1aa11612b1c0e39162065e56388856c8ede13e06e89d2e1ef78e689314d5003d"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[0]",
+          "outcome": {
+            "refused": "list"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[1]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[1].section[0]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[1].section[0].section[0]",
+          "outcome": {
+            "divSha256": "897ef54d60ece44b79e1ea988901294c914b5537dcce0f9481e1876f6418945d"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[1].section[0].section[1]",
+          "outcome": {
+            "divSha256": "c72250bde3c367a46d92660dc60de755f2d9d709d979dc05822268b65df9630d"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[1].section[0].section[2]",
+          "outcome": {
+            "divSha256": "c9050950c1785a9c9ca9d084928e1eb1b8fac371b19a2ff914b0eeefed5e5a16"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[1].section[0].section[3]",
+          "outcome": {
+            "divSha256": "675f7f54fb29903780a81f6f22bbc1adac315f45cbaa1c0a266d79558cedf569"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[1].section[0].section[4]",
+          "outcome": {
+            "divSha256": "17d319cf2ca817880aa887b0e1934ce759d3e60ca9066563bdff46852cc64841"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[1].section[1]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[1].section[1].section[0]",
+          "outcome": {
+            "divSha256": "d89975b397671ac69f115be1c775445b841b5dc588c495be24d7ee6bba4632b8"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[1].section[1].section[1]",
+          "outcome": {
+            "refused": "markup"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[1].section[1].section[2]",
+          "outcome": {
+            "divSha256": "1b329f136d16f2f1d7af619b67becfea3707653566f03a80d9e5a7c047f3cad9"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[1].section[2]",
+          "outcome": {
+            "divSha256": "69dcf73a079e3ac99bcd943f75058f42c7cfd5a3c677a8d93f502d5ab62c849c"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[1].section[3]",
+          "outcome": {
+            "divSha256": "5d22f1f3d29c39635258216f036c7c33f6bb7e45a281da953a3df5a6dd9e2d93"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[2]",
+          "outcome": {
+            "refused": "markup"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[3]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[3].section[0]",
+          "outcome": {
+            "divSha256": "10ee069e1c6a13bb6c9dbd0db7e54afb2f0bc5a03916af907c4562744916bf5a"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[3].section[1]",
+          "outcome": {
+            "divSha256": "8a835c64363ba7731ddc597d816f13348014b242d4877cc33c25f45f32e58159"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[3].section[2]",
+          "outcome": {
+            "refused": "markup"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[3].section[3]",
+          "outcome": {
+            "divSha256": "4826da11956b415bed1dc00928c1b70c7dd6b9716786ce3607571c71ae6b041b"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[3].section[4]",
+          "outcome": {
+            "refused": "markup"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[3].section[5]",
+          "outcome": {
+            "divSha256": "ddedd653ccc6f50ff32cf44a3d07b368d9251813aa0f363793677d3a4be95283"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[3].section[6]",
+          "outcome": {
+            "divSha256": "e7468e8a1903dcc84926fe5b1df25f6be82b82056e716f26313c974c38e4e27f"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[3].section[7]",
+          "outcome": {
+            "divSha256": "33e0853ab5252bf6f3fe172ac36525973259ad2a28103c458a329d36736da77f"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[3].section[8]",
+          "outcome": {
+            "divSha256": "2f716c9ce4cbdbf5ead83bca3b7fddcf08f7793d80b9b9513da3f29141b8ac0e"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[3].section[9]",
+          "outcome": {
+            "divSha256": "c0647dc039c6eb9cc83fa42567ae0d0f8dfde948d5a1b3e59b466897e957dd48"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[3].section[10]",
+          "outcome": {
+            "divSha256": "b186ca17f54252ea57fc8a61fe36c1b318b5d3c5a63969b521dbd84867711172"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[3].section[11]",
+          "outcome": {
+            "divSha256": "ad6ca8acba91f01ce2310ccce2d715a225fc5959c3149dcca74862e9bacfb707"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[4]",
+          "outcome": {
+            "divSha256": "4adb1fd81d826e7ce05b81929d0256eaf6779639997ca493a1eac7b7837b59fb"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[4].section[0]",
+          "outcome": {
+            "divSha256": "6fc400b2df4b3a3339a7b7be0da46a5439b8b90197c2adbe718bd67a4ca9ef24"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[4].section[1]",
+          "outcome": {
+            "refused": "list"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[5]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[5].section[0]",
+          "outcome": {
+            "divSha256": "0681dcae5b3a4df98bd27a88d9fe955e571dd6ae7a0b32cabe354e450fa86ba6"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[5].section[1]",
+          "outcome": {
+            "divSha256": "554f91973b403189e60e6fdd83d163394d34cc384b9b53ec5687608c6238676c"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[5].section[2]",
+          "outcome": {
+            "divSha256": "cba356f1c6de12d8e9636c194f2e6a585d8f79d1e5f91646cc38894507f2aa9c"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[6]",
+          "outcome": {
+            "divSha256": "34e91f33111d6d28f1b0ae387439f4903ad9e75bd4a5d40bdde1c76ffaaf8f41"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[7]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[7].section[0]",
+          "outcome": {
+            "divSha256": "0613c0ce280394d7348cea54c67bb4ab35377ac373d6d6dd2282a4d29659b412"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[7].section[0].section[0]",
+          "outcome": {
+            "refused": "markup"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[7].section[1]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[7].section[1].section[0]",
+          "outcome": {
+            "divSha256": "b7c1e703e6646ebbcc56811106a0ab6459363b0bd66869daec3dc3f7d9ae87f0"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[7].section[1].section[1]",
+          "outcome": {
+            "divSha256": "cd9e978c0e3a3c242e37691175277a53650db9a18eba071a976e08e80d968f3d"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[7].section[2]",
+          "outcome": {
+            "divSha256": "54ab22732aad0280cbde9ad06f9a28c2e467d8b9d893a342706f2589e913d573"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[7].section[3]",
+          "outcome": {
+            "divSha256": "701b0cfb8cd1e40680fb182d49b0a3dc239fcfa6c94bf203b03ec9e5e232ab30"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[7].section[4]",
+          "outcome": {
+            "divSha256": "467b094acc469386046497ae651bbe89649f74b273f15f67f1f74c53bf1ebd43"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[8]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[8].section[0]",
+          "outcome": {
+            "divSha256": "e74cf26236cbf2fc1a3683f6219131662237bf1d74eaa0015dbbdf0221d1e634"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[8].section[1]",
+          "outcome": {
+            "divSha256": "69cda5e9bd26bf9f8bd9e0fdd7b0c69c322b131a20b855b0d772d3ff10278eb8"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[8].section[2]",
+          "outcome": {
+            "divSha256": "33c3e4a666c05e07aaf609ca91fcce7ce651d1e810c2d240e04b3ac761b00c31"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[0]",
+          "outcome": {
+            "divSha256": "3f42ea0bd1a51f7bc66228c7cdeb9bba10e450e6adf72035625cc4fdcfa1341d"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[0].section[0]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[0].section[0].section[0]",
+          "outcome": {
+            "divSha256": "fac13f60c8780aeec456f35cee0b2732bc4581634e397ae892501563162a9a2d"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[0].section[1]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[0].section[1].section[0]",
+          "outcome": {
+            "divSha256": "cf216c34834e2321bf71b13cba909cba5255e5bfc6af78419c124efb93a7848a"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[0].section[1].section[1]",
+          "outcome": {
+            "refused": "markup"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[0].section[2]",
+          "outcome": {
+            "divSha256": "39328a492c1d0befdac528bf618cc66565011b0cc93f19e37fa139b50eccb161"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[1]",
+          "outcome": {
+            "divSha256": "c050b6bf6f6aca971a402d315942a01e87f6e56a171949c6b0573e1561d9aa53"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[1].section[0]",
+          "outcome": {
+            "divSha256": "a83ccaeb4bee976290c95aa73ee0d8a1ec8d4ebe9f40b5e389e5b41f60a141ed"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[1].section[0].section[0]",
+          "outcome": {
+            "divSha256": "76358037d4e80f485f4bf1bdccd441dc025ab2398ca26d769a7256371f38fee7"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[1].section[0].section[1]",
+          "outcome": {
+            "divSha256": "718634c1e6258e57883589e15dced1b1fbbd1912455cf8ccb5cb65f76f0015fe"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[1].section[0].section[2]",
+          "outcome": {
+            "divSha256": "31bc3bb0b484f38b2d5518ddaaf5ace44b2ddc2ba05f59402f4669a576ed382c"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[1].section[0].section[3]",
+          "outcome": {
+            "divSha256": "c5f73680a3709852d2aa457b5de7d9045f2b3d6998eeed53c0688374f27ca6ac"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[1].section[0].section[4]",
+          "outcome": {
+            "divSha256": "e8818e722b7073a25d9a8efac314603d66a1e8fbc037decc4715fe51109ad20d"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[1].section[0].section[5]",
+          "outcome": {
+            "divSha256": "3b53c7edf9399bacc0f4988e989078b1a8a3281604f44fa636af158b4334eea8"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[1].section[0].section[6]",
+          "outcome": {
+            "divSha256": "0a299728bd65918fc65e99f690cfef6f154867b0e4bdbb02467021b19f929e32"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[1].section[0].section[7]",
+          "outcome": {
+            "divSha256": "be2537a4e1c72c51ab5038c45a7c3b71cd3a5c7091fbd6e2278ecb9e785b7041"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[1].section[0].section[8]",
+          "outcome": {
+            "divSha256": "141b20cbebbc63094a8a2861206d79c8b6e19d7aa35fa39a1779ca92858704da"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[1].section[0].section[9]",
+          "outcome": {
+            "refused": "markup"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[1].section[0].section[10]",
+          "outcome": {
+            "divSha256": "9ca7f2c963a2713f9a24f78024d0b4c9cf0c7a313928e2f29dd12971b66b7f66"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[1].section[1]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[1].section[1].section[0]",
+          "outcome": {
+            "divSha256": "0e262ffab3906c920e4e38952eb2229bf7e605e44d846553f0222498ff931b14"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[1].section[1].section[1]",
+          "outcome": {
+            "divSha256": "1c6112a4332042fb5405606730594bc60af58d4ed447dc482aa3f0b0e013752b"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[1].section[1].section[2]",
+          "outcome": {
+            "divSha256": "e39f9ec000ca73f57c675261f95c4d7ee69df97510930151d2e880fa5d32fa47"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[1].section[1].section[3]",
+          "outcome": {
+            "divSha256": "735d9d286bdfbd93c3356ae092a48698b2904c6b3ca7edd1c9c3e1476b883c7a"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[1].section[1].section[4]",
+          "outcome": {
+            "divSha256": "9043c7c910a9227f5b14c59ea0314075fb9b0da293df8785c78154c3a9d84934"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[2]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[2].section[0]",
+          "outcome": {
+            "divSha256": "3c3de173d1687771f1629a64bc55cd835c1fac357846d63420b90eea85434eea"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[2].section[1]",
+          "outcome": {
+            "divSha256": "619037fd2bd37341b916b5ab8fd0e2b6116074717733584bdc8019f8201b7c09"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[2].section[2]",
+          "outcome": {
+            "divSha256": "987ebcfaa7beabe6a7fdbce6bb5caae23fa8fb0e55db3c968b03c2949c8079d3"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[0]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[0].section[0]",
+          "outcome": {
+            "divSha256": "83b513ad5df2b8361a0989090e85b6cfa81b90e29240e5e0ad6f2c48fdccda4b"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[0].section[1]",
+          "outcome": {
+            "divSha256": "e163145ceab04a2bb7f36859acf1afd2a68057e35e0e4c041f99ae32bd13d7f8"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[0].section[2]",
+          "outcome": {
+            "divSha256": "b19716c740b68991618cc4a7a064c5a54207afb81564bc2c48dac71704d389ba"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[1]",
+          "outcome": {
+            "divSha256": "561ffc3d435a09eb2f0cbb6dc74bca7cb568b99235eda1e7c7f128063087302e"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[2]",
+          "outcome": {
+            "divSha256": "a6906bcb071ca796e170bb2f6d4f9fa8532ab3cea678679838e3b06def53be5c"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[3]",
+          "outcome": {
+            "divSha256": "0441e1513bb36f6e9a6ca2d2801791cc3c10ba58e512281b358c496efd9e2989"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[3].section[0]",
+          "outcome": {
+            "divSha256": "1664cc115814d8c99354aa7b6f2e4b12440617cb850f0ff3ee1f2fb8e58f1d08"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[3].section[1]",
+          "outcome": {
+            "divSha256": "92cba7ebc5ddb6f26c138b8517ea5cb9510833bee20a867a83988d3beafb7353"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[4]",
+          "outcome": {
+            "refused": "list"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[5]",
+          "outcome": {
+            "divSha256": "c5c8f44291502c04fc1ca3ff244e22ca5b7bb80410c4795b2be5555c6385cda5"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[6]",
+          "outcome": {
+            "divSha256": "898676f6f5bea0a9103ef5aa7b1a136b4323689216e8a2f803169ab709ea9028"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[7]",
+          "outcome": {
+            "divSha256": "690bc5655421a2b05f560af2bdd498fac5054d31b8ff5386c3aaffd7278a17f4"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[8]",
+          "outcome": {
+            "divSha256": "cbb62ffc15830583858aac305488a4f74eef730c6bde134c5adca21afdc55db4"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[9]",
+          "outcome": {
+            "divSha256": "e11712f93155af627d96dad6f477dc388aa2c7de0d1abed040c9d0f50286836e"
+          }
+        }
+      ]
+    },
+    {
+      "name": "nuvaxovid-smpc-en.json",
+      "sections": [
+        {
+          "path": "Composition.section[0]",
+          "outcome": {
+            "refused": "markup"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[0]",
+          "outcome": {
+            "divSha256": "409a86e481ae1f69859a99305b3d82cf3d5c210b6e71dba382f17e29f58e3cd8"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[1]",
+          "outcome": {
+            "divSha256": "5dc67cdd5d02c550faf6fc7b001142f62b4af5c755bc8c38e4e4907c3a8f16fe"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[2]",
+          "outcome": {
+            "divSha256": "d4bac108d5acacf443ce5175682aae56bdea182e84e4d01d2b7a046d48c60300"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[0]",
+          "outcome": {
+            "divSha256": "5cf8852a0e9ce3e41deb3b646fa97532dc5bbda3a2839d1d16d67f68a7c7c5cb"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[1]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[1].section[0]",
+          "outcome": {
+            "divSha256": "c1b4e74d4291988155f5f23be54f11a5ea8790b776e2b561c5e8f378b0db70e6"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[1].section[1]",
+          "outcome": {
+            "divSha256": "d322081d1c065481dd7b957980e36e15af09a61e8fac39adf1382a5efc7f1dbb"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[2]",
+          "outcome": {
+            "divSha256": "85ff7709f794899247e5ce9c777259aabb2d98a72a157d4d6f4d9ab4375fceb7"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[3]",
+          "outcome": {
+            "divSha256": "d825605da747c7d7244993679c66005b0db72043554c3d4f52cc21ee0843c368"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[4]",
+          "outcome": {
+            "divSha256": "179ab8f756d3cb81a3b686974017e7ed21eecb4eb85bde947cbfc47b6b592319"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[5]",
+          "outcome": {
+            "divSha256": "5f9d11ae2829a1fd83a8a4da1fe88bd4762f0fef08b8f926dd987682ce11bb0d"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[6]",
+          "outcome": {
+            "divSha256": "0549ab3810c5a18f4e225bd79cbab2a4b5d276e23260ca66d9e78096ec0d671e"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[7]",
+          "outcome": {
+            "refused": "element"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[7].section[0]",
+          "outcome": {
+            "divSha256": "c6b736513631e4cdb971d24a4ec6612e77f110b59dcae7a98b77e608b8d5717e"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[3].section[8]",
+          "outcome": {
+            "divSha256": "9ff2a3cc4a4d68c352da35730ba6053a6e267c11d55f54be21bc652f06eba7d7"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[0]",
+          "outcome": {
+            "refused": "font"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[1]",
+          "outcome": {
+            "divSha256": "ddfab546b686e74bc67a3472fab747b514a1732e719469d454a77dabe02b0cc9"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[4].section[2]",
+          "outcome": {
+            "divSha256": "124f4ffa5a52d3114484a7d4d40d19d9eaac8da4d86ab1b0a636ed54424c2615"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5]",
+          "outcome": {
+            "divSha256": "d2c6da5a829ff53f4f25012a80960400000d9f5f75f0db72ead765fcf4cfc091"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[0]",
+          "outcome": {
+            "divSha256": "2a9fdf2fb35ae8a60aaba838d615518c28a9ba2e369b39daa84c7c3bb364d243"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[1]",
+          "outcome": {
+            "divSha256": "3f8a2da0bfc626510f2ee78984f75cf80e3cb04dd4699e4101856469f1ffc0b9"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[2]",
+          "outcome": {
+            "divSha256": "e6ba278bb432afb2ccef5e3c52e19046ff8e9e8b9495a6978f0e1958fe205ad4"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[3]",
+          "outcome": {
+            "divSha256": "5502eec1bd4ca645ad34acb501b1a026a69feac0de88be4809c438cd63a71b33"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[4]",
+          "outcome": {
+            "divSha256": "17e2baaa9ccf293e1d6ed5efa9199c5e9585473c57d8354677968feed4012911"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[5].section[5]",
+          "outcome": {
+            "refused": "list"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[6]",
+          "outcome": {
+            "divSha256": "dc0e416a48482b28e7cc6dad50db814e7e2b4956997e2ef5f4a0cd4bfc87d7bb"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[7]",
+          "outcome": {
+            "divSha256": "93607be8ff6c75d1002070e67bcf85e8730dbdf4e04d226909d573e385ad69f8"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[8]",
+          "outcome": {
+            "divSha256": "53c136813cf5d41e6fa7f4476acd371691ffb07fa929d6b1590add6952f8cf38"
+          }
+        },
+        {
+          "path": "Composition.section[0].section[9]",
+          "outcome": {
+            "divSha256": "c56a372d83e61ae7081e978d64d1d8c9521573e9af157963aa6952dc08e3b5c2"
+          }
+        }
+      ]
     }
-  },
-  {
-    "name": "imatinib-teva-smpc-en.json",
-    "documentSha256": "b266a38b3a06e07f272b56da08d178198025d8d47761b70187b2c389b9f7e5e7",
-    "indexSha256": "e7eef4b4ff86cccf0dc03974726e7887491bbf3fe98c3a874717d4e8f193519b",
-    "outcome": {
-      "refused": "pictures: picture-reference-without-template-or-evidence"
+  ],
+  "transforms": [
+    {
+      "name": "styles-and-classes-deleted",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p class=\"MsoNormal\" style=\"margin: 0cm 0cm 0.0001pt; font-size: 11pt; font-family: 'Times New Roman', serif; color: #231f20;\">Take one tablet.</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Take one tablet.</p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "span-u-and-link-unwrapped",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><span style=\"color: black;\"><u>Posology</u> see <a href=\"https://www.ema.europa.eu\" style=\"color: blue; text-decoration: underline;\">www.ema.europa.eu</a></span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Posology see www.ema.europa.eu</p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "hanging-indent-kept-in-its-box",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"margin: 0cm 0cm 0.0001pt 1cm; text-indent: -1cm;\">1&#160;&#160; Pneumonia</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>1&#160;&#160; Pneumonia</p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "raised-digit-folded-to-sup",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"font-size: 11pt;\">platelets &gt; 100 x 10<span style=\"font-size: 7.0pt; position: relative; top: -5.0pt;\">9</span>/l</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>platelets &gt; 100 x 10<sup>9</sup>/l</p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "lowered-run-folded-to-sub",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"font-size: 11pt;\">(CI<span style=\"font-size: 7.0pt; position: relative; top: 1.5pt;\">95%</span>)</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>(CI<sub>95%</sub>)</p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "small-shift-deleted",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"font-size: 11pt;\"><span style=\"position: relative; top: .5pt;\">Table 2</span> response</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Table 2 response</p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "table-attributes-deleted-spans-kept",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table class=\"MsoNormalTable\" style=\"border-collapse: collapse;\" border=\"0\" cellspacing=\"0\" cellpadding=\"0\"><tbody><tr><td style=\"width: 125.9pt; border: solid windowtext 1.0pt; padding: 0cm 5.4pt;\" colspan=\"2\" valign=\"top\"><p>Dose</p></td></tr><tr><td style=\"border: solid windowtext 1.0pt; padding: 0cm 5.4pt;\" valign=\"top\"><p>1</p></td><td style=\"border: solid windowtext 1.0pt; padding: 0cm 5.4pt;\" valign=\"top\"><p>5 mg</p></td></tr></tbody></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tbody><tr><td colspan=\"2\"><p>Dose</p></td></tr><tr><td><p>1</p></td><td><p>5 mg</p></td></tr></tbody></table><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "ordered-list-keeps-type-and-start",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><ol type=\"a\" start=\"2\" style=\"margin-top: 0px; margin-bottom: 0cm;\"><li style=\"font-size: 11pt;\">first</li><li style=\"font-size: 11pt;\">second</li></ol><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><ol type=\"a\" start=\"2\"><li>first</li><li>second</li></ol><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "ltr-and-language-deleted",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p dir=\"ltr\"><span lang=\"EN-GB\">Dose</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Dose</p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "inline-shading-at-normal-line-height",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"line-height: normal;\"><span style=\"background: lightgrey;\">via the national reporting system</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>via the national reporting system</p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "plus-in-underlined-subheading-waived-on-evidence",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><u>Posology for Ph+ ALL in children</u></p><p>not for clinical use</p></div>",
+      "evidence": [
+        "Ph+"
+      ],
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Posology for Ph+ ALL in children</p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "unknown-element",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><font>x</font></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "element"
+    },
+    {
+      "name": "code-element",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><code>x</code></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "element"
+    },
+    {
+      "name": "bgcolor-attribute",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table bgcolor=\"black\"><tr><td>x</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "attribute"
+    },
+    {
+      "name": "right-to-left-dir",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p dir=\"rtl\">10 mg or 20 mg</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "attribute"
+    },
+    {
+      "name": "floated-table",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table align=\"left\"><tr><td>x</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "attribute"
+    },
+    {
+      "name": "abbreviation-title",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>CrCl <abbr title=\"x\">&lt;</abbr> 30</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "attribute"
+    },
+    {
+      "name": "important",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"color: red !important\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-grammar"
+    },
+    {
+      "name": "bracket-in-any-value",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"font-size:24pt; mso-x:(; font-size:12pt; mso-y:)\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-grammar"
+    },
+    {
+      "name": "brace-in-any-value",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"color:#fff;mso-x:{;color:#000;mso-y:}\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-grammar"
+    },
+    {
+      "name": "display-none",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"display: none\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-property"
+    },
+    {
+      "name": "letter-spacing",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"letter-spacing: -2pt\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-property"
+    },
+    {
+      "name": "number-ending-in-a-point",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"font-size: 3pt\"><span style=\"font-size: 12.pt\">x</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "five-value-margin",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"margin: 0 0 0 0 5pt\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "position-absolute",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><span style=\"position: absolute; top: 0\">x</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "faint-text",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"color: #cccccc\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "contrast"
+    },
+    {
+      "name": "white-text-pulled-out-of-its-black-box",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"margin-left: 1cm; text-indent: -1cm; background: black; color: white\">Do not exceed</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "contrast"
+    },
+    {
+      "name": "negative-margin-in-a-cell",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td style=\"padding: 0\"><p style=\"margin-left: -3pt\">x</p></td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "offset"
+    },
+    {
+      "name": "positive-indent-in-a-cell",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td><p style=\"text-indent: 80pt\">5 mg</p></td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "offset"
+    },
+    {
+      "name": "margin-on-inline",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>CrCl &gt;<span style=\"margin-left: -1.65pt\">_</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "offset"
+    },
+    {
+      "name": "em-on-a-margin",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"margin-left: 1em\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "margin-beyond-bound",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"margin-left: 3000pt\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "offset"
+    },
+    {
+      "name": "line-under-its-font-size",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"font-size: 12pt; line-height: 0.9em\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "line-height"
+    },
+    {
+      "name": "text-under-five-points",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"font-size: 4pt\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "font-size"
+    },
+    {
+      "name": "text-under-half-its-block",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"font-size: 24pt\">Dose <span style=\"font-size: 10pt\">not</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "font-size"
+    },
+    {
+      "name": "font-without-a-pinned-substitute",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"font-family: Verdana\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "font"
+    },
+    {
+      "name": "quoted-generic",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"font-family: 'serif'\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "font"
+    },
+    {
+      "name": "list-without-its-marker-padding",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><ol style=\"padding-left: 0\"><li>x</li></ol><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "list"
+    },
+    {
+      "name": "list-item-pulled-left",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><ol><li style=\"margin-left: -30pt\">x</li></ol><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "list"
+    },
+    {
+      "name": "cells-without-space-or-border",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table cellspacing=\"0\" cellpadding=\"0\"><tr><td><p style=\"text-align: right\">Dose 1</p></td><td><p>5 mg</p></td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "table-edge"
+    },
+    {
+      "name": "shift-between-the-bounds",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"font-size: 12pt\">10<span style=\"position: relative; top: -1.8pt\">2</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "baseline-shift"
+    },
+    {
+      "name": "whole-line-raised",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><span style=\"position: relative; top: -3.5pt\">Take 200 mg twice daily.</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "baseline-shift"
+    },
+    {
+      "name": "raise-into-the-line-above",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"font-size: 12pt\">10<span style=\"font-size: 7pt; position: relative; top: -14pt\">9</span>/l</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "baseline-shift"
+    },
+    {
+      "name": "sup-vertical-align-replaced",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>10<sup style=\"vertical-align: baseline\">6</sup></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "underlined-less-than",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>CrCl <u>&lt;</u> 30</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "underline"
+    },
+    {
+      "name": "underlined-ordinal",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>1<u>a</u> dose</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "underline"
+    },
+    {
+      "name": "dash-that-reads-as-equals",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><u>a⸗b</u></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "underline"
+    },
+    {
+      "name": "plus-without-evidence",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><u>Posology for Ph+ ALL in children</u></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "underline"
+    },
+    {
+      "name": "block-inside-a-paragraph",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a<div>b</div>c</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "markup"
+    },
+    {
+      "name": "definition-inside-a-paragraph",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Take <dd>2 tablets</dd>daily</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "markup"
+    },
+    {
+      "name": "span-directly-in-a-table",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><span><tr><td>x</td></tr></span></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "markup"
+    },
+    {
+      "name": "self-closing-span",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Take <span style=\"font-size:1pt\"/>4 tablets</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "markup"
+    },
+    {
+      "name": "upper-case-attribute",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p STYLE=\"font-size:11pt\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "markup"
+    },
+    {
+      "name": "function-other-than-rgb",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"color: calc(1)\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-grammar"
+    },
+    {
+      "name": "line-break-in-a-quoted-family",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"font-family: 'Times\nNew'\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-grammar"
+    },
+    {
+      "name": "declaration-without-a-colon",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"color\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-grammar"
+    },
+    {
+      "name": "property-name-not-an-identifier",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"1color: red\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-grammar"
+    },
+    {
+      "name": "quote-outside-font-family",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"color: 'red'\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-grammar"
+    },
+    {
+      "name": "global-keyword",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"color: inherit\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-grammar"
+    },
+    {
+      "name": "current-colour",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td style=\"border: 1pt solid currentcolor\">x</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-grammar"
+    },
+    {
+      "name": "family-by-reference",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"font-family: &quot;Times New Roman&quot;, serif\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x</p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "unitless-length",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"margin-left: 5\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "short-hex-and-rgb-colours",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"color: #333\"><span style=\"color: rgb(35, 31, 32)\">x</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x</p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "rgb-channel-over-255",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"color: rgb(300, 0, 0)\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "unknown-colour",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"color: blurple\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "transparent-background",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"background: transparent\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x</p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "heading-size",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><h2>Dose</h2><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><h2>Dose</h2><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "word-properties",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"mso-bidi-font-size: 11.0pt; tab-stops: 35.4pt; text-autospace: none; page-break-after: avoid\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x</p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "text-autospace-other",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"text-autospace: ideograph-alpha\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "zero-font-size",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"font-size: 0pt\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "font-size"
+    },
+    {
+      "name": "relative-font-size",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"font-size: 12pt\">a <span style=\"font-size: 90%\">b</span> <span style=\"font-size: 0.8em\">c</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a b c</p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "zero-relative-font-size",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><span style=\"font-size: 0em\">x</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "font-size"
+    },
+    {
+      "name": "font-style-and-weight",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"font-style: italic; font-weight: bold\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x</p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "font-style-other",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"font-style: slanted\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "font-weight-other",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"font-weight: heavy\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "transparent-text",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"color: transparent\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "number-and-length-line-heights",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"line-height: 1.2\">a</p><p style=\"line-height: 13pt; font-size: 11pt\">b</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a</p><p>b</p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "line-height-length-under-a-larger-child",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"line-height: 13pt; font-size: 11pt\">a <span style=\"font-size: 14pt\">b</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "line-height"
+    },
+    {
+      "name": "text-align-other",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"text-align: middle\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "width-outside-a-table",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"width: 100pt\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-property"
+    },
+    {
+      "name": "width-in-em",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td style=\"width: 3em\">x</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "negative-width",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td style=\"width: -3pt\">x</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "collapse-on-a-cell",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td style=\"border-collapse: collapse\">x</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "border-image-other",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td style=\"border-image: stretch\">x</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "border-outside-a-table",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"border: 1pt solid black\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-property"
+    },
+    {
+      "name": "border-with-four-parts",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td style=\"border: 1pt solid black double\">x</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "border-with-two-styles",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td style=\"border: solid double\">x</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "border-with-two-widths",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td style=\"border: 1pt 2pt solid\">x</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "border-with-a-negative-width",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td style=\"border: -1pt solid black\">x</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "border-with-two-colours",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td style=\"border: solid black white\">x</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "border-too-wide",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td style=\"border: 4pt solid black\">x</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "border-longhands",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td style=\"border-top-width: 1pt; border-top-style: solid; border-top-color: black; border-bottom: thin dashed #231F20\">x</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>x</td></tr></table><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "border-longhand-style-other",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td style=\"border-top-style: wavy\">x</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "border-longhand-negative-width",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td style=\"border-left-width: -2pt\">x</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "top-in-percent",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a<span style=\"position: relative; top: -50%\">b</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "bottom-in-percent",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a<span style=\"position: relative; bottom: 50%\">b</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "top-without-position",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a<span style=\"top: -5pt\">b</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "top-and-bottom",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a<span style=\"position: relative; top: -5pt; bottom: 1pt\">b</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "position-without-an-offset",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a<span style=\"position: relative\">b</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "overline",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"text-decoration: overline\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "cell-vertical-align",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td style=\"vertical-align: middle\">x</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>x</td></tr></table><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "cell-vertical-align-super",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td style=\"vertical-align: super\">x</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "vertical-align-and-position",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a<span style=\"position: relative; top: -5pt; vertical-align: super\">b</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "vertical-align-on-a-block",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"vertical-align: super\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "vertical-align-super-folded",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x<span style=\"vertical-align: super\">2</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x<sup>2</sup></p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "vertical-align-sub-folded",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>CO<span style=\"vertical-align: sub\">2</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>CO<sub>2</sub></p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "vertical-align-length-folded",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"font-size: 12pt\">10<span style=\"vertical-align: 5pt\">6</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>10<sup>6</sup></p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "vertical-align-percent",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>10<span style=\"vertical-align: 50%\">6</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "vertical-align-baseline-kept-on-the-line",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>10<span style=\"vertical-align: baseline\">6</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>106</p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "position-on-sup",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>10<sup style=\"position: relative; top: -1pt\">6</sup></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "baseline-shift"
+    },
+    {
+      "name": "em-shift-folded",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>10<span style=\"position: relative; top: -0.5em\">2</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>10<sup>2</sup></p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "em-shift-deleted",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><span style=\"position: relative; top: -0.05em\">Dose</span> daily</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Dose daily</p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "fold-over-an-unwrapped-span",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"font-size: 11pt\">10<span style=\"font-size: 7pt; position: relative; top: -5pt\"><span>9</span></span>/l</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>10<sup>9</sup>/l</p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "footnote-mark-before-a-word",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"font-size: 11pt\"><span style=\"font-size: 7pt; position: relative; top: -5pt\">1 </span>Haematological</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><sup>1 </sup>Haematological</p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "shift-on-a-picture",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Dose <span style=\"position: relative; top: -22pt\"><img src=\"data:image/png;base64,iVBORw0KGgo=\"/></span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "baseline-shift"
+    },
+    {
+      "name": "shift-on-emphasis",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>10<em style=\"position: relative; top: -5pt\">2</em></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "baseline-shift"
+    },
+    {
+      "name": "shift-inside-sup",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>10<sup><span style=\"position: relative; top: -3pt\">2</span></sup></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "baseline-shift"
+    },
+    {
+      "name": "nested-shifts",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>10<span style=\"position: relative; top: -3pt\"><span style=\"position: relative; top: -3pt\">2</span></span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "baseline-shift"
+    },
+    {
+      "name": "shifted-run-holding-strong",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>10<span style=\"position: relative; top: -5pt\"><strong>2</strong></span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "baseline-shift"
+    },
+    {
+      "name": "shifted-run-larger-than-its-parent",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"font-size: 10pt\">10<span style=\"font-size: 12pt; position: relative; top: -4pt\">9</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "baseline-shift"
+    },
+    {
+      "name": "shifted-run-too-long",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a<span style=\"position: relative; top: -5pt\">12345</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "baseline-shift"
+    },
+    {
+      "name": "namespace-below-the-root",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p xmlns=\"http://www.w3.org/1999/xhtml\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "attribute"
+    },
+    {
+      "name": "language-outside-the-eu",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><span lang=\"zh\">x</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "attribute"
+    },
+    {
+      "name": "name-on-a-link",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a name=\"top\">x</a></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x</p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "name-elsewhere",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p name=\"x\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "attribute"
+    },
+    {
+      "name": "title-deleted",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p title=\"x\" id=\"y\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x</p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "valign-outside-a-table",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p valign=\"top\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "attribute"
+    },
+    {
+      "name": "valign-other",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td valign=\"left\">x</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "attribute"
+    },
+    {
+      "name": "width-attribute-outside-a-table",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p width=\"10\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "attribute"
+    },
+    {
+      "name": "cell-width-and-nowrap-deleted",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table width=\"100\"><tr><td width=\"50\" nowrap=\"nowrap\" align=\"center\">x</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>x</td></tr></table><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "paragraph-align-deleted",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p align=\"center\">x</p><h1 align=\"left\">y</h1><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x</p><h1>y</h1><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "align-on-inline",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><span align=\"center\">x</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "attribute"
+    },
+    {
+      "name": "align-other",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p align=\"middle\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "attribute"
+    },
+    {
+      "name": "centred-table",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table align=\"center\" summary=\"s\"><tr><td>x</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>x</td></tr></table><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "border-attribute-outside-a-table",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p border=\"1\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "attribute"
+    },
+    {
+      "name": "cellspacing-not-a-number",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table cellspacing=\"1px\"><tr><td>x</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "attribute"
+    },
+    {
+      "name": "href-outside-a-link",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><span href=\"x\">x</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "attribute"
+    },
+    {
+      "name": "src-outside-a-picture",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p src=\"x\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "attribute"
+    },
+    {
+      "name": "colspan-outside-a-cell",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p colspan=\"2\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "attribute"
+    },
+    {
+      "name": "scope-kept-on-a-header-cell",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><th scope=\"col\">x</th></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><th scope=\"col\">x</th></tr></table><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "scope-on-a-data-cell",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td scope=\"col\">x</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "attribute"
+    },
+    {
+      "name": "type-on-a-bullet-list",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><ul type=\"disc\"><li>x</li></ul><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "attribute"
+    },
+    {
+      "name": "link-in-its-default-colours",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"https://www.ema.europa.eu\">ema.europa.eu</a></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>ema.europa.eu</p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "link-in-a-faint-colour",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"https://www.ema.europa.eu\" style=\"color: #dddddd\">ema</a></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "contrast"
+    },
+    {
+      "name": "negative-padding",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"padding-left: -2pt\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "offset"
+    },
+    {
+      "name": "negative-top-margin",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"margin-top: -2pt\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "offset"
+    },
+    {
+      "name": "indent-beyond-bound",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"text-indent: 200pt\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "offset"
+    },
+    {
+      "name": "root-pulled-left",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\" style=\"margin-left: -2pt\"><p>x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "offset"
+    },
+    {
+      "name": "row-with-padding",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr style=\"padding: 1pt\"><td>x</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "offset"
+    },
+    {
+      "name": "nested-sums-beyond-bound",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><div style=\"margin-left: 100pt\"><div style=\"margin-left: 100pt\"><p>x</p></div></div><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "offset"
+    },
+    {
+      "name": "block-in-a-list-item-pulled-left",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><ol><li><p style=\"margin-left: -1pt\">x</p></li></ol><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "list"
+    },
+    {
+      "name": "list-item-with-negative-padding",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><ul><li style=\"padding-left: -1pt\">x</li></ul><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "list"
+    },
+    {
+      "name": "block-pulled-out-of-the-section",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"margin-left: -5pt\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "offset"
+    },
+    {
+      "name": "right-overhang-within-bound",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"margin: 0cm -0.1pt 0.0001pt 0cm\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x</p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "right-overhang-beyond-bound",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"margin-right: -2pt\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "offset"
+    },
+    {
+      "name": "marker-wider-than-its-padding",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><ol start=\"1000\"><li style=\"font-size: 20pt\">x</li></ol><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "list"
+    },
+    {
+      "name": "cells-under-a-row-group-and-a-row-span",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table cellspacing=\"0\"><thead><tr><th style=\"padding: 0 5.4pt\">A</th><th style=\"padding: 0 5.4pt\">B</th></tr></thead><tbody><tr><td rowspan=\"2\" style=\"padding: 0 5.4pt\">1</td><td style=\"padding: 0 5.4pt\">2</td></tr><tr><td style=\"padding: 0 5.4pt\">3</td></tr></tbody></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><thead><tr><th>A</th><th>B</th></tr></thead><tbody><tr><td rowspan=\"2\">1</td><td>2</td></tr><tr><td>3</td></tr></tbody></table><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "cells-side-by-side-under-a-faint-border",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table cellspacing=\"0\" cellpadding=\"0\"><tr><td style=\"border-right: 1pt solid #eeeeee\">Dose 1</td><td>5 mg</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "table-edge"
+    },
+    {
+      "name": "cells-side-by-side-under-a-drawn-border",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table cellspacing=\"0\" cellpadding=\"0\"><tr><td style=\"border-right: 1pt solid black\">Dose 1</td><td>5 mg</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>Dose 1</td><td>5 mg</td></tr></table><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "underline-over-a-raised-run",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><u>x<sup>2</sup></u></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "underline"
+    },
+    {
+      "name": "plus-waived-only-in-a-subheading",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td><u>Ph+ ALL</u></td></tr></table><p>not for clinical use</p></div>",
+      "evidence": [
+        "Ph+"
+      ],
+      "refused": "underline"
+    },
+    {
+      "name": "plus-waived-only-in-a-whole-underline",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Study <u>Ph+ ALL</u></p><p>not for clinical use</p></div>",
+      "evidence": [
+        "Ph+"
+      ],
+      "refused": "underline"
+    },
+    {
+      "name": "plus-waived-only-for-its-own-token",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><u>Studies in ER+ ALL</u></p><p>not for clinical use</p></div>",
+      "evidence": [
+        "Ph+"
+      ],
+      "refused": "underline"
+    },
+    {
+      "name": "plus-after-one-letter",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><u>Range x+ 2</u></p><p>not for clinical use</p></div>",
+      "evidence": [
+        "x+"
+      ],
+      "refused": "underline"
+    },
+    {
+      "name": "plus-before-a-digit",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><u>Ph+2 ALL</u></p><p>not for clinical use</p></div>",
+      "evidence": [
+        "Ph+"
+      ],
+      "refused": "underline"
+    },
+    {
+      "name": "plus-in-a-list-item",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><ul><li><u>Ph+ ALL</u></li></ul><p>not for clinical use</p></div>",
+      "evidence": [
+        "Ph+"
+      ],
+      "refused": "underline"
+    },
+    {
+      "name": "underline-in-a-block-holding-a-block",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><div><u>Ph+ ALL</u><p>x</p></div><p>not for clinical use</p></div>",
+      "evidence": [
+        "Ph+"
+      ],
+      "refused": "underline"
+    },
+    {
+      "name": "underline-on-a-shaded-inline",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"line-height: normal\"><span style=\"background: lightgrey; position: relative; top: .5pt\">x</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "shading-under-a-tight-line",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"line-height: 13pt; font-size: 11pt\"><span style=\"background: lightgrey\">x</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "line-height"
+    },
+    {
+      "name": "definition-inside-a-definition",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><dl><dd>a<dd>b</dd></dd></dl><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "markup"
+    },
+    {
+      "name": "link-inside-a-link",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><a href=\"x\">a<a href=\"y\">b</a></a></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "markup"
+    },
+    {
+      "name": "paragraph-directly-in-a-list",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><ul><p>x</p></ul><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "markup"
+    },
+    {
+      "name": "unknown-entity-in-an-attribute",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p title=\"&nbsp;\">x</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "markup"
+    },
+    {
+      "name": "reference-beyond-unicode",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>&#x110000;</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "markup"
+    },
+    {
+      "name": "reference-to-a-surrogate",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>&#xD800;</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "markup"
+    },
+    {
+      "name": "end-tag-that-does-not-match",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x</span><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "markup"
+    },
+    {
+      "name": "malformed-start-tag",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p =x>y</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "markup"
+    },
+    {
+      "name": "upper-case-element",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><P>x</P><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "markup"
+    },
+    {
+      "name": "bare-ampersand",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a &bogus b</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "markup"
+    },
+    {
+      "name": "line-feed-in-text",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Take one\ntablet</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Take one\ntablet</p><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "text-directly-in-a-table",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table>x<tr><td>y</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "markup"
+    },
+    {
+      "name": "element-left-open",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x<p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "markup"
     }
-  },
-  {
-    "name": "jentadueto-smpc-en.json",
-    "documentSha256": "544b2f24e69f410d3e792a80f3ee82c00ef60afcdf913526308e799db54a1ee4",
-    "indexSha256": "3a4ac2e34a955ebeb0a128183b7ddf095e5b6150513d805f6582858ced9b47ea",
-    "outcome": {
-      "refused": "shape: document-shape"
-    }
-  },
-  {
-    "name": "nuvaxovid-smpc-en.json",
-    "documentSha256": "3256838d8d4a270581a4b41e9bf302b4cd2e073a9c3ad75f999563b731f73828",
-    "indexSha256": "2956503ab020d2cd6f50253a728877862b5a913912047a12744f9a27bf81c351",
-    "outcome": {
-      "refused": "pictures: pictures-not-enabled"
-    }
-  }
-]
+  ]
+}
