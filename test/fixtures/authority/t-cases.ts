@@ -236,7 +236,7 @@ export const T_CASES: TCase[] = [
   },
   { name: "underlined-less-than", inner: "<p>CrCl <u>&lt;</u> 30</p>", expected: no("underline") },
   { name: "underlined-ordinal", inner: "<p>1<u>a</u> dose</p>", expected: no("underline") },
-  { name: "dash-that-reads-as-equals", inner: "<p><u>a⸗b</u></p>", expected: no("underline") },
+  { name: "dash-that-reads-as-equals", inner: "<p><u>a\u2e17b</u></p>", expected: no("underline") },
   {
     name: "plus-without-evidence",
     inner: "<p><u>Posology for Ph+ ALL in children</u></p>",
@@ -860,4 +860,106 @@ export const T_CASES: TCase[] = [
     expected: no("markup"),
   },
   { name: "element-left-open", inner: "<p>x", expected: no("markup") },
+  // --- the first code review's repros ---
+  {
+    name: "indent-on-a-cell",
+    inner:
+      '<table style="border-collapse: collapse"><tr><td style="border: 1pt solid black; padding: 0 5.4pt">Dose 1</td><td style="border: 1pt solid black; padding: 0 5.4pt; text-indent: -60pt">5 mg</td></tr></table>',
+    expected: no("offset"),
+  },
+  {
+    name: "indent-inherited-from-a-row",
+    inner: '<table><tr style="text-indent: 30pt"><td>5 mg</td></tr></table>',
+    expected: no("offset"),
+  },
+  {
+    name: "indent-on-a-caption",
+    inner:
+      '<table><caption style="text-indent: -100pt">Table 1</caption><tr><td>x</td></tr></table>',
+    expected: no("offset"),
+  },
+  {
+    name: "indent-on-the-root",
+    root: '<div xmlns="http://www.w3.org/1999/xhtml" style="text-indent: -50pt">',
+    inner: "<p>Hello</p>",
+    expected: no("offset"),
+  },
+  {
+    name: "border-colour-from-the-final-colour",
+    inner:
+      '<table style="border-collapse: collapse; color: black"><tr><td style="border: solid 1pt; color: white; padding: 0"><p style="color: black">Dose 1</p></td><td style="border: solid 1pt; color: white; padding: 0"><p style="color: black">5 mg</p></td></tr></table>',
+    expected: no("table-edge"),
+  },
+  {
+    name: "hidden-border",
+    inner:
+      '<table style="border-collapse: collapse"><tr><td style="border-right: 1pt solid black; padding: 0">Dose 1</td><td style="border-left: 1pt hidden; padding: 0">5 mg</td></tr></table>',
+    expected: no("css-value"),
+  },
+  {
+    name: "collapsed-edge-won-by-a-white-border",
+    inner:
+      '<table style="border-collapse: collapse"><tr><td style="font-size: 24pt; border-right: 1pt solid black; padding: 0">Dose 1</td><td style="font-size: 24pt; border-left: 2pt solid white; padding: 0">5 mg</td></tr></table>',
+    expected: no("table-edge"),
+  },
+  {
+    name: "collapsed-edge-won-by-a-drawn-border",
+    inner:
+      '<table style="border-collapse: collapse"><tr><td style="border-right: 2pt solid black; padding: 0">Dose 1</td><td style="border-left: 1pt solid white; padding: 0">5 mg</td></tr></table>',
+    expected: ok("<table><tr><td>Dose 1</td><td>5 mg</td></tr></table>"),
+  },
+  {
+    name: "marker-from-the-border-box",
+    inner:
+      '<table style="border-collapse: collapse"><tr><td style="border: 1pt solid black; padding: 0 5.4pt">Dose 1</td><td style="border: 1pt solid black; padding: 0"><ol type="i" start="88" style="margin: 0"><li style="padding-left: 100pt">item</li></ol></td></tr></table>',
+    expected: no("list"),
+  },
+  {
+    name: "right-to-left-by-reference",
+    inner: '<p dir="ltr">&#x5D0;<span dir="ltr">1</span>2</p>',
+    expected: no("attribute"),
+  },
+  {
+    name: "column-span-not-a-number",
+    inner: '<table><tr><td colspan="x">a</td><td>b</td><td>c</td></tr></table>',
+    expected: no("attribute"),
+  },
+  {
+    name: "column-span-beyond-the-scanner",
+    inner: '<table><tr><td colspan="20000" rowspan="20000">a</td></tr></table>',
+    expected: no("attribute"),
+  },
+  {
+    name: "slots-beyond-the-bound",
+    inner: '<table><tr><td colspan="1000" rowspan="100">a</td></tr></table>',
+    expected: no("attribute"),
+  },
+  {
+    name: "list-start-not-a-number",
+    inner: '<ol type="a" start="1e400"><li>x</li></ol>',
+    expected: no("attribute"),
+  },
+  { name: "list-type-other", inner: '<ol type="z"><li>x</li></ol>', expected: no("attribute") },
+  {
+    name: "underline-over-a-folded-run",
+    inner:
+      '<p style="font-size: 11pt">10<span style="font-size: 7pt; position: relative; top: -5pt"><u>9</u></span>/l</p>',
+    expected: no("underline"),
+  },
+  {
+    name: "background-inside-a-positioned-inline",
+    inner:
+      '<div><span style="position: relative; top: -1pt"><p style="background: lightgrey">x</p></span></div>',
+    expected: no("css-value"),
+  },
+  {
+    name: "tab-in-a-folded-run",
+    inner: '<p>a<span style="position: relative; top: -5pt">12\t34</span></p>',
+    expected: no("baseline-shift"),
+  },
+  {
+    name: "sup-larger-than-its-parent",
+    inner: '<p style="font-size: 11pt">10<sup style="font-size: 24pt">2</sup></p>',
+    expected: no("baseline-shift"),
+  },
 ];

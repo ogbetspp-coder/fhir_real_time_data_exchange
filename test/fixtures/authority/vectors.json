@@ -1346,7 +1346,7 @@
         {
           "path": "Composition.section[0].section[3].section[7]",
           "outcome": {
-            "refused": "element"
+            "refused": "line-height"
           }
         },
         {
@@ -1370,7 +1370,7 @@
         {
           "path": "Composition.section[0].section[4].section[0]",
           "outcome": {
-            "refused": "font"
+            "refused": "line-height"
           }
         },
         {
@@ -2562,6 +2562,120 @@
       "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>x<p>not for clinical use</p></div>",
       "evidence": null,
       "refused": "markup"
+    },
+    {
+      "name": "indent-on-a-cell",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table style=\"border-collapse: collapse\"><tr><td style=\"border: 1pt solid black; padding: 0 5.4pt\">Dose 1</td><td style=\"border: 1pt solid black; padding: 0 5.4pt; text-indent: -60pt\">5 mg</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "offset"
+    },
+    {
+      "name": "indent-inherited-from-a-row",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr style=\"text-indent: 30pt\"><td>5 mg</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "offset"
+    },
+    {
+      "name": "indent-on-a-caption",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><caption style=\"text-indent: -100pt\">Table 1</caption><tr><td>x</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "offset"
+    },
+    {
+      "name": "indent-on-the-root",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\" style=\"text-indent: -50pt\"><p>Hello</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "offset"
+    },
+    {
+      "name": "border-colour-from-the-final-colour",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table style=\"border-collapse: collapse; color: black\"><tr><td style=\"border: solid 1pt; color: white; padding: 0\"><p style=\"color: black\">Dose 1</p></td><td style=\"border: solid 1pt; color: white; padding: 0\"><p style=\"color: black\">5 mg</p></td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "table-edge"
+    },
+    {
+      "name": "hidden-border",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table style=\"border-collapse: collapse\"><tr><td style=\"border-right: 1pt solid black; padding: 0\">Dose 1</td><td style=\"border-left: 1pt hidden; padding: 0\">5 mg</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "collapsed-edge-won-by-a-white-border",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table style=\"border-collapse: collapse\"><tr><td style=\"font-size: 24pt; border-right: 1pt solid black; padding: 0\">Dose 1</td><td style=\"font-size: 24pt; border-left: 2pt solid white; padding: 0\">5 mg</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "table-edge"
+    },
+    {
+      "name": "collapsed-edge-won-by-a-drawn-border",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table style=\"border-collapse: collapse\"><tr><td style=\"border-right: 2pt solid black; padding: 0\">Dose 1</td><td style=\"border-left: 1pt solid white; padding: 0\">5 mg</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>Dose 1</td><td>5 mg</td></tr></table><p>not for clinical use</p></div>"
+    },
+    {
+      "name": "marker-from-the-border-box",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table style=\"border-collapse: collapse\"><tr><td style=\"border: 1pt solid black; padding: 0 5.4pt\">Dose 1</td><td style=\"border: 1pt solid black; padding: 0\"><ol type=\"i\" start=\"88\" style=\"margin: 0\"><li style=\"padding-left: 100pt\">item</li></ol></td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "list"
+    },
+    {
+      "name": "right-to-left-by-reference",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p dir=\"ltr\">&#x5D0;<span dir=\"ltr\">1</span>2</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "attribute"
+    },
+    {
+      "name": "column-span-not-a-number",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td colspan=\"x\">a</td><td>b</td><td>c</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "attribute"
+    },
+    {
+      "name": "column-span-beyond-the-scanner",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td colspan=\"20000\" rowspan=\"20000\">a</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "attribute"
+    },
+    {
+      "name": "slots-beyond-the-bound",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td colspan=\"1000\" rowspan=\"100\">a</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "attribute"
+    },
+    {
+      "name": "list-start-not-a-number",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><ol type=\"a\" start=\"1e400\"><li>x</li></ol><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "attribute"
+    },
+    {
+      "name": "list-type-other",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><ol type=\"z\"><li>x</li></ol><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "attribute"
+    },
+    {
+      "name": "underline-over-a-folded-run",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"font-size: 11pt\">10<span style=\"font-size: 7pt; position: relative; top: -5pt\"><u>9</u></span>/l</p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "underline"
+    },
+    {
+      "name": "background-inside-a-positioned-inline",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><div><span style=\"position: relative; top: -1pt\"><p style=\"background: lightgrey\">x</p></span></div><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "css-value"
+    },
+    {
+      "name": "tab-in-a-folded-run",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>a<span style=\"position: relative; top: -5pt\">12\t34</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "baseline-shift"
+    },
+    {
+      "name": "sup-larger-than-its-parent",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"font-size: 11pt\">10<sup style=\"font-size: 24pt\">2</sup></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "baseline-shift"
     }
   ]
 }

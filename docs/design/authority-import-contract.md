@@ -399,7 +399,9 @@ set closed by resource type and count; Type 2 stays exactly as strict.
 `src/authority/` joins ADR 0004 decision 2's shared pure code: it decides what text enters the
 record. Golden import vectors (synthetic publications in, submissions out) are generated under
 `contracts:check`, and a lock file maps each importer version to the hash of `src/authority/`
-(code and data: T's lists, templates, evidence records, the language table) and of its vectors: CI
+(code and data: T's lists, templates, evidence records, the language table), from importer 2.0.0
+also of the fidelity scanner's files T reads with (`src/fidelity/xhtml.ts`, `normalize.ts`), and of
+its vectors: CI
 fails when either changes while the version does not, so a change of behaviour or data must
 change the version. The version is the reviewed label of the importer; the worker image digest in
 the manifest (D1) is its complete identity, including `src/fidelity/`, the hash library, the

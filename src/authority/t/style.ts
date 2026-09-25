@@ -24,6 +24,7 @@ export type LineHeight =
   // with that same size is exact (T1: one computed size takes one factor).
   | { kind: "length"; lo: number; hi: number; of?: Size; factor?: number };
 
+// A border; `colour` undefined is the element's own final `color` (CSS `currentcolor`).
 export type Border = { widthPt: number; style: string; colour: Rgb | undefined };
 
 export type Shift =
@@ -145,18 +146,8 @@ function box(value: string): number[] {
   return [top, right, bottom, left];
 }
 
-const BORDER_STYLES = new Set([
-  "none",
-  "hidden",
-  "solid",
-  "double",
-  "dotted",
-  "dashed",
-  "groove",
-  "ridge",
-  "inset",
-  "outset",
-]);
+// T3's border styles; `hidden`, `groove`, `ridge`, `inset` and `outset` refuse.
+const BORDER_STYLES = new Set(["none", "solid", "double", "dotted", "dashed"]);
 const BORDER_KEYWORD_WIDTH: Readonly<Record<string, number>> = {
   thin: 0.75,
   medium: 2.25,
@@ -164,7 +155,7 @@ const BORDER_KEYWORD_WIDTH: Readonly<Record<string, number>> = {
 };
 
 // A `border` shorthand or `border-<side>`: each of a width, a style and a colour at most once.
-function border(value: string, fallbackColour: Rgb | undefined): Border {
+function border(value: string): Border {
   let width: number | undefined;
   let style: string | undefined;
   let colourValue: Rgb | undefined;
@@ -190,7 +181,7 @@ function border(value: string, fallbackColour: Rgb | undefined): Border {
   return {
     widthPt: width ?? 2.25,
     style: style ?? "none",
-    colour: sawColour ? colourValue : fallbackColour,
+    colour: sawColour ? colourValue : undefined,
   };
 }
 
@@ -392,7 +383,7 @@ export function computeStyle(context: ElementContext): ComputedStyle {
             style: "none",
             colour: undefined,
           };
-          if (part === undefined) style.borders[which] = border(value, style.colour);
+          if (part === undefined) style.borders[which] = border(value);
           else if (part === "width") {
             const width = BORDER_KEYWORD_WIDTH[keyword] ?? absolute(value);
             if (width < 0) throw new CssRefusal("css-value");
@@ -412,12 +403,13 @@ export function computeStyle(context: ElementContext): ComputedStyle {
     }
   }
 
-  // Borders: at most 3 pt wide (T3).
+  // Borders: at most 3 pt wide (T3); a colour left out is the element's final `color`.
   for (const which of SIDES) {
     const drawn = style.borders[which];
-    if (drawn !== undefined && drawn.style !== "none" && drawn.widthPt > 3) {
-      throw new CssRefusal("css-value");
-    }
+    if (drawn === undefined) continue;
+    if (drawn.style !== "none" && drawn.widthPt > 3) throw new CssRefusal("css-value");
+    if (drawn.colour === undefined)
+      style.borders[which] = { ...drawn, colour: style.colour ?? [0, 0, 0] };
   }
   style.size = size;
   style.declared = declaredNames;

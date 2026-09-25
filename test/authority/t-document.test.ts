@@ -45,7 +45,17 @@ describe("T over a document", () => {
       "<p>Ph+2 ALL</p>", // not followed by a space
       "<p><u>Ph+</u> ALL</p>", // underlined
       "<p>Ph<sup>+</sup> ALL</p>", // raised
-      "<p>Ph+́ ALL</p>", // a mark on the sign
+      "<p>Ph+\u0301 ALL</p>", // a mark on the sign
+    ]) {
+      const [, subheading] = transformDocument([div(plain), SUBHEADING]);
+      expect([plain, subheading]).toEqual([plain, { refused: "underline" }]);
+    }
+  });
+
+  it("takes no evidence from a plus that T raises, or that a picture follows", () => {
+    for (const plain of [
+      '<p style="font-size: 11pt">Philadelphia (Ph<span style="font-size: 7pt; position: relative; top: -4pt">+</span> ALL)</p>',
+      '<p>Ph+<img src="data:image/png;base64,iVBORw0KGgo="/> ALL</p>',
     ]) {
       const [, subheading] = transformDocument([div(plain), SUBHEADING]);
       expect([plain, subheading]).toEqual([plain, { refused: "underline" }]);

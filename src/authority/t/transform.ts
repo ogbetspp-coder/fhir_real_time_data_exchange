@@ -1,10 +1,17 @@
-import { listMarker } from "../../fidelity/xhtml.js";
+import {
+  LIST_START_VALUE,
+  LIST_TYPE_VALUE,
+  listMarker,
+  SPAN_VALUE,
+  TABLE_SLOT_LIMIT,
+} from "../../fidelity/xhtml.js";
 import { isDefaultIgnorable } from "../../fidelity/normalize.js";
 import { isUnderlineLetter, underlineChanges } from "../underline.js";
 import { contrast, CssRefusal, type Rgb } from "./css.js";
 import {
   BLOCKS,
   computeStyle,
+  type Border,
   type ComputedStyle,
   LINK_COLOURS,
   ROOT_BACKGROUND,
@@ -203,14 +210,16 @@ function checkAttributes(element: ElementNode, isRoot: boolean, rightToLeft: boo
         break;
       case "colspan":
       case "rowspan":
-        if (name !== "td" && name !== "th") refuse("attribute");
+        if ((name !== "td" && name !== "th") || !SPAN_VALUE.test(value)) refuse("attribute");
         break;
       case "scope":
         if (name !== "th") refuse("attribute");
         break;
       case "type":
+        if (name !== "ol" || !LIST_TYPE_VALUE.test(value)) refuse("attribute");
+        break;
       case "start":
-        if (name !== "ol") refuse("attribute");
+        if (name !== "ol" || !LIST_START_VALUE.test(value)) refuse("attribute");
         break;
       default:
         refuse("attribute");
@@ -320,6 +329,18 @@ function walkSection(root: ElementNode, rightToLeft: boolean): Walk {
     if (style.margin.top < 0 || style.margin.bottom < 0) refuse(name === "li" ? "list" : "offset");
     if (Math.abs(style.textIndent) > 144) refuse("offset");
     if (isRoot && (style.margin.left < 0 || style.margin.right < 0)) refuse("offset");
+    // A cell's or caption's own lines start at its content box: no indent there (T3b), and the
+    // root's lines start at the section's.
+    if (CELLS.has(name) && style.textIndent !== 0) refuse("offset");
+    if (isRoot && (style.textIndent < 0 || style.textIndent > 144)) refuse("offset");
+    // A raised or lowered element is no larger than its parent's text (T4).
+    if (
+      (name === "sup" || name === "sub") &&
+      parent !== undefined &&
+      style.size.hi > parent.style.size.lo
+    ) {
+      refuse("baseline-shift");
+    }
     // Row-level table parts take no box offsets (a browser ignores them): refuse any.
     if (ROW_LEVEL.has(name)) {
       for (const side of ["top", "right", "bottom", "left"] as const) {
@@ -377,6 +398,8 @@ function walkSection(root: ElementNode, rightToLeft: boolean): Walk {
     };
     infos.set(element, info);
 
+    // A list item's marker is drawn text, judged at its tag (T3d, T6).
+    if (name === "li") checkDrawn(style, info.blockSize);
     const start = points.length;
     if (block)
       points.push({
@@ -397,6 +420,16 @@ function walkSection(root: ElementNode, rightToLeft: boolean): Walk {
           boundary: true,
         });
       }
+    }
+    // A picture is drawn and emitted (U+FFFC), so it is no letter and no gap to T5.
+    if (name === "img") {
+      points.push({
+        point: "\ufffc",
+        element,
+        underlined: style.underline,
+        inScript: info.inScript,
+        boundary: false,
+      });
     }
     for (const child of element.children) {
       if (child.kind === "text") {
@@ -423,6 +456,21 @@ function walkSection(root: ElementNode, rightToLeft: boolean): Walk {
         boundary: true,
       });
     ranges.set(element, { start, end: points.length });
+    // A background, judged at the element's end tag with its descendants' sizes known (T3): never
+    // on or inside a positioned element; on an inline element, a line height of at least 1.2 times
+    // the largest of its own and its descendants' sizes.
+    if (style.background !== undefined) {
+      if (style.declaredPosition || info.positionedAncestor) refuse("css-value");
+      if (!block) {
+        let largest = style.size;
+        for (const node of descendants(element)) {
+          if (node.kind !== "element") continue;
+          const size = infos.get(node)?.style.size;
+          if (size !== undefined && size.hi > largest.hi) largest = size;
+        }
+        if (!lineHeightAtLeast(style, largest, 1.2)) refuse("line-height");
+      }
+    }
   };
   visit(root, undefined);
   return { infos, points, ranges };
@@ -579,7 +627,7 @@ function decideShifts(walk: Walk): Map<ElementNode, ShiftDecision> {
     const range = walk.ranges.get(element);
     if (range === undefined) refuse("baseline-shift");
     const own = walk.points.slice(range.start, range.end).map((point) => point.point);
-    const drawn = own.filter((point) => !/^[\t\n\r\f \u00a0]$/u.test(point));
+    const drawn = own.filter((point) => !SPACE_OR_NBSP.has(point));
     if (drawn.length < 1 || drawn.length > 4) refuse("baseline-shift");
     if (!hasUnshiftedNeighbour(walk, range, decisions)) refuse("baseline-shift");
     decisions.set(
@@ -598,8 +646,7 @@ function hasUnshiftedNeighbour(
   decisions: ReadonlyMap<ElementNode, ShiftDecision>,
 ): boolean {
   const { points } = walk;
-  const isWhite = (index: number): boolean =>
-    /^[\t\n\r\f \u00a0]$/u.test(points[index]?.point ?? "");
+  const isWhite = (index: number): boolean => SPACE_OR_NBSP.has(points[index]?.point ?? "");
   let first = range.start;
   while (first < range.end && isWhite(first)) first += 1;
   let last = range.end - 1;
@@ -633,7 +680,6 @@ function markerWidth(marker: string): number {
 function checkLists(walk: Walk): void {
   for (const info of walk.infos.values()) {
     if (info.element.name !== "li") continue;
-    checkDrawn(info.style, info.blockSize);
     const list = info.element.parent;
     const width =
       list?.name === "ol"
@@ -645,26 +691,42 @@ function checkLists(walk: Walk): void {
               .map((li) => markerWidth(markerFor(li))),
           )
         : 1;
-    if (info.s - width * info.style.size.hi < 0) refuse("list");
+    // A browser hangs the marker off the item's border box, not its content box.
+    if (info.s - info.style.padding.left - width * info.style.size.hi < 0) refuse("list");
   }
 }
 
 type Placed = { cell: ElementNode; info: Info };
 
-function drawnEdge(first: Info, second: Info, firstSide: "right" | "left"): boolean {
-  const backgrounds = [...first.style.backgrounds, ...second.style.backgrounds, WHITE];
-  for (const [info, side] of [
-    [first, firstSide],
-    [second, firstSide === "right" ? "left" : "right"],
-  ] as const) {
-    const border = info.style.borders[side];
-    if (border === undefined) continue;
-    if (!["solid", "double", "dotted", "dashed"].includes(border.style) || border.widthPt <= 0)
-      continue;
-    const colour = border.colour ?? info.style.colour ?? [0, 0, 0];
-    if (backgrounds.every((background) => contrast(colour, background) >= 3)) return true;
+const DRAWN_STYLES = ["double", "solid", "dashed", "dotted"];
+
+function isDrawn(border: Border | undefined, backgrounds: readonly Rgb[]): boolean {
+  if (border === undefined || !DRAWN_STYLES.includes(border.style) || border.widthPt <= 0) {
+    return false;
   }
-  return false;
+  const colour = border.colour ?? [0, 0, 0];
+  return backgrounds.every((background) => contrast(colour, background) >= 3);
+}
+
+// Whether the edge between two cells side by side is drawn (T3e). Under `separate` each cell draws
+// its own border; under `collapse` only the winner of CSS 2.1's conflict resolution is drawn: the
+// wider, then by style (double, solid, dashed, dotted), then the left cell's.
+function drawnEdge(left: Info, right: Info, collapse: boolean): boolean {
+  const backgrounds = [...left.style.backgrounds, ...right.style.backgrounds, WHITE];
+  const leftBorder = left.style.borders.right;
+  const rightBorder = right.style.borders.left;
+  if (!collapse) return isDrawn(leftBorder, backgrounds) || isDrawn(rightBorder, backgrounds);
+  const weight = (border: Border | undefined): [number, number] =>
+    border === undefined || border.style === "none"
+      ? [-1, -1]
+      : [border.widthPt, DRAWN_STYLES.length - DRAWN_STYLES.indexOf(border.style)];
+  const [leftWidth, leftStyle] = weight(leftBorder);
+  const [rightWidth, rightStyle] = weight(rightBorder);
+  const winner =
+    rightWidth > leftWidth || (rightWidth === leftWidth && rightStyle > leftStyle)
+      ? rightBorder
+      : leftBorder;
+  return isDrawn(winner, backgrounds);
 }
 
 function largestSize(walk: Walk, cell: ElementNode): number {
@@ -695,6 +757,15 @@ function checkTables(walk: Walk): void {
       : spacingAttribute === undefined
         ? 1.5
         : Number(spacingAttribute) * 0.75;
+    // The slots the table's cells cover, bounded as the scanner bounds them, before a grid is laid.
+    let slots = 0;
+    for (const node of descendants(table)) {
+      if (node.kind === "element" && (node.name === "td" || node.name === "th")) {
+        slots +=
+          Number(attribute(node, "colspan") ?? "1") * Number(attribute(node, "rowspan") ?? "1");
+      }
+    }
+    if (slots > TABLE_SLOT_LIMIT) refuse("attribute");
     const rows: ElementNode[] = [];
     for (const child of table.children) {
       if (child.kind !== "element") continue;
@@ -732,7 +803,7 @@ function checkTables(walk: Walk): void {
         const left = row[column - 1];
         const right = row[column];
         if (left === undefined || right === undefined || left.cell === right.cell) continue;
-        if (drawnEdge(left.info, right.info, "right")) continue;
+        if (drawnEdge(left.info, right.info, collapse)) continue;
         const gap = left.info.style.padding.right + right.info.style.padding.left + spacing;
         const larger = Math.max(largestSize(walk, left.cell), largestSize(walk, right.cell));
         if (gap < 0.25 * larger) refuse("table-edge");
@@ -911,21 +982,21 @@ export function transformSection(div: string, evidence?: ReadonlySet<string>): S
     if (error instanceof MarkupRefusal) refuse(error.reason);
     throw error;
   }
-  const rightToLeft = RIGHT_TO_LEFT.test(div);
+  // Right-to-left text anywhere in the section, decoded (a reference to U+05D0 counts).
+  const rightToLeft = [root, ...descendants(root)].some((node) =>
+    node.kind === "text"
+      ? RIGHT_TO_LEFT.test(node.points.join(""))
+      : node.attributes.some(({ value }) => RIGHT_TO_LEFT.test(value)),
+  );
   const walk = walkSection(root, rightToLeft);
-  // The inline backgrounds (T3), judged with their descendants' sizes known.
-  for (const info of walk.infos.values()) {
-    if (info.style.background === undefined || isBlock(info.element.name)) continue;
-    if (info.style.declaredPosition || info.positionedAncestor) refuse("css-value");
-    let largest = info.style.size;
-    for (const node of descendants(info.element)) {
-      if (node.kind !== "element") continue;
-      const size = walk.infos.get(node)?.style.size;
-      if (size !== undefined && size.hi > largest.hi) largest = size;
-    }
-    if (!lineHeightAtLeast(info.style, largest, 1.2)) refuse("line-height");
-  }
   const shifts = decideShifts(walk);
+  // A folded run is raised or lowered text from here on (T5's runs and the waiver's evidence).
+  for (const point of walk.points) {
+    for (let node = point.element; node !== undefined; node = node.parent) {
+      const decision = shifts.get(node);
+      if (decision === "sup" || decision === "sub") point.inScript = true;
+    }
+  }
   checkLists(walk);
   checkTables(walk);
   checkUnderlines(walk, evidence);

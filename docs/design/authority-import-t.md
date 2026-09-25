@@ -272,16 +272,18 @@ line height (T3a, T3c and the font-size row). It is drawn in the list's padding,
   or roman numeral 1 em, and the ". " after it 1.25 em (a monospaced font's full stop and space);
   a `ul`'s bullet counts 1 em; all of the `li`'s font size (wider than any glyph of
   the text fonts T accepts); with `S_li` the `li`'s content start as T3b sums it, `S_li − W` is at
-  least 0, outside tables and inside a cell. The label's lists are two `ul` in 4.1 (6 items at
+  least 0, outside tables and inside a cell, where `S_li` is taken at the `li`'s border box (its
+  content start less its own `padding-left`: a browser hangs the marker off the border box). The label's lists are two `ul` in 4.1 (6 items at
   most) and six `ol` of 2 to 4 items in 4.2's cells, at 11 and 12 pt: "4. " is at most 22.8 pt,
   inside its 30 pt.
 
 **T3e. Tables.** Two cells side by side with neither a drawn border nor space between them read
-as one: "Dose 1" beside "5 mg" is drawn "Dose 15 mg". So every cell edge shared with another cell
+as one: "Dose 1" beside "5 mg" is drawn "Dose 15 mg". So every vertical edge shared by two cells side by side (above and below is the renderer gate's)
 must have a drawn border, or the two cells' facing paddings plus the table's `border-spacing`
 (0 under `border-collapse: collapse`) must be at least 0.25 em of the largest font size of a text node or marker in the two cells (with T3b, no text enters its cell's padding). A **drawn border** is a cell's (under
-`separate`, a row's or row group's border is not drawn; under `collapse`, a shared edge is drawn
-when either cell's border there is) whose style is `solid`, `double`, `dotted` or `dashed`, whose
+`separate`, a row's or row group's border is not drawn and each cell draws its own; under
+`collapse`, only the winner of CSS 2.1 §17.6.2.1's conflict resolution is drawn: the wider, then by
+style, `double`, `solid`, `dashed`, `dotted`, then the left cell's) whose style is `solid`, `double`, `dotted` or `dashed`, whose
 computed width is above 0 (Chrome draws a width under one pixel as one pixel), and whose colour has a contrast of at least 3:1 with every background painted under that edge (both
 adjacent cells', their rows' and row groups', the table's and its ancestors', and the root's
 white). The `border-spacing` property is refused; the `cellspacing` attribute sets it. A horizontal line under text (a cell's, row's, row
@@ -325,8 +327,8 @@ against **every text node under its element**, at that node's font size:
   larger than half the parent's font size, a shifted run with no unshifted neighbour on its line
   (a whole line moved up is not an exponent), a shifted element with no text node or with an
   `img` (a picture moved over text), nested shifts that are not all deleted, a shift on or inside
-  `sup` or `sub` that is not deleted, and any `vertical-align` or `position` declared on `sup` or
-  `sub` themselves (a declared `vertical-align` replaces their raise: `<sup
+  `sup` or `sub` that is not deleted, a `sup` or `sub` larger than its parent's text, and any `position` declared on `sup` or `sub`
+  (a declared `vertical-align` there is T3's `css-value`) (a declared `vertical-align` replaces their raise: `<sup
 style="vertical-align:baseline">` draws on the line).
 
 Whether a folded run's glyphs reach the line above or below depends on the font and on what the
@@ -411,7 +413,8 @@ checks tied to a tag (T1's one tree, T2, T3's declarations, T3a, T3b, T3c at eac
 marker), in document order of the div's tags; then T4's shifts, in document order of the shifted
 elements; T3d's lists (an `li`'s negative offsets and its indent are T3d's, reason `list`; T3b's
 upper bounds, 144 pt on each margin and padding and on `S`, `S + I` and `SR`, still judge an `li`), T3e's tables,
-then T5's underline runs, each in document order; and only then the scanner reads T(div)
+then T5's underline runs, each in document order (an `li`'s offsets and its marker's T3a and T3c
+are judged at the `li`'s tag, and a background at its element's end tag, with the tag-tied checks); and only then the scanner reads T(div)
 (`scanner-*`, then PR 2's `invisible-character` on its text). The
 waiver's second pass runs on the sections whose first-pass reason is `underline` (T5's "refused
 only for `underline`" means this); the `record` check (`section-draws-nothing`) runs per section, in pre-order, after
@@ -672,3 +675,15 @@ Each refusal names the stage (`narrative`) and a closed reason: `markup`, `eleme
     viewport" refused the fixed-width tables of 4.2 and 4.8 at a phone's width; whether an inline
     background's edge is a line under text read two ways. Low: which size's 0.3 em; the 0.5 px
     clearance was measured in the system's fonts, not the pinned ones. Fixed in this draft.
+15. **First code review** (2026-09-25), of the implementation. High, where the code or this note was
+    wrong: a cell's, caption's or root's own `text-indent` was not bounded; a border's omitted colour
+    was taken before the element's final `color`; border styles outside T3's list were accepted,
+    and under `collapse` this note said either cell's border draws the edge where CSS draws only
+    the winner; a list marker hangs off the `li`'s border box, not its content box; right-to-left
+    text written as references escaped the `dir` rule. Medium: a malformed `colspan` hung the
+    importer and huge spans exhausted memory; a malformed `start` crashed it; a `+` T raises by
+    folding counted as plain evidence. Low: the check order for `li` offsets, markers and
+    backgrounds; T3e's scope; a background on a block inside a positioned inline; pictures
+    invisible to the waiver; tabs in a folded run; a `sup` larger than its parent; the lock not
+    covering the scanner files T reads. Fixed, the note amended (T3d, T3e, T4, T6), and each repro
+    a case.
