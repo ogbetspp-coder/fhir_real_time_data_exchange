@@ -106,7 +106,8 @@ authority-publication source when `DRY_RUN` is false, so nothing is persisted an
 entitled to the query service or reach the agent. PR 5 adds the pilot status to their answers,
 then lifts the refusal. Recomputation proves that the named importer ran on those bytes, not
 that the importer is right: that rests on its tests, its golden vectors (D10) and ADR 0005's
-renderer cross-check (PR 3).
+renderer cross-check, made a gate of reproduced records whose hash the run manifest pins
+(`docs/design/authority-import-renderer.md`, PR 3c).
 
 **Bytes and JSON.** The gate hashes raw bytes after HTTP content decoding, never a re-serialised
 value (an exception to ADR 0002's hash-the-JSON-value convention, stated in its amendment). It

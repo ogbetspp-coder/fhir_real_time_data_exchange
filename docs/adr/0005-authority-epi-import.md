@@ -292,3 +292,28 @@ independent reviews, and changes this ADR as follows.
   document (ADR 0003, amended).
 - **What the pinned labels give:** both Imatinib Teva SmPCs pass T in 31 of their 32 sections;
   5.1 refuses (its tables need the renderer), and the import stops first at the pictures stage.
+
+## Amendment (2026-09-25, the renderer gate and a withheld section)
+
+`docs/design/authority-import-renderer.md` and `docs/design/authority-import-withheld.md`
+(roadmap 3a, PR 3c; owner decisions of 2026-09-25) change this ADR as follows.
+
+- **The renderer cross-check is a store of reproduced records.** CI draws every publication in a
+  pinned image (Chrome for Testing's headless shell, pinned metric-compatible fonts), and writes a
+  small evidence record into its own store outside the importer's data; a record merges only if
+  the merge gate draws it again with the same layout. The importer's `rendering` stage looks the
+  record up by the document's hash and each carried section's T(div) hash, and the run manifest
+  pins the record's hash. The consequence "the importer's CI job needs a headless browser" is
+  that job.
+- **Decision 3's consequence is narrowed.** A section the importer refuses on its own (pictures,
+  T, the scanner, the record check, or the renderer gate) may be **withheld** by the person who
+  requests the import: it keeps its heading and code, carries no authority content, and says it
+  is withheld (`emptyReason` `unavailable` and a generated notice). The import refuses if a listed
+  section would pass or a refused one is not listed, and a document-level refusal still refuses
+  the import. A withheld section is never repaired, answered from or quoted. Imatinib Teva's 5.1,
+  measured misleading when drawn, is the first.
+- **Decision 3's pictures.** The EMA's viewer draws Imatinib Teva's two `~/_entity/annotation/…`
+  pictures as broken images, and the EMA's FHIR export of the same List carries them as contained
+  Binaries under the same ids. A reference is carried from the authority's own export of the same
+  publication, bound by hash and by the export's text equalling the document's (PR 3c-E, its own
+  note), which D6's "reference the authority's viewer resolves" did not foresee.
