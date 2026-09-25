@@ -192,9 +192,11 @@ of the authority's text enters the record by it: none of the section's text ente
 
 ## Amendment (2026-09-25, a raised number against the tail above)
 
-A second stated exception to "false passes are not" (owner decision of 2026-09-25;
-`docs/design/authority-import-renderer.md`, P9): in the renderer gate, a glyph T folded as raised
-may touch, or share at most a few device pixels with, the descender of a glyph on the line directly
-above, and nothing else, each contact recorded and shown to the reviewer. The EMA's Imatinib Teva
-SmPC draws the 9 of "10⁹/l" in 4.2 against the "p" above it at most widths; it stays legible, and the
-finding is reported to the authority.
+A second stated exception to "false passes are not" (owner decisions of 2026-09-25;
+`docs/design/authority-import-renderer.md`, P9): in the renderer gate, a digit T folded as raised
+may touch, or share a stated fraction of its pixels with, a glyph on the line directly above, within
+the raised digit's top third and at or below that glyph's baseline, one contact per glyph, and only
+once the person who requests the import has acknowledged that contact, legible, in the gate's
+captures of the record they name. No automatic limit alone decides it. The EMA's Imatinib Teva SmPC
+draws the 9 of "10⁹/l" in 4.2 against letters, a bracket and a digit of the line above at some
+widths; the finding is reported to the authority.

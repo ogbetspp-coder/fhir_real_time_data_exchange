@@ -1,6 +1,6 @@
 # A withheld section: importing a publication with an authority's defect recorded in place (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25; ninth draft, after eight design reviews
+- Status: proposed, 2026-09-25; tenth draft, after nine design reviews
 - Owner decisions (2026-09-25): withhold the Imatinib Teva tablets SmPC's 5.1 and import the
   other 31 sections; a section may be withheld only on reviewed, measured evidence of the
   authority's defect, the whole record is marked incomplete everywhere it is read, and the safety
@@ -33,7 +33,7 @@ again in the pinned image):
   wraps to a line starting 19.45 px left of the table, off a page without a margin ("vents").
 - In table 2, twelve paragraphs with a −1 pt right margin in unpadded, bordered cells cross the
   cell edge by up to 1.28 px at some widths (the border touches a serif pixel of an "n" at 561 px,
-  a contact, not a line through the letter).
+  a touch, not a line through the letter).
 
 ADR 0005 decision 3 refuses such a publication. Of the EMA ePI API's public corpus (268 Bundles;
 English SmPCs for five centrally authorised products) no English SmPC gets past T, pictures and
@@ -49,21 +49,21 @@ the authority's content, and the gap stated wherever the record is read.
 A section may be withheld only when all hold:
 
 1. **A person asks, having reviewed the evidence.** The import request (D2) gains
-   `withheldEvidence`, `{ recordSha256, environment, capturesSha256 }`: the renderer record the person
-   reviewed (one per document) and the index of the render build's captures of it that they
-   reviewed, which its attestation names (R1), read with a review tool that verifies the
-   attestation, the index and each capture's hash before showing them; and `withheld`: a list of
+   names, as every authority import request does (the renderer note's R5), the evidence reviewed,
+   `renderEvidence: { recordSha256, environment, capturesSha256 }`: the renderer record (one per
+   document) and the index of the render build's captures of it, which its attestation names (R1),
+   read with a review tool that verifies the attestation, the index and each capture's hash before
+   showing them, in the environment the import is made in; and it gains `withheld`: a list of
    `{ path, code, confirmed, rejected }` in the document's pre-order, `path` the section's
    `SectionPath`, `code` its code as served, `confirmed` the defects (by their identity, `{ kind,
 location }`, the renderer note's R8) they judged misleading and `rejected` those they judged
    sound (a split number such as "12" beside ".5" is geometrically a run-together and is rejected).
-   Both fields are present or both absent; `withheld` has at least one entry; `confirmed` and
+   `withheld`, when present, has at least one entry; `confirmed` and
    `rejected` are disjoint, without repeats, in the record's order, and their union is exactly the
    section's defects in the record. The request is approved content (D2), covered by
-   `approvedContentSha256` (D8). The image build places each verified attestation's
-   `capturesSha256` beside its record, and the lookup refuses if the record or the captures it has
-   are not the ones named, or the section's defects are not exactly those confirmed and rejected
-   (`withheld-evidence-changed`), or none is confirmed (`withheld-section-not-shown`), so a later
+   `approvedContentSha256` (D8). The lookup refuses if the record, captures or environment are not
+   the ones named (`render-evidence-changed`, the renderer note's R5), or the section's defects are
+   not exactly those confirmed and rejected (`withheld-evidence-changed`), or none is confirmed (`withheld-section-not-shown`), so a later
    record never stands in for the one reviewed. The rejected defects are kept in the provenance, as
    findings against the gate's definition of a defect.
 2. **Its drawing is shown unsound, by evidence that is not ours.** The renderer gate's record for
@@ -135,8 +135,8 @@ automatic and never silent. For a synthetic publication, a withheld section need
   generated from that code alone. No entry, extension or other element. The reason and the
   evidence are in the provenance, not in the notice.
 - **The document says it is partial.** `Composition.status` is `partial` instead of D9's `final`
-  whenever a section is withheld, and only then: on every source the gate and the crosswalk require
-  `final`, or exactly `partial` if and only if the verified withheld list is non-empty (the status
+  whenever a section is withheld, and only then: on every source (drawn, synthetic, authority, and the fixture and `healthcare-api` run sources,
+  which also pass through the crosswalk) the gate and the crosswalk require `final`, or exactly `partial` if and only if the verified withheld list is non-empty (the status
   code system is a hierarchy, and `preliminary` is a kind of `partial`, so no other status is
   allowed), and the query service fails closed on any other status, in the record and in the EMA output. R5 defines it as "partial
   (e.g. initial, interim or preliminary)", of which "data in the composition may be incomplete or
@@ -181,7 +181,7 @@ skips it. A section that needed evidence only from a withheld section then refus
 can make B refused, and B can be withheld only on its own defect. Every section that gives
 evidence is carried, and every carried section must pass the gate, so the evidence is drawn and
 judged. For Imatinib Teva nothing changes: 5.1 gives no evidence (T refuses it), and 4.2's
-evidence comes from 4.1, 4.5 and 4.8, all carried.
+evidence comes from 4.1, 4.5, 4.8 and 5.2, all carried.
 
 ### W5. The fidelity contract recognises a withheld section (a minor version)
 
@@ -221,8 +221,9 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
   section, or such a section without `partial`, fails closed. Never from the latest Provenance by
   write order; for the current version, `get_provenance` cross-checks the Provenance's extension,
   and a disagreement fails closed. `get_section` on a withheld section returns a new outcome,
-  `section-withheld`, with its confirmed defect kinds for the current version (read from the
-  Provenance; for a superseded version, without them), never the notice as document content; `verify_quote`
+  `section-withheld`, with its confirmed defect kinds for the current version only when the
+  Provenance's extension agrees with the version read (the same cross-check as `get_provenance`;
+  otherwise, and for a superseded version, without them), never the notice as document content; `verify_quote`
   reports the withheld sections as not searched, so a `no-match` on an incomplete record never
   reads as absence; `get_provenance` returns the withheld sections; every result about the
   document carries `incomplete`. `QUERY_TOOLS_VERSION` and the agent's vendored contracts move.
@@ -245,7 +246,8 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
 
 ### W7. Versions
 
-- `CanonicalSubmission` 2.1.0: the request's `withheldEvidence` and `withheld`, the source record's `withheldSections` and
+- `CanonicalSubmission` 2.1.0: the request's `renderEvidence`, `acknowledgedContacts` (the renderer
+  note's R5) and `withheld`, the source record's `withheldSections` and
   `rendering`, `Composition.status` `partial`. `schemaVersion` is a literal, so a 2.0.0 submission
   does not read as 2.1.0: 2.0.0 authority imports (dry runs only; none approved) are re-imported,
   and readers that must keep reading old documents accept both (the run manifest's
@@ -276,7 +278,8 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
 - A synthetic publication with a withheld section can be imported only against a test store: the
   render build draws only publications pinned in `labels/`, so the deployed gate refuses it.
 - The record named in a request changes whenever any section's outputs, the pins (3c-E's export
-  among them) or the gate change; each change needs a new review and a new request before the
+  among them) or the gate change, and its captures whenever it is attested again (a new key
+  version); each change needs a new review and a new request, in each environment, before the
   publication can be imported again with a section withheld.
 
 ## Verification
@@ -290,6 +293,8 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
   `tree`; a document-level refusal refuses whatever is listed; a withheld section's picture is not
   fetched; a section whose only T5 evidence is withheld refuses; listing 4.2 Posology refuses.
 - The gate's recomputation reproduces the withheld list, the defects and the status.
+- The review tool (delivered with 3c-W) refuses a tampered capture, index or attestation, and one of
+  another environment.
 - `fidelity-norm/3.2.0`'s vectors and differential cases; the verifier refuses the notice, an
   `emptyReason` or a `generated` narrative on any other source or section.
 - The EMA output passes official validation (`cmp-1`, `cmp-2`, `partial`) with a withheld section.
@@ -379,3 +384,12 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
    checks; `final` or exactly `partial`; the rest as found. The renderer note's eighth review found
    4.2's raised 9 touching the line above; the owner's decision (a stated exception, the renderer
    note's P9) keeps the label importable.
+9. **Ninth independent review** (2026-09-25). Medium: a defect's index space was undefined in a
+   section T refuses, the only kind withheld; P9's contacts were "shown to the reviewer" by no
+   mechanism. Low: the environment unchecked; the captures' sidecar unstated in the renderer note;
+   re-attestation after a key's revocation; which widths are captured; the review tool undelivered;
+   `get_section`'s kinds from the latest Provenance; `off-page` without ink; P9's bound from withheld
+   sections; "a contact" for a touch; the run sources; 5.2's evidence. Fixed in this draft, with the
+   renderer note's tenth: every authority import request names the evidence reviewed
+   (`renderEvidence`, replacing `withheldEvidence`) and acknowledges each contact, which the owner
+   decided (2026-09-25); the judge's own index space; the rest as found.
