@@ -24,8 +24,10 @@ export type LineHeight =
   // with that same size is exact (T1: one computed size takes one factor).
   | { kind: "length"; lo: number; hi: number; of?: Size; factor?: number };
 
-// A border; `colour` undefined is the element's own final `color` (CSS `currentcolor`).
-export type Border = { widthPt: number; style: string; colour: Rgb | undefined };
+// A border and the colours it may be drawn in; `colours` undefined is the element's own final
+// `color` (CSS `currentcolor`), resolved once every declaration is read: both link colours where
+// an `a` with `href` sets it.
+export type Border = { widthPt: number; style: string; colours: readonly Rgb[] | undefined };
 
 export type Shift =
   | { kind: "none" }
@@ -181,7 +183,7 @@ function border(value: string): Border {
   return {
     widthPt: width ?? 2.25,
     style: style ?? "none",
-    colour: sawColour ? colourValue : undefined,
+    colours: sawColour && colourValue !== undefined ? [colourValue] : undefined,
   };
 }
 
@@ -329,7 +331,10 @@ export function computeStyle(context: ElementContext): ComputedStyle {
         break;
       case "width":
       case "height": {
-        if (!isTablePart) throw new CssRefusal("css-property");
+        // A caption's height can draw its text over the first row, in any layout.
+        if (!isTablePart || (name === "caption" && property === "height")) {
+          throw new CssRefusal("css-property");
+        }
         const parsed = length(value, true);
         if ("em" in parsed) throw new CssRefusal("css-value");
         if (("points" in parsed ? parsed.points : parsed.percent) < 0)
@@ -381,7 +386,7 @@ export function computeStyle(context: ElementContext): ComputedStyle {
           const current = style.borders[which] ?? {
             widthPt: 2.25,
             style: "none",
-            colour: undefined,
+            colours: undefined,
           };
           if (part === undefined) style.borders[which] = border(value);
           else if (part === "width") {
@@ -395,7 +400,7 @@ export function computeStyle(context: ElementContext): ComputedStyle {
             const parsed = colour(value);
             style.borders[which] = {
               ...current,
-              colour: parsed === "transparent" ? undefined : parsed,
+              colours: parsed === "transparent" ? undefined : [parsed],
             };
           }
         }
@@ -408,8 +413,15 @@ export function computeStyle(context: ElementContext): ComputedStyle {
     const drawn = style.borders[which];
     if (drawn === undefined) continue;
     if (drawn.style !== "none" && drawn.widthPt > 3) throw new CssRefusal("css-value");
-    if (drawn.colour === undefined)
-      style.borders[which] = { ...drawn, colour: style.colour ?? [0, 0, 0] };
+    if (drawn.colours === undefined) {
+      const current =
+        style.colour !== undefined
+          ? [style.colour]
+          : style.underLink && !style.colourSinceLink
+            ? LINK_COLOURS
+            : [[0, 0, 0] as const];
+      style.borders[which] = { ...drawn, colours: current };
+    }
   }
   style.size = size;
   style.declared = declaredNames;

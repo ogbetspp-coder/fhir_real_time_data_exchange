@@ -31,8 +31,18 @@ export function declarations(style: string): Declaration[] {
   if (/[()[\]]/u.test(style.replace(/rgb\([^;()[\]]*\)/giu, ""))) {
     throw new CssRefusal("css-grammar");
   }
-  // A line break inside quotes is a bad string, which Chrome drops with what follows it.
-  if (/'[^']*[\r\n\f][^']*'|"[^"]*[\r\n\f][^"]*"/u.test(style)) throw new CssRefusal("css-grammar");
+  // A line break inside quotes is a bad string, which Chrome drops with what follows it; read in
+  // one pass, so the check is linear.
+  let quote: string | undefined;
+  for (const character of style) {
+    if (quote === undefined) {
+      if (character === "'" || character === '"') quote = character;
+    } else if (character === quote) quote = undefined;
+    else if (character === "\r" || character === "\n" || character === "\f") {
+      throw new CssRefusal("css-grammar");
+    }
+  }
+
   const result: Declaration[] = [];
   for (const part of style.split(";")) {
     if (part.trim() === "") continue;

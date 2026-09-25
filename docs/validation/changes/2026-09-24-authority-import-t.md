@@ -22,7 +22,8 @@ behaviour). `labels/ema-epi/` pins the Imatinib Teva film-coated tablets SmPC (t
 end-to-end label) with its QRD check result.
 
 **Why.** Roadmap 3a, PR 3: PR 2's T removed nothing, so every real section refused. The design
-was reviewed fourteen times; its reviews are recorded in the design note.
+was reviewed fourteen times and its code twice (so far); the reviews are recorded in the design
+note.
 
 **Impact assessment (step 0).** `src/authority/` is imported by the worker's gate (Zone B
 recomputes every import) and by the producer script. The contract does not change
@@ -32,7 +33,7 @@ submission hash moves with the importer's version.
 
 **Steps 1–6.** 1: `IMPORTER_VERSION` 2.0.0, locked (`npm run authority:lock`). 2: the importer's
 vectors (`test/fixtures/authority/vectors.json`) now hold the imports, T's outcome for every
-section of every pinned label (its T(div) hash or its refusal), and T's 53 cases
+section of every pinned label (its T(div) hash or its refusal), and T's 215 cases
 (`test/fixtures/authority/t-cases.ts`, each rule's both sides and every refusal reason, the
 design reviews' repros among them). 3: the imports' outcomes are unchanged but the synthetic
 hash; the tablets SmPC is added and stops at `pictures`, as the capsules' does. 4: the T cases

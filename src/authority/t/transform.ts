@@ -309,6 +309,12 @@ function walkSection(root: ElementNode, rightToLeft: boolean): Walk {
       throw error;
     }
     const block = isBlock(name);
+    // Every element's size is bounded, not only where text stands: an element with no text of its
+    // own sets its children's raise and T4's ceiling (T3's font-size row).
+    const blockSize = block ? style.size : (parent?.blockSize ?? style.size);
+    if (style.size.lo < 5 || style.size.hi > 24) refuse("font-size");
+    if (!block && style.size !== blockSize && style.size.lo < 0.5 * blockSize.hi)
+      refuse("font-size");
     // Inline elements take no offsets (T3).
     if (!block) {
       for (const side of ["top", "right", "bottom", "left"] as const) {
@@ -321,9 +327,10 @@ function walkSection(root: ElementNode, rightToLeft: boolean): Walk {
         refuse("offset");
       }
     }
-    // T3b's bounds on the element's own values.
+    // T3b's bounds on the element's own values; a caption's box is not pulled out of its table.
     for (const side of ["top", "right", "bottom", "left"] as const) {
-      if (style.margin[side] > 144 || style.padding[side] > 144) refuse("offset");
+      if (Math.abs(style.margin[side]) > 144 || style.padding[side] > 144) refuse("offset");
+      if (name === "caption" && style.margin[side] < 0) refuse("offset");
       if (style.padding[side] < 0) refuse(name === "li" ? "list" : "offset");
     }
     if (style.margin.top < 0 || style.margin.bottom < 0) refuse(name === "li" ? "list" : "offset");
@@ -490,15 +497,26 @@ function isShifted(info: Info): boolean {
   );
 }
 
-// The marker an `li` of an `ol` draws, as the scanner writes it.
-function markerFor(li: ElementNode): string {
-  const list = li.parent;
-  if (list === undefined) return "";
+// The markers each `ol` draws, as the scanner writes them, computed once per list.
+const MARKERS = new WeakMap<ElementNode, Map<ElementNode, string>>();
+
+function markersOf(list: ElementNode): Map<ElementNode, string> {
+  const cached = MARKERS.get(list);
+  if (cached !== undefined) return cached;
   const items = list.children.filter(
     (child): child is ElementNode => child.kind === "element" && child.name === "li",
   );
   const start = Number(attribute(list, "start") ?? "1");
-  return listMarker(attribute(list, "type") ?? "1", start + items.indexOf(li));
+  const type = attribute(list, "type") ?? "1";
+  const markers = new Map(items.map((li, index) => [li, listMarker(type, start + index)]));
+  MARKERS.set(list, markers);
+  return markers;
+}
+
+// The marker an `li` of an `ol` draws.
+function markerFor(li: ElementNode): string {
+  const list = li.parent;
+  return list === undefined ? "" : (markersOf(list).get(li) ?? "");
 }
 
 // --- T4 ----------------------------------------------------------------------------------------
@@ -654,7 +672,13 @@ function hasUnshiftedNeighbour(
   const unshifted = (index: number): boolean => {
     const point = points[index];
     if (point === undefined || point.boundary || point.element === undefined) return false;
-    if (isWhite(index)) return false;
+    // A neighbour draws ink: no whitespace, no code point drawn as nothing, no mark, no picture.
+    if (
+      /^[\s\p{M}\ufffc]$/u.test(point.point) ||
+      isDefaultIgnorable(point.point.codePointAt(0) ?? 0)
+    ) {
+      return false;
+    }
     const info = walk.infos.get(point.element);
     if (info === undefined) return false;
     const chain = [...(isShifted(info) ? [info.element] : []), ...info.shiftedAncestors];
@@ -677,20 +701,22 @@ function markerWidth(marker: string): number {
   return width;
 }
 
+const WIDEST = new WeakMap<ElementNode, number>();
+
+function widestMarker(list: ElementNode): number {
+  const cached = WIDEST.get(list);
+  if (cached !== undefined) return cached;
+  let widest = 0;
+  for (const marker of markersOf(list).values()) widest = Math.max(widest, markerWidth(marker));
+  WIDEST.set(list, widest);
+  return widest;
+}
+
 function checkLists(walk: Walk): void {
   for (const info of walk.infos.values()) {
     if (info.element.name !== "li") continue;
     const list = info.element.parent;
-    const width =
-      list?.name === "ol"
-        ? Math.max(
-            ...list.children
-              .filter(
-                (child): child is ElementNode => child.kind === "element" && child.name === "li",
-              )
-              .map((li) => markerWidth(markerFor(li))),
-          )
-        : 1;
+    const width = list?.name === "ol" ? widestMarker(list) : 1;
     // A browser hangs the marker off the item's border box, not its content box.
     if (info.s - info.style.padding.left - width * info.style.size.hi < 0) refuse("list");
   }
@@ -704,8 +730,10 @@ function isDrawn(border: Border | undefined, backgrounds: readonly Rgb[]): boole
   if (border === undefined || !DRAWN_STYLES.includes(border.style) || border.widthPt <= 0) {
     return false;
   }
-  const colour = border.colour ?? [0, 0, 0];
-  return backgrounds.every((background) => contrast(colour, background) >= 3);
+  const colours = border.colours ?? [[0, 0, 0] as const];
+  return colours.every((colour) =>
+    backgrounds.every((background) => contrast(colour, background) >= 3),
+  );
 }
 
 // Whether the edge between two cells side by side is drawn (T3e). Under `separate` each cell draws
@@ -716,20 +744,24 @@ function drawnEdge(left: Info, right: Info, collapse: boolean): boolean {
   const leftBorder = left.style.borders.right;
   const rightBorder = right.style.borders.left;
   if (!collapse) return isDrawn(leftBorder, backgrounds) || isDrawn(rightBorder, backgrounds);
-  const weight = (border: Border | undefined): [number, number] =>
-    border === undefined || border.style === "none"
-      ? [-1, -1]
-      : [border.widthPt, DRAWN_STYLES.length - DRAWN_STYLES.indexOf(border.style)];
-  const [leftWidth, leftStyle] = weight(leftBorder);
-  const [rightWidth, rightStyle] = weight(rightBorder);
-  const winner =
-    rightWidth > leftWidth || (rightWidth === leftWidth && rightStyle > leftStyle)
-      ? rightBorder
-      : leftBorder;
-  return isDrawn(winner, backgrounds);
+  // Chrome snaps widths to device pixels, so two widths within a pixel (0.75 pt) of each other may
+  // draw either border: then the edge is drawn only if every facing border is.
+  const facing = [leftBorder, rightBorder].filter(
+    (border): border is Border => border !== undefined && border.style !== "none",
+  );
+  const [first, second] = facing;
+  if (first === undefined) return false;
+  if (second === undefined || Math.abs(first.widthPt - second.widthPt) < 0.75) {
+    return facing.every((border) => isDrawn(border, backgrounds));
+  }
+  return isDrawn(first.widthPt > second.widthPt ? first : second, backgrounds);
 }
 
+const LARGEST = new WeakMap<ElementNode, number>();
+
 function largestSize(walk: Walk, cell: ElementNode): number {
+  const cached = LARGEST.get(cell);
+  if (cached !== undefined) return cached;
   let largest = walk.infos.get(cell)?.style.size.hi ?? 0;
   for (const node of descendants(cell)) {
     if (node.kind === "element") {
@@ -743,6 +775,7 @@ function largestSize(walk: Walk, cell: ElementNode): number {
       }
     }
   }
+  LARGEST.set(cell, largest);
   return largest;
 }
 
@@ -874,7 +907,7 @@ export function plainTokens(points: readonly Point[]): Set<string> {
   return tokens;
 }
 
-function waivable(walk: Walk, run: Run, evidence: ReadonlySet<string>): boolean {
+function waivable(walk: Walk, run: Run, evidence: ReadonlySet<string>, text: string[]): boolean {
   const { points } = walk;
   const first = points[run.start];
   const block = blockOf(first?.element);
@@ -890,16 +923,25 @@ function waivable(walk: Walk, run: Run, evidence: ReadonlySet<string>): boolean 
     if (point === undefined || point.boundary || /^[\t\n\r\f \u00a0]$/u.test(point.point)) continue;
     if (index < run.start || index >= run.end) return false;
   }
-  const masked = points.map((point) => point.point);
-  let waived = false;
+  // The waived signs are masked in place on the section's text, and restored.
+  const masked: number[] = [];
+  let accepted = true;
   for (let index = run.start; index < run.end; index += 1) {
-    if (masked[index] !== "+") continue;
+    if (text[index] !== "+") continue;
     const token = plusToken(points, index);
-    if (token === undefined || !evidence.has(token)) return false;
-    masked[index] = " ";
-    waived = true;
+    if (token === undefined || !evidence.has(token)) {
+      accepted = false;
+      break;
+    }
+    text[index] = " ";
+    masked.push(index);
   }
-  return waived && !underlineChanges(masked, run.start, run.end, { hyphensInWords: true });
+  accepted =
+    accepted &&
+    masked.length > 0 &&
+    !underlineChanges(text, run.start, run.end, { hyphensInWords: true });
+  for (const index of masked) text[index] = "+";
+  return accepted;
 }
 
 function checkUnderlines(walk: Walk, evidence: ReadonlySet<string> | undefined): void {
@@ -914,7 +956,7 @@ function checkUnderlines(walk: Walk, evidence: ReadonlySet<string> | undefined):
       }
     }
     if (!underlineChanges(text, run.start, run.end, { hyphensInWords: true })) continue;
-    if (evidence === undefined || !waivable(walk, run, evidence)) refuse("underline");
+    if (evidence === undefined || !waivable(walk, run, evidence, text)) refuse("underline");
   }
 }
 
@@ -991,10 +1033,13 @@ export function transformSection(div: string, evidence?: ReadonlySet<string>): S
   const walk = walkSection(root, rightToLeft);
   const shifts = decideShifts(walk);
   // A folded run is raised or lowered text from here on (T5's runs and the waiver's evidence).
-  for (const point of walk.points) {
-    for (let node = point.element; node !== undefined; node = node.parent) {
-      const decision = shifts.get(node);
-      if (decision === "sup" || decision === "sub") point.inScript = true;
+  for (const [element, decision] of shifts) {
+    if (decision === "delete") continue;
+    const range = walk.ranges.get(element);
+    if (range === undefined) continue;
+    for (let index = range.start; index < range.end; index += 1) {
+      const point = walk.points[index];
+      if (point !== undefined) point.inScript = true;
     }
   }
   checkLists(walk);

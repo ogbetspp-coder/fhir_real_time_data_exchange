@@ -130,7 +130,7 @@ export const T_CASES: TCase[] = [
   },
   {
     name: "number-ending-in-a-point",
-    inner: '<p style="font-size: 3pt"><span style="font-size: 12.pt">x</span></p>',
+    inner: '<p style="font-size: 11pt"><span style="font-size: 12.pt">x</span></p>',
     expected: no("css-value"),
   },
   {
@@ -961,5 +961,83 @@ export const T_CASES: TCase[] = [
     name: "sup-larger-than-its-parent",
     inner: '<p style="font-size: 11pt">10<sup style="font-size: 24pt">2</sup></p>',
     expected: no("baseline-shift"),
+  },
+  // --- the second code review's repros ---
+  {
+    name: "neighbour-is-a-tab",
+    inner: '<p>\t<span style="position: relative; top: -5pt">9</span></p>',
+    expected: no("baseline-shift"),
+  },
+  {
+    name: "neighbour-is-a-line-feed-by-reference",
+    inner: '<p>&#10;&#10;<span style="position: relative; top: -5pt">9</span></p>',
+    expected: no("baseline-shift"),
+  },
+  {
+    name: "neighbour-is-an-em-space",
+    inner: '<p> <span style="position: relative; top: -5pt">9</span></p>',
+    expected: no("baseline-shift"),
+  },
+  {
+    name: "neighbour-is-invisible",
+    inner: '<p>&#x2063;<span style="position: relative; top: -5pt">9</span></p>',
+    expected: no("baseline-shift"),
+  },
+  {
+    name: "neighbour-is-a-picture",
+    inner:
+      '<p><img src="data:image/png;base64,iVBORw0KGgo="/><span style="position: relative; top: -5pt">9</span></p>',
+    expected: no("baseline-shift"),
+  },
+  {
+    name: "large-element-without-text",
+    inner:
+      '<p>Platelets 10<b style="font-size: 200pt"><span style="font-size: 7pt; position: relative; top: -90pt">9</span></b>/l</p>',
+    expected: no("font-size"),
+  },
+  {
+    name: "large-element-around-a-sup",
+    inner: '<p>10<b style="font-size: 200pt"><sup style="font-size: 9pt">9</sup></b></p>',
+    expected: no("font-size"),
+  },
+  {
+    name: "caption-pulled-off-the-page",
+    inner:
+      '<table><caption style="margin-left: -10000pt">Warning</caption><tr><td style="padding: 0 5pt">a</td></tr></table>',
+    expected: no("offset"),
+  },
+  {
+    name: "caption-pulled-left",
+    inner:
+      '<table><caption style="margin-left: -40pt">Warning</caption><tr><td style="padding: 0 5pt">a</td></tr></table>',
+    expected: no("offset"),
+  },
+  {
+    name: "margin-beyond-the-negative-bound",
+    inner: '<p style="margin-right: -200pt">x</p>',
+    expected: no("offset"),
+  },
+  {
+    name: "border-in-a-link-colour",
+    inner:
+      '<p>x</p><a href="#"><table style="border-collapse: collapse"><tr><td style="background: #777; border-right: 1pt solid; padding: 0"><span style="color: black">Dose 1</span></td><td style="background: #777; padding: 0"><span style="color: black">5 mg</span></td></tr></table></a>',
+    expected: no("table-edge"),
+  },
+  {
+    name: "collapsed-widths-within-a-pixel",
+    inner:
+      '<table style="border-collapse: collapse"><tr><td style="border-right: 1.05pt solid black; padding: 0">Dose 1</td><td style="border-left: 0.9pt double #ccc; padding: 0">5 mg</td></tr></table>',
+    expected: no("table-edge"),
+  },
+  {
+    name: "caption-height",
+    inner:
+      '<table><caption style="height: 0">Maximum dose</caption><tr><td style="padding: 0 5pt">Take with food</td></tr></table>',
+    expected: no("css-property"),
+  },
+  {
+    name: "nesting-beyond-the-scanner",
+    inner: "<p>" + "<span>".repeat(40) + "x" + "</span>".repeat(40) + "</p>",
+    expected: no("markup"),
   },
 ];

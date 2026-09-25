@@ -138,6 +138,8 @@ function checkOneTree(name: string, selfClosing: boolean, stack: readonly Elemen
 }
 
 const LOWER_NAME = /^[a-z][a-z0-9]*$/u;
+// The scanner's own bound on nesting (fidelity §5, `nesting-depth`).
+const MAX_DEPTH = 32;
 const LOWER_ATTRIBUTE = /^[a-z_:][-a-z0-9_:.]*$/u;
 
 const END_TAG = new RegExp(XHTML_TOKENS.endTag, "y");
@@ -246,7 +248,10 @@ export function readTree(div: string): ElementNode {
       };
       if (parent === undefined) root = element;
       else parent.children.push(element);
-      if (!selfClosing) stack.push(element);
+      if (!selfClosing) {
+        stack.push(element);
+        if (stack.length > MAX_DEPTH) throw new MarkupRefusal("markup");
+      }
       index = START_TAG.lastIndex;
       continue;
     }
@@ -259,6 +264,8 @@ export function readTree(div: string): ElementNode {
       if (match === null) throw new MarkupRefusal("markup");
       point = decodeReference(match);
       next = ENTITY.lastIndex;
+      // A line feed or carriage return, raw or by reference, is emitted as a space (fidelity §5).
+      if (point === "\r" || point === "\n") point = " ";
     } else {
       const codePoint = div.codePointAt(index) ?? 0;
       point = String.fromCodePoint(codePoint);
