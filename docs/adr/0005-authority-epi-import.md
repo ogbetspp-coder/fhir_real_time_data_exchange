@@ -300,21 +300,23 @@ independent reviews, and changes this ADR as follows.
 
 - **The renderer cross-check is a store of reproduced records.** CI draws every publication in a
   pinned image (Chrome for Testing's headless shell, pinned metric-compatible fonts), and writes a
-  small evidence record into its own store outside the importer's data; main's own deploy
-  workflow draws every record again, and deploys only if each reproduces. The importer's `rendering` stage looks the
+  small evidence record into its own store outside the importer's data; the image build that
+  every deploy runs draws every record again, and the worker image carries only records its own
+  code reproduced. The importer's `rendering` stage looks the
   record up by the document's hash and each carried section's T(div) hash, and the run manifest
   pins the record's hash. The consequence "the importer's CI job needs a headless browser" is
   that job.
-- **Decision 3 is narrowed: a withheld section.** A section whose drawing, as the authority
-  serves it, fails the renderer gate's measured checks may be **withheld** by the person who
-  requests the import, never a safety section (4.2 to 4.9) and never on a refusal of our own
-  (a font we cannot draw, a rule stricter than the drawing, a picture we cannot fetch). It keeps
-  its heading and code, carries none of the authority's content, and carries `emptyReason`
-  `withheld` and a fixed notice; the record is marked incomplete wherever it is read. The import
-  refuses if a listed section draws correctly or a failing one is not listed, and a
-  document-level refusal still refuses it. A withheld section is never repaired, answered from
-  or quoted. Imatinib Teva's 5.1, measured misleading when drawn, is the first (owner decisions of
-  2026-09-25).
+- **Decision 3 is narrowed: a withheld section.** A leaf section whose drawing, as the
+  authority's div draws with its inline styles, the renderer gate shows unsound by lower-bound
+  evidence from the browser's own boxes (two cells' text touching, text off the page, a line
+  through text), with no refusal of the gate's own, may be **withheld** by the person who requests
+  the import; never a safety section (4.2 to 4.9), and never on a refusal or a conservative
+  failure of ours. It keeps its heading and code, carries none of the authority's content, and
+  carries our own `emptyReason` code and a fixed notice; the Composition is `partial` and the
+  record is marked incomplete wherever it is read. The import refuses if a listed section is not
+  shown unsound or a failing one is not listed, and a document-level refusal still refuses it. A
+  withheld section is never repaired, answered from or quoted. Imatinib Teva's 5.1 is the first
+  (owner decisions of 2026-09-25).
 - **Decision 3's pictures.** The EMA's viewer draws Imatinib Teva's two `~/_entity/annotation/…`
   pictures as broken images, and the EMA's FHIR export of the same List carries them as contained
   Binaries under the same ids. A reference is carried from the authority's own export of the same
