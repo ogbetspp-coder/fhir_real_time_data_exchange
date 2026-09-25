@@ -197,6 +197,8 @@ A second stated exception to "false passes are not" (owner decisions of 2026-09-
 failures (clear misreadings, which refuse) and **contacts**, glyphs or lines that touch or stand
 closer than the gate can prove harmless, which pass only once the person who requests the import,
 an attested identity before anything is persisted, has seen each one in the gate's captures of the
-record they name and acknowledged it legible. No automatic limit alone decides a contact. The EMA's
-Imatinib Teva SmPC has contacts in 4.2 (the raised 9 of "10⁹/l" against the line above) and 4.8 ("V"
-of "Appendix V" past its grey background); the findings are reported to the authority.
+record they name and acknowledged it legible. No automatic limit alone decides a contact. Two drawings that
+cannot change a letter are clear by rule, not contacts: a letter's descender touching its own cell's
+bottom border, and text at a background's edge that keeps its contrast against both fills. The EMA's
+Imatinib Teva SmPC has about 60 contacts, 4.2's raised 9 of "10⁹/l" against the line above among
+them; the findings are reported to the authority.

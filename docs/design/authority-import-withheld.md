@@ -1,6 +1,6 @@
 # A withheld section: importing a publication with an authority's defect recorded in place (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25; eleventh draft, after ten design reviews
+- Status: proposed, 2026-09-25; twelfth draft, after eleven design reviews
 - Owner decisions (2026-09-25): withhold the Imatinib Teva tablets SmPC's 5.1 and import the
   other 31 sections; a section may be withheld only on reviewed, measured evidence of the
   authority's defect, the whole record is marked incomplete everywhere it is read, and the safety
@@ -8,9 +8,10 @@
 - Decides: how an authority import carries a section it cannot accept, instead of refusing the
   whole publication
 - Amends: `AGENTS.md` ("fail closed on … mandatory QRD sections", a scoped exception); ADR 0002
-  (invariants 4 and 6: a coded section with a verified notice instead of a verified narrative);
+  (invariants 3, 4, 6 and 10: a coded section with a verified notice instead of a verified narrative; its 2026-09-24 amendment's contract, 3.0.0, and who judges content: an attested requester);
   ADR 0003 (the verifier's scope); ADR 0005 decision 3 and its consequence;
-  `docs/design/authority-import-contract.md` D2, D3, D4, D6, D7, D9, D10, D12, D13;
+  `docs/design/authority-import-contract.md` D1 (the dry-run lift's condition), D2, D3, D4, D6, D7,
+  D8 (the placeholder requester), D9, D10, D12, D13;
   `docs/fidelity-normalization.md` §7 (a new minor version, W5); the query service's and the
   agent's designs (`docs/design/epi-mcp-query-service.md`, `docs/design/verifiable-answers.md`)
 - Related: ADR 0002, `docs/design/authority-import-t.md` (T5's evidence),
@@ -62,7 +63,7 @@ location }`, the renderer note's R8) they judged misleading and `rejected` those
    `rejected` are disjoint, without repeats, in the record's order, and their union is exactly the
    section's defects in the record. The request is approved content (D2), covered by
    `approvedContentSha256` (D8). The lookup refuses if the record, captures or environment are not
-   the ones named (`render-evidence-changed`, the renderer note's R5), or the section's defects are
+   the ones named (`renderer-evidence-changed`, the renderer note's R5), or the section's defects are
    not exactly those confirmed and rejected (`withheld-evidence-changed`), or none is confirmed (`withheld-section-not-shown`), so a later
    record never stands in for the one reviewed. The rejected defects are kept in the provenance, as
    findings against the gate's definition of a defect.
@@ -84,14 +85,16 @@ location }`, the renderer note's R8) they judged misleading and `rejected` those
      (`off-page`); none involving a picture's box. Every defect is also a failure of the gate's
      checks.
 
-   A failure of the gate's conservative checks (a 0.25 em gap, a 0.5 px clearance, a contrast
-   margin) is not a defect: it shows the gate cannot prove the drawing sound, not that it is
-   unsound, and such a section refuses the import, as today. So is every refusal of ours (a font
-   we cannot draw, a rule of T's stricter than the drawing, a scanner grammar, and in a carried
-   section a picture we cannot fetch; a withheld section's pictures are drawn as the import has
-   them, 5.1's two as broken-image boxes, `unpinned`, until 3c-E pins the export, and no defect may
-   involve a picture's box). The finding is stated for what the gate draws: the FHIR div as published, with its
-   inline styles only, in fonts metric-compatible with those it names.
+     A contact (the renderer note's R4) is not a defect, nor is a failure that is not one (a line under
+     a sign, a covered glyph, a contrast under 4.5:1, a fold off its position): neither can justify
+     withholding. A section with such a failure and no confirmed defect refuses the import, as today;
+     a section withheld on a confirmed defect carries none of its other failures into the record (they
+     stay in the record by hash). So is every refusal of ours (a font
+     we cannot draw, a rule of T's stricter than the drawing, a scanner grammar, and in a carried
+     section a picture we cannot fetch; a withheld section's pictures are drawn as the import has
+     them, 5.1's two as broken-image boxes, `unpinned`, until 3c-E pins the export, and no defect may
+     involve a picture's box). The finding is stated for what the gate draws: the FHIR div as published, with its
+     inline styles only, in fonts metric-compatible with those it names.
 
 3. **A leaf.** The section has no subsections (5.1 has none), so "information withheld" never
    stands over carried text.
@@ -103,7 +106,7 @@ location }`, the renderer note's R8) they judged misleading and `rejected` those
 
 Both directions are enforced: a listed section without a defect, or with a refusal of ours,
 refuses the import (`withheld-section-not-shown`); a section that is not listed must pass as any
-carried section does (no refusal, no failure; the renderer note's R5), and since every defect is a
+carried section does (no refusal, no failure, every contact acknowledged; the renderer note's R5), and since every defect is a
 failure, an unlisted defect refuses the import, at the first stage that refuses the section in
 D10's order (`pictures`, `narrative`, `record` or, last, `rendering`). Withholding is never
 automatic and never silent. For a synthetic publication, a withheld section needs a record too
@@ -151,9 +154,10 @@ automatic and never silent. For a synthetic publication, a withheld section need
   can return them; the run manifest's ingestion evidence, the ledger row (its BigQuery schema) and every
   query result carry `incomplete: true` and the codes.
 - **Provenance.** The source record gains `withheldSections: [{ path, code, page, confirmed,
-rejected }]` (checked against the request and the record); `rendering` (below) is now carried by
-  every authority import, withheld or not (the renderer note's R1) and, when anything is withheld, `rendering: { gateVersion, gateSha256, recordSha256 }`
-  (checked: the record the lookup used; the run's evidence keeps its bytes). Such a submission
+rejected }]` (checked against the request and the record); and `rendering: { gateVersion,
+gateSha256, recordSha256 }` (checked: the record the lookup used; the run's evidence keeps its
+  bytes), carried as the renderer note's R5 requires `renderEvidence`: when the authority is not
+  `synthetic` or a section is withheld. Such a submission
   re-verifies in its own worker image, whose store and gate it used (the renderer note's R10). The record shapes the approved content of every authority import
   (the contacts acknowledged, and what is withheld), and is named in it.
 - **Structuring decisions (D9).** `Composition.status` becomes a decision by rule
@@ -247,14 +251,16 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
 
 ### W7. Versions
 
-- `CanonicalSubmission` 3.0.0 (a major: required fields for an authority import): the request's `renderEvidence`, `acknowledgedContacts` (the renderer
-  note's R5) and `withheld`, the source record's `withheldSections` and
-  `rendering`, `Composition.status` `partial`. `schemaVersion` is a literal, so a 2.0.0 submission
-  does not read as 3.0.0: 2.0.0 authority imports (dry runs only; none approved) are re-imported,
-  and readers that must keep reading old documents accept both (the run manifest's
-  `contractVersion`, D13), as `AnyRunManifestSchema` does for manifests.
-- `fidelity-norm/3.2.0` and the fidelity report's version (W5); one minor version of the run
-  manifest, shared with the renderer note's R10; `QUERY_TOOLS_VERSION`; the ledger's schema; the
+- `CanonicalSubmission` 3.0.0 (a major, ADR 0002's rule: fields required for an authority import, and
+  enums the gate branches on): the request's `renderEvidence`, `acknowledgedContacts` (the renderer
+  note's R5) and `withheld`, the source record's `withheldSections` and `rendering`,
+  `Composition.status` `partial`, `SectionProvenanceSchema.spans` allowing none for a withheld
+  section. `schemaVersion` is a literal, so a 2.0.0 submission does not read as 3.0.0: 2.0.0
+  authority imports (dry runs only; none approved) are re-imported, and 2.0.0 drawn and synthetic
+  submissions are refused as 1.0.0's were at 2.0.0.
+- `fidelity-norm/3.2.0` and the fidelity report's next major (W5: `SectionStatus` `withheld`,
+  `summary.withheld`, `sectionsWithheld`); the run manifest's 3.0.0 (the renderer note's R10: the
+  2.0.0 ingestion block frozen with its literal in `AnyRunManifestSchema`, read in a test); `QUERY_TOOLS_VERSION`; the ledger's schema; the
   importer's version (D10's lock). Generated schemas and Zone A models are regenerated.
 - `AGENTS.md`: "An authority import may carry a mandatory section as withheld only under
   `docs/design/authority-import-withheld.md` (reviewed, measured evidence of the authority's defect, never a
@@ -405,3 +411,12 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
     requester for any acknowledgement; `rendering` in every authority import; the rest as found. The
     contract's version: `CanonicalSubmission` 3.0.0, a major, since new fields are required for an
     authority import and 2.0.0 submissions do not read as it (ADR 0002's rule).
+11. **Eleventh independent review** (2026-09-25). Medium: two cells' numbers 0.19 px apart ("64:2246:"
+    in 5.1's table 9) were only a contact, which a person could acknowledge; the run manifest's
+    literal `contractVersion` made 3.0.0 unreadable for 2.0.0 manifests under a "minor" bump; ADR 0002
+    was stale on the contract and on who judges content. Low: failures still described as conservative
+    checks; `renderEvidence`'s scope stated three ways; withheld-only leftovers; the review tool; the
+    acknowledgements in no consumer; amendment lists; PR 5's dependence on an attested identity for
+    every real label; a reason code; W7's list. Fixed in this draft, with the renderer note's twelfth:
+    cells closer than a stated gap are a failure; the run manifest 3.0.0 with 2.0.0 frozen; ADR 0002
+    amended; failures and contacts in class terms; the rest as found.

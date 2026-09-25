@@ -265,3 +265,21 @@ and a fixed notice, `Composition.status` `partial`. Invariants 3, 4, 6 and 10 ch
 
 The human decision that withholds is the import request's, hash-bound in the approved content as
 every request is (invariant 2); before PR 5 lifts the dry run it is bound to an attested identity.
+
+## Amendment (2026-09-25, the renderer gate's review)
+
+`docs/design/authority-import-renderer.md` (R5) and `docs/design/authority-import-withheld.md`
+(owner decisions of 2026-09-25) change the contract of an authority import:
+
+- **`CanonicalSubmission` 3.0.0**, a major under this ADR's rule (fields required for an authority
+  import; enums the gate branches on): the request's `renderEvidence`, `acknowledgedContacts` and
+  `withheld`, and the source record's `rendering` and `withheldSections`, are approved content,
+  covered by `approvedContentSha256` (invariant 2) as the request is. The run manifest moves to 3.0.0
+  with it, its 2.0.0 ingestion block frozen.
+- **Who judges content.** The 2026-09-24 amendment's "whether the words are right is what invariant 8
+  proves, not what a person attests" stays true of the words. Two judgements of drawing now rest on
+  a person, both stated exceptions: acknowledging a contact the renderer gate cannot prove harmless
+  as legible, and withholding a section on a confirmed defect. So a request that acknowledges or
+  withholds anything is bound to an attested identity before D1's dry run is lifted for it (PR 5); D8's
+  placeholder requester does not suffice, and since every real label has contacts, no real label is
+  persisted until that identity exists.

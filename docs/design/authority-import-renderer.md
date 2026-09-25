@@ -1,12 +1,14 @@
 # The renderer gate: a pinned browser's evidence for every authority import (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25 (architecture approved by the owner the same day); eleventh draft,
-  after ten design reviews; R4's thresholds provisional, settled by 3c-C's measured design
+- Status: proposed, 2026-09-25 (architecture approved by the owner the same day); twelfth draft,
+  after eleven design reviews; R4's thresholds provisional, settled by 3c-C's measured design
 - Decides: what `docs/design/authority-import-t.md`'s "What waits for PR 3c" left open: who draws,
   what is drawn and measured, the evidence record and its store, and the `rendering` stage
-- Amends: ADR 0005 (decision 1's renderer cross-check); `docs/design/authority-import-t.md` (the
+- Amends: ADR 0003 (the second stated exception, contacts acknowledged); ADR 0005 (decision 1's
+  renderer cross-check); `docs/design/authority-import-t.md` (the
   store and who writes it, settled; the frame; the gap between cells; the tolerances);
-  `docs/design/authority-import-contract.md` (D1's trust statement, D6, D10, D12, D13, D14)
+  `docs/design/authority-import-contract.md` (D1's trust statement, D2, D3 and D8 (the request's
+  review fields), D6, D10, D12, D13, D14)
 - Related: ADR 0003, ADR 0004 (the importer lock), `docs/design/authority-import-withheld.md`
 
 ## What this is for
@@ -66,7 +68,7 @@ recordSha256, capturesIndex, capturesSha256, documentSha256, pinsSha256, rendere
   staging bucket reader, `objectViewer` and `objectCreator` on the attestation and captures
   buckets, signer on its environment's key, the repository connection's token accessor, and log
   writer. The captures bucket keeps objects under a retention policy, and the deployers and the
-  people who withhold sections may read it. The renderer image is built and pushed, when its pins
+  people who request imports may read it. The renderer image is built and pushed, when its pins
   change, by a separate image build with writer on its own repository (`renderer-images`), not the
   worker's. A record that does not reproduce gets no attestation.
 
@@ -120,8 +122,9 @@ recordSha256, capturesIndex, capturesSha256, documentSha256, pinsSha256, rendere
   against the current T and scanner so a change that makes a record stale fails the pull request
   that makes it, and draws the records whose bytes, gate hash or pinned files differ from `main`'s
   (by git content, never by an Actions cache). Captures of the failures and defects are the run's
-  artefacts, a pre-check's; the drawing a person reviews before withholding a section is the render
-  build's captures of the attested record (the withheld note's W1.1).
+  artefacts, a pre-check's; the drawing a person reviews before acknowledging a contact or
+  withholding a section is the render build's captures of the attested record, read through the
+  review tool (R5).
 - **What Zone B does.** The `rendering` stage is a pure, synchronous lookup inside
   `importPublication`, with the store passed in as data (as the mapping is). D10's check order is
   unchanged; the gate's recomputation (D1) repeats it; the record's hash goes into the signed run
@@ -296,31 +299,43 @@ pinned labels, and reviewed there before any record is attested.
 **Three classes (binding).** Every glyph and every line of the authority's drawing, at every width
 and ratio of R2, is:
 
-1. **clear**: proven, on pixels and exact geometry, to keep its stated clearance from every other
-   glyph and line, inside its frame, uncovered, on the page and at its model's position; or
+1. **clear**: proven, on pixels and exact geometry, to keep its stated clearance (at least one blank
+   device pixel) from every other glyph, every line and every picture's box, inside its frame (its
+   cell's or caption's content box, or the section div's), uncovered, on the page and at its model's
+   position; or clear by rule (P8); or
 2. **a failure**: a clear misreading or a drawing the gate cannot judge, which refuses the section
    (and can be withheld only under the withheld note); or
 3. **a contact**: neither proven clear nor a failure, which the gate never passes silently: it is
    recorded, captured, and must be acknowledged, legible, by the person who requests the import
    (R5), or the import refuses.
 
+A value within ε of a threshold (R7) falls in the more severe class of the decision it belongs to: a
+failure where the threshold separates a failure, a contact where it separates a contact from clear.
+
 **Principles (binding).**
 
 - **P1. Bounds nominate, pixels and exact geometry decide.** A rounded-out ink bound only finds
-  candidates. Every verdict is decided on glyph pixels (attributed as R4 states) or on exact
-  horizontal advances, never on a widened bound. Glyph pixels come from drawings made once per
-  width and ratio where candidates exist, layout asserted unchanged, cropped locally.
+  candidates. Every verdict is decided on glyph pixels (attributed as R4 states; a pixel is a
+  glyph's at 10 % coverage or more) or on exact horizontal advances, never on a widened bound, but
+  for `off-page` (R8), where only the bound can speak for what is not drawn. Glyph pixels come from
+  drawings made once per width and ratio where candidates exist, layout asserted unchanged, cropped
+  locally.
 - **P2. Thresholds in device pixels, measured both ways.** Every clearance is stated in device pixels
-  (or in em of the glyph's own size where the reading depends on the size), set from the pinned
-  labels' drawings at every ratio with a stated margin, and required to put every must-fail seeded
-  case in its stated class at T's extremes (5 pt, every ratio); never loosened by hand.
-- **P3. Failures: clear misreadings.** Each of these is a failure: two cells' text running together
-  (R8's `cells-run-together`); a line through the body of a glyph, with the glyph's pixels on both of
-  its sides (a colon shifted across its cell's bottom border, "10:1" drawn "10.1"); a glyph covered
-  (its coverage mask changes when a box over it alone is made transparent), or under 4.5:1 against
-  what is drawn behind it; a character wholly off the page, or any advance left of the page; a line
-  under text that makes a sign another (P5); a folded or unfolded glyph off T4's position; and every
-  refusal of ours (R8).
+  (or in em of the glyph's own size where the reading depends on the size), at least one blank
+  device pixel, set from the pinned labels' drawings at every ratio with a stated margin, and
+  required to put every seeded case in its stated class at T's extremes (5 pt, every ratio); never
+  loosened by hand.
+- **P3. Failures: clear misreadings.** Each of these is a failure: two cells' text standing side by
+  side on one line closer than a stated gap (a fraction of a word space, in em, on exact advances;
+  R8's `cells-run-together`, at no gap, is the defect within it); a line through the body of a glyph,
+  with the glyph's pixels on both of its sides (a colon shifted across its cell's bottom border,
+  "10:1" drawn "10.1"); a connected part of a glyph's ink lying wholly within a line's pixels (a
+  colon's lower dot inside a thick border, "10·1"; a raised 7's bar inside its cell's top border); a
+  glyph's pixels overlapping a picture's; a glyph covered (its coverage mask changes when a
+  background, a border or a picture over it alone is made transparent; glyph over glyph is P6's), or
+  under 4.5:1 against what is drawn behind it; a character wholly off the page, any advance left of
+  the page, or any advance above the section's top edge or the page's; a line under text that makes
+  a sign another (P5); a folded or unfolded glyph off T4's position; and every refusal of ours (R8).
 - **P4. What a font draws is not a contact.** Two characters adjacent in logical order on one line
   fragment (one line box of one block, never across cells), in whatever text nodes, are not checked
   against each other, and the judge asserts that each line's visual order is its logical order; a
@@ -335,37 +350,56 @@ and ratio of R2, is:
 - **P6. Contacts.** Two glyphs P4 does not exempt that touch (a pixel of one 8-adjacent to, or shared
   with, a pixel of the other) or stand within a stated clearance; a glyph and a line (a border, a
   rule, a decoration, a background's edge, a run's own underline for a shifted glyph, the gaps
-  skip-ink cuts counted as line) that touch or stand within a stated clearance; and a glyph whose ink
-  reaches past its frame without leaving the page, are contacts, unless P3 makes them failures. A
-  contact's identity is its section's path, its kind and the characters (and line) involved, in R3's
-  index space; it is captured at every distinct mask of pixels it takes across the widths and ratios
-  (so what a person sees is every drawing they acknowledge), and it is neither a failure nor a defect.
-- **P7. Clear needs proof.** Only a glyph or line the gate proves clear under P1 and P2 passes
-  without acknowledgement; everything the proof does not reach is a contact or a failure.
+  skip-ink cuts counted as line), or a glyph and a picture's box, that touch or stand within a
+  stated clearance; and a glyph whose ink reaches past its frame without leaving the page, are
+  contacts, unless P3 makes them failures or P8 clear. A contact's kind is one of a closed list 3c-C
+  enumerates with each kind's location type (glyph–glyph, glyph–line, glyph–picture, glyph–frame);
+  its identity is its section's path, its kind and the characters (and line or picture) involved, in
+  R3's index space. It is captured at every distinct mask (the participants' pixels relative to one
+  another), and identical masks are shown once across identities, so a person sees every distinct
+  drawing they acknowledge and no drawing twice; the acknowledgement stays per identity. It is
+  neither a failure nor a defect.
+- **P7. Clear needs proof.** Only a glyph or line the gate proves clear under P1 and P2, or clear by
+  rule under P8, passes without acknowledgement; everything else is a contact or a failure.
+- **P8. Clear by rule: two drawings that cannot change a letter.** Measured on the label (4.2's and
+  4.8's tables; the reporting box), these are clear without acknowledgement, and nothing else is:
+  (a) a letter's ink below its own baseline (the descenders of g, j, p, q and y, and of the Greek
+  letters with descenders; never a digit, a punctuation mark or a symbol, since a comma's tail on a
+  line can read as a full stop) touching, without a shared pixel, its own cell's bottom border; and
+  (b) a glyph meeting or crossing the edge of a background (a boundary between two fills, not a
+  stroke) where the glyph keeps 4.5:1 against both fills. 3c-C measures that each holds on the pinned
+  labels and seeds a case of each that fails when its condition fails.
 
 These replace the ninth draft's P8 and P9, whose exact exceptions each review found too wide or too
-narrow for the label: the raised digit's contacts, a descender above its own cell's border, the
-reporting box's grey edge, "Appendix V" are all contacts now, acknowledged, where they are not
-proven clear. It is ADR 0003's second stated exception, amended (owner decisions of 2026-09-25): a
+narrow for the label. On the tablets label the eleventh review counted about 350 contact identities
+before P8: 236 descenders touching their own cells' bottom borders in 4.8, 41 at the reporting box's
+grey edges, 57 pairs of 4.2's raised 9 against the line above, and one in 5.2. P8 makes the first two
+kinds clear by rule, so a person acknowledges about 60, 4.2's raised 9 among them, each distinct
+drawing once; 3c-C states the counts it measures and refuses a record whose contacts exceed a stated
+number, so acknowledgement never becomes a rubber stamp. It is ADR 0003's second stated exception, amended (owner decisions of 2026-09-25): a
 contact the gate cannot prove harmless passes only by a person's acknowledgement.
 
 **Seeded cases (binding).** Each is a case of the judge's tests in both modes and at every ratio.
-Must be failures: a colon shifted across its cell's bottom border ("10:1" drawn "10.1"); a border
-through a letter; a line under a `<`; two cells' text running together; text wholly off the page;
-raised text above the section; a marker off the page; a picture over a glyph; a later box in the
+Must be failures: a colon shifted across its cell's bottom border ("10:1" drawn "10.1"); a colon's
+lower dot inside a thick bottom border ("10·1"); a raised 7 folded by 2.8 pt, its bar inside its
+cell's top border; two cells' numbers 0.19 px apart (5.1's table 9 at 504 px); a glyph's pixels on a
+picture's; a border through a letter; a line under a `<`; two cells' text running together; text wholly off the page;
+raised text above the section's top edge; a marker off the page; a picture over a glyph; a later box in the
 text's own colour over a glyph; a missing glyph (U+2070); an unpinned family (Verdana); a glyph too
 faint to judge. Must be contacts (never clear): the colon of "10:1" at 5 pt against its border; two
 glyphs 0.2 px apart across lines; a combining mark stacked into the line above; a raised digit
-against the underline of the line above; a raised 7 folded by 2.4 pt against its own cell's top
-border ("x 10⁷/l"); `<u>AUC<sub>0-24</sub></u>` where the lowered hyphen abuts its underline or sits
-in a skip-ink gap; 4.2's "10⁹/l" against the line above; 4.8's "Appendix V" past its grey box.
+against the underline of the line above; a raised 7 folded by 2.4 pt abutting its own cell's top
+border ("x 10⁷/l"); a descender touching a picture on the next line; a comma's tail touching its
+own cell's bottom border; `<u>AUC<sub>0-24</sub></u>` where the lowered hyphen abuts its underline or sits
+in a skip-ink gap; 4.2's "10⁹/l" against the line above.
 Must be clear: a `>` 0.36 em above its cell's bottom border in the pinned face (4.2; T's note
 measured 0.39 em in the original) as an underline question (P5); a descender over an ascender at
 `line-height: normal` (4.4's "g" over "b"); `<span>T</span><span>he`; two adjacent `u` elements
 (4.2's "Posology for Ph+ ALL in children"); the waived `+` of 4.2's headings; an underlined
 "Posology" and 4.8's underlined link "Appendix V", their descenders breaking the underline (P4).
-Whether a descender a pixel above its own cell's border, or text meeting its grey background, is
-clear or a contact is 3c-C's measurement; neither may be a failure.
+Must be clear by rule (P8): 4.2's and 4.8's letter descenders touching their own cells' bottom
+borders; 4.8's reporting box text meeting its grey background's edges, "Appendix V" past it
+included.
 
 **Provisional checks** (the second draft's list, kept as 3c-C's starting point, each to be restated
 under the three classes and P1–P7 with measured thresholds): overlap; every drawn line as ink (0.5 CSS px); a line under
@@ -381,7 +415,11 @@ kind, location }]`, in the record's order (sections in pre-order, then R8's orde
 a withheld section's contacts are neither acknowledged nor checked, and acknowledging one refuses; a
 withheld section's confirmations are the withheld note's. Acknowledging a contact is a judgement of
 content, so, as for withholding, PR 5 lifts the dry run for a request that acknowledges any only once
-its requester is an attested identity. When several attestations of a record verify (key versions
+its requester is an attested identity (every Imatinib Teva import acknowledges some, so PR 5 needs that
+identity before any real label is persisted). The review tool (delivered with 3c-D) verifies the
+attestation, the index and each capture's hash before showing the captures, deduplicates identical
+masks, and writes the request's acknowledgements; that the requester opened them is a claim, not
+proven, a stated residual. When several attestations of a record verify (key versions
 not revoked), the image build takes the one of the highest key version, and its captures are those a
 request names. The image build places, beside each record it keeps,
 the verified attestation's `{ environment, capturesSha256 }`
@@ -453,9 +491,10 @@ A regeneration reproduces a record when it gives:
 - **the record itself**, canonically equal, but for the pixel fields: the layout (every measured
   rectangle and snapped line, as the raw doubles Chrome reports, serialised by RFC 8785 and hashed
   per section, mode and ratio), the outputs, the pictures, the constants and every verdict;
-- **pixels** (the candidates' resolutions, check 7 and `line-through-letter`), the contrast and
-  visibility margins within ε = 0.02, and a coverage or margin within ε of its threshold counts
-  against the section (a failure, never a defect), so no verdict flips between CPUs.
+- **pixels** (the candidates' resolutions, the contacts' masks, the contrast and visibility margins
+  and `line-through-letter`) within ε = 0.02, a mask's hash computed after each pixel within ε of the
+  coverage floor is counted in; a value within ε of a threshold falls in the more severe class of its
+  decision (R4), never a defect, so no class flips between CPUs.
 
 The render build regenerates twice (R1). Once, 3c-C draws on two CPU families (Cloud Build's E2
 machines vary) and records that the layout hashes agree; a later disagreement fails the render
@@ -474,7 +513,7 @@ build for that record, a false failure that is investigated, never waived.
                layoutSha256: { "<mode>@<ratio>": sha256 },
                pixel: { minContrast, visibilityMargin },
                refusals: [{ reason, at }],
-               failures: [{ check, worst, at: { width, ratio, mode } }],
+                              failures: [{ check, worst, at: [{ width, ratio, mode }] }],
                defects: [{ kind, location, measure, at: [{ width, ratio }] }],
                               contacts: [{ kind, location, masks, at: [{ width, ratio }] }] }] }
 ```
@@ -483,7 +522,7 @@ build for that record, a false failure that is investigated, never waived.
   does not bound, a mark without a lookup, a calibration failure, an XML `parsererror`, a width
   assertion, a layout that changed between a drawing and its transparent or clipped counterpart,
   and a defect that is not also a failure): the gate cannot judge the section.
-- `failures` are R4's conservative checks.
+- `failures` are P3's misreadings, each with every width and ratio it occurs at.
 - `defects` are geometric findings that a reader cannot read the drawing as written, which the
   person who withholds a section confirms or rejects one by one against the record's captures (the
   withheld note's W1). They are never taken from a content area, and use only the binding
@@ -546,10 +585,14 @@ and the attestation names their index (R1).
 
 ### R10. The run manifest, and re-verification
 
-`AuthorityFetchSchema` gains `authority` and `rendering: { gateVersion, gateSha256, recordSha256 }`,
-the latter required when `authority` is not `synthetic` or something is withheld, and absent
-otherwise. One minor version of `RUN_MANIFEST_VERSION` carries this and the withheld note's fields,
-the previous kept in `AnyRunManifestSchema`. The run's evidence keeps the record's bytes by hash. The
+`AuthorityFetchSchema` gains `authority` and `rendering: { gateVersion, gateSha256, recordSha256,
+contactsAcknowledged }`, the latter required when `authority` is not `synthetic` or something is
+withheld, and absent otherwise. `RUN_MANIFEST_VERSION` moves to 3.0.0, a major, with the withheld
+note's fields and the submission's 3.0.0 (`contractVersion` follows it, D13); the 2.0.0 ingestion
+block is frozen with the literal `"2.0.0"` in `AnyRunManifestSchema`, as 1.0.0's was, and a 2.0.0
+manifest fixture is read through it in a test. The FHIR Provenance carries `rendering.recordSha256`
+and, per section, the number of contacts acknowledged and the requester's role, which
+`get_provenance` returns; the ledger gains a column for the count. The run's evidence keeps the record's bytes by hash. The
 worker image carries the store (`Dockerfile` copies `src/render/records`); re-verifying an import
 (`scripts/authority/verify-import.ts`) runs in that import's own worker image, whose store and gate
 it used, not in a later one.
@@ -575,7 +618,8 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
    format's addendum.
 2. **3c-C**: its measured design of R4 (reviewed first), then R4, R7, R8, R9, R11; the render build,
    its trigger and attestations; the records of the pinned labels.
-3. **3c-D**: R5 and R10: the lookup, the image build's verification, the manifest, re-verification.
+3. **3c-D**: R5 and R10: the lookup, the image build's verification, the review tool, the manifest,
+   re-verification.
 4. **3c-W**: the withheld section (its note), including the lookup's withheld part.
 5. **3c-E**: pictures from the authority's export (the owner's decision of 2026-09-25; its own
    note), needed by every pinned label but Imatinib Teva once 5.1 is withheld.
@@ -759,3 +803,16 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
     acknowledged by the requester, who must be an attested identity before PR 5; the record named in
     every authority import's source record; reasons, the attestation chosen among key versions, and
     the seeds restated by class.
+11. **Eleventh independent reviews** (2026-09-25). Medium: pictures were outside the classes (a
+    glyph against a picture beneath it was clear); a glyph part wholly inside a line (a colon's dot in
+    a thick border, a raised 7's bar in its cell's top border) was only a contact; glyph over glyph
+    could count as "covered", refusing 4.2; no failure for text above the section; the ε band pushed
+    near-floor touches into failures, refusing 4.2 and 4.8; a 3c-C decision P6 had already made;
+    about 350 acknowledgements per import on the tablets label, mostly identical descenders on their
+    own borders, a rubber stamp; two notes still treated a shortfall of clearance as a refusal; two
+    cells' numbers 0.19 px apart only a contact. Fixed in this draft: pictures in the classes; P3's
+    failures widened (a part inside a line, a picture's pixels, above the section, cells closer than
+    a stated gap); the ε band to the more severe class of its own decision; P8, clear by rule, for
+    letter descenders on their own bottom border and text at a background's edge; identical masks
+    shown once and a stated cap on contacts; the run manifest 3.0.0 with 2.0.0 frozen; the Provenance
+    and ledger show acknowledgements; the review tool delivered with 3c-D; the rest as found.

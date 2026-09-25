@@ -313,7 +313,8 @@ independent reviews, and changes this ADR as follows.
   names the record reviewed (two cells'
   text running together, a line through the body of a letter, a character wholly off the page),
   with no refusal of the gate's own, may be **withheld** by the person who requests the import;
-  never a safety section (4.2 to 4.9), and never on a refusal or a conservative failure of ours.
+  never a safety section (4.2 to 4.9), and never on a refusal of ours, a contact, or a
+  failure that is not such a defect.
   It keeps its heading and code, carries none of the authority's content, and carries our own
   `emptyReason` code and a fixed notice; the Composition is `partial` and the record is marked
   incomplete wherever it is read. The import refuses if a listed section is not shown so or a
@@ -321,7 +322,7 @@ independent reviews, and changes this ADR as follows.
   never repaired, answered from or quoted. Imatinib Teva's 5.1, whose at-risk table runs its
   values together, is the first.
 - **A second stated exception** (ADR 0003, amended): a contact the renderer gate cannot prove harmless
-  (4.2's raised "10⁹/l" against the line above; 4.8's "Appendix V" past its grey background) passes
+  (about 60 on the tablets label, 4.2's raised "10⁹/l" against the line above among them) passes
   only once the person who requests the import acknowledges it, legible, in the gate's captures of
   the record they name; clear misreadings refuse.
 - **Decision 3's pictures.** The EMA's viewer draws Imatinib Teva's two `~/_entity/annotation/…`
