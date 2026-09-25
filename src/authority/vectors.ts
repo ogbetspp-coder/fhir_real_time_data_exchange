@@ -4,6 +4,7 @@ import type { EmaMapping } from "../fhir/mapping.js";
 import { sha256 } from "../lib/hash.js";
 import { ImportRefusedError, importPublication, sha256Bytes, type ImportRun } from "./import.js";
 import { syntheticPublication } from "./synthetic.js";
+import { transformDocument } from "./t/document.js";
 
 // The importer's golden vectors (docs/design/authority-import-contract.md, D10): what it makes of
 // the synthetic publication, and where it refuses each pinned EMA label. Regenerated and
@@ -84,4 +85,52 @@ export function importerVectors(mapping: EmaMapping): Vector[] {
     });
   }
   return vectors;
+}
+
+type SectionVector = {
+  path: string;
+  outcome: { divSha256: string } | { refused: string } | "no-div";
+};
+
+// T's outcome for every section of every pinned label, in pre-order (docs/design/authority-import-t.md,
+// T7): each section's T(div) hash, or its refusal, so T's output is locked where the import as a
+// whole refuses.
+export function labelSectionVectors(): { name: string; sections: SectionVector[] }[] {
+  const lock = JSON.parse(readFileSync(`${LABELS}/sources.lock.json`, "utf8")) as {
+    sources: { file: string }[];
+  };
+  type Section = { text?: { div?: string }; section?: Section[] };
+  return [...lock.sources]
+    .map(({ file }) => file)
+    .sort()
+    .map((file) => {
+      const document = JSON.parse(readFileSync(`${LABELS}/sources/${file}`, "utf8")) as {
+        entry?: { resource?: { section?: Section[] } }[];
+      };
+      const placed: { path: string; div: string | undefined }[] = [];
+      const walk = (sections: Section[], base: string): void => {
+        sections.forEach((section, position) => {
+          const path = `${base}[${position}]`;
+          placed.push({ path, div: section.text?.div });
+          walk(section.section ?? [], `${path}.section`);
+        });
+      };
+      walk(document.entry?.[0]?.resource?.section ?? [], "Composition.section");
+      const outcomes = transformDocument(placed.map(({ div }) => div));
+      return {
+        name: file,
+        sections: placed.map(({ path }, index) => {
+          const outcome = outcomes[index];
+          return {
+            path,
+            outcome:
+              outcome === undefined
+                ? ("no-div" as const)
+                : "div" in outcome
+                  ? { divSha256: sha256(outcome.div) }
+                  : { refused: outcome.refused },
+          };
+        }),
+      };
+    });
 }

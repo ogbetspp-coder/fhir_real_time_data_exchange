@@ -702,9 +702,9 @@ def test_an_optional_fill_in_in_the_same_paragraph_is_matched() -> None:
         used = next(s for s in result["statements"] if s["id"] == "smpc.5.1#0")
         source = LABELS / "sources" / name
         assert source.exists()
-        if name == "imatinib-teva-smpc-en.json":
-            # Its 5.1 draws text with `position: relative`, which the reader refuses (roadmap 3a,
-            # PR 3), so nothing in 5.1 is checked.
+        if name in ("imatinib-teva-smpc-en.json", "imatinib-teva-tablets-smpc-en.json"):
+            # Both Imatinib Teva SmPCs draw text in 5.1 with `position: relative`, which the
+            # reader refuses (roadmap 3a, PR 3), so nothing in 5.1 is checked.
             assert used["status"] == "not-checked", name
             continue
         assert used["status"] == "used", name

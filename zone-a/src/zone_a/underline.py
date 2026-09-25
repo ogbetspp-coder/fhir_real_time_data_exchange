@@ -17,7 +17,7 @@ from typing import Final
 
 from zone_a.fidelity.normalize import is_default_ignorable
 
-__all__ = ["underline_changes"]
+__all__ = ["is_underline_letter", "underline_changes"]
 
 # Space, no-break space, plain punctuation and the curly quotation marks: none of them changes
 # under a line (an e-mail address and a link's text are often underlined).
@@ -33,8 +33,12 @@ _O_LETTERS: Final = frozenset("o") | frozenset(map(chr, (0x043E, 0x03BF, 0x1D0F)
 _SCRIPTS: Final = ("LATIN ", "GREEK ", "CYRILLIC ")
 
 
-def _letter(character: str) -> bool:
+def is_underline_letter(character: str) -> bool:
+    """A letter of the Latin, Greek or Cyrillic script, as an underline cannot change it."""
     return character.isalpha() and unicodedata.name(character, "").startswith(_SCRIPTS)
+
+
+_letter = is_underline_letter
 
 
 def _digit(character: str) -> bool:

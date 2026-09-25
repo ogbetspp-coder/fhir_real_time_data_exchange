@@ -81,6 +81,25 @@
       "marketingAuthorisationHolder": "Teva B.V.",
       "compositionDate": "2025-02-06",
       "epar": "https://www.ema.europa.eu/en/medicines/human/EPAR/imatinib-teva"
+    },
+    {
+      "product": "Imatinib Teva",
+      "activeSubstance": "imatinib",
+      "kind": "small molecule",
+      "document": "Summary of product characteristics (English), film-coated tablets",
+      "file": "imatinib-teva-tablets-smpc-en.json",
+      "url": "https://epi.ema.europa.eu/consuming/api/fhir/Bundle/e107e26d-f544-ef11-a317-000d3aaa05e0",
+      "sha256": "0cad9db87d0b60ac0d589d6cfb611efcacda0ce6d36b0c0f15182157af582037",
+      "bytes": 385104,
+      "list": "https://epi.ema.europa.eu/consuming/api/fhir/List/f2b36255-f544-ef11-b4ad-6045bd9c274b",
+      "listFile": "imatinib-teva-smpc-en.list.json",
+      "listSha256": "e7eef4b4ff86cccf0dc03974726e7887491bbf3fe98c3a874717d4e8f193519b",
+      "listBytes": 2662,
+      "epiId": "EPI/24/35",
+      "procedureNumber": "EMEA/H/C/002585/IA/0056",
+      "marketingAuthorisationHolder": "Teva B.V.",
+      "compositionDate": "2025-02-06",
+      "epar": "https://www.ema.europa.eu/en/medicines/human/EPAR/imatinib-teva"
     }
   ]
 }

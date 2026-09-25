@@ -42,3 +42,6 @@ agent/src/verifiable_answer_agent/contracts/agent-turn.schema.json
 # reformatting them would change the bytes the lock records.
 labels/ema-epi/sources/
 labels/ema-epi/lists/
+src/authority/data/underline-letters.json
+test/fixtures/authority/underline-cases.json
+test/fixtures/authority/vectors.json

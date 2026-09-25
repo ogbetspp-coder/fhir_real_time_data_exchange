@@ -30,6 +30,7 @@ import {
 } from "../fhir/mapping.js";
 import { sha256, sha256Utf8, stableUuid } from "../lib/hash.js";
 import { AuthorityBytesError, readAuthorityJson } from "./json.js";
+import { transformDocument } from "./t/document.js";
 import {
   EMA_DOCUMENT_IDENTIFIER_SYSTEM,
   EMA_EPI_ID_SYSTEM,
@@ -53,7 +54,7 @@ import {
 
 // The importer's version: part of the extractor's name in every submission it writes, and locked
 // to the hash of this directory's code and data and of its golden vectors (D10).
-export const IMPORTER_VERSION = "1.1.0";
+export const IMPORTER_VERSION = "2.0.0";
 export const IMPORTER_EXTRACTOR = `${AUTHORITY_IMPORTER_NAME}/${IMPORTER_VERSION}`;
 
 export const AUTHORITY_IMPORT_IDENTIFIER_SYSTEM =
@@ -74,7 +75,15 @@ export class ImportRefusedError extends Error {
 
 // The order the importer checks in; a refusal names the first stage that fails (D10).
 export type ImportStage =
-  "bytes" | "shape" | "binding" | "tree" | "titles" | "pictures" | "narrative" | "record";
+  | "bytes"
+  | "shape"
+  | "binding"
+  | "tree"
+  | "titles"
+  | "pictures"
+  | "narrative"
+  | "record"
+  | "rendering";
 
 export type ImportInputs = {
   document: Uint8Array;
@@ -219,8 +228,23 @@ function placeSections(document: EmaDocument, mapping: EmaMapping): Placed[] {
   return placed;
 }
 
-const IMG = /<img\b[^>]*>/giu;
+const IMG_START = /<img\b/giu;
 const SRC = /\bsrc\s*=\s*("([^"]*)"|'([^']*)')/iu;
+
+// Every `<img …>` tag of a div, as /<img\b[^>]*>/giu would match them, in linear time: a tag ends
+// at the first `>` after its start, and the next search starts past it.
+function imgTags(div: string): string[] {
+  const tags: string[] = [];
+  let close = -1;
+  IMG_START.lastIndex = 0;
+  for (let match = IMG_START.exec(div); match !== null; match = IMG_START.exec(div)) {
+    if (close < match.index) close = div.indexOf(">", match.index);
+    if (close === -1) break;
+    tags.push(div.slice(match.index, close + 1));
+    IMG_START.lastIndex = close + 1;
+  }
+  return tags;
+}
 
 // D6: every picture the document names, by form. PR 2's T carries none, so the stage refuses
 // any picture; a reference the importer has neither a template nor evidence for refuses here,
@@ -229,7 +253,7 @@ function checkPictures(placed: Placed[]): void {
   for (const { section } of placed) {
     const div = section.text?.div;
     if (div === undefined) continue;
-    for (const tag of div.match(IMG) ?? []) {
+    for (const tag of imgTags(div)) {
       const match = SRC.exec(tag);
       const src = match?.[2] ?? match?.[3];
       if (src === undefined) refuse("pictures", "picture-without-a-source");
@@ -247,9 +271,9 @@ function checkPictures(placed: Placed[]): void {
 // Characters §3 step 1 removes, which a structured page may not hold (fidelity §7).
 const INVISIBLE = /[\u00ad\u200b\ufeff\u2060]/u;
 
-// T, ADR 0005's lexical transform, with empty closed lists: it removes nothing, so a div is
-// carried only if the fidelity scanner reads it as it stands (D1, "What PR 2 ships").
-function transform(div: string): string {
+// The scanner reads T(div) (docs/design/authority-import-t.md, T6): a scanner refusal, then a
+// section 3 step 1 invisible character in its text, refuses the section.
+function scan(div: string): string {
   let text: string;
   try {
     text = xhtmlToText(div);
@@ -258,15 +282,20 @@ function transform(div: string): string {
     refuse("narrative", typeof code === "string" ? `scanner-${code}` : "scanner-refused");
   }
   if (INVISIBLE.test(text)) refuse("narrative", "invisible-character");
-  return div;
+  return text;
 }
 
 type Page = { page: number; text: string; placed: Placed; div: string | undefined };
 
+// T over every section (T5's two passes), then each section in pre-order: its T refusal, the
+// scanner's, and D4's record check.
 function buildPages(placed: Placed[]): Page[] {
+  const outcomes = transformDocument(placed.map((entry) => entry.section.text?.div));
   return placed.map((entry, index) => {
-    const source = entry.section.text?.div;
-    const div = source === undefined ? undefined : transform(source);
+    const outcome = outcomes[index];
+    if (outcome !== undefined && "refused" in outcome) refuse("narrative", outcome.refused);
+    const div = outcome?.div;
+    if (div !== undefined) scan(div);
     const drawn = div !== undefined && "text" in normalizeNarrative(div);
     const leaf = (entry.rule.children ?? []).length === 0;
     // A section that draws nothing refuses where the mapping needs its narrative, and a leaf
@@ -632,6 +661,10 @@ export function importPublication(
       approvedContentSha256: sha256(approvedContent(content)),
     },
   };
+  // The renderer gate (docs/design/authority-import-t.md, T6; PR 3c): until it exists no
+  // authority's publication is accepted on T's static rules alone. A synthetic publication is
+  // never approved content (D7), so it passes.
+  if (request.authority !== "synthetic") refuse("rendering", "renderer-evidence-missing");
   return { submission, fidelityReport, sourceText };
 }
 

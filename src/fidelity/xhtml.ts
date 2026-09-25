@@ -360,7 +360,7 @@ type TableState = {
 
 type ListState = { style: string; next: number };
 
-const NAMED_ENTITIES = new Map<string, string>([
+export const NAMED_ENTITIES: ReadonlyMap<string, string> = new Map<string, string>([
   ["amp", "&"],
   ["lt", "<"],
   ["gt", ">"],
@@ -464,6 +464,15 @@ const START_TAG =
 const ATTRIBUTE = /([A-Za-z_:][-A-Za-z0-9_:.]*)[\t\n\r ]*=[\t\n\r ]*(?:"([^"<]*)"|'([^'<]*)')/g;
 const ENTITY = /&(?:([A-Za-z]+)|#(\d{1,7})|#x([0-9A-Fa-f]{1,6}));/y;
 
+// The tokeniser's grammar, for the authority importer's T (src/authority/t), which must read a div
+// exactly as this scanner does. Sources, not the objects: each reader keeps its own `lastIndex`.
+export const XHTML_TOKENS = {
+  endTag: END_TAG.source,
+  startTag: START_TAG.source,
+  attribute: ATTRIBUTE.source,
+  entity: ENTITY.source,
+} as const;
+
 function isAsciiWhitespace(character: string): boolean {
   return character === " " || character === "\t" || character === "\n" || character === "\r";
 }
@@ -473,9 +482,9 @@ function isAsciiWhitespace(character: string): boolean {
 // that needs it. Nothing a viewer's stylesheet or script could key on to hide text (`class`, `id`,
 // a language tag below the root, a link) is allowed.
 const TOKEN_VALUE = /^[A-Za-z0-9_.:-]{1,32}$/;
-const LIST_TYPE_VALUE = /^[1aAiI]$/;
-const LIST_START_VALUE = /^(?:0|-?[1-9][0-9]{0,3})$/;
-const SPAN_VALUE = /^(?:[1-9][0-9]{0,2}|1000)$/;
+export const LIST_TYPE_VALUE = /^[1aAiI]$/;
+export const LIST_START_VALUE = /^(?:0|-?[1-9][0-9]{0,3})$/;
+export const SPAN_VALUE = /^(?:[1-9][0-9]{0,2}|1000)$/;
 // A picture's source is a PNG or JPEG `data:` URI: the picture's own bytes, compared with the
 // source through the hash `img` emits. A reference (a path or a URL) is refused: what it draws is
 // whatever the viewer's origin serves, or nothing, and neither is bound by the check.

@@ -202,9 +202,23 @@ describe("the first check a publication fails", () => {
       "pictures: picture-reference-in-no-known-grammar",
     );
     expect(refusal(withDiv(div("<p><img/></p>")))).toBe("pictures: picture-without-a-source");
-    expect(refusal(withDiv(div('<p style="color:red">x; not for clinical use</p>')))).toBe(
-      "narrative: scanner-forbidden-attribute",
+    // Every `<img` up to the first `>` is one tag; finding them is linear (the third code review).
+    const started = performance.now();
+    expect(refusal(withDiv(div(`<p>${"<img ".repeat(80000)}</p>`)))).toBe(
+      "pictures: picture-without-a-source",
     );
+    expect(performance.now() - started).toBeLessThan(10_000);
+    // T reads the style (red on white is 4.0:1, under T3a's 4.5:1), then the scanner reads T(div).
+    expect(refusal(withDiv(div('<p style="color:red">x; not for clinical use</p>')))).toBe(
+      "narrative: contrast",
+    );
+    expect(
+      refusal(
+        withDiv(
+          div("<table><tr><td>x</td></tr><tr><td>not for clinical use</td><td>y</td></tr></table>"),
+        ),
+      ),
+    ).toBe("narrative: scanner-table-shape");
     expect(refusal(withDiv(div("<p>x⁠; not for clinical use</p>")))).toBe(
       "narrative: invisible-character",
     );
@@ -225,6 +239,8 @@ describe("the pinned EMA labels", () => {
   // template's brackets in two headings; Jentadueto has uncoded subheadings.
   const expected: Record<string, string> = {
     "imatinib-teva-smpc-en.json": "pictures: picture-reference-without-template-or-evidence",
+    "imatinib-teva-tablets-smpc-en.json":
+      "pictures: picture-reference-without-template-or-evidence",
     "nuvaxovid-smpc-en.json": "pictures: pictures-not-enabled",
     "brukinsa-smpc-en.json": "titles: heading-not-permitted",
     "jentadueto-smpc-en.json": "shape: document-shape",

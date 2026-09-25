@@ -399,3 +399,4 @@ order.
 - [`fidelity-norm/2.0.0` → `fidelity-norm/3.0.0`, 2026-09-23](changes/2026-09-23-fidelity-norm-3-0-0.md)
 - [`CanonicalSubmission` 2.0.0 and the authority importer, 2026-09-24](changes/2026-09-24-authority-import-contract.md)
 - [`fidelity-norm/3.0.0` → `fidelity-norm/3.1.0`, 2026-09-24](changes/2026-09-24-fidelity-norm-3-1-0.md)
+- [The authority importer's T, importer 2.0.0, 2026-09-24](changes/2026-09-24-authority-import-t.md)

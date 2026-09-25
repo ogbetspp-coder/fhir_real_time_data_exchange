@@ -399,13 +399,16 @@ set closed by resource type and count; Type 2 stays exactly as strict.
 `src/authority/` joins ADR 0004 decision 2's shared pure code: it decides what text enters the
 record. Golden import vectors (synthetic publications in, submissions out) are generated under
 `contracts:check`, and a lock file maps each importer version to the hash of `src/authority/`
-(code and data: T's lists, templates, evidence records, the language table) and of its vectors: CI
+(code and data: T's lists, templates, evidence records, the language table), from importer 2.0.0
+also of the fidelity scanner's files T reads with (`src/fidelity/xhtml.ts`, `normalize.ts`), and of
+its vectors: CI
 fails when either changes while the version does not, so a change of behaviour or data must
 change the version. The version is the reviewed label of the importer; the worker image digest in
 the manifest (D1) is its complete identity, including `src/fidelity/`, the hash library, the
 mapping and the dependencies, which the lock covers only where the vectors exercise them. The importer checks in a stated order, and a refusal names the first check that fails: the fetch
 and bytes (D1), Appendix A, D5, D4's tree, D4's titles, pictures (D6), then T and the scanner per
-section in pre-order. The vectors include the pinned real labels as expected-refusal cases with
+section in pre-order, the record's checks, and last the renderer gate's `rendering` stage
+(`docs/design/authority-import-t.md`, amending this list). The vectors include the pinned real labels as expected-refusal cases with
 the reasons the importer actually produces, recorded when it is built (in PR 2 the pictures stage
 should refuse Imatinib Teva, whose two `~/_entity` pictures in 5.1 have neither template nor
 evidence; Jentadueto fails the closed shape (its uncoded subheadings), Brukinsa its titles, Nuvaxovid its

@@ -154,6 +154,14 @@ reader sees without the check seeing it._
   (`t<sub>½</sub>` against `t½`; `docs/design/fidelity-norm-3-1-0.md`); strong right-to-left letters can reorder adjacent numbers, and no EU
   product-information language uses them; a viewer's own stylesheet or script can still act on
   the element names that remain.
+- A stated exception to "false passes are not", in the authority importer's T
+  (`docs/design/authority-import-t.md`, T5; amended 2026-09-24): an underlined `+` is drawn as
+  `±`, and T records `+` where the underline covers a whole subheading paragraph outside every
+  table and list, the `+` ends a token of at least two letters (`Ph+`), and the same document
+  writes that token with a plain `+` in a section T accepts without the rule. The document itself
+  settles the meaning (the Imatinib Teva SmPCs define "Ph+ ALL" in 4.1 and underline their
+  subheadings as the QRD template styles them); the residual is an author who meant `±` at that
+  one place. Nothing else a drawing changes is read as intended: every other sign stays refused.
 - Golden vectors are the fixed, reviewed floor of a re-implementation, not its proof. The first
   second-language port (Python, 2026-09-20) passed all 130 vectors and then diverged from the
   reference on inputs nobody had written a vector for — regex dialect (`\d`, `$`), unpaired
