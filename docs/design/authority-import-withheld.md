@@ -1,6 +1,6 @@
 # A withheld section: importing a publication with an authority's defect recorded in place (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25; sixteenth draft, after fifteen design reviews
+- Status: proposed, 2026-09-25; seventeenth draft, after sixteen design reviews
 - Owner decisions (2026-09-25): withhold the Imatinib Teva tablets SmPC's 5.1 and import the
   other 31 sections; a section may be withheld only on reviewed, measured evidence of the
   authority's defect, the whole record is marked incomplete everywhere it is read, and the safety
@@ -55,7 +55,7 @@ A section may be withheld only when all hold:
    withholds nothing, the evidence reviewed,
    `renderEvidence: { recordSha256, environment, capturesSha256 }`: the renderer record (one per
    document) and the index of the render build's captures of it, which its attestation names (R1),
-   read with a review tool that verifies the attestation, the index and each capture's hash before
+   in the review item 2's signer builds after verifying the attestation, the index and each capture's hash (`docs/design/approval.md`), before
    showing them, in the environment the import is made in; and it gains `withheld`: a list of
    `{ path, code, confirmed, rejected }` in the document's pre-order, `path` the section's
    `SectionPath`, `code` its code as served, `confirmed` the defects (by their identity, `{ kind,
@@ -228,8 +228,7 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
   section, such a section without `partial`, a withheld set that differs from the approval
   statement's, or a withheld safety or non-leaf section, fails closed with a new error code,
   `record-inconsistent`. Never from the latest Provenance by
-  write order; for the current version, `get_provenance` cross-checks the Provenance's extension,
-  and a disagreement fails closed. `get_section` on a withheld section returns a new outcome,
+  write order; the signed request statement pins the withheld set (D9), so no second cross-check is made. `get_section` on a withheld section returns a new outcome,
   `section-withheld`, a validated success variant of its output (not an error, which the agent treats
   as unavailable), with its confirmed defect kinds read from the signed request statement (for every
   version, `docs/design/approval.md`), never the notice as document content; `verify_quote`
@@ -272,7 +271,8 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
   section. `schemaVersion` is a literal, so a 2.0.0 submission does not read as 3.0.0: 2.0.0
   authority imports (dry runs only; none approved) are re-imported, and 2.0.0 drawn and synthetic
   submissions are refused as 1.0.0's were at 2.0.0.
-- `ApprovalStatement`'s next version (the `request` kind and its meaning code; `docs/design/approval.md`),
+- `ApprovalStatement` 1.0.0, new with item 2, including the `request` kind and its meaning codes
+  (`docs/design/approval.md`),
   and version 1.0.0 of our `withheld-reason` CodeSystem and `ext-record-incomplete` extension, defined
   as FHIR artefacts beside the mapping.
 - `QUERY_TOOLS_VERSION`'s next major (3.0.0 unless item 2's lands first) (`incomplete` required; the `record-inconsistent` error code; `get_section`'s `section-withheld`
@@ -309,7 +309,8 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
 - A reader of our record sees "Information withheld." where the authority's page draws 5.1; the
   provenance says why.
 - That a requester reviewed a withheld section's captures before confirming or rejecting its defects
-  is their claim; the review tool records what it showed them.
+  is their claim; the review's fetch is in Cloud Storage's data-access log, which shows they opened
+  it, not that they looked at each drawing.
 - The finding is of the FHIR div drawn with its inline styles in metric-compatible fonts; the
   EMA's viewer applies its own stylesheet, which the gate does not model.
 - Whether an incomplete record may be entitled to the query service is PR 5's decision, with the
@@ -335,7 +336,7 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
   `tree`; a document-level refusal refuses whatever is listed; a withheld section's picture is not
   fetched; a section whose only T5 evidence is withheld refuses; listing 4.2 Posology refuses.
 - The gate's recomputation reproduces the withheld list, the defects and the status.
-- The review tool (delivered with 3c-D, which first requires reviewed evidence) refuses a tampered capture, index or attestation, and one of
+- Item 2's signer (its build steps 2 and 3) refuses a tampered capture, index or attestation, and one of
   another environment.
 - `fidelity-norm/3.2.0`'s vectors and differential cases; the verifier refuses the notice, an
   `emptyReason` or a `generated` narrative on any other source or section.
@@ -494,3 +495,13 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
     review, a Chat card links to it in Cloud Storage's authenticated viewer, the person signs); the
     kind derived from the source; the defect kinds signed in the statement; the head, the error order,
     segregation, versions and build order stated.
+16. **Sixteenth independent review** (2026-09-25). Medium: the review surface was named but not
+    specified, granted or tested (an authenticated browser download needs a reader grant, and a
+    review of separate objects would not resolve its captures). Low: stale review-tool wording;
+    `reject` unbuilt in phase 1 and its effect on the head; a signed request that could never
+    publish; a request without renderer evidence; `ApprovalStatement`'s version and pointers that do
+    not yet point; who decides supersession; failure codes; the Provenance-extension cross-check;
+    the signer's source for records. Fixed in this draft, with approval.md's amendment: one
+    self-contained review file, the approvers' conditioned read, the audit log as evidence of the
+    fetch, the spike's evidence; declining to sign; a draft that does not partition the record
+    refused; the rest as found.
