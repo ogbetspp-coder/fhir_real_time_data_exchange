@@ -1,6 +1,6 @@
 # A withheld section: importing a publication with an authority's defect recorded in place (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25; thirteenth draft, after twelve design reviews
+- Status: proposed, 2026-09-25; fourteenth draft, after thirteen design reviews
 - Owner decisions (2026-09-25): withhold the Imatinib Teva tablets SmPC's 5.1 and import the
   other 31 sections; a section may be withheld only on reviewed, measured evidence of the
   authority's defect, the whole record is marked incomplete everywhere it is read, and the safety
@@ -12,8 +12,8 @@
   ADR 0003 (the verifier's scope); ADR 0005 decision 3 and its consequence;
   `docs/design/authority-import-contract.md` D1 (the dry-run lift's condition), D2, D3, D4, D6, D7,
   D8 (the placeholder requester), D9, D10, D12, D13;
-  `docs/fidelity-normalization.md` §7 (a new minor version, W5); the query service's and the
-  agent's designs (`docs/design/epi-mcp-query-service.md`, `docs/design/verifiable-answers.md`)
+  `docs/fidelity-normalization.md` §7 (a new minor version, W5); `docs/design/approval.md` (item 2's
+  signed request statement and its role, W6); the query service's and the agent's designs (`docs/design/epi-mcp-query-service.md`, `docs/design/verifiable-answers.md`)
 - Related: ADR 0002, `docs/design/authority-import-t.md` (T5's evidence),
   `docs/design/authority-import-renderer.md` (the evidence), `docs/design/qrd-conformance-check.md`
 
@@ -90,7 +90,7 @@ location }`, the renderer note's R8) they judged misleading and `rejected` those
      a sign, a covered glyph, a contrast under 4.5:1, a fold off its position): neither can justify
      withholding. A section with such a failure and no confirmed defect refuses the import, as today;
      a section withheld on a confirmed defect carries none of its other failures into the record (they
-     stay in the record by hash). So is every refusal of ours (a font
+     stay in the record by hash). Nor can any refusal of ours (a font
      we cannot draw, a rule of T's stricter than the drawing, a scanner grammar, and in a carried
      section a picture we cannot fetch; a withheld section's pictures are drawn as the import has
      them, 5.1's two as broken-image boxes, `unpinned`, until 3c-E pins the export, and no defect may
@@ -227,17 +227,25 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
   section, or such a section without `partial`, fails closed. Never from the latest Provenance by
   write order; for the current version, `get_provenance` cross-checks the Provenance's extension,
   and a disagreement fails closed. `get_section` on a withheld section returns a new outcome,
-  `section-withheld`, with its confirmed defect kinds for the current version only when the
+  `section-withheld`, a validated success variant of its output (not an error, which the agent treats
+  as unavailable), with its confirmed defect kinds for the current version only when the
   Provenance's extension agrees with the version read (the same cross-check as `get_provenance`;
   otherwise, and for a superseded version, without them), never the notice as document content; `verify_quote`
   reports the withheld sections as not searched, so a `no-match` on an incomplete record never
   reads as absence; `get_provenance` returns the withheld sections; every result about the
-  document carries `incomplete`. `QUERY_TOOLS_VERSION` and the agent's vendored contracts move.
+  document carries `incomplete`; `get_provenance` also returns the record's hash and, per section,
+  the contacts acknowledged and the attested requester (the renderer note's R10).
 - **The agent**: a question about a withheld section is answered with the fact that it is withheld
-  and why, never from memory or another section; every answer from an incomplete record says so.
+  and why, never from memory or another section; every answer from an incomplete record carries a
+  line saying so, rendered deterministically from `incomplete`, not written by the model.
 - **Before persistence.** D1's dry run is lifted for a publication with a withheld section only once
   the query service and the agent do the above, and for any request that withholds a section or
-  acknowledges a contact (the renderer note's R5) only once it is bound to an attested person (D2 names who requests an import; withholding is a decision about content, so its
+  acknowledges a contact (the renderer note's R5) only once it is bound to an attested person: roadmap
+  item 2's signer signs a request statement over the request's `approvedContentSha256` (which covers
+  `renderEvidence`, `acknowledgedContacts` and `withheld`), in the approver map's `content-reviewer`
+  role, which alone may acknowledge a contact or withhold a section; the requester should not be the
+  person who proposed the record (the renderer note's R1), a separation that is a stated residual
+  while the project has one named person (D2 names who requests an import; withholding is a decision about content, so its
   requester must be an identity, not D8's placeholder): PR 5's preconditions.
 - **The round trip** (PR 4) reports the withheld section as an expected, recorded difference.
 - **The defect is recorded** in `docs/design/qrd-conformance-check.md` with its measurements, as
@@ -245,8 +253,8 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
   attested record (the record's pull request shows only a pre-check's), and the request names what
   was reviewed (W1.1).
 - **Forward pointers.** `docs/architecture.md` (its statements that `emptyReason` and a mandatory
-  leaf without narrative are refused), `docs/design/authority-import-contract.md` (D2, D3, D4, D6,
-  D7, D9, D10, D12, D13),
+  leaf without narrative are refused), `docs/design/authority-import-contract.md` (D1, D2, D3, D4,
+  D6, D7, D8, D9, D10, D12, D13), `docs/design/approval.md`,
   `docs/design/epi-mcp-query-service.md` and `docs/design/verifiable-answers.md` gain a line
   pointing here, in the change that implements each part.
 
@@ -259,15 +267,22 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
   section. `schemaVersion` is a literal, so a 2.0.0 submission does not read as 3.0.0: 2.0.0
   authority imports (dry runs only; none approved) are re-imported, and 2.0.0 drawn and synthetic
   submissions are refused as 1.0.0's were at 2.0.0.
-- `QUERY_TOOLS_VERSION` 3.0.0, a major (`incomplete` required, the `section-withheld` outcome carrying
-  its defect kinds); the agent's turn record's version, since it carries `incomplete`; the
-  `ingestion-provenance` schema's published `$id` version, and the fidelity report's in both places it
-  is written (the index and the `reportVersion` literal).
+- `QUERY_TOOLS_VERSION` 3.0.0, a major (`incomplete` required; `get_section`'s `section-withheld`
+  variant with its defect kinds; `get_provenance`'s withheld sections, record hash, contacts
+  acknowledged and requester); the agent's turn record's next major (`AGENT_TURN_VERSION`, a required
+  `incomplete`); the `ingestion-provenance` schema's published `$id`, its next major, from a constant
+  rather than the string it is today (it stayed 1.0.0 through 2.0.0's change), and each frozen 2.0.0
+  copy with its own `$id`; the fidelity report's version wherever it is written (the index, the
+  `reportVersion` literal, the TypeScript and Zone A verifiers, the Zone A model, the golden vectors),
+  made one constant per implementation.
+- The mapping's `mappingVersion` and StructureMap move a minor version, since the crosswalk now carries
+  a withheld section's `emptyReason` and notice and checks `Composition.status` (its precedent: 1.2.0
+  to 1.3.0).
 - `fidelity-norm/3.2.0` and the fidelity report's next major (W5: `SectionStatus` `withheld`,
   `summary.withheld`, `sectionsWithheld`); the run manifest's 3.0.0 (the renderer note's R10: the
   2.0.0 ingestion block frozen with its literal in `AnyRunManifestSchema`, with deep copies of the
   2.0.0 `AuthorityFetch`, `IngestionFidelity` and `Approval` schemas, read in a test with an authority
-  import's dry-run manifest); `QUERY_TOOLS_VERSION`; the ledger's schema; the
+  import's dry-run manifest); the ledger's schema; the
   importer's version (D10's lock). Generated schemas and Zone A models are regenerated.
 - `AGENTS.md`: "An authority import may carry a mandatory section as withheld only under
   `docs/design/authority-import-withheld.md` (reviewed, measured evidence of the authority's defect, never a
@@ -289,6 +304,9 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
   EMA's viewer applies its own stylesheet, which the gate does not model.
 - Whether an incomplete record may be entitled to the query service is PR 5's decision, with the
   incompleteness in every answer.
+- A sound carried section whose only defect a person rejects (a split number, "12" beside ".5") is
+  still a failure: it can neither be acknowledged nor withheld, and the label refuses (false, and
+  closed).
 - A synthetic publication with a withheld section can be imported only against a test store: the
   render build draws only publications pinned in `labels/`, so the deployed gate refuses it.
 - The record named in a request changes whenever any section's outputs, the pins (3c-E's export
@@ -437,3 +455,13 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
     sections with `renderer-contacts-exceeded`; P8(a) a closed list; the Provenance names the attested
     requester; the versions listed; the rest as found. An attested identity is one the approval of
     roadmap item 2 authenticates and records; PR 5 depends on it.
+13. **Thirteenth independent review** (2026-09-25). Medium: the attested requester had no design
+    behind it in roadmap item 2 (approval.md designs a Type 2 approval, not a request) and no role.
+    Low: the fidelity report's version written in more places than listed; the provenance schema's
+    `$id`; the agent turn record's major; `section-withheld` as an error the agent reads as
+    unavailable; the unstated residual about opened captures; AGENTS.md's other rule; the mapping's
+    version; the cap's home; pointers; the T note's pointer; a rejected split number; query tools'
+    reasons; formatting. Fixed in this draft: item 2's signer signs a request statement over the
+    approved content in the `content-reviewer` role, the only role that may acknowledge or withhold,
+    separation from the proposer a stated residual while the project has one person; the rest as
+    found.

@@ -1,7 +1,7 @@
 # The renderer gate: a pinned browser's evidence for every authority import (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25 (architecture approved by the owner the same day); thirteenth draft,
-  after twelve design reviews; R4's thresholds provisional, settled by 3c-C's measured design
+- Status: proposed, 2026-09-25 (architecture approved by the owner the same day); fourteenth draft,
+  after thirteen design reviews; R4's thresholds provisional, settled by 3c-C's measured design
 - Decides: what `docs/design/authority-import-t.md`'s "What waits for PR 3c" left open: who draws,
   what is drawn and measured, the evidence record and its store, and the `rendering` stage
 - Amends: ADR 0003 (the second stated exception, contacts acknowledged); ADR 0005 (decision 1's
@@ -333,19 +333,21 @@ clear. Geometry from layout (advances, boxes) is compared exactly, in Chrome's l
   R8's `cells-run-together`, at no gap, is the defect within it); a line through the body of a glyph,
   with the glyph's pixels on both of its sides (a colon shifted across its cell's bottom border,
   "10:1" drawn "10.1"); a part of a glyph's ink hidden in a line (an 8-connected set of at least
-  two of the glyph's pixels, every one of them also a pixel of the line, as a colon's lower dot inside
+  two of the glyph's pixels, or a whole 8-connected component of them of any size, every one of them
+  also a pixel of the line, a line's pixel being one at 10 % coverage or more of the line's colour, as a colon's lower dot inside
   a thick border, "10·1", or a raised 7's bar inside its cell's top border); a
   glyph's pixels overlapping a picture's; a glyph covered (its coverage mask changes when a
   background, a border or a picture over it alone is made transparent; glyph over glyph is P6's), or
   under 4.5:1 against what is drawn behind it; a character wholly off the page, any advance left of
-  the page, or any glyph pixel above the section's top edge or the page's by a device pixel or more
-  (ink, not the character box, so a first line at `line-height: 1em`, whose box stands a pixel above
-  the section, is not a failure unless its ink does); a line under text that makes
+  the page, or any pixel of a shifted glyph above the section's top edge or the page's by a device pixel or
+  more (ink, not the character box; an unshifted glyph's ink above the section's top, an accented
+  capital on a first line at `line-height: 1em`, is a contact, not a failure); a line under text that makes
   a sign another (P5); a folded or unfolded glyph off T4's position; and every refusal of ours (R8).
 - **P4. What a font draws is not a contact.** Two characters adjacent in logical order on one line
   fragment (one line box of one block, never across cells), in whatever text nodes, neither shifted
   relative to the other (a raised "14" beside the "C" of "¹⁴C" is checked), are not checked against
-  each other, and the judge asserts that each line's visual order is its logical order; a
+  each other; an unshifted glyph is not checked against its own run's decoration by P3's line items
+  or by P6 (P5 still judges that decoration as an underline, and a shifted glyph keeps P6's rule); and the judge asserts that each line's visual order is its logical order; a
   combining mark that draws a line through or under its base (U+0332 among them, a closed list 3c-C
   states) is a refusal of ours; a run's own decoration is the one drawn by its decorating box, and
   the collinear decorations of adjacent runs are one line; T5's waived `+` is exempt, under its own
@@ -376,9 +378,9 @@ clear. Geometry from layout (advances, boxes) is compared exactly, in Chrome's l
   β, γ, ζ, η, μ, ξ, ρ, φ, χ, ψ; with no mark below, never a capital, a digit, a punctuation mark or a
   symbol, since a comma's tail on a line can read as a full stop and a cedilla's as nothing) touching,
   or standing within the glyph–line clearance of, its own cell's bottom border, with no shared pixel,
-  where the descender keeps at least one row of pixels at 40 % coverage or more that is not
-  8-adjacent to the border (so a tail small enough to fuse into the line, "y" read as "v" at 7 pt,
-  stays a contact); and
+  where the descender keeps at least two rows of pixels at 40 % coverage or more that are not
+  8-adjacent to the border, its rows counted from the lowest baseline R4's one-pixel uncertainty
+  allows (so a tail small enough to fuse into the line, "y" read as "v" at 7 pt, stays a contact); and
   (b) a glyph meeting, crossing or standing within the clearance of the edge of a background (a
   boundary between two fills whose painted box is at least 3 device pixels in both dimensions; a
   thinner one is a stroke, judged as a line), where the glyph's coverage mask is the same with that
@@ -386,7 +388,8 @@ clear. Geometry from layout (advances, boxes) is compared exactly, in Chrome's l
 
   The order of the classes is: a refusal of ours, then a failure (P3, always judged before P8), then
   clear by rule (P8), then a contact, then clear. A background's edge that meets (b) is not a line for
-  P3's "line through the body of a glyph" nor for R8's `line-through-letter`; any other is. 3c-C seeds
+  any of P3's items nor for R8's `line-through-letter`; an edge has no pixels of its own, and a glyph
+  touches it when one of its pixels is adjacent to the boundary between the fills. 3c-C seeds
   a case of each rule that becomes a contact, or a failure, when its condition fails (a covered
   descender is a failure).
 
@@ -396,7 +399,8 @@ carried sections before P8 (178 descenders on their own borders in 4.8 and 9 in 
 reporting box's grey edges; 65 pairs of 4.2's raised 9 against the line above; two brackets on their
 own borders in 4.8; one in 5.2) and about 70 after it, 65 of them the raised 9's, in some 100 to 250
 distinct drawings; every integer width adds more. 3c-C measures the counts at every width and sets
-a cap on the carried sections' contacts, identities and distinct drawings, per record; the lookup
+a cap, one gate constant in the record's `tolerances` (so changing it is a new gate version), on the
+number of contact identities and of distinct drawings across a record's carried sections; the lookup
 refuses above it (`renderer-contacts-exceeded`, a failure, never a refusal of ours), so
 acknowledgement never becomes a rubber stamp. The withheld sections' contacts are not counted. It is ADR 0003's second stated exception, amended (owner decisions of 2026-09-25): a
 contact the gate cannot prove harmless passes only by a person's acknowledgement.
@@ -444,7 +448,7 @@ its requester is an attested identity (every Imatinib Teva import acknowledges s
 identity before any real label is persisted). The review tool (delivered with 3c-D) verifies the
 attestation, the index and each capture's hash before showing the captures, deduplicates identical
 masks, and writes the request's acknowledgements; that the requester opened them is a claim, not
-proven, a stated residual. When several attestations of a record verify (key versions
+proven, a residual stated below. When several attestations of a record verify (key versions
 not revoked), the image build takes the one of the highest key version, and its captures are those a
 request names. The image build places, beside each record it keeps,
 the verified attestation's `{ environment, capturesSha256 }`
@@ -463,7 +467,8 @@ requires:
   output, the scanner's text; R3), and by its pictures, which must equal the list the import
   computes for the section (R2);
 - every carried section has no refusal and no failure (and so no defect: every defect is also a
-  failure, R8), and its contacts are exactly those the request acknowledges;
+  failure, R8), and its contacts are exactly those the request acknowledges; and the carried sections'
+  contacts are within the cap (R4);
 - the withheld sections: the withheld note's W1.
 
 Reasons: `renderer-evidence-missing`, `renderer-evidence-mismatch` (another authority, document id,
@@ -539,52 +544,56 @@ build for that record, a false failure that is investigated, never waived.
                layoutSha256: { "<mode>@<ratio>": sha256 },
                pixel: { minContrast, visibilityMargin },
                refusals: [{ reason, at }],
-                              failures: [{ check, worst, at: [{ width, ratio, mode }] }],
+               failures: [{ check, worst, at: [{ width, ratio, mode }] }],
                defects: [{ kind, location, measure, at: [{ width, ratio }] }],
-                              contacts: [{ kind, location, masks, at: [{ width, ratio }] }] }] }
+               contacts: [{ kind, location, masks, at: [{ width, ratio }] }] }] }
 ```
 
-- `refusals` are ours (R3 differences, `font-unpinned`, `font-coverage`, a run in a script the gate
-  does not bound, a mark without a lookup, a calibration failure, an XML `parsererror`, a width
-  assertion, a layout that changed between a drawing and its transparent or clipped counterpart,
-  and a defect that is not also a failure): the gate cannot judge the section.
-- `failures` are P3's misreadings, each with every width and ratio it occurs at.
-- `defects` are geometric findings that a reader cannot read the drawing as written, which the
-  person who withholds a section confirms or rejects one by one against the record's captures (the
-  withheld note's W1). They are never taken from a content area, and use only the binding
-  parameters above, each chosen so a defect is found less often, never more. Each has an identity,
-  `{ kind, location }`, unique within its section, with a location typed by kind, in the index space
-  of R3 (the judge's own, defined for every section). The section's defects are sorted by kind
-  (`cells-run-together`, `line-through-letter`, `off-page`) then location, lexicographically, each one's `at` by ratio then width, and its `measure` is the
-  worst over `at`. The kinds:
-  - `cells-run-together` (location: the two cells and the two facing characters), at every width
-    and ratio (it needs no drawing): two cells whose text stands side by side on one line (R4), whose
-    facing characters (not whitespace, a no-break space or a zero-width code point) have advances
-    that abut or overlap horizontally (a gap of zero or less in Chrome's layout units, 1/64 px), so
-    no more space separates the cells than separates two letters of a word ("182:8" beside "177:12"
-    read as one run); a split number such as "12" beside ".5" is the same geometry, which is why a
-    person confirms or rejects each;
-    - `off-page` (location: the character), at every width and ratio: a character with ink (not
-      whitespace, a no-break space or a zero-width code point) whose rounded-out ink bound lies wholly
-      beyond the page's left or top edge; this one is read from a conservative
-      bound, calibrated in every draw (R4), because nothing beyond the page is drawn: if even the
-      bound that contains all the ink is off the page, none of the ink is drawn;
-  - `line-through-letter` (location: the character, and the line as its element and which of its
-    edges, decorations or rules), from glyph pixels (R4) at every width where P3's candidates arise:
-    a line (not a run's own decoration) with a glyph's pixels on both of its sides, measured from the
-    glyph's own baseline (moved, for a shifted glyph), inside the band from one device pixel above
-    the glyph's baseline to one below its x-height (or cap height for a capital): a line through the
-    body of a letter, not a touch at a tail or serif; seeded controls that must not be one: "jelly"
-    and an italic "jf" in an unpadded bordered cell, a ")" on a bottom border.
+`refusals` are ours (R3 differences, `font-unpinned`, `font-coverage`, a run in a script the gate
+does not bound, a mark without a lookup, a calibration failure, an XML `parsererror`, a width
+assertion, a layout that changed between a drawing and its transparent or clipped counterpart, and a
+defect that is not also a failure): the gate cannot judge the section.
 
-    Every defect is also a failure (P3 names all three); a defect that is not is a refusal of ours. No
-    defect involves a picture's box. A test requires that no carried section of a pinned label has
-    one. The contacts (P6) are recorded beside them, `contacts: [{ kind, location, masks, at }]`, sorted
-    by kind then location, each with its distinct pixel masks' hashes (whose captures a person
-    acknowledges); neither failures nor defects. Whether a contact exists is decided on pixels, so a
-    coverage within ε of the noise floor, or a clearance within ε of its threshold, counts as a
-    contact (and so needs an acknowledgement), and a contact set that differs between the two
-    regenerations fails the render build for that record (R7).
+`failures` are P3's misreadings, each with every width and ratio it occurs at.
+
+`defects` are geometric findings that a reader cannot read the drawing as written, which the person
+who withholds a section confirms or rejects one by one against the record's captures (the withheld
+note's W1). They are never taken from a content area, and use only the binding parameters above,
+each chosen so a defect is found less often, never more. Each has an identity, `{ kind, location }`,
+unique within its section, with a location typed by kind, in the index space of R3 (the judge's own,
+defined for every section). The section's defects are sorted by kind (`cells-run-together`,
+`line-through-letter`, `off-page`) then location, lexicographically, each one's `at` by ratio then
+width, and its `measure` is the worst over `at`. The kinds:
+
+- `cells-run-together` (location: the two cells and the two facing characters), at every width and
+  ratio (it needs no drawing): two cells whose text stands side by side on one line (R4), whose
+  facing characters (not whitespace, a no-break space or a zero-width code point) have advances that
+  abut or overlap horizontally (a gap of zero or less in Chrome's layout units, 1/64 px), so no more
+  space separates the cells than separates two letters of a word ("182:8" beside "177:12" read as
+  one run); a split number such as "12" beside ".5" is the same geometry, which is why a person
+  confirms or rejects each.
+- `line-through-letter` (location: the character, and the line as its element and which of its
+  edges, decorations or rules), from glyph pixels (R4) at every width where P3's candidates arise: a
+  line (not a run's own decoration, nor a background's edge that meets P8(b)) with a glyph's pixels
+  on both of its sides, measured from the glyph's own baseline (moved, for a shifted glyph), inside
+  the band from one device pixel above the glyph's baseline to one below its x-height (or cap height
+  for a capital): a line through the body of a letter, not a touch at a tail or serif; seeded
+  controls that must not be one: "jelly" and an italic "jf" in an unpadded bordered cell, a ")" on a
+  bottom border.
+- `off-page` (location: the character), at every width and ratio: a character with ink (not
+  whitespace, a no-break space or a zero-width code point) whose rounded-out ink bound lies wholly
+  beyond the page's left or top edge; this one is read from a conservative bound, calibrated in every
+  draw (R4), because nothing beyond the page is drawn: if even the bound that contains all the ink is
+  off the page, none of the ink is drawn.
+
+Every defect is also a failure (P3 names all three); a defect that is not is a refusal of ours. No
+defect involves a picture's box. A test requires that no carried section of a pinned label has one.
+
+`contacts` (P6) are recorded beside them, sorted by kind then location, each with its distinct pixel
+masks' hashes (whose captures a person acknowledges); neither failures nor defects. Whether a contact
+exists is decided on pixels, so a coverage within ε of the noise floor, or a clearance within ε of
+its threshold, counts as a contact (and so needs an acknowledgement), and a contact set that differs
+between the two regenerations fails the render build for that record (R7).
 
 No overall pass and no withheld field: what is withheld is the request's. Captures are not part of
 the record and not compared: the render build stores them under the record's hash before it signs,
@@ -657,6 +666,10 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
 - The authority's viewer applies a stylesheet the gate does not, and its page margin may differ
   from the gate's 16 px, which `off-page` and check 6 depend on.
 - The visited link colour is judged statically (T3a).
+- That a requester opened the captures of every contact they acknowledge is their claim; the review
+  tool records what it showed them, but not that they looked.
+- The person who acknowledges a record's contacts should not be the one who proposed it (R1); while
+  the project has one named person they are the same, as the change records already state.
 - Chrome runs without its sandbox inside the render container; an exploit in authority content
   could forge both draws of one build (the container has no network and no credentials).
 - Re-verifying an old import needs its worker image, which carries the store, to persist.
@@ -853,3 +866,13 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
     classes' order (failure before P8); P8 closed, within the clearance, with a remaining pixel row,
     uncovered, per contact; strokes defined; the cap over carried sections, with its reason; ε for
     pixels only; the rest as found.
+13. **Thirteenth independent reviews** (2026-09-25). Medium: P8(a)'s single remaining row cleared the
+    seeded 7 pt "y" and "μ", which must be contacts; a 5 pt colon's lower dot, one pixel wholly inside
+    a border, was only a contact; nothing exempted a glyph from its own run's decoration, so every
+    underlined descender was a contact and some skip-ink edges a failure; P8(b)'s carve-out left a
+    background's edge a line for P3's hidden part, failing "Appendix V". Low: an accented capital's
+    ink above the section a failure; the cap's home; a line pixel's threshold. Fixed in this draft:
+    two remaining rows, counted from the lowest possible baseline; a whole component hidden in a line
+    is a failure at any size; an unshifted glyph is not checked against its own run's decoration
+    (P5 still judges it); a (b) edge is no line for any P3 item and has no pixels; unshifted ink above
+    the section a contact; the cap a gate constant, checked by the lookup; R8's lists restructured.

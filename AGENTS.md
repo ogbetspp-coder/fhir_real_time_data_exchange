@@ -8,7 +8,8 @@ Google Cloud Healthcare API and observe their native near-real-time BigQuery str
 
 ## Non-negotiable rules
 
-- Never generate, summarize, or infer regulated clinical narrative. Preserve supplied XHTML. The
+- Never generate, summarize, or infer regulated clinical narrative. Preserve supplied XHTML (a
+  withheld section's fixed notice is the one generated div, under the exception below). The
   fidelity check proves its words, list numbers, table grids and embedded pictures; paragraph
   breaks, headings, bullets, list nesting and emphasis are kept, not proved. Its contract
   (`fidelity-norm/3.1.0`) qualifies structured sources only (an FHIR ePI); over a drawn

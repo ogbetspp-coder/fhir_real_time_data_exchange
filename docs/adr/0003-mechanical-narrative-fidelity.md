@@ -196,8 +196,9 @@ A second stated exception to "false passes are not" (owner decisions of 2026-09-
 `docs/design/authority-import-renderer.md`, R4): the renderer gate sorts what it draws into clear,
 failures (clear misreadings, which refuse) and **contacts**, glyphs or lines that touch or stand
 closer than the gate can prove harmless, which pass only once the person who requests the import,
-an attested identity before anything is persisted, has seen each one in the gate's captures of the
-record they name and acknowledged it legible. No automatic limit passes a contact. Two drawings that
+an attested identity before anything is persisted, has been shown each one in the
+gate's captures of the record they name and acknowledged it legible (that they looked is their
+claim). No automatic limit passes a contact. Two drawings that
 cannot change a letter are clear by rule, not contacts, exactly as the renderer note's P8 states
 them (a descender of a closed list of letters on its own cell's bottom border, keeping a row of its
 own, with no shared pixel; a glyph at a background's edge, not covered, keeping 4.5:1 against both
