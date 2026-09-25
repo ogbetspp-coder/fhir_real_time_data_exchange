@@ -189,3 +189,12 @@ painted pixels and the pinned fonts' ink bounds, that the authority's own drawin
 written, confirmed by the
 person who requests the import, never on a refusal of ours, so no false pass
 of the authority's text enters the record by it: none of the section's text enters at all.
+
+## Amendment (2026-09-25, a raised number against the tail above)
+
+A second stated exception to "false passes are not" (owner decision of 2026-09-25;
+`docs/design/authority-import-renderer.md`, P9): in the renderer gate, a glyph T folded as raised
+may touch, or share at most a few device pixels with, the descender of a glyph on the line directly
+above, and nothing else, each contact recorded and shown to the reviewer. The EMA's Imatinib Teva
+SmPC draws the 9 of "10⁹/l" in 4.2 against the "p" above it at most widths; it stays legible, and the
+finding is reported to the authority.

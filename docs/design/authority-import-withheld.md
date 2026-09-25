@@ -1,6 +1,6 @@
 # A withheld section: importing a publication with an authority's defect recorded in place (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25; eighth draft, after seven design reviews
+- Status: proposed, 2026-09-25; ninth draft, after eight design reviews
 - Owner decisions (2026-09-25): withhold the Imatinib Teva tablets SmPC's 5.1 and import the
   other 31 sections; a section may be withheld only on reviewed, measured evidence of the
   authority's defect, the whole record is marked incomplete everywhere it is read, and the safety
@@ -49,18 +49,23 @@ the authority's content, and the gap stated wherever the record is read.
 A section may be withheld only when all hold:
 
 1. **A person asks, having reviewed the evidence.** The import request (D2) gains
-   `withheldEvidence`, the `recordSha256` of the renderer record the person reviewed (one record per
-   document; its drawing is the render build's captures of that attested record, stored under its
-   hash and named by its attestation, R1), and `withheld`: a list of `{ path, code, confirmed,
-rejected }` in the document's pre-order, `path` the section's `SourcePath`, `code` its code as
-   served, `confirmed` the defect locations they judged misleading and `rejected` those they judged
-   sound (a split number such as "12" beside ".5" is geometrically a run-together and is
-   rejected). Both fields are present or both absent, and `withheld` has at least one entry. The request is approved content (D2), covered by
-   `approvedContentSha256` (D8); the lookup refuses if the record it uses is not the one named, or
-   the section's defect locations in it are not exactly those confirmed and rejected
-   (`withheld-evidence-changed`), so a later record never stands in for the one reviewed. At least
-   one location must be confirmed; the rejected ones are kept in the provenance, as findings
-   against the gate's definition of a defect.
+   `withheldEvidence`, `{ recordSha256, environment, capturesSha256 }`: the renderer record the person
+   reviewed (one per document) and the index of the render build's captures of it that they
+   reviewed, which its attestation names (R1), read with a review tool that verifies the
+   attestation, the index and each capture's hash before showing them; and `withheld`: a list of
+   `{ path, code, confirmed, rejected }` in the document's pre-order, `path` the section's
+   `SectionPath`, `code` its code as served, `confirmed` the defects (by their identity, `{ kind,
+location }`, the renderer note's R8) they judged misleading and `rejected` those they judged
+   sound (a split number such as "12" beside ".5" is geometrically a run-together and is rejected).
+   Both fields are present or both absent; `withheld` has at least one entry; `confirmed` and
+   `rejected` are disjoint, without repeats, in the record's order, and their union is exactly the
+   section's defects in the record. The request is approved content (D2), covered by
+   `approvedContentSha256` (D8). The image build places each verified attestation's
+   `capturesSha256` beside its record, and the lookup refuses if the record or the captures it has
+   are not the ones named, or the section's defects are not exactly those confirmed and rejected
+   (`withheld-evidence-changed`), or none is confirmed (`withheld-section-not-shown`), so a later
+   record never stands in for the one reviewed. The rejected defects are kept in the provenance, as
+   findings against the gate's definition of a defect.
 2. **Its drawing is shown unsound, by evidence that is not ours.** The renderer gate's record for
    the document (`docs/design/authority-import-renderer.md` R8), attested by the render build and
    verified by the image build (R1), holds for the section:
@@ -69,8 +74,9 @@ rejected }` in the document's pre-order, `path` the section's `SourcePath`, `cod
      bound, a calibration failure, an XML `parsererror`); the font check runs on every section,
      T's or not, so no defect is measured in a substitute font;
      **and** at least one confirmed defect (the renderer note's R8), a geometric finding that a reader
-     cannot read the drawing as written, never taken from a content area or a widened bound, and
-     using only the parameters R4 binds for defects: two cells'
+     cannot read the drawing as written, never taken from a content area, and using only the
+     parameters R4 binds for defects (`off-page` alone reads a bound, one that contains all the ink,
+     so the direction is safe): two cells'
      text on one line with no more space between them than between two letters of a word, their
      facing advances abutting or overlapping (`cells-run-together`: "182:8" beside "177:12" read as
      one run); a line through the body of a letter, not a touch at a tail or serif
@@ -81,8 +87,10 @@ rejected }` in the document's pre-order, `path` the section's `SourcePath`, `cod
    A failure of the gate's conservative checks (a 0.25 em gap, a 0.5 px clearance, a contrast
    margin) is not a defect: it shows the gate cannot prove the drawing sound, not that it is
    unsound, and such a section refuses the import, as today. So is every refusal of ours (a font
-   we cannot draw, a rule of T's stricter than the drawing, a picture we cannot fetch, a scanner
-   grammar). The finding is stated for what the gate draws: the FHIR div as published, with its
+   we cannot draw, a rule of T's stricter than the drawing, a scanner grammar, and in a carried
+   section a picture we cannot fetch; a withheld section's pictures are drawn as the import has
+   them, 5.1's two as broken-image boxes, `unpinned`, until 3c-E pins the export, and no defect may
+   involve a picture's box). The finding is stated for what the gate draws: the FHIR div as published, with its
    inline styles only, in fonts metric-compatible with those it names.
 
 3. **A leaf.** The section has no subsections (5.1 has none), so "information withheld" never
@@ -127,8 +135,10 @@ automatic and never silent. For a synthetic publication, a withheld section need
   generated from that code alone. No entry, extension or other element. The reason and the
   evidence are in the provenance, not in the notice.
 - **The document says it is partial.** `Composition.status` is `partial` instead of D9's `final`
-  whenever a section is withheld, and only then: the gate and the crosswalk refuse `partial` on any
-  source unless the verified withheld list is non-empty, in the record and in the EMA output. R5 defines it as "partial
+  whenever a section is withheld, and only then: on every source the gate and the crosswalk require
+  `final`, or exactly `partial` if and only if the verified withheld list is non-empty (the status
+  code system is a hierarchy, and `preliminary` is a kind of `partial`, so no other status is
+  allowed), and the query service fails closed on any other status, in the record and in the EMA output. R5 defines it as "partial
   (e.g. initial, interim or preliminary)", of which "data in the composition may be incomplete or
   unverified", the nearest of its codes to a document with a section withheld; the binding is required to the
   status value set, and no profile narrows it (Composition-uv-epi's short text lists five other
@@ -227,8 +237,9 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
   a finding reportable to the authority; the person reviews the render build's captures of the
   attested record (the record's pull request shows only a pre-check's), and the request names what
   was reviewed (W1.1).
-- **Forward pointers.** `docs/design/authority-import-contract.md` (D2, D3, D4, D6, D7, D9, D10, D12,
-  D13),
+- **Forward pointers.** `docs/architecture.md` (its statements that `emptyReason` and a mandatory
+  leaf without narrative are refused), `docs/design/authority-import-contract.md` (D2, D3, D4, D6,
+  D7, D9, D10, D12, D13),
   `docs/design/epi-mcp-query-service.md` and `docs/design/verifiable-answers.md` gain a line
   pointing here, in the change that implements each part.
 
@@ -262,14 +273,17 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
   EMA's viewer applies its own stylesheet, which the gate does not model.
 - Whether an incomplete record may be entitled to the query service is PR 5's decision, with the
   incompleteness in every answer.
+- A synthetic publication with a withheld section can be imported only against a test store: the
+  render build draws only publications pinned in `labels/`, so the deployed gate refuses it.
 - The record named in a request changes whenever any section's outputs, the pins (3c-E's export
   among them) or the gate change; each change needs a new review and a new request before the
   publication can be imported again with a section withheld.
 
 ## Verification
 
-- The importer: a synthetic publication with one section whose record shows a defect imports with
-  it withheld; a listed section with only a conservative failure, or with a refusal of ours, or
+- The importer (against a test store): a synthetic publication with one section whose record shows a
+  defect imports with it withheld; a request that rejects every defect, lists a defect both confirmed
+  and rejected, or names a defect under another kind, refuses; a listed section with only a conservative failure, or with a refusal of ours, or
   with nothing, refuses (`withheld-section-not-shown`); a request whose confirmed and rejected locations differ from
   the record's refuses (`withheld-evidence-changed`); an unlisted failing section refuses; a
   listed safety section, a section with subsections, a repeat or an out-of-order list refuses at
@@ -354,3 +368,14 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
    systems named. Fixed in this draft, with the renderer note's eighth: captures written before
    signing under the record's hash and named by the attestation; defects located, confirmed or
    rejected one by one; the rest as found.
+8. **Eighth independent review** (2026-09-25). Medium: a defect's location had no defined identity
+   (the kind was not part of it, the index space unstated, confirmed and rejected neither disjoint
+   nor ordered). Low: the captures bound only through an attestation neither the request nor the
+   lookup names; `partial`'s child codes; `SourcePath` for `SectionPath`; `off-page`'s wording; a
+   withheld section's pictures; synthetic withholding against the deployed gate; the "reviewed"
+   condition missing from ADR 0005 and the roadmap; `docs/architecture.md`. Fixed in this draft, with
+   the renderer note's ninth: defects identified by `{ kind, location }`, typed and sorted, confirmed
+   and rejected disjoint and exhaustive; `withheldEvidence` names the captures, which the lookup
+   checks; `final` or exactly `partial`; the rest as found. The renderer note's eighth review found
+   4.2's raised 9 touching the line above; the owner's decision (a stated exception, the renderer
+   note's P9) keeps the label importable.
