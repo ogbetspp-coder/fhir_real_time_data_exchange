@@ -408,18 +408,17 @@ export function computeStyle(context: ElementContext): ComputedStyle {
     }
   }
 
-  // Borders: at most 3 pt wide (T3); a colour left out is the element's final `color`.
+  // Borders: at most 3 pt wide (T3); a colour left out is the colour the element's text is drawn
+  // in: both link colours under a link with no author colour since it, else its `color`.
   for (const which of SIDES) {
     const drawn = style.borders[which];
     if (drawn === undefined) continue;
     if (drawn.style !== "none" && drawn.widthPt > 3) throw new CssRefusal("css-value");
     if (drawn.colours === undefined) {
       const current =
-        style.colour !== undefined
-          ? [style.colour]
-          : style.underLink && !style.colourSinceLink
-            ? LINK_COLOURS
-            : [[0, 0, 0] as const];
+        style.underLink && !style.colourSinceLink
+          ? LINK_COLOURS
+          : [style.colour ?? ([0, 0, 0] as const)];
       style.borders[which] = { ...drawn, colours: current };
     }
   }

@@ -903,10 +903,47 @@ export const T_CASES: TCase[] = [
     expected: no("table-edge"),
   },
   {
-    name: "collapsed-edge-won-by-a-drawn-border",
+    // CSS draws the wider black border, but which is wider turns on device pixels: T3e asks for
+    // every facing border to be drawn.
+    name: "collapsed-edge-beside-a-faint-border",
     inner:
       '<table style="border-collapse: collapse"><tr><td style="border-right: 2pt solid black; padding: 0">Dose 1</td><td style="border-left: 1pt solid white; padding: 0">5 mg</td></tr></table>',
-    expected: ok("<table><tr><td>Dose 1</td><td>5 mg</td></tr></table>"),
+    expected: no("table-edge"),
+  },
+  {
+    // The third code review: 0.5 pt and 1.4 pt both draw one pixel wide at 96 dpi, and the left
+    // cell's white border wins.
+    name: "collapsed-widths-snapping-to-one-pixel",
+    inner:
+      '<table style="border-collapse:collapse"><tr><td style="padding:0;border-right:solid 0.5pt white"><p>Dose 1</p></td><td style="padding:0;border-left:solid 1.4pt black"><p>5 mg</p></td></tr></table>',
+    expected: no("table-edge"),
+  },
+  {
+    // An omitted border colour under a link is a link colour, even where a colour is declared
+    // above the link.
+    name: "border-in-a-link-colour-under-an-outer-colour",
+    inner:
+      '<span style="color:black"><a href="x"><table style="border-collapse:collapse"><tr><td style="background:#7b7b7b;border-right:solid 1pt;padding:0"><p style="color:black">Dose 1</p></td><td style="background:#7b7b7b;padding:0"><p style="color:black">5 mg</p></td></tr></table></a></span>',
+    expected: no("table-edge"),
+  },
+  {
+    // A neighbour whose own shift T deletes is not on the baseline: the run is 0.101 em from it.
+    name: "fold-beside-a-deleted-shift",
+    inner:
+      '<p><span style="position:relative;top:-0.099em">10</span><span style="position:relative;top:-0.2em">5</span></p>',
+    expected: no("baseline-shift"),
+  },
+  {
+    name: "fold-beside-a-superscript",
+    inner: '<p><sup>2</sup><span style="position:relative;top:-6pt">3</span></p>',
+    expected: no("baseline-shift"),
+  },
+  {
+    // The slot bound is the scanner's: across the section, not per table.
+    name: "slots-across-tables",
+    inner:
+      '<table><tr><td colspan="50" rowspan="600">x</td></tr></table><table><tr><td colspan="50" rowspan="600">y</td></tr></table>',
+    expected: no("attribute"),
   },
   {
     name: "marker-from-the-border-box",

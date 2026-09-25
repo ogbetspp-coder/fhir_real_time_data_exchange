@@ -61,6 +61,9 @@ describe("T's cost", () => {
         ),
       ),
     ).toBe("ok");
+    expect(
+      outcome(() => transformSection(div(`<p style="mso-x:${"a".repeat(1e6)} b(">x</p>`))),
+    ).toBe("css-grammar");
     // About 2 s here; minutes when any of these was quadratic. Room for coverage instrumentation.
     expect(performance.now() - started).toBeLessThan(30_000);
   }, 60_000);

@@ -228,8 +228,23 @@ function placeSections(document: EmaDocument, mapping: EmaMapping): Placed[] {
   return placed;
 }
 
-const IMG = /<img\b[^>]*>/giu;
+const IMG_START = /<img\b/giu;
 const SRC = /\bsrc\s*=\s*("([^"]*)"|'([^']*)')/iu;
+
+// Every `<img …>` tag of a div, as /<img\b[^>]*>/giu would match them, in linear time: a tag ends
+// at the first `>` after its start, and the next search starts past it.
+function imgTags(div: string): string[] {
+  const tags: string[] = [];
+  let close = -1;
+  IMG_START.lastIndex = 0;
+  for (let match = IMG_START.exec(div); match !== null; match = IMG_START.exec(div)) {
+    if (close < match.index) close = div.indexOf(">", match.index);
+    if (close === -1) break;
+    tags.push(div.slice(match.index, close + 1));
+    IMG_START.lastIndex = close + 1;
+  }
+  return tags;
+}
 
 // D6: every picture the document names, by form. PR 2's T carries none, so the stage refuses
 // any picture; a reference the importer has neither a template nor evidence for refuses here,
@@ -238,7 +253,7 @@ function checkPictures(placed: Placed[]): void {
   for (const { section } of placed) {
     const div = section.text?.div;
     if (div === undefined) continue;
-    for (const tag of div.match(IMG) ?? []) {
+    for (const tag of imgTags(div)) {
       const match = SRC.exec(tag);
       const src = match?.[2] ?? match?.[3];
       if (src === undefined) refuse("pictures", "picture-without-a-source");

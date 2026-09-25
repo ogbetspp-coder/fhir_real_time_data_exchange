@@ -2606,10 +2606,40 @@
       "refused": "table-edge"
     },
     {
-      "name": "collapsed-edge-won-by-a-drawn-border",
+      "name": "collapsed-edge-beside-a-faint-border",
       "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table style=\"border-collapse: collapse\"><tr><td style=\"border-right: 2pt solid black; padding: 0\">Dose 1</td><td style=\"border-left: 1pt solid white; padding: 0\">5 mg</td></tr></table><p>not for clinical use</p></div>",
       "evidence": null,
-      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td>Dose 1</td><td>5 mg</td></tr></table><p>not for clinical use</p></div>"
+      "refused": "table-edge"
+    },
+    {
+      "name": "collapsed-widths-snapping-to-one-pixel",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table style=\"border-collapse:collapse\"><tr><td style=\"padding:0;border-right:solid 0.5pt white\"><p>Dose 1</p></td><td style=\"padding:0;border-left:solid 1.4pt black\"><p>5 mg</p></td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "table-edge"
+    },
+    {
+      "name": "border-in-a-link-colour-under-an-outer-colour",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><span style=\"color:black\"><a href=\"x\"><table style=\"border-collapse:collapse\"><tr><td style=\"background:#7b7b7b;border-right:solid 1pt;padding:0\"><p style=\"color:black\">Dose 1</p></td><td style=\"background:#7b7b7b;padding:0\"><p style=\"color:black\">5 mg</p></td></tr></table></a></span><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "table-edge"
+    },
+    {
+      "name": "fold-beside-a-deleted-shift",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><span style=\"position:relative;top:-0.099em\">10</span><span style=\"position:relative;top:-0.2em\">5</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "baseline-shift"
+    },
+    {
+      "name": "fold-beside-a-superscript",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><sup>2</sup><span style=\"position:relative;top:-6pt\">3</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "baseline-shift"
+    },
+    {
+      "name": "slots-across-tables",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td colspan=\"50\" rowspan=\"600\">x</td></tr></table><table><tr><td colspan=\"50\" rowspan=\"600\">y</td></tr></table><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "attribute"
     },
     {
       "name": "marker-from-the-border-box",

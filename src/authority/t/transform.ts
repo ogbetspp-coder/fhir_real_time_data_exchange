@@ -124,6 +124,8 @@ type Point = {
   inScript: boolean;
   // A block, `br` or cell boundary, or a list marker: not text of any element.
   boundary: boolean;
+  // The boundary a `br` draws.
+  lineBreak?: boolean;
 };
 
 export type SectionResult = {
@@ -415,6 +417,7 @@ function walkSection(root: ElementNode, rightToLeft: boolean): Walk {
         underlined: false,
         inScript: false,
         boundary: true,
+        ...(name === "br" ? { lineBreak: true } : {}),
       });
     if (name === "li" && parent?.element.name === "ol") {
       const marker = markerFor(element);
@@ -647,7 +650,7 @@ function decideShifts(walk: Walk): Map<ElementNode, ShiftDecision> {
     const own = walk.points.slice(range.start, range.end).map((point) => point.point);
     const drawn = own.filter((point) => !SPACE_OR_NBSP.has(point));
     if (drawn.length < 1 || drawn.length > 4) refuse("baseline-shift");
-    if (!hasUnshiftedNeighbour(walk, range, decisions)) refuse("baseline-shift");
+    if (!hasUnshiftedNeighbour(walk, range)) refuse("baseline-shift");
     decisions.set(
       element,
       raise.hi > 0 && raise.lo >= 0 ? "sup" : raise.hi <= 0 ? "sub" : refuse("baseline-shift"),
@@ -658,11 +661,7 @@ function decideShifts(walk: Walk): Map<ElementNode, ShiftDecision> {
 
 // T4's neighbour: the code point before the run's first non-whitespace code point, or after its
 // last, is unshifted text, or one U+0020 or U+00A0 away from it, in the same block.
-function hasUnshiftedNeighbour(
-  walk: Walk,
-  range: { start: number; end: number },
-  decisions: ReadonlyMap<ElementNode, ShiftDecision>,
-): boolean {
+function hasUnshiftedNeighbour(walk: Walk, range: { start: number; end: number }): boolean {
   const { points } = walk;
   const isWhite = (index: number): boolean => SPACE_OR_NBSP.has(points[index]?.point ?? "");
   let first = range.start;
@@ -679,10 +678,15 @@ function hasUnshiftedNeighbour(
     ) {
       return false;
     }
+    // It sits on the baseline: under no shift, deleted or not, and in no `sup` or `sub`, so the
+    // run's offset from it is the run's own.
     const info = walk.infos.get(point.element);
-    if (info === undefined) return false;
-    const chain = [...(isShifted(info) ? [info.element] : []), ...info.shiftedAncestors];
-    return chain.every((element) => decisions.get(element) === "delete");
+    return (
+      info !== undefined &&
+      !point.inScript &&
+      !isShifted(info) &&
+      info.shiftedAncestors.length === 0
+    );
   };
   const look = (from: number, step: number): boolean => {
     let index = from;
@@ -737,24 +741,20 @@ function isDrawn(border: Border | undefined, backgrounds: readonly Rgb[]): boole
 }
 
 // Whether the edge between two cells side by side is drawn (T3e). Under `separate` each cell draws
-// its own border; under `collapse` only the winner of CSS 2.1's conflict resolution is drawn: the
-// wider, then by style (double, solid, dashed, dotted), then the left cell's.
+// its own border; under `collapse` only the winner of CSS 2.1's conflict resolution is drawn, and
+// which one wins turns on widths snapped to device pixels (a 0.5 pt and a 1.4 pt border both draw
+// one pixel wide at 96 dpi, and the left cell's then wins): so the edge counts as drawn only if
+// every facing border other than `none` is.
 function drawnEdge(left: Info, right: Info, collapse: boolean): boolean {
   const backgrounds = [...left.style.backgrounds, ...right.style.backgrounds, WHITE];
   const leftBorder = left.style.borders.right;
   const rightBorder = right.style.borders.left;
   if (!collapse) return isDrawn(leftBorder, backgrounds) || isDrawn(rightBorder, backgrounds);
-  // Chrome snaps widths to device pixels, so two widths within a pixel (0.75 pt) of each other may
-  // draw either border: then the edge is drawn only if every facing border is.
+
   const facing = [leftBorder, rightBorder].filter(
     (border): border is Border => border !== undefined && border.style !== "none",
   );
-  const [first, second] = facing;
-  if (first === undefined) return false;
-  if (second === undefined || Math.abs(first.widthPt - second.widthPt) < 0.75) {
-    return facing.every((border) => isDrawn(border, backgrounds));
-  }
-  return isDrawn(first.widthPt > second.widthPt ? first : second, backgrounds);
+  return facing.length > 0 && facing.every((border) => isDrawn(border, backgrounds));
 }
 
 const LARGEST = new WeakMap<ElementNode, number>();
@@ -780,6 +780,16 @@ function largestSize(walk: Walk, cell: ElementNode): number {
 }
 
 function checkTables(walk: Walk): void {
+  // The slots every table's cells cover, bounded across the section as the scanner bounds them,
+  // before any grid is laid.
+  let slots = 0;
+  for (const node of walk.infos.keys()) {
+    if (node.name === "td" || node.name === "th") {
+      slots +=
+        Number(attribute(node, "colspan") ?? "1") * Number(attribute(node, "rowspan") ?? "1");
+    }
+  }
+  if (slots > TABLE_SLOT_LIMIT) refuse("attribute");
   for (const info of walk.infos.values()) {
     if (info.element.name !== "table") continue;
     const table = info.element;
@@ -790,15 +800,7 @@ function checkTables(walk: Walk): void {
       : spacingAttribute === undefined
         ? 1.5
         : Number(spacingAttribute) * 0.75;
-    // The slots the table's cells cover, bounded as the scanner bounds them, before a grid is laid.
-    let slots = 0;
-    for (const node of descendants(table)) {
-      if (node.kind === "element" && (node.name === "td" || node.name === "th")) {
-        slots +=
-          Number(attribute(node, "colspan") ?? "1") * Number(attribute(node, "rowspan") ?? "1");
-      }
-    }
-    if (slots > TABLE_SLOT_LIMIT) refuse("attribute");
+
     const rows: ElementNode[] = [];
     for (const child of table.children) {
       if (child.kind !== "element") continue;
@@ -882,9 +884,19 @@ function plusToken(points: readonly Point[], index: number): string | undefined 
   )
     start -= 1;
   if (index - start < 2) return undefined;
+  // Nothing drawn joins the token: no letter, mark or default-ignorable before it, and after it
+  // a space, a no-break space or its block's end (not a `br`).
   const before = points[start - 1];
-  if (before !== undefined && !before.boundary && isUnderlineLetter(before.point)) return undefined;
+  if (
+    before !== undefined &&
+    !before.boundary &&
+    (isUnderlineLetter(before.point) ||
+      MARK.test(before.point) ||
+      isDefaultIgnorable(before.point.codePointAt(0) ?? 0))
+  )
+    return undefined;
   const after = points[index + 1];
+  if (after?.lineBreak === true) return undefined;
   if (after !== undefined && !after.boundary && !SPACE_OR_NBSP.has(after.point)) return undefined;
   const next = after?.point ?? "";
   if (MARK.test(next) || isDefaultIgnorable(next.codePointAt(0) ?? 0)) return undefined;

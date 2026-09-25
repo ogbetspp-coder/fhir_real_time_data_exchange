@@ -16,15 +16,20 @@ export type Declaration = { property: string; value: string };
 // Printable ASCII only, no comment, escape, block, `!important`, `url(` or `&` (T1's cascade).
 const STYLE_CHARACTERS = /^[\x20-\x7e\t\n\r\f]*$/u;
 const FORBIDDEN = /\/\*|\\|[{}<>@]|!|url\(|&/iu;
-const FUNCTION = /[a-z-]+\(/giu;
+const FUNCTION_NAME = /^[a-z-]$/iu;
 const QUOTED_FAMILY = /^(?:'[^'";]*'|"[^'";]*"|[^'";]*)$/u;
 const GLOBAL_KEYWORDS = new Set(["inherit", "initial", "unset", "revert", "revert-layer"]);
 
 // The declarations of a `style` value, in order, names lower-cased and values trimmed.
 export function declarations(style: string): Declaration[] {
   if (!STYLE_CHARACTERS.test(style) || FORBIDDEN.test(style)) throw new CssRefusal("css-grammar");
-  for (const match of style.matchAll(FUNCTION)) {
-    if (match[0].toLowerCase() !== "rgb(") throw new CssRefusal("css-grammar");
+  // Every function is `rgb(`: the name before each `(`, read backwards to the first code point
+  // that is no letter or `-` (a `(` among them), so each is read once and the check is linear.
+  for (let open = style.indexOf("("); open !== -1; open = style.indexOf("(", open + 1)) {
+    let start = open;
+    while (start > 0 && FUNCTION_NAME.test(style[start - 1] ?? "")) start -= 1;
+    const name = style.slice(start, open).toLowerCase();
+    if (name !== "" && name !== "rgb") throw new CssRefusal("css-grammar");
   }
   // CSS reads a bracket or a function to its matching close, a `;` inside included: a bracket
   // other than a balanced `rgb(…)` holding no `;` refuses, so a split at `;` is Chrome's.

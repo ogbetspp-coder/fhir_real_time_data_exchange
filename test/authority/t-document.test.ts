@@ -46,6 +46,8 @@ describe("T over a document", () => {
       "<p><u>Ph+</u> ALL</p>", // underlined
       "<p>Ph<sup>+</sup> ALL</p>", // raised
       "<p>Ph+\u0301 ALL</p>", // a mark on the sign
+      "<p>see Ph+<br/>ALL</p>", // a line break is no space
+      "<p>E\u0301Ph+ ALL</p>", // a mark joins the token to the letter before
     ]) {
       const [, subheading] = transformDocument([div(plain), SUBHEADING]);
       expect([plain, subheading]).toEqual([plain, { refused: "underline" }]);

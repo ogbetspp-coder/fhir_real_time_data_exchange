@@ -285,11 +285,13 @@ as one: "Dose 1" beside "5 mg" is drawn "Dose 15 mg". So every vertical edge sha
 must have a drawn border, or the two cells' facing paddings plus the table's `border-spacing`
 (0 under `border-collapse: collapse`) must be at least 0.25 em of the largest font size of a text node or marker in the two cells (with T3b, no text enters its cell's padding). A **drawn border** is a cell's (under
 `separate`, a row's or row group's border is not drawn and each cell draws its own; under
-`collapse`, only the winner of CSS 2.1 §17.6.2.1's conflict resolution is drawn: the wider, then by
-style, `double`, `solid`, `dashed`, `dotted`, then the left cell's; and since a browser snaps widths to device pixels, where the facing widths
-differ by less than a pixel (0.75 pt) the edge counts as drawn only if every facing border is) whose style is `solid`, `double`, `dotted` or `dashed`, whose
-computed width is above 0 (Chrome draws a width under one pixel as one pixel), and whose colour (an omitted one is the cell's `color`, and under a link with no author colour both
-link colours) has a contrast of at least 3:1 with every background painted under that edge (both
+`collapse`, only the winner of CSS 2.1 §17.6.2.1's conflict resolution is drawn, and which one
+wins turns on widths snapped to device pixels, a 0.5 pt and a 1.4 pt border both drawing one
+pixel wide at 96 dpi, where the left cell's then wins: so under `collapse` the edge counts as
+drawn only if every facing border other than `none` is) whose style is `solid`, `double`, `dotted` or `dashed`, whose
+computed width is above 0 (Chrome draws a width under one pixel as one pixel), and whose colour (an omitted one is the colour the cell's text is drawn in: both link colours under a
+link with no author colour declared from the link down, a colour declared above the link
+included, else the cell's `color`) has a contrast of at least 3:1 with every background painted under that edge (both
 adjacent cells', their rows' and row groups', the table's and its ancestors', and the root's
 white). The `border-spacing` property is refused; the `cellspacing` attribute sets it. A horizontal line under text (a cell's, row's, row
 group's or table's bottom border, the collapsed top border of the cell below, a rule) can read as
@@ -315,15 +317,15 @@ against **every text node under its element**, at that node's font size:
   - every text node under it is no larger than its parent's font size;
   - no ancestor and no descendant carries a shift;
   - after T it holds only text: 1 to 4 code points other than whitespace (a footnote mark, an
-    exponent, "95%"), and whitespace (U+0020, U+00A0);
-    - unshifted text (text with no shift left once T's deletions are made) that draws ink (no
-      whitespace, no Default_Ignorable code point, no mark, no picture) stands directly beside it
-      in the same block: the code point before its first
-      non-whitespace code point, or after its last, is a non-whitespace code point of unshifted
-      text, or one U+0020 or U+00A0 away from one, with no block boundary, `br` or cell between (a
-      neighbour on its own line: `10<span>9</span>/l`, `(CI<span>95%</span>)`,
-      `<span>1 </span>Haematological`); a U+0020 can break the line there, which the renderer
-      gate measures.
+    exponent, "95%"), and whitespace (U+0020, U+00A0); - unshifted text (text under no shift, deleted or not, and in no `sup` or `sub`, so it sits
+    on the baseline and the run's offset from it is the run's own) that draws ink (no
+    whitespace, no Default_Ignorable code point, no mark, no picture) stands directly beside it
+    in the same block: the code point before its first
+    non-whitespace code point, or after its last, is a non-whitespace code point of unshifted
+    text, or one U+0020 or U+00A0 away from one, with no block boundary, `br` or cell between (a
+    neighbour on its own line: `10<span>9</span>/l`, `(CI<span>95%</span>)`,
+    `<span>1 </span>Haematological`); a U+0020 can break the line there, which the renderer
+    gate measures.
 
   `vertical-align: super` and `sub` fold under the same conditions, the 0.2 bound excepted; their
   shift, wherever T4 uses one (the deletion bound and the ceiling), is Chrome's: the parent's
@@ -381,7 +383,8 @@ So T waives an underlined U+002B PLUS SIGN, and nothing else, where all hold:
   default-ignorable code point next to it; the **token** is the maximal sequence of letters before
   it together with the `+` (`Ph+`);
 - the same token, in exactly the same code points, preceded by a code point that is not one of
-  T5's letters (`isUnderlineLetter`), or by the start of a block, and followed as above, occurs outside every underline run in the
+  T5's letters (`isUnderlineLetter`), a mark or a default-ignorable code point, or by the start
+  of a block, and followed as above (a `br` is no end of the block), occurs outside every underline run in the
   scanner's text of a section of the same document that T accepts without this rule (the document
   writes the term with a plain `+` where nothing is drawn under it; in the label, 4.1's
   definition);
@@ -703,3 +706,15 @@ Each refusal names the stage (`narrative`) and a closed reason: `markup`, `eleme
     and several steps were quadratic on crafted input (a 40 000-run section took minutes); a
     `caption`'s `height` overprints the first row. Low: the check order of a `sup` or `sub`'s own
     refusals. Fixed, the note amended, each repro a case, and a cost test on the crafted inputs.
+17. **Third code review** (2026-09-25). It compared T's model with Chrome's computed style on
+    1 894 random accepted sections (7 136 text nodes): size, colour, underline and backgrounds
+    agreed on every node. High: an omitted border colour under a link took a colour declared
+    above the link, not the link colour; under `collapse`, widths more than 0.75 pt apart can
+    snap to the same pixel width (0.5 pt white beside 1.4 pt black draws the white), so the
+    within-a-pixel rule was unsound; two regular expressions (a CSS function name, the pictures
+    stage's `img` tag) were quadratic on crafted input. Medium: T4's neighbour could itself be
+    shifted by a deleted shift or sit in a `sup`, so a fold stood 0.1 em from it, or nothing was
+    on the baseline. Low: the slot bound was per table where the scanner's is per section; the
+    plus-sign evidence took a `+` before a `br`, and after a mark. Fixed: under `collapse` every
+    facing border must be drawn, a neighbour is under no shift at all, and the rest as found;
+    each repro a case or a cost test.

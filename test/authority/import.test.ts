@@ -202,6 +202,12 @@ describe("the first check a publication fails", () => {
       "pictures: picture-reference-in-no-known-grammar",
     );
     expect(refusal(withDiv(div("<p><img/></p>")))).toBe("pictures: picture-without-a-source");
+    // Every `<img` up to the first `>` is one tag; finding them is linear (the third code review).
+    const started = performance.now();
+    expect(refusal(withDiv(div(`<p>${"<img ".repeat(80000)}</p>`)))).toBe(
+      "pictures: picture-without-a-source",
+    );
+    expect(performance.now() - started).toBeLessThan(10_000);
     // T reads the style (red on white is 4.0:1, under T3a's 4.5:1), then the scanner reads T(div).
     expect(refusal(withDiv(div('<p style="color:red">x; not for clinical use</p>')))).toBe(
       "narrative: contrast",
