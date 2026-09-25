@@ -5,7 +5,7 @@ import {
   SPAN_VALUE,
   TABLE_SLOT_LIMIT,
 } from "../../fidelity/xhtml.js";
-import { isDefaultIgnorable } from "../../fidelity/normalize.js";
+import { isDefaultIgnorable, isGap } from "../../fidelity/normalize.js";
 import { isUnderlineLetter, underlineChanges } from "../underline.js";
 import { contrast, CssRefusal, type Rgb } from "./css.js";
 import {
@@ -99,6 +99,8 @@ const DASHES_UNDER_UNDERLINE = new Set(["-", "\u2010", "\u2011"]);
 const MARK = /^\p{M}$/u;
 const WHITE: Rgb = ROOT_BACKGROUND;
 const SPACE_OR_NBSP = new Set([" ", "\u00a0"]);
+const BOUNDARY: Point = { element: undefined, underlined: false, inScript: false, boundary: true };
+const LINE_BREAK: Point = { ...BOUNDARY, lineBreak: true };
 
 type Info = {
   element: ElementNode;
@@ -116,9 +118,10 @@ type Info = {
   positionedAncestor: boolean;
 };
 
-// One code point of the section as the scanner emits it, with what T4 and T5 need to know of it.
+// What T4 and T5 need to know of a code point of the section as the scanner emits it: one record,
+// shared by every code point of a text node, of a marker or of a boundary, so T's memory is a
+// reference per code point (the fourth code review: a record each took 300 bytes per byte).
 type Point = {
-  point: string;
   element: ElementNode | undefined;
   underlined: boolean;
   inScript: boolean;
@@ -275,6 +278,8 @@ function hasDrawnText(node: TextNode): boolean {
 
 type Walk = {
   infos: Map<ElementNode, Info>;
+  // The code points, and what is known of each, index by index.
+  codes: string[];
   points: Point[];
   // The index of each element's first and one-past-last point, for T4 and T5.
   ranges: Map<ElementNode, { start: number; end: number }>;
@@ -282,7 +287,12 @@ type Walk = {
 
 function walkSection(root: ElementNode, rightToLeft: boolean): Walk {
   const infos = new Map<ElementNode, Info>();
+  const codes: string[] = [];
   const points: Point[] = [];
+  const push = (code: string, point: Point): void => {
+    codes.push(code);
+    points.push(point);
+  };
   const ranges = new Map<ElementNode, { start: number; end: number }>();
 
   const visit = (element: ElementNode, parent: Info | undefined): void => {
@@ -410,61 +420,27 @@ function walkSection(root: ElementNode, rightToLeft: boolean): Walk {
     // A list item's marker is drawn text, judged at its tag (T3d, T6).
     if (name === "li") checkDrawn(style, info.blockSize);
     const start = points.length;
-    if (block)
-      points.push({
-        point: "\n",
-        element: undefined,
-        underlined: false,
-        inScript: false,
-        boundary: true,
-        ...(name === "br" ? { lineBreak: true } : {}),
-      });
+    if (block) push("\n", name === "br" ? LINE_BREAK : BOUNDARY);
     if (name === "li" && parent?.element.name === "ol") {
-      const marker = markerFor(element);
-      for (const point of marker) {
-        points.push({
-          point,
-          element: undefined,
-          underlined: false,
-          inScript: false,
-          boundary: true,
-        });
-      }
+      for (const code of markerFor(element)) push(code, BOUNDARY);
     }
+    const own: Point = {
+      element,
+      underlined: style.underline,
+      inScript: info.inScript,
+      boundary: false,
+    };
     // A picture is drawn and emitted (U+FFFC), so it is no letter and no gap to T5.
-    if (name === "img") {
-      points.push({
-        point: "\ufffc",
-        element,
-        underlined: style.underline,
-        inScript: info.inScript,
-        boundary: false,
-      });
-    }
+    if (name === "img") push("\ufffc", own);
     for (const child of element.children) {
       if (child.kind === "text") {
         if (hasDrawnText(child)) checkDrawn(style, info.blockSize);
-        for (const point of child.points) {
-          points.push({
-            point,
-            element,
-            underlined: style.underline,
-            inScript: info.inScript,
-            boundary: false,
-          });
-        }
+        for (const code of child.points) push(code, own);
       } else {
         visit(child, info);
       }
     }
-    if (block)
-      points.push({
-        point: "\n",
-        element: undefined,
-        underlined: false,
-        inScript: false,
-        boundary: true,
-      });
+    if (block) push("\n", BOUNDARY);
     ranges.set(element, { start, end: points.length });
     // A background, judged at the element's end tag with its descendants' sizes known (T3): never
     // on or inside a positioned element; on an inline element, a line height of at least 1.2 times
@@ -483,7 +459,7 @@ function walkSection(root: ElementNode, rightToLeft: boolean): Walk {
     }
   };
   visit(root, undefined);
-  return { infos, points, ranges };
+  return { infos, codes, points, ranges };
 }
 
 function hasLiAncestor(element: ElementNode): boolean {
@@ -647,7 +623,7 @@ function decideShifts(walk: Walk): Map<ElementNode, ShiftDecision> {
     if (magnitudeHi(raise) > 0.5 * parent.style.size.lo) refuse("baseline-shift");
     const range = walk.ranges.get(element);
     if (range === undefined) refuse("baseline-shift");
-    const own = walk.points.slice(range.start, range.end).map((point) => point.point);
+    const own = walk.codes.slice(range.start, range.end);
     const drawn = own.filter((point) => !SPACE_OR_NBSP.has(point));
     if (drawn.length < 1 || drawn.length > 4) refuse("baseline-shift");
     if (!hasUnshiftedNeighbour(walk, range)) refuse("baseline-shift");
@@ -662,19 +638,23 @@ function decideShifts(walk: Walk): Map<ElementNode, ShiftDecision> {
 // T4's neighbour: the code point before the run's first non-whitespace code point, or after its
 // last, is unshifted text, or one U+0020 or U+00A0 away from it, in the same block.
 function hasUnshiftedNeighbour(walk: Walk, range: { start: number; end: number }): boolean {
-  const { points } = walk;
-  const isWhite = (index: number): boolean => SPACE_OR_NBSP.has(points[index]?.point ?? "");
+  const { codes, points } = walk;
+  const isWhite = (index: number): boolean => SPACE_OR_NBSP.has(codes[index] ?? "");
   let first = range.start;
   while (first < range.end && isWhite(first)) first += 1;
   let last = range.end - 1;
   while (last >= range.start && isWhite(last)) last -= 1;
   const unshifted = (index: number): boolean => {
     const point = points[index];
+    const code = codes[index] ?? "";
     if (point === undefined || point.boundary || point.element === undefined) return false;
-    // A neighbour draws ink: no whitespace, no code point drawn as nothing, no mark, no picture.
+    // A neighbour draws ink: a letter, number, punctuation or symbol (no space, control, format,
+    // private-use, unassigned or mark code point), no picture, and none the fidelity layer knows
+    // is drawn blank (a thin space, U+2800 BRAILLE PATTERN BLANK, a default-ignorable).
     if (
-      /^[\s\p{M}\ufffc]$/u.test(point.point) ||
-      isDefaultIgnorable(point.point.codePointAt(0) ?? 0)
+      !/^[\p{L}\p{N}\p{P}\p{S}]$/u.test(code) ||
+      code === "\ufffc" ||
+      isGap(code.codePointAt(0) ?? 0)
     ) {
       return false;
     }
@@ -691,7 +671,9 @@ function hasUnshiftedNeighbour(walk: Walk, range: { start: number; end: number }
   const look = (from: number, step: number): boolean => {
     let index = from;
     const point = points[index];
-    if (point !== undefined && !point.boundary && SPACE_OR_NBSP.has(point.point)) index += step;
+    if (point !== undefined && !point.boundary && SPACE_OR_NBSP.has(codes[index] ?? "")) {
+      index += step;
+    }
     return unshifted(index);
   };
   return look(first - 1, -1) || look(last + 1, 1);
@@ -874,43 +856,41 @@ function blockOf(element: ElementNode | undefined): ElementNode | undefined {
 
 // A `+` T5 may waive: after at least two letters, before a space, a no-break space or the end of
 // its block, with no mark or default-ignorable next to it. Returns its token (`Ph+`), if any.
-function plusToken(points: readonly Point[], index: number): string | undefined {
-  if (points[index]?.point !== "+") return undefined;
+function plusToken(
+  codes: readonly string[],
+  points: readonly Point[],
+  index: number,
+): string | undefined {
+  if (codes[index] !== "+") return undefined;
   let start = index;
-  while (
-    start > 0 &&
-    isUnderlineLetter(points[start - 1]?.point ?? "") &&
-    !points[start - 1]?.boundary
-  )
+  while (start > 0 && isUnderlineLetter(codes[start - 1] ?? "") && !points[start - 1]?.boundary)
     start -= 1;
   if (index - start < 2) return undefined;
   // Nothing drawn joins the token: no letter, mark or default-ignorable before it, and after it
   // a space, a no-break space or its block's end (not a `br`).
   const before = points[start - 1];
+  const previous = codes[start - 1] ?? "";
   if (
     before !== undefined &&
     !before.boundary &&
-    (isUnderlineLetter(before.point) ||
-      MARK.test(before.point) ||
-      isDefaultIgnorable(before.point.codePointAt(0) ?? 0))
+    (isUnderlineLetter(previous) ||
+      MARK.test(previous) ||
+      isDefaultIgnorable(previous.codePointAt(0) ?? 0))
   )
     return undefined;
   const after = points[index + 1];
+  const next = codes[index + 1] ?? "";
   if (after?.lineBreak === true) return undefined;
-  if (after !== undefined && !after.boundary && !SPACE_OR_NBSP.has(after.point)) return undefined;
-  const next = after?.point ?? "";
+  if (after !== undefined && !after.boundary && !SPACE_OR_NBSP.has(next)) return undefined;
   if (MARK.test(next) || isDefaultIgnorable(next.codePointAt(0) ?? 0)) return undefined;
-  return points
-    .slice(start, index + 1)
-    .map((point) => point.point)
-    .join("");
+  return codes.slice(start, index + 1).join("");
 }
 
-export function plainTokens(points: readonly Point[]): Set<string> {
+function plainTokens(codes: readonly string[], points: readonly Point[]): Set<string> {
   const tokens = new Set<string>();
   points.forEach((point, index) => {
-    if (point.point !== "+" || point.underlined || point.inScript || point.boundary) return;
-    const token = plusToken(points, index);
+    if (codes[index] !== "+" || point.underlined || point.inScript || point.boundary) return;
+    const token = plusToken(codes, points, index);
     if (token === undefined) return;
     const letters = points.slice(index - (Array.from(token).length - 1), index);
     if (letters.some((letter) => letter.underlined || letter.inScript)) return;
@@ -932,7 +912,8 @@ function waivable(walk: Walk, run: Run, evidence: ReadonlySet<string>, text: str
   if (range === undefined) return false;
   for (let index = range.start; index < range.end; index += 1) {
     const point = points[index];
-    if (point === undefined || point.boundary || /^[\t\n\r\f \u00a0]$/u.test(point.point)) continue;
+    if (point === undefined || point.boundary || /^[\t\n\r\f \u00a0]$/u.test(text[index] ?? ""))
+      continue;
     if (index < run.start || index >= run.end) return false;
   }
   // The waived signs are masked in place on the section's text, and restored.
@@ -940,7 +921,7 @@ function waivable(walk: Walk, run: Run, evidence: ReadonlySet<string>, text: str
   let accepted = true;
   for (let index = run.start; index < run.end; index += 1) {
     if (text[index] !== "+") continue;
-    const token = plusToken(points, index);
+    const token = plusToken(walk.codes, points, index);
     if (token === undefined || !evidence.has(token)) {
       accepted = false;
       break;
@@ -957,15 +938,14 @@ function waivable(walk: Walk, run: Run, evidence: ReadonlySet<string>, text: str
 }
 
 function checkUnderlines(walk: Walk, evidence: ReadonlySet<string> | undefined): void {
-  const { points } = walk;
-  const text = points.map((point) => point.point);
+  const { codes, points } = walk;
+  // A copy: the waiver masks signs on it in place.
+  const text = [...codes];
   for (const run of underlineRuns(points)) {
     for (let index = run.start; index < run.end; index += 1) {
-      const point = points[index];
-      if (point?.inScript === true) refuse("underline");
-      if (/^\p{Pd}$/u.test(point?.point ?? "") && !DASHES_UNDER_UNDERLINE.has(point?.point ?? "")) {
-        refuse("underline");
-      }
+      const code = codes[index] ?? "";
+      if (points[index]?.inScript === true) refuse("underline");
+      if (/^\p{Pd}$/u.test(code) && !DASHES_UNDER_UNDERLINE.has(code)) refuse("underline");
     }
     if (!underlineChanges(text, run.start, run.end, { hyphensInWords: true })) continue;
     if (evidence === undefined || !waivable(walk, run, evidence, text)) refuse("underline");
@@ -1045,13 +1025,21 @@ export function transformSection(div: string, evidence?: ReadonlySet<string>): S
   const walk = walkSection(root, rightToLeft);
   const shifts = decideShifts(walk);
   // A folded run is raised or lowered text from here on (T5's runs and the waiver's evidence).
+  const scripted = new Map<Point, Point>();
   for (const [element, decision] of shifts) {
     if (decision === "delete") continue;
     const range = walk.ranges.get(element);
     if (range === undefined) continue;
     for (let index = range.start; index < range.end; index += 1) {
       const point = walk.points[index];
-      if (point !== undefined) point.inScript = true;
+      if (point !== undefined && !point.inScript) {
+        let raised = scripted.get(point);
+        if (raised === undefined) {
+          raised = { ...point, inScript: true };
+          scripted.set(point, raised);
+        }
+        walk.points[index] = raised;
+      }
     }
   }
   checkLists(walk);
@@ -1060,5 +1048,5 @@ export function transformSection(div: string, evidence?: ReadonlySet<string>): S
   const output = edit(div, root, shifts);
   const after = readTree(output);
   if (blockTags(after).join(" ") !== blockTags(root).join(" ")) refuse("markup");
-  return { div: output, plainTokens: plainTokens(walk.points) };
+  return { div: output, plainTokens: plainTokens(walk.codes, walk.points) };
 }

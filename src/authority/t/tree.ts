@@ -140,6 +140,9 @@ function checkOneTree(name: string, selfClosing: boolean, stack: readonly Elemen
 const LOWER_NAME = /^[a-z][a-z0-9]*$/u;
 // The scanner's own bound on nesting (fidelity §5, `nesting-depth`).
 const MAX_DEPTH = 32;
+// T's bound on a section's elements, so its records of them fit the worker's memory: ten times
+// the most any pinned label's section holds (1 965, the Imatinib Teva tablets' 5.1).
+export const MAX_ELEMENTS = 20_000;
 const LOWER_ATTRIBUTE = /^[a-z_:][-a-z0-9_:.]*$/u;
 
 const END_TAG = new RegExp(XHTML_TOKENS.endTag, "y");
@@ -204,6 +207,7 @@ function attributes(source: string, offset: number): Attribute[] {
 export function readTree(div: string): ElementNode {
   const stack: ElementNode[] = [];
   let root: ElementNode | undefined;
+  let elements = 0;
   let text: TextNode | undefined;
   let index = 0;
 
@@ -237,6 +241,8 @@ export function readTree(div: string): ElementNode {
       const attributeOffset = index + 1 + (start[1] ?? "").length;
       const parent = stack.at(-1);
       if (parent === undefined && root !== undefined) throw new MarkupRefusal("markup");
+      elements += 1;
+      if (elements > MAX_ELEMENTS) throw new MarkupRefusal("markup");
       const element: ElementNode = {
         kind: "element",
         name,

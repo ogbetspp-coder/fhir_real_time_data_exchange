@@ -2636,6 +2636,18 @@
       "refused": "baseline-shift"
     },
     {
+      "name": "neighbour-is-a-blank-glyph",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"text-align:right\">Dose 10<br/>&#x2800;<span style=\"position:relative;top:-6pt\">2</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "baseline-shift"
+    },
+    {
+      "name": "neighbour-is-private-use",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Dose 10<br/>&#xe000;<span style=\"position:relative;top:-6pt\">2</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "baseline-shift"
+    },
+    {
       "name": "slots-across-tables",
       "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td colspan=\"50\" rowspan=\"600\">x</td></tr></table><table><tr><td colspan=\"50\" rowspan=\"600\">y</td></tr></table><p>not for clinical use</p></div>",
       "evidence": null,

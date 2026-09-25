@@ -939,6 +939,19 @@ export const T_CASES: TCase[] = [
     expected: no("baseline-shift"),
   },
   {
+    // The fourth code review: U+2800 BRAILLE PATTERN BLANK draws nothing, so the 2 stands alone
+    // on its line, raised.
+    name: "neighbour-is-a-blank-glyph",
+    inner:
+      '<p style="text-align:right">Dose 10<br/>&#x2800;<span style="position:relative;top:-6pt">2</span></p>',
+    expected: no("baseline-shift"),
+  },
+  {
+    name: "neighbour-is-private-use",
+    inner: '<p>Dose 10<br/>&#xe000;<span style="position:relative;top:-6pt">2</span></p>',
+    expected: no("baseline-shift"),
+  },
+  {
     // The slot bound is the scanner's: across the section, not per table.
     name: "slots-across-tables",
     inner:

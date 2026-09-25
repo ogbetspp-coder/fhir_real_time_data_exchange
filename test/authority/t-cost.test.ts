@@ -22,7 +22,7 @@ function outcome(action: () => unknown): string {
 describe("T's cost", () => {
   it("handles long lists, tall cells, many runs and large sections quickly", () => {
     const started = performance.now();
-    expect(outcome(() => transformSection(div(`<ol>${"<li>x</li>".repeat(20000)}</ol>`)))).toBe(
+    expect(outcome(() => transformSection(div(`<ol>${"<li>x</li>".repeat(19000)}</ol>`)))).toBe(
       "list",
     );
     expect(
@@ -34,14 +34,14 @@ describe("T's cost", () => {
       outcome(() =>
         transformSection(
           div(
-            `<table><tr><td rowspan="1000">${"<p>x</p>".repeat(100000)}</td><td>y</td></tr>${"<tr><td>z</td></tr>".repeat(999)}</table>`,
+            `<table><tr><td rowspan="1000">${"<p>x</p>".repeat(17000)}</td><td>y</td></tr>${"<tr><td>z</td></tr>".repeat(999)}</table>`,
           ),
         ),
       ),
     ).toBe("ok");
     expect(
       outcome(() =>
-        transformDocument([div("<p>(Ph+ ALL)</p>"), div("<p><u>Ph+ ALL</u></p>".repeat(40000))]),
+        transformDocument([div("<p>(Ph+ ALL)</p>"), div("<p><u>Ph+ ALL</u></p>".repeat(9000))]),
       ),
     ).toBe("ok");
     expect(
@@ -57,13 +57,16 @@ describe("T's cost", () => {
     expect(
       outcome(() =>
         transformSection(
-          div('<p style="font-size:11pt;margin:0cm">Dose 10 mg daily.</p>'.repeat(70000)),
+          div('<p style="font-size:11pt;margin:0cm">Dose 10 mg daily.</p>'.repeat(19000)),
         ),
       ),
     ).toBe("ok");
     expect(
       outcome(() => transformSection(div(`<p style="mso-x:${"a".repeat(1e6)} b(">x</p>`))),
     ).toBe("css-grammar");
+    // A section of more elements than T's bound refuses before T keeps a record of each: 4 MiB of
+    // them took more than 1 GiB (the fourth code review).
+    expect(outcome(() => transformSection(div("<p>a</p>".repeat(521000))))).toBe("markup");
     // About 2 s here; minutes when any of these was quadratic. Room for coverage instrumentation.
     expect(performance.now() - started).toBeLessThan(30_000);
   }, 60_000);

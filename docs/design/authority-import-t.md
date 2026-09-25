@@ -98,6 +98,8 @@ every tag, deleted or kept, to rules under which the two trees agree, and refuse
   style no longer the cells');
 - nesting deeper than the scanner's 32 levels (as the scanner refuses it, and so the importer
   never recurses further);
+- more than 20 000 elements in a section (ten times the most a pinned label's section holds, 1 965
+  in the Imatinib Teva tablets' 5.1), so T's records of them fit the worker's memory;
 - a self-closing tag other than `br`, `hr` and `img`, and those three written otherwise (HTML
   ignores the `/`: `<span style="font-size:1pt"/>` wraps everything after it, and `<u/>` is
   rebuilt into every later block);
@@ -318,8 +320,9 @@ against **every text node under its element**, at that node's font size:
   - no ancestor and no descendant carries a shift;
   - after T it holds only text: 1 to 4 code points other than whitespace (a footnote mark, an
     exponent, "95%"), and whitespace (U+0020, U+00A0); - unshifted text (text under no shift, deleted or not, and in no `sup` or `sub`, so it sits
-    on the baseline and the run's offset from it is the run's own) that draws ink (no
-    whitespace, no Default_Ignorable code point, no mark, no picture) stands directly beside it
+    on the baseline and the run's offset from it is the run's own) that draws ink (a letter, number, punctuation or symbol, General_Category L, N, P or S,
+    and not a picture or a code point the fidelity layer draws as a gap: a thin space, a
+    blank glyph such as U+2800 BRAILLE PATTERN BLANK, a Default_Ignorable code point) stands directly beside it
     in the same block: the code point before its first
     non-whitespace code point, or after its last, is a non-whitespace code point of unshifted
     text, or one U+0020 or U+00A0 away from one, with no block boundary, `br` or cell between (a
@@ -718,3 +721,11 @@ Each refusal names the stage (`narrative`) and a closed reason: `markup`, `eleme
     plus-sign evidence took a `+` before a `br`, and after a mark. Fixed: under `collapse` every
     facing border must be drawn, a neighbour is under no shift at all, and the rest as found;
     each repro a case or a cost test.
+18. **Fourth code review** (2026-09-25). It found the fixes of reviews 15–17 sound. High: T4's
+    neighbour could be a code point drawn blank that is neither whitespace nor default-ignorable
+    (U+2800 BRAILLE PATTERN BLANK, the blank Mongolian and Yi glyphs, a private-use code point),
+    so a raised digit alone on its line was folded; a 4 MiB section of small elements took more
+    than 1 GiB of heap, past the worker's memory, where it should refuse. Fixed: a neighbour is a
+    letter, number, punctuation or symbol that is no gap, and a section holds at most 20 000
+    elements; T's per-code-point records are shared, so a 4 MiB section imports within a 384 MB
+    heap (peak resident memory 690 MB, from 940 MB).
