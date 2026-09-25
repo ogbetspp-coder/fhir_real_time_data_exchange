@@ -184,7 +184,8 @@ The fidelity check covers "every section that carries the code and a `text.div`"
 **withheld** section of an authority import (`docs/design/authority-import-withheld.md`), whose
 only text is a fixed notice that is not narrative: `fidelity-norm/3.2.0` gives the report a
 `withheld` status, binds the section in `narrativeBindingSha256` and refuses the notice anywhere
-else. A section is withheld only on the renderer gate's evidence, from the browser's exact advances and
-painted pixels, that the authority's own drawing cannot be read as written, confirmed by the
+else. A section is withheld only on the renderer gate's evidence, from the browser's exact advances, its
+painted pixels and the pinned fonts' ink bounds, that the authority's own drawing cannot be read as
+written, confirmed by the
 person who requests the import, never on a refusal of ours, so no false pass
 of the authority's text enters the record by it: none of the section's text enters at all.

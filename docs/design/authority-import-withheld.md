@@ -1,6 +1,6 @@
 # A withheld section: importing a publication with an authority's defect recorded in place (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25; seventh draft, after six design reviews
+- Status: proposed, 2026-09-25; eighth draft, after seven design reviews
 - Owner decisions (2026-09-25): withhold the Imatinib Teva tablets SmPC's 5.1 and import the
   other 31 sections; a section may be withheld only on reviewed, measured evidence of the
   authority's defect, the whole record is marked incomplete everywhere it is read, and the safety
@@ -37,7 +37,8 @@ again in the pinned image):
 
 ADR 0005 decision 3 refuses such a publication. Of the EMA ePI API's public corpus (268 Bundles;
 English SmPCs for five centrally authorised products) no English SmPC gets past T, pictures and
-structure except this label, blocked only by 5.1. The owner decided that the other 31 sections
+structure except the two Imatinib Teva SmPCs, each blocked only by its 5.1; the capsules' 5.1 shows
+no run-together cells, so only the tablets' can be withheld. The owner decided that the other 31 sections
 are imported with their full proof and 5.1 is carried as withheld: its heading and code, none of
 the authority's content, and the gap stated wherever the record is read.
 
@@ -49,13 +50,17 @@ A section may be withheld only when all hold:
 
 1. **A person asks, having reviewed the evidence.** The import request (D2) gains
    `withheldEvidence`, the `recordSha256` of the renderer record the person reviewed (one record per
-   document; its drawing is the render build's captures of that attested record, R1), and `withheld`:
-   a list of `{ path, code, defects }` in the document's pre-order, `path` the section's
-   `SourcePath`, `code` its code as served and `defects` the kinds they confirmed there (a split number such as "12" beside ".5" is geometrically a run-together and
-   must not be confirmed). The request is approved content (D2), covered by
+   document; its drawing is the render build's captures of that attested record, stored under its
+   hash and named by its attestation, R1), and `withheld`: a list of `{ path, code, confirmed,
+rejected }` in the document's pre-order, `path` the section's `SourcePath`, `code` its code as
+   served, `confirmed` the defect locations they judged misleading and `rejected` those they judged
+   sound (a split number such as "12" beside ".5" is geometrically a run-together and is
+   rejected). Both fields are present or both absent, and `withheld` has at least one entry. The request is approved content (D2), covered by
    `approvedContentSha256` (D8); the lookup refuses if the record it uses is not the one named, or
-   its defects for the section are not the ones confirmed (`withheld-evidence-changed`), so a later
-   record, drawn under another gate, never stands in for the one reviewed.
+   the section's defect locations in it are not exactly those confirmed and rejected
+   (`withheld-evidence-changed`), so a later record never stands in for the one reviewed. At least
+   one location must be confirmed; the rejected ones are kept in the provenance, as findings
+   against the gate's definition of a defect.
 2. **Its drawing is shown unsound, by evidence that is not ours.** The renderer gate's record for
    the document (`docs/design/authority-import-renderer.md` R8), attested by the render build and
    verified by the image build (R1), holds for the section:
@@ -63,8 +68,9 @@ A section may be withheld only when all hold:
      it has no pinned face for, a missing glyph, a model difference, a script or mark it cannot
      bound, a calibration failure, an XML `parsererror`); the font check runs on every section,
      T's or not, so no defect is measured in a substitute font;
-     **and** at least one defect (the renderer note's R8), a geometric finding that a reader cannot
-     read the drawing as written, never taken from a content area or a threshold of ours: two cells'
+     **and** at least one confirmed defect (the renderer note's R8), a geometric finding that a reader
+     cannot read the drawing as written, never taken from a content area or a widened bound, and
+     using only the parameters R4 binds for defects: two cells'
      text on one line with no more space between them than between two letters of a word, their
      facing advances abutting or overlapping (`cells-run-together`: "182:8" beside "177:12" read as
      one run); a line through the body of a letter, not a touch at a tail or serif
@@ -121,7 +127,8 @@ automatic and never silent. For a synthetic publication, a withheld section need
   generated from that code alone. No entry, extension or other element. The reason and the
   evidence are in the provenance, not in the notice.
 - **The document says it is partial.** `Composition.status` is `partial` instead of D9's `final`
-  whenever a section is withheld, in the record and in the EMA output. R5 defines it as "partial
+  whenever a section is withheld, and only then: the gate and the crosswalk refuse `partial` on any
+  source unless the verified withheld list is non-empty, in the record and in the EMA output. R5 defines it as "partial
   (e.g. initial, interim or preliminary)", of which "data in the composition may be incomplete or
   unverified", the nearest of its codes to a document with a section withheld; the binding is required to the
   status value set, and no profile narrows it (Composition-uv-epi's short text lists five other
@@ -129,12 +136,12 @@ automatic and never silent. For a synthetic publication, a withheld section need
   (`createEmaList`), which references our document, stays `current`: the List is current; the
   document it lists says it is partial. The FHIR Provenance
   (D12) carries the extension `https://khs.dev/fhir/StructureDefinition/ext-record-incomplete` with
-  each withheld section's code and defect kinds, so the query service, which reads the FHIR store,
+  each withheld section's canonical key (`smpc.*`), its EMA code (its SPOR system named) and its
+  confirmed defect kinds, so the query service, which reads the FHIR store,
   can return them; the run manifest's ingestion evidence, the ledger row (its BigQuery schema) and every
   query result carry `incomplete: true` and the codes.
-- **Provenance.** The source record gains `withheldSections: [{ path, code, page, defects }]`
-  (`path` and `code` checked against the request; `defects` recomputed from the record: the kinds
-  found) and, when anything is withheld, `rendering: { gateVersion, gateSha256, recordSha256 }`
+- **Provenance.** The source record gains `withheldSections: [{ path, code, page, confirmed,
+rejected }]` (checked against the request and the record) and, when anything is withheld, `rendering: { gateVersion, gateSha256, recordSha256 }`
   (checked: the record the lookup used; the run's evidence keeps its bytes). Such a submission
   re-verifies in its own worker image, whose store and gate it used (the renderer note's R10). The record thus shapes approved content only when something is
   withheld, and is then named in it.
@@ -204,7 +211,8 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
   section, or such a section without `partial`, fails closed. Never from the latest Provenance by
   write order; for the current version, `get_provenance` cross-checks the Provenance's extension,
   and a disagreement fails closed. `get_section` on a withheld section returns a new outcome,
-  `section-withheld`, with its defects, never the notice as document content; `verify_quote`
+  `section-withheld`, with its confirmed defect kinds for the current version (read from the
+  Provenance; for a superseded version, without them), never the notice as document content; `verify_quote`
   reports the withheld sections as not searched, so a `no-match` on an incomplete record never
   reads as absence; `get_provenance` returns the withheld sections; every result about the
   document carries `incomplete`. `QUERY_TOOLS_VERSION` and the agent's vendored contracts move.
@@ -216,8 +224,9 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
   requester must be an identity, not D8's placeholder): PR 5's preconditions.
 - **The round trip** (PR 4) reports the withheld section as an expected, recorded difference.
 - **The defect is recorded** in `docs/design/qrd-conformance-check.md` with its measurements, as
-  a finding reportable to the authority; the record's pull request publishes the defects' captures
-  for its reviewer (the renderer note's R1), and the request names what was reviewed (W1.1).
+  a finding reportable to the authority; the person reviews the render build's captures of the
+  attested record (the record's pull request shows only a pre-check's), and the request names what
+  was reviewed (W1.1).
 - **Forward pointers.** `docs/design/authority-import-contract.md` (D2, D3, D4, D6, D7, D9, D10, D12,
   D13),
   `docs/design/epi-mcp-query-service.md` and `docs/design/verifiable-answers.md` gain a line
@@ -225,7 +234,7 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
 
 ### W7. Versions
 
-- `CanonicalSubmission` 2.1.0: the request's `withheld`, the source record's `withheldSections` and
+- `CanonicalSubmission` 2.1.0: the request's `withheldEvidence` and `withheld`, the source record's `withheldSections` and
   `rendering`, `Composition.status` `partial`. `schemaVersion` is a literal, so a 2.0.0 submission
   does not read as 2.1.0: 2.0.0 authority imports (dry runs only; none approved) are re-imported,
   and readers that must keep reading old documents accept both (the run manifest's
@@ -261,7 +270,8 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
 
 - The importer: a synthetic publication with one section whose record shows a defect imports with
   it withheld; a listed section with only a conservative failure, or with a refusal of ours, or
-  with nothing, refuses (`withheld-section-not-shown`); an unlisted failing section refuses; a
+  with nothing, refuses (`withheld-section-not-shown`); a request whose confirmed and rejected locations differ from
+  the record's refuses (`withheld-evidence-changed`); an unlisted failing section refuses; a
   listed safety section, a section with subsections, a repeat or an out-of-order list refuses at
   `tree`; a document-level refusal refuses whatever is listed; a withheld section's picture is not
   fetched; a section whose only T5 evidence is withheld refuses; listing 4.2 Posology refuses.
@@ -335,3 +345,12 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
    this draft, with the renderer note's seventh: R4's principles decide on pixels and exact advances;
    the propose mode, and the review of the render build's captures of the attested record; the record
    named once per request; the churn stated as a residual; the rest as found.
+7. **Seventh independent review** (2026-09-25). Medium: the captures a person reviews were not bound
+   to the record named (stored by their own hash, after signing, and lost for good if their upload
+   failed); confirmation was per kind while the rule it applies is per instance, and a record's
+   defects had no location. Low: `withheldEvidence`'s rules and version; W6 pointed at a
+   pre-check's captures; defects for a superseded version; `partial` without a withheld section;
+   the delivery order; the page's top edge; which defect parameters bind; the capsules' 5.1; code
+   systems named. Fixed in this draft, with the renderer note's eighth: captures written before
+   signing under the record's hash and named by the attestation; defects located, confirmed or
+   rejected one by one; the rest as found.

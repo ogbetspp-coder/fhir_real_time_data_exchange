@@ -459,7 +459,7 @@ Each refusal names the stage (`narrative`) and a closed reason: `markup`, `eleme
 
 ## What waits for PR 3c
 
-_Settled by `docs/design/authority-import-renderer.md` (the gate: records drawn and attested by a dedicated build, verified by the image build, looked up by Zone B; the frame tolerance is 1/32 px) and `docs/design/authority-import-withheld.md` (5.1 is withheld, an EMA defect measured in Chrome), 2026-09-25. The list below is kept as the requirements those notes answer._
+_Settled by `docs/design/authority-import-renderer.md` (the gate: records drawn and attested by a dedicated build, verified by the image build, looked up by Zone B; its thresholds, the frame tolerance among them, provisional until 3c-C's measured design) and `docs/design/authority-import-withheld.md` (5.1 is withheld, an EMA defect measured in Chrome), 2026-09-25. The list below is kept as the requirements those notes answer._
 
 - **The renderer gate** (ADR 0005's renderer cross-check, made a gate). A pinned headless browser
   draws each publication's sections as the authority serves them (inline styles, no class
