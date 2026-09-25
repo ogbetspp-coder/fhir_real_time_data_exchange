@@ -319,16 +319,17 @@ against **every text node under its element**, at that node's font size:
   - every text node under it is no larger than its parent's font size;
   - no ancestor and no descendant carries a shift;
   - after T it holds only text: 1 to 4 code points other than whitespace (a footnote mark, an
-    exponent, "95%"), and whitespace (U+0020, U+00A0); - unshifted text (text under no shift, deleted or not, and in no `sup` or `sub`, so it sits
-    on the baseline and the run's offset from it is the run's own) that draws ink (a letter, number, punctuation or symbol, General_Category L, N, P or S,
-    and not a picture or a code point the fidelity layer draws as a gap: a thin space, a
-    blank glyph such as U+2800 BRAILLE PATTERN BLANK, a Default_Ignorable code point) stands directly beside it
-    in the same block: the code point before its first
-    non-whitespace code point, or after its last, is a non-whitespace code point of unshifted
-    text, or one U+0020 or U+00A0 away from one, with no block boundary, `br` or cell between (a
-    neighbour on its own line: `10<span>9</span>/l`, `(CI<span>95%</span>)`,
-    `<span>1 </span>Haematological`); a U+0020 can break the line there, which the renderer
-    gate measures.
+    exponent, "95%"), and whitespace (U+0020, U+00A0);
+  - unshifted text (text under no shift, deleted or not, and in no `sup` or `sub`, so it sits on
+    the baseline and the run's offset from it is the run's own) that draws ink (a letter, number,
+    punctuation or symbol, General_Category L, N, P or S, and not a picture or a code point the
+    fidelity layer draws as a gap: a thin space, a blank glyph such as U+2800 BRAILLE PATTERN
+    BLANK, a Default_Ignorable code point) stands directly beside it in the same block: the code
+    point before its first non-whitespace code point, or after its last, is a non-whitespace code
+    point of unshifted text, or one U+0020 or U+00A0 away from one, with no block boundary, `br`
+    or cell between (a neighbour on its own line: `10<span>9</span>/l`, `(CI<span>95%</span>)`,
+    `<span>1 </span>Haematological`); a U+0020 can break the line there, which the renderer gate
+    measures.
 
   `vertical-align: super` and `sub` fold under the same conditions, the 0.2 bound excepted; their
   shift, wherever T4 uses one (the deletion bound and the ceiling), is Chrome's: the parent's
@@ -338,9 +339,9 @@ against **every text node under its element**, at that node's font size:
   larger than half the parent's font size, a shifted run with no unshifted neighbour on its line
   (a whole line moved up is not an exponent), a shifted element with no text node or with an
   `img` (a picture moved over text), nested shifts that are not all deleted, a shift on or inside
-  `sup` or `sub` that is not deleted, a `sup` or `sub` larger than its parent's text, and any `position` declared on `sup` or `sub`
-  (a declared `vertical-align` there is T3's `css-value`) (a declared `vertical-align` replaces their raise: `<sup
-style="vertical-align:baseline">` draws on the line).
+  `sup` or `sub` that is not deleted, a `sup` or `sub` larger than its parent's text, and any
+  `position` declared on `sup` or `sub` (a declared `vertical-align` there is T3's `css-value`,
+  since it replaces their raise: `<sup style="vertical-align:baseline">` draws on the line).
 
 Whether a folded run's glyphs reach the line above or below depends on the font and on what the
 line above holds at the width drawn; the renderer gate measures it on every publication. The
@@ -729,3 +730,9 @@ Each refusal names the stage (`narrative`) and a closed reason: `markup`, `eleme
     letter, number, punctuation or symbol that is no gap, and a section holds at most 20 000
     elements; T's per-code-point records are shared, so a 4 MiB section imports within a 384 MB
     heap (peak resident memory 690 MB, from 940 MB).
+19. **Fifth code review** (2026-09-25). Nothing Medium or higher. It held review 18's refactor
+    behaviour-preserving by differential testing against the code before it (90 000 random
+    sections, no difference beyond the new neighbour rule, which only adds refusals), drew every
+    letter, number, punctuation and symbol code point in Chrome in T's eight font stacks (the only
+    blank ones are those the fidelity layer lists as gaps, and U+FFFC), and imported 4 MiB
+    sections of eight shapes within a 256 MB heap. Low: two formatting faults in T4, fixed.

@@ -22,7 +22,7 @@ behaviour). `labels/ema-epi/` pins the Imatinib Teva film-coated tablets SmPC (t
 end-to-end label) with its QRD check result.
 
 **Why.** Roadmap 3a, PR 3: PR 2's T removed nothing, so every real section refused. The design
-was reviewed fourteen times and its code four times (so far); the reviews are recorded in the design
+was reviewed fourteen times and its code five times, the last finding nothing Medium or higher; the reviews are recorded in the design
 note.
 
 **Impact assessment (step 0).** `src/authority/` is imported by the worker's gate (Zone B
