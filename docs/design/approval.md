@@ -313,3 +313,42 @@ It does not claim 21 CFR Part 11 or Annex 11 compliance: that needs the organisa
 procedures, training, identity lifecycle and record retention as well. It produces the technical
 evidence such a claim would rest on. It does not approve label content; it attests that a record
 represents an approved label.
+
+## Amendment (2026-09-25, an authority import's request statement)
+
+`docs/design/authority-import-withheld.md` and `docs/design/authority-import-renderer.md` (roadmap
+3a, PR 3c; owner decisions of 2026-09-25) make a person judge two things about an authority import
+that no check proves: that each contact the renderer gate could not prove harmless is legible, and
+which sections are withheld on a confirmed defect. PR 5 persists an authority import only once that
+person is attested, so phase 1 of this design gains the following, without changing what it
+decides for a Type 2 approval.
+
+- **A statement kind, `request`,** with its own meaning code ("I reviewed the renderer gate's
+  captures of this publication's record; each listed contact is legible; each listed defect is
+  confirmed or rejected as stated; I request this import"). For an authority import it is the
+  statement D5 links and D9 verifies; there is no second `approve`, since the content's approval is
+  the authority's publication (ADR 0005 decision 4). `document` is generalised to the canonical
+  `Bundle.identifier` (an import's is `authority-import:ema:<id>`).
+- **Its review (D6)** is a pure function of the submission and the attested renderer record: the
+  record and captures named by `renderEvidence`, every acknowledged contact with its captures' mask
+  hashes and every identity each drawing stands for, and each withheld section's confirmed and
+  rejected defects with their captures. The renderer note's review tool is this review's surface; the
+  signer rebuilds it and binds its hash in `reviewSha256`, so what was shown is what is signed.
+- **Its `sections`** list every carried section's `narrativeDivSha256` and every withheld section,
+  with `status: withheld` and the notice's hash. D9 requires the served version's withheld set to
+  equal the statement's exactly and every statement section to be present, and the query service
+  fails closed on a withheld section that is a safety section (4.2 to 4.9, or under one) or is not a
+  leaf, so no store write can plant a withholding behind a valid approval.
+- **The role.** The signer requires `content-reviewer` for a request that acknowledges a contact or
+  withholds a section.
+- **Segregation (D7) for a request.** The requester may be the principal that ran the producer, but
+  may not be the person who proposed or committed the renderer record (the renderer note's R1);
+  while the project has one named person this is the known gap D7 already records.
+- **Where the publication's approval goes.** Item 2 removes `approval` from the submission. For an
+  authority import the publication's fields (ePI id, document, List, version number, procedure
+  number, timestamp) and `authorityStatus: pilot` move into the source record
+  (`provenance.sourceDocument`), which already carries the request; the request statement signs over
+  them through `approvedContentSha256`.
+- **Versions.** `ApprovalStatement` gains the kind and the meaning code (its `statementVersion`
+  moves), and `ReviewRecord` the import review's shape; item 2's build order places them in phase 1,
+  before PR 5.

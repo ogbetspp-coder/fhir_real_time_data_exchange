@@ -1,6 +1,6 @@
 # A withheld section: importing a publication with an authority's defect recorded in place (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25; fourteenth draft, after thirteen design reviews
+- Status: proposed, 2026-09-25; fifteenth draft, after fourteen design reviews
 - Owner decisions (2026-09-25): withhold the Imatinib Teva tablets SmPC's 5.1 and import the
   other 31 sections; a section may be withheld only on reviewed, measured evidence of the
   authority's defect, the whole record is marked incomplete everywhere it is read, and the safety
@@ -21,7 +21,8 @@
 
 Section 5.1 of the EMA's Imatinib Teva film-coated tablets SmPC is misleading when drawn, not
 only outside T's rules. It was measured in macOS Chrome, with the FHIR div's inline styles only,
-on a page with an 8 px margin, at widths from 280 to 1 000 CSS px (the renderer gate measures it
+on a page with an 8 px margin, at viewport widths from 280 to 1 000 CSS px (the figures below are
+content widths, the div's own, as the gate's R2 counts them) (the renderer gate measures it
 again in the pinned image):
 
 - The at-risk tables under the two Kaplan-Meier figures put up to three values in one cell. At
@@ -224,7 +225,9 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
 - **The query service**: every tool reads the version it answers from whole (`loadDocument`), and
   takes `incomplete` from it: a version is incomplete when its `Composition.status` is `partial`,
   and its withheld sections are those carrying our `emptyReason` code; `partial` without such a
-  section, or such a section without `partial`, fails closed. Never from the latest Provenance by
+  section, such a section without `partial`, a withheld set that differs from the approval
+  statement's, or a withheld safety or non-leaf section, fails closed with a new error code,
+  `record-inconsistent`. Never from the latest Provenance by
   write order; for the current version, `get_provenance` cross-checks the Provenance's extension,
   and a disagreement fails closed. `get_section` on a withheld section returns a new outcome,
   `section-withheld`, a validated success variant of its output (not an error, which the agent treats
@@ -241,11 +244,13 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
 - **Before persistence.** D1's dry run is lifted for a publication with a withheld section only once
   the query service and the agent do the above, and for any request that withholds a section or
   acknowledges a contact (the renderer note's R5) only once it is bound to an attested person: roadmap
-  item 2's signer signs a request statement over the request's `approvedContentSha256` (which covers
-  `renderEvidence`, `acknowledgedContacts` and `withheld`), in the approver map's `content-reviewer`
-  role, which alone may acknowledge a contact or withhold a section; the requester should not be the
-  person who proposed the record (the renderer note's R1), a separation that is a stated residual
-  while the project has one named person (D2 names who requests an import; withholding is a decision about content, so its
+  item 2's signer signs a `request` statement (`docs/design/approval.md`, its amendment of
+  2026-09-25) over the request's `approvedContentSha256`, after a review built from the attested
+  record that shows every acknowledged contact and every withheld section's confirmed and rejected
+  defects, in the approver map's `content-reviewer` role, which alone may acknowledge a contact or
+  withhold a section; the statement pins the withheld set, which the query service requires the
+  served version to match exactly; the requester should not be the person who proposed the record,
+  a separation that is a stated residual while the project has one named person (D2 names who requests an import; withholding is a decision about content, so its
   requester must be an identity, not D8's placeholder): PR 5's preconditions.
 - **The round trip** (PR 4) reports the withheld section as an expected, recorded difference.
 - **The defect is recorded** in `docs/design/qrd-conformance-check.md` with its measurements, as
@@ -267,7 +272,10 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
   section. `schemaVersion` is a literal, so a 2.0.0 submission does not read as 3.0.0: 2.0.0
   authority imports (dry runs only; none approved) are re-imported, and 2.0.0 drawn and synthetic
   submissions are refused as 1.0.0's were at 2.0.0.
-- `QUERY_TOOLS_VERSION` 3.0.0, a major (`incomplete` required; `get_section`'s `section-withheld`
+- `ApprovalStatement`'s next version (the `request` kind and its meaning code; `docs/design/approval.md`),
+  and version 1.0.0 of our `withheld-reason` CodeSystem and `ext-record-incomplete` extension, defined
+  as FHIR artefacts beside the mapping.
+- `QUERY_TOOLS_VERSION` 3.0.0, a major (`incomplete` required; the `record-inconsistent` error code; `get_section`'s `section-withheld`
   variant with its defect kinds; `get_provenance`'s withheld sections, record hash, contacts
   acknowledged and requester); the agent's turn record's next major (`AGENT_TURN_VERSION`, a required
   `incomplete`); the `ingestion-provenance` schema's published `$id`, its next major, from a constant
@@ -300,6 +308,8 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
 
 - A reader of our record sees "Information withheld." where the authority's page draws 5.1; the
   provenance says why.
+- That a requester reviewed a withheld section's captures before confirming or rejecting its defects
+  is their claim; the review tool records what it showed them.
 - The finding is of the FHIR div drawn with its inline styles in metric-compatible fonts; the
   EMA's viewer applies its own stylesheet, which the gate does not model.
 - Whether an incomplete record may be entitled to the query service is PR 5's decision, with the
@@ -465,3 +475,11 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
     approved content in the `content-reviewer` role, the only role that may acknowledge or withhold,
     separation from the proposer a stated residual while the project has one person; the rest as
     found.
+14. **Fourteenth independent review** (2026-09-25). Medium: approval.md could not carry the request
+    statement as written (its kinds, meaning, document identity, review and segregation are a Type 2
+    approval's), and the signed statement did not pin the withheld set, so a store write could plant a
+    withholding behind a valid approval. Low: ADR 0003's wording; what the Provenance carries; ADR
+    0002 and the roadmap behind W6; W7's missing items; no error code for the query service's closed
+    failures; the withheld review's claim; width units. Fixed in this draft: approval.md amended with a
+    `request` statement kind, its review, sections (the withheld set pinned and checked by D9), role,
+    segregation and phase; `record-inconsistent`; the rest as found.
