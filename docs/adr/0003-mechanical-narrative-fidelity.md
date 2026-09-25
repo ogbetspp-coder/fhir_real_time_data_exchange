@@ -177,3 +177,13 @@ reader sees without the check seeing it._
   normalisation version even though no code changes.
 - The verifier is a second, independent narrative gate alongside the existing
   byte-preservation assertion in `src/fhir/transform.ts` (UR-01); the new control is UR-09.
+
+## Amendment (2026-09-25, a withheld section)
+
+The fidelity check covers "every section that carries the code and a `text.div`" except a
+**withheld** section of an authority import (`docs/design/authority-import-withheld.md`), whose
+only text is a fixed notice that is not narrative: `fidelity-norm/3.2.0` gives the report a
+`withheld` status, binds the section in `narrativeBindingSha256` and refuses the notice anywhere
+else. A section is withheld only on the renderer gate's evidence, from the pixels the browser
+paints, that the authority's own drawing is unsound, never on a refusal of ours, so no false pass
+of the authority's text enters the record by it: none of the section's text enters at all.

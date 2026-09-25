@@ -243,3 +243,21 @@ agent of its source files (each named by the authority's id and by hash), the re
 
 **Status.** Producers are `src/fixtures/synthetic-submission.ts` and, for authority imports,
 `scripts/authority/import.ts`, whose identity is not trusted (invariant 8).
+
+## Amendment (2026-09-25, a withheld section)
+
+`docs/design/authority-import-withheld.md` (roadmap 3a, PR 3c; owner decisions of 2026-09-25)
+lets an authority import carry a leaf section the renderer gate shows the authority drew unsound
+as **withheld**: its heading and code, none of the authority's content, our own `emptyReason` code
+and a fixed notice, `Composition.status` `partial`. Invariants 4 and 6 change for that case only:
+
+- **4.** A withheld section still has its provenance entry (no spans; `narrativeDivSha256` the
+  notice's hash, `normalizedTextSha256` that of the empty text), so the bijection holds; the
+  fidelity counts add `sectionsWithheld`, and `sectionsChecked` is verified plus withheld.
+- **6.** The notice is the one `text.div` outside the verified narratives that is accepted, and only
+  on a section the recomputed provenance of an `authority-publication` source lists as withheld,
+  byte for byte the constant; anywhere else, on any source, it refuses, as does any `emptyReason`
+  or `generated` narrative.
+
+The human decision that withholds is the import request's, hash-bound in the approved content as
+every request is (invariant 2); before PR 5 lifts the dry run it is bound to an attested identity.
