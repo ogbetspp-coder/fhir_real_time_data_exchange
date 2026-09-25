@@ -1,7 +1,7 @@
 # The renderer gate: a pinned browser's evidence for every authority import (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25 (architecture approved by the owner the same day); sixth draft,
-  after five design reviews
+- Status: proposed, 2026-09-25 (architecture approved by the owner the same day); seventh draft,
+  after six design reviews; R4's thresholds provisional, settled by 3c-C's measured design
 - Decides: what `docs/design/authority-import-t.md`'s "What waits for PR 3c" left open: who draws,
   what is drawn and measured, the evidence record and its store, and the `rendering` stage
 - Amends: ADR 0005 (decision 1's renderer cross-check); `docs/design/authority-import-t.md` (the
@@ -46,21 +46,32 @@ text (T's opening; ADR 0005, amended 2026-09-24). Until the gate exists the impo
      against the lock's entry for the record's gate version (R9) and each pinned file's hash, and
      **regenerates the whole record** twice, in separate processes, requiring each to equal the
      committed record canonically, the pixel fields within ε (R7);
-  4. only then, with network: signs an **attestation** `{ environment, keyVersion, gateSha256,
-recordSha256, documentSha256, pinsSha256, rendererImageDigest }` with a KMS key version of that
-     environment's key, which only the render identity may use, and writes it (`objectCreator`, no
-     overwrite) to `attestations/<gateSha256>/<documentSha256>.json` in a bucket only the render
-     identity may write.
+  4. only then, with network: signs an **attestation** `{ environment, keyVersion, commitSha,
+ gateSha256, recordSha256, documentSha256, pinsSha256, rendererImageDigest }` with a KMS key
+     version of that environment's key, which only the render identity may use, after checking that
+     `commitSha` is a first-parent commit of `main`, and writes it, create-if-absent
+     (`ifGenerationMatch=0`; "exists" is done), to `attestations/<gateSha256>/<recordSha256>.json` in
+     a bucket only the render identity may write. A record whose attestation already exists at that
+     path is not drawn again.
 
   The render identity's grants are exactly: reader on the renderer image repository, the build's
-  staging bucket reader, `objectCreator` on the attestation and captures buckets, signer on its
-  environment's key, and log writer. The renderer image is built and pushed, when its pins change,
+  staging bucket reader, `objectViewer` and `objectCreator` on the attestation and captures
+  buckets, signer on its environment's key, and log writer. The renderer image is built and pushed, when its pins change,
   by a separate image build with writer on its own repository (`renderer-images`), not the worker's.
   A record that does not reproduce gets no attestation.
 
+- **Where a record comes from.** The same configuration has a **propose** mode, which a deployer runs
+  on any commit under a separate proposal identity that cannot sign: it draws a publication and
+  writes the candidate record, with its captures, to a proposals bucket. A person commits that
+  record in a pull request; after the merge, the attest mode regenerates it on `main` and signs only
+  if it reproduces. The first gate version needs two changes: one adding `Dockerfile.renderer` and
+  its pins, after which the image build pushes the renderer image; then one locking its digest and
+  the gate, with the first records proposed under that digest.
+
 - **The image build verifies, offline.** Every deploy route (`deploy.yml` and `scripts/gcp/deploy.sh`)
-  first downloads, for each record in the store, the attestation at its predictable path (the
-  deployer may read the bucket), checking each object's name against `^[0-9a-f]{64}$`, into
+  first downloads, for each record in the store, the attestation at its predictable path, by the
+  record's own hash (the deployer may read the bucket), checking each object's name against
+  `^[0-9a-f]{64}$`, into
   `render-attestations/`, which is uploaded with the tree (neither `.gitignore` nor
   `.gcloudignore` excludes it). `cloudbuild.images.yaml` gains a step, `--network none`, before the
   worker image is built: for each record, the attestation's signature verifies against a public key
@@ -71,11 +82,15 @@ recordSha256, documentSha256, pinsSha256, rendererImageDigest }` with a KMS key 
   recompute the judge's hash (CI and the render build do). A record without a valid attestation is
   removed from the image's store, and the lookup then refuses its publication
   (`renderer-evidence-missing`): the render build is off the deploy's critical path, and one bad
-  record never blocks a deploy. The worker's digest is taken from the build's own results.
+  record never blocks a deploy. So the deploy that follows a record's merge usually runs before its
+  attestation exists and drops it; a later deploy (or a `workflow_dispatch` of `deploy.yml`)
+  activates it. The worker's digest is taken from the build's own results.
 - **The trust root, stated.** A record is trusted because the render identity, run only from
   `main`, drew it twice with the reviewed judge from pinned bytes and signed that it reproduced.
-  Whoever can change `main`, `cloudbuild.render.yaml`, the trigger or the pinned keys (the project's
-  deployers; without branch protection, whoever can push to `main`) can change that; they can also
+  Whoever can change `main`, `cloudbuild.render.yaml`, the trigger or the pinned keys, or act as the
+  render identity (the project's deployers, who hold `serviceAccountUser`, and can run the trigger
+  on another commit, which the `commitSha` check then refuses; without branch protection, whoever can
+  push to `main`) can change that; they can also
   ship an importer without the stage, so the gate adds no trust beyond them and takes none away.
   The producer, whom D1 does not trust, can neither draw nor sign, and a pull request's own build
   configuration never runs as the render identity.
@@ -166,6 +181,14 @@ recordSha256, documentSha256, pinsSha256, rendererImageDigest }` with a KMS key 
   with the scanner's; each table's grid from cell rectangles, compared with T(div)'s. Each character
   box's height must equal the pinned face's ascent plus descent at its computed size, rounded at the
   device size (R4).
+- **The output format.** T's model output is specified in 3c-B's addendum to this note before R3
+  lands: its entries keyed by the pre-order index of each text node and marker in the authority's
+  div (the same in both modes by T1's one-tree rule); each property as T models it (a size's range
+  under `smaller`, a colour's set under a link, a line height's kind, each element's fold); the
+  code-point offsets of T5's waivers and of the scanner's text for each drawn code point, which the
+  allowlist's neighbours need; how points compare with Chrome's serialised pixels; and the
+  per-section picture list (R2). Its serialiser is T's code, under D10's lock, and step 2 of the
+  render build (R1) emits it with the scanner's text and the picture list.
 - **What the record binds.** Not T's or the scanner's code but their outputs, per section: T(div)'s
   hash; the hash of T's model output (every text node's and list marker's modelled style, fold
   decision and waiver, serialised canonically); and the scanner's text hash (which holds the list
@@ -208,12 +231,10 @@ computed from the pinned fonts and bounded:
   uses, at the fractional origins the page uses, the pixels a glyph paints on a page of its own
   must lie inside its rounded-out ink bound. A glyph that fails is a refusal of ours, not a
   widened bound.
-- **Glyph pixels.** Where a check below resolves a candidate by pixels, the judge draws, clipped to
-  the candidate's region, the page with only the glyphs (lines, borders and backgrounds transparent)
-  and with only the lines (glyph fills and decorations transparent), layout asserted unchanged; a
-  glyph's pixels are those inside its advance-and-ink region that differ from the background at a
-  coverage of 40 % or more, a coverage within ε of 40 % counting against the section (R7). Pixels
-  are attributed to a glyph by its advance, never by colour.
+- **Glyph pixels** (P1 below): a glyph's pixels are those inside its advance-and-ink region, in
+  the drawing with only the glyphs, that differ from the background at a coverage of 40 % or more,
+  a coverage within ε of 40 % counting against the section (R7); they are attributed to a glyph by
+  its advance, never by colour.
 - **Markers.** A list marker's box from `DOM.getBoxModel` on its `::marker` pseudo-node, bounded as
   text.
 - **Lines.** Borders, rules, decoration lines and the edges of backgrounds, at their positions
@@ -223,55 +244,58 @@ computed from the pinned fonts and bounded:
 - **Side by side on one line.** Two runs of text stand side by side on one line when their
   baselines are within 0.5 em of the larger computed size of the two.
 
-Each check, on the authority's drawing, at every width and ratio of R2 ("ink" is the rounded-out ink
-bound). The bounds find candidates cheaply at every width; a candidate the check names is resolved
-by glyph pixels at that width and ratio. Each check is conservative: a failure says the gate cannot
-prove the drawing sound, not that it is unsound (R8 separates the two).
+**What is binding now, and what 3c-C settles.** Six reviews of this section found that geometric
+thresholds argued on paper either refuse the label's sound safety sections or miss a real
+misreading. So the principles below are binding, with the seeded cases that test them; the exact
+thresholds, candidate rules and costs are **provisional**, settled by 3c-C's own design note from the
+judge's measurements of the pinned labels, and reviewed there before any record is attested.
 
-1. **Overlap.** No two inks meet, except two consecutive characters (or ligature units) of the same
-   line fragment of the same text node, which a font's own spacing draws; every other pair, across
-   lines, elements, cells, shifts or pictures, is checked. A painted box that is not the glyph's own
-   or an ancestor's (a background, a border, a picture) and meets an ink is a candidate: it fails
-   unless the glyph's pixels are the same in the full drawing as in the glyphs-only one (nothing
-   painted over them).
-2. **Every drawn line as ink.** A foreign line that crosses, or comes within 0.5 CSS px of, any ink,
-   above, below or beside it, fails. A line of the glyph's own frame near its ink is a candidate: it
-   fails if any of its pixels is a glyph pixel (a border or a background edge on the letter itself);
-   a descender standing a pixel above its own cell's border passes. A run's own underline under
-   unshifted glyphs the allowlist accepted, and a `+` T5 waived under its own run's underline, are
-   exempt. In a section T refuses, T's allowlist and waiver do not apply, so its underlines fail
-   (a failure, not a defect).
-3. **A line under text is an underline.** Any horizontal line under text, foreign or own frame, is
-   judged by the allowlist over the stretch of the line of text above it that it spans, a code point
-   counting as underlined where its ink lies within 0.3 em (its computed size) above the line (`<`
-   over its cell's bottom border reads "≤").
-4. **The gap between cells.** Between any two cells whose text stands side by side on one line
-   (whether they share a vertical edge or not), the gap between their nearest text, measured on the
-   union of advance boxes and inks, is at least 0.25 em of the larger computed size.
-5. **The frame.** Horizontally, every advance box inside its frame (the section `div`'s content
-   box outside tables, widened on the right by 1.2 pt; in a table its cell's or caption's content
-   box, a collapsed border counting half inside it), with a tolerance of 1/32 CSS px. Vertically,
-   every ink inside its frame's border box: Chrome exposes no line box (the rectangles are content
-   areas, which a `line-height` or a `position` shift moves), so the vertical frame is judged on ink,
-   where T's note named the line box; text shifted by `position` is left to checks 1, 2 and 6.
-6. **Reach.** No advance box beyond the page's left edge, no ink, shifted or not, above the section
-   div's border box (where the viewer draws the section's heading) or the page's top edge, and none
-   clipped; overflow to the right, which the page scrolls, is allowed.
-7. **Visibility and contrast.** At the named widths and every ratio, a second drawing with each
-   glyph's fill and its decorations transparent (`-webkit-text-fill-color` and
-   `text-decoration-color`; borders keep their colour; layout asserted unchanged): the pixels inside
-   each ink must differ between the two drawings (nothing covers the glyph), and the glyph's colour
-   must have at least 4.5:1 against the second drawing's pixels behind it, excluding its own
-   accepted underline.
-8. **Folds.** A glyph T left on the baseline has its baseline within 0.1 em (its computed size)
-   plus one device pixel of its line's; a folded glyph's baseline stands at least 0.2 em minus one
-   device pixel from the baseline of the unshifted text beside it on the same line.
+**Principles (binding).**
 
-**Tolerances re-measured.** Before a gate version is set, 0.5 px, 0.3 em, 0.25 em, 1/32 px and the
-fold bounds are measured again on the pinned labels in the pinned fonts. A tolerance the labels'
-accepted drawings do not clear with a stated margin is not loosened by hand: the gate refuses those
-sections until this note is amended by review. 3c-C measures 4.2's and 4.8's tables, which stand
-nearest their borders, first.
+- **P1. Bounds nominate, pixels and exact geometry decide.** A rounded-out ink bound only finds
+  candidates. Every verdict is decided on glyph pixels (attributed to a glyph by its advance) or on
+  exact horizontal advances, never on a widened bound. Glyph pixels come from drawings made once per
+  width and ratio where candidates exist (the page with only the glyphs; with only the lines; with
+  the candidate's box alone made transparent), layout asserted unchanged, cropped locally.
+- **P2. Thresholds in device pixels, measured.** Every clearance is stated in device pixels (or in
+  em of the glyph's own size where the reading depends on the size), set from the pinned labels'
+  accepted drawings at every ratio with a stated margin, and never loosened by hand: a label that
+  does not clear one refuses until this note is amended by review.
+- **P3. A line through a glyph fails, whatever the line.** A line (a border of any cell, a rule, a
+  decoration, a background's edge) with one glyph's pixels on both of its sides within the glyph's
+  advance fails, own frame or foreign, shifted glyph or not; so does a line on a glyph's pixels. A
+  glyph shifted by `position` is judged on its moved pixels.
+- **P4. What a font draws is not a collision.** Two characters adjacent in logical order on one line
+  fragment, in whatever text nodes, are not checked against each other; a run's own decoration is
+  the one drawn by its decorating box, and the collinear decorations of adjacent runs are one line.
+  T5's waived `+` is exempt, under its own run's underline, from every check that judges a line
+  under text.
+- **P5. A line under text is judged as an underline** by the allowlist over the stretch of text it
+  spans, a code point counting as underlined where its pixels come within a stated distance, in its
+  own em, above the line (`<` over its cell's bottom border reads "≤").
+- **P6. Nothing covers a glyph.** A glyph's pixels are the same in the full drawing and in one with a
+  candidate box (a background, a border, a picture) alone made transparent; and its colour keeps
+  4.5:1 against what is drawn behind it.
+- **P7. Text stays readable as laid out.** Two cells' text standing side by side on one line keep a
+  stated gap; every glyph stays inside its frame and on the page (no advance left of the page, no
+  pixel above the section's div or the page), shifted or not; a folded glyph stands off its
+  neighbours' baseline by T4's bound, an unfolded one on it.
+
+**Seeded cases (binding).** Each is a case of the judge's tests in both modes and at every ratio.
+Must fail: a colon shifted across its cell's bottom border ("10:1" drawn "10.1"); a border through a
+letter; a line under a `<`; overlapping cells; text off the page; raised text above the section; a
+marker off the page; a picture over a glyph; a later box in the text's own colour over a glyph; a
+missing glyph (U+2070); an unpinned family (Verdana). Must pass: a descender a pixel above its own
+cell's border; a `>` 0.36 em above its cell's bottom border (4.2); a descender over an ascender at
+`line-height: normal` (4.4's "g" over "b"); `<span>T</span><span>he`; two adjacent `u` elements
+(4.2's "Posology for Ph+ ALL in children"); the waived `+` of 4.2's headings; the reporting box's
+grey background a device pixel below the line above (4.8); text inside its own inline background;
+the last line's descenders at the bottom of the section and of a cell.
+
+**Provisional checks** (the second draft's list, kept as 3c-C's starting point, each to be restated
+under P1–P7 with measured thresholds): overlap; every drawn line as ink (0.5 CSS px); a line under
+text as an underline (0.3 em); the gap between cells (0.25 em); the frame (1/32 CSS px
+horizontally); reach; visibility and contrast (4.5:1); folds (0.1 em and 0.2 em).
 
 ### R5. The `rendering` stage: what the lookup requires
 
@@ -290,7 +314,8 @@ and requires:
 - the withheld sections: the withheld note's W1, read from the record named in the request.
 
 Reasons: `renderer-evidence-missing`, `renderer-evidence-stale` (another gate, constants, output or
-picture this import does not compute), `renderer-evidence-failed`, and the withheld note's. A
+picture this import does not compute), `renderer-evidence-failed`, and the withheld note's
+(`withheld-section-not-shown`, `withheld-evidence-changed`). A
 synthetic publication with nothing withheld passes, as today; one with a withheld section needs an
 attested record like any other. The importer's golden vectors use a synthetic store, so adding a
 record does not change them.
@@ -369,22 +394,23 @@ build for that record, a false failure that is investigated, never waived.
   never taken from a content area or a threshold of ours:
   - `cells-run-together`, at every width and ratio (it needs no drawing): two cells whose text stands
     side by side on one line (R4), whose facing characters (not whitespace, a no-break space or a
-    zero-width code point) have advances that abut or overlap horizontally, so no more space
+    zero-width code point) have advances that abut or overlap horizontally (a gap of zero or less in
+    Chrome's layout units, 1/64 px), so no more space
     separates the cells than separates two letters of a word ("182:8" beside "177:12" read as one
     run); a split number such as "12" beside ".5" is the same geometry, which is why a person
     confirms each;
   - `off-page`, at every width and ratio: a character whose rounded-out ink bound, which contains
     all its ink, lies wholly beyond the page's left or top edge, so none of it is drawn;
-  - `line-through-letter`, from glyph pixels (R4) at the widths where check 2 fails and at the named
-    widths: a line (not a run's own decoration) with a glyph's pixels on both of its sides, inside the
-    band from one device pixel above the glyph's baseline to one below its x-height (or cap height
-    for a capital), the baseline's snapping allowed for: a line through the body of a letter, not a
-    touch at a tail or serif; seeded controls that must not be one: "jelly" and an italic "jf" in an
-    unpadded bordered cell, a ")" on a bottom border.
+    - `line-through-letter`, from glyph pixels (R4) at every width where P3's candidates arise: a line
+      (not a run's own decoration) with a glyph's pixels on both of its sides, inside the
+      band from one device pixel above the glyph's baseline to one below its x-height (or cap height
+      for a capital), the baseline's snapping allowed for: a line through the body of a letter, not a
+      touch at a tail or serif; seeded controls that must not be one: "jelly" and an italic "jf" in an
+      unpadded bordered cell, a ")" on a bottom border.
 
-  Every defect is also a failure (a `cells-run-together` pair fails check 4, an `off-page` character
-  check 6, a line through a letter check 2); a defect that is not is a refusal of ours. No defect
-  involves a picture's box. A test requires that no carried section of a pinned label has one.
+    Every defect is also a failure (a `cells-run-together` pair fails P7's gap, an `off-page` character
+    P7's page, a line through a letter P3); a defect that is not is a refusal of ours. No defect
+    involves a picture's box. A test requires that no carried section of a pinned label has one.
 
 No overall pass and no withheld field: what is withheld is the request's. Captures (clipped
 screenshots of the failing and defect regions, and the full measurements) are not part of the
@@ -424,8 +450,11 @@ it used, not in a later one.
 The reviews measured 211 ms to read the whole tablets label's 105 k rectangles per width on an
 M-series core, about 0.5 s per layout with the checks, so about 50 CPU-minutes per label per draw
 (6 406 layouts); a full-page capture of 5.1 at ratio 3 takes 2 to 6.5 s. So pixels are drawn only
-clipped to candidates (R4) and at the named widths (check 7), never as full pages at every width;
-the advance-only defects are computed from the rectangles already read. The render build runs on a
+drawn only at widths and ratios where candidates exist, once per drawing (glyphs only, lines only,
+a box made transparent), and cropped locally; the advance-only defects are computed from the
+rectangles already read. The sixth review measured 709 to 741 own-frame candidates per layout in
+4.8 and a full-page capture of 4.8 at 0.13 s (ratio 1) to 0.73 s (ratio 3): about two CPU-hours per
+draw for 4.8 alone, which 3c-C measures again before setting the build's timeout. The render build runs on a
 high-CPU Cloud Build machine (a private pool in the project's region if the region's default pool
 has none), sharded by ratio and width range within one build, which alone signs, with a timeout set
 from 3c-C's measurement of the pinned labels (4.8's candidates the largest share); it runs only when
@@ -470,7 +499,8 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
   margin; and seeded sound cases that must pass: a descender a pixel above its cell's border, text
   inside its own inline background.
 - Defects: the seeded controls are not defects; no carried section of a pinned label has one; the
-  tablets' 5.1 shows `cells-run-together` in table 8 (from 320 to 419 px at every ratio).
+  tablets' 5.1 shows `cells-run-together` in table 8 (from 320 to 419 px and at 671 px at ratio 1;
+  320 to 418 px at the other ratios).
 - The render build refuses a record it cannot regenerate, one whose pinned bytes are missing, and a
   judge whose hash is not the lock's; it never runs outside `main`'s trigger; the image build drops a
   record without a valid attestation, and one attested in another environment or with a revoked key.
@@ -550,3 +580,17 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
    recomputing; checks resolve their bounds' candidates by glyph pixels, and a glyph's own frame is
    judged on pixels (a descender beside its border passes, a border on a letter fails); the rest as
    found.
+6. **Sixth independent reviews** (2026-09-25). High: a colon shifted across its own cell's bottom
+   border, a dot on each side and no pixel shared, passed every check: "10:1" drawn "10.1". Medium:
+   check 3 had lost T5's waived `+` (4.2's headings); checks 1, 3, 5 and 2's foreign lines still
+   decided on rounded-out bounds, refusing sound text in 4.2, 4.4 and 4.8, safety sections that can
+   never be withheld (neighbours in different text nodes, a descender over an ascender, a `>` 0.36 em
+   above its border, the reporting box's background a device pixel below a descender); one
+   attestation per (gate, document) could not hold a changed record; the model output's format,
+   which the lookup rests on, was unspecified; the pixel work's cost; nothing named who produces a
+   record. Fixed in this draft: R4 now binds principles (bounds nominate, pixels and exact advances
+   decide; a line through a glyph fails whatever its frame; neighbours in logical order and a run's
+   decorating box exempt; the waived `+` exempt everywhere) and seeded cases, sound and unsound, from
+   these findings, and leaves the thresholds to 3c-C's measured design; attestations keyed by the
+   record's hash, created if absent, bound to a first-parent commit of `main`; the output format's
+   contents; a propose mode; captures once per drawing per width.

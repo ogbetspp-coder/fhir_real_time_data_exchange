@@ -1,6 +1,6 @@
 # A withheld section: importing a publication with an authority's defect recorded in place (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25; sixth draft, after five design reviews
+- Status: proposed, 2026-09-25; seventh draft, after six design reviews
 - Owner decisions (2026-09-25): withhold the Imatinib Teva tablets SmPC's 5.1 and import the
   other 31 sections; a section may be withheld only on reviewed, measured evidence of the
   authority's defect, the whole record is marked incomplete everywhere it is read, and the safety
@@ -47,11 +47,11 @@ the authority's content, and the gap stated wherever the record is read.
 
 A section may be withheld only when all hold:
 
-1. **A person asks, having reviewed the evidence.** The import request (D2) gains `withheld`: a list
-   of `{ path, code, recordSha256, defects }` in the document's pre-order, `path` the section's
-   `SourcePath`, `code` its code as served, `recordSha256` the renderer record the person reviewed
-   (its drawing published with the record's pull request, R1) and `defects` the kinds they
-   confirmed there (a split number such as "12" beside ".5" is geometrically a run-together and
+1. **A person asks, having reviewed the evidence.** The import request (D2) gains
+   `withheldEvidence`, the `recordSha256` of the renderer record the person reviewed (one record per
+   document; its drawing is the render build's captures of that attested record, R1), and `withheld`:
+   a list of `{ path, code, defects }` in the document's pre-order, `path` the section's
+   `SourcePath`, `code` its code as served and `defects` the kinds they confirmed there (a split number such as "12" beside ".5" is geometrically a run-together and
    must not be confirmed). The request is approved content (D2), covered by
    `approvedContentSha256` (D8); the lookup refuses if the record it uses is not the one named, or
    its defects for the section are not the ones confirmed (`withheld-evidence-changed`), so a later
@@ -104,7 +104,8 @@ automatic and never silent. For a synthetic publication, a withheld section need
 - At `pictures`, `narrative` and `record`: a listed section is skipped. Its pictures are neither
   checked, fetched nor listed in `pictures` (D6), T and the scanner do not read it, and it gives T5
   no evidence (W4). Unlisted sections are checked as today, stopping at the first refusal.
-- At `rendering`: W1.2 in both directions, in the renderer note's lookup.
+- At `rendering`: W1.1's binding (`withheld-evidence-changed`) and W1.2 in both directions
+  (`withheld-section-not-shown`), in the renderer note's lookup.
 
 ### W3. What the record carries
 
@@ -148,6 +149,7 @@ automatic and never silent. For a synthetic publication, a withheld section need
   (`computeNarrativeBinding` and `get_provenance` use it, never the notice's text); the fidelity
   counts are `sectionsChecked` = `sectionsMatched` + `sectionsWithheld` (the structural rule that
   replaces `sectionsMatched` = `sectionsChecked`; `sectionsWithheld` is 0 for every other source),
+  the binding entry of a withheld section carrying `status: withheld` beside the sentinel,
   and the gate's "missing provenance", "orphan" and text-hash checks read the entry as such. ADR
   0002's invariant 3, the binding recomputed from the Bundle, takes the withheld list as its second
   input. A synthetic withheld
@@ -216,7 +218,8 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
 - **The defect is recorded** in `docs/design/qrd-conformance-check.md` with its measurements, as
   a finding reportable to the authority; the record's pull request publishes the defects' captures
   for its reviewer (the renderer note's R1), and the request names what was reviewed (W1.1).
-- **Forward pointers.** `docs/design/authority-import-contract.md` (D2, D3, D4, D6, D9, D12, D13),
+- **Forward pointers.** `docs/design/authority-import-contract.md` (D2, D3, D4, D6, D7, D9, D10, D12,
+  D13),
   `docs/design/epi-mcp-query-service.md` and `docs/design/verifiable-answers.md` gain a line
   pointing here, in the change that implements each part.
 
@@ -250,6 +253,9 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
   EMA's viewer applies its own stylesheet, which the gate does not model.
 - Whether an incomplete record may be entitled to the query service is PR 5's decision, with the
   incompleteness in every answer.
+- The record named in a request changes whenever any section's outputs, the pins (3c-E's export
+  among them) or the gate change; each change needs a new review and a new request before the
+  publication can be imported again with a section withheld.
 
 ## Verification
 
@@ -321,3 +327,11 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
    0003's wording and the forward pointers; the list's order. Fixed in this draft: the request names
    the record reviewed and the defects confirmed, and the lookup refuses a change; the reviewer
    rejects a split number; the rest as found.
+6. **Sixth independent review** (2026-09-25). Medium: four of the renderer gate's checks still
+   decided on rounded-out bounds and failed the safety sections 4.2 and 4.8 by construction; nothing
+   named who produces a record, so the drawing a person reviews was not the attested one. Low: one
+   record per document named per entry; the record's churn unstated; the binding entry's status;
+   pointers to D7 and D10; the roadmap's "leaves the page"; "abut" at layout-unit precision. Fixed in
+   this draft, with the renderer note's seventh: R4's principles decide on pixels and exact advances;
+   the propose mode, and the review of the render build's captures of the attested record; the record
+   named once per request; the churn stated as a residual; the rest as found.

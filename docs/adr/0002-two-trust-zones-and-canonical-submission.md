@@ -249,7 +249,7 @@ agent of its source files (each named by the authority's id and by hash), the re
 `docs/design/authority-import-withheld.md` (roadmap 3a, PR 3c; owner decisions of 2026-09-25)
 lets an authority import carry a leaf section the renderer gate shows the authority drew unsound
 as **withheld**: its heading and code, none of the authority's content, our own `emptyReason` code
-and a fixed notice, `Composition.status` `partial`. Invariants 4 and 6 change for that case only:
+and a fixed notice, `Composition.status` `partial`. Invariants 3, 4, 6 and 10 change for that case only:
 
 - **4.** A withheld section still has its provenance entry (no spans; `narrativeDivSha256` the
   notice's hash, `normalizedTextSha256` that of the empty text), so the bijection holds; the
