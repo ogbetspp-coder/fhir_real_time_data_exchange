@@ -1,14 +1,15 @@
 # A withheld section: importing a publication with an authority's defect recorded in place (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25; third draft, after two design reviews
+- Status: proposed, 2026-09-25; fourth draft, after three design reviews
 - Owner decisions (2026-09-25): withhold the Imatinib Teva tablets SmPC's 5.1 and import the
   other 31 sections; a section may be withheld only on reviewed, measured evidence of the
   authority's defect, the whole record is marked incomplete everywhere it is read, and the safety
   sections 4.2 to 4.9 are never withheld
 - Decides: how an authority import carries a section it cannot accept, instead of refusing the
   whole publication
-- Amends: `AGENTS.md` ("fail closed on … mandatory QRD sections", a scoped exception); ADR 0003
-  (the verifier's scope); ADR 0005 decision 3 and its consequence;
+- Amends: `AGENTS.md` ("fail closed on … mandatory QRD sections", a scoped exception); ADR 0002
+  (invariants 4 and 6: a coded section with a verified notice instead of a verified narrative);
+  ADR 0003 (the verifier's scope); ADR 0005 decision 3 and its consequence;
   `docs/design/authority-import-contract.md` D2, D3, D4, D6, D7, D9, D10, D12, D13;
   `docs/fidelity-normalization.md` §7 (a new minor version, W5); the query service's and the
   agent's designs (`docs/design/epi-mcp-query-service.md`, `docs/design/verifiable-answers.md`)
@@ -18,15 +19,17 @@
 ## What this is for
 
 Section 5.1 of the EMA's Imatinib Teva film-coated tablets SmPC is misleading when drawn, not
-only outside T's rules. It was measured in Chrome, with the FHIR div's inline styles only, at
-widths from 280 to 1 000 CSS px:
+only outside T's rules. It was measured in macOS Chrome, with the FHIR div's inline styles only,
+on a page with an 8 px margin, at widths from 280 to 1 000 CSS px (the renderer gate measures it
+again in the pinned image):
 
 - The at-risk tables under the two Kaplan-Meier figures put up to three values in one cell. At
-  800 px, table 8's "182:8" and "177:12" stand 2.33 px apart (0.19 em). At 360 px, 19 of its cell
-  pairs touch, drawing "10:842:840:84", and table 9 merges ("64:2246:2327:25") at 537 px and
-  below. The EMA's PDF draws each value under its own axis tick.
-- The row heading "At-risk : Events" has `margin-left: -14.6pt`; at 580 px and below "Events"
-  wraps to a line starting 19.45 px left of the table, off the page at 360 px ("vents").
+  800 px, table 8's "182:8" and "177:12" stand 2.33 px apart (0.19 em). At 360 px, 18 of its cell
+  pairs touch, drawing "10:842:840:84" (from 281 to 419 px they touch at every width), and table
+  9's values stand as little as 0.19 px apart at 537 px and below ("64:2246:2327:25"). The EMA's
+  PDF draws each value under its own axis tick.
+- The row heading "At-risk : Events" has `margin-left: -14.6pt`; at 593 px and below "Events"
+  wraps to a line starting 19.45 px left of the table, off a page without a margin ("vents").
 - In table 2, twelve paragraphs with a −1 pt right margin in unpadded, bordered cells cross the
   cell edge by up to 1.28 px at some widths (at 561 px the border runs through the "n" of
   "evaluation").
@@ -49,13 +52,16 @@ A section may be withheld only when all hold:
 2. **Its drawing is shown unsound, by evidence that is not ours.** The renderer gate's record for
    the document (`docs/design/authority-import-renderer.md` R8), which the worker image's own code
    reproduced, holds for the section:
-   - **no refusal of ours** at any width, ratio or mode: nothing the gate could not judge (a model
-     difference, a missing glyph, a script it cannot bound, a calibration failure, an XML
-     `parsererror`);
-   - **at least one defect**: lower-bound evidence from Chrome's own rectangles, with no widening
-     and no threshold of ours: two cells' text touching or overlapping (`cells-touch`), text off
-     the page (`off-page`), or a drawn line through text (`line-through-text`), none resting on a
-     broken picture's box.
+   - **no refusal of ours** at any width, ratio or mode: nothing the gate could not judge (a family
+     it has no pinned face for, a missing glyph, a model difference, a script or mark it cannot
+     bound, a calibration failure, an XML `parsererror`); the font check runs on every section,
+     T's or not, so no defect is measured in a substitute font;
+   - **at least one defect** (the renderer note's R8): evidence from the pixels Chrome paints, never
+     from a box, a widened bound or a threshold of ours: two cells' text on one line whose glyph
+     pixels come within one device pixel (`cells-touch`), a line's pixels on a glyph's
+     (`line-through-text`, never a run's own decoration), or a glyph's advance box wholly beyond
+     the page's edge (`off-page`), none resting on a broken picture's box; every such defect is
+     also a failure of the gate's checks.
 
    A failure of the gate's conservative checks (a 0.25 em gap, a 0.5 px clearance, a contrast
    margin) is not a defect: it shows the gate cannot prove the drawing sound, not that it is
@@ -73,8 +79,10 @@ A section may be withheld only when all hold:
    refuse the import whatever is listed.
 
 Both directions are enforced: a listed section without a defect, or with a refusal of ours,
-refuses the import (`withheld-section-not-shown`); a section with a failure or a defect that is not
-listed refuses it (`renderer-evidence-failed`, as for any carried section). Withholding is never
+refuses the import (`withheld-section-not-shown`); a section that is not listed must pass as any
+carried section does (no refusal, no failure; the renderer note's R5), and since every defect is a
+failure, an unlisted defect refuses the import, at the stage that first refuses the section (T at
+`narrative` for a section T refuses, the lookup at `rendering` otherwise). Withholding is never
 automatic and never silent. For a synthetic publication, a withheld section needs a record too
 (the renderer note's R5).
 
@@ -102,22 +110,33 @@ automatic and never silent. For a synthetic publication, a withheld section need
   fixed constant `<div xmlns="http://www.w3.org/1999/xhtml"><p>Information withheld.</p></div>`,
   generated from that code alone. No entry, extension or other element. The reason and the
   evidence are in the provenance, not in the notice.
-- **The document says it is partial.** `Composition.status` is `partial` ("the document is
-  incomplete") instead of D9's `final` whenever a section is withheld, in the record and in the
-  EMA output; the profiles do not constrain it (Composition-uv-epi, EUEpiComposition and its
-  specialisations checked). The FHIR Provenance (D12) carries the extension
-  `https://khs.dev/fhir/StructureDefinition/ext-record-incomplete` with the withheld sections'
-  codes; the run manifest's ingestion evidence, the ledger row (its BigQuery schema) and every
+- **The document says it is partial.** `Composition.status` is `partial` instead of D9's `final`
+  whenever a section is withheld, in the record and in the EMA output. R5 defines it as "partial
+  (e.g. initial, interim or preliminary) … the content may be incomplete or unverified", the
+  nearest of its codes to a document with a section withheld; the binding is required to the
+  status value set, and no profile narrows it (Composition-uv-epi's short text lists five other
+  codes, but constrains nothing; EUEpiComposition and its specialisations checked). The EMA List
+  stays `current`: it indexes the authority's publication, not our record. The FHIR Provenance
+  (D12) carries the extension `https://khs.dev/fhir/StructureDefinition/ext-record-incomplete` with
+  each withheld section's code and defect kinds, so the query service, which reads the FHIR store,
+  can return them; the run manifest's ingestion evidence, the ledger row (its BigQuery schema) and every
   query result carry `incomplete: true` and the codes.
 - **Provenance.** The source record gains `withheldSections: [{ path, code, page, defects }]`
   (`path` and `code` checked against the request; `defects` recomputed from the record: the kinds
-  found) and, when anything is withheld, `rendering: { gateVersion, recordSha256 }` (checked: the
-  record the lookup used). The record thus shapes approved content only when something is
+  found) and, when anything is withheld, `rendering: { gateVersion, gateSha256, recordSha256 }`
+  (checked: the record the lookup used; the run's evidence keeps its bytes). Such a submission
+  re-verifies in its own worker image, whose store and gate it used (the renderer note's R10). The record thus shapes approved content only when something is
   withheld, and is then named in it.
 - **Structuring decisions (D9).** `Composition.status` becomes a decision by rule
   (`status-from-publication` or `partial-when-withheld`); one `defaulted-by-rule` decision per
   withheld section for its `emptyReason` and one for its notice (`rule: withheld-section`).
-- **Pages.** The section's page (fidelity §7) is empty and has no span. A synthetic withheld
+- **Pages and provenance sections.** The section's page (fidelity §7) is empty and has no span.
+  ADR 0002's bijection between coded sections and provenance entries holds: a withheld section
+  has a `provenance.sections` entry with no spans, its `narrativeDivSha256` the notice's hash and
+  its `normalizedTextSha256` that of the empty text; the fidelity counts are
+  `sectionsChecked` = verified + withheld, `sectionsMatched` = verified, `sectionsWithheld` =
+  withheld, and the gate's "missing provenance", "orphan" and text-hash checks read the entry as
+  such. A synthetic withheld
   section carries the same notice; D7's rule that every synthetic narrative says "not for clinical
   use" does not apply to it, since it is not narrative (W5).
 
@@ -142,7 +161,9 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
   list is empty. The verifier does not infer it from the Bundle.
 - **The rule.** A listed section must be exactly W3's: the one coding, the notice constant byte for
   byte, `text.status` `generated`, and nothing else. Anywhere else, on any source, an `emptyReason`,
-  a `generated` narrative or the notice refuses.
+  a `generated` narrative or the notice refuses; the gate's section walk enforces this (the
+  verifier's input holds only the listed sections' paths and divs), and the crosswalk refuses
+  `emptyReason` anywhere it is not given.
 - **The report.** `SectionStatus` gains `withheld`; `summary` gains `withheld`; the report's version
   moves (its `reportVersion` literal), withheld sections are bound in `narrativeBindingSha256`, and
   the report's `status` is `passed` when every section not withheld is verified. The provenance's
@@ -167,7 +188,9 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
 - **The agent**: a question about a withheld section is answered with the fact that it is withheld
   and why, never from memory or another section; every answer from an incomplete record says so.
 - **Before persistence.** D1's dry run is lifted for a publication with a withheld section only once
-  the query service and the agent do the above (PR 5's precondition).
+  the query service and the agent do the above, and once the request that withholds is bound to an
+  attested person (D2 names who requests an import; withholding is a decision about content, so its
+  requester must be an identity, not D8's placeholder): PR 5's preconditions.
 - **The round trip** (PR 4) reports the withheld section as an expected, recorded difference.
 - **The defect is recorded** in `docs/design/qrd-conformance-check.md` with its measurements, as
   a finding reportable to the authority; the record's pull request publishes the defects' captures
@@ -216,8 +239,9 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
 - `fidelity-norm/3.2.0`'s vectors and differential cases; the verifier refuses the notice, an
   `emptyReason` or a `generated` narrative on any other source or section.
 - The EMA output passes official validation (`cmp-1`, `cmp-2`, `partial`) with a withheld section.
-- The Imatinib Teva tablets SmPC imports in dry run with 5.1 withheld, its defects `cells-touch`
-  and `off-page`, once the renderer gate draws the document.
+- The Imatinib Teva tablets SmPC imports in dry run with 5.1 withheld, its defects including
+  `cells-touch` (table 8) and `line-through-text` (table 2), once the renderer gate draws the
+  document; no carried section of any pinned label shows a defect.
 
 ## Reviews
 
@@ -238,3 +262,15 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
    defect (R8's `defects`), leaf sections only; `partial`; recognition by the document gate from
    the recomputed provenance; our own `authority-defect` code; the record named in the source
    record; captures published for review; synthetic withholding needs a record.
+3. **Third independent review** (2026-09-25). High: the defects were defined on character
+   rectangles, which are content areas larger than the ink, so every underline, a tight table's
+   border and a first line at the page's top were "defects": a sound section (2, 3, 6.1) could be
+   withheld, and 4.8 and Posology, with false defects, would have refused the label. Medium: R5 and
+   W1 stated the carried-section rule differently; a section T refuses got no font check; ADR
+   0002's invariants 4 and 6 were changed without being amended. Low: the recognition rule placed
+   where it cannot run; the named record not kept; `get_section` could not return the defects;
+   `partial` misquoted; five figures of 5.1 corrected. Fixed in this draft: defects are measured on
+   the pixels Chrome paints (the renderer note's R8) and are failures too; the font check on every
+   section; ADR 0002 amended with the provenance entry and counts; the rule enforced by the gate's
+   walk; the record kept in the run's evidence; the Provenance extension carries defect kinds; the
+   requester of a withholding bound to an attested identity before PR 5.
