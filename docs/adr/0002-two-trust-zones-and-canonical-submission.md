@@ -281,5 +281,6 @@ every request is (invariant 2); before PR 5 lifts the dry run it is bound to an 
   a person, both stated exceptions: acknowledging a contact the renderer gate cannot prove harmless
   as legible, and withholding a section on a confirmed defect. So a request that acknowledges or
   withholds anything is bound to an attested identity before D1's dry run is lifted for it (PR 5); D8's
-  placeholder requester does not suffice, and since every real label has contacts, no real label is
-  persisted until that identity exists.
+  placeholder requester does not suffice, an attested identity is one the approval of roadmap item 2 authenticates and records, and since the
+  tablets label has contacts (as any label with contacts will), it is not persisted until that
+  identity exists.

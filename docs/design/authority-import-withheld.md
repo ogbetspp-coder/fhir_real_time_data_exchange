@@ -1,6 +1,6 @@
 # A withheld section: importing a publication with an authority's defect recorded in place (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25; twelfth draft, after eleven design reviews
+- Status: proposed, 2026-09-25; thirteenth draft, after twelve design reviews
 - Owner decisions (2026-09-25): withhold the Imatinib Teva tablets SmPC's 5.1 and import the
   other 31 sections; a section may be withheld only on reviewed, measured evidence of the
   authority's defect, the whole record is marked incomplete everywhere it is read, and the safety
@@ -50,7 +50,8 @@ the authority's content, and the gap stated wherever the record is read.
 A section may be withheld only when all hold:
 
 1. **A person asks, having reviewed the evidence.** The import request (D2)
-   names, as every authority import request does (the renderer note's R5), the evidence reviewed,
+   names, as the renderer note's R5 requires of every import request but a synthetic one that
+   withholds nothing, the evidence reviewed,
    `renderEvidence: { recordSha256, environment, capturesSha256 }`: the renderer record (one per
    document) and the index of the render build's captures of it, which its attestation names (R1),
    read with a review tool that verifies the attestation, the index and each capture's hash before
@@ -258,9 +259,15 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
   section. `schemaVersion` is a literal, so a 2.0.0 submission does not read as 3.0.0: 2.0.0
   authority imports (dry runs only; none approved) are re-imported, and 2.0.0 drawn and synthetic
   submissions are refused as 1.0.0's were at 2.0.0.
+- `QUERY_TOOLS_VERSION` 3.0.0, a major (`incomplete` required, the `section-withheld` outcome carrying
+  its defect kinds); the agent's turn record's version, since it carries `incomplete`; the
+  `ingestion-provenance` schema's published `$id` version, and the fidelity report's in both places it
+  is written (the index and the `reportVersion` literal).
 - `fidelity-norm/3.2.0` and the fidelity report's next major (W5: `SectionStatus` `withheld`,
   `summary.withheld`, `sectionsWithheld`); the run manifest's 3.0.0 (the renderer note's R10: the
-  2.0.0 ingestion block frozen with its literal in `AnyRunManifestSchema`, read in a test); `QUERY_TOOLS_VERSION`; the ledger's schema; the
+  2.0.0 ingestion block frozen with its literal in `AnyRunManifestSchema`, with deep copies of the
+  2.0.0 `AuthorityFetch`, `IngestionFidelity` and `Approval` schemas, read in a test with an authority
+  import's dry-run manifest); `QUERY_TOOLS_VERSION`; the ledger's schema; the
   importer's version (D10's lock). Generated schemas and Zone A models are regenerated.
 - `AGENTS.md`: "An authority import may carry a mandatory section as withheld only under
   `docs/design/authority-import-withheld.md` (reviewed, measured evidence of the authority's defect, never a
@@ -293,8 +300,8 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
 
 - The importer (against a test store): a synthetic publication with one section whose record shows a
   defect imports with it withheld; a request that rejects every defect, lists a defect both confirmed
-  and rejected, or names a defect under another kind, refuses; a listed section with only a conservative failure, or with a refusal of ours, or
-  with nothing, refuses (`withheld-section-not-shown`); a request whose confirmed and rejected locations differ from
+  and rejected, or names a defect under another kind, refuses; a listed section with only a contact, a failure that is not a defect, a refusal
+  of ours, or nothing, refuses (`withheld-section-not-shown`); a request whose confirmed and rejected locations differ from
   the record's refuses (`withheld-evidence-changed`); an unlisted failing section refuses; a
   listed safety section, a section with subsections, a repeat or an out-of-order list refuses at
   `tree`; a document-level refusal refuses whatever is listed; a withheld section's picture is not
@@ -306,7 +313,7 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
   `emptyReason` or a `generated` narrative on any other source or section.
 - The EMA output passes official validation (`cmp-1`, `cmp-2`, `partial`) with a withheld section.
 - The Imatinib Teva tablets SmPC imports in dry run with 5.1 withheld on `cells-run-together`
-  (table 8, from 320 to 419 px, and at 671 px, at ratio 1; 320 to 418 px at the other ratios), once
+  (table 8, from 320 to 419 px, and at 671 px, at ratio 1; and at the other ratios as the pinned image measures them), once
   the renderer gate draws the document and a person has reviewed the record; no carried section of any pinned label shows a defect; the Greek letters of 4.1, 5.1
   and 5.2 are bounded, not refused.
 
@@ -420,3 +427,13 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
     every real label; a reason code; W7's list. Fixed in this draft, with the renderer note's twelfth:
     cells closer than a stated gap are a failure; the run manifest 3.0.0 with 2.0.0 frozen; ADR 0002
     amended; failures and contacts in class terms; the rest as found.
+12. **Twelfth independent review** (2026-09-25). Medium: the contact cap counted the withheld section's
+    contacts and had no reason; P8(a)'s "letter" was open (a cedilla fusing into a line). Low: the
+    requester's role had no source; versions (query tools, the agent's turn record, the provenance
+    schema's `$id`, the fidelity report's two places); the frozen 2.0.0 manifest needs deep copies;
+    stale "free of overlapping" and "conservative failure"; widths per ratio; "every real label";
+    "attested identity" undefined and item 2 missing from the roadmap's dependencies; P8(b)'s scope;
+    formatting. Fixed in this draft, with the renderer note's thirteenth: the cap over carried
+    sections with `renderer-contacts-exceeded`; P8(a) a closed list; the Provenance names the attested
+    requester; the versions listed; the rest as found. An attested identity is one the approval of
+    roadmap item 2 authenticates and records; PR 5 depends on it.

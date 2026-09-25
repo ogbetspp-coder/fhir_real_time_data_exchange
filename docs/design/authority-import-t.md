@@ -37,7 +37,8 @@ right-aligned number against the next cell. So:
   where the markup alone cannot settle a question T refuses (ADR 0003).
 - **Geometry is measured, per publication.** An import is accepted only for a publication whose
   exact bytes a pinned browser has drawn, with T's output, and found free of overlapping,
-  hidden or displaced text: a renderer evidence record (PR 3c), in its own versioned store, bound to
+  hidden or displaced text, save the contacts a person has acknowledged (the renderer note's R4): a
+  renderer evidence record (PR 3c), in its own versioned store, bound to
   the document's and T's output's hashes and to the gate's own version, as D6 already requires
   evidence for pictures. T's geometric rules (T3b, T3c, T4's bounds) are the bounds
   within which that measurement is made, not a proof on their own.
