@@ -405,7 +405,8 @@ change the version. The version is the reviewed label of the importer; the worke
 the manifest (D1) is its complete identity, including `src/fidelity/`, the hash library, the
 mapping and the dependencies, which the lock covers only where the vectors exercise them. The importer checks in a stated order, and a refusal names the first check that fails: the fetch
 and bytes (D1), Appendix A, D5, D4's tree, D4's titles, pictures (D6), then T and the scanner per
-section in pre-order. The vectors include the pinned real labels as expected-refusal cases with
+section in pre-order, the record's checks, and last the renderer gate's `rendering` stage
+(`docs/design/authority-import-t.md`, amending this list). The vectors include the pinned real labels as expected-refusal cases with
 the reasons the importer actually produces, recorded when it is built (in PR 2 the pictures stage
 should refuse Imatinib Teva, whose two `~/_entity` pictures in 5.1 have neither template nor
 evidence; Jentadueto fails the closed shape (its uncoded subheadings), Brukinsa its titles, Nuvaxovid its

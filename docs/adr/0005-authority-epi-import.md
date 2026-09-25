@@ -264,6 +264,31 @@ rest stay PR 3's work. The importer's version moves to 1.1.0 with it (D10's lock
 
 One finding of the same survey is recorded here for PR 3: both Imatinib Teva SmPCs (capsules
 and film-coated tablets) underline "Posology for Ph+ ALL in adult patients" and "Posology for
-Ph+ ALL in" (4.2) and "Clinical studies in Ph+ ALL" (5.1). An underlined "+" is drawn "±"
+Ph+ ALL in children" (4.2) and "Clinical studies in Ph+ ALL" (5.1). An underlined "+" is drawn "±"
 (decision 1's underline requirement), so under that requirement 4.2 and 5.1 refuse in both;
 PR 3's design of T settles it.
+
+## Amendment (2026-09-24, T's closed lists)
+
+`docs/design/authority-import-t.md` (roadmap 3a, PR 3b) fills decision 1's lists, after fourteen
+independent reviews, and changes this ADR as follows.
+
+- **What T decides, and what the renderer measures.** T's rules are static and decide what the
+  markup alone decides: which elements and characters, raised or lowered, underlined or not,
+  colours against every background behind them, fonts, and offsets bounded so text stays in its
+  box. Whether glyphs drawn at a given width and font touch, whether cells' text meets, whether a
+  line runs under a sign: those the renderer cross-check measures, made a **gate** on every import
+  (PR 3c) with the requirements the design lists, including a comparison of T's style model with
+  the browser's for every text node. Until it exists, the importer's `rendering` stage refuses
+  every publication but a synthetic one.
+- **Decision 1's bounds change:** font sizes may be given in `em` and `%`, and the effective size
+  is at least 5 pt (it said absolute units and 2 pt); line height at least the font size at every
+  text node, not "at least normal", which would refuse the label's body text; borders at most
+  3 pt at 3:1 contrast (it said thin and dark); offsets as the design's T3b states; and T also
+  holds the authority's own tags to rules under which the HTML parser's tree and the markup's
+  nesting agree.
+- **One stated exception** to the underline requirement and to "T drops only what cannot change
+  the drawn page": T5's plus sign in a wholly underlined subheading, on evidence from the same
+  document (ADR 0003, amended).
+- **What the pinned labels give:** both Imatinib Teva SmPCs pass T in 31 of their 32 sections;
+  5.1 refuses (its tables need the renderer), and the import stops first at the pictures stage.
