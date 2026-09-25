@@ -1,7 +1,7 @@
 # The renderer gate: a pinned browser's evidence for every authority import (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25 (architecture approved by the owner the same day); seventeenth draft,
-  after sixteen design reviews; R4's thresholds provisional, settled by 3c-C's measured design
+- Status: proposed, 2026-09-25 (architecture approved by the owner the same day); eighteenth draft,
+  after seventeen design reviews; R4's thresholds provisional, settled by 3c-C's measured design
 - Decides: what `docs/design/authority-import-t.md`'s "What waits for PR 3c" left open: who draws,
   what is drawn and measured, the evidence record and its store, and the `rendering` stage
 - Amends: ADR 0003 (the second stated exception, contacts acknowledged); ADR 0005 (decision 1's
@@ -324,7 +324,9 @@ clear. Geometry from layout (advances, boxes) is compared exactly, in Chrome's l
   for `off-page` (R8), where only the bound can speak for what is not drawn. Glyph pixels come from
   drawings made once per width and ratio where candidates exist, layout asserted unchanged, cropped
   locally.
-- **P2. Thresholds in device pixels, measured both ways.** Every clearance is stated in device pixels
+- **P2. Thresholds in device pixels, measured both ways.** Where a seed's class depends on the face,
+  weight, size, ratio or sub-pixel phase, the seed binds its class at the configurations 3c-C
+  measures and states, and never a laxer one elsewhere. Every clearance is stated in device pixels
   (or in em of the glyph's own size where the reading depends on the size), at least one blank
   device pixel, set from the pinned labels' drawings at every ratio with a stated margin, and
   required to put every synthetic seeded case in its stated class at T's extremes (5 pt, every ratio)
@@ -350,14 +352,17 @@ clear. Geometry from layout (advances, boxes) is compared exactly, in Chrome's l
   each other; an unshifted glyph and its own run's underline on its own line are judged on the
   glyph's pixels inside the underline's band (the rows the drawn line occupies, its skip-ink cuts
   counted as band) and on those 8-adjacent to the band from below; and, for a character whose pinned
-  glyphs descend below the baseline by more than a stated overshoot (from R4's ink bound: a comma, a
+  glyphs descend below the baseline by more than a stated overshoot (at least 0.03 em, above the
+  largest descent of a resting glyph in the pinned faces, which 3c-C lists; from R4's ink bound: a comma, a
   semicolon, a cedilla, a mark below, a descender, a bracket), also on its ink below the highest
   baseline R4 allows. A character resting on the baseline (its glyphs descending no more than the
   overshoot) is not judged on ink above the band that only touches it, so a letter resting on its
   underline is not a contact (P5 still judges that underline as an underline, and a shifted glyph
   keeps P6's rule). For the judged ink, the cuts count as line except for P8(a)'s letters, whose
-  tails the cut lets through: a descending part lying wholly in the band (drawn or cut), or sharing
-  at least two 8-connected pixels with the drawn line, is P3's failure (a comma merged into its
+  tails the cut lets through: a descending part (an 8-connected component of the glyph's pixels below the
+  lowest baseline R4 allows) lying wholly in the band (drawn or cut), or sharing at least two
+  8-connected pixels with the drawn line (a count within the anti-aliasing variance of two counting
+  as two), is P3's failure (a comma merged into its
   underline, "1,5" read as "1.5"; an "ạ" whose dot sits in a cut); any other touch is a contact,
   cleared only by P8(a). A low-line character under a
   decoration (U+005F, U+02CD, U+2017, U+0332 and the closed list 3c-C states) is a refusal of ours.
@@ -395,7 +400,8 @@ clear. Geometry from layout (advances, boxes) is compared exactly, in Chrome's l
   underline on its own line (or passing through the gap skip-ink cuts in that underline), with no
   shared pixel,
   where the descender keeps at least two rows of pixels at 40 % coverage or more that are not
-  8-adjacent to the border's or underline's drawn pixels (a pixel in a cut is not a free row), its rows counted from the lowest baseline R4's one-pixel uncertainty
+  8-adjacent to the border's or underline's drawn pixels (a row in a cut of its own underline, below
+  the drawn line's top, counts as free: the cut is what lets the tail through), its rows counted from the lowest baseline R4's one-pixel uncertainty
   allows (so a tail small enough to fuse into the line, "y" read as "v" at 7 pt, stays a contact); and
   (b) a glyph meeting, crossing or standing within the clearance of the edge of a background of its
   own frame (its own element's or an ancestor's, as R4 defines the own frame; a boundary between two
@@ -416,47 +422,58 @@ narrow for the label. On the tablets label the twelfth review counted, at sample
 carried sections before P8 (178 descenders on their own borders in 4.8 and 9 in 4.2; 39 at the
 reporting box's grey edges; 65 pairs of 4.2's raised 9 against the line above; two brackets on their
 own borders in 4.8; one in 5.2) and about 70 after it, 65 of them the raised 9's, in some 100 to 250
-distinct drawings; every integer width adds more, and the own-underline rule of this draft is
-recounted by 3c-C before the cap is set. 3c-C measures the counts at every width and sets
+distinct drawings; the seventeenth review counted about 49 own-underline contacts (descender tails
+touching their underline at ratio 1) under the rule then, which this draft's free cut row reduces;
+every integer width adds more, and 3c-C recounts before the cap is set. 3c-C measures the counts at every width and sets
 a cap, one gate constant in the record's `tolerances` (so changing it is a new gate version), on the
 number of contact identities and of distinct drawings across a record's carried sections; the lookup
 refuses above it (`renderer-contacts-exceeded`, a failure, never a refusal of ours), so
 acknowledgement never becomes a rubber stamp. The withheld sections' contacts are not counted. It is ADR 0003's second stated exception, amended (owner decisions of 2026-09-25): a
 contact the gate cannot prove harmless passes only by a person's acknowledgement.
 
-**Seeded cases (binding).** Each is a case of the judge's tests in both modes and at every ratio.
-Must be failures: a descender covered by a later line's inline background; an underscore under
-its own underline ("a_b", a refusal of ours at any size); a comma tip sharing two 8-connected
-pixels with its own drawn underline (7 pt serif at ratio 1, "1,5" read as "1.5"); the dot of an "ạ"
-lying wholly in a cut of its own underline (9 pt at ratio 1); a "<" one blank device row above a shaded bar that is not its own frame's background (P5, "≤"); a colon shifted across
-its cell's bottom border ("10:1" drawn "10.1"); a colon's
-lower dot inside a thick bottom border ("10·1"); a raised 7 folded by 2.8 pt, its bar inside its
-cell's top border; two cells' numbers 0.19 px apart (5.1's table 9 at 504 px); a glyph's pixels on a
-picture's; a border through a letter; a line under a `<`; two cells' text running together; text wholly off the page;
-raised text above the section's top edge; a marker off the page; a picture over a glyph; a later box in the
-text's own colour over a glyph; a missing glyph (U+2070); an unpinned family (Verdana); a glyph too
-faint to judge. Must be contacts (never clear): the colon of "10:1" at 5 pt against its border; two
-glyphs 0.2 px apart across lines; a combining mark stacked into the line above; a raised digit
-against the underline of the line above; a raised 7 folded by 2.4 pt abutting its own cell's top
-border ("x 10⁷/l"); a descender touching a picture on the next line; a comma's tail touching its
-own cell's bottom border; a "ç" whose cedilla touches its own cell's bottom border; a 7 pt "y" and
-"μ" touching their own cells' bottom borders at ratio 1; an underlined "1,5" and "ç" at 5 pt where their
-comma and cedilla touch their own underline, or stand in a cut without lying wholly in it; the "y" of
-4.2's underlined "Posology" at ratio 1, whose hook touches a one-pixel piece of underline between
-two cuts; the
-reporting box's final "." and a descender of the line above touching the grey fragment's edge; an accent on a run's second line touching the
-underline of its first at `line-height: 1em`; 5.2's raised "14" against the "C" of
-"¹⁴C"; `<u>AUC<sub>0-24</sub></u>` where the lowered hyphen abuts its underline or sits
-in a skip-ink gap; 4.2's "10⁹/l" against the line above.
-Must be clear: a `>` 0.36 em above its cell's bottom border in the pinned face (4.2; T's note
-measured 0.39 em in the original) as an underline question (P5); a descender over an ascender at
+**Seeded cases (binding).** Each is a case of the judge's tests in both modes and at every ratio;
+where a case's class depends on the face, weight, size, ratio or sub-pixel phase, it binds at the
+configurations 3c-C measures and states (P2).
+
+Must be failures: a descender covered by a later line's inline background; an underscore under its
+own underline ("a_b", a refusal of ours at any size); a comma sharing two 8-connected pixels with its
+own drawn underline ("1,5" read as "1.5") and a mark below lying wholly in a cut of its own
+underline, each at the configurations 3c-C finds them (bold serif at 7 pt, sans at 9 pt, ratio 1,
+measured); a "<" one blank device row above a shaded bar that is not its own frame's background (P5,
+"≤"); a colon shifted across its cell's bottom border ("10:1" drawn "10.1"); a colon's lower dot
+inside a thick bottom border ("10·1"); a raised 7 folded by 2.8 pt, its bar inside its cell's top
+border; two cells' numbers 0.19 px apart (5.1's table 9 at 504 px); a glyph's pixels on a picture's;
+a border through a letter; a line under a `<`; two cells' text running together; text wholly off the
+page; raised text above the section's top edge; a marker off the page; a picture over a glyph; a
+later box in the text's own colour over a glyph; a missing glyph (U+2070); an unpinned family
+(Verdana); a glyph too faint to judge.
+
+Must never be clear (a contact or a failure): a comma, semicolon, cedilla or mark below touching its
+own underline, at every size, face and ratio (measured over 3 840 cases per ratio); the colon of
+"10:1" at 5 pt against its border.
+
+Must be contacts: two glyphs 0.2 px apart across lines; a combining mark stacked into the line above;
+a raised digit against the underline of the line above; a raised 7 folded by 2.4 pt abutting its own
+cell's top border ("x 10⁷/l"); a descender touching a picture on the next line; a comma's tail
+touching its own cell's bottom border; a "ç" whose cedilla touches its own cell's bottom border; a
+7 pt "y" and "μ" touching their own cells' bottom borders at ratio 1; the "y" of 4.2's underlined
+"Posology" at ratio 1 where its hook touches a one-pixel piece of underline between two cuts; the
+reporting box's final "." and a descender of the line above touching the grey fragment's edge; an
+accent on a run's second line touching the underline of its first at `line-height: 1em`; 5.2's raised
+"14" against the "C" of "¹⁴C"; `<u>AUC<sub>0-24</sub></u>` where the lowered hyphen abuts its
+underline or sits in a skip-ink gap; 4.2's "10⁹/l" against the line above.
+
+Must be clear: a `>` 0.36 em above its cell's bottom border in the pinned face (4.2; T's note measured
+0.39 em in the original) as an underline question (P5); a descender over an ascender at
 `line-height: normal` (4.4's "g" over "b"); `<span>T</span><span>he`; two adjacent `u` elements
-(4.2's "Posology for Ph+ ALL in children"); the waived `+` of 4.2's headings; an underlined
-"Posology" and 4.8's underlined link "Appendix V", their descenders breaking the underline (P4).
+(4.2's "Posology for Ph+ ALL in children"); the waived `+` of 4.2's headings; an underlined "o" at
+ratio 1.25, resting on its underline (P4).
+
 Must be clear by rule (P8): 4.2's and 4.8's letter descenders touching their own cells' bottom
-borders; the grey text's own glyphs in 4.8's reporting box meeting their grey background's edges,
-"Appendix V" past it included. Must be clear: an underlined "o" at ratio 1.25, resting on its
-underline (P4).
+borders; the "g"s of 4.2's underlined "Posology" at every ratio, and its "y" and the "p"s of 4.8's
+underlined link "Appendix V" at ratio 1.25 and above, passing through the cuts of their own
+underline; the grey text's own glyphs in 4.8's reporting box meeting their grey background's edges,
+"Appendix V" past it included.
 
 **Provisional checks** (the second draft's list, kept as 3c-C's starting point, each to be restated
 under the three classes and P1–P7 with measured thresholds): overlap; every drawn line as ink (0.5 CSS px); a line under
@@ -702,9 +719,8 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
 - A shifted glyph crossed through its body by its own run's underline (a lowered "2" in an
   underlined "AUC₀₋₂₄") is P3's failure even where it stays readable; 3c-C measures how often an
   underlined heading with a subscript is refused.
-- That a requester looked at every capture they acknowledge is not proven: the review's fetch is in
-  Cloud Storage's data-access log with its principal and time, which shows they opened it, not that
-  they looked at each drawing.
+- That a requester looked at every capture they acknowledge is not proven: at most the record shows
+  who opened the review (approval.md's amendment), never that they looked at each drawing.
 - A request is one person's judgement (item 2's D7 gap while the project has one named person).
 - Chrome runs without its sandbox inside the render container; an exploit in authority content
   could forge both draws of one build (the container has no network and no credentials).
@@ -942,3 +958,13 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
     judged on every pixel in its band (cuts included) and adjacent below, and on a descending
     character's ink below the highest baseline; a failure is a descending part wholly in the band or
     sharing two connected drawn pixels, any other touch a contact; seeds restated as measured.
+17. **Seventeenth independent reviews** (2026-09-25). Nothing High: a descending comma, cedilla or
+    mark under its own underline never came out clear (3 840 cases per ratio), and no resting letter
+    became a contact. Medium: "a descending part" was undefined, and no reading satisfied all three
+    pixel-exact seeds, which depend on face, weight and phase; P8(a)'s "a cut row is not free" made
+    every underlined "p" at ratio 1 a contact, contradicting the "Appendix V" seed. Low: "Posology" in
+    two classes; the overshoot's value; contact and failure turning on one anti-aliased pixel. Fixed
+    in this draft: "part" defined; seeds for such characters bind "never clear", and pixel-exact
+    seeds bind at the configurations 3c-C measures; a cut row of the glyph's own underline counts as
+    free for P8(a)'s letters; the overshoot at least 0.03 em; a pixel count within its variance
+    counts against the section.

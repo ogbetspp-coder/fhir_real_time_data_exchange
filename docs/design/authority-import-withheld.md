@@ -1,6 +1,6 @@
 # A withheld section: importing a publication with an authority's defect recorded in place (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25; seventeenth draft, after sixteen design reviews
+- Status: proposed, 2026-09-25; eighteenth draft, after seventeen design reviews
 - Owner decisions (2026-09-25): withhold the Imatinib Teva tablets SmPC's 5.1 and import the
   other 31 sections; a section may be withheld only on reviewed, measured evidence of the
   authority's defect, the whole record is marked incomplete everywhere it is read, and the safety
@@ -152,8 +152,8 @@ automatic and never silent. For a synthetic publication, a withheld section need
   document it lists says it is partial. The FHIR Provenance
   (D12) carries the extension `https://khs.dev/fhir/StructureDefinition/ext-record-incomplete` with
   each withheld section's canonical key (`smpc.*`), its EMA code (its SPOR system named) and its
-  confirmed defect kinds, so the query service, which reads the FHIR store,
-  can return them; the run manifest's ingestion evidence, the ledger row (its BigQuery schema) and every
+  confirmed defect kinds, for FHIR readers (the query service reads the defect kinds from the signed
+  request statement, never from this extension); the run manifest's ingestion evidence, the ledger row (its BigQuery schema) and every
   query result carry `incomplete: true` and the codes.
 - **Provenance.** The source record gains `withheldSections: [{ path, code, page, confirmed,
 rejected }]` (checked against the request and the record); and `rendering: { gateVersion,
@@ -309,8 +309,9 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
 - A reader of our record sees "Information withheld." where the authority's page draws 5.1; the
   provenance says why.
 - That a requester reviewed a withheld section's captures before confirming or rejecting its defects
-  is their claim; the review's fetch is in Cloud Storage's data-access log, which shows they opened
-  it, not that they looked at each drawing.
+  is their claim; at most the record shows who opened the review (approval.md's amendment: the log
+  redacts the principal of a browser download, so the approval service may serve it behind
+  Identity-Aware Proxy), never that they looked at each drawing.
 - The finding is of the FHIR div drawn with its inline styles in metric-compatible fonts; the
   EMA's viewer applies its own stylesheet, which the gate does not model.
 - Whether an incomplete record may be entitled to the query service is PR 5's decision, with the
@@ -505,3 +506,12 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
     self-contained review file, the approvers' conditioned read, the audit log as evidence of the
     fetch, the spike's evidence; declining to sign; a draft that does not partition the record
     refused; the rest as found.
+17. **Seventeenth independent review** (2026-09-25). Medium: Cloud Storage's data-access log redacts
+    the principal of an authenticated browser download made outside the console, so the log could
+    not show who opened the review; supersession across document ids had an owner but no mechanism
+    in item 2's phase 1. Low: the pre-sign check narrower than its claim; the signer's grants; the
+    review's link and hash untied; D7 and the drafter; the role for a request with nothing to
+    acknowledge; a stale sentence in W3; build-order cases; emails for the IAM grant. Fixed in this
+    draft, with approval.md's amendment: the log's limit stated, the spike records it, and the review
+    served behind Identity-Aware Proxy if needed; `supersedes`, signed, moving both heads, in phase 1;
+    the lookup's checks before signing; the rest as found.
