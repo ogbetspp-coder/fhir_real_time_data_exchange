@@ -156,7 +156,7 @@ the design does not pretend otherwise, and `dev` records this as a known gap.
 
 ### D8. One head per document; the head is the current text
 
-The signer keeps a head per document, appended in a bucket of its own (amended 2026-09-25: under
+The signer keeps a head per document, appended in a bucket of its own (amended 2026-09-25, proposed for item 2's review: under
 retention an object cannot be updated, so a head is the highest of append-only, create-if-absent
 objects; see the amendment). It refuses to sign unless the statement's
 `previousStatementSha256` is the current head: two reviews racing for the same document cannot
@@ -178,7 +178,7 @@ section's `narrativeDivSha256` from the Composition and compares it with the sta
 `sections`**. Only then does it answer. A version with no linked approval, an invalid signature,
 or a section that does not match is `not-approved`.
 
-This bounds reads (amended: the linked Provenance, the head's listing and entry, and for a request
+This bounds reads (amended, proposed for item 2's review: the linked Provenance, the head's listing and entry, and for a request
 the product chain's), so `find_product`'s scan budget is
 recalculated rather than silently exhausted, and its answer lists only documents with a current
 approval.
@@ -193,7 +193,7 @@ approval.
 3. The approver opens the review and approves, rejects or withdraws.
 4. The signer verifies the approver's token itself, checks role, segregation of duties and the
    review hash, signs the statement, writes it to `evidence/approvals/`, and appends the head
-   (amendment: in its own bucket, create-if-absent).
+   (amendment, proposed for item 2's review: in its own bucket, create-if-absent).
 5. An Eventarc trigger on `approvals/` starts the publish run, pinned to the statement by hash.
    No Workflows callback: completing a callback needs `roles/workflows.invoker`, which can only
    be granted project-wide and would also let the signer start or cancel any execution.
@@ -270,7 +270,7 @@ prevent.
 - One signer on Cloud Run with its own identity and its own HSM key. The review file is rendered
   by the signer itself, not a separate review service; it is still built by a pure function, stored
   once under `reviews/`, and its hash still travels in the click and the statement (D6).
-- The head, append-only in its own bucket (D8 as amended), so a replay or a race cannot make old
+- The head, append-only in its own bucket (D8 as amended, proposed for item 2's review), so a replay or a race cannot make old
   text current.
 - The versioned Provenance written after commit (D5), and the query service's verification and
   re-hash on every answer (D9).
@@ -287,7 +287,7 @@ gate, so production cannot go live without it.
 - `reject` and `withdraw` statements.
 - The image-digest allowlist, Binary Authorization on the signer, and paging on IAM changes to
   the key (Infrastructure).
-- (The worker's write condition moves to phase 1, amendment.) A separate review service with its
+- (The worker's write condition moves to phase 1, amendment, proposed for item 2's review.) A separate review service with its
   own identity for Type 2 reviews; for an authority import's requests it is phase 1's fallback
   behind Identity-Aware Proxy, if the spike needs it (amendment).
 - Eventarc in place of a direct call; re-authentication at signing if a client requires it
@@ -302,7 +302,7 @@ gate, so production cannot go live without it.
 2. **Statement, review and verifier libraries** (pure) with negative tests: another key, other
    content, another document, a replayed old head, a stale review hash, an unmapped subject, a
    wrong environment. Evidence: the tests.
-3. **Signer**, with the append-only head (amended). Evidence: a signed statement and its review file
+3. **Signer**, with the append-only head (amended, proposed for item 2's review). Evidence: a signed statement and its review file
    in the evidence bucket; a racing second approval refused.
 4. **Pipeline verifies and links** (D5). Evidence: an unsigned submission refused; the same
    content signed, published, with its versioned Provenance.
@@ -327,8 +327,9 @@ represents an approved label.
 3a, PR 3c; owner decisions of 2026-09-25) make a person judge two things about an authority import
 that no check proves: that each contact the renderer gate could not prove harmless is legible, and
 which sections are withheld on a confirmed defect. PR 5 persists an authority import only once that
-person is attested, so phase 1 of this design gains the following, without changing what it
-decides for a Type 2 approval.
+person is attested, so phase 1 of this design gains the following. It changes nothing a Type 2
+approval decides; the proposed heads mechanics, if item 2's review adopts them, apply to every
+statement kind.
 
 **What binds now, and what item 2's own review settles.** This amendment is written for roadmap
 3a's PR 3c; item 2 is designed here, not built, and "is reviewed again before any of it runs". So
@@ -340,8 +341,8 @@ only these requirements bind now, and item 2 must meet them before PR 5:
 2. What was shown is what is signed: a self-contained review, built by the signer from the
    submission, its own recomputation of the import and the attested renderer record, after it has
    verified, for this environment, the record's attestation, its captures index and each capture's
-   hash, shows every acknowledged contact, every withheld section's confirmed and rejected defects,
-   and the product and List; the signer refuses a draft the gate would refuse; nothing between the
+   hash, shows every acknowledged contact and every withheld section's confirmed and rejected defects,
+   each with its captures, and the product and List; the signer refuses a draft the gate would refuse; nothing between the
    person and the signer can change what their action names (the review's hash, the kind and the
    submission); and the build's tests refuse a tampered capture, index or attestation, and one of
    another environment.
@@ -355,13 +356,16 @@ only these requirements bind now, and item 2 must meet them before PR 5:
    pass), at publish and on every answer; supersession across Lists waits for its own reviewed
    design.
 6. No head, and no product-level record, can be replaced, hidden or rolled back while it is
-   retained; a reader fails closed on anything malformed; and a write sequence interrupted at any
+   retained, with the limits stated (before retention is locked at the production gate, and after
+   it expires); a reader fails closed on anything malformed; and a write sequence interrupted at any
    point fails closed or is rolled forward, never leaving a state that breaks requirements 4 to 6.
 7. Where the publication's fields go, and the versions, as stated below.
 8. Phase 1's properties hold for requests: the person is asserted by a Google-signed token that the
    signer verifies itself (D2); the statement is signed by an HSM key of its environment (D3, D4)
-   over the submission's `approvedContentSha256` and the review's hash, and the pipeline refuses a
-   mismatch; each stored version is linked to its statement (D5); the head is the current text
+   over the submission's `approvedContentSha256` and the review's hash; the pipeline persists an
+   authority import only under a request statement whose signature verifies against its
+   environment's keys, which is the head and whose `approvedContentSha256` matches, and otherwise
+   refuses and persists nothing (the flow's step 6); each stored version is linked to its statement (D5); the head is the current text
    (D8); and the query service verifies all of it on every answer (D9). Item 2's review may change
    how these are met, not whether.
 
@@ -374,7 +378,7 @@ rolled forward, and a lost race re-reads both (never reusing earlier positions),
 finds different bytes failing closed; a committed product entry whose head was never written must be
 visible to D9 (as the head, or rolled forward on a schedule); the click's parameters (review hash,
 kind, submission) are not signed by the add-on's tokens, so the receiver is a trust root to put
-under the signer's image allowlist, or the signer is the endpoint, with each token consumed once and
+under the signer's image allowlist (which then moves to phase 1), or the signer is the endpoint, with each token consumed once and
 a stated freshness window, to meet requirement 2; D9 needs a lookup from the head's statement to its stored version (a
 second deterministic Provenance id from the statement's hash, or a bounded walk); Type 2 approvals
 have no product chain and write the head before `approvals/`; a withdraw's place in the product
@@ -436,13 +440,13 @@ signer's egress to the authority and the wider surface of the process holding th
   tells the tablets SmPC from the capsules one, which share a List and differ only in their text. Until
   a separate, reviewed design settles supersession (a precondition of PR 5 for any product whose List
   changes), the rule is closed: every current import of a product comes from the same List. The
-  statement signs `{ authority, epiId }` and the List's GUID, `versionNumber` and hash. A per-product
-  append-only chain, `products/<sha256(authority, epiId)>/<sequence>` (below), names the product's
-  List and its current document chains; every request, and every `withdraw` once built, extends it,
-  and the signer refuses a request whose List differs from the product chain's (`list-differs`),
-  newer or older. Two racing requests for one product collide on the product chain's next sequence,
-  so only one wins. A document chain whose head is a request is a current import whether or not it
-  has published. The pipeline and D9 require the served statement's List to equal the product chain's.
+  statement signs `{ authority, epiId }` and the List's GUID, `versionNumber` and hash. A
+  product-level record, append-only under requirement 6, names the product's List and its current
+  imports; the signer refuses a request whose List differs from it (`list-differs`), newer or older;
+  two racing requests for one product cannot both pass; and a document whose head is a request is a
+  current import whether or not it has published. The pipeline and D9 require the served statement's
+  List to equal the product-level record's. How that record is stored, and a `withdraw`'s place in
+  it, are proposed below.
   So a newer List's documents are imported only after the older imports are withdrawn (phase 2), and
   an older List's never displace a newer one's; a re-import after a normalisation change is refused
   too if the List's bytes have changed since, until `withdraw` exists. An import's text therefore stays
@@ -480,7 +484,10 @@ signer's egress to the authority and the wider surface of the process holding th
   next position, with the same review (the click covers the review's hash, not the position); one
   for the same document re-reviews. Before accepting a new request for a product, the signer rolls
   forward any product entry whose document head is missing. The current document chains of a
-  product are those its product chain names, and nothing else. Keys are the SHA-256 of the canonical
+  product are those its product chain names, and nothing else. The chain lives at
+  `products/<sha256(authority, epiId)>/<sequence>`, every request (and every `withdraw`, once built)
+  extends it, and two racing requests for one product collide on its next sequence, so only one
+  wins. Keys are the SHA-256 of the canonical
   JSON (RFC 8785) of `{ authority, epiId }` and of the document identifier.
 - **Where the key and the List come from.** Before signing, the signer runs the gate's own
   recomputation of the import (it fetches the authority's bytes and recomputes, D1 of the contract

@@ -1,6 +1,6 @@
 # A withheld section: importing a publication with an authority's defect recorded in place (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25; twenty-third draft, after twenty-two design reviews
+- Status: proposed, 2026-09-25; twenty-fifth draft, after twenty-four design reviews
 - Owner decisions (2026-09-25): withhold the Imatinib Teva tablets SmPC's 5.1 and import the
   other 31 sections; a section may be withheld only on reviewed, measured evidence of the
   authority's defect, the whole record is marked incomplete everywhere it is read, and the safety
@@ -578,3 +578,14 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
     the action's integrity and their tests; requirement 5 binds the product and List in the
     statement and the rule at signing, publish and every answer; requirement 6 binds interrupted
     writes; bullets marked _proposed_; the rest as found.
+24. **Twenty-fourth independent review** (2026-09-26). No High; round 23's three Mediums closed.
+    Medium: the binding list did not say the pipeline persists nothing without a valid request; an
+    unmarked bullet bound the product chain's path, its collision and `withdraw`'s place, which are
+    proposed and open. Low: the base design's in-place amendments read as settled; retention's
+    limits not bound; the receiver option needing phase 2's allowlist; the captures not said to be
+    shown; this note's draft count. Fixed: requirement 8 binds that the pipeline persists an
+    authority import only under a verifying request statement that is the head, and nothing
+    otherwise; the One-List bullet states the requirement and the chain's mechanics moved to the
+    proposed bullet; the in-place amendments tagged proposed and the intro says the heads mechanics
+    apply to every kind if adopted; requirement 6 states retention's limits; requirement 2 says
+    "each with its captures"; the rest as found.
