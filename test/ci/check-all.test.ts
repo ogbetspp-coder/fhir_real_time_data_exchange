@@ -19,6 +19,7 @@ const NOT_RUN_LOCALLY = new Set([
   "bash scripts/ci/lock-base.sh",
   "npm run renderer:image",
   "npm run renderer:smoke",
+  "npm run renderer:check",
 ]);
 
 const commands = [...workflow.matchAll(/^[ \t]+run:[ \t]*(\S.*)$/gm)].map((match) =>

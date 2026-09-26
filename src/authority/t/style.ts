@@ -39,6 +39,10 @@ export type Shift =
 
 export type ComputedStyle = {
   size: Size;
+  // Recorded for the model output only (docs/design/authority-import-renderer-model.md, M3); no
+  // decision of T reads them.
+  fontWeight: number;
+  fontStyle: "normal" | "italic" | "oblique";
   lineHeight: LineHeight;
   // The author's colour, if one is declared on this element or inherited; undefined is black.
   colour: Rgb | undefined;
@@ -203,6 +207,18 @@ export type ElementContext = {
   style: string | undefined;
 };
 
+// CSS's relative weights (CSS Fonts 4, "bolder" and "lighter").
+function bolder(weight: number): number {
+  if (weight < 350) return 400;
+  if (weight < 550) return 700;
+  return 900;
+}
+function lighter(weight: number): number {
+  if (weight < 550) return 100;
+  if (weight < 750) return 400;
+  return 700;
+}
+
 function smaller(size: Size): Size {
   return { lo: size.lo * 0.75, hi: size.hi * 0.9 };
 }
@@ -218,8 +234,15 @@ export function computeStyle(context: ElementContext): ComputedStyle {
   const heading = HEADING_EM[name];
   if (heading !== undefined) size = { lo: size.lo * heading, hi: size.hi * heading };
   const cellPadding = context.cellPadding ?? 0.75;
+  let fontWeight = parent.fontWeight;
+  if (name === "b" || name === "strong") fontWeight = bolder(parent.fontWeight);
+  if (heading !== undefined || name === "th") fontWeight = 700;
+  let fontStyle = parent.fontStyle;
+  if (name === "i" || name === "em" || name === "cite") fontStyle = "italic";
   const style: ComputedStyle = {
     size,
+    fontWeight,
+    fontStyle,
     lineHeight: parent.lineHeight,
     colour: parent.colour,
     colourSinceLink: context.isLink ? false : parent.colourSinceLink,
@@ -279,11 +302,22 @@ export function computeStyle(context: ElementContext): ComputedStyle {
       }
       case "font-style":
         if (!["normal", "italic", "oblique"].includes(keyword)) throw new CssRefusal("css-value");
+        style.fontStyle = keyword as ComputedStyle["fontStyle"];
         break;
       case "font-weight":
         if (!/^(?:normal|bold|bolder|lighter|[1-9]00)$/u.test(keyword)) {
           throw new CssRefusal("css-value");
         }
+        style.fontWeight =
+          keyword === "normal"
+            ? 400
+            : keyword === "bold"
+              ? 700
+              : keyword === "bolder"
+                ? bolder(parent.fontWeight)
+                : keyword === "lighter"
+                  ? lighter(parent.fontWeight)
+                  : Number(keyword);
         break;
       case "color": {
         const parsed = colour(value);
@@ -487,6 +521,8 @@ export function computeStyle(context: ElementContext): ComputedStyle {
 export function rootStyle(): ComputedStyle {
   return {
     size: ROOT_SIZE,
+    fontWeight: 400,
+    fontStyle: "normal",
     lineHeight: { kind: "normal" },
     colour: undefined,
     colourSinceLink: false,

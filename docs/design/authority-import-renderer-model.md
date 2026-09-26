@@ -14,7 +14,7 @@
 
 R3 makes the third code review's one-off comparison a merge gate: for every text node and list
 marker of every section T transforms, Chrome's computed style must equal T's model of it, in both
-modes, at the named widths, or the section is a refusal of ours. So a gap in T's model (a default
+modes, at M4's widths and ratios, or the section is a refusal of ours. So a gap in T's model (a default
 T forgot, a declaration it reads differently from Chrome) fails the gate instead of letting T judge
 text in a style it is not drawn in. The judge never loads T's code (R1, R9): T emits its model as
 data, and the judge compares that data with what Chrome reports. This note fixes that data's shape
@@ -187,8 +187,8 @@ before it fails a label.
 
 ## M4. What the judge does with it (R3)
 
-For every carried section, in HTML and XML mode, at R2's named widths (813, 360 and 1 240 px) and
-every ratio, the judge reads each element's computed style (in an isolated world, scripts disabled)
+For every carried section, in HTML and XML mode, at 813 px at every ratio and at R2's other named
+widths (360 and 1 240 px) at ratio 1, the judge reads each element's computed style (in an isolated world, scripts disabled)
 and each list marker's text from the accessibility tree, and compares them with the model entry of
 the same key by M3. Any difference, a missing entry or an extra element, is a refusal of ours
 (`model-mismatch`, with the key, the property, T's value and Chrome's), and the record carries it.
@@ -224,8 +224,9 @@ for widths as drawn.
 - M1's keys and offsets equal the judge's on every carried section and every accepted T case,
   including one with whitespace between table parts and list items and one with CR LF line ends.
 - Every default of M3 asserted against the pinned image; the width rule asserted at every ratio.
-- R3 on every accepted T case and every carried section of the pinned labels, in both modes, at the
-  named widths and every ratio: no mismatch; and a model entry deliberately altered in a test
+- R3 on every accepted T case, every synthetic model case (`test/fixtures/render/model-cases.ts`)
+  and every carried section of the pinned labels, in both modes, at M4's widths and ratios: no
+  mismatch (CI's Renderer job, in the pinned image); and a model entry deliberately altered in a test
   (a colour, a size, a weight, a border width, a vertical alignment) fails with `model-mismatch`.
 - The model output reproduces byte for byte across two runs and two machines.
 

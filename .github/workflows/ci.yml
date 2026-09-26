@@ -111,7 +111,7 @@ jobs:
   renderer:
     name: Renderer
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     defaults:
       run:
         shell: bash --noprofile --norc -eo pipefail {0}
@@ -135,6 +135,12 @@ jobs:
 
       - name: Check the renderer image offline
         run: npm run renderer:smoke
+
+      # R3: T's model against Chrome's computed style for every accepted T case, every synthetic
+      # model case and every section of the pinned labels T and the scanner accept, in both modes
+      # (docs/design/authority-import-renderer-model.md, M4). Any mismatch fails.
+      - name: Compare T's model with the drawn page
+        run: npm run renderer:check
 
   zone-a:
     name: Zone A

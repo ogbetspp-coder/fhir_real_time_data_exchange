@@ -39,7 +39,8 @@
     "authority:vectors": "tsx scripts/authority/generate-vectors.ts",
     "authority:lock": "tsx scripts/authority/lock.ts",
     "renderer:image": "docker build --file Dockerfile.renderer --tag renderer:local .",
-    "renderer:smoke": "docker run --rm --network none --read-only --tmpfs /tmp --shm-size=1g --volume \"$PWD:/work:ro\" renderer:local node --import tsx scripts/render/smoke.ts"
+    "renderer:smoke": "docker run --rm --network none --read-only --tmpfs /tmp --shm-size=1g --volume \"$PWD:/work:ro\" renderer:local node --import tsx scripts/render/smoke.ts",
+    "renderer:check": "docker run --rm --network none --read-only --tmpfs /tmp --shm-size=1g --volume \"$PWD:/work:ro\" renderer:local node --import tsx scripts/render/check.ts"
   },
   "repository": {
     "type": "git",

@@ -38,6 +38,31 @@ export type ElementNode = {
 
 export type TreeNode = ElementNode | TextNode;
 
+// The XML-mode DOM's view of the same div, for T's model output
+// (docs/design/authority-import-renderer-model.md, M1): every element in document order, and every
+// text node the DOM holds, the whitespace T drops between table parts and list items included
+// (`interElement`), with its data as the DOM has it: references decoded, a raw CR LF or lone CR one
+// LF. `pointToDom[i]` is the DOM offset, within the node, of T's code point `i` (the CR of a CR LF
+// shares its LF's). Recorded as the div is read; it changes nothing T decides.
+export type DomText = {
+  parent: ElementNode;
+  node: TextNode | undefined;
+  interElement: boolean;
+  data: string[];
+  pointToDom: number[];
+};
+
+export type TreeIndex = { elements: ElementNode[]; texts: DomText[] };
+
+const INDEXES = new WeakMap<ElementNode, TreeIndex>();
+
+// The index `readTree` recorded for `root`.
+export function treeIndex(root: ElementNode): TreeIndex {
+  const index = INDEXES.get(root);
+  if (index === undefined) throw new Error("no index was recorded for this tree");
+  return index;
+}
+
 // T's "One tree" (T1): rules on the authority's own tags under which the HTML parser's tree and
 // the markup's nesting agree, so T's model judges text in the style a browser draws it in.
 
@@ -210,9 +235,13 @@ export function readTree(div: string): ElementNode {
   let elements = 0;
   let text: TextNode | undefined;
   let index = 0;
+  const elementOrder: ElementNode[] = [];
+  const texts: DomText[] = [];
+  let dom: DomText | undefined;
 
   const closeText = (): void => {
     text = undefined;
+    dom = undefined;
   };
 
   while (index < div.length) {
@@ -254,6 +283,7 @@ export function readTree(div: string): ElementNode {
       };
       if (parent === undefined) root = element;
       else parent.children.push(element);
+      elementOrder.push(element);
       if (!selfClosing) {
         stack.push(element);
         if (stack.length > MAX_DEPTH) throw new MarkupRefusal("markup");
@@ -264,11 +294,15 @@ export function readTree(div: string): ElementNode {
     const parent = stack.at(-1);
     let point: string;
     let next: number;
+    // The DOM's code point for it, or undefined for the CR of a raw CR LF, which XML reads as one
+    // LF with the LF that follows.
+    let domPoint: string | undefined;
     if (character === "&") {
       ENTITY.lastIndex = index;
       const match = ENTITY.exec(div);
       if (match === null) throw new MarkupRefusal("markup");
       point = decodeReference(match);
+      domPoint = point;
       next = ENTITY.lastIndex;
       // A line feed or carriage return, raw or by reference, is emitted as a space (fidelity §5).
       if (point === "\r" || point === "\n") point = " ";
@@ -276,7 +310,22 @@ export function readTree(div: string): ElementNode {
       const codePoint = div.codePointAt(index) ?? 0;
       point = String.fromCodePoint(codePoint);
       next = index + point.length;
+      domPoint = point === "\r" ? (div[next] === "\n" ? undefined : "\n") : point;
       if (point === "\r" || point === "\n") point = " ";
+    }
+    if (parent !== undefined) {
+      if (dom === undefined) {
+        dom = {
+          parent,
+          node: undefined,
+          interElement: TABLE_CONTAINERS.has(parent.name) || LIST_CONTAINERS.has(parent.name),
+          data: [],
+          pointToDom: [],
+        };
+        texts.push(dom);
+      }
+      dom.pointToDom.push(dom.data.length);
+      if (domPoint !== undefined) dom.data.push(domPoint);
     }
     const whitespace = /^[\t\n\r ]$/u.test(point) && character !== "&";
     if (
@@ -293,12 +342,14 @@ export function readTree(div: string): ElementNode {
     if (text?.parent !== parent) {
       text = { kind: "text", span: { start: index, end: next }, points: [], parent };
       parent.children.push(text);
+      if (dom !== undefined) dom.node = text;
     }
     text.points.push(point);
     text.span.end = next;
     index = next;
   }
   if (root === undefined || stack.length > 0) throw new MarkupRefusal("markup");
+  INDEXES.set(root, { elements: elementOrder, texts });
   return root;
 }
 
