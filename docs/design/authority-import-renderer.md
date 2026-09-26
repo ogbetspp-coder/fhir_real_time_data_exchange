@@ -721,7 +721,8 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
   underlined heading with a subscript is refused.
 - That a requester looked at every capture they acknowledge is not proven: at most the record shows
   who opened the review (approval.md's amendment), never that they looked at each drawing.
-- A request is one person's judgement (item 2's D7 gap while the project has one named person).
+- Segregation for a request is approval.md's D7 as its amendment applies it: in production preparing
+  and signing take two people (the drafter may sign); in `dev` one person does both, the known gap.
 - Chrome runs without its sandbox inside the render container; an exploit in authority content
   could forge both draws of one build (the container has no network and no credentials).
 - Re-verifying an old import needs its worker image, which carries the store, to persist.

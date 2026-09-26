@@ -1,6 +1,6 @@
 # A withheld section: importing a publication with an authority's defect recorded in place (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25; eighteenth draft, after seventeen design reviews
+- Status: proposed, 2026-09-25; nineteenth draft, after eighteen design reviews
 - Owner decisions (2026-09-25): withhold the Imatinib Teva tablets SmPC's 5.1 and import the
   other 31 sections; a section may be withheld only on reviewed, measured evidence of the
   authority's defect, the whole record is marked incomplete everywhere it is read, and the safety
@@ -248,8 +248,9 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
   record that shows every acknowledged contact and every withheld section's confirmed and rejected
   defects, in the approver map's `content-reviewer` role, which alone may acknowledge a contact or
   withhold a section; the statement pins the withheld set, which the query service requires the
-  served version to match exactly; a request is one person's judgement, attested, with
-  D7's known gap while the project has one named person (D2 names who requests an import; withholding is a decision about content, so its
+  served version to match exactly; segregation is approval.md's D7 as its amendment applies
+  it to a request (the requester may draft what they sign, but in production preparing and signing
+  take two people; in `dev` one person does both, the known gap) (D2 names who requests an import; withholding is a decision about content, so its
   requester must be an identity, not D8's placeholder): PR 5's preconditions.
 - **The round trip** (PR 4) reports the withheld section as an expected, recorded difference.
 - **The defect is recorded** in `docs/design/qrd-conformance-check.md` with its measurements, as
@@ -515,3 +516,14 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
     draft, with approval.md's amendment: the log's limit stated, the spike records it, and the review
     served behind Identity-Aware Proxy if needed; `supersedes`, signed, moving both heads, in phase 1;
     the lookup's checks before signing; the rest as found.
+18. **Eighteenth independent review** (2026-09-25). High: approval.md's `supersedes` was signed but
+    neither shown in the review nor checked, so a draft could name another product's current import
+    and hide it. Medium: the two heads' update was not atomic and did not pin the superseded
+    statement; a superseded chain's future and recovery were undefined; the notes disagreed on
+    segregation for a request. Low: the role for a synthetic import that withholds; the signer's read
+    on `reviews/` and the heads' overwrite; the pre-sign claim; the Identity-Aware Proxy fallback's
+    specifics; the statement's new fields. Fixed in this draft, with approval.md's amendment rewritten:
+    supersession objective (the authority's List shows the older document gone and the new one
+    present, same product, type and language) and pinned (the older head statement signed, written
+    first, verified by D9), a superseded head terminal, a failed supersession closed; D7 for a request
+    stated once (in production two people, the drafter may sign); the rest as found.
