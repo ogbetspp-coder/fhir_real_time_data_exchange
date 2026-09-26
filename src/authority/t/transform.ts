@@ -102,7 +102,7 @@ const SPACE_OR_NBSP = new Set([" ", "\u00a0"]);
 const BOUNDARY: Point = { element: undefined, underlined: false, inScript: false, boundary: true };
 const LINE_BREAK: Point = { ...BOUNDARY, lineBreak: true };
 
-type Info = {
+export type Info = {
   element: ElementNode;
   style: ComputedStyle;
   blockSize: Size;
@@ -121,7 +121,7 @@ type Info = {
 // What T4 and T5 need to know of a code point of the section as the scanner emits it: one record,
 // shared by every code point of a text node, of a marker or of a boundary, so T's memory is a
 // reference per code point (the fourth code review: a record each took 300 bytes per byte).
-type Point = {
+export type Point = {
   element: ElementNode | undefined;
   underlined: boolean;
   inScript: boolean;
@@ -253,7 +253,7 @@ function lineHeightAtLeast(style: ComputedStyle, size: Size, times: number): boo
   return lineHeight.lo >= times * size.hi;
 }
 
-function colours(style: ComputedStyle): Rgb[] {
+export function colours(style: ComputedStyle): Rgb[] {
   if (style.underLink && !style.colourSinceLink) return [...LINK_COLOURS];
   return [style.colour ?? [0, 0, 0]];
 }
@@ -276,22 +276,27 @@ function hasDrawnText(node: TextNode): boolean {
 
 // --- the section -----------------------------------------------------------------------------
 
-type Walk = {
+export type Walk = {
   infos: Map<ElementNode, Info>;
   // The code points, and what is known of each, index by index.
   codes: string[];
   points: Point[];
   // The index of each element's first and one-past-last point, for T4 and T5.
   ranges: Map<ElementNode, { start: number; end: number }>;
+  // For a code point of a text node, the node and the point's index in it (the model output's
+  // offsets, docs/design/authority-import-renderer-model.md); undefined for a boundary or marker.
+  sources: (readonly [TextNode, number] | undefined)[];
 };
 
-function walkSection(root: ElementNode, rightToLeft: boolean): Walk {
+function walkSection(root: ElementNode, rightToLeft: boolean, recordSources: boolean): Walk {
   const infos = new Map<ElementNode, Info>();
   const codes: string[] = [];
   const points: Point[] = [];
-  const push = (code: string, point: Point): void => {
+  const sources: (readonly [TextNode, number] | undefined)[] = [];
+  const push = (code: string, point: Point, source?: readonly [TextNode, number]): void => {
     codes.push(code);
     points.push(point);
+    if (recordSources) sources.push(source);
   };
   const ranges = new Map<ElementNode, { start: number; end: number }>();
 
@@ -435,7 +440,8 @@ function walkSection(root: ElementNode, rightToLeft: boolean): Walk {
     for (const child of element.children) {
       if (child.kind === "text") {
         if (hasDrawnText(child)) checkDrawn(style, info.blockSize);
-        for (const code of child.points) push(code, own);
+        if (recordSources) child.points.forEach((code, index) => push(code, own, [child, index]));
+        else for (const code of child.points) push(code, own);
       } else {
         visit(child, info);
       }
@@ -459,7 +465,7 @@ function walkSection(root: ElementNode, rightToLeft: boolean): Walk {
     }
   };
   visit(root, undefined);
-  return { infos, codes, points, ranges };
+  return { infos, codes, points, ranges, sources };
 }
 
 function hasLiAncestor(element: ElementNode): boolean {
@@ -493,7 +499,7 @@ function markersOf(list: ElementNode): Map<ElementNode, string> {
 }
 
 // The marker an `li` of an `ol` draws.
-function markerFor(li: ElementNode): string {
+export function markerFor(li: ElementNode): string {
   const list = li.parent;
   return list === undefined ? "" : (markersOf(list).get(li) ?? "");
 }
@@ -547,7 +553,7 @@ function containsImage(element: ElementNode): boolean {
   );
 }
 
-type ShiftDecision = "delete" | "sup" | "sub";
+export type ShiftDecision = "delete" | "sup" | "sub";
 
 function decideShifts(walk: Walk): Map<ElementNode, ShiftDecision> {
   const decisions = new Map<ElementNode, ShiftDecision>();
@@ -899,7 +905,13 @@ function plainTokens(codes: readonly string[], points: readonly Point[]): Set<st
   return tokens;
 }
 
-function waivable(walk: Walk, run: Run, evidence: ReadonlySet<string>, text: string[]): boolean {
+function waivable(
+  walk: Walk,
+  run: Run,
+  evidence: ReadonlySet<string>,
+  text: string[],
+  waived: number[],
+): boolean {
   const { points } = walk;
   const first = points[run.start];
   const block = blockOf(first?.element);
@@ -934,11 +946,16 @@ function waivable(walk: Walk, run: Run, evidence: ReadonlySet<string>, text: str
     masked.length > 0 &&
     !underlineChanges(text, run.start, run.end, { hyphensInWords: true });
   for (const index of masked) text[index] = "+";
+  // One at a time: a spread of a large array into push overflows the stack (the first code
+  // review: 130 000 waived signs threw a RangeError).
+  if (accepted) for (const index of masked) waived.push(index);
   return accepted;
 }
 
-function checkUnderlines(walk: Walk, evidence: ReadonlySet<string> | undefined): void {
+// Returns the walk indices of the plus signs T5 waived.
+function checkUnderlines(walk: Walk, evidence: ReadonlySet<string> | undefined): number[] {
   const { codes, points } = walk;
+  const waived: number[] = [];
   // A copy: the waiver masks signs on it in place.
   const text = [...codes];
   for (const run of underlineRuns(points)) {
@@ -948,8 +965,9 @@ function checkUnderlines(walk: Walk, evidence: ReadonlySet<string> | undefined):
       if (/^\p{Pd}$/u.test(code) && !DASHES_UNDER_UNDERLINE.has(code)) refuse("underline");
     }
     if (!underlineChanges(text, run.start, run.end, { hyphensInWords: true })) continue;
-    if (evidence === undefined || !waivable(walk, run, evidence, text)) refuse("underline");
+    if (evidence === undefined || !waivable(walk, run, evidence, text, waived)) refuse("underline");
   }
+  return waived;
 }
 
 // --- the edits -------------------------------------------------------------------------------
@@ -1006,12 +1024,34 @@ function blockTags(root: ElementNode): string[] {
   return tags;
 }
 
+// What T decided about one section, for T(div) and for the model output
+// (src/authority/t/model.ts): the tree, the walk, T4's decisions and T5's waived signs.
+export type Analysis = {
+  root: ElementNode;
+  walk: Walk;
+  shifts: ReadonlyMap<ElementNode, ShiftDecision>;
+  waived: readonly number[];
+  output: string;
+};
+
 // T for one section's div. `evidence` is given in the waiver's second pass (T5): the tokens the
 // document writes with a plain `+` in the sections the first pass accepted.
 export function transformSection(div: string, evidence?: ReadonlySet<string>): SectionResult {
+  const { walk, output } = analyseSection(div, evidence);
+  return { div: output, plainTokens: plainTokens(walk.codes, walk.points) };
+}
+
+// With `model`, T also records what the model output needs (a DOM index of the tree, the source of
+// each code point); the import's own T leaves it out, so its memory stays bounded.
+export function analyseSection(
+  div: string,
+  evidence?: ReadonlySet<string>,
+  options: { model?: boolean } = {},
+): Analysis {
+  const model = options.model === true;
   let root: ElementNode;
   try {
-    root = readTree(div);
+    root = readTree(div, { index: model });
   } catch (error) {
     if (error instanceof MarkupRefusal) refuse(error.reason);
     throw error;
@@ -1022,7 +1062,7 @@ export function transformSection(div: string, evidence?: ReadonlySet<string>): S
       ? RIGHT_TO_LEFT.test(node.points.join(""))
       : node.attributes.some(({ value }) => RIGHT_TO_LEFT.test(value)),
   );
-  const walk = walkSection(root, rightToLeft);
+  const walk = walkSection(root, rightToLeft, model);
   const shifts = decideShifts(walk);
   // A folded run is raised or lowered text from here on (T5's runs and the waiver's evidence).
   const scripted = new Map<Point, Point>();
@@ -1044,9 +1084,9 @@ export function transformSection(div: string, evidence?: ReadonlySet<string>): S
   }
   checkLists(walk);
   checkTables(walk);
-  checkUnderlines(walk, evidence);
+  const waived = checkUnderlines(walk, evidence);
   const output = edit(div, root, shifts);
   const after = readTree(output);
   if (blockTags(after).join(" ") !== blockTags(root).join(" ")) refuse("markup");
-  return { div: output, plainTokens: plainTokens(walk.codes, walk.points) };
+  return { root, walk, shifts, waived, output };
 }

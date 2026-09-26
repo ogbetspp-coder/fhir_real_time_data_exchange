@@ -12,11 +12,14 @@ const script = readFileSync("scripts/check-all.sh", "utf8");
 // Installing Node dependencies is the caller's `npm ci`; the official HL7 validator needs Java
 // and ~200 MB of downloads and stays its own CI job (the script's header says so).
 // A local checkout already has origin/main; CI's shallow checkout fetches the importer lock's
-// base.
+// base. The renderer image needs Docker and ~200 MB of downloads, and is its own CI job too.
 const NOT_RUN_LOCALLY = new Set([
   "npm ci --no-audit --no-fund",
   "npm run validate:official",
   "bash scripts/ci/lock-base.sh",
+  "npm run renderer:image",
+  "npm run renderer:smoke",
+  "npm run renderer:check",
 ]);
 
 const commands = [...workflow.matchAll(/^[ \t]+run:[ \t]*(\S.*)$/gm)].map((match) =>
@@ -39,5 +42,6 @@ describe("scripts/check-all.sh", () => {
   it("does not run the steps it documents as left out", () => {
     expect(script).not.toMatch(/^\s*npm ci\b/m);
     expect(script).not.toMatch(/^\s*npm run validate:official\b/m);
+    expect(script).not.toMatch(/^\s*npm run renderer:/m);
   });
 });

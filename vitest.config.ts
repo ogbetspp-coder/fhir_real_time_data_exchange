@@ -16,6 +16,8 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/**"],
+      // The renderer image's fontconfig is XML, not code.
+      exclude: ["src/render/image/**"],
       // Summaries only: the text one for the log, the JSON one for anyone comparing runs. The
       // directory is git-, prettier-, eslint- and docker-ignored.
       reporter: ["text-summary", "json-summary"],
@@ -33,6 +35,7 @@ export default defineConfig({
         "src/gcp/**": { lines: 90, statements: 87, functions: 90, branches: 80 },
         "src/lib/**": { lines: 90, statements: 90, functions: 100, branches: 90 },
         "src/authority/**": { lines: 93, statements: 91, functions: 92, branches: 85 },
+        "src/render/**": { lines: 97, statements: 96, functions: 96, branches: 86 },
       },
     },
   },

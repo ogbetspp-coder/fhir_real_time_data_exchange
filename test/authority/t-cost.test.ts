@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+
 import { describe, expect, it } from "vitest";
 
 import { transformDocument } from "../../src/authority/t/document.js";
@@ -69,5 +71,24 @@ describe("T's cost", () => {
     expect(outcome(() => transformSection(div("<p>a</p>".repeat(521000))))).toBe("markup");
     // About 2 s here; minutes when any of these was quadratic. Room for coverage instrumentation.
     expect(performance.now() - started).toBeLessThan(30_000);
+  }, 60_000);
+
+  // The import's own T keeps its memory bound: a 4.28 MB section of 19 990 runs fits a 384 MB heap
+  // (the fourth code review of PR 3b; the first of PR 3c-B found the model's bookkeeping doubling it).
+  it("fits a 4 MB section in a 384 MB heap", () => {
+    const output = execFileSync(
+      process.execPath,
+      ["--max-old-space-size=384", "--import", "tsx", "test/authority/t-heap-run.ts"],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+    );
+    const [input] = output.trim().split(" ").map(Number);
+    expect(input).toBeGreaterThan(4_000_000);
+  }, 120_000);
+
+  // Waived signs are recorded one at a time: 130 000 of them overflowed the stack as a spread (the
+  // first code review of PR 3c-B), where main accepts 400 000.
+  it("waives any number of signs without overflowing the stack", () => {
+    const section = div(`<p><u>${"Ph+ ALL ".repeat(150_000)}</u></p>`);
+    expect(outcome(() => transformSection(section, new Set(["Ph+"])))).toBe("ok");
   }, 60_000);
 });

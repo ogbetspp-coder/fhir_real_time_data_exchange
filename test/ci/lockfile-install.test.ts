@@ -25,9 +25,19 @@ describe("dependency installs", () => {
     }
   });
 
+  // The renderer image installs no Node dependency: the render build and CI mount a workspace
+  // installed from the lockfile outside it, read-only (docs/design/authority-import-renderer.md,
+  // R1), so the image holds only the browser and its fonts, and must not run npm at all.
+  it("keep npm out of the renderer image", () => {
+    expect(readFileSync("Dockerfile.renderer", "utf8")).not.toMatch(/\bnpm\b/);
+  });
+
   it("copy the lockfile into every Node image by name, so a missing one fails the build", () => {
     const node = readdirSync(".").filter(
-      (name) => /^Dockerfile(\.|$)/.test(name) && /^FROM\s+node:/m.test(readFileSync(name, "utf8")),
+      (name) =>
+        /^Dockerfile(\.|$)/.test(name) &&
+        name !== "Dockerfile.renderer" &&
+        /^FROM\s+node:/m.test(readFileSync(name, "utf8")),
     );
     expect(node.length).toBeGreaterThan(1);
     for (const name of node) {

@@ -204,7 +204,8 @@ recordSha256, capturesIndex, capturesSha256, documentSha256, pinsSha256, rendere
   (`font-unpinned`), so no measurement is ever made in a substitute font. The scripts the gate
   bounds are Latin, Greek, Common and Inherited (the labels' α, β and μ are Greek; the pinned faces
   cover it); a run in another script is a refusal of ours.
-- **T's model.** For every text node and list marker of a section T transforms, in both modes at
+- **T's model.** For every element and list marker of a section T transforms (a text node takes
+  its element's style), in both modes at
   the named widths, Chrome's computed style against T's model output for every property the model
   holds: `font-size` (under `smaller` against the model's range, × 0.75 to × 0.9), weight, style,
   `color`, `line-height`, `-webkit-text-decorations-in-effect`, the chain of backgrounds,
@@ -219,17 +220,22 @@ recordSha256, capturesIndex, capturesSha256, documentSha256, pinsSha256, rendere
   HTML parser inserts, such as a `tbody`, has no key; a marker placed before its `li`'s first child;
   an element with no text node, such as an empty bordered cell, keyed for its borders and padding),
   characters counted as code-point offsets in the concatenation, in that order, of the text nodes'
-  raw, reference-decoded data. The render build's step 2 keys T's model output with the same
+  data as the XML-mode DOM holds it (references decoded, raw CR LF and CR one LF; the addendum's
+  M1). The render build's step 2 keys T's model output with the same
   function, tested to agree with the judge on every carried section.
-- **The output format.** T's model output is specified in 3c-B's addendum to this note, reviewed
-  independently before R3 lands: its entries in the index space above; each property as T models it (a size's range
-  under `smaller`, a colour's set under a link, a line height's kind, each element's fold); the
-  code-point offsets of T5's waivers and of the scanner's text for each drawn code point, which the
-  allowlist's neighbours need; how points compare with Chrome's serialised pixels; and the
-  per-section picture list (R2). Its serialiser is T's code, under D10's lock, and step 2 of the
-  render build (R1) emits it with the scanner's text and the picture list.
+- **The output format.** T's model output is specified in 3c-B's addendum to this note
+  (`docs/design/authority-import-renderer-model.md`), reviewed independently before R3 lands: its
+  entries in the index space above; each property as T models it (a size's range under `smaller`,
+  a colour's set under a link, a line height's kind, each element's fold); the code-point offsets
+  of T5's waivers; and how points compare with Chrome's serialised pixels. The scanner's offsets
+  for each drawn code point, which the allowlist's neighbours need, are 3c-C's addition to the
+  model (`t-model/1.1.0`, a change to T's code under D10's lock, so a new importer version); the
+  per-section picture list (R2) is an output of its own, R8's, not part of the model. The
+  serialiser is T's code, under D10's lock, and step 2 of the render build (R1) emits the model
+  with the scanner's text and the picture list.
 - **What the record binds.** Not T's or the scanner's code but their outputs, per section: T(div)'s
-  hash; the hash of T's model output (every text node's and list marker's modelled style, fold
+  hash; the hash of T's model output (every element's and list marker's modelled style, which its text
+  nodes take, fold
   decision and waiver, serialised canonically); and the scanner's text hash (which holds the list
   numbers, T3d). The judge reads T only through those serialised outputs (R1 step 2). A change to T
   or the scanner that leaves a label's outputs alone leaves its record valid; one that alters them
@@ -788,15 +794,39 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
 
 ## Delivery
 
-1. **3c-B**: R2's page, the renderer image and its build, the CI pre-check, R3 with the output
-   format's addendum.
+1. **3c-B**, in two changes (the first code review of 3c-B asked that what waits be named):
+   - **3c-B1**: the renderer image (`Dockerfile.renderer`, its pins and fontconfig) built and
+     checked offline in CI; R2's page; the DevTools client; the output format's addendum; T's
+     model output; and R3's comparison of it with Chrome's computed style and list markers, in
+     both modes at every ratio, and of its text ranges with the XML-mode DOM, as the CI
+     pre-check. The importer moves to 2.1.0.
+   - **3c-B2**: the rest of R3 and R2's second drawing: the fonts and scripts of every section,
+     T's or not (`font-unpinned`, the script bound); R6's coverage (`font-coverage`, the U+2070
+     seed, the pixel tests of the substitutions); each table's grid from cell rectangles against
+     T(div)'s; each character box's height against the face's ascent and descent; a
+     `parsererror` as its own refusal; the text, list numbers, grids and pictures of the
+     authority's drawing against T(div)'s at the named widths; R2's assertion that the div's
+     content box is the width, and the refusal of a div with its own padding or border; and R2's
+     picture forms the import already carries (`data`, `contained`, `unpinned` rewritten to a
+     failing URL), each asserted by a test, with the per-section picture list for them.
+
 2. **3c-C**: its measured design of R4 (reviewed first), then R4, R7, R8, R9, R11; the render build,
    its trigger and attestations; the records of the pinned labels.
+   It also takes R1 but the image build's verification and the deploy routes' download of
+   attestations (3c-D's): the render build in its attest and propose modes, their identities
+   and buckets, the captures, their index and the bucket's retention, the pull request's
+   recomputation of every record's output hashes, and the redrawing of records whose bytes,
+   gate hash or pins differ from `main`'s; with R4, R2's width sweep, its relayout, and XML
+   mode's geometry of text, markers and cells against HTML mode's at the named widths and every
+   ratio; and the renderer image's own build (`cloudbuild.renderer-image.yaml`, the
+   `renderer-images` repository), with the repository connection only the owner can make.
 3. **3c-D**: R5 and R10: the lookup, the image build's verification, the manifest, re-verification
    (the review a requester signs is item 2's, before PR 5).
 4. **3c-W**: the withheld section (its note), including the lookup's withheld part.
 5. **3c-E**: pictures from the authority's export (the owner's decision of 2026-09-25; its own
    note), needed by every pinned label but Imatinib Teva once 5.1 is withheld.
+   It takes the `export`, `not-drawn` (an empty box of its evidence's `drawnBox`)
+   and `fetched` forms, the last with the first picture template, and their tests.
 
 ## Stated residuals
 
