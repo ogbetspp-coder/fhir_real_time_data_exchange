@@ -63,11 +63,32 @@ export function readRendererPins(dockerfile = RENDERER_DOCKERFILE) {
   const download =
     /curl\s+(?:-\S+\s+)*"([^"]+)"\s+-o\s+(\S+)\s+&&\s+echo\s+"\$\{([A-Z0-9_]+)\}\s+(\S+)"\s+\|\s+sha256sum\s+--check/g;
   for (const line of lines) {
-    // Nothing reaches the image but through a checksummed curl or the snapshot's apt: no ADD, no
-    // COPY from another image, no other fetcher.
+    // Common ways a download could reach the image unchecked are refused here: an ADD, another
+    // image's files, fetchers other than a checksummed curl, heredocs this reader cannot see into,
+    // and a checksum whose failure could be swallowed. It is a denylist, not a proof: the control
+    // is the review of Dockerfile.renderer itself (CODEOWNERS is recommended, R1), which this
+    // reader supports by catching the usual mistakes.
     if (/^\s*ADD\s/i.test(line)) throw new Error(`${name}: ADD; copy local files with COPY`);
     if (/^\s*COPY\s.*--from/i.test(line)) throw new Error(`${name}: COPY --from another image`);
     if (!/^\s*RUN\b/.test(line)) continue;
+    if (/<<-?\s*['"]?\w+/.test(line) || /--mount\b/.test(line)) {
+      throw new Error(`${name}: a RUN heredoc or --mount, which this reader cannot check`);
+    }
+    if (/\bnpm\b|\bnpx\b|\bperl\b|\/dev\/tcp\b|\bhttps?\.get\b/.test(line)) {
+      throw new Error(
+        `${name}: a RUN line can download with something other than a checksummed curl`,
+      );
+    }
+    if (
+      /\bTrusted:\s*yes\b|\[trusted=yes\]|allow-unauthenticated|AllowInsecureRepositories/i.test(
+        line,
+      )
+    ) {
+      throw new Error(`${name}: an apt source or install that skips signature checks`);
+    }
+    if (/sha256sum/.test(line) && /\|\|/.test(line)) {
+      throw new Error(`${name}: a RUN line that checks a checksum may not use ||`);
+    }
     if (
       /\bwget\b|\bgit\s+clone\b|\bfetch\s*\(|\bnode\s+-e\b|\bpython3?\s+-c\b|\bapt-get\s+download\b/.test(
         line,

@@ -1,6 +1,6 @@
 # T's model output: what the renderer gate compares (roadmap 3a, PR 3c-B)
 
-- Status: proposed, 2026-09-26; fifth draft, after four design reviews
+- Status: proposed, 2026-09-26; sixth draft, after five design reviews
 - Decides: the output format the renderer note's R3 leaves to "3c-B's addendum": the entries T
   emits for each section, in R3's index space; each property as T models it; how each is compared
   with Chrome's computed style; the fold and waiver fields, and where the scanner offsets and the
@@ -162,15 +162,17 @@ blue.
 - **`hr`.** Its own colour is gray (`rgb(128, 128, 128)`) unless it declares one, and its 1 px
   `inset` border on every side is drawn in that colour (measured: `hr style="color:red"` has a red
   colour and red borders).
-- **A centred table.** A `table` with `align="center"` has `auto` left and right margins, unless it
+- **A centred table.** A `table` whose `align` is `center` in any case, not trimmed (Chrome does not
+  trim it: `align=" center "` centres nothing), has `auto` left and right margins, unless it
   declares one side, which keeps its value while the other stays `auto`; Chrome reports the used
   value, which depends on the width (377 px at 813), so the judge does not compare an `auto` side.
 - **Tables.** Outside any table, `border-spacing` is 0 and `border-collapse` is `separate`. Each
   `table` resets them: `border-spacing` to 2 px (1.5 pt) or its `cellspacing` attribute's pixels,
   `border-collapse` to `separate` or its declaration; both inherit to its descendants (the scanner
-  refuses a table inside a table). A `table` `border` attribute of `N` other than `0` is a set of
-  presentational longhands: on the table, each side's `border-*-width` `N` px, `border-*-style`
-  `outset`; on each of its cells, 1 px and `inset`. A declared longhand, directly or through a
+  refuses a table inside a table). A `table` `border` attribute of `N` is a set of presentational
+  longhands: on the table, each side's `border-*-width` `N` px, `0` included, and, where `N` is not
+  `0`, `border-*-style` `outset`; on each of its cells, where `N` is not `0`, 1 px and `inset`
+  (measured: `border="0" style="border-style:solid"` draws 0 px). A declared longhand, directly or through a
   shorthand covering it, replaces the presentational one of the same property and side, one
   property at a time, and a width or style neither declares is initial (`medium`, `none`)
   (measured: `td style="border-style:solid"` under `border="1"` draws 1 px solid).
@@ -211,14 +213,20 @@ For every carried section, in HTML and XML mode, at 813 px at every ratio and at
 widths (360 and 1 240 px) at ratio 1, the judge reads each element's computed style (in an isolated world, scripts disabled)
 and each list marker's text from the accessibility tree, and compares them with the model entry of
 the same key by M3. The judge first reads the model as data and refuses it, `model-mismatch`, unless
-it has exactly M2's fields for its format; each element's key is its position, its parent's key
-before it and only the div's −1; each text entry's key is its position, its element one of the
-model's, and the entries cover the offsets from 0 in order; there is one marker per `li`, in
-order, and none elsewhere; each fold is on one of its elements, in order, and `delete`, `sup` or
-`sub`; each waiver is one code point within the text, in order; and every style has M3's shape.
-It then matches Chrome's elements to the keys in order, skipping a `tbody` only in HTML mode and
-only where the model has none there, and requires each element's parent, through such a `tbody`,
-to be the model's; and it requires a marker in the model exactly where Chrome draws one. A
+it has exactly M2's fields for its format, and each entry exactly its fields (`interElement` present
+only as `true`); each element's key is its position, its parent's key before it, the div's −1 and
+every other's at least 0; each text entry's key is its position, its element one of the model's,
+and the entries cover the offsets from 0 in order; there is one marker per `li`, in order, and none
+elsewhere; each fold is on one of its elements other than the div, in order, and `delete`, `sup`
+or `sub`; each waiver is one code point within the text, in order; and every style has M3's
+fields and values: ranges finite with `lo` at most `hi`, colours of three channels from 0 to 255,
+keywords from their lists, and `auto` only on a table's left and right margins, the one value
+that turns a comparison off. It then matches Chrome's elements to the keys in order, skipping a
+`tbody` only in HTML mode, where the model's next element is a `tr` placed directly in a `table`
+and the `tbody` stands in that table; it requires each element's parent, through such a `tbody`,
+to be the model's, and a marker in the model exactly where Chrome draws one. In XML mode it reads
+each text node's data itself: a node directly in a `table`, row group, `tr`, `ol` or `ul` must be
+the one flagged `interElement`, and each waived code point must be a plus sign. A
 marker's style is compared against `getComputedStyle(li, "::marker")` (size, weight,
 style, colour, line height, decorations in effect), and its backgrounds against the `li`'s chain. Any difference, a missing entry or an extra element, is a refusal of ours
 (`model-mismatch`, with the key, the property, T's value and Chrome's), and the record carries it.
@@ -302,3 +310,12 @@ for widths as drawn.
    XML mode's geometry and the picture forms to no change. Low: B1's wording of text ranges; a
    malformed style crashing the judge; a `border` attribute past HTML's integer range; R3's
    "every text node's modelled style". Fixed in this draft and the renderer note as found.
+5. **Fifth independent review** (2026-09-26). No High; no accepted section's model is refused by the
+   stated rules, and some seventy probes matched. Medium: the judge's validation was stated more
+   strongly than coded (entries' own fields, style values, `interElement`, `auto` margins, which
+   turn a comparison off, allowed anywhere); a `border="0"` attribute sets the table's widths to
+   0; the Delivery left parts of R1 and R2's `fetched` form to no change. Low: `align` is not
+   trimmed by Chrome; the `tbody` condition; folds on the div; R3's wording; waived signs. Fixed
+   in this draft and the renderer note as found; the judge now checks each entry's fields and
+   values, `auto` only on a table's sides, and reads `interElement` and the waived signs from the
+   XML DOM itself.

@@ -7,6 +7,15 @@ export type ModelCase = { name: string; inner: string };
 
 export const MODEL_CASES: ModelCase[] = [
   {
+    // A `border="0"` attribute sets the table's widths to 0 whatever style is declared (the fifth
+    // review); `align` is matched without case but not trimmed.
+    name: "border-zero-and-align",
+    inner:
+      '<table border="0" style="border-style:solid"><tr><td>a</td></tr></table>' +
+      '<table border="00" style="border-top-style:dashed"><tr><td>b</td></tr></table>' +
+      '<table align=" center "><tr><td>c</td></tr></table><table align="CENTER"><tr><td>d</td></tr></table>',
+  },
+  {
     // The elements no other case drew (the first code review of PR 3c-B): `abbr`, a carried
     // picture, a `tfoot` with its own alignment and border colour.
     name: "abbr-picture-and-footer",

@@ -173,6 +173,36 @@ describe("the renderer image's pins", () => {
     ],
     ["any ADD", (text: string) => text.replace("USER node", "ADD local.tar /opt/\nUSER node")],
     [
+      "a checksum chain that ends in || true",
+      (text: string) =>
+        text.replace(
+          'echo "${CALADEA_BOLDITALIC_SHA256}  Caladea-BoldItalic.ttf" | sha256sum --check -',
+          'echo "${CALADEA_BOLDITALIC_SHA256}  Caladea-BoldItalic.ttf" | sha256sum --check - || true',
+        ),
+    ],
+    [
+      "a RUN heredoc",
+      (text: string) =>
+        text.replace("USER node", "RUN <<EOT\ncurl https://example.org/x\nEOT\nUSER node"),
+    ],
+    [
+      "a bind mount of another image",
+      (text: string) =>
+        text.replace(
+          "RUN set -eu; \\\n    unzip",
+          "RUN --mount=type=bind,from=busybox,target=/b set -eu; \\\n    unzip",
+        ),
+    ],
+    [
+      "an npm install",
+      (text: string) => text.replace("USER node", "RUN npm install -g something\nUSER node"),
+    ],
+    [
+      "an apt source trusted without a signature",
+      (text: string) =>
+        text.replace('"Check-Valid-Until: no" \\\n      "" \\', '"Trusted: yes" \\\n      "" \\'),
+    ],
+    [
       "a malformed snapshot",
       (text: string) => text.replace(/ARG DEBIAN_SNAPSHOT=\S+/, "ARG DEBIAN_SNAPSHOT=latest"),
     ],

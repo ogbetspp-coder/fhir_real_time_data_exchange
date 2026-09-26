@@ -257,6 +257,134 @@ function compareMarker(
 }
 
 const TOP_LEVEL = new Set(["format", "elements", "text", "markers", "folds", "waivers"]);
+const ENTRY_FIELDS: Readonly<Record<string, readonly string[]>> = {
+  elements: ["key", "name", "parent", "style"],
+  text: ["key", "element", "start", "end", "interElement"],
+  markers: ["element", "text", "style"],
+  folds: ["element", "decision"],
+  waivers: ["start", "end"],
+};
+const STYLE_FIELDS = [
+  "fontSize",
+  "fontWeight",
+  "fontStyle",
+  "colours",
+  "lineHeight",
+  "underline",
+  "backgrounds",
+  "textIndent",
+  "margin",
+  "padding",
+  "borders",
+  "borderCollapse",
+  "borderSpacing",
+  "display",
+  "position",
+  "top",
+  "bottom",
+  "verticalAlign",
+];
+const MARKER_STYLE_FIELDS = [
+  "fontSize",
+  "fontWeight",
+  "fontStyle",
+  "colours",
+  "lineHeight",
+  "backgrounds",
+  "underline",
+];
+// The containers whose whitespace T's walk drops and the model flags `interElement` (M1).
+const CONTAINERS = new Set(["table", "thead", "tbody", "tfoot", "tr", "ol", "ul"]);
+
+const FONT_STYLES = new Set(["normal", "italic", "oblique"]);
+const LINE_STYLES = new Set(["solid", "double", "dotted", "dashed", "inset", "outset"]);
+const DISPLAYS = new Set([
+  "block",
+  "inline",
+  "list-item",
+  "table",
+  "table-caption",
+  "table-header-group",
+  "table-row-group",
+  "table-footer-group",
+  "table-row",
+  "table-cell",
+]);
+const ALIGN_KEYWORDS = new Set(["baseline", "super", "sub", "top", "middle", "bottom"]);
+
+const isRange = (value: unknown): boolean =>
+  shaped(value, ["lo", "hi"]) &&
+  Number.isFinite((value as Range).lo) &&
+  Number.isFinite((value as Range).hi) &&
+  (value as Range).lo <= (value as Range).hi;
+const isRgb = (value: unknown): boolean =>
+  Array.isArray(value) &&
+  value.length === 3 &&
+  value.every((channel) => isInteger(channel) && channel >= 0 && channel <= 255);
+const isColours = (value: unknown, allowEmpty = false): boolean =>
+  Array.isArray(value) && (allowEmpty || value.length > 0) && value.every(isRgb);
+const isSides = (value: unknown, side: (entry: unknown, name: string) => boolean): boolean =>
+  shaped(value, ["top", "right", "bottom", "left"]) &&
+  ["top", "right", "bottom", "left"].every((name) =>
+    side((value as Record<string, unknown>)[name], name),
+  );
+
+// The values of a marker's style, as M2 and M3 state them.
+function markerStyleValid(style: Record<string, unknown>): boolean {
+  return (
+    isRange(style.fontSize) &&
+    isInteger(style.fontWeight) &&
+    style.fontWeight >= 1 &&
+    style.fontWeight <= 1000 &&
+    FONT_STYLES.has(style.fontStyle as string) &&
+    isColours(style.colours) &&
+    (style.lineHeight === "normal" || isRange(style.lineHeight)) &&
+    typeof style.underline === "boolean" &&
+    isColours(style.backgrounds, true)
+  );
+}
+
+// The values of an element's style: every one of M3's kinds, and `auto` only on a table's left
+// and right margins, the one value that turns a comparison off.
+function styleValid(style: Record<string, unknown>, name: string): boolean {
+  const border = (value: unknown): boolean =>
+    value === "none" ||
+    (shaped(value, ["width", "style", "colours"]) &&
+      Number.isFinite((value as { width: number }).width) &&
+      (value as { width: number }).width >= 0 &&
+      LINE_STYLES.has((value as { style: string }).style) &&
+      isColours((value as { colours: unknown }).colours));
+  return (
+    markerStyleValid(style) &&
+    isRange(style.textIndent) &&
+    isSides(
+      style.margin,
+      (value, side) =>
+        isRange(value) ||
+        (value === "auto" && name === "table" && (side === "left" || side === "right")),
+    ) &&
+    isSides(style.padding, isRange) &&
+    isSides(style.borders, border) &&
+    (style.borderCollapse === "collapse" || style.borderCollapse === "separate") &&
+    Number.isFinite(style.borderSpacing) &&
+    (style.borderSpacing as number) >= 0 &&
+    DISPLAYS.has(style.display as string) &&
+    (style.position === "static" || style.position === "relative") &&
+    (style.top === "auto" || isRange(style.top)) &&
+    (style.bottom === "auto" || isRange(style.bottom)) &&
+    (ALIGN_KEYWORDS.has(style.verticalAlign as string) || isRange(style.verticalAlign))
+  );
+}
+
+// An object whose own fields are among `allowed`, with every one of `required`.
+function shaped(value: unknown, allowed: readonly string[], required = allowed): boolean {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const fields = Object.keys(value);
+  return (
+    fields.every((field) => allowed.includes(field)) &&
+    required.every((field) => fields.includes(field))
+  );
+}
 const DECISIONS = new Set(["delete", "sup", "sub"]);
 const isInteger = (value: unknown): value is number => Number.isInteger(value);
 
@@ -271,9 +399,38 @@ export function validateModel(model: Model): string | undefined {
   }
   const { elements, text, markers, folds, waivers } = model;
   if (![elements, text, markers, folds, waivers].every(Array.isArray)) return "arrays";
+  for (const [field, entries] of Object.entries({ elements, text, markers, folds, waivers })) {
+    const allowed = ENTRY_FIELDS[field] ?? [];
+    const required = field === "text" ? allowed.filter((name) => name !== "interElement") : allowed;
+    if (!(entries as unknown[]).every((entry) => shaped(entry, allowed, required))) {
+      return `${field} entries of M2's shape`;
+    }
+  }
+  if (
+    !elements.every(
+      ({ style, name }) =>
+        shaped(style, STYLE_FIELDS) &&
+        styleValid(style as unknown as Record<string, unknown>, name),
+    )
+  ) {
+    return "styles of M3's shape and values";
+  }
+  if (
+    !markers.every(
+      ({ style }) =>
+        shaped(style, MARKER_STYLE_FIELDS) &&
+        markerStyleValid(style as unknown as Record<string, unknown>),
+    )
+  ) {
+    return "marker styles of M2's shape and values";
+  }
   const dense = elements.every(
-    ({ key, parent }, index) =>
-      key === index && isInteger(parent) && parent < index && (index === 0) === (parent === -1),
+    ({ key, name, parent }, index) =>
+      typeof (name as unknown) === "string" &&
+      key === index &&
+      isInteger(parent) &&
+      parent < index &&
+      (index === 0 ? parent === -1 : parent >= 0),
   );
   if (!dense) return "keys 0 to n - 1, parents first";
   let offset = 0;
@@ -288,6 +445,16 @@ export function validateModel(model: Model): string | undefined {
     }
     if (!isInteger(entry.element) || entry.element < 0 || entry.element >= elements.length) {
       return "text entries naming its elements";
+    }
+    // `interElement` only as true, and only in a table or list container (M1): the judge compares
+    // no style for such a node, so the flag is no exemption elsewhere.
+    // The model arrives as JSON, whatever its type says: the flag is read as unknown.
+    const flag: unknown = (entry as { interElement?: unknown }).interElement;
+    if (
+      flag !== undefined &&
+      (flag !== true || !CONTAINERS.has(elements[entry.element]?.name ?? ""))
+    ) {
+      return "interElement only on whitespace in a table or list container";
     }
     offset = entry.end;
   }
@@ -436,14 +603,18 @@ export function compareModel(
     };
     const text = markers.get(index);
     check("text", text === marker.text, marker.text, text ?? "(none)");
-    compareMarker(check, marker.style, elements[index]?.marker);
-    const chain = backgroundChain(elements, index);
-    check(
-      "background-color",
-      sameChain(marker.style.backgrounds, chain),
-      marker.style.backgrounds,
-      show(chain),
-    );
+    try {
+      compareMarker(check, marker.style, elements[index]?.marker);
+      const chain = backgroundChain(elements, index);
+      check(
+        "background-color",
+        sameChain(marker.style.backgrounds, chain),
+        marker.style.backgrounds,
+        show(chain),
+      );
+    } catch {
+      check("style", false, "a marker style of M2's shape", "(model malformed)");
+    }
   }
   return mismatches;
 }
@@ -462,23 +633,41 @@ export function compareText(model: Model, texts: readonly ChromeText[]): Mismatc
     return mismatches;
   }
   let offset = 0;
+  const points: string[] = [];
   texts.forEach((text, index) => {
     const entry = model.text[index];
     const expected = { element: text.parent, start: offset, end: offset + text.length };
     offset += text.length;
+    points.push(...Array.from(text.data));
+    // The judge's own reading of M1: a node directly in a table or list container is the
+    // whitespace T's walk drops, and only such a node is flagged.
+    const between = CONTAINERS.has(model.elements[text.parent]?.name ?? "");
     if (
       entry?.element !== expected.element ||
       entry.start !== expected.start ||
-      entry.end !== expected.end
+      entry.end !== expected.end ||
+      (entry.interElement === true) !== between
     ) {
       mismatches.push({
         reason: "model-mismatch",
         key: entry?.element ?? -1,
         property: `text ${index}`,
         model: show(entry),
-        chrome: show(expected),
+        chrome: show({ ...expected, interElement: between }),
       });
     }
   });
+  // Each waived code point is a plus sign in the DOM's text.
+  for (const { start } of model.waivers) {
+    if (points[start] !== "+") {
+      mismatches.push({
+        reason: "model-mismatch",
+        key: -1,
+        property: `waiver ${start}`,
+        model: "+",
+        chrome: points[start] ?? "(none)",
+      });
+    }
+  }
   return mismatches;
 }

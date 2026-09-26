@@ -1,6 +1,1382 @@
 {
   "browser": "HeadlessChrome/154.0.8037.57",
   "ratio": 1.25,
+  "border-zero-and-align html": {
+    "elements": [
+      {
+        "name": "div",
+        "parent": -1,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "0px",
+          "margin-bottom": "0px",
+          "margin-left": "0px",
+          "padding-top": "0px",
+          "padding-right": "0px",
+          "padding-bottom": "0px",
+          "padding-left": "0px",
+          "border-top-width": "0px",
+          "border-top-style": "none",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "0px",
+          "display": "block",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "baseline"
+        }
+      },
+      {
+        "name": "table",
+        "parent": 0,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "0px",
+          "margin-bottom": "0px",
+          "margin-left": "0px",
+          "padding-top": "0px",
+          "padding-right": "0px",
+          "padding-bottom": "0px",
+          "padding-left": "0px",
+          "border-top-width": "0px",
+          "border-top-style": "solid",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "solid",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "solid",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "solid",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "1.6px",
+          "display": "table",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "baseline"
+        }
+      },
+      {
+        "name": "tbody",
+        "parent": 1,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "0px",
+          "margin-bottom": "0px",
+          "margin-left": "0px",
+          "padding-top": "0px",
+          "padding-right": "0px",
+          "padding-bottom": "0px",
+          "padding-left": "0px",
+          "border-top-width": "0px",
+          "border-top-style": "none",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "1.6px",
+          "display": "table-row-group",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "middle"
+        }
+      },
+      {
+        "name": "tr",
+        "parent": 2,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "0px",
+          "margin-bottom": "0px",
+          "margin-left": "0px",
+          "padding-top": "0px",
+          "padding-right": "0px",
+          "padding-bottom": "0px",
+          "padding-left": "0px",
+          "border-top-width": "0px",
+          "border-top-style": "none",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "1.6px",
+          "display": "table-row",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "middle"
+        }
+      },
+      {
+        "name": "td",
+        "parent": 3,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "0px",
+          "margin-bottom": "0px",
+          "margin-left": "0px",
+          "padding-top": "1px",
+          "padding-right": "1px",
+          "padding-bottom": "1px",
+          "padding-left": "1px",
+          "border-top-width": "0px",
+          "border-top-style": "none",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "1.6px",
+          "display": "table-cell",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "middle"
+        }
+      },
+      {
+        "name": "table",
+        "parent": 0,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "0px",
+          "margin-bottom": "0px",
+          "margin-left": "0px",
+          "padding-top": "0px",
+          "padding-right": "0px",
+          "padding-bottom": "0px",
+          "padding-left": "0px",
+          "border-top-width": "0px",
+          "border-top-style": "dashed",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "1.6px",
+          "display": "table",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "baseline"
+        }
+      },
+      {
+        "name": "tbody",
+        "parent": 5,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "0px",
+          "margin-bottom": "0px",
+          "margin-left": "0px",
+          "padding-top": "0px",
+          "padding-right": "0px",
+          "padding-bottom": "0px",
+          "padding-left": "0px",
+          "border-top-width": "0px",
+          "border-top-style": "none",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "1.6px",
+          "display": "table-row-group",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "middle"
+        }
+      },
+      {
+        "name": "tr",
+        "parent": 6,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "0px",
+          "margin-bottom": "0px",
+          "margin-left": "0px",
+          "padding-top": "0px",
+          "padding-right": "0px",
+          "padding-bottom": "0px",
+          "padding-left": "0px",
+          "border-top-width": "0px",
+          "border-top-style": "none",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "1.6px",
+          "display": "table-row",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "middle"
+        }
+      },
+      {
+        "name": "td",
+        "parent": 7,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "0px",
+          "margin-bottom": "0px",
+          "margin-left": "0px",
+          "padding-top": "1px",
+          "padding-right": "1px",
+          "padding-bottom": "1px",
+          "padding-left": "1px",
+          "border-top-width": "0px",
+          "border-top-style": "none",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "1.6px",
+          "display": "table-cell",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "middle"
+        }
+      },
+      {
+        "name": "table",
+        "parent": 0,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "0px",
+          "margin-bottom": "0px",
+          "margin-left": "0px",
+          "padding-top": "0px",
+          "padding-right": "0px",
+          "padding-bottom": "0px",
+          "padding-left": "0px",
+          "border-top-width": "0px",
+          "border-top-style": "none",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "1.6px",
+          "display": "table",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "baseline"
+        }
+      },
+      {
+        "name": "tbody",
+        "parent": 9,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "0px",
+          "margin-bottom": "0px",
+          "margin-left": "0px",
+          "padding-top": "0px",
+          "padding-right": "0px",
+          "padding-bottom": "0px",
+          "padding-left": "0px",
+          "border-top-width": "0px",
+          "border-top-style": "none",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "1.6px",
+          "display": "table-row-group",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "middle"
+        }
+      },
+      {
+        "name": "tr",
+        "parent": 10,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "0px",
+          "margin-bottom": "0px",
+          "margin-left": "0px",
+          "padding-top": "0px",
+          "padding-right": "0px",
+          "padding-bottom": "0px",
+          "padding-left": "0px",
+          "border-top-width": "0px",
+          "border-top-style": "none",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "1.6px",
+          "display": "table-row",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "middle"
+        }
+      },
+      {
+        "name": "td",
+        "parent": 11,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "0px",
+          "margin-bottom": "0px",
+          "margin-left": "0px",
+          "padding-top": "1px",
+          "padding-right": "1px",
+          "padding-bottom": "1px",
+          "padding-left": "1px",
+          "border-top-width": "0px",
+          "border-top-style": "none",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "1.6px",
+          "display": "table-cell",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "middle"
+        }
+      },
+      {
+        "name": "table",
+        "parent": 0,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "400.2px",
+          "margin-bottom": "0px",
+          "margin-left": "400.2px",
+          "padding-top": "0px",
+          "padding-right": "0px",
+          "padding-bottom": "0px",
+          "padding-left": "0px",
+          "border-top-width": "0px",
+          "border-top-style": "none",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "1.6px",
+          "display": "table",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "baseline"
+        }
+      },
+      {
+        "name": "tbody",
+        "parent": 13,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "0px",
+          "margin-bottom": "0px",
+          "margin-left": "0px",
+          "padding-top": "0px",
+          "padding-right": "0px",
+          "padding-bottom": "0px",
+          "padding-left": "0px",
+          "border-top-width": "0px",
+          "border-top-style": "none",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "1.6px",
+          "display": "table-row-group",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "middle"
+        }
+      },
+      {
+        "name": "tr",
+        "parent": 14,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "0px",
+          "margin-bottom": "0px",
+          "margin-left": "0px",
+          "padding-top": "0px",
+          "padding-right": "0px",
+          "padding-bottom": "0px",
+          "padding-left": "0px",
+          "border-top-width": "0px",
+          "border-top-style": "none",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "1.6px",
+          "display": "table-row",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "middle"
+        }
+      },
+      {
+        "name": "td",
+        "parent": 15,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "0px",
+          "margin-bottom": "0px",
+          "margin-left": "0px",
+          "padding-top": "1px",
+          "padding-right": "1px",
+          "padding-bottom": "1px",
+          "padding-left": "1px",
+          "border-top-width": "0px",
+          "border-top-style": "none",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "1.6px",
+          "display": "table-cell",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "middle"
+        }
+      },
+      {
+        "name": "p",
+        "parent": 0,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "16px",
+          "margin-right": "0px",
+          "margin-bottom": "16px",
+          "margin-left": "0px",
+          "padding-top": "0px",
+          "padding-right": "0px",
+          "padding-bottom": "0px",
+          "padding-left": "0px",
+          "border-top-width": "0px",
+          "border-top-style": "none",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "0px",
+          "display": "block",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "baseline"
+        }
+      }
+    ],
+    "markers": [],
+    "texts": [
+      {
+        "parent": 4,
+        "length": 1,
+        "data": "a"
+      },
+      {
+        "parent": 8,
+        "length": 1,
+        "data": "b"
+      },
+      {
+        "parent": 12,
+        "length": 1,
+        "data": "c"
+      },
+      {
+        "parent": 16,
+        "length": 1,
+        "data": "d"
+      },
+      {
+        "parent": 17,
+        "length": 20,
+        "data": "not for clinical use"
+      }
+    ]
+  },
+  "border-zero-and-align xml": {
+    "elements": [
+      {
+        "name": "div",
+        "parent": -1,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "0px",
+          "margin-bottom": "0px",
+          "margin-left": "0px",
+          "padding-top": "0px",
+          "padding-right": "0px",
+          "padding-bottom": "0px",
+          "padding-left": "0px",
+          "border-top-width": "0px",
+          "border-top-style": "none",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "0px",
+          "display": "block",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "baseline"
+        }
+      },
+      {
+        "name": "table",
+        "parent": 0,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "0px",
+          "margin-bottom": "0px",
+          "margin-left": "0px",
+          "padding-top": "0px",
+          "padding-right": "0px",
+          "padding-bottom": "0px",
+          "padding-left": "0px",
+          "border-top-width": "0px",
+          "border-top-style": "solid",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "solid",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "solid",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "solid",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "1.6px",
+          "display": "table",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "baseline"
+        }
+      },
+      {
+        "name": "tr",
+        "parent": 1,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "0px",
+          "margin-bottom": "0px",
+          "margin-left": "0px",
+          "padding-top": "0px",
+          "padding-right": "0px",
+          "padding-bottom": "0px",
+          "padding-left": "0px",
+          "border-top-width": "0px",
+          "border-top-style": "none",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "1.6px",
+          "display": "table-row",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "middle"
+        }
+      },
+      {
+        "name": "td",
+        "parent": 2,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "0px",
+          "margin-bottom": "0px",
+          "margin-left": "0px",
+          "padding-top": "1px",
+          "padding-right": "1px",
+          "padding-bottom": "1px",
+          "padding-left": "1px",
+          "border-top-width": "0px",
+          "border-top-style": "none",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "1.6px",
+          "display": "table-cell",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "middle"
+        }
+      },
+      {
+        "name": "table",
+        "parent": 0,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "0px",
+          "margin-bottom": "0px",
+          "margin-left": "0px",
+          "padding-top": "0px",
+          "padding-right": "0px",
+          "padding-bottom": "0px",
+          "padding-left": "0px",
+          "border-top-width": "0px",
+          "border-top-style": "dashed",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "1.6px",
+          "display": "table",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "baseline"
+        }
+      },
+      {
+        "name": "tr",
+        "parent": 4,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "0px",
+          "margin-bottom": "0px",
+          "margin-left": "0px",
+          "padding-top": "0px",
+          "padding-right": "0px",
+          "padding-bottom": "0px",
+          "padding-left": "0px",
+          "border-top-width": "0px",
+          "border-top-style": "none",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "1.6px",
+          "display": "table-row",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "middle"
+        }
+      },
+      {
+        "name": "td",
+        "parent": 5,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "0px",
+          "margin-bottom": "0px",
+          "margin-left": "0px",
+          "padding-top": "1px",
+          "padding-right": "1px",
+          "padding-bottom": "1px",
+          "padding-left": "1px",
+          "border-top-width": "0px",
+          "border-top-style": "none",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "1.6px",
+          "display": "table-cell",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "middle"
+        }
+      },
+      {
+        "name": "table",
+        "parent": 0,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "0px",
+          "margin-bottom": "0px",
+          "margin-left": "0px",
+          "padding-top": "0px",
+          "padding-right": "0px",
+          "padding-bottom": "0px",
+          "padding-left": "0px",
+          "border-top-width": "0px",
+          "border-top-style": "none",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "1.6px",
+          "display": "table",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "baseline"
+        }
+      },
+      {
+        "name": "tr",
+        "parent": 7,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "0px",
+          "margin-bottom": "0px",
+          "margin-left": "0px",
+          "padding-top": "0px",
+          "padding-right": "0px",
+          "padding-bottom": "0px",
+          "padding-left": "0px",
+          "border-top-width": "0px",
+          "border-top-style": "none",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "1.6px",
+          "display": "table-row",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "middle"
+        }
+      },
+      {
+        "name": "td",
+        "parent": 8,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "0px",
+          "margin-bottom": "0px",
+          "margin-left": "0px",
+          "padding-top": "1px",
+          "padding-right": "1px",
+          "padding-bottom": "1px",
+          "padding-left": "1px",
+          "border-top-width": "0px",
+          "border-top-style": "none",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "1.6px",
+          "display": "table-cell",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "middle"
+        }
+      },
+      {
+        "name": "table",
+        "parent": 0,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "400.2px",
+          "margin-bottom": "0px",
+          "margin-left": "400.2px",
+          "padding-top": "0px",
+          "padding-right": "0px",
+          "padding-bottom": "0px",
+          "padding-left": "0px",
+          "border-top-width": "0px",
+          "border-top-style": "none",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "1.6px",
+          "display": "table",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "baseline"
+        }
+      },
+      {
+        "name": "tr",
+        "parent": 10,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "0px",
+          "margin-bottom": "0px",
+          "margin-left": "0px",
+          "padding-top": "0px",
+          "padding-right": "0px",
+          "padding-bottom": "0px",
+          "padding-left": "0px",
+          "border-top-width": "0px",
+          "border-top-style": "none",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "1.6px",
+          "display": "table-row",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "middle"
+        }
+      },
+      {
+        "name": "td",
+        "parent": 11,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "0px",
+          "margin-right": "0px",
+          "margin-bottom": "0px",
+          "margin-left": "0px",
+          "padding-top": "1px",
+          "padding-right": "1px",
+          "padding-bottom": "1px",
+          "padding-left": "1px",
+          "border-top-width": "0px",
+          "border-top-style": "none",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "1.6px",
+          "display": "table-cell",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "middle"
+        }
+      },
+      {
+        "name": "p",
+        "parent": 0,
+        "style": {
+          "font-size": "16px",
+          "font-weight": "400",
+          "font-style": "normal",
+          "color": "rgb(0, 0, 0)",
+          "line-height": "normal",
+          "-webkit-text-decorations-in-effect": "none",
+          "background-color": "rgba(0, 0, 0, 0)",
+          "text-indent": "0px",
+          "margin-top": "16px",
+          "margin-right": "0px",
+          "margin-bottom": "16px",
+          "margin-left": "0px",
+          "padding-top": "0px",
+          "padding-right": "0px",
+          "padding-bottom": "0px",
+          "padding-left": "0px",
+          "border-top-width": "0px",
+          "border-top-style": "none",
+          "border-top-color": "rgb(0, 0, 0)",
+          "border-right-width": "0px",
+          "border-right-style": "none",
+          "border-right-color": "rgb(0, 0, 0)",
+          "border-bottom-width": "0px",
+          "border-bottom-style": "none",
+          "border-bottom-color": "rgb(0, 0, 0)",
+          "border-left-width": "0px",
+          "border-left-style": "none",
+          "border-left-color": "rgb(0, 0, 0)",
+          "border-collapse": "separate",
+          "border-spacing": "0px",
+          "display": "block",
+          "position": "static",
+          "top": "auto",
+          "bottom": "auto",
+          "vertical-align": "baseline"
+        }
+      }
+    ],
+    "markers": [],
+    "texts": [
+      {
+        "parent": 3,
+        "length": 1,
+        "data": "a"
+      },
+      {
+        "parent": 6,
+        "length": 1,
+        "data": "b"
+      },
+      {
+        "parent": 9,
+        "length": 1,
+        "data": "c"
+      },
+      {
+        "parent": 12,
+        "length": 1,
+        "data": "d"
+      },
+      {
+        "parent": 13,
+        "length": 20,
+        "data": "not for clinical use"
+      }
+    ]
+  },
   "abbr-picture-and-footer html": {
     "elements": [
       {
@@ -500,27 +1876,33 @@
     "texts": [
       {
         "parent": 2,
-        "length": 4
+        "length": 4,
+        "data": "SmPC"
       },
       {
         "parent": 1,
-        "length": 3
+        "length": 3,
+        "data": " x "
       },
       {
         "parent": 1,
-        "length": 2
+        "length": 2,
+        "data": " y"
       },
       {
         "parent": 7,
-        "length": 1
+        "length": 1,
+        "data": "y"
       },
       {
         "parent": 10,
-        "length": 1
+        "length": 1,
+        "data": "x"
       },
       {
         "parent": 11,
-        "length": 20
+        "length": 20,
+        "data": "not for clinical use"
       }
     ]
   },
@@ -1023,27 +2405,33 @@
     "texts": [
       {
         "parent": 2,
-        "length": 4
+        "length": 4,
+        "data": "SmPC"
       },
       {
         "parent": 1,
-        "length": 3
+        "length": 3,
+        "data": " x "
       },
       {
         "parent": 1,
-        "length": 2
+        "length": 2,
+        "data": " y"
       },
       {
         "parent": 7,
-        "length": 1
+        "length": 1,
+        "data": "y"
       },
       {
         "parent": 10,
-        "length": 1
+        "length": 1,
+        "data": "x"
       },
       {
         "parent": 11,
-        "length": 20
+        "length": 20,
+        "data": "not for clinical use"
       }
     ]
   },
@@ -1874,27 +3262,33 @@
     "texts": [
       {
         "parent": 4,
-        "length": 1
+        "length": 1,
+        "data": "a"
       },
       {
         "parent": 8,
-        "length": 1
+        "length": 1,
+        "data": "b"
       },
       {
         "parent": 10,
-        "length": 1
+        "length": 1,
+        "data": "c"
       },
       {
         "parent": 14,
-        "length": 1
+        "length": 1,
+        "data": "d"
       },
       {
         "parent": 18,
-        "length": 1
+        "length": 1,
+        "data": "e"
       },
       {
         "parent": 19,
-        "length": 20
+        "length": 20,
+        "data": "not for clinical use"
       }
     ]
   },
@@ -2643,27 +4037,33 @@
     "texts": [
       {
         "parent": 4,
-        "length": 1
+        "length": 1,
+        "data": "a"
       },
       {
         "parent": 7,
-        "length": 1
+        "length": 1,
+        "data": "b"
       },
       {
         "parent": 9,
-        "length": 1
+        "length": 1,
+        "data": "c"
       },
       {
         "parent": 12,
-        "length": 1
+        "length": 1,
+        "data": "d"
       },
       {
         "parent": 16,
-        "length": 1
+        "length": 1,
+        "data": "e"
       },
       {
         "parent": 17,
-        "length": 20
+        "length": 20,
+        "data": "not for clinical use"
       }
     ]
   },
@@ -3699,51 +5099,63 @@
     "texts": [
       {
         "parent": 4,
-        "length": 1
+        "length": 1,
+        "data": "a"
       },
       {
         "parent": 5,
-        "length": 1
+        "length": 1,
+        "data": "b"
       },
       {
         "parent": 6,
-        "length": 1
+        "length": 1,
+        "data": "c"
       },
       {
         "parent": 7,
-        "length": 1
+        "length": 1,
+        "data": "d"
       },
       {
         "parent": 9,
-        "length": 1
+        "length": 1,
+        "data": "e"
       },
       {
         "parent": 10,
-        "length": 1
+        "length": 1,
+        "data": "f"
       },
       {
         "parent": 11,
-        "length": 1
+        "length": 1,
+        "data": "g"
       },
       {
         "parent": 12,
-        "length": 1
+        "length": 1,
+        "data": "h"
       },
       {
         "parent": 16,
-        "length": 1
+        "length": 1,
+        "data": "i"
       },
       {
         "parent": 19,
-        "length": 1
+        "length": 1,
+        "data": "j"
       },
       {
         "parent": 23,
-        "length": 1
+        "length": 1,
+        "data": "k"
       },
       {
         "parent": 24,
-        "length": 20
+        "length": 20,
+        "data": "not for clinical use"
       }
     ]
   },
@@ -4697,51 +6109,63 @@
     "texts": [
       {
         "parent": 3,
-        "length": 1
+        "length": 1,
+        "data": "a"
       },
       {
         "parent": 4,
-        "length": 1
+        "length": 1,
+        "data": "b"
       },
       {
         "parent": 5,
-        "length": 1
+        "length": 1,
+        "data": "c"
       },
       {
         "parent": 6,
-        "length": 1
+        "length": 1,
+        "data": "d"
       },
       {
         "parent": 8,
-        "length": 1
+        "length": 1,
+        "data": "e"
       },
       {
         "parent": 9,
-        "length": 1
+        "length": 1,
+        "data": "f"
       },
       {
         "parent": 10,
-        "length": 1
+        "length": 1,
+        "data": "g"
       },
       {
         "parent": 11,
-        "length": 1
+        "length": 1,
+        "data": "h"
       },
       {
         "parent": 15,
-        "length": 1
+        "length": 1,
+        "data": "i"
       },
       {
         "parent": 18,
-        "length": 1
+        "length": 1,
+        "data": "j"
       },
       {
         "parent": 21,
-        "length": 1
+        "length": 1,
+        "data": "k"
       },
       {
         "parent": 22,
-        "length": 20
+        "length": 20,
+        "data": "not for clinical use"
       }
     ]
   },
@@ -4875,11 +6299,13 @@
     "texts": [
       {
         "parent": 1,
-        "length": 10
+        "length": 10,
+        "data": "a\r\nb\n\nc\r\nd"
       },
       {
         "parent": 2,
-        "length": 20
+        "length": 20,
+        "data": "not for clinical use"
       }
     ]
   },
@@ -5013,11 +6439,13 @@
     "texts": [
       {
         "parent": 1,
-        "length": 10
+        "length": 10,
+        "data": "a\r\nb\n\nc\r\nd"
       },
       {
         "parent": 2,
-        "length": 20
+        "length": 20,
+        "data": "not for clinical use"
       }
     ]
   },
@@ -5364,31 +6792,38 @@
     "texts": [
       {
         "parent": 1,
-        "length": 2
+        "length": 2,
+        "data": "\n "
       },
       {
         "parent": 3,
-        "length": 1
+        "length": 1,
+        "data": "\n"
       },
       {
         "parent": 4,
-        "length": 7
+        "length": 7,
+        "data": "a\nb\nc\rd"
       },
       {
         "parent": 5,
-        "length": 1
+        "length": 1,
+        "data": " "
       },
       {
         "parent": 6,
-        "length": 1
+        "length": 1,
+        "data": "e"
       },
       {
         "parent": 5,
-        "length": 1
+        "length": 1,
+        "data": "\n"
       },
       {
         "parent": 7,
-        "length": 20
+        "length": 20,
+        "data": "not for clinical use"
       }
     ]
   },
@@ -5694,31 +7129,38 @@
     "texts": [
       {
         "parent": 1,
-        "length": 2
+        "length": 2,
+        "data": "\n "
       },
       {
         "parent": 2,
-        "length": 1
+        "length": 1,
+        "data": "\n"
       },
       {
         "parent": 3,
-        "length": 7
+        "length": 7,
+        "data": "a\nb\nc\rd"
       },
       {
         "parent": 4,
-        "length": 1
+        "length": 1,
+        "data": " "
       },
       {
         "parent": 5,
-        "length": 1
+        "length": 1,
+        "data": "e"
       },
       {
         "parent": 4,
-        "length": 1
+        "length": 1,
+        "data": "\n"
       },
       {
         "parent": 6,
-        "length": 20
+        "length": 20,
+        "data": "not for clinical use"
       }
     ]
   },
@@ -6467,59 +7909,73 @@
     "texts": [
       {
         "parent": 1,
-        "length": 1
+        "length": 1,
+        "data": "a"
       },
       {
         "parent": 2,
-        "length": 1
+        "length": 1,
+        "data": "b"
       },
       {
         "parent": 3,
-        "length": 1
+        "length": 1,
+        "data": "c"
       },
       {
         "parent": 4,
-        "length": 1
+        "length": 1,
+        "data": "d"
       },
       {
         "parent": 6,
-        "length": 1
+        "length": 1,
+        "data": "e"
       },
       {
         "parent": 7,
-        "length": 1
+        "length": 1,
+        "data": "f"
       },
       {
         "parent": 9,
-        "length": 1
+        "length": 1,
+        "data": "g"
       },
       {
         "parent": 10,
-        "length": 1
+        "length": 1,
+        "data": "h"
       },
       {
         "parent": 12,
-        "length": 1
+        "length": 1,
+        "data": "i"
       },
       {
         "parent": 13,
-        "length": 1
+        "length": 1,
+        "data": "j"
       },
       {
         "parent": 14,
-        "length": 1
+        "length": 1,
+        "data": "k"
       },
       {
         "parent": 15,
-        "length": 1
+        "length": 1,
+        "data": "l"
       },
       {
         "parent": 16,
-        "length": 1
+        "length": 1,
+        "data": "m"
       },
       {
         "parent": 17,
-        "length": 20
+        "length": 20,
+        "data": "not for clinical use"
       }
     ]
   },
@@ -7268,59 +8724,73 @@
     "texts": [
       {
         "parent": 1,
-        "length": 1
+        "length": 1,
+        "data": "a"
       },
       {
         "parent": 2,
-        "length": 1
+        "length": 1,
+        "data": "b"
       },
       {
         "parent": 3,
-        "length": 1
+        "length": 1,
+        "data": "c"
       },
       {
         "parent": 4,
-        "length": 1
+        "length": 1,
+        "data": "d"
       },
       {
         "parent": 6,
-        "length": 1
+        "length": 1,
+        "data": "e"
       },
       {
         "parent": 7,
-        "length": 1
+        "length": 1,
+        "data": "f"
       },
       {
         "parent": 9,
-        "length": 1
+        "length": 1,
+        "data": "g"
       },
       {
         "parent": 10,
-        "length": 1
+        "length": 1,
+        "data": "h"
       },
       {
         "parent": 12,
-        "length": 1
+        "length": 1,
+        "data": "i"
       },
       {
         "parent": 13,
-        "length": 1
+        "length": 1,
+        "data": "j"
       },
       {
         "parent": 14,
-        "length": 1
+        "length": 1,
+        "data": "k"
       },
       {
         "parent": 15,
-        "length": 1
+        "length": 1,
+        "data": "l"
       },
       {
         "parent": 16,
-        "length": 1
+        "length": 1,
+        "data": "m"
       },
       {
         "parent": 17,
-        "length": 20
+        "length": 20,
+        "data": "not for clinical use"
       }
     ]
   },
@@ -7823,39 +9293,48 @@
     "texts": [
       {
         "parent": 1,
-        "length": 1
+        "length": 1,
+        "data": "a"
       },
       {
         "parent": 2,
-        "length": 1
+        "length": 1,
+        "data": "b"
       },
       {
         "parent": 3,
-        "length": 1
+        "length": 1,
+        "data": "c"
       },
       {
         "parent": 4,
-        "length": 1
+        "length": 1,
+        "data": "d"
       },
       {
         "parent": 5,
-        "length": 1
+        "length": 1,
+        "data": "e"
       },
       {
         "parent": 6,
-        "length": 1
+        "length": 1,
+        "data": "f"
       },
       {
         "parent": 9,
-        "length": 1
+        "length": 1,
+        "data": "g"
       },
       {
         "parent": 10,
-        "length": 1
+        "length": 1,
+        "data": "h"
       },
       {
         "parent": 11,
-        "length": 20
+        "length": 20,
+        "data": "not for clinical use"
       }
     ]
   },
@@ -8358,39 +9837,48 @@
     "texts": [
       {
         "parent": 1,
-        "length": 1
+        "length": 1,
+        "data": "a"
       },
       {
         "parent": 2,
-        "length": 1
+        "length": 1,
+        "data": "b"
       },
       {
         "parent": 3,
-        "length": 1
+        "length": 1,
+        "data": "c"
       },
       {
         "parent": 4,
-        "length": 1
+        "length": 1,
+        "data": "d"
       },
       {
         "parent": 5,
-        "length": 1
+        "length": 1,
+        "data": "e"
       },
       {
         "parent": 6,
-        "length": 1
+        "length": 1,
+        "data": "f"
       },
       {
         "parent": 9,
-        "length": 1
+        "length": 1,
+        "data": "g"
       },
       {
         "parent": 10,
-        "length": 1
+        "length": 1,
+        "data": "h"
       },
       {
         "parent": 11,
-        "length": 20
+        "length": 20,
+        "data": "not for clinical use"
       }
     ]
   },
@@ -9508,59 +10996,73 @@
     "texts": [
       {
         "parent": 2,
-        "length": 1
+        "length": 1,
+        "data": "a"
       },
       {
         "parent": 4,
-        "length": 1
+        "length": 1,
+        "data": "b"
       },
       {
         "parent": 6,
-        "length": 1
+        "length": 1,
+        "data": "c"
       },
       {
         "parent": 8,
-        "length": 1
+        "length": 1,
+        "data": "c"
       },
       {
         "parent": 10,
-        "length": 1
+        "length": 1,
+        "data": "d"
       },
       {
         "parent": 12,
-        "length": 1
+        "length": 1,
+        "data": "e"
       },
       {
         "parent": 13,
-        "length": 1
+        "length": 1,
+        "data": "f"
       },
       {
         "parent": 15,
-        "length": 1
+        "length": 1,
+        "data": "g"
       },
       {
         "parent": 16,
-        "length": 1
+        "length": 1,
+        "data": "h"
       },
       {
         "parent": 18,
-        "length": 1
+        "length": 1,
+        "data": "k"
       },
       {
         "parent": 19,
-        "length": 1
+        "length": 1,
+        "data": "l"
       },
       {
         "parent": 21,
-        "length": 1
+        "length": 1,
+        "data": "i"
       },
       {
         "parent": 23,
-        "length": 1
+        "length": 1,
+        "data": "j"
       },
       {
         "parent": 24,
-        "length": 20
+        "length": 20,
+        "data": "not for clinical use"
       }
     ]
   },
@@ -10678,59 +12180,73 @@
     "texts": [
       {
         "parent": 2,
-        "length": 1
+        "length": 1,
+        "data": "a"
       },
       {
         "parent": 4,
-        "length": 1
+        "length": 1,
+        "data": "b"
       },
       {
         "parent": 6,
-        "length": 1
+        "length": 1,
+        "data": "c"
       },
       {
         "parent": 8,
-        "length": 1
+        "length": 1,
+        "data": "c"
       },
       {
         "parent": 10,
-        "length": 1
+        "length": 1,
+        "data": "d"
       },
       {
         "parent": 12,
-        "length": 1
+        "length": 1,
+        "data": "e"
       },
       {
         "parent": 13,
-        "length": 1
+        "length": 1,
+        "data": "f"
       },
       {
         "parent": 15,
-        "length": 1
+        "length": 1,
+        "data": "g"
       },
       {
         "parent": 16,
-        "length": 1
+        "length": 1,
+        "data": "h"
       },
       {
         "parent": 18,
-        "length": 1
+        "length": 1,
+        "data": "k"
       },
       {
         "parent": 19,
-        "length": 1
+        "length": 1,
+        "data": "l"
       },
       {
         "parent": 21,
-        "length": 1
+        "length": 1,
+        "data": "i"
       },
       {
         "parent": 23,
-        "length": 1
+        "length": 1,
+        "data": "j"
       },
       {
         "parent": 24,
-        "length": 20
+        "length": 20,
+        "data": "not for clinical use"
       }
     ]
   },
@@ -11151,39 +12667,48 @@
     "texts": [
       {
         "parent": 1,
-        "length": 1
+        "length": 1,
+        "data": "a"
       },
       {
         "parent": 2,
-        "length": 1
+        "length": 1,
+        "data": "2"
       },
       {
         "parent": 3,
-        "length": 1
+        "length": 1,
+        "data": "4"
       },
       {
         "parent": 4,
-        "length": 1
+        "length": 1,
+        "data": "3"
       },
       {
         "parent": 5,
-        "length": 1
+        "length": 1,
+        "data": "b"
       },
       {
         "parent": 6,
-        "length": 1
+        "length": 1,
+        "data": "c"
       },
       {
         "parent": 7,
-        "length": 1
+        "length": 1,
+        "data": "d"
       },
       {
         "parent": 8,
-        "length": 1
+        "length": 1,
+        "data": "e"
       },
       {
         "parent": 9,
-        "length": 20
+        "length": 20,
+        "data": "not for clinical use"
       }
     ]
   },
@@ -11604,39 +13129,48 @@
     "texts": [
       {
         "parent": 1,
-        "length": 1
+        "length": 1,
+        "data": "a"
       },
       {
         "parent": 2,
-        "length": 1
+        "length": 1,
+        "data": "2"
       },
       {
         "parent": 3,
-        "length": 1
+        "length": 1,
+        "data": "4"
       },
       {
         "parent": 4,
-        "length": 1
+        "length": 1,
+        "data": "3"
       },
       {
         "parent": 5,
-        "length": 1
+        "length": 1,
+        "data": "b"
       },
       {
         "parent": 6,
-        "length": 1
+        "length": 1,
+        "data": "c"
       },
       {
         "parent": 7,
-        "length": 1
+        "length": 1,
+        "data": "d"
       },
       {
         "parent": 8,
-        "length": 1
+        "length": 1,
+        "data": "e"
       },
       {
         "parent": 9,
-        "length": 20
+        "length": 20,
+        "data": "not for clinical use"
       }
     ]
   },
@@ -12016,59 +13550,73 @@
     "texts": [
       {
         "parent": 1,
-        "length": 2
+        "length": 2,
+        "data": "x "
       },
       {
         "parent": 2,
-        "length": 1
+        "length": 1,
+        "data": "a"
       },
       {
         "parent": 1,
-        "length": 3
+        "length": 3,
+        "data": " y "
       },
       {
         "parent": 3,
-        "length": 1
+        "length": 1,
+        "data": "b"
       },
       {
         "parent": 1,
-        "length": 3
+        "length": 3,
+        "data": " z "
       },
       {
         "parent": 4,
-        "length": 1
+        "length": 1,
+        "data": "c"
       },
       {
         "parent": 1,
-        "length": 3
+        "length": 3,
+        "data": " w "
       },
       {
         "parent": 5,
-        "length": 1
+        "length": 1,
+        "data": "d"
       },
       {
         "parent": 1,
-        "length": 3
+        "length": 3,
+        "data": " v "
       },
       {
         "parent": 6,
-        "length": 1
+        "length": 1,
+        "data": "e"
       },
       {
         "parent": 1,
-        "length": 3
+        "length": 3,
+        "data": " u "
       },
       {
         "parent": 7,
-        "length": 1
+        "length": 1,
+        "data": "f"
       },
       {
         "parent": 1,
-        "length": 2
+        "length": 2,
+        "data": " t"
       },
       {
         "parent": 8,
-        "length": 20
+        "length": 20,
+        "data": "not for clinical use"
       }
     ]
   },
@@ -12448,59 +13996,73 @@
     "texts": [
       {
         "parent": 1,
-        "length": 2
+        "length": 2,
+        "data": "x "
       },
       {
         "parent": 2,
-        "length": 1
+        "length": 1,
+        "data": "a"
       },
       {
         "parent": 1,
-        "length": 3
+        "length": 3,
+        "data": " y "
       },
       {
         "parent": 3,
-        "length": 1
+        "length": 1,
+        "data": "b"
       },
       {
         "parent": 1,
-        "length": 3
+        "length": 3,
+        "data": " z "
       },
       {
         "parent": 4,
-        "length": 1
+        "length": 1,
+        "data": "c"
       },
       {
         "parent": 1,
-        "length": 3
+        "length": 3,
+        "data": " w "
       },
       {
         "parent": 5,
-        "length": 1
+        "length": 1,
+        "data": "d"
       },
       {
         "parent": 1,
-        "length": 3
+        "length": 3,
+        "data": " v "
       },
       {
         "parent": 6,
-        "length": 1
+        "length": 1,
+        "data": "e"
       },
       {
         "parent": 1,
-        "length": 3
+        "length": 3,
+        "data": " u "
       },
       {
         "parent": 7,
-        "length": 1
+        "length": 1,
+        "data": "f"
       },
       {
         "parent": 1,
-        "length": 2
+        "length": 2,
+        "data": " t"
       },
       {
         "parent": 8,
-        "length": 20
+        "length": 20,
+        "data": "not for clinical use"
       }
     ]
   },
@@ -13126,35 +14688,43 @@
     "texts": [
       {
         "parent": 2,
-        "length": 1
+        "length": 1,
+        "data": "a"
       },
       {
         "parent": 5,
-        "length": 1
+        "length": 1,
+        "data": "b"
       },
       {
         "parent": 6,
-        "length": 1
+        "length": 1,
+        "data": "c"
       },
       {
         "parent": 9,
-        "length": 1
+        "length": 1,
+        "data": "d"
       },
       {
         "parent": 10,
-        "length": 1
+        "length": 1,
+        "data": "e"
       },
       {
         "parent": 12,
-        "length": 1
+        "length": 1,
+        "data": "g"
       },
       {
         "parent": 13,
-        "length": 1
+        "length": 1,
+        "data": "f"
       },
       {
         "parent": 14,
-        "length": 20
+        "length": 20,
+        "data": "not for clinical use"
       }
     ]
   },
@@ -13780,35 +15350,43 @@
     "texts": [
       {
         "parent": 2,
-        "length": 1
+        "length": 1,
+        "data": "a"
       },
       {
         "parent": 5,
-        "length": 1
+        "length": 1,
+        "data": "b"
       },
       {
         "parent": 6,
-        "length": 1
+        "length": 1,
+        "data": "c"
       },
       {
         "parent": 9,
-        "length": 1
+        "length": 1,
+        "data": "d"
       },
       {
         "parent": 10,
-        "length": 1
+        "length": 1,
+        "data": "e"
       },
       {
         "parent": 12,
-        "length": 1
+        "length": 1,
+        "data": "g"
       },
       {
         "parent": 13,
-        "length": 1
+        "length": 1,
+        "data": "f"
       },
       {
         "parent": 14,
-        "length": 20
+        "length": 20,
+        "data": "not for clinical use"
       }
     ]
   },
@@ -14598,27 +16176,33 @@
     "texts": [
       {
         "parent": 4,
-        "length": 1
+        "length": 1,
+        "data": "a"
       },
       {
         "parent": 5,
-        "length": 1
+        "length": 1,
+        "data": "c"
       },
       {
         "parent": 9,
-        "length": 1
+        "length": 1,
+        "data": "b"
       },
       {
         "parent": 13,
-        "length": 1
+        "length": 1,
+        "data": "d"
       },
       {
         "parent": 17,
-        "length": 1
+        "length": 1,
+        "data": "e"
       },
       {
         "parent": 18,
-        "length": 20
+        "length": 20,
+        "data": "not for clinical use"
       }
     ]
   },
@@ -15244,27 +16828,33 @@
     "texts": [
       {
         "parent": 3,
-        "length": 1
+        "length": 1,
+        "data": "a"
       },
       {
         "parent": 4,
-        "length": 1
+        "length": 1,
+        "data": "c"
       },
       {
         "parent": 7,
-        "length": 1
+        "length": 1,
+        "data": "b"
       },
       {
         "parent": 10,
-        "length": 1
+        "length": 1,
+        "data": "d"
       },
       {
         "parent": 13,
-        "length": 1
+        "length": 1,
+        "data": "e"
       },
       {
         "parent": 14,
-        "length": 20
+        "length": 20,
+        "data": "not for clinical use"
       }
     ]
   },
@@ -15726,31 +17316,38 @@
     "texts": [
       {
         "parent": 1,
-        "length": 1
+        "length": 1,
+        "data": "a"
       },
       {
         "parent": 2,
-        "length": 1
+        "length": 1,
+        "data": "b"
       },
       {
         "parent": 3,
-        "length": 1
+        "length": 1,
+        "data": "c"
       },
       {
         "parent": 4,
-        "length": 1
+        "length": 1,
+        "data": "d"
       },
       {
         "parent": 8,
-        "length": 1
+        "length": 1,
+        "data": "e"
       },
       {
         "parent": 9,
-        "length": 1
+        "length": 1,
+        "data": "f"
       },
       {
         "parent": 10,
-        "length": 20
+        "length": 20,
+        "data": "not for clinical use"
       }
     ]
   },
@@ -16171,31 +17768,38 @@
     "texts": [
       {
         "parent": 1,
-        "length": 1
+        "length": 1,
+        "data": "a"
       },
       {
         "parent": 2,
-        "length": 1
+        "length": 1,
+        "data": "b"
       },
       {
         "parent": 3,
-        "length": 1
+        "length": 1,
+        "data": "c"
       },
       {
         "parent": 4,
-        "length": 1
+        "length": 1,
+        "data": "d"
       },
       {
         "parent": 7,
-        "length": 1
+        "length": 1,
+        "data": "e"
       },
       {
         "parent": 8,
-        "length": 1
+        "length": 1,
+        "data": "f"
       },
       {
         "parent": 9,
-        "length": 20
+        "length": 20,
+        "data": "not for clinical use"
       }
     ]
   },
@@ -16657,27 +18261,33 @@
     "texts": [
       {
         "parent": 1,
-        "length": 1
+        "length": 1,
+        "data": "a"
       },
       {
         "parent": 2,
-        "length": 1
+        "length": 1,
+        "data": "b"
       },
       {
         "parent": 6,
-        "length": 1
+        "length": 1,
+        "data": "c"
       },
       {
         "parent": 8,
-        "length": 1
+        "length": 1,
+        "data": "d"
       },
       {
         "parent": 9,
-        "length": 1
+        "length": 1,
+        "data": "e"
       },
       {
         "parent": 10,
-        "length": 20
+        "length": 20,
+        "data": "not for clinical use"
       }
     ]
   },
@@ -17098,27 +18708,33 @@
     "texts": [
       {
         "parent": 1,
-        "length": 1
+        "length": 1,
+        "data": "a"
       },
       {
         "parent": 2,
-        "length": 1
+        "length": 1,
+        "data": "b"
       },
       {
         "parent": 5,
-        "length": 1
+        "length": 1,
+        "data": "c"
       },
       {
         "parent": 7,
-        "length": 1
+        "length": 1,
+        "data": "d"
       },
       {
         "parent": 8,
-        "length": 1
+        "length": 1,
+        "data": "e"
       },
       {
         "parent": 9,
-        "length": 20
+        "length": 20,
+        "data": "not for clinical use"
       }
     ]
   }

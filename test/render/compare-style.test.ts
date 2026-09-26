@@ -341,11 +341,68 @@ describe("R3 on the recorded drawings", () => {
     );
   });
 
-  it("names a style of the wrong shape a mismatch, never a crash", () => {
-    const model = modelOf("offsets");
-    delete (element(model, "p").style as Partial<Model["elements"][number]["style"]>).borders;
-    expect(compare(model, "offsets")).toContainEqual(
-      expect.objectContaining({ property: "style", chrome: "(model malformed)" }),
+  it("names a malformed model a mismatch, never a crash", () => {
+    const malformed = (mutate: (model: Model) => void) => {
+      const model = modelOf("nested-lists");
+      mutate(model);
+      return compare(model, "nested-lists");
+    };
+    const refused: unknown = expect.arrayContaining([
+      expect.objectContaining({ chrome: "(model malformed)" }),
+    ]);
+    expect(
+      malformed(
+        (m) =>
+          delete (element(m, "p").style as Partial<Model["elements"][number]["style"]>).borders,
+      ),
+    ).toEqual(refused);
+    expect(
+      malformed((m) => delete (m.markers[0] as Partial<Model["markers"][number]>).style),
+    ).toEqual(refused);
+    expect(
+      malformed(
+        (m) => ((m.markers[0] ?? { style: {} }).style = {} as Model["markers"][number]["style"]),
+      ),
+    ).toEqual(refused);
+    expect(malformed((m) => ((m.elements as unknown[])[1] = null))).toEqual(refused);
+    expect(malformed((m) => ((m.text as unknown[])[0] = null))).toEqual(refused);
+    expect(malformed((m) => ((m.elements[1] ?? { parent: 0 }).parent = -2))).toEqual(refused);
+    expect(malformed((m) => Object.assign(m.elements[1] ?? {}, { extra: 1 }))).toEqual(refused);
+    expect(malformed((m) => Object.assign(m.text[0] ?? {}, { interElement: true }))).toEqual(
+      refused,
+    );
+  });
+
+  it("allows auto margins only on a table's sides, and ranges only in order", () => {
+    const refused: unknown = expect.arrayContaining([
+      expect.objectContaining({ chrome: "(model malformed)" }),
+    ]);
+    const autoP = modelOf("offsets");
+    element(autoP, "p").style.margin.left = "auto";
+    expect(compare(autoP, "offsets")).toEqual(refused);
+    const reversed = modelOf("offsets");
+    element(reversed, "p").style.fontSize = { lo: 12, hi: 11 };
+    expect(compare(reversed, "offsets")).toEqual(refused);
+    const badColour = modelOf("offsets");
+    element(badColour, "p").style.colours = [[0, 0, 256]];
+    expect(compare(badColour, "offsets")).toEqual(refused);
+  });
+
+  it("reads which text is between table parts, and the waived signs, from the DOM itself", () => {
+    const name = "line-ends-and-inter-element-text";
+    const model = modelOf(name);
+    const { texts } = recording(name, "xml");
+    expect(compareText(model, texts)).toEqual([]);
+    const flagged = structuredClone(model);
+    const cell = flagged.text.find((entry) => entry.interElement !== true);
+    if (cell !== undefined) cell.interElement = true;
+    expect(compareText(flagged, texts).length).toBeGreaterThan(0);
+    const unflagged = structuredClone(model);
+    const between = unflagged.text.find((entry) => entry.interElement === true);
+    if (between !== undefined) delete between.interElement;
+    expect(compareText(unflagged, texts).length).toBeGreaterThan(0);
+    expect(compareText({ ...model, waivers: [{ start: 0, end: 1 }] }, texts)).toContainEqual(
+      expect.objectContaining({ property: "waiver 0", model: "+" }),
     );
   });
 

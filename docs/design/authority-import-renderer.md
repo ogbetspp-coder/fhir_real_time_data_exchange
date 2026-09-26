@@ -204,7 +204,8 @@ recordSha256, capturesIndex, capturesSha256, documentSha256, pinsSha256, rendere
   (`font-unpinned`), so no measurement is ever made in a substitute font. The scripts the gate
   bounds are Latin, Greek, Common and Inherited (the labels' α, β and μ are Greek; the pinned faces
   cover it); a run in another script is a refusal of ours.
-- **T's model.** For every text node and list marker of a section T transforms, in both modes at
+- **T's model.** For every element and list marker of a section T transforms (a text node takes
+  its element's style), in both modes at
   the named widths, Chrome's computed style against T's model output for every property the model
   holds: `font-size` (under `smaller` against the model's range, × 0.75 to × 0.9), weight, style,
   `color`, `line-height`, `-webkit-text-decorations-in-effect`, the chain of backgrounds,
@@ -219,7 +220,8 @@ recordSha256, capturesIndex, capturesSha256, documentSha256, pinsSha256, rendere
   HTML parser inserts, such as a `tbody`, has no key; a marker placed before its `li`'s first child;
   an element with no text node, such as an empty bordered cell, keyed for its borders and padding),
   characters counted as code-point offsets in the concatenation, in that order, of the text nodes'
-  raw, reference-decoded data. The render build's step 2 keys T's model output with the same
+  data as the XML-mode DOM holds it (references decoded, raw CR LF and CR one LF; the addendum's
+  M1). The render build's step 2 keys T's model output with the same
   function, tested to agree with the judge on every carried section.
 - **The output format.** T's model output is specified in 3c-B's addendum to this note
   (`docs/design/authority-import-renderer-model.md`), reviewed independently before R3 lands: its
@@ -807,9 +809,14 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
      content box is the width, and the refusal of a div with its own padding or border; and R2's
      picture forms the import already carries (`data`, `contained`, `unpinned` rewritten to a
      failing URL), each asserted by a test, with the per-section picture list for them.
-   - **3c-C** takes XML mode's geometry of text, markers and cells against HTML mode's (R2, at the
-     named widths and every ratio) with R4; **3c-E** the `export` and `not-drawn` forms (a
-     not-drawn picture as an empty box of its evidence's `drawnBox`) and their tests.
+   - **3c-C** takes R1 but the image build's verification and the deploy routes' download of
+     attestations (3c-D's): the render build in its attest and propose modes, their identities
+     and buckets, the captures, their index and the bucket's retention, the pull request's
+     recomputation of every record's output hashes, and the redrawing of records whose bytes,
+     gate hash or pins differ from `main`'s; with R4, R2's width sweep, its relayout, and XML
+     mode's geometry of text, markers and cells against HTML mode's at the named widths and every
+     ratio. **3c-E** takes the `export`, `not-drawn` (an empty box of its evidence's `drawnBox`)
+     and `fetched` forms, the last with the first picture template, and their tests.
 
    The renderer image's own build (`cloudbuild.renderer-image.yaml`, the `renderer-images`
    repository) moves to 3c-C with the render build, its identities and Terraform, and the

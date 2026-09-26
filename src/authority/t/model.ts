@@ -175,7 +175,8 @@ function horizontalMargin(
   side: "left" | "right",
 ): Range | "auto" {
   const centred =
-    element.name === "table" && attribute(element, "align")?.trim().toLowerCase() === "center";
+    // Chrome matches the value without case but does not trim it (the fifth review).
+    element.name === "table" && attribute(element, "align")?.toLowerCase() === "center";
   if (centred && !style.declared.has(`margin-${side}`)) return "auto";
   return exact(style.margin[side]);
 }
@@ -241,9 +242,14 @@ function borders(
     if (element.name === "hr") {
       width = 0.75;
       lineStyle = "inset";
+    } else if (element.name === "table" && attribute(element, "border") !== undefined) {
+      // Any `border` attribute sets the table's widths, `0` included; its `outset` style only
+      // where it is not 0 (the fifth review, measured).
+      width = attributeWidth * 0.75;
+      if (attributeWidth > 0) lineStyle = "outset";
     } else if (attributeWidth > 0) {
       width = attributeWidth * 0.75;
-      lineStyle = element.name === "table" ? "outset" : "inset";
+      lineStyle = "inset";
     }
     const declared = style.borders[side];
     if (declared !== undefined) {

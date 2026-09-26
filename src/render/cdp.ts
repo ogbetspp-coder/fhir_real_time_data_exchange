@@ -39,6 +39,7 @@ export class Cdp {
   >();
   private readonly listeners = new Set<(event: CdpEvent) => void>();
   private readonly waiters = new Set<(error: Error) => void>();
+  private readonly aborts = new Set<(error: Error) => void>();
   // Bytes of a message not yet ended by its NUL.
   private partial: Buffer[] = [];
   private closed: Error | undefined;
@@ -80,6 +81,17 @@ export class Cdp {
   on(listener: (event: CdpEvent) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  // Called once if the pipe fails, until the returned function removes it; at once if it has.
+  onAbort(listener: (error: Error) => void): () => void {
+    if (this.closed !== undefined) {
+      const error = this.closed;
+      queueMicrotask(() => listener(error));
+      return () => undefined;
+    }
+    this.aborts.add(listener);
+    return () => this.aborts.delete(listener);
   }
 
   // The first event of `method` (in `sessionId`, if given) that `accept` takes; rejected if the
@@ -167,6 +179,8 @@ export class Cdp {
     this.pending.clear();
     for (const waiter of [...this.waiters]) waiter(error);
     this.waiters.clear();
+    for (const listener of [...this.aborts]) listener(error);
+    this.aborts.clear();
   }
 }
 

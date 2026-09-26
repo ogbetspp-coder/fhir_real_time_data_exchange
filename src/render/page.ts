@@ -141,19 +141,25 @@ export async function openPage(cdp: Cdp, options: OpenOptions): Promise<Page> {
           milliseconds === undefined
             ? undefined
             : setTimeout(() => {
-                stop();
+                end();
                 reject(new Error(`${method} did not arrive within ${milliseconds} ms`));
               }, milliseconds);
         const stop = cdp.on((received) => {
           if (received.sessionId !== sessionId || received.method !== method) return;
-          clearTimeout(timer);
-          stop();
+          end();
           resolve();
         });
-        listeners.push(() => {
+        // A browser that is gone fails the wait at once, not at its timeout.
+        const unabort = cdp.onAbort((error) => {
+          end();
+          reject(error);
+        });
+        const end = (): void => {
           clearTimeout(timer);
           stop();
-        });
+          unabort();
+        };
+        listeners.push(end);
       });
     const loaded = event("Page.loadEventFired", options.loadTimeoutMs ?? LOAD_TIMEOUT_MS);
     const crashed = event("Inspector.targetCrashed").then(() => {

@@ -134,7 +134,9 @@ export async function readMarkers(page: Page): Promise<Map<number, string>> {
   return markers;
 }
 
-export type ChromeText = { parent: number; length: number };
+// `data` is the node's text as the DOM holds it, for the judge's own reading of which nodes are
+// whitespace between table parts and list items, and of the waived signs.
+export type ChromeText = { parent: number; length: number; data: string };
 
 // Every text node of the div in pre-order, with its parent element's pre-order index and its
 // length in code points: M1's index space, as the XML-mode DOM holds it.
@@ -147,7 +149,9 @@ const READ_TEXTS = `(() => {
       const index = elements.length;
       elements.push(node);
       for (const child of node.childNodes) {
-        if (child.nodeType === 3) texts.push({ parent: index, length: [...child.data].length });
+        if (child.nodeType === 3) {
+          texts.push({ parent: index, length: [...child.data].length, data: child.data });
+        }
         else visit(child);
       }
     }

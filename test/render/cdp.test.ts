@@ -120,6 +120,19 @@ describe("the DevTools pipe client", () => {
     await expect(failing.send("Page.enable")).rejects.toThrow(/EIO/);
   });
 
+  it("tells abort listeners once, and at once after the pipe has failed", async () => {
+    const { cdp, hangUp } = wired();
+    const heard: string[] = [];
+    const removed = cdp.onAbort(() => heard.push("removed"));
+    removed();
+    cdp.onAbort((error) => heard.push(error.message));
+    hangUp();
+    await new Promise((resolve) => setImmediate(resolve));
+    cdp.onAbort((error) => heard.push(`late: ${error.message}`))();
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(heard).toEqual(["the browser closed its pipe", "late: the browser closed its pipe"]);
+  });
+
   it("fails every command of a browser that cannot start, without throwing", async () => {
     const browser = launchChrome({ executable: "/nonexistent/chrome-headless-shell", ratio: 1 });
     await expect(browser.cdp.send("Target.createTarget")).rejects.toThrow();
