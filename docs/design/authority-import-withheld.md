@@ -1,6 +1,6 @@
 # A withheld section: importing a publication with an authority's defect recorded in place (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25; twenty-first draft, after twenty design reviews
+- Status: proposed, 2026-09-25; twenty-second draft, after twenty-one design reviews
 - Owner decisions (2026-09-25): withhold the Imatinib Teva tablets SmPC's 5.1 and import the
   other 31 sections; a section may be withheld only on reviewed, measured evidence of the
   authority's defect, the whole record is marked incomplete everywhere it is read, and the safety
@@ -549,3 +549,13 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
     extends, names the product's List, so racing requests collide and the pipeline and D9 check it;
     heads and product chains in their own unversioned bucket with retention, signed before they are
     appended, numbered to sort; grants, stale text and pointers corrected.
+21. **Twenty-first independent review** (2026-09-26). No High; every crash and race traced still fails
+    closed. Medium: the product chain's append order, commit point and entry format were unstated (a
+    head appended first could outlive a lost product entry, a product entry first could lock a product
+    to a List with no import); the product key and List had no stated source, so a draft could name
+    another product. Low: D9's reads; how a head is read; retention's end; reviews still in the
+    versioned bucket; grant wording; the version list; the publish race; the environment enum; stale
+    lines. Fixed in approval.md's amendment: the signed statement is the product entry and the commit
+    point, written first, then the head, then `approvals/`, then the publish, with a roll-forward; the
+    key and List from the signer's own recomputation, shown in the review and checked by the pipeline;
+    head reads specified and failing closed; the rest as found.

@@ -1,8 +1,9 @@
 # Approval: a named person signs, and only the text they approved answers
 
 _Roadmap item 2. Design, 2026-09-22. Nothing in this note is built. It was revised once after an
-independent adversarial review (validation, security and engineering lenses) and is reviewed
-again before any of it runs._
+independent adversarial review (validation, security and engineering lenses), amended on
+2026-09-25 for an authority import's request statement after that amendment's own reviews (roadmap
+3a's PR 3c design), and is reviewed again before any of it runs._
 
 ## What this is for
 
@@ -85,7 +86,7 @@ statement that names the person and pins exactly what they approved:
 ApprovalStatement {
   statementVersion        "approval-statement/1"
   kind                    "approve" | "reject" | "withdraw"
-  environment             "dev" | "prod"                   // a dev approval never publishes in prod
+  environment             "dev" | "validation" | "prod"    // one environment's approval never publishes in another
   document                { Type 2 Bundle.identifier system + value, EMA bundle id, language }
   sequence                1, 2, 3 … per document            // order is the signer's, not a clock's
   previousStatementSha256 the document's head before this one, or null
@@ -177,7 +178,8 @@ section's `narrativeDivSha256` from the Composition and compares it with the sta
 `sections`**. Only then does it answer. A version with no linked approval, an invalid signature,
 or a section that does not match is `not-approved`.
 
-This bounds reads: one extra read per answered document, so `find_product`'s scan budget is
+This bounds reads (amended: the linked Provenance, the head's listing and entry, and for a request
+the product chain's), so `find_product`'s scan budget is
 recalculated rather than silently exhausted, and its answer lists only documents with a current
 approval.
 
@@ -416,6 +418,37 @@ decides for a Type 2 approval.
   delete or an overwrite is refused. This corrects D8, the flow, phase 1 and build step 3 for every
   statement kind. The worker's bucket-wide `objectCreator` on the evidence bucket is conditioned to
   exclude `approvals/` and `reviews/` in phase 1, not phase 2.
+- **The product chain: its entries, order and checks.** For a request, the statement also signs
+  `productSequence` and `previousProductEntrySha256`, and the product chain's entry is the signed
+  statement itself, the commit point. The order is: (1) the product entry,
+  `products/<key>/<productSequence>`, create-if-absent; (2) the document head, the same bytes; (3)
+  the statement under `approvals/`; (4) the publish run. A request that loses the product entry to
+  a racing request for another document of the same product is signed again by the signer at the
+  next position, with the same review (the click covers the review's hash, not the position); one
+  for the same document re-reviews. Before accepting a new request for a product, the signer rolls
+  forward any product entry whose document head is missing. The current document chains of a
+  product are those its product chain names, and nothing else. Keys are the SHA-256 of the canonical
+  JSON (RFC 8785) of `{ authority, epiId }` and of the document identifier.
+- **Where the key and the List come from.** Before signing, the signer runs the gate's own
+  recomputation of the import (it fetches the authority's bytes and recomputes, D1 of the contract
+  design) and takes `{ authority, epiId }` and the List's GUID, `versionNumber` and hash from it,
+  never from the draft; the review shows the product and the List. The pipeline requires the
+  statement's product and List to equal the recomputed source record's.
+- **Reading a head.** A reader (the signer, the pipeline, D9) lists the chain, takes the highest
+  entry, and requires: its name matches `^\d{12}$` and equals the statement's sequence; the
+  statement's document (or product) hashes to the prefix; its previous hash equals the entry below
+  it; and, for a request, the head's bytes equal `products/<key>/<productSequence>`. A malformed or
+  unreadable highest entry fails closed (`not-approved`), never falling back to the one below. D9
+  answers from the stored version linked to the head, not the newest stored version. Its reads per
+  answered document are the linked Provenance, the head's listing and entry and, for a request, the
+  product chain's listing and entry; `find_product`'s scan budget is recalculated from that.
+- **Beyond retention.** An IAM deny on `storage.objects.delete` for the heads bucket (the key-guard
+  pattern) and no lifecycle rule keep a head in place after its retention expires; before the policy
+  is locked at the production gate, an administrator could remove it, stated.
+- **Reviews in the versioned evidence bucket.** A principal who may delete there could make
+  `reviews/<hash>` noncurrent and create different bytes under the name; the IAP review service
+  hashes the bytes before serving them, and for a direct download the deployers with delete rights on
+  the bucket are the trust root, stated.
 - **Its `sections`** list every carried section with narrative, by its `narrativeDivSha256`, and
   every withheld section, with `status: withheld`, the notice's hash and its confirmed defect kinds.
   D9 requires the served version's withheld set to equal the statement's exactly, every statement
@@ -447,7 +480,8 @@ decides for a Type 2 approval.
   over them through `approvedContentSha256`. ADR 0005 decision 4 and the contract design's D8 will
   point here (the withheld note's forward pointers), in the change that makes the move.
 - **Versions.** `ApprovalStatement` and `ReviewRecord` are new, so their 1.0.0 includes the `request`
-  kind and its meaning codes, D3's shape extended with the List's GUID, `versionNumber` and hash,
+  kind and its meaning codes, D3's shape extended with `{ authority, epiId }`, the List's GUID,
+  `versionNumber` and hash, `productSequence` and `previousProductEntrySha256`,
   `sections` entries with `status: withheld`, the notice's hash and defect kinds, and the import
   review's shape. Item 2's majors of `CanonicalSubmission` and the query tools and roadmap 3a's (the
   renderer and withheld notes' 3.0.0) are one major each if they land together, and consecutive
@@ -455,7 +489,7 @@ decides for a Type 2 approval.
   `request` kind, `ReviewRecord`'s import review, `record-inconsistent` and `get_section`'s
   `section-withheld`.
 - **Identities.** The signer's grants become: `signerVerifier` on its key; create-only on
-  `approvals/`; create and read on the heads bucket; create-if-absent and read on `reviews/`, except
+  `approvals/`; create, and `objectViewer` (read and list), on the heads bucket; create-if-absent and read on `reviews/`, except
   `reviews/fetches/`, which it only reads; read on the submissions it signs over; read on the render
   build's attestation and captures buckets. The IAP review service, if built, reads `reviews/` and
   creates `reviews/fetches/` only. The query service and the pipeline read and list the heads
