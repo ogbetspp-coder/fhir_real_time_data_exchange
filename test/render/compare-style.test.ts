@@ -433,7 +433,7 @@ describe("R3 on the recorded drawings", () => {
     expect(compareText(shifted, recording("offsets", "xml").texts).length).toBeGreaterThan(0);
     expect(
       compareText({ ...model, text: model.text.slice(1) }, recording("offsets", "xml").texts),
-    ).toEqual([expect.objectContaining({ property: "text nodes" })]);
+    ).toEqual([expect.objectContaining({ property: "structure", chrome: "(model malformed)" })]);
   });
 });
 

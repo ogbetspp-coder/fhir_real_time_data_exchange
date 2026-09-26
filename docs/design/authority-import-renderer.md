@@ -809,26 +809,24 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
      content box is the width, and the refusal of a div with its own padding or border; and R2's
      picture forms the import already carries (`data`, `contained`, `unpinned` rewritten to a
      failing URL), each asserted by a test, with the per-section picture list for them.
-   - **3c-C** takes R1 but the image build's verification and the deploy routes' download of
-     attestations (3c-D's): the render build in its attest and propose modes, their identities
-     and buckets, the captures, their index and the bucket's retention, the pull request's
-     recomputation of every record's output hashes, and the redrawing of records whose bytes,
-     gate hash or pins differ from `main`'s; with R4, R2's width sweep, its relayout, and XML
-     mode's geometry of text, markers and cells against HTML mode's at the named widths and every
-     ratio. **3c-E** takes the `export`, `not-drawn` (an empty box of its evidence's `drawnBox`)
-     and `fetched` forms, the last with the first picture template, and their tests.
-
-   The renderer image's own build (`cloudbuild.renderer-image.yaml`, the `renderer-images`
-   repository) moves to 3c-C with the render build, its identities and Terraform, and the
-   repository connection only the owner can make (R1).
 
 2. **3c-C**: its measured design of R4 (reviewed first), then R4, R7, R8, R9, R11; the render build,
    its trigger and attestations; the records of the pinned labels.
+   It also takes R1 but the image build's verification and the deploy routes' download of
+   attestations (3c-D's): the render build in its attest and propose modes, their identities
+   and buckets, the captures, their index and the bucket's retention, the pull request's
+   recomputation of every record's output hashes, and the redrawing of records whose bytes,
+   gate hash or pins differ from `main`'s; with R4, R2's width sweep, its relayout, and XML
+   mode's geometry of text, markers and cells against HTML mode's at the named widths and every
+   ratio; and the renderer image's own build (`cloudbuild.renderer-image.yaml`, the
+   `renderer-images` repository), with the repository connection only the owner can make.
 3. **3c-D**: R5 and R10: the lookup, the image build's verification, the manifest, re-verification
    (the review a requester signs is item 2's, before PR 5).
 4. **3c-W**: the withheld section (its note), including the lookup's withheld part.
 5. **3c-E**: pictures from the authority's export (the owner's decision of 2026-09-25; its own
    note), needed by every pinned label but Imatinib Teva once 5.1 is withheld.
+   It takes the `export`, `not-drawn` (an empty box of its evidence's `drawnBox`)
+   and `fetched` forms, the last with the first picture template, and their tests.
 
 ## Stated residuals
 

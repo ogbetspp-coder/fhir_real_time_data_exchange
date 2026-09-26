@@ -260,7 +260,8 @@ export function launchChrome(options: LaunchOptions): Browser {
       }
       if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
       await Promise.race([exited, settle(5000)]);
-      rmSync(profile, { recursive: true, force: true });
+      // A helper still writing to the profile can make the first removal fail (ENOTEMPTY).
+      rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     },
   };
 }

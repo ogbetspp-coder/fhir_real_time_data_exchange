@@ -197,6 +197,21 @@ function compareElement(
     model.textIndent,
     at("text-indent"),
   );
+  // A table centred with both margins `auto` is not compared side by side, but Chrome's used
+  // margins must then be equal: `auto` cannot switch the comparison off for a table that is not
+  // centred.
+  if (model.margin.left === "auto" && model.margin.right === "auto") {
+    const left = parsePixels(at("margin-left"));
+    const right = parsePixels(at("margin-right"));
+    check(
+      "margin-left",
+      left !== undefined &&
+        right !== undefined &&
+        Math.abs(left - right) <= tolerance(Math.max(left, right)) * 2 + 0.5,
+      "auto, centred",
+      `${at("margin-left")} / ${at("margin-right")}`,
+    );
+  }
   for (const side of ["top", "right", "bottom", "left"] as const) {
     const margin = model.margin[side];
     if (margin !== "auto") {
@@ -323,6 +338,20 @@ const isRgb = (value: unknown): boolean =>
   value.every((channel) => isInteger(channel) && channel >= 0 && channel <= 255);
 const isColours = (value: unknown, allowEmpty = false): boolean =>
   Array.isArray(value) && (allowEmpty || value.length > 0) && value.every(isRgb);
+// A text colour set: one colour, or both link colours, sorted by red, green, blue (M3).
+const isColourSet = (value: unknown): boolean =>
+  isColours(value) &&
+  (value as number[][]).length <= 2 &&
+  (value as number[][]).every(
+    (colour, index, all) => index === 0 || compareRgb(all[index - 1] ?? [], colour) < 0,
+  );
+function compareRgb(first: readonly number[], second: readonly number[]): number {
+  return (
+    (first[0] ?? 0) - (second[0] ?? 0) ||
+    (first[1] ?? 0) - (second[1] ?? 0) ||
+    (first[2] ?? 0) - (second[2] ?? 0)
+  );
+}
 const isSides = (value: unknown, side: (entry: unknown, name: string) => boolean): boolean =>
   shaped(value, ["top", "right", "bottom", "left"]) &&
   ["top", "right", "bottom", "left"].every((name) =>
@@ -333,11 +362,12 @@ const isSides = (value: unknown, side: (entry: unknown, name: string) => boolean
 function markerStyleValid(style: Record<string, unknown>): boolean {
   return (
     isRange(style.fontSize) &&
+    (style.fontSize as Range).lo > 0 &&
     isInteger(style.fontWeight) &&
-    style.fontWeight >= 1 &&
-    style.fontWeight <= 1000 &&
+    style.fontWeight >= 100 &&
+    style.fontWeight <= 900 &&
     FONT_STYLES.has(style.fontStyle as string) &&
-    isColours(style.colours) &&
+    isColourSet(style.colours) &&
     (style.lineHeight === "normal" || isRange(style.lineHeight)) &&
     typeof style.underline === "boolean" &&
     isColours(style.backgrounds, true)
@@ -622,6 +652,18 @@ export function compareModel(
 // M1 in XML mode: the model's text nodes, their parents and their ranges equal the DOM's.
 export function compareText(model: Model, texts: readonly ChromeText[]): Mismatch[] {
   const mismatches: Mismatch[] = [];
+  const malformed = validateModel(model);
+  if (malformed !== undefined) {
+    return [
+      {
+        reason: "model-mismatch",
+        key: -1,
+        property: "structure",
+        model: malformed,
+        chrome: "(model malformed)",
+      },
+    ];
+  }
   if (texts.length !== model.text.length) {
     mismatches.push({
       reason: "model-mismatch",
@@ -641,7 +683,9 @@ export function compareText(model: Model, texts: readonly ChromeText[]): Mismatc
     points.push(...Array.from(text.data));
     // The judge's own reading of M1: a node directly in a table or list container is the
     // whitespace T's walk drops, and only such a node is flagged.
-    const between = CONTAINERS.has(model.elements[text.parent]?.name ?? "");
+    // ... and holds only the ASCII whitespace T allows there.
+    const between =
+      CONTAINERS.has(model.elements[text.parent]?.name ?? "") && /^[\t\n\f\r ]*$/u.test(text.data);
     if (
       entry?.element !== expected.element ||
       entry.start !== expected.start ||

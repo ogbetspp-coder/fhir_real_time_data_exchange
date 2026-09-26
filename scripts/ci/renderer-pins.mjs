@@ -61,12 +61,13 @@ export function readRendererPins(dockerfile = RENDERER_DOCKERFILE) {
 
   const artefacts = [];
   const download =
-    /curl\s+(?:-\S+\s+)*"([^"]+)"\s+-o\s+(\S+)\s+&&\s+echo\s+"\$\{([A-Z0-9_]+)\}\s+(\S+)"\s+\|\s+sha256sum\s+--check/g;
+    /curl\s+(?:-fsSL|-fL)\s+"([^"]+)"\s+-o\s+(\S+)\s+&&\s+echo\s+"\$\{([A-Z0-9_]+)\}\s+(\S+)"\s+\|\s+sha256sum\s+--check/g;
   for (const line of lines) {
     // Common ways a download could reach the image unchecked are refused here: an ADD, another
     // image's files, fetchers other than a checksummed curl, heredocs this reader cannot see into,
     // and a checksum whose failure could be swallowed. It is a denylist, not a proof: the control
-    // is the review of Dockerfile.renderer itself (CODEOWNERS is recommended, R1), which this
+    // is the review of Dockerfile.renderer itself (CODEOWNERS is recommended, the renderer note's
+    // stated residuals), which this
     // reader supports by catching the usual mistakes.
     if (/^\s*ADD\s/i.test(line)) throw new Error(`${name}: ADD; copy local files with COPY`);
     if (/^\s*COPY\s.*--from/i.test(line)) throw new Error(`${name}: COPY --from another image`);
@@ -74,7 +75,11 @@ export function readRendererPins(dockerfile = RENDERER_DOCKERFILE) {
     if (/<<-?\s*['"]?\w+/.test(line) || /--mount\b/.test(line)) {
       throw new Error(`${name}: a RUN heredoc or --mount, which this reader cannot check`);
     }
-    if (/\bnpm\b|\bnpx\b|\bperl\b|\/dev\/tcp\b|\bhttps?\.get\b/.test(line)) {
+    if (
+      /\bnpm\s+(?:i|install|ci|exec)\b|\bnpx\s|\bperl\s+-|\/dev\/tcp\b|\bhttps?\.get\b|\bnode\s+(?:-[ep]\b|--eval|--print|--input-type)|\|\s*node\b|\bgit\s|\bruby\s+-e\b/.test(
+        line,
+      )
+    ) {
       throw new Error(
         `${name}: a RUN line can download with something other than a checksummed curl`,
       );
