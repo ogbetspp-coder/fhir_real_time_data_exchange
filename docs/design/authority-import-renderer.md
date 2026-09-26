@@ -1,7 +1,7 @@
 # The renderer gate: a pinned browser's evidence for every authority import (roadmap 3a, PR 3c)
 
 - Status: proposed, 2026-09-25 (architecture approved by the owner the same day); twenty-seventh draft,
-  after twenty-six design reviews; R4's thresholds provisional, settled by 3c-C's measured design
+  after twenty-seven design reviews; R4's thresholds provisional, settled by 3c-C's measured design
 - Decides: what `docs/design/authority-import-t.md`'s "What waits for PR 3c" left open: who draws,
   what is drawn and measured, the evidence record and its store, and the `rendering` stage
 - Amends: ADR 0003 (the second stated exception, contacts acknowledged; the third, zoomed out); ADR 0005 (decision 1's
@@ -258,12 +258,17 @@ computed from the pinned fonts and bounded:
   that is judged, derives every reference baseline from drawn pixels (never from the estimate),
   accounts for whatever the raster depends on (the twenty-sixth review measured four horizontal
   sub-pixel phases and a dependence on the text colour at 0.8 and 0.9 on the Mac shell, despite the
-  flag), and is checked in every record. Where it is established, it is both the lowest and the
+  flag), and is checked in every record: an established baseline lies within the estimate's
+  one-pixel band and tells its row apart from both neighbours, or it is not established; and each
+  record compares the method against controls whose baseline is independently known, at the same
+  face, size, ratio, phase and colour, and where they disagree nothing in that record is
+  established. Where it is established, it is both the lowest and the
   highest baseline R4 allows for that glyph, for P3, P4, P8(a) and R8 alike; where it is not, the
   glyph keeps the one-pixel allowance and the zoomed-out kind does not apply to it, so it is judged
-  as a contact or a failure by the other rules (never a refusal of ours, never unjudged). Every
-  other glyph keeps the allowance. A seed binds the method's result: the label's zoomed-out "y"s
-  (below).
+  by the other rules (clear, clear by P8, a contact or a failure; never a refusal of ours, never
+  unjudged). Every
+  other glyph keeps the allowance. Every seed at 0.8 or 0.9 involving a descender of P8(a)'s letters
+  binds with the exact baseline established, the label's zoomed-out "y"s among them (below).
 - **Ink bound.** For each character, the union of the ink boxes (the `glyf` bounding boxes,
   overhangs included) of every glyph reachable for it through the lookups of HarfBuzz's default
   features for the run's script and language, as the pinned face has them, displaced by every
@@ -277,7 +282,7 @@ computed from the pinned fonts and bounded:
   Carlito) is a refusal of ours.
 - **Rounding out.** Each ink bound is widened by the baseline's snapping (one device pixel
   vertically, and horizontally one device pixel too, since horizontal positions can
-  fall between pixels: 3c-B measures on the pinned image whether the flag holds them to whole
+  fall between pixels: 3c-C measures on the pinned image whether the flag holds them to whole
   pixels), by anti-aliasing (one device pixel), and by the largest per-glyph difference
   between the pinned and original outlines (measured once from the original fonts' files and
   stated), then rounded outwards to whole device pixels at the drawn ratio.
@@ -289,17 +294,20 @@ computed from the pinned fonts and bounded:
   drawing it alone (every other glyph made transparent, and every marker's `::marker` too, layout
   asserted unchanged, and each drawing's computed colours asserted to have taken effect, a drawing
   whose colours did not being a refusal of ours), by a method that does not clip the glyph's ink:
-  the isolated drawings must composite back to the drawing with only the glyphs within ε at every
-  pixel, and any ink lost is a refusal of ours (`::highlight()` clips a glyph to its own advance,
+  the isolated drawings, composited source-over in paint order, must reproduce the drawing with
+  only the glyphs within ε at every pixel of the isolated glyphs' boxes (every glyph that paints
+  there composited), and any ink lost is a refusal of ours (`::highlight()` clips a glyph to its own advance,
   losing an italic "f"'s hook and tail and up to 5 px of a sans "y", measured, so 3c-C uses another
   method, such as colour-only wrappers with every character rectangle asserted unchanged); elsewhere each pixel of the
-  drawing with only the glyphs belongs to the glyph whose exact ink box, snapped to device pixels,
-  contains it. For a failure, a glyph's pixels are
+  drawing with only the glyphs belongs to the glyph whose exact ink box, snapped outwards to device
+  pixels, contains it, and an inked pixel of that drawing that belongs to no glyph is a refusal of
+  ours. For a failure, a glyph's pixels are
   those above a noise floor of 10 % coverage (so a faint 5 pt colon is still seen); for a defect
   (R8), only those at 40 % or more (so a defect is never found in faint pixels); a coverage within ε
   of either threshold counts against the section (R7). A glyph is "too faint to judge", a refusal of
   ours, when its own raster on R4's calibration page, fixed per face, size and ratio, has no pixel
-  above the noise floor. The "lines only" drawing sets `color: transparent` with an explicit
+  above the noise floor, or when it has ink but no pixel above the floor in its own judged or
+  isolated drawing (the raster depends on the sub-pixel phase and the colour). The "lines only" drawing sets `color: transparent` with an explicit
   `text-decoration-color` (with a transparent text fill Chrome paints no underline).
 - **Markers.** A list marker's box from `DOM.getBoxModel` on its `::marker` pseudo-node, bounded as
   text.
@@ -549,7 +557,8 @@ Must not be failures, and not recorded (the zoomed-out kind): 4.6's underlined "
 coverage below the line) and at 0.9, and 4.8's underlined "Laboratory" "y" at 0.9 (414 and 900 px),
 measured; R4's exact baseline must be established for each of them (a kerned "y," as in
 "Fertility," among them), so none of their ink above the baseline is taken as hidden in the line;
-and a 10 pt serif "y" at 0.8 whose estimate is a device pixel off, its exact baseline established.
+and a 10 pt serif "y" at 0.8, underlined, its tail showing below the drawn line, whose estimate is
+a device pixel off, its exact baseline established.
 
 Must be clear (by P8 or plainly): 4.2's and 4.8's letter descenders touching their own cells'
 bottom borders; the "g"s of 4.2's underlined "Posology" at every ratio, and its "y" and the "p"s of
@@ -1161,3 +1170,11 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
     record), and where it is not established the zoomed-out kind does not apply (judged, never a
     refusal of ours); every other glyph keeps the allowance; rounding out's horizontal reason
     corrected, 3c-B to measure the flag on the pinned image.
+27. **Twenty-seventh independent review** (2026-09-26). No High, no Medium: round 26's fixes close
+    its findings; the composite-back rule is satisfiable (colour-only isolation composited
+    source-over reproduced the joint drawing within 1.4/255, overlaps included, at five ratios), and
+    a method meeting the exact-baseline requirement exists (the flat-bottomed neighbours in the same
+    run agreed in 186 and 189 of 192 lines at 0.8 and 0.9); the fallback is fail-safe, and the
+    label's "y" seed rightly forces the method to succeed there. Low: the per-record check without
+    content; the fallback's wording; two seeds incomplete; the composite's operator and region;
+    "too faint" assuming one raster; a measurement given to 3c-B. Fixed as found.
