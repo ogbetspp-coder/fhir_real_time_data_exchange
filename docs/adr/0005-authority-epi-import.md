@@ -328,7 +328,9 @@ independent reviews, and changes this ADR as follows.
   against the line above) passes only once the person who requests the import acknowledges it,
   legible, in the gate's captures of the record they name; clear misreadings refuse.
 - **A third stated exception** (ADR 0003, amended 2026-09-26): at 80 % and 90 % zoom on an ordinary
-  display the renderer gate judges clear misreadings only; a contact there is not shown.
+  display the renderer gate does not judge a letter's descender against its own line or a glyph at
+  its own background's edge; every clear misreading, every refusal of its own and every other
+  contact is still judged there.
 - **Decision 3's pictures.** The EMA's viewer draws Imatinib Teva's two `~/_entity/annotation/…`
   pictures as broken images, and the EMA's FHIR export of the same List carries them as contained
   Binaries under the same ids. A reference is carried from the authority's own export of the same

@@ -210,8 +210,10 @@ are reported to the authority.
 
 A third stated exception to "false passes are not" (owner decision of 2026-09-26;
 `docs/design/authority-import-renderer.md`, R2 and R4): at device pixel ratios 0.8 and 0.9 (80 %
-and 90 % zoom on an ordinary display) the renderer gate judges only clear misreadings (its
-failures, the defects among them) and its own refusals. A contact there, a touch that changes no
-sign, is neither shown nor acknowledged: at those sizes the tablets label's descenders touch their
-lines in hundreds of places, and acknowledging them would make acknowledgement a rubber stamp.
-Below 0.8, nothing is judged.
+and 90 % zoom on an ordinary display) the renderer gate does not judge two kinds of contact that
+change no letter: a descender of a closed list of letters against its own cell's bottom border or
+its own underline, and a glyph against the edge of its own frame's background. At those sizes the
+tablets label's descenders touch their own lines in hundreds of places, and acknowledging them
+would make acknowledgement a rubber stamp. Every clear misreading and every refusal of the gate's
+own is still judged there, and every other contact (a comma, a digit or a symbol touching a line,
+one glyph against another) is still shown and acknowledged. Below 0.8, nothing is judged.
