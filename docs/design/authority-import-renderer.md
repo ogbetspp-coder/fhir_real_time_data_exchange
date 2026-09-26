@@ -1,7 +1,7 @@
 # The renderer gate: a pinned browser's evidence for every authority import (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25 (architecture approved by the owner the same day); twenty-first draft,
-  after twenty design reviews; R4's thresholds provisional, settled by 3c-C's measured design
+- Status: proposed, 2026-09-25 (architecture approved by the owner the same day); twenty-second draft,
+  after twenty-one design reviews; R4's thresholds provisional, settled by 3c-C's measured design
 - Decides: what `docs/design/authority-import-t.md`'s "What waits for PR 3c" left open: who draws,
   what is drawn and measured, the evidence record and its store, and the `rendering` stage
 - Amends: ADR 0003 (the second stated exception, contacts acknowledged; the third, zoomed out); ADR 0005 (decision 1's
@@ -183,8 +183,8 @@ recordSha256, capturesIndex, capturesSha256, documentSha256, pinsSha256, rendere
   browser process launched with `--force-device-scale-factor`: 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2,
   2.625 and 3 (a page zoom times the display's ratio is the effective ratio: 80 %, 90 % and 110 % zoom
   on an ordinary display, and a common phone's 2.625, are drawn); at ratios other than 1, every
-  integer width from 320 to 1 280 px (R11). At 0.8 and 0.9, **zoomed out**, two kinds of contact
-  that change no letter are not judged (R4; ADR 0003's third stated exception, the owner's decision
+  integer width from 320 to 1 280 px (R11). At 0.8 and 0.9, **zoomed out**, one kind of contact
+  that changes no letter is not judged (R4; ADR 0003's third stated exception, the owner's decision
   of 2026-09-26). Layout does change with the ratio (the tablets' 5.1 alone is
   10 776 px tall at 813 px and ratio 1, 10 730 px at ratio 3). A test asserts snapped border widths
   per ratio.
@@ -319,10 +319,12 @@ and ratio of R2 (at 0.8 and 0.9 as the zoomed-out rule below states), is:
    recorded, captured, and must be acknowledged, legible, by the person who requests the import
    (R5), or the import refuses.
 
-**Zoomed out (binding).** At ratios 0.8 and 0.9 two kinds of contact are neither shown nor
-recorded: a descender of one of P8(a)'s letters against its own cell's bottom border or its own
-run's underline (shared pixels included), and a glyph against the edge of its own frame's
-background (P8(b)'s kind). This is ADR 0003's third stated exception (the owner's decision of
+**Zoomed out (binding).** At ratios 0.8 and 0.9 one kind of contact is neither shown nor
+recorded: an unshifted descender of one of P8(a)'s letters (with no mark below) against its own
+cell's bottom border or its own run's underline on its own line, shared pixels included, where the
+descender keeps at least one free row by P8(a)'s count; with none (a fused tail, "y" read as "v")
+it stays a contact. (A glyph at its own background's edge that meets P8(b) is clear at every ratio;
+one that does not stays a contact.) This is ADR 0003's third stated exception (the owner's decision of
 2026-09-26: at those sizes the label's descenders touch their own lines in hundreds of places that
 change no letter, and acknowledging them would make acknowledgement a rubber stamp). Every failure
 and refusal of ours is judged there, and every other contact (a comma, semicolon, cedilla, mark
@@ -364,9 +366,11 @@ clear. Geometry from layout (advances, boxes) is compared exactly, in Chrome's l
   the page, or any pixel of a shifted glyph above the section's top edge or the page's by a device pixel or
   more (ink, not the character box; an unshifted glyph's ink above the section's top, an accented
   capital on a first line at `line-height: 1em`, is a contact, not a failure); a line under text that makes
-  a sign another (P5); a folded or unfolded glyph off T4's position; and every refusal of ours (R8). A descending
-  part of one of P8(a)'s letters against its own run's underline is judged by P4, not by the
-  line-through and hidden-part items above.
+  a sign another (P5); a folded or unfolded glyph off T4's position; and every refusal of ours (R8). An unshifted
+  descending part of one of P8(a)'s letters (with no mark below) against its own run's underline or
+  its own cell's bottom border is judged by P4's rule, not by the line-through and hidden-part items
+  above: a part lying wholly in the band (drawn or cut) or wholly in the border is a failure, and
+  sharing is a contact.
 - **P4. What a font draws is not a contact.** Two characters adjacent in logical order on one line
   fragment (one line box of one block, never across cells), in whatever text nodes, neither shifted
   relative to the other (a raised "14" beside the "C" of "¹⁴C" is checked), are not checked against
@@ -453,7 +457,10 @@ distinct drawings; the seventeenth review counted about 49 own-underline contact
 touching their underline at ratio 1) under the rule then, which the free cut row reduces; the
 nineteenth found more underlined "y"s as plain contacts at 1.1 (4.4 and 4.8), and, at 0.8 and 0.9,
 hundreds of descender contacts and two underlined "y"s sharing pixels with their line, which the
-zoomed-out rule and P4's letters leave unjudged; every integer width adds more, and 3c-C recounts
+zoomed-out rule and P4's letters leave unjudged; the twenty-first counted, at 0.8 and 0.9, what
+remains still in the tens (in 4.2, some twenty descender-over-ascender pairs beside the raised 9;
+in 4.8, brackets on their own borders), identities ratio 1 does not have, so 3c-C counts 0.8 and
+0.9 separately; every integer width adds more, and 3c-C recounts
 before the cap is set. 3c-C measures the counts at every width and sets
 a cap, one gate constant in the record's `tolerances` (so changing it is a new gate version), on the
 number of contact identities and of distinct drawings across a record's carried sections; the lookup
@@ -462,8 +469,7 @@ acknowledgement never becomes a rubber stamp. The withheld sections' contacts ar
 contact the gate cannot prove harmless passes only by a person's acknowledgement.
 
 **Seeded cases (binding).** Each is a case of the judge's tests in both modes and at every ratio
-(at 0.8 and 0.9, a seed of the two kinds the zoomed-out rule leaves unjudged binds only as a
-failure); where a case's class depends on the face, weight, size, ratio or sub-pixel phase, it binds at the
+(at 0.8 and 0.9, a seed of the kind the zoomed-out rule leaves unjudged binds only as a failure); where a case's class depends on the face, weight, size, ratio or sub-pixel phase, it binds at the
 configurations 3c-C measures and states (P2).
 
 Must be failures: a descender covered by a later line's inline background; an underscore under its
@@ -487,7 +493,8 @@ Serif and Sans, regular and bold, and again in their italics and in Carlito); th
 "10:1" at 5 pt against its border.
 
 Must be contacts: a "y" sharing pixels with its own underline, its tail showing below the line, at
-a ratio from 1 up where 3c-C finds one; two glyphs 0.2 px apart across lines; a combining mark stacked into the line above;
+a ratio from 1 up where 3c-C finds one; a 5 pt serif "y" and "γ" at 0.8, underlined, with no free
+row; two glyphs 0.2 px apart across lines; a combining mark stacked into the line above;
 a raised digit against the underline of the line above; a raised 7 folded by 2.4 pt abutting its own
 cell's top border ("x 10⁷/l"); a descender touching a picture on the next line; a comma's tail
 touching its own cell's bottom border; a "ç" whose cedilla touches its own cell's bottom border; a
@@ -754,9 +761,9 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
   to 7 pt at ratio 1 (6 to 8 pt at 0.8), in Liberation Serif and Sans, measured; so small
   underlined text in a safety section refuses; one whose tail shares pixels with the line is a
   contact; 3c-C measures how often, on the pinned labels.
-- Zoomed out (0.8 and 0.9), a letter's descender on its own line and a glyph at its own
-  background's edge are not shown to anyone (ADR 0003's third stated exception); below 0.8, nothing
-  is judged.
+- Zoomed out (0.8 and 0.9), a descender of P8(a)'s closed list of letters touching its own
+  underline or its own cell's bottom border, keeping a free row, is not shown to anyone (ADR 0003's
+  third stated exception; a tail wholly hidden is still a failure); below 0.8, nothing is judged.
 - A shifted glyph crossed through its body by its own run's underline (a lowered "2" in an
   underlined "AUC₀₋₂₄") is P3's failure even where it stays readable; 3c-C measures how often an
   underlined heading with a subscript is refused.
@@ -784,7 +791,8 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
   broken picture's box, a not-drawn picture drawn at its evidence's box, a first block's negative
   margin.
 - The three classes: every seeded case in its stated class; at 0.8 and 0.9 every seeded failure
-  found, every contact recorded but the two kinds the zoomed-out rule leaves unjudged; 4.2's and 4.8's contacts found and
+  found, every contact recorded but the kind the zoomed-out rule leaves unjudged; 4.6's underlined
+  "Pregnancy" "y" at 0.8 not recorded; 4.2's and 4.8's contacts found and
   captured at every distinct mask; an import that does not acknowledge every contact, or
   acknowledges one the record lacks, refuses.
 - Defects: the seeded controls are not defects; no carried section of a pinned label has one; the
@@ -1044,3 +1052,14 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
     against their own underline; the residual restated as measured; seeds each way; the rest as
     found. Measured: no failure in any carried section at any of the ten ratios; 12 underline contact
     identities at ratio 1 and 15 at 1.1.
+21. **Twenty-first independent review** (2026-09-26). High: the zoomed-out kind for P8(a)'s
+    descenders had no legibility condition, so at 5 and 6 pt at 0.8 and 0.9 a fused tail ("y" read
+    as "v", "μ" as "u") passed unseen where it is not wholly in the band. Medium: the second
+    zoomed-out kind (a background's edge) added only drawings that fail P8(b), a contrast failure on
+    the second fill among them. Low: a border's shared pixels still P3's failure; P3's closing
+    sentence not limited to unshifted letters with no mark below; the ADRs' and roadmap's wording
+    dropping the closed list; the count at 0.8 and 0.9 unstated. Fixed in this draft: the
+    zoomed-out kind needs a free row by P8(a)'s count, and is the only kind (the background's edge
+    removed); P3 yields to P4's rule for an unshifted P8(a) letter against its own underline or its
+    own cell's bottom border; seeds each way; the wording and counts as found. Measured: no failure
+    in any carried section at any of the ten ratios.
