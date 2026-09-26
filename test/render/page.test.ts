@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { launchChrome, type Browser } from "../../src/render/cdp.js";
+import { readElements, readMarkers, readTexts } from "../../src/render/measure.js";
 import { ORIGIN, openPage, pageDocument } from "../../src/render/page.js";
 
 const FAKE = fileURLToPath(new URL("./fake-chrome.mjs", import.meta.url));
@@ -75,6 +76,29 @@ describe("R2's page", () => {
       width: 360,
     });
     await expect(page.evaluate("boom")).rejects.toThrow(/evaluation failed in the page: Uncaught/);
+  });
+
+  it("reads each list item's marker by its pre-order index within the div", async () => {
+    const page = await openPage(fake("ok").cdp, { div: DIV, mode: "html", width: 813 });
+    // div 0, ol 1, li 2, li 3: only the first item has a marker node under it.
+    expect([...(await readMarkers(page))]).toEqual([[2, "1. "]]);
+    // The page-side reads are expressions evaluated in the judge's world.
+    const read = await readElements(page);
+    expect(read).toEqual(expect.objectContaining({ contextId: 7 }));
+    expect(await readTexts(page)).toEqual(expect.objectContaining({ contextId: 7 }));
+  });
+
+  it("refuses a page whose target crashes before it loads", async () => {
+    await expect(
+      openPage(fake("crash").cdp, { div: DIV, mode: "html", width: 813 }),
+    ).rejects.toThrow(/the page crashed/);
+  });
+
+  it("serves the page once, and refuses to read a page that navigated after it loaded", async () => {
+    const page = await openPage(fake("renavigate").cdp, { div: DIV, mode: "html", width: 813 });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(page.failed).toContain("https://renderer.invalid/");
+    await expect(page.evaluate("1")).rejects.toThrow(/navigated after it loaded/);
   });
 
   it("fails every command once the browser writes something that is not the protocol", async () => {

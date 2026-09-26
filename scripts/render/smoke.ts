@@ -46,7 +46,11 @@ BINDINGS.forEach(([family, face], f) => {
 });
 const div = `<div xmlns="http://www.w3.org/1999/xhtml"><p>${parts.join(" ")}<img src="picture.png" alt=""/></p></div>`;
 
-const browser = launchChrome({ executable: EXECUTABLE, ratio: 1, noSandbox: true });
+const browser = launchChrome({
+  executable: EXECUTABLE,
+  ratio: 1,
+  noSandbox: process.env.RENDERER_NO_SANDBOX === "1",
+});
 try {
   for (const mode of ["html", "xml"] as const) {
     const page = await openPage(browser.cdp, { div, mode, width: 813 });

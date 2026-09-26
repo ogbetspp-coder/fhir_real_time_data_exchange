@@ -95,7 +95,7 @@ RUN curl -fsSL \
     && echo "${CALADEA_BOLDITALIC_SHA256}  Caladea-BoldItalic.ttf" | sha256sum --check -
 
 # Chrome unpacked, and every shared library it links resolved: a missing one fails the build here
-# rather than the first draw. Only the Serif and Sans faces of Liberation are kept (the gate binds
+# rather than the first draw. The download tools are removed once the downloads are checked. Only the Serif and Sans faces of Liberation are kept (the gate binds
 # no other family to them), with Carlito and Caladea, in one directory fontconfig alone reads.
 RUN set -eu; \
     unzip -q chrome-headless-shell-linux64.zip; \
@@ -109,7 +109,8 @@ RUN set -eu; \
     done; \
     rm -rf liberation-fonts-ttf.tar.gz "liberation-fonts-ttf-${LIBERATION_VERSION}"; \
     mv Carlito-*.ttf Caladea-*.ttf /opt/renderer/fonts/; \
-    [ "$(ls /opt/renderer/fonts | wc -l)" -eq 16 ] || { echo "expected 16 font files" >&2; exit 1; }
+    [ "$(ls /opt/renderer/fonts | wc -l)" -eq 16 ] || { echo "expected 16 font files" >&2; exit 1; }; \
+    apt-get purge --yes --auto-remove curl unzip
 
 # The only fontconfig configuration Chrome reads: the pinned directory, the family bindings R6
 # states, no hinting, no sub-pixel order and no embedded bitmaps.

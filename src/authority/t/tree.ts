@@ -43,7 +43,8 @@ export type TreeNode = ElementNode | TextNode;
 // text node the DOM holds, the whitespace T drops between table parts and list items included
 // (`interElement`), with its data as the DOM has it: references decoded, a raw CR LF or lone CR one
 // LF. `pointToDom[i]` is the DOM offset, within the node, of T's code point `i` (the CR of a CR LF
-// shares its LF's). Recorded as the div is read; it changes nothing T decides.
+// shares its LF's). Recorded only when asked for (the model output's path, in the render build),
+// so the import's own T keeps its memory bound; it changes nothing T decides.
 export type DomText = {
   parent: ElementNode;
   node: TextNode | undefined;
@@ -229,7 +230,8 @@ function attributes(source: string, offset: number): Attribute[] {
 
 // Reads a section's div into a tree whose root is the div element. The div is the whole string,
 // whitespace around the root aside.
-export function readTree(div: string): ElementNode {
+export function readTree(div: string, options: { index?: boolean } = {}): ElementNode {
+  const recording = options.index === true;
   const stack: ElementNode[] = [];
   let root: ElementNode | undefined;
   let elements = 0;
@@ -283,7 +285,7 @@ export function readTree(div: string): ElementNode {
       };
       if (parent === undefined) root = element;
       else parent.children.push(element);
-      elementOrder.push(element);
+      if (recording) elementOrder.push(element);
       if (!selfClosing) {
         stack.push(element);
         if (stack.length > MAX_DEPTH) throw new MarkupRefusal("markup");
@@ -313,7 +315,7 @@ export function readTree(div: string): ElementNode {
       domPoint = point === "\r" ? (div[next] === "\n" ? undefined : "\n") : point;
       if (point === "\r" || point === "\n") point = " ";
     }
-    if (parent !== undefined) {
+    if (recording && parent !== undefined) {
       if (dom === undefined) {
         dom = {
           parent,
@@ -349,7 +351,7 @@ export function readTree(div: string): ElementNode {
     index = next;
   }
   if (root === undefined || stack.length > 0) throw new MarkupRefusal("markup");
-  INDEXES.set(root, { elements: elementOrder, texts });
+  if (recording) INDEXES.set(root, { elements: elementOrder, texts });
   return root;
 }
 

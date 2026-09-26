@@ -27,20 +27,31 @@ export class CdpError extends Error {
   }
 }
 
+// A command the browser does not answer within this fails, so a hung browser fails a draw rather
+// than the job's timeout.
+export const COMMAND_TIMEOUT_MS = 60_000;
+
 export class Cdp {
   private nextId = 1;
-  private readonly pending = new Map<number, Pending & { method: string }>();
+  private readonly pending = new Map<
+    number,
+    Pending & { method: string; timer: ReturnType<typeof setTimeout> }
+  >();
   private readonly listeners = new Set<(event: CdpEvent) => void>();
-  private buffer = Buffer.alloc(0);
+  private readonly waiters = new Set<(error: Error) => void>();
+  // Bytes of a message not yet ended by its NUL.
+  private partial: Buffer[] = [];
   private closed: Error | undefined;
 
   constructor(
     private readonly output: Writable,
     input: Readable,
+    private readonly timeoutMs = COMMAND_TIMEOUT_MS,
   ) {
     input.on("data", (chunk: Buffer) => this.receive(chunk));
-    input.on("close", () => this.fail(new Error("the browser closed its pipe")));
-    input.on("error", (error: Error) => this.fail(error));
+    input.on("close", () => this.abort(new Error("the browser closed its pipe")));
+    input.on("error", (error: Error) => this.abort(error));
+    output.on("error", (error: Error) => this.abort(error));
   }
 
   // One command, answered by the reply with its id; a protocol error rejects.
@@ -56,7 +67,11 @@ export class Cdp {
       sessionId === undefined ? { id, method, params } : { id, method, params, sessionId },
     );
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject, method });
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new CdpError(method, -1, `no reply within ${this.timeoutMs} ms`));
+      }, this.timeoutMs);
+      this.pending.set(id, { resolve, reject, method, timer });
       this.output.write(`${message}\0`);
     });
   }
@@ -67,7 +82,8 @@ export class Cdp {
     return () => this.listeners.delete(listener);
   }
 
-  // The first event of `method` (in `sessionId`, if given) that `accept` takes.
+  // The first event of `method` (in `sessionId`, if given) that `accept` takes; rejected if the
+  // pipe fails first.
   waitFor(
     method: string,
     sessionId?: string,
@@ -78,25 +94,32 @@ export class Cdp {
         reject(this.closed);
         return;
       }
+      const failed = (error: Error): void => {
+        stop();
+        reject(error);
+      };
+      this.waiters.add(failed);
       const stop = this.on((event) => {
         if (event.method !== method) return;
         if (sessionId !== undefined && event.sessionId !== sessionId) return;
         if (!accept(event.params)) return;
         stop();
+        this.waiters.delete(failed);
         resolve(event.params);
       });
     });
   }
 
+  // Each chunk is searched for NUL once, so a large reply costs its length, not its square.
   private receive(chunk: Buffer): void {
-    this.buffer = Buffer.concat([this.buffer, chunk]);
-    for (;;) {
-      const end = this.buffer.indexOf(0);
-      if (end < 0) return;
-      const text = this.buffer.subarray(0, end).toString("utf8");
-      this.buffer = this.buffer.subarray(end + 1);
+    let start = 0;
+    for (let end = chunk.indexOf(0); end >= 0; end = chunk.indexOf(0, start)) {
+      const text = Buffer.concat([...this.partial, chunk.subarray(start, end)]).toString("utf8");
+      this.partial = [];
+      start = end + 1;
       this.dispatch(text);
     }
+    if (start < chunk.length) this.partial.push(chunk.subarray(start));
   }
 
   private dispatch(text: string): void {
@@ -111,13 +134,14 @@ export class Cdp {
     try {
       message = JSON.parse(text) as typeof message;
     } catch {
-      this.fail(new Error("the browser wrote a message that is not JSON"));
+      this.abort(new Error("the browser wrote a message that is not JSON"));
       return;
     }
     if (typeof message.id === "number") {
       const pending = this.pending.get(message.id);
       if (pending === undefined) return;
       this.pending.delete(message.id);
+      clearTimeout(pending.timer);
       if (message.error !== undefined) {
         pending.reject(new CdpError(pending.method, message.error.code, message.error.message));
       } else {
@@ -132,11 +156,17 @@ export class Cdp {
     }
   }
 
-  private fail(error: Error): void {
+  // Fails every pending command and waiter, and every later one.
+  abort(error: Error): void {
     if (this.closed !== undefined) return;
     this.closed = error;
-    for (const pending of this.pending.values()) pending.reject(error);
+    for (const pending of this.pending.values()) {
+      clearTimeout(pending.timer);
+      pending.reject(error);
+    }
     this.pending.clear();
+    for (const waiter of [...this.waiters]) waiter(error);
+    this.waiters.clear();
   }
 }
 
@@ -197,20 +227,25 @@ export function launchChrome(options: LaunchOptions): Browser {
     throw new Error("the browser's debugging pipe did not open");
   }
   const cdp = new Cdp(commands, replies);
-  const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
+  // A browser that cannot start (a wrong path) or that dies fails every command, never throws
+  // outside them.
+  child.once("error", (error: Error) => cdp.abort(error));
+  const exited = new Promise<void>((resolve) => {
+    child.once("exit", () => resolve());
+    child.once("error", () => resolve());
+  });
+  const settle = (milliseconds: number): Promise<void> =>
+    new Promise((resolve) => setTimeout(resolve, milliseconds));
   return {
     cdp,
     close: async () => {
       try {
-        await Promise.race([
-          cdp.send("Browser.close"),
-          new Promise((resolve) => setTimeout(resolve, 2000)),
-        ]);
+        await Promise.race([cdp.send("Browser.close"), settle(2000)]);
       } catch {
         // Closing is best effort; the process is killed below either way.
       }
-      if (child.exitCode === null) child.kill("SIGKILL");
-      await exited;
+      if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+      await Promise.race([exited, settle(5000)]);
       rmSync(profile, { recursive: true, force: true });
     },
   };

@@ -58,81 +58,117 @@ export async function openPage(cdp: Cdp, options: OpenOptions): Promise<Page> {
   const { targetId } = (await cdp.send("Target.createTarget", { url: "about:blank" })) as {
     targetId: string;
   };
-  const { sessionId } = (await cdp.send("Target.attachToTarget", { targetId, flatten: true })) as {
-    sessionId: string;
+  const listeners: (() => void)[] = [];
+  const closeTarget = async (): Promise<void> => {
+    for (const stop of listeners) stop();
+    await cdp.send("Target.closeTarget", { targetId }).catch(() => undefined);
   };
-  const send = (method: string, params: Record<string, unknown> = {}) =>
-    cdp.send(method, params, sessionId);
-  const document = pageDocument(options.div, options.mode);
-  const failed: string[] = [];
-  const stop = cdp.on((event) => {
-    if (event.sessionId !== sessionId || event.method !== "Fetch.requestPaused") return;
-    const { requestId, request } = event.params as { requestId: string; request: { url: string } };
-    const resource = options.resources?.get(request.url);
-    if (request.url === ORIGIN) {
-      void send("Fetch.fulfillRequest", {
-        requestId,
-        responseCode: 200,
-        responseHeaders: [{ name: "Content-Type", value: document.contentType }],
-        body: Buffer.from(document.body, "utf8").toString("base64"),
-      });
-    } else if (resource !== undefined) {
-      void send("Fetch.fulfillRequest", {
-        requestId,
-        responseCode: 200,
-        responseHeaders: [{ name: "Content-Type", value: resource.contentType }],
-        body: resource.body.toString("base64"),
-      });
-    } else {
-      failed.push(request.url);
-      void send("Fetch.failRequest", { requestId, errorReason: "BlockedByClient" });
+  try {
+    const { sessionId } = (await cdp.send("Target.attachToTarget", {
+      targetId,
+      flatten: true,
+    })) as { sessionId: string };
+    const send = (method: string, params: Record<string, unknown> = {}) =>
+      cdp.send(method, params, sessionId);
+    // A reply to a paused request can fail if the target goes away; that failure is the draw's,
+    // reported by the commands that follow, never an unhandled rejection.
+    const answer = (method: string, params: Record<string, unknown>): void => {
+      send(method, params).catch(() => undefined);
+    };
+    const document = pageDocument(options.div, options.mode);
+    const failed: string[] = [];
+    let served = false;
+    let loadedOnce = false;
+    let navigatedAway = false;
+    listeners.push(
+      cdp.on((event) => {
+        if (event.sessionId !== sessionId) return;
+        if (event.method === "Page.frameNavigated" && loadedOnce) navigatedAway = true;
+        if (event.method !== "Fetch.requestPaused") return;
+        const { requestId, request, resourceType } = event.params as {
+          requestId: string;
+          request: { url: string };
+          resourceType?: string;
+        };
+        const resource = options.resources?.get(request.url);
+        // The page itself, once, as the frame's document: never as a picture or a second
+        // navigation (a refresh, a link followed), which fail.
+        if (request.url === ORIGIN && resourceType === "Document" && !served) {
+          served = true;
+          answer("Fetch.fulfillRequest", {
+            requestId,
+            responseCode: 200,
+            responseHeaders: [{ name: "Content-Type", value: document.contentType }],
+            body: Buffer.from(document.body, "utf8").toString("base64"),
+          });
+        } else if (resource !== undefined && resourceType !== "Document") {
+          answer("Fetch.fulfillRequest", {
+            requestId,
+            responseCode: 200,
+            responseHeaders: [{ name: "Content-Type", value: resource.contentType }],
+            body: resource.body.toString("base64"),
+          });
+        } else {
+          failed.push(request.url);
+          answer("Fetch.failRequest", { requestId, errorReason: "BlockedByClient" });
+        }
+      }),
+    );
+    await send("Fetch.enable", { patterns: [{ urlPattern: "*" }] });
+    await send("Page.enable");
+    await send("Inspector.enable");
+    await send("Emulation.setScriptExecutionDisabled", { value: true });
+    await send("Emulation.setDeviceMetricsOverride", {
+      width: options.width + 32,
+      height: 600,
+      deviceScaleFactor: 0,
+      mobile: false,
+    });
+    const loaded = cdp.waitFor("Page.loadEventFired", sessionId);
+    const crashed = cdp.waitFor("Inspector.targetCrashed", sessionId).then(() => {
+      throw new Error("the page crashed");
+    });
+    // Whichever loses the race below settles later; neither is left unhandled.
+    loaded.catch(() => undefined);
+    crashed.catch(() => undefined);
+    const navigation = (await send("Page.navigate", { url: ORIGIN })) as {
+      frameId: string;
+      errorText?: string;
+    };
+    if (navigation.errorText !== undefined) {
+      throw new Error(`the page did not load: ${navigation.errorText}`);
     }
-  });
-  await send("Fetch.enable", { patterns: [{ urlPattern: "*" }] });
-  await send("Page.enable");
-  await send("Emulation.setScriptExecutionDisabled", { value: true });
-  await send("Emulation.setDeviceMetricsOverride", {
-    width: options.width + 32,
-    height: 600,
-    deviceScaleFactor: 0,
-    mobile: false,
-  });
-  const loaded = cdp.waitFor("Page.loadEventFired", sessionId);
-  const navigation = (await send("Page.navigate", { url: ORIGIN })) as {
-    frameId: string;
-    errorText?: string;
-  };
-  if (navigation.errorText !== undefined) {
-    stop();
-    throw new Error(`the page did not load: ${navigation.errorText}`);
-  }
-  await loaded;
-  const { executionContextId } = (await send("Page.createIsolatedWorld", {
-    frameId: navigation.frameId,
-    worldName: "renderer-judge",
-    grantUniveralAccess: false,
-  })) as { executionContextId: number };
-  const evaluate = async <T>(expression: string): Promise<T> => {
-    const reply = (await send("Runtime.evaluate", {
-      expression,
+    await Promise.race([loaded, crashed]);
+    loadedOnce = true;
+    const { executionContextId } = (await send("Page.createIsolatedWorld", {
+      frameId: navigation.frameId,
+      worldName: "renderer-judge",
+      grantUniveralAccess: false,
+    })) as { executionContextId: number };
+    const evaluate = async <T>(expression: string): Promise<T> => {
+      // A page that navigated after it loaded is no longer the section drawn.
+      if (navigatedAway) throw new Error("the page navigated after it loaded");
+      const reply = (await send("Runtime.evaluate", {
+        expression,
+        contextId: executionContextId,
+        returnByValue: true,
+        awaitPromise: true,
+      })) as { result: { value?: unknown }; exceptionDetails?: { text: string } };
+      if (reply.exceptionDetails !== undefined) {
+        throw new Error(`evaluation failed in the page: ${reply.exceptionDetails.text}`);
+      }
+      return reply.result.value as T;
+    };
+    return {
+      sessionId,
       contextId: executionContextId,
-      returnByValue: true,
-      awaitPromise: true,
-    })) as { result: { value?: unknown }; exceptionDetails?: { text: string } };
-    if (reply.exceptionDetails !== undefined) {
-      throw new Error(`evaluation failed in the page: ${reply.exceptionDetails.text}`);
-    }
-    return reply.result.value as T;
-  };
-  return {
-    sessionId,
-    contextId: executionContextId,
-    evaluate,
-    send,
-    failed,
-    close: async () => {
-      stop();
-      await cdp.send("Target.closeTarget", { targetId });
-    },
-  };
+      evaluate,
+      send,
+      failed,
+      close: closeTarget,
+    };
+  } catch (error) {
+    await closeTarget();
+    throw error;
+  }
 }

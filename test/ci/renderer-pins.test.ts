@@ -115,6 +115,31 @@ describe("the renderer image's pins", () => {
       (text: string) => text.replace("COPY src/render/image/fonts.conf", "COPY other.conf"),
     ],
     [
+      "a curl whose first argument is the URL",
+      (text: string) =>
+        text.replace(
+          "RUN set -eu; \\\n    unzip",
+          'RUN curl "https://example.org/x" -o x; \\\n    unzip',
+        ),
+    ],
+    [
+      "a download with wget",
+      (text: string) =>
+        text.replace("RUN set -eu; \\\n    unzip", "RUN wget https://example.org/x; \\\n    unzip"),
+    ],
+    [
+      "an ADD of a URL",
+      (text: string) => text.replace("USER node", "ADD https://example.org/x /opt/x\nUSER node"),
+    ],
+    [
+      "a checksum failure ignored",
+      (text: string) =>
+        text.replace(
+          'echo "${CHROME_SHA256}  chrome-headless-shell-linux64.zip" | sha256sum --check -',
+          'echo "${CHROME_SHA256}  chrome-headless-shell-linux64.zip" | sha256sum --check - || true',
+        ),
+    ],
+    [
       "a malformed snapshot",
       (text: string) => text.replace(/ARG DEBIAN_SNAPSHOT=\S+/, "ARG DEBIAN_SNAPSHOT=latest"),
     ],

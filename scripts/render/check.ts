@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { transformDocument } from "../../src/authority/t/document.js";
 import { modelDocument, modelSection, type Model } from "../../src/authority/t/model.js";
 import { TRefusal, transformSection } from "../../src/authority/t/transform.js";
-import { xhtmlToText } from "../../src/fidelity/xhtml.js";
+import { xhtmlToText, XhtmlError } from "../../src/fidelity/xhtml.js";
 import { launchChrome } from "../../src/render/cdp.js";
 import { compareModel, compareText, type Mismatch } from "../../src/render/compare-style.js";
 import { readElements, readMarkers, readTexts } from "../../src/render/measure.js";
@@ -23,6 +23,9 @@ import { MODEL_CASES } from "../../test/fixtures/render/model-cases.js";
 const EXECUTABLE =
   process.env.RENDERER_CHROME ??
   "/opt/renderer/chrome-headless-shell-linux64/chrome-headless-shell";
+// Chrome's sandbox is off only inside the render container, which has no network, no credentials
+// and a read-only workspace (R1, R6); the container's run sets RENDERER_NO_SANDBOX=1.
+const NO_SANDBOX = process.env.RENDERER_NO_SANDBOX === "1";
 const RATIOS = [0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.625, 3];
 const WIDTHS = [813, 360, 1240];
 const LABELS = "labels/ema-epi";
@@ -45,42 +48,60 @@ const modes = (option("modes")?.split(",") ?? ["html", "xml"]) as Mode[];
 
 type Case = { name: string; div: string; model: Model };
 
-function scannerAccepts(div: string, evidence?: ReadonlySet<string>): boolean {
+// Whether the scanner accepts a T(div); only its own refusal counts as no.
+function scannerAccepts(output: string): boolean {
   try {
-    xhtmlToText(transformSection(div, evidence).div);
+    xhtmlToText(output);
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    if (error instanceof XhtmlError) return false;
+    throw error;
   }
 }
 
+// Every section R3 draws, and nothing silently skipped: an accepted T case T or the scanner now
+// refuses, a model case refused, or a label section T and the scanner accept without a model, all
+// fail the check (the first code review).
 function cases(): Case[] {
   const found: Case[] = [];
+  const broken: string[] = [];
   for (const testCase of T_CASES) {
     if (!("div" in testCase.expected)) continue;
     const div = `${testCase.root ?? ROOT}${testCase.inner}${MARKED}`;
+    const evidence = testCase.evidence === undefined ? undefined : new Set(testCase.evidence);
     try {
-      const evidence = testCase.evidence === undefined ? undefined : new Set(testCase.evidence);
-      const model = JSON.parse(modelSection(div, evidence)) as Model;
-      if (scannerAccepts(div, evidence))
-        found.push({ name: `t-case ${testCase.name}`, div, model });
+      if (!scannerAccepts(transformSection(div, evidence).div)) continue;
+      found.push({
+        name: `t-case ${testCase.name}`,
+        div,
+        model: JSON.parse(modelSection(div, evidence)) as Model,
+      });
     } catch (error) {
       if (!(error instanceof TRefusal)) throw error;
+      broken.push(`t-case ${testCase.name}: accepted in t-cases.ts, refused (${error.reason})`);
     }
   }
   for (const modelCase of MODEL_CASES) {
     const div = `${ROOT}${modelCase.inner}${MARKED}`;
-    // Every one is accepted by T and the scanner (test/render/model.test.ts); a refusal here is a
-    // broken fixture, which fails loudly.
-    found.push({
-      name: `model-case ${modelCase.name}`,
-      div,
-      model: JSON.parse(modelSection(div)) as Model,
-    });
+    try {
+      if (!scannerAccepts(transformSection(div).div)) {
+        broken.push(`model-case ${modelCase.name}: the scanner refuses it`);
+        continue;
+      }
+      found.push({
+        name: `model-case ${modelCase.name}`,
+        div,
+        model: JSON.parse(modelSection(div)) as Model,
+      });
+    } catch (error) {
+      if (!(error instanceof TRefusal)) throw error;
+      broken.push(`model-case ${modelCase.name}: T refuses it (${error.reason})`);
+    }
   }
   const lock = JSON.parse(readFileSync(`${LABELS}/sources.lock.json`, "utf8")) as {
     sources: { file: string }[];
   };
+  if (lock.sources.length === 0) broken.push(`${LABELS}/sources.lock.json pins no label`);
   type Section = { text?: { div?: string }; section?: Section[] };
   for (const { file } of lock.sources) {
     const document = JSON.parse(readFileSync(`${LABELS}/sources/${file}`, "utf8")) as {
@@ -95,20 +116,24 @@ function cases(): Case[] {
       });
     };
     walk(document.entry?.[0]?.resource?.section ?? [], "Composition.section");
+    if (placed.length === 0) broken.push(`${file}: no sections`);
     const models = modelDocument(placed.map(({ div }) => div));
     const outcomes = transformDocument(placed.map(({ div }) => div));
     placed.forEach(({ path, div }, index) => {
-      const model = models[index];
-      if (div === undefined || model === undefined) return;
       const outcome = outcomes[index];
-      if (outcome === undefined || !("div" in outcome)) return;
-      try {
-        xhtmlToText(outcome.div);
-      } catch {
+      if (div === undefined || outcome === undefined || !("div" in outcome)) return;
+      if (!scannerAccepts(outcome.div)) return;
+      const model = models[index];
+      if (model === undefined) {
+        broken.push(`${file} ${path}: accepted by T and the scanner, but has no model`);
         return;
       }
       found.push({ name: `${file} ${path}`, div, model: JSON.parse(model) as Model });
     });
+  }
+  if (broken.length > 0) {
+    console.error(broken.join("\n"));
+    process.exit(1);
   }
   return found;
 }
@@ -123,7 +148,7 @@ const failures: {
 }[] = [];
 let drawings = 0;
 for (const ratio of ratios) {
-  const browser = launchChrome({ executable: EXECUTABLE, ratio, noSandbox: true });
+  const browser = launchChrome({ executable: EXECUTABLE, ratio, noSandbox: NO_SANDBOX });
   try {
     for (const { name, div, model } of all) {
       for (const mode of modes) {
@@ -133,7 +158,7 @@ for (const ratio of ratios) {
             const elements = await readElements(page);
             const markers =
               model.markers.length > 0 ? await readMarkers(page) : new Map<number, string>();
-            const mismatches = compareModel(model, elements, markers, ratio);
+            const mismatches = compareModel(model, elements, markers, ratio, mode);
             if (mode === "xml") mismatches.push(...compareText(model, await readTexts(page)));
             drawings += 1;
             if (mismatches.length > 0) failures.push({ name, mode, ratio, width, mismatches });

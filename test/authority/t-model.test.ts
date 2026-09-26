@@ -67,7 +67,7 @@ describe("T's model output", () => {
       { key: 6, element: 6, start: 13, end: 33 },
     ]);
     // T's own code points are unchanged: a raw CR or LF is a space to the scanner.
-    const root = readTree(section(inner));
+    const root = readTree(section(inner), { index: true });
     const cell = treeIndex(root).texts[2];
     expect(cell?.node?.points.join("")).toBe("a  b c d");
     expect(cell?.data.join("")).toBe("a\nb\nc\rd");
@@ -129,7 +129,7 @@ describe("T's model output", () => {
 
   it("is computed from T's own analysis, which T(div) is unchanged by", () => {
     const div = section('<p><span style="color:#000">a</span> <u>b</u></p>');
-    const analysis = analyseSection(div);
+    const analysis = analyseSection(div, undefined, { model: true });
     expect(analysis.output).toBe(transformSection(div).div);
     expect(canonicalJson(buildModel(analysis))).toBe(modelSection(div));
   });

@@ -52,7 +52,8 @@ export type MarkerStyle = Pick<
 
 export type Model = {
   format: string;
-  elements: { key: number; name: string; style: ModelStyle }[];
+  // `parent` is the parent element's key, -1 for the div.
+  elements: { key: number; name: string; parent: number; style: ModelStyle }[];
   text: { key: number; element: number; start: number; end: number; interElement?: true }[];
   markers: { element: number; text: string; style: MarkerStyle }[];
   folds: { element: number; decision: string }[];
@@ -369,7 +370,8 @@ export function buildModel(analysis: Analysis): Model {
   const elements = index.elements.map((element) => {
     const style = modelStyle(context, element);
     context.styles.set(element, style);
-    return { key: key(element), name: element.name, style };
+    const parent = element.parent === undefined ? -1 : key(element.parent);
+    return { key: key(element), name: element.name, parent, style };
   });
 
   const text: Model["text"] = [];
@@ -430,7 +432,7 @@ export function buildModel(analysis: Analysis): Model {
 
 // T's model output for one section's div, as canonical JSON (RFC 8785), or T's refusal thrown.
 export function modelSection(div: string, evidence?: ReadonlySet<string>): string {
-  return canonicalJson(buildModel(analyseSection(div, evidence)));
+  return canonicalJson(buildModel(analyseSection(div, evidence, { model: true })));
 }
 
 // The model of each section of a document, in the order given (pre-order): T's two passes as
@@ -460,13 +462,13 @@ export function modelDocument(divs: readonly (string | undefined)[]): (string | 
   return divs.map((div) => {
     if (div === undefined) return undefined;
     try {
-      return scanned(analyseSection(div));
+      return scanned(analyseSection(div, undefined, { model: true }));
     } catch (error) {
       if (!(error instanceof TRefusal)) throw error;
       if (error.reason !== "underline") return undefined;
     }
     try {
-      return scanned(analyseSection(div, evidence));
+      return scanned(analyseSection(div, evidence, { model: true }));
     } catch (error) {
       if (!(error instanceof TRefusal)) throw error;
       return undefined;

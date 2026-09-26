@@ -63,9 +63,20 @@ export function readRendererPins(dockerfile = RENDERER_DOCKERFILE) {
   const download =
     /curl\s+(?:-\S+\s+)*"([^"]+)"\s+-o\s+(\S+)\s+&&\s+echo\s+"\$\{([A-Z0-9_]+)\}\s+(\S+)"\s+\|\s+sha256sum\s+--check/g;
   for (const line of lines) {
+    // Nothing reaches the image but through a checksummed curl: no ADD of a URL, no other fetcher.
+    if (/^\s*ADD\s/i.test(line) && /https?:\/\//i.test(line)) {
+      throw new Error(`${name}: ADD fetches a URL; download with a checksummed curl instead`);
+    }
     if (!/^\s*RUN\b/.test(line)) continue;
-    // Every curl in a RUN line must be one of the checksummed pairs: an unpinned download fails.
-    const curls = (line.match(/\bcurl\s+-/g) ?? []).length;
+    if (/\bwget\b|\bgit\s+clone\b|\bfetch\s*\(|\bnode\s+-e\b|\bpython3?\s+-c\b/.test(line)) {
+      throw new Error(`${name}: a RUN line downloads with something other than a checksummed curl`);
+    }
+    if (/sha256sum\s+--check\s*-?\s*\|\|/.test(line)) {
+      throw new Error(`${name}: a checksum failure is ignored (sha256sum --check ... ||)`);
+    }
+    // Every curl, however its arguments start, is one of the checksummed pairs.
+    const invocations = line.replace(/apt-get\s+(?:install|purge)[^;&|]*/g, "").match(/\bcurl\b/g);
+    const curls = invocations === null ? 0 : invocations.length;
     const pairs = [...line.matchAll(download)];
     if (curls !== pairs.length) {
       throw new Error(`${name}: a RUN line downloads with curl without a SHA-256 check`);

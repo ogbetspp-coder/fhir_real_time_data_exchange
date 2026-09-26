@@ -791,8 +791,22 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
 
 ## Delivery
 
-1. **3c-B**: R2's page, the renderer image and its build, the CI pre-check, R3 with the output
-   format's addendum.
+1. **3c-B**, in two changes (the first code review of 3c-B asked that what waits be named):
+   - **3c-B1**: the renderer image (`Dockerfile.renderer`, its pins and fontconfig) built and
+     checked offline in CI; R2's page; the DevTools client; the output format's addendum; T's
+     model output; and R3's comparison of it with Chrome's computed style, list markers and text
+     ranges, in both modes at every ratio, as the CI pre-check. The importer moves to 2.1.0.
+   - **3c-B2**: the rest of R3 and R2's second drawing: the fonts and scripts of every section,
+     T's or not (`font-unpinned`, the script bound); R6's coverage (`font-coverage`, the U+2070
+     seed, the pixel tests of the substitutions); each table's grid from cell rectangles against
+     T(div)'s; each character box's height against the face's ascent and descent; a
+     `parsererror` as its own refusal; and the text, list numbers, grids and pictures of the
+     authority's drawing against T(div)'s at the named widths.
+
+   The renderer image's own build (`cloudbuild.renderer-image.yaml`, the `renderer-images`
+   repository) moves to 3c-C with the render build, its identities and Terraform, and the
+   repository connection only the owner can make (R1).
+
 2. **3c-C**: its measured design of R4 (reviewed first), then R4, R7, R8, R9, R11; the render build,
    its trigger and attestations; the records of the pinned labels.
 3. **3c-D**: R5 and R10: the lookup, the image build's verification, the manifest, re-verification

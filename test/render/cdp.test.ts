@@ -88,6 +88,22 @@ describe("the DevTools pipe client", () => {
     await expect(waiting).rejects.toThrow(/not JSON/);
   });
 
+  it("fails a command the browser never answers, and a waiter when the pipe fails", async () => {
+    const toBrowser = new PassThrough();
+    const fromBrowser = new PassThrough();
+    const cdp = new Cdp(toBrowser, fromBrowser, 20);
+    await expect(cdp.send("Page.enable")).rejects.toThrow(/no reply within 20 ms/);
+    const waiting = cdp.waitFor("Page.loadEventFired");
+    fromBrowser.destroy();
+    await expect(waiting).rejects.toThrow(/closed its pipe/);
+  });
+
+  it("fails every command of a browser that cannot start, without throwing", async () => {
+    const browser = launchChrome({ executable: "/nonexistent/chrome-headless-shell", ratio: 1 });
+    await expect(browser.cdp.send("Target.createTarget")).rejects.toThrow();
+    await browser.close();
+  });
+
   it("launches with R6's flags, the ratio per process, and the pipe", async () => {
     expect(chromeFlags(2.625)).toEqual(
       expect.arrayContaining([

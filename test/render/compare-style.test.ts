@@ -40,7 +40,7 @@ function recording(name: string, mode: "html" | "xml"): Recording {
 }
 function compare(model: Model, name: string, mode: "html" | "xml" = "html") {
   const { elements, markers } = recording(name, mode);
-  return compareModel(model, elements, new Map(markers), RATIO);
+  return compareModel(model, elements, new Map(markers), RATIO, mode);
 }
 // The first element named `name` in the model, for a mutation.
 function element(model: Model, name: string, nth = 0) {
@@ -225,6 +225,47 @@ describe("R3 on the recorded drawings", () => {
     expect(compare({ ...modelOf("offsets"), format: "t-model/2.0.0" }, "offsets")).toEqual([
       { reason: "model-format", key: -1, property: "format", model: "t-model/2.0.0", chrome: "" },
     ]);
+  });
+
+  it("refuses a model that drops an authored tbody, has malformed keys or a wrong parent", () => {
+    // The first code review: with the authored tbody removed and the keys renumbered, XML mode
+    // matched. A tbody is skipped only where HTML mode inserted it.
+    const model = modelOf("bordered-table");
+    const tbody = model.elements.findIndex(({ name }) => name === "tbody");
+    const renumber = new Map<number, number>();
+    const kept = model.elements.filter((_, index) => index !== tbody);
+    kept.forEach(({ key }, index) => renumber.set(key, index));
+    const dropped: Model = {
+      ...model,
+      elements: kept.map((entry, index) => ({
+        ...entry,
+        key: index,
+        parent:
+          entry.parent === tbody
+            ? (model.elements[tbody]?.parent ?? -1)
+            : (renumber.get(entry.parent) ?? -1),
+      })),
+      text: [],
+    };
+    expect(
+      compare(dropped, "bordered-table", "xml").some(({ property }) => property === "structure"),
+    ).toBe(true);
+
+    const gapped = structuredClone(model);
+    const second = gapped.elements[1];
+    if (second !== undefined) second.key = 7;
+    expect(compare(gapped, "bordered-table")).toEqual([
+      expect.objectContaining({ property: "structure", chrome: "(model malformed)" }),
+    ]);
+    const stray = { ...structuredClone(model), text: [{ key: 0, element: 999, start: 0, end: 1 }] };
+    expect(compare(stray, "bordered-table")[0]?.chrome).toBe("(model malformed)");
+
+    const reparented = structuredClone(model);
+    const cell = reparented.elements.find(({ name }) => name === "td");
+    if (cell !== undefined) cell.parent = 0;
+    expect(
+      compare(reparented, "bordered-table").some(({ property }) => property === "parent"),
+    ).toBe(true);
   });
 
   it("does not compare a centred table's auto margins, which depend on the width", () => {

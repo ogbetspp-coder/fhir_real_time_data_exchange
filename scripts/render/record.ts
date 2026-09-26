@@ -19,7 +19,11 @@ const ROOT = '<div xmlns="http://www.w3.org/1999/xhtml">';
 const MARKED = "<p>not for clinical use</p></div>";
 const RATIO = 1.25;
 
-const browser = launchChrome({ executable: EXECUTABLE, ratio: RATIO, noSandbox: true });
+const browser = launchChrome({
+  executable: EXECUTABLE,
+  ratio: RATIO,
+  noSandbox: process.env.RENDERER_NO_SANDBOX === "1",
+});
 const recorded: Record<string, unknown> = {};
 try {
   const { product } = (await browser.cdp.send("Browser.getVersion")) as { product: string };

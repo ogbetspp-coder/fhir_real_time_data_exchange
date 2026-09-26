@@ -7,6 +7,15 @@ export type ModelCase = { name: string; inner: string };
 
 export const MODEL_CASES: ModelCase[] = [
   {
+    // The elements no other case drew (the first code review of PR 3c-B): `abbr`, a carried
+    // picture, a `tfoot` with its own alignment and border colour.
+    name: "abbr-picture-and-footer",
+    inner:
+      '<p><abbr>SmPC</abbr> x <img src="data:image/png;base64,iVBORw0KGgo="/> y</p>' +
+      '<table><tbody><tr><td>y</td></tr></tbody><tfoot valign="bottom" style="border-color:#009900">' +
+      '<tr><td style="border-top-style:solid">x</td></tr></tfoot></table>',
+  },
+  {
     // Row groups and rows inherit border colours always, cells under the attribute too, and a
     // colour a shorthand omits is `currentcolor`, resolved by each element (the third review).
     name: "border-colour-inheritance",

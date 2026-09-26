@@ -288,7 +288,7 @@ export type Walk = {
   sources: (readonly [TextNode, number] | undefined)[];
 };
 
-function walkSection(root: ElementNode, rightToLeft: boolean): Walk {
+function walkSection(root: ElementNode, rightToLeft: boolean, recordSources: boolean): Walk {
   const infos = new Map<ElementNode, Info>();
   const codes: string[] = [];
   const points: Point[] = [];
@@ -296,7 +296,7 @@ function walkSection(root: ElementNode, rightToLeft: boolean): Walk {
   const push = (code: string, point: Point, source?: readonly [TextNode, number]): void => {
     codes.push(code);
     points.push(point);
-    sources.push(source);
+    if (recordSources) sources.push(source);
   };
   const ranges = new Map<ElementNode, { start: number; end: number }>();
 
@@ -440,7 +440,8 @@ function walkSection(root: ElementNode, rightToLeft: boolean): Walk {
     for (const child of element.children) {
       if (child.kind === "text") {
         if (hasDrawnText(child)) checkDrawn(style, info.blockSize);
-        child.points.forEach((code, index) => push(code, own, [child, index]));
+        if (recordSources) child.points.forEach((code, index) => push(code, own, [child, index]));
+        else for (const code of child.points) push(code, own);
       } else {
         visit(child, info);
       }
@@ -945,7 +946,9 @@ function waivable(
     masked.length > 0 &&
     !underlineChanges(text, run.start, run.end, { hyphensInWords: true });
   for (const index of masked) text[index] = "+";
-  if (accepted) waived.push(...masked);
+  // One at a time: a spread of a large array into push overflows the stack (the first code
+  // review: 130 000 waived signs threw a RangeError).
+  if (accepted) for (const index of masked) waived.push(index);
   return accepted;
 }
 
@@ -1038,10 +1041,17 @@ export function transformSection(div: string, evidence?: ReadonlySet<string>): S
   return { div: output, plainTokens: plainTokens(walk.codes, walk.points) };
 }
 
-export function analyseSection(div: string, evidence?: ReadonlySet<string>): Analysis {
+// With `model`, T also records what the model output needs (a DOM index of the tree, the source of
+// each code point); the import's own T leaves it out, so its memory stays bounded.
+export function analyseSection(
+  div: string,
+  evidence?: ReadonlySet<string>,
+  options: { model?: boolean } = {},
+): Analysis {
+  const model = options.model === true;
   let root: ElementNode;
   try {
-    root = readTree(div);
+    root = readTree(div, { index: model });
   } catch (error) {
     if (error instanceof MarkupRefusal) refuse(error.reason);
     throw error;
@@ -1052,7 +1062,7 @@ export function analyseSection(div: string, evidence?: ReadonlySet<string>): Ana
       ? RIGHT_TO_LEFT.test(node.points.join(""))
       : node.attributes.some(({ value }) => RIGHT_TO_LEFT.test(value)),
   );
-  const walk = walkSection(root, rightToLeft);
+  const walk = walkSection(root, rightToLeft, model);
   const shifts = decideShifts(walk);
   // A folded run is raised or lowered text from here on (T5's runs and the waiver's evidence).
   const scripted = new Map<Point, Point>();

@@ -264,6 +264,7 @@ export function compareModel(
   elements: readonly ChromeElement[],
   markers: ReadonlyMap<number, string>,
   ratio: number,
+  mode: "html" | "xml",
 ): Mismatch[] {
   if (!KNOWN_FORMATS.has(model.format)) {
     return [
@@ -271,35 +272,55 @@ export function compareModel(
     ];
   }
   const mismatches: Mismatch[] = [];
-  // Chrome's index of each model key: the elements in order, skipping only what the HTML parser
-  // inserts (M1).
+  const structure = (model: string, chrome: string): Mismatch[] => {
+    mismatches.push({ reason: "model-mismatch", key: -1, property: "structure", model, chrome });
+    return mismatches;
+  };
+  // The model is read as data: its keys run 0 to n − 1 in order, each parent before its child,
+  // and every text entry names an element it has.
+  const keysDense = model.elements.every(
+    ({ key, parent }, index) =>
+      key === index && parent < index && (index === 0) === (parent === -1),
+  );
+  if (!keysDense) return structure("keys 0 to n - 1, parents first", "(model malformed)");
+  if (model.text.some(({ element }) => element < 0 || element >= model.elements.length)) {
+    return structure("text entries naming its elements", "(model malformed)");
+  }
+  // Chrome's index of each model key: the elements in order, skipping only a `tbody` the HTML
+  // parser inserted, in HTML mode, where the model has no `tbody` at that position (M1).
   const placed: number[] = [];
+  const inserted = new Set<number>();
   let next = 0;
   elements.forEach((element, index) => {
     const expected = model.elements[next];
     if (element.name === expected?.name) {
       placed.push(index);
       next += 1;
-    } else if (element.name !== "tbody") {
-      mismatches.push({
-        reason: "model-mismatch",
-        key: -1,
-        property: "structure",
-        model: expected?.name ?? "(none)",
-        chrome: element.name,
-      });
+    } else if (mode === "html" && element.name === "tbody") {
+      inserted.add(index);
+    } else {
+      structure(expected?.name ?? "(none)", element.name);
     }
   });
   if (next !== model.elements.length) {
-    mismatches.push({
-      reason: "model-mismatch",
-      key: -1,
-      property: "structure",
-      model: `${model.elements.length} elements`,
-      chrome: `${next} matched`,
-    });
-    return mismatches;
+    return structure(`${model.elements.length} elements`, `${next} matched`);
   }
+  // Each element's parent, through an inserted `tbody`, is the model's.
+  const keyOf = new Map(placed.map((index, key) => [index, key]));
+  model.elements.forEach(({ key, parent }) => {
+    let at = elements[placed[key] ?? -1]?.parent ?? -1;
+    while (inserted.has(at)) at = elements[at]?.parent ?? -1;
+    const chromeParent = at === -1 ? -1 : (keyOf.get(at) ?? -2);
+    if (chromeParent !== parent) {
+      mismatches.push({
+        reason: "model-mismatch",
+        key,
+        property: "parent",
+        model: String(parent),
+        chrome: String(chromeParent),
+      });
+    }
+  });
   model.elements.forEach(({ key, style }) => {
     const index = placed[key] ?? -1;
     const check: Check = (property, ok, modelValue, chrome) => {
