@@ -328,8 +328,9 @@ independent reviews, and changes this ADR as follows.
   against the line above) passes only once the person who requests the import acknowledges it,
   legible, in the gate's captures of the record they name; clear misreadings refuse.
 - **A third stated exception** (ADR 0003, amended 2026-09-26): at 80 % and 90 % zoom on an ordinary
-  display the renderer gate does not judge the descender of a closed list of letters touching its
-  own underline or cell border while its tail stays visible; every clear misreading, every refusal
+  display the renderer gate does not judge, exactly as the renderer note's R4 states it, the
+  unshifted descender of a closed list of letters on its own line touching its own underline or
+  cell border while its tail stays visible (that one contact only); every clear misreading, every refusal
   of its own and every other contact is still judged there.
 - **Decision 3's pictures.** The EMA's viewer draws Imatinib Teva's two `~/_entity/annotation/…`
   pictures as broken images, and the EMA's FHIR export of the same List carries them as contained
