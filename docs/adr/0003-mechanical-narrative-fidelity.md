@@ -202,5 +202,6 @@ claim). No automatic limit passes a contact. Two drawings that
 cannot change a letter are clear by rule, not contacts, exactly as the renderer note's P8 states
 them (a descender of a closed list of letters on its own cell's bottom border or its own underline,
 keeping two rows of its own, with no shared pixel; a glyph at the edge of its own frame's background, not covered, keeping
-4.5:1 against both fills, an edge below it still judged as an underline). The EMA's Imatinib Teva film-coated tablets SmPC has about 70 contacts at sampled widths, 4.2's raised 9 of "10⁹/l" against the line above among
+4.5:1 against both fills, an edge below it still judged as an underline). The EMA's Imatinib Teva film-coated tablets SmPC has tens of contacts at sampled widths, nearly all
+4.2's raised 9 (3c-C recounts them), 4.2's raised 9 of "10⁹/l" against the line above among
 them; the findings are reported to the authority.

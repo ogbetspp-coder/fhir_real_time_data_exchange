@@ -324,8 +324,7 @@ independent reviews, and changes this ADR as follows.
   never repaired, answered from or quoted. Imatinib Teva's 5.1, whose at-risk table runs its
   values together, is the first.
 - **A second stated exception** (ADR 0003, amended): a contact the renderer gate cannot prove harmless
-  (about 70 on the tablets label at sampled widths, nearly all 4.2's raised "10⁹/l" against the line
-  above) passes
+  (tens on the tablets label at sampled widths, nearly all 4.2's raised "10⁹/l" against the line above) passes
   only once the person who requests the import acknowledges it, legible, in the gate's captures of
   the record they name; clear misreadings refuse.
 - **Decision 3's pictures.** The EMA's viewer draws Imatinib Teva's two `~/_entity/annotation/…`
