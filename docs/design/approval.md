@@ -289,7 +289,7 @@ gate, so production cannot go live without it.
   the key (Infrastructure).
 - (The worker's write condition moves to phase 1, amendment, proposed for item 2's review.) A separate review service with its
   own identity for Type 2 reviews; for an authority import's requests it is phase 1's fallback
-  behind Identity-Aware Proxy, if the spike needs it (amendment).
+  behind Identity-Aware Proxy, if the spike needs it (amendment, proposed for item 2's review).
 - Eventarc in place of a direct call; re-authentication at signing if a client requires it
   (option C).
 - The validation work: intended use, architecture section, traceability rows, effective-IAM
@@ -333,13 +333,16 @@ statement kind.
 
 **What binds now, and what item 2's own review settles.** This amendment is written for roadmap
 3a's PR 3c; item 2 is designed here, not built, and "is reviewed again before any of it runs". So
-only these requirements bind now, and item 2 must meet them before PR 5:
+only these eight requirements, and the unmarked bullets below that elaborate them, bind now, and
+item 2 must meet them before PR 5 (where a served review's bytes are trusted to a deployer rather
+than re-hashed, that trust root is stated, as requirement 6 states its limits):
 
 1. A `request` statement, derived from the source kind, with its meaning codes; the requester is an
    attested person in the `content-reviewer` role; the request is one content-reviewer's
    judgement (whether production adds a countersignature is the owner's decision).
 2. What was shown is what is signed: a self-contained review, built by the signer from the
-   submission, its own recomputation of the import and the attested renderer record, after it has
+   submission, a recomputation of the authority's own bytes (by the signer or by a component whose
+   result it verifies, never the draft) and the attested renderer record, after it has
    verified, for this environment, the record's attestation, its captures index and each capture's
    hash, shows every acknowledged contact and every withheld section's confirmed and rejected defects,
    each with its captures, and the product and List; the signer refuses a draft the gate would refuse; nothing between the
@@ -352,10 +355,11 @@ only these requirements bind now, and item 2 must meet them before PR 5:
    signed statement.
 5. One List per product at a time: the statement signs `{ authority, epiId }` and the List, taken
    from the recomputed import, not the draft; every document served as current for a product comes
-   from that product's one List, checked at signing (by a check that two racing requests cannot both
-   pass), at publish and on every answer; supersession across Lists waits for its own reviewed
+   from that product's one List, checked at signing (a serialised check: of racing requests only one
+   is checked against a given product state, and a loser is checked again against the new state, so
+   two whose Lists differ cannot both pass), at publish and on every answer; supersession across Lists waits for its own reviewed
    design.
-6. No head, and no product-level record, can be replaced, hidden or rolled back while it is
+6. No request's head, and no product-level record, can be replaced, hidden or rolled back while it is
    retained, with the limits stated (before retention is locked at the production gate, and after
    it expires); a reader fails closed on anything malformed; and a write sequence interrupted at any
    point fails closed or is rolled forward, never leaving a state that breaks requirements 4 to 6.
@@ -365,7 +369,8 @@ only these requirements bind now, and item 2 must meet them before PR 5:
    over the submission's `approvedContentSha256` and the review's hash; the pipeline persists an
    authority import only under a request statement whose signature verifies against its
    environment's keys, which is the head and whose `approvedContentSha256` matches, and otherwise
-   refuses and persists nothing (the flow's step 6); each stored version is linked to its statement (D5); the head is the current text
+   refuses, writing nothing to the FHIR store (the refusal is recorded as any refusal is; the
+   flow's step 6); each stored version is linked to its statement (D5); the head is the current text
    (D8); and the query service verifies all of it on every answer (D9). Item 2's review may change
    how these are met, not whether.
 
@@ -384,7 +389,7 @@ second deterministic Provenance id from the statement's hash, or a bounded walk)
 have no product chain and write the head before `approvals/`; a withdraw's place in the product
 chain; roll-forward completing `approvals/` and the publish, verifying the entry, and treating an
 equal "exists" as success; D9's read count; a deny policy scoped by a tag on the heads bucket and
-covering `objects.move`; the bytes each hash covers; the reviews bucket's own retention; and the
+covering `objects.move`; the bytes each hash covers; the reviews bucket's own retention, and that a served review's bytes hash to the signed value (or the trust root is stated); and the
 signer's egress to the authority and the wider surface of the process holding the key.
 
 - **A statement kind, `request`,** with its own meaning codes: for an import with renderer evidence,
@@ -402,12 +407,12 @@ signer's egress to the authority and the wider surface of the process holding th
   request (approved content) lists every contact of the record (the lookup requires exactly those),
   and each withheld section's confirmed and rejected defects.
   (2) The signer runs the lookup's evidence checks (the renderer note's R5) against its own image's
-  verified store, at the same commit as the worker's (the record and captures the request names,
+  verified store (a commit differing from the worker's refuses at publish; the record and captures the request names,
   the environment, the gate version and constants, no failure or refusal in a carried section, each
   withheld section's eligibility, the contact cap, and that the acknowledged contacts and the
   withheld sections' confirmed and rejected defects exactly partition the record's), verifies the
   record's attestation, its captures index and each capture's hash, checks the List (below), and
-  builds the review (D6) as a pure function of the submission and the attested record: the record and captures named by
+  builds the review (D6) as a pure function of the submission, the recomputed import and the attested record: the record and captures named by
   `renderEvidence`; every acknowledged contact with its captures and every identity each drawing
   stands for; and each withheld section's confirmed and rejected defects with their captures. It
   stores the review as one self-contained immutable file, `reviews/<reviewSha256>` (a PDF, or HTML
@@ -441,9 +446,9 @@ signer's egress to the authority and the wider surface of the process holding th
   a separate, reviewed design settles supersession (a precondition of PR 5 for any product whose List
   changes), the rule is closed: every current import of a product comes from the same List. The
   statement signs `{ authority, epiId }` and the List's GUID, `versionNumber` and hash. A
-  product-level record, append-only under requirement 6, names the product's List and its current
+  product-level record, immutable under requirement 6, names the product's List and its current
   imports; the signer refuses a request whose List differs from it (`list-differs`), newer or older;
-  two racing requests for one product cannot both pass; and a document whose head is a request is a
+  racing requests are checked one at a time against the product's state (requirement 5); and a document whose head is a request is a
   current import whether or not it has published. The pipeline and D9 require the served statement's
   List to equal the product-level record's. How that record is stored, and a `withdraw`'s place in
   it, are proposed below.
@@ -489,9 +494,10 @@ signer's egress to the authority and the wider surface of the process holding th
   extends it, and two racing requests for one product collide on its next sequence, so only one
   wins. Keys are the SHA-256 of the canonical
   JSON (RFC 8785) of `{ authority, epiId }` and of the document identifier.
-- **Where the key and the List come from.** Before signing, the signer runs the gate's own
-  recomputation of the import (it fetches the authority's bytes and recomputes, D1 of the contract
-  design) and takes `{ authority, epiId }` and the List's GUID, `versionNumber` and hash from it,
+- **Where the key and the List come from.** Before signing, the gate's own
+  recomputation of the import runs, by the signer or by an unprivileged component whose result the
+  signer verifies (it fetches the authority's bytes and recomputes, D1 of the contract design; which
+  is proposed, with the signer's egress) and takes `{ authority, epiId }` and the List's GUID, `versionNumber` and hash from it,
   never from the draft; the review shows the product and the List. The pipeline requires the
   statement's product and List to equal the recomputed source record's.
 - _Proposed._ **Reading a head.** A reader (the signer, the pipeline, D9) lists the chain, takes the highest

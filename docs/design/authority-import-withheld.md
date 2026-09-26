@@ -1,6 +1,6 @@
 # A withheld section: importing a publication with an authority's defect recorded in place (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25; twenty-fifth draft, after twenty-four design reviews
+- Status: proposed, 2026-09-25; twenty-sixth draft, after twenty-five design reviews
 - Owner decisions (2026-09-25): withhold the Imatinib Teva tablets SmPC's 5.1 and import the
   other 31 sections; a section may be withheld only on reviewed, measured evidence of the
   authority's defect, the whole record is marked incomplete everywhere it is read, and the safety
@@ -589,3 +589,9 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
     proposed bullet; the in-place amendments tagged proposed and the intro says the heads mechanics
     apply to every kind if adopted; requirement 6 states retention's limits; requirement 2 says
     "each with its captures"; the rest as found.
+25. **Twenty-fifth independent review** (2026-09-26). No High, no Medium; rounds 23 and 24's fixes
+    hold, and the binding list covers what the other notes claim of item 2, no more. Low: one
+    in-place amendment untagged; "cannot both pass" against the proposed re-sign; the key-holding
+    process bound to fetch the authority's bytes; the scope sentence against the unmarked bullets;
+    requirement 6 reaching Type 2 heads; "persists nothing" against recorded refusals; the review's
+    inputs; a served review's trust root. Fixed as found.
