@@ -102,6 +102,40 @@ jobs:
       - name: Validate the fixture against the official HL7 validator
         run: npm run validate:official
 
+  # The renderer gate's image (docs/design/authority-import-renderer.md, R1's pre-check and R6):
+  # built from Dockerfile.renderer, every download checked against its pin and every library
+  # Chrome links resolved, then run with no network, a read-only workspace and no credentials, to
+  # prove the browser starts offline, loads both modes, fails every request but the page's, and
+  # draws every family the fontconfig binds in the pinned face it names. Its own job, since it
+  # needs Docker and ~200 MB of downloads; scripts/check-all.sh leaves it out.
+  renderer:
+    name: Renderer
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash --noprofile --norc -eo pipefail {0}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 22.22.0
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build the renderer image
+        run: npm run renderer:image
+
+      - name: Check the renderer image offline
+        run: npm run renderer:smoke
+
   zone-a:
     name: Zone A
     runs-on: ubuntu-24.04

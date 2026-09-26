@@ -1,0 +1,122 @@
+# The renderer gate's image (docs/design/authority-import-renderer.md, R6): a pinned
+# chrome-headless-shell, the pinned fonts and a fontconfig that knows only them. Every download is
+# checked against its SHA-256 here, and scripts/ci/renderer-pins.mjs reads these pins for the
+# Dockerfile check and the gate's lock, so the two cannot disagree.
+#
+# The base is the worker's own node image (scripts/ci/check-dockerfiles.mjs holds every node
+# image to one digest). Its shared libraries come from a dated snapshot.debian.org mirror, so a
+# rebuild installs the same packages; the image is used by digest once pushed, so a draw never
+# downloads Chrome or depends on the mirror.
+FROM node:22.22.0-bookworm-slim@sha256:dd9d21971ec4395903fa6143c2b9267d048ae01ca6d3ea96f16cb30df6187d94
+
+ARG DEBIAN_SNAPSHOT=20260926T000000Z
+ARG CHROME_VERSION=154.0.8037.57
+ARG CHROME_SHA256=5a6979d0ab7cf952ea575d35164e7bdce4872b2ced8f8a215c8f8e8eda00ee09
+ARG LIBERATION_VERSION=2.1.5
+ARG LIBERATION_SHA256=7191c669bf38899f73a2094ed00f7b800553364f90e2637010a69c0e268f25d0
+ARG GOOGLE_FONTS_COMMIT=23e54b51ddffbc7713c583748e3bd86f62b1fa4a
+ARG CARLITO_REGULAR_SHA256=f6418f708baede9789daef5d458c0f53d2a888af9820e8062934e504fedc6595
+ARG CARLITO_BOLD_SHA256=bb5d20f79b82599ec72983597437373a80f2d2085fa91fc144fd74e876a594db
+ARG CARLITO_ITALIC_SHA256=0b019225e58d702bfedcbd35c21696769f8ee115cb6343f84c2f240312450d1c
+ARG CARLITO_BOLDITALIC_SHA256=b32928186c119599e03ca6a1ffc680fdcb7fac95772f4b95d989cf6cd3861517
+ARG CALADEA_REGULAR_SHA256=f1e899278b7b4491aba5b6a8253c4b04c050cc59b21865be5c37559a775153cd
+ARG CALADEA_BOLD_SHA256=ae3cb2dcbc925809dd29d2a44e9802211cab66be541bacbfc9c08c74b27c3742
+ARG CALADEA_ITALIC_SHA256=4359a8e24f748b6447b1ff6d7a174febe70961d29f8bb8634b56dacd740a3deb
+ARG CALADEA_BOLDITALIC_SHA256=ccabaa7b7e2fdf253d2b1a5fa699dd8a3df8d835a9eb285ad82631a677eb76c0
+
+# The Debian archive as it stood at DEBIAN_SNAPSHOT, for the base and its security updates. The
+# snapshot's Release files are past their Valid-Until date, which apt is told to accept for these
+# sources only. fontconfig is installed for its library; its configuration is replaced below.
+RUN set -eu; \
+    rm -f /etc/apt/sources.list /etc/apt/sources.list.d/*; \
+    printf '%s\n' \
+      "Types: deb" \
+      "URIs: http://snapshot.debian.org/archive/debian/${DEBIAN_SNAPSHOT}" \
+      "Suites: bookworm bookworm-updates" \
+      "Components: main" \
+      "Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg" \
+      "Check-Valid-Until: no" \
+      "" \
+      "Types: deb" \
+      "URIs: http://snapshot.debian.org/archive/debian-security/${DEBIAN_SNAPSHOT}" \
+      "Suites: bookworm-security" \
+      "Components: main" \
+      "Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg" \
+      "Check-Valid-Until: no" \
+      > /etc/apt/sources.list.d/snapshot.sources; \
+    apt-get update; \
+    apt-get install --yes --no-install-recommends \
+      ca-certificates curl unzip fontconfig \
+      libnss3 libnspr4 libexpat1 libdbus-1-3 libgbm1 libdrm2 libxkbcommon0 libasound2 \
+      libatk1.0-0 libatk-bridge2.0-0 libcups2 libxcomposite1 libxdamage1 libxfixes3 \
+      libxrandr2 libpango-1.0-0 libcairo2 libx11-6 libxcb1 libxext6; \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt/renderer
+RUN curl -fsSL \
+      "https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION}/linux64/chrome-headless-shell-linux64.zip" \
+      -o chrome-headless-shell-linux64.zip \
+    && echo "${CHROME_SHA256}  chrome-headless-shell-linux64.zip" | sha256sum --check - \
+    && curl -fsSL \
+      "https://github.com/liberationfonts/liberation-fonts/files/7261482/liberation-fonts-ttf-${LIBERATION_VERSION}.tar.gz" \
+      -o liberation-fonts-ttf.tar.gz \
+    && echo "${LIBERATION_SHA256}  liberation-fonts-ttf.tar.gz" | sha256sum --check - \
+    && curl -fsSL \
+      "https://raw.githubusercontent.com/google/fonts/${GOOGLE_FONTS_COMMIT}/ofl/carlito/Carlito-Regular.ttf" \
+      -o Carlito-Regular.ttf \
+    && echo "${CARLITO_REGULAR_SHA256}  Carlito-Regular.ttf" | sha256sum --check - \
+    && curl -fsSL \
+      "https://raw.githubusercontent.com/google/fonts/${GOOGLE_FONTS_COMMIT}/ofl/carlito/Carlito-Bold.ttf" \
+      -o Carlito-Bold.ttf \
+    && echo "${CARLITO_BOLD_SHA256}  Carlito-Bold.ttf" | sha256sum --check - \
+    && curl -fsSL \
+      "https://raw.githubusercontent.com/google/fonts/${GOOGLE_FONTS_COMMIT}/ofl/carlito/Carlito-Italic.ttf" \
+      -o Carlito-Italic.ttf \
+    && echo "${CARLITO_ITALIC_SHA256}  Carlito-Italic.ttf" | sha256sum --check - \
+    && curl -fsSL \
+      "https://raw.githubusercontent.com/google/fonts/${GOOGLE_FONTS_COMMIT}/ofl/carlito/Carlito-BoldItalic.ttf" \
+      -o Carlito-BoldItalic.ttf \
+    && echo "${CARLITO_BOLDITALIC_SHA256}  Carlito-BoldItalic.ttf" | sha256sum --check - \
+    && curl -fsSL \
+      "https://raw.githubusercontent.com/google/fonts/${GOOGLE_FONTS_COMMIT}/ofl/caladea/Caladea-Regular.ttf" \
+      -o Caladea-Regular.ttf \
+    && echo "${CALADEA_REGULAR_SHA256}  Caladea-Regular.ttf" | sha256sum --check - \
+    && curl -fsSL \
+      "https://raw.githubusercontent.com/google/fonts/${GOOGLE_FONTS_COMMIT}/ofl/caladea/Caladea-Bold.ttf" \
+      -o Caladea-Bold.ttf \
+    && echo "${CALADEA_BOLD_SHA256}  Caladea-Bold.ttf" | sha256sum --check - \
+    && curl -fsSL \
+      "https://raw.githubusercontent.com/google/fonts/${GOOGLE_FONTS_COMMIT}/ofl/caladea/Caladea-Italic.ttf" \
+      -o Caladea-Italic.ttf \
+    && echo "${CALADEA_ITALIC_SHA256}  Caladea-Italic.ttf" | sha256sum --check - \
+    && curl -fsSL \
+      "https://raw.githubusercontent.com/google/fonts/${GOOGLE_FONTS_COMMIT}/ofl/caladea/Caladea-BoldItalic.ttf" \
+      -o Caladea-BoldItalic.ttf \
+    && echo "${CALADEA_BOLDITALIC_SHA256}  Caladea-BoldItalic.ttf" | sha256sum --check -
+
+# Chrome unpacked, and every shared library it links resolved: a missing one fails the build here
+# rather than the first draw. Only the Serif and Sans faces of Liberation are kept (the gate binds
+# no other family to them), with Carlito and Caladea, in one directory fontconfig alone reads.
+RUN set -eu; \
+    unzip -q chrome-headless-shell-linux64.zip; \
+    rm chrome-headless-shell-linux64.zip; \
+    missing="$(ldd chrome-headless-shell-linux64/chrome-headless-shell | grep 'not found' || true)"; \
+    [ -z "$missing" ] || { echo "chrome-headless-shell links libraries the image lacks:" >&2; echo "$missing" >&2; exit 1; }; \
+    mkdir -p /opt/renderer/fonts; \
+    tar -xzf liberation-fonts-ttf.tar.gz; \
+    for face in Serif-Regular Serif-Bold Serif-Italic Serif-BoldItalic Sans-Regular Sans-Bold Sans-Italic Sans-BoldItalic; do \
+      mv "liberation-fonts-ttf-${LIBERATION_VERSION}/Liberation${face}.ttf" /opt/renderer/fonts/ || exit 1; \
+    done; \
+    rm -rf liberation-fonts-ttf.tar.gz "liberation-fonts-ttf-${LIBERATION_VERSION}"; \
+    mv Carlito-*.ttf Caladea-*.ttf /opt/renderer/fonts/; \
+    [ "$(ls /opt/renderer/fonts | wc -l)" -eq 16 ] || { echo "expected 16 font files" >&2; exit 1; }
+
+# The only fontconfig configuration Chrome reads: the pinned directory, the family bindings R6
+# states, no hinting, no sub-pixel order and no embedded bitmaps.
+COPY src/render/image/fonts.conf /opt/renderer/fonts.conf
+ENV FONTCONFIG_FILE=/opt/renderer/fonts.conf \
+    FONTCONFIG_PATH=/opt/renderer \
+    XDG_CACHE_HOME=/tmp/cache
+
+USER node
+WORKDIR /work

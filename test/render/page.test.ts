@@ -1,0 +1,83 @@
+import { fileURLToPath } from "node:url";
+
+import { afterEach, describe, expect, it } from "vitest";
+
+import { launchChrome, type Browser } from "../../src/render/cdp.js";
+import { ORIGIN, openPage, pageDocument } from "../../src/render/page.js";
+
+const FAKE = fileURLToPath(new URL("./fake-chrome.mjs", import.meta.url));
+const DIV = '<div xmlns="http://www.w3.org/1999/xhtml"><p>x</p></div>';
+
+let browser: Browser | undefined;
+function fake(mode: string): Browser {
+  process.env.FAKE_CHROME = mode;
+  browser = launchChrome({ executable: process.execPath, launcherArgs: [FAKE], ratio: 1 });
+  return browser;
+}
+afterEach(async () => {
+  await browser?.close();
+  browser = undefined;
+  delete process.env.FAKE_CHROME;
+});
+
+describe("R2's page", () => {
+  it("serves the div alone in each mode, with the 16 px page margin as padding", () => {
+    expect(pageDocument(DIV, "html")).toEqual({
+      body: `<!DOCTYPE html><meta charset="utf-8"><body style="margin:0;padding:16px">${DIV}</body>`,
+      contentType: "text/html; charset=utf-8",
+    });
+    const xml = pageDocument(DIV, "xml");
+    expect(xml.contentType).toBe("application/xhtml+xml; charset=utf-8");
+    expect(xml.body).toBe(
+      '<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="utf-8"/></head>' +
+        `<body style="margin:0;padding:16px">${DIV}</body></html>`,
+    );
+  });
+
+  it("fulfils the page at the fixed origin and the carried pictures, and fails everything else", async () => {
+    const { cdp } = fake("ok");
+    const picture = { body: Buffer.from("png-bytes"), contentType: "image/png" };
+    const page = await openPage(cdp, {
+      div: DIV,
+      mode: "html",
+      width: 813,
+      resources: new Map([[`${ORIGIN}p.png`, picture]]),
+    });
+    expect(page.sessionId).toBe("S1");
+    expect(page.contextId).toBe(7);
+    expect(page.failed).toEqual(["https://example.org/x.png"]);
+    const handled =
+      await page.evaluate<
+        { method: string; requestId: string; body?: string; errorReason?: string }[]
+      >("handled");
+    expect(handled.map(({ method, requestId }) => `${method}:${requestId}`)).toEqual([
+      "Fetch.fulfillRequest:R0",
+      "Fetch.fulfillRequest:R1",
+      "Fetch.failRequest:R2",
+    ]);
+    expect(Buffer.from(handled[0]?.body ?? "", "base64").toString("utf8")).toBe(
+      pageDocument(DIV, "html").body,
+    );
+    expect(Buffer.from(handled[1]?.body ?? "", "base64").toString("utf8")).toBe("png-bytes");
+    expect(handled[2]?.errorReason).toBe("BlockedByClient");
+    await expect(page.evaluate("1 + 1")).resolves.toEqual({ expression: "1 + 1", contextId: 7 });
+    await page.close();
+  });
+
+  it("refuses a page that did not load, and an evaluation that throws", async () => {
+    await expect(
+      openPage(fake("navigate-error").cdp, { div: DIV, mode: "xml", width: 360 }),
+    ).rejects.toThrow(/did not load: net::ERR_FAILED/);
+    await browser?.close();
+    const page = await openPage(fake("evaluate-throws").cdp, {
+      div: DIV,
+      mode: "html",
+      width: 360,
+    });
+    await expect(page.evaluate("boom")).rejects.toThrow(/evaluation failed in the page: Uncaught/);
+  });
+
+  it("fails every command once the browser writes something that is not the protocol", async () => {
+    await expect(fake("garbage").cdp.send("Target.createTarget")).rejects.toThrow(/not JSON/);
+  });
+});

@@ -37,7 +37,9 @@
     "validate:official": "node scripts/ci/official-validate.mjs",
     "demo": "tsx scripts/dev/run-demo.ts",
     "authority:vectors": "tsx scripts/authority/generate-vectors.ts",
-    "authority:lock": "tsx scripts/authority/lock.ts"
+    "authority:lock": "tsx scripts/authority/lock.ts",
+    "renderer:image": "docker build --file Dockerfile.renderer --tag renderer:local .",
+    "renderer:smoke": "docker run --rm --network none --read-only --tmpfs /tmp --shm-size=1g --volume \"$PWD:/work:ro\" renderer:local node --import tsx scripts/render/smoke.ts"
   },
   "repository": {
     "type": "git",
