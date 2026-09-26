@@ -221,8 +221,8 @@ recordSha256, capturesIndex, capturesSha256, documentSha256, pinsSha256, rendere
   characters counted as code-point offsets in the concatenation, in that order, of the text nodes'
   raw, reference-decoded data. The render build's step 2 keys T's model output with the same
   function, tested to agree with the judge on every carried section.
-- **The output format.** T's model output is specified in 3c-B's addendum to this note, reviewed
-  independently before R3 lands: its entries in the index space above; each property as T models it (a size's range
+- **The output format.** T's model output is specified in 3c-B's addendum to this note
+  (`docs/design/authority-import-renderer-model.md`), reviewed independently before R3 lands: its entries in the index space above; each property as T models it (a size's range
   under `smaller`, a colour's set under a link, a line height's kind, each element's fold); the
   code-point offsets of T5's waivers and of the scanner's text for each drawn code point, which the
   allowlist's neighbours need; how points compare with Chrome's serialised pixels; and the
