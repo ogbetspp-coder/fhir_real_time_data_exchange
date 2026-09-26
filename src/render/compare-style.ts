@@ -6,7 +6,12 @@ import type { ChromeElement, ChromeText } from "./measure.js";
 // T's model only as data (a type import, erased when compiled) and Chrome's values as strings.
 // Every difference is a refusal of ours, `model-mismatch`.
 
+// The model formats this judge reads (the addendum's M5); any other is refused, `model-format`.
+export const KNOWN_FORMATS: ReadonlySet<string> = new Set(["t-model/1.0.0"]);
+
 export type Mismatch = {
+  // A refusal of ours: `model-mismatch`, or `model-format` for a model this judge cannot read.
+  reason: "model-mismatch" | "model-format";
   // The element's key in the model's index space, or -1 where the structure itself differs.
   key: number;
   property: string;
@@ -260,6 +265,11 @@ export function compareModel(
   markers: ReadonlyMap<number, string>,
   ratio: number,
 ): Mismatch[] {
+  if (!KNOWN_FORMATS.has(model.format)) {
+    return [
+      { reason: "model-format", key: -1, property: "format", model: model.format, chrome: "" },
+    ];
+  }
   const mismatches: Mismatch[] = [];
   // Chrome's index of each model key: the elements in order, skipping only what the HTML parser
   // inserts (M1).
@@ -272,6 +282,7 @@ export function compareModel(
       next += 1;
     } else if (element.name !== "tbody") {
       mismatches.push({
+        reason: "model-mismatch",
         key: -1,
         property: "structure",
         model: expected?.name ?? "(none)",
@@ -281,6 +292,7 @@ export function compareModel(
   });
   if (next !== model.elements.length) {
     mismatches.push({
+      reason: "model-mismatch",
       key: -1,
       property: "structure",
       model: `${model.elements.length} elements`,
@@ -291,7 +303,15 @@ export function compareModel(
   model.elements.forEach(({ key, style }) => {
     const index = placed[key] ?? -1;
     const check: Check = (property, ok, modelValue, chrome) => {
-      if (!ok) mismatches.push({ key, property, model: show(modelValue), chrome });
+      if (!ok) {
+        mismatches.push({
+          reason: "model-mismatch",
+          key,
+          property,
+          model: show(modelValue),
+          chrome,
+        });
+      }
     };
     compareElement(check, style, elements, index, ratio);
   });
@@ -300,6 +320,7 @@ export function compareModel(
     const check: Check = (property, ok, modelValue, chrome) => {
       if (!ok)
         mismatches.push({
+          reason: "model-mismatch",
           key: marker.element,
           property: `marker ${property}`,
           model: show(modelValue),
@@ -325,6 +346,7 @@ export function compareText(model: Model, texts: readonly ChromeText[]): Mismatc
   const mismatches: Mismatch[] = [];
   if (texts.length !== model.text.length) {
     mismatches.push({
+      reason: "model-mismatch",
       key: -1,
       property: "text nodes",
       model: String(model.text.length),
@@ -343,6 +365,7 @@ export function compareText(model: Model, texts: readonly ChromeText[]): Mismatc
       entry.end !== expected.end
     ) {
       mismatches.push({
+        reason: "model-mismatch",
         key: entry?.element ?? -1,
         property: `text ${index}`,
         model: show(entry),

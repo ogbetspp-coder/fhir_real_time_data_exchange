@@ -121,6 +121,10 @@ describe("T's model output", () => {
     expect((JSON.parse(models[1] ?? "{}") as Model).waivers).toHaveLength(1);
     expect(models[2]).toBeUndefined();
     expect(models[3]).toBeUndefined();
+    // T accepts this, but the scanner refuses T(div) (an li inside an li): no model (M2).
+    const nested = section("<ol><li>a<li>b</li></li></ol>");
+    expect(() => modelSection(nested)).not.toThrow();
+    expect(modelDocument([nested])).toEqual([undefined]);
   });
 
   it("is computed from T's own analysis, which T(div) is unchanged by", () => {

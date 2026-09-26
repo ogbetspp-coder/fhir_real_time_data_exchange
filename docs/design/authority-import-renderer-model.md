@@ -1,6 +1,6 @@
 # T's model output: what the renderer gate compares (roadmap 3a, PR 3c-B)
 
-- Status: proposed, 2026-09-26; third draft, after two design reviews
+- Status: proposed, 2026-09-26; fourth draft, after three design reviews
 - Decides: the output format the renderer note's R3 leaves to "3c-B's addendum": the entries T
   emits for each section, in R3's index space; each property as T models it; how each is compared
   with Chrome's computed style; the fold and waiver fields, and where the scanner offsets and the
@@ -27,7 +27,9 @@ alignment, an element's display, the whitespace text between table parts and lis
 now records it, and a test asserts that T(div) and every refusal are unchanged on every T case and
 every pinned label. The model covers the sections T and the scanner both accept: T's "one tree"
 (T1) holds only with the scanner's own nesting refusals (`misnested-tag` among them; T alone accepts
-`<ol><li>a<li>b</li></li></ol>`), and a section either refuses has no model output.
+`<ol><li>a<li>b</li></li></ol>`), and a section either refuses has no model output: the whole
+document's emitter (`modelDocument`, which the render build's step 2 runs) drops a model whose
+T(div) the scanner refuses.
 
 ## M1. The index space
 
@@ -167,13 +169,19 @@ blue.
   `border-collapse` to `separate` or its declaration; both inherit to its descendants (the scanner
   refuses a table inside a table). A `table` `border` attribute of `N` other than `0` is a set of
   presentational longhands: on the table, each side's `border-*-width` `N` px, `border-*-style`
-  `outset` and `border-*-color` its own colour; on each of its cells, 1 px, `inset`, and a colour
-  inherited through the cell's row, row group and table from the nearest that declares one, else
-  the cell's own colour. A declared longhand, directly or through a shorthand covering it, replaces
-  the presentational one of the same property and side, one property at a time, and a longhand
-  neither declares is initial (`none`, `medium`, the element's colour) (measured:
-  `td style="border-style:solid"` under `border="1"` draws 1 px solid; `border-color:blue` on a
-  `tr` draws its cells blue). A cell's `padding` is 1 px, or the
+  `outset`; on each of its cells, 1 px and `inset`. A declared longhand, directly or through a
+  shorthand covering it, replaces the presentational one of the same property and side, one
+  property at a time, and a width or style neither declares is initial (`medium`, `none`)
+  (measured: `td style="border-style:solid"` under `border="1"` draws 1 px solid).
+- **Border colours.** A border colour longhand is computed as a colour or as `currentcolor`, and
+  resolved last, against the element's own colours (both link colours under a link with no author
+  colour since it). Its value is the element's declaration (`currentcolor` where a shorthand
+  omits the colour); else, for a `thead`, `tbody`, `tfoot` or `tr` always, and for a `td` or `th`
+  under a table's `border` attribute, its parent's value (Chrome's own stylesheet gives them
+  `border-color: inherit`; in HTML mode through the inserted `tbody`, which inherits too); else
+  `currentcolor`. Only the colour inherits, never the width or style (measured: a `tr` declaring
+  only `border-top-style:solid` under `table style="border-color:#900"` draws its top in `#900`; a
+  red cell under `tr style="border:1px solid"` and `border="1"` draws red, not the row's colour). A cell's `padding` is 1 px, or the
   `cellpadding` attribute's pixels, and a declaration replaces it.
 - **Vertical alignment.** A `thead`, `tbody` or `tfoot` is its `valign`, else `middle`; a `tr` is
   its own `valign`, else its group's value, else `middle` where its parent is the `table` itself; a
@@ -214,7 +222,7 @@ for widths as drawn.
   whitespace. `modelSha256` (R3, R8) is the SHA-256 of those bytes.
 - `format` is `t-model/1.0.0`. A field added that the judge then requires (3c-C's `scanner`) is a
   new minor; a change to the shape or the meaning of a field is a new major; the judge refuses a
-  format it does not know (`model-format`).
+  format it does not know (`model-format`), and names every other difference `model-mismatch`.
 - The emitter is T's code (`src/authority/t/model.ts`), under the importer lock (D10); adding it
   moves the importer to 2.1.0 (`npm run authority:lock`). It computes the model from T's own walk;
   it has no path of its own through the markup.
@@ -265,3 +273,12 @@ for widths as drawn.
    duplicated row; how a marker's style is read; nested tables unreachable; HTML mode's `tbody`;
    the renderer note's pointer and 3c-C's version; declarations over defaults in Verification.
    Fixed in this draft as found, with synthetic cases for each.
+3. **Third independent review** (2026-09-26). No High; round 2's fixes hold, a sweep of some 130
+   further synthetic cases matched, and `scripts/render/check.ts` passed at every ratio and width
+   (237 sections, 5 688 drawings). Medium: border colours in table parts are inherited as
+   `currentcolor` and resolved by the inheriting element, and rows and row groups inherit them
+   always, attribute or not (seven cases measured; false refusals only, none on a pinned label).
+   Low: the judge did not check the format or name its reasons; the emitter modelled sections the
+   scanner refuses. Fixed in this draft: border colours as values or `currentcolor`, inherited as
+   Chrome's stylesheet says and resolved last; `model-format` and `model-mismatch` in the judge;
+   `modelDocument` drops a model the scanner refuses; a synthetic case of each.

@@ -27,7 +27,14 @@ export type LineHeight =
 // A border and the colours it may be drawn in; `colours` undefined is the element's own final
 // `color` (CSS `currentcolor`), resolved once every declaration is read: both link colours where
 // an `a` with `href` sets it.
-export type Border = { widthPt: number; style: string; colours: readonly Rgb[] | undefined };
+export type Border = {
+  widthPt: number;
+  style: string;
+  colours: readonly Rgb[] | undefined;
+  // The colour was not given (CSS `currentcolor`) and `colours` is the element's own; recorded for
+  // the model output only, where a table part passes `currentcolor` down (no decision of T reads it).
+  currentColour?: boolean;
+};
 
 export type Shift =
   | { kind: "none" }
@@ -453,7 +460,7 @@ export function computeStyle(context: ElementContext): ComputedStyle {
         style.underLink && !style.colourSinceLink
           ? LINK_COLOURS
           : [style.colour ?? ([0, 0, 0] as const)];
-      style.borders[which] = { ...drawn, colours: current };
+      style.borders[which] = { ...drawn, colours: current, currentColour: true };
     }
   }
   style.size = size;

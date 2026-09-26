@@ -216,6 +216,17 @@ describe("R3 on the recorded drawings", () => {
     expect(compare(model, name).map((mismatch) => mismatch.property)).toContain(property);
   });
 
+  it("labels every mismatch a model mismatch, and refuses a model format it cannot read", () => {
+    const model = modelOf("weights-and-styles");
+    element(model, "b").style.fontWeight = 100;
+    expect(
+      compare(model, "weights-and-styles").every(({ reason }) => reason === "model-mismatch"),
+    ).toBe(true);
+    expect(compare({ ...modelOf("offsets"), format: "t-model/2.0.0" }, "offsets")).toEqual([
+      { reason: "model-format", key: -1, property: "format", model: "t-model/2.0.0", chrome: "" },
+    ]);
+  });
+
   it("does not compare a centred table's auto margins, which depend on the width", () => {
     const model = modelOf("collapsed-and-centred-tables");
     expect(element(model, "table", 2).style.margin.left).toBe("auto");

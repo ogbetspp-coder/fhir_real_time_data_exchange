@@ -7,6 +7,17 @@ export type ModelCase = { name: string; inner: string };
 
 export const MODEL_CASES: ModelCase[] = [
   {
+    // Row groups and rows inherit border colours always, cells under the attribute too, and a
+    // colour a shorthand omits is `currentcolor`, resolved by each element (the third review).
+    name: "border-colour-inheritance",
+    inner:
+      '<table style="border-color:#990000"><thead style="border-bottom-style:solid"><tr style="border-top-style:solid"><td>a</td></tr></thead></table>' +
+      '<table border="1"><tr style="border:1px solid"><td style="color:#990000">b</td></tr>' +
+      '<tr style="color:#000099;border:1px solid"><td style="color:#990000">c</td></tr></table>' +
+      '<table border="1" style="color:#000099;border:2px solid"><tr><td style="color:#990000">d</td></tr></table>' +
+      '<table border="1"><tbody style="border:1px solid;color:#000099"><tr style="color:#990000"><td style="color:#006600">e</td></tr></tbody></table>',
+  },
+  {
     // A table's `border` attribute merged with declarations one longhand at a time, and a cell's
     // attribute border colour inherited through its row, row group and table (the second review).
     name: "border-attribute-longhands",

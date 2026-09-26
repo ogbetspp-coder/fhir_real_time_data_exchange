@@ -1,3 +1,4 @@
+import { xhtmlToText, XhtmlError } from "../../fidelity/xhtml.js";
 import { canonicalJson } from "../../lib/hash.js";
 import type { Rgb } from "./css.js";
 import type { ComputedStyle, Size } from "./style.js";
@@ -60,6 +61,7 @@ export type Model = {
 
 const GRAY: Rgb = [128, 128, 128];
 const SIDES = ["top", "right", "bottom", "left"] as const;
+type Side = (typeof SIDES)[number];
 const HEADING_MARGIN_EM: Readonly<Record<string, number>> = {
   h1: 0.67,
   h2: 0.83,
@@ -192,21 +194,27 @@ function declaresPart(style: ComputedStyle, side: string, part: Part): boolean {
   );
 }
 
-// A cell's border colour under a table's `border` attribute: inherited through its row, row group
-// and table from the nearest that declares one, else the cell's own colour (M3, "Tables").
-function inheritedBorderColours(
-  context: Context,
-  cell: ElementNode,
-  side: string,
-  own: Rgb[],
-): Rgb[] {
-  for (let node = cell.parent; node !== undefined; node = node.parent) {
-    const style = styleOf(context, node);
-    if (declaresPart(style, side, "color"))
-      return sortedColours(style.borders[side as "top"]?.colours ?? own);
-    if (node.name === "table") break;
+// A border colour longhand as computed: a colour set, or `currentcolor`, which each element
+// resolves against its own colour (M3, "Tables").
+type ColourValue = Rgb[] | "currentcolor";
+
+const PARTS_INHERITING = new Set(["thead", "tbody", "tfoot", "tr"]);
+
+// Chrome's own stylesheet gives row groups and rows `border-color: inherit`, and a table's
+// `border` attribute gives its cells the same; every other element's undeclared colour is
+// `currentcolor`. A declared colour is its value; a shorthand that omits it is `currentcolor`.
+function borderColourValue(context: Context, element: ElementNode, side: Side): ColourValue {
+  const style = styleOf(context, element);
+  const declared = style.borders[side];
+  if (declared !== undefined && declaresPart(style, side, "color")) {
+    return declared.currentColour === true ? "currentcolor" : sortedColours(declared.colours ?? []);
   }
-  return own;
+  const isCell = element.name === "td" || element.name === "th";
+  const inherits =
+    PARTS_INHERITING.has(element.name) || (isCell && tableBorder(nearestTable(element)) > 0);
+  const parent = element.parent;
+  if (inherits && parent !== undefined) return borderColourValue(context, parent, side);
+  return "currentcolor";
 }
 
 // Each side's border, one longhand at a time (M3): a declared longhand over the presentational
@@ -229,23 +237,23 @@ function borders(
   for (const side of SIDES) {
     let width = 2.25;
     let lineStyle = "none";
-    let lineColours = own;
     if (element.name === "hr") {
       width = 0.75;
       lineStyle = "inset";
     } else if (attributeWidth > 0) {
       width = attributeWidth * 0.75;
       lineStyle = element.name === "table" ? "outset" : "inset";
-      if (isCell) lineColours = inheritedBorderColours(context, element, side, own);
     }
     const declared = style.borders[side];
     if (declared !== undefined) {
       if (declaresPart(style, side, "width")) width = declared.widthPt;
       if (declaresPart(style, side, "style")) lineStyle = declared.style;
-      if (declaresPart(style, side, "color")) lineColours = sortedColours(declared.colours ?? own);
     }
+    const colour = borderColourValue(context, element, side);
     result[side] =
-      lineStyle === "none" ? "none" : { width, style: lineStyle, colours: lineColours };
+      lineStyle === "none"
+        ? "none"
+        : { width, style: lineStyle, colours: colour === "currentcolor" ? own : colour };
   }
   return result;
 }
@@ -427,7 +435,9 @@ export function modelSection(div: string, evidence?: ReadonlySet<string>): strin
 
 // The model of each section of a document, in the order given (pre-order): T's two passes as
 // transformDocument makes them (T5), so a section accepted only with the plus-sign waiver is
-// modelled with the evidence that accepted it. A section T refuses, or with no div, has none.
+// modelled with the evidence that accepted it. A section T refuses, whose T(div) the scanner
+// refuses (the addendum's M2: T's "one tree" holds only with the scanner's nesting rules), or with
+// no div, has none.
 export function modelDocument(divs: readonly (string | undefined)[]): (string | undefined)[] {
   const evidence = new Set<string>();
   for (const div of divs) {
@@ -438,16 +448,25 @@ export function modelDocument(divs: readonly (string | undefined)[]): (string | 
       if (!(error instanceof TRefusal)) throw error;
     }
   }
+  const scanned = (analysis: Analysis): string | undefined => {
+    try {
+      xhtmlToText(analysis.output);
+    } catch (error) {
+      if (error instanceof XhtmlError) return undefined;
+      throw error;
+    }
+    return canonicalJson(buildModel(analysis));
+  };
   return divs.map((div) => {
     if (div === undefined) return undefined;
     try {
-      return modelSection(div);
+      return scanned(analyseSection(div));
     } catch (error) {
       if (!(error instanceof TRefusal)) throw error;
       if (error.reason !== "underline") return undefined;
     }
     try {
-      return modelSection(div, evidence);
+      return scanned(analyseSection(div, evidence));
     } catch (error) {
       if (!(error instanceof TRefusal)) throw error;
       return undefined;
