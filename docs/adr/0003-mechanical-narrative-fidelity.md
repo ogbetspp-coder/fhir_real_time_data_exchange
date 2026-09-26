@@ -211,8 +211,9 @@ are reported to the authority.
 A third stated exception to "false passes are not" (owner decision of 2026-09-26;
 `docs/design/authority-import-renderer.md`, R2 and R4): at device pixel ratios 0.8 and 0.9 (80 %
 and 90 % zoom on an ordinary display) the renderer gate does not judge one kind of contact that
-changes no letter: a descender of a closed list of letters against its own cell's bottom border or
-its own underline, while its tail stays visible (against an underline, a row of the tail at 40 %
+changes no letter, exactly as the renderer note's R4 states it: an unshifted descender of a closed
+list of letters, on its own line, against its own cell's bottom border or its own underline (that
+one contact only; its reach past its frame and its other contacts are still judged), while its tail stays visible (against an underline, a row of the tail at 40 %
 coverage or more below the drawn line, a row in its cut not counting; against a border, a free
 row), so a fused tail is still shown and a hidden one still refuses. At those sizes the
 tablets label's descenders touch their own lines in hundreds of places, and acknowledging them

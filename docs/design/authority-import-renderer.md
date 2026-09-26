@@ -1,7 +1,7 @@
 # The renderer gate: a pinned browser's evidence for every authority import (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25 (architecture approved by the owner the same day); twenty-fourth draft,
-  after twenty-three design reviews; R4's thresholds provisional, settled by 3c-C's measured design
+- Status: proposed, 2026-09-25 (architecture approved by the owner the same day); twenty-fifth draft,
+  after twenty-four design reviews; R4's thresholds provisional, settled by 3c-C's measured design
 - Decides: what `docs/design/authority-import-t.md`'s "What waits for PR 3c" left open: who draws,
   what is drawn and measured, the evidence record and its store, and the `rendering` stage
 - Amends: ADR 0003 (the second stated exception, contacts acknowledged; the third, zoomed out); ADR 0005 (decision 1's
@@ -250,7 +250,12 @@ computed from the pinned fonts and bounded:
   where P8(a)'s two rows hold with no slack); with `--disable-font-subpixel-positioning` (R6) Blink's Linux adjustment that
   moves a pixel from ascent to descent under sub-pixel positioning does not apply. Glyphs are
   drawn with the baseline snapped to whole device pixels, so the baseline is known to within one
-  device pixel, and every bound below allows for it.
+  device pixel, and every bound below allows for it, except at 0.8 and 0.9: there the zoomed-out
+  kind needs the baseline exact, so the judge takes it from the drawing itself (the rounded top of a
+  zero-size inline-block aligned to the baseline in the same line box, which matched the drawn
+  baseline in all 352 cases the twenty-fourth review measured at 0.8, 0.9 and 1, where the
+  rectangle-plus-ascent estimate was a device pixel off at 10 pt), with no pixel of allowance, and
+  P8(a)'s count for the zoomed-out kind starts from it.
 - **Ink bound.** For each character, the union of the ink boxes (the `glyf` bounding boxes,
   overhangs included) of every glyph reachable for it through the lookups of HarfBuzz's default
   features for the run's script and language, as the pinned face has them, displaced by every
@@ -270,7 +275,9 @@ computed from the pinned fonts and bounded:
 - **Calibration, per record.** In every draw, for every (face, computed size, ratio) the record
   uses, at the fractional origins the page uses, the pixels a glyph paints on a page of its own
   must lie inside its rounded-out ink bound. A glyph that fails is a refusal of ours, not a
-  widened bound.
+  widened bound. At 0.8 and 0.9, for every face, computed size and fractional vertical origin the
+  record uses, the exact baseline must equal the one drawn on a page of its own (the row the
+  glyph's flat bottoms rest on); a difference is a refusal of ours in the section.
 - **Glyph pixels** (P1 below). Where two candidate glyphs' boxes overlap, the judge isolates each by
   drawing it alone (every other glyph's `::highlight()` made transparent, and every marker's
   `::marker` too, layout asserted unchanged, and each drawing's computed colours asserted to have
@@ -417,7 +424,8 @@ clear. Geometry from layout (advances, boxes) is compared exactly, in Chrome's l
   rule, a decoration, a background's edge, a run's own underline for a shifted glyph, the gaps
   skip-ink cuts counted as line), or a glyph and a picture's box, that touch or stand within a
   stated clearance; and a glyph whose ink reaches past its frame without leaving the page, are
-  contacts, unless P3 makes them failures or P8 clear. A contact's kind is one of a closed list 3c-C
+  contacts, unless P3 makes them failures or P8 clear (save the zoomed-out kind, R4, at 0.8 and
+  0.9). A contact's kind is one of a closed list 3c-C
   enumerates with each kind's location type (glyph–glyph, glyph–line, glyph–picture, glyph–frame);
   its identity is its section's path, its kind and the characters (and line or picture) involved, in
   R3's index space. It is captured at every distinct mask (the participants' pixels relative to one
@@ -425,7 +433,8 @@ clear. Geometry from layout (advances, boxes) is compared exactly, in Chrome's l
   drawing they acknowledge and no drawing twice, each shown with every identity, and its text, that it
   stands for; the acknowledgement stays per identity. It is neither a failure nor a defect.
 - **P7. Clear needs proof.** Only a glyph or line the gate proves clear under P1 and P2, or clear by
-  rule under P8, passes without acknowledgement; everything else is a contact or a failure.
+  rule under P8, passes without acknowledgement; everything else is a contact or a failure (save the
+  zoomed-out kind at 0.8 and 0.9, which is not recorded).
 - **P8. Clear by rule: two drawings that cannot change a letter.** Measured on the label (4.2's and
   4.8's tables; the reporting box), these contacts are clear without acknowledgement, and nothing
   else is; each clears only the one contact it names, never the glyph's other contacts, failures or
@@ -475,7 +484,8 @@ acknowledgement never becomes a rubber stamp. The withheld sections' contacts ar
 contact the gate cannot prove harmless passes only by a person's acknowledgement.
 
 **Seeded cases (binding).** Each is a case of the judge's tests in both modes and at every ratio
-(at 0.8 and 0.9, a seed of the kind the zoomed-out rule leaves unjudged binds only as a failure); where a case's class depends on the face, weight, size, ratio or sub-pixel phase, it binds at the
+(at 0.8 and 0.9, a seed of the kind the zoomed-out rule leaves unjudged binds only as a failure,
+save the seeds that must not be failures and must not be recorded, which bind as stated); where a case's class depends on the face, weight, size, ratio or sub-pixel phase, it binds at the
 configurations 3c-C measures and states (P2).
 
 Must be failures: a descender covered by a later line's inline background; an underscore under its
@@ -499,8 +509,8 @@ Serif and Sans, regular and bold, and again in their italics and in Carlito); th
 "10:1" at 5 pt against its border.
 
 Must be contacts: a "y" sharing pixels with its own underline, its tail showing below the line, at
-a ratio from 1 up where 3c-C finds one; a 5 pt serif "y" and "γ" at 0.8, underlined, with no free
-row; an 11 pt sans "g" and a 10 pt serif "μ" at 0.8, underlined, each tail's pixels at 40 % or more
+a ratio from 1 up where 3c-C finds one; a 5 pt serif "y" and "γ" at 0.8, underlined, with no row of its
+tail at 40 % or more below the drawn line; an 11 pt sans "g" and a 10 pt serif "μ" at 0.8, underlined, each tail's pixels at 40 % or more
 ending inside its own cut, with fainter ones below (5.1's underlined "adjuvant" "j" at 0.8 and 320
 px is one, measured); two glyphs 0.2 px apart across lines; a combining mark stacked into the line above;
 a raised digit against the underline of the line above; a raised 7 folded by 2.4 pt abutting its own
@@ -522,8 +532,8 @@ ratio 1.25, resting on its underline (P4).
 Must not be failures, and not recorded (the zoomed-out kind): 4.6's underlined "y"s at 0.8
 ("Fertility" at 360 px, "Pregnancy" at 1 024, 1 152 and 1 280 px; one pixel of tail at 0.45 to 0.46
 coverage below the line) and at 0.9, and 4.8's underlined "Laboratory" "y" at 0.9 (414 and 900 px),
-measured; 3c-C states R4's baseline estimator exact at 0.8 and 0.9 so that none of their ink above
-the lowest baseline is taken as hidden in the line.
+measured; R4 takes the baseline exact at 0.8 and 0.9 and checks it per record, so none of their
+ink above the baseline is taken as hidden in the line.
 
 Must be clear (by P8 or plainly): 4.2's and 4.8's letter descenders touching their own cells'
 bottom borders; the "g"s of 4.2's underlined "Posology" at every ratio, and its "y" and the "p"s of
@@ -777,8 +787,9 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
   contact; 3c-C measures how often, on the pinned labels.
 - Zoomed out (0.8 and 0.9), a descender of P8(a)'s closed list of letters touching its own
   underline or its own cell's bottom border, its tail still visible, is not shown to anyone (ADR 0003's
-  third stated exception; a fused tail, its pixels at 40 % or more ending in the line or its cut,
-  stays a contact, and a tail wholly hidden is still a failure); below 0.8, nothing is judged. The
+  third stated exception; a fused tail stays a contact: against an underline, one with no row at
+  40 % or more below the drawn line, a cut row not counting; against a border, one with no free
+  row by P8(a)'s count from the exact baseline; and a tail wholly hidden is still a failure); below 0.8, nothing is judged. The
   label's unjudged "y"s rest on one pixel 0.05 above the 40 % threshold at 0.8, seeded (above).
 - A shifted glyph crossed through its body by its own run's underline (a lowered "2" in an
   underlined "AUC₀₋₂₄") is P3's failure even where it stays readable; 3c-C measures how often an
@@ -1099,3 +1110,13 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
     ADR 0003 states the visible-tail rule; the label's unjudged "y"s seeded as neither failures nor
     recorded, with the estimator exact at 0.8 and 0.9; the wording as found. Measured: no failure
     in any carried section at any of the ten ratios.
+24. **Twenty-fourth independent review** (2026-09-26; its second run, the first stopped at the
+    owner's pause). Round 23's fixes hold, and the zoomed-out rule is stated alike in the ADRs, the
+    roadmap and the note. Medium: the seeds' header cancelled the new "must not be recorded" seeds;
+    the "estimator exact at 0.8 and 0.9" premise contradicted R4's one-pixel allowance, and nothing
+    checked it per record (the rectangle-plus-ascent estimate was a device pixel off at 10 pt at 0.8,
+    measured). Low: the 5 pt contact seed's "no free row" against the new seed; the residual's
+    border condition; P6 and P7 silent on the exception; ADR 0003 broader than R4. Fixed in this
+    draft: the header excepts those seeds; at 0.8 and 0.9 the baseline is taken from the drawing
+    (a zero-size inline-block's rounded top, exact in all 352 measured cases) with no allowance, and
+    checked per record, a difference refusing; the rest as found.
