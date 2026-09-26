@@ -256,6 +256,69 @@ function compareMarker(
   compareTyped(check, model, marker);
 }
 
+const TOP_LEVEL = new Set(["format", "elements", "text", "markers", "folds", "waivers"]);
+const DECISIONS = new Set(["delete", "sup", "sub"]);
+const isInteger = (value: unknown): value is number => Number.isInteger(value);
+
+// The model read as data (M2, M4): its fields and no others, keys 0 to n − 1 in order with each
+// parent before its child, text entries keyed by position and covering the offsets in order,
+// one marker per list item and only on list items, folds and waivers within the section. Returns
+// what is wrong, or undefined.
+export function validateModel(model: Model): string | undefined {
+  const fields = Object.keys(model);
+  if (fields.some((field) => !TOP_LEVEL.has(field)) || fields.length !== TOP_LEVEL.size) {
+    return `exactly the fields ${[...TOP_LEVEL].join(", ")}`;
+  }
+  const { elements, text, markers, folds, waivers } = model;
+  if (![elements, text, markers, folds, waivers].every(Array.isArray)) return "arrays";
+  const dense = elements.every(
+    ({ key, parent }, index) =>
+      key === index && isInteger(parent) && parent < index && (index === 0) === (parent === -1),
+  );
+  if (!dense) return "keys 0 to n - 1, parents first";
+  let offset = 0;
+  for (const [index, entry] of text.entries()) {
+    if (
+      entry.key !== index ||
+      entry.start !== offset ||
+      !isInteger(entry.end) ||
+      entry.end < offset
+    ) {
+      return "text entries keyed by position, covering the offsets in order";
+    }
+    if (!isInteger(entry.element) || entry.element < 0 || entry.element >= elements.length) {
+      return "text entries naming its elements";
+    }
+    offset = entry.end;
+  }
+  const items = elements.filter(({ name }) => name === "li").map(({ key }) => key);
+  const marked = markers.map(({ element }) => element);
+  if (marked.length !== items.length || marked.some((element, index) => element !== items[index])) {
+    return "one marker per list item, in order";
+  }
+  const folded = folds.map(({ element }) => element);
+  if (
+    folds.some(
+      ({ element, decision }) =>
+        !isInteger(element) ||
+        element <= 0 ||
+        element >= elements.length ||
+        !DECISIONS.has(decision),
+    ) ||
+    folded.some((element, index) => index > 0 && element <= (folded[index - 1] ?? -1))
+  ) {
+    return "folds on its elements, in order, each delete, sup or sub";
+  }
+  let previous = -1;
+  for (const { start, end } of waivers) {
+    if (!isInteger(start) || start <= previous || end !== start + 1 || end > offset) {
+      return "waivers of single code points within the text, in order";
+    }
+    previous = start;
+  }
+  return undefined;
+}
+
 // R3 for one drawing of one section. `elements` are Chrome's in pre-order (an element the HTML
 // parser inserted, a `tbody`, among them); `markers` Chrome's marker texts by that pre-order
 // index; `ratio` the drawing's device pixel ratio.
@@ -276,16 +339,8 @@ export function compareModel(
     mismatches.push({ reason: "model-mismatch", key: -1, property: "structure", model, chrome });
     return mismatches;
   };
-  // The model is read as data: its keys run 0 to n − 1 in order, each parent before its child,
-  // and every text entry names an element it has.
-  const keysDense = model.elements.every(
-    ({ key, parent }, index) =>
-      key === index && parent < index && (index === 0) === (parent === -1),
-  );
-  if (!keysDense) return structure("keys 0 to n - 1, parents first", "(model malformed)");
-  if (model.text.some(({ element }) => element < 0 || element >= model.elements.length)) {
-    return structure("text entries naming its elements", "(model malformed)");
-  }
+  const malformed = validateModel(model);
+  if (malformed !== undefined) return structure(malformed, "(model malformed)");
   // Chrome's index of each model key: the elements in order, skipping only a `tbody` the HTML
   // parser inserted, in HTML mode, where the model has no `tbody` at that position (M1).
   const placed: number[] = [];
@@ -296,7 +351,15 @@ export function compareModel(
     if (element.name === expected?.name) {
       placed.push(index);
       next += 1;
-    } else if (mode === "html" && element.name === "tbody") {
+    } else if (
+      mode === "html" &&
+      element.name === "tbody" &&
+      expected?.name === "tr" &&
+      model.elements[expected.parent]?.name === "table" &&
+      placed[expected.parent] === element.parent
+    ) {
+      // Where the HTML parser inserted it: between a table and a row the model puts directly in
+      // that table (the second code review: any other tbody is a structure mismatch).
       inserted.add(index);
     } else {
       structure(expected?.name ?? "(none)", element.name);
@@ -321,6 +384,24 @@ export function compareModel(
       });
     }
   });
+  // Every list item Chrome draws a marker for has one in the model, and no other (M2, M4).
+  const chromeMarkers = new Set<number>();
+  for (const index of markers.keys()) {
+    const key = keyOf.get(index);
+    chromeMarkers.add(key ?? -1);
+  }
+  const modelMarkers = new Set(model.markers.map(({ element }) => element));
+  for (const key of new Set([...chromeMarkers, ...modelMarkers])) {
+    if (chromeMarkers.has(key) !== modelMarkers.has(key)) {
+      mismatches.push({
+        reason: "model-mismatch",
+        key,
+        property: "marker",
+        model: modelMarkers.has(key) ? "a marker" : "none",
+        chrome: chromeMarkers.has(key) ? "a marker" : "none",
+      });
+    }
+  }
   model.elements.forEach(({ key, style }) => {
     const index = placed[key] ?? -1;
     const check: Check = (property, ok, modelValue, chrome) => {
@@ -334,7 +415,12 @@ export function compareModel(
         });
       }
     };
-    compareElement(check, style, elements, index, ratio);
+    try {
+      compareElement(check, style, elements, index, ratio);
+    } catch {
+      // A style object of the wrong shape: the model is malformed, never a crash of the judge.
+      check("style", false, "a style of M3's shape", "(model malformed)");
+    }
   });
   for (const marker of model.markers) {
     const index = placed[marker.element] ?? -1;

@@ -16,6 +16,8 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/**"],
+      // The renderer image's fontconfig is XML, not code.
+      exclude: ["src/render/image/**"],
       // Summaries only: the text one for the log, the JSON one for anyone comparing runs. The
       // directory is git-, prettier-, eslint- and docker-ignored.
       reporter: ["text-summary", "json-summary"],

@@ -232,7 +232,8 @@ recordSha256, capturesIndex, capturesSha256, documentSha256, pinsSha256, rendere
   serialiser is T's code, under D10's lock, and step 2 of the render build (R1) emits the model
   with the scanner's text and the picture list.
 - **What the record binds.** Not T's or the scanner's code but their outputs, per section: T(div)'s
-  hash; the hash of T's model output (every text node's and list marker's modelled style, fold
+  hash; the hash of T's model output (every element's and list marker's modelled style, which its text
+  nodes take, fold
   decision and waiver, serialised canonically); and the scanner's text hash (which holds the list
   numbers, T3d). The judge reads T only through those serialised outputs (R1 step 2). A change to T
   or the scanner that leaves a label's outputs alone leaves its record valid; one that alters them
@@ -794,14 +795,21 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
 1. **3c-B**, in two changes (the first code review of 3c-B asked that what waits be named):
    - **3c-B1**: the renderer image (`Dockerfile.renderer`, its pins and fontconfig) built and
      checked offline in CI; R2's page; the DevTools client; the output format's addendum; T's
-     model output; and R3's comparison of it with Chrome's computed style, list markers and text
-     ranges, in both modes at every ratio, as the CI pre-check. The importer moves to 2.1.0.
+     model output; and R3's comparison of it with Chrome's computed style and list markers, in
+     both modes at every ratio, and of its text ranges with the XML-mode DOM, as the CI
+     pre-check. The importer moves to 2.1.0.
    - **3c-B2**: the rest of R3 and R2's second drawing: the fonts and scripts of every section,
      T's or not (`font-unpinned`, the script bound); R6's coverage (`font-coverage`, the U+2070
      seed, the pixel tests of the substitutions); each table's grid from cell rectangles against
      T(div)'s; each character box's height against the face's ascent and descent; a
-     `parsererror` as its own refusal; and the text, list numbers, grids and pictures of the
-     authority's drawing against T(div)'s at the named widths.
+     `parsererror` as its own refusal; the text, list numbers, grids and pictures of the
+     authority's drawing against T(div)'s at the named widths; R2's assertion that the div's
+     content box is the width, and the refusal of a div with its own padding or border; and R2's
+     picture forms the import already carries (`data`, `contained`, `unpinned` rewritten to a
+     failing URL), each asserted by a test, with the per-section picture list for them.
+   - **3c-C** takes XML mode's geometry of text, markers and cells against HTML mode's (R2, at the
+     named widths and every ratio) with R4; **3c-E** the `export` and `not-drawn` forms (a
+     not-drawn picture as an empty box of its evidence's `drawnBox`) and their tests.
 
    The renderer image's own build (`cloudbuild.renderer-image.yaml`, the `renderer-images`
    repository) moves to 3c-C with the render build, its identities and Terraform, and the

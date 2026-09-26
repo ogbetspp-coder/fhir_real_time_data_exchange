@@ -1,6 +1,6 @@
 # T's model output: what the renderer gate compares (roadmap 3a, PR 3c-B)
 
-- Status: proposed, 2026-09-26; fourth draft, after three design reviews
+- Status: proposed, 2026-09-26; fifth draft, after four design reviews
 - Decides: the output format the renderer note's R3 leaves to "3c-B's addendum": the entries T
   emits for each section, in R3's index space; each property as T models it; how each is compared
   with Chrome's computed style; the fold and waiver fields, and where the scanner offsets and the
@@ -62,7 +62,7 @@ For each section T accepts, the model output is one JSON object:
 ```json
 {
   "format": "t-model/1.0.0",
-  "elements": [ { "key": 0, "name": "div", "style": { … } }, … ],
+  "elements": [ { "key": 0, "name": "div", "parent": -1, "style": { … } }, … ],
   "text": [ { "key": 0, "element": 3, "start": 0, "end": 14 }, … ],
   "markers": [ { "element": 12, "text": "1. ", "style": { … } }, … ],
   "folds": [ { "element": 40, "decision": "sup" }, … ],
@@ -70,8 +70,9 @@ For each section T accepts, the model output is one JSON object:
 }
 ```
 
-- `elements`: every element of the div, in key order, with its modelled style (M3). A text node's
-  style is its parent element's; there is no per-text-node style.
+- `elements`: every element of the div, in key order, with its parent element's key (−1 for the
+  div) and its modelled style (M3). A text node's style is its parent element's; there is no
+  per-text-node style.
 - `text`: every text node (M1), its parent element's key and its range.
 - `markers`: every `li`, its marker's text and the style it is drawn in. An `ol`'s marker is the
   scanner's (`listMarker`, "1. " with its space, T3d; type `a`, `A`, `i`, `I`, `start`, zero and
@@ -209,7 +210,16 @@ before it fails a label.
 For every carried section, in HTML and XML mode, at 813 px at every ratio and at R2's other named
 widths (360 and 1 240 px) at ratio 1, the judge reads each element's computed style (in an isolated world, scripts disabled)
 and each list marker's text from the accessibility tree, and compares them with the model entry of
-the same key by M3; a marker's style against `getComputedStyle(li, "::marker")` (size, weight,
+the same key by M3. The judge first reads the model as data and refuses it, `model-mismatch`, unless
+it has exactly M2's fields for its format; each element's key is its position, its parent's key
+before it and only the div's −1; each text entry's key is its position, its element one of the
+model's, and the entries cover the offsets from 0 in order; there is one marker per `li`, in
+order, and none elsewhere; each fold is on one of its elements, in order, and `delete`, `sup` or
+`sub`; each waiver is one code point within the text, in order; and every style has M3's shape.
+It then matches Chrome's elements to the keys in order, skipping a `tbody` only in HTML mode and
+only where the model has none there, and requires each element's parent, through such a `tbody`,
+to be the model's; and it requires a marker in the model exactly where Chrome draws one. A
+marker's style is compared against `getComputedStyle(li, "::marker")` (size, weight,
 style, colour, line height, decorations in effect), and its backgrounds against the `li`'s chain. Any difference, a missing entry or an extra element, is a refusal of ours
 (`model-mismatch`, with the key, the property, T's value and Chrome's), and the record carries it.
 Widths are named because a computed style does not depend on the width, but for a centred table's
@@ -229,6 +239,8 @@ for widths as drawn.
 
 ## Stated residuals
 
+- A table `border` attribute too large for HTML's integer parsing (`border="99999999999"`) is drawn
+  by Chrome as 1 px and modelled as its digits: a false refusal, never a pass.
 - The model covers the properties R3 lists; a property Chrome draws that R3 does not list (text
   alignment from `align`, `white-space` from `nowrap`, `width`, `height`) is not compared, since T
   does not judge text by it.
@@ -282,3 +294,11 @@ for widths as drawn.
    scanner refuses. Fixed in this draft: border colours as values or `currentcolor`, inherited as
    Chrome's stylesheet says and resolved last; `model-format` and `model-mismatch` in the judge;
    `modelDocument` drops a model the scanner refuses; a synthetic case of each.
+4. **Fourth independent review** (2026-09-26). No High; round 3's border colours held in all thirty
+   cases measured, links, `hr` and captions included. Medium: M2 and M4 did not state the `parent`
+   field or the judge's validation; the judge compared only the markers the model named, so a
+   model that dropped or repeated one, or carried an extra field, a misplaced text key or folds and
+   waivers out of range, passed (measured); the Delivery split left R2's content-box assertion,
+   XML mode's geometry and the picture forms to no change. Low: B1's wording of text ranges; a
+   malformed style crashing the judge; a `border` attribute past HTML's integer range; R3's
+   "every text node's modelled style". Fixed in this draft and the renderer note as found.

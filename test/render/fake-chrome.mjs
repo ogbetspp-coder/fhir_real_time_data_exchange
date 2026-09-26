@@ -3,7 +3,8 @@
 // JSON) and answers the commands src/render/page.ts sends, with the page's requests played as
 // Fetch.requestPaused events. Behaviour is chosen by FAKE_CHROME: "ok", "navigate-error",
 // "evaluate-throws", "garbage", "crash" (the target crashes instead of loading), "renavigate" (the
-// page asks for itself again and navigates after it loaded).
+// page asks for itself again and navigates after it loaded), "refuse-replies" (replies to paused
+// requests and the target's close fail), "no-load" (the page never loads).
 import { createReadStream, createWriteStream } from "node:fs";
 import { setTimeout } from "node:timers";
 
@@ -40,6 +41,7 @@ function reply(message) {
           },
         });
       }
+      if (mode === "no-load") return undefined;
       if (mode === "crash") {
         setTimeout(
           () => write({ method: "Inspector.targetCrashed", sessionId: "S1", params: {} }),
@@ -66,6 +68,12 @@ function reply(message) {
     case "Fetch.fulfillRequest":
     case "Fetch.failRequest":
       fulfilled.push({ method, ...params });
+      if (mode === "refuse-replies")
+        return write({ id, error: { code: -32000, message: "Invalid InterceptionId" } });
+      return answer({});
+    case "Target.closeTarget":
+      if (mode === "refuse-replies")
+        return write({ id, error: { code: -32000, message: "No target" } });
       return answer({});
     case "Page.createIsolatedWorld":
       return answer({ executionContextId: 7 });

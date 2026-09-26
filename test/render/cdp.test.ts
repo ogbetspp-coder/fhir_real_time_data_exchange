@@ -98,6 +98,28 @@ describe("the DevTools pipe client", () => {
     await expect(waiting).rejects.toThrow(/closed its pipe/);
   });
 
+  it("fails every command once writing to the browser fails", async () => {
+    const toBrowser = new PassThrough();
+    const cdp = new Cdp(toBrowser, new PassThrough());
+    toBrowser.destroy(new Error("EPIPE"));
+    await new Promise((resolve) => setImmediate(resolve));
+    await expect(cdp.send("Page.enable")).rejects.toThrow(/EPIPE/);
+  });
+
+  it("fails every command once reading from the browser fails, and waits past other events", async () => {
+    const { cdp, say } = wired();
+    const waited = cdp.waitFor("Page.loadEventFired");
+    say(
+      `{"method":"Page.frameNavigated","params":{}}\0{"method":"Page.loadEventFired","params":{}}\0`,
+    );
+    await expect(waited).resolves.toEqual({});
+    const fromBrowser = new PassThrough();
+    const failing = new Cdp(new PassThrough(), fromBrowser);
+    fromBrowser.destroy(new Error("EIO"));
+    await new Promise((resolve) => setImmediate(resolve));
+    await expect(failing.send("Page.enable")).rejects.toThrow(/EIO/);
+  });
+
   it("fails every command of a browser that cannot start, without throwing", async () => {
     const browser = launchChrome({ executable: "/nonexistent/chrome-headless-shell", ratio: 1 });
     await expect(browser.cdp.send("Target.createTarget")).rejects.toThrow();

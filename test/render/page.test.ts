@@ -88,6 +88,18 @@ describe("R2's page", () => {
     expect(await readTexts(page)).toEqual(expect.objectContaining({ contextId: 7 }));
   });
 
+  it("survives replies to paused requests, and the close, failing", async () => {
+    const page = await openPage(fake("refuse-replies").cdp, { div: DIV, mode: "html", width: 813 });
+    expect(page.failed).toEqual(["https://renderer.invalid/p.png", "https://example.org/x.png"]);
+    await expect(page.close()).resolves.toBeUndefined();
+  });
+
+  it("refuses a page that does not load in time", async () => {
+    await expect(
+      openPage(fake("no-load").cdp, { div: DIV, mode: "html", width: 813, loadTimeoutMs: 50 }),
+    ).rejects.toThrow(/Page.loadEventFired did not arrive within 50 ms/);
+  });
+
   it("refuses a page whose target crashes before it loads", async () => {
     await expect(
       openPage(fake("crash").cdp, { div: DIV, mode: "html", width: 813 }),

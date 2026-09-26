@@ -94,14 +94,12 @@ RUN curl -fsSL \
       -o Caladea-BoldItalic.ttf \
     && echo "${CALADEA_BOLDITALIC_SHA256}  Caladea-BoldItalic.ttf" | sha256sum --check -
 
-# Chrome unpacked, and every shared library it links resolved: a missing one fails the build here
-# rather than the first draw. The download tools are removed once the downloads are checked. Only the Serif and Sans faces of Liberation are kept (the gate binds
+# Chrome unpacked, the download tools removed, and then every shared library Chrome links
+# resolved: a missing one, the purge's included, fails the build here rather than the first draw. Only the Serif and Sans faces of Liberation are kept (the gate binds
 # no other family to them), with Carlito and Caladea, in one directory fontconfig alone reads.
 RUN set -eu; \
     unzip -q chrome-headless-shell-linux64.zip; \
     rm chrome-headless-shell-linux64.zip; \
-    missing="$(ldd chrome-headless-shell-linux64/chrome-headless-shell | grep 'not found' || true)"; \
-    [ -z "$missing" ] || { echo "chrome-headless-shell links libraries the image lacks:" >&2; echo "$missing" >&2; exit 1; }; \
     mkdir -p /opt/renderer/fonts; \
     tar -xzf liberation-fonts-ttf.tar.gz; \
     for face in Serif-Regular Serif-Bold Serif-Italic Serif-BoldItalic Sans-Regular Sans-Bold Sans-Italic Sans-BoldItalic; do \
@@ -110,7 +108,9 @@ RUN set -eu; \
     rm -rf liberation-fonts-ttf.tar.gz "liberation-fonts-ttf-${LIBERATION_VERSION}"; \
     mv Carlito-*.ttf Caladea-*.ttf /opt/renderer/fonts/; \
     [ "$(ls /opt/renderer/fonts | wc -l)" -eq 16 ] || { echo "expected 16 font files" >&2; exit 1; }; \
-    apt-get purge --yes --auto-remove curl unzip
+    apt-get purge --yes --auto-remove curl unzip; \
+    missing="$(ldd chrome-headless-shell-linux64/chrome-headless-shell | grep 'not found' || true)"; \
+    [ -z "$missing" ] || { echo "chrome-headless-shell links libraries the image lacks:" >&2; echo "$missing" >&2; exit 1; }
 
 # The only fontconfig configuration Chrome reads: the pinned directory, the family bindings R6
 # states, no hinting, no sub-pixel order and no embedded bitmaps.

@@ -7,6 +7,9 @@ import type { Cdp } from "./cdp.js";
 
 export const ORIGIN = "https://renderer.invalid/";
 
+// A page that has not loaded by then fails its draw.
+export const LOAD_TIMEOUT_MS = 60_000;
+
 export type Mode = "html" | "xml";
 
 const XHTML = "http://www.w3.org/1999/xhtml";
@@ -50,6 +53,8 @@ export type OpenOptions = {
   mode: Mode;
   width: number;
   resources?: ReadonlyMap<string, Resource>;
+  // How long the page may take to load (a test shortens it).
+  loadTimeoutMs?: number;
 };
 
 // The viewport is 32 px wider than the div's content box (R2's 16 px padding on each side); its
@@ -83,7 +88,11 @@ export async function openPage(cdp: Cdp, options: OpenOptions): Promise<Page> {
     listeners.push(
       cdp.on((event) => {
         if (event.sessionId !== sessionId) return;
-        if (event.method === "Page.frameNavigated" && loadedOnce) navigatedAway = true;
+        // The page's own frame only: a subframe (none in markup T accepts) is not the page.
+        const frame = (event.params as { frame?: { parentId?: string } }).frame;
+        if (event.method === "Page.frameNavigated" && loadedOnce && frame?.parentId === undefined) {
+          navigatedAway = true;
+        }
         if (event.method !== "Fetch.requestPaused") return;
         const { requestId, request, resourceType } = event.params as {
           requestId: string;
@@ -124,11 +133,33 @@ export async function openPage(cdp: Cdp, options: OpenOptions): Promise<Page> {
       deviceScaleFactor: 0,
       mobile: false,
     });
-    const loaded = cdp.waitFor("Page.loadEventFired", sessionId);
-    const crashed = cdp.waitFor("Inspector.targetCrashed", sessionId).then(() => {
+    // Each wait is removed with the page's other listeners when it closes, and the load's is
+    // bounded: a paused request whose reply failed would otherwise hold it until the job's timeout.
+    const event = (method: string, milliseconds?: number): Promise<void> =>
+      new Promise((resolve, reject) => {
+        const timer =
+          milliseconds === undefined
+            ? undefined
+            : setTimeout(() => {
+                stop();
+                reject(new Error(`${method} did not arrive within ${milliseconds} ms`));
+              }, milliseconds);
+        const stop = cdp.on((received) => {
+          if (received.sessionId !== sessionId || received.method !== method) return;
+          clearTimeout(timer);
+          stop();
+          resolve();
+        });
+        listeners.push(() => {
+          clearTimeout(timer);
+          stop();
+        });
+      });
+    const loaded = event("Page.loadEventFired", options.loadTimeoutMs ?? LOAD_TIMEOUT_MS);
+    const crashed = event("Inspector.targetCrashed").then(() => {
       throw new Error("the page crashed");
     });
-    // Whichever loses the race below settles later; neither is left unhandled.
+    // Whichever loses the race below settles later, or never; neither is left unhandled.
     loaded.catch(() => undefined);
     crashed.catch(() => undefined);
     const navigation = (await send("Page.navigate", { url: ORIGIN })) as {

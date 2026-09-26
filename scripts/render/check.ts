@@ -70,7 +70,10 @@ function cases(): Case[] {
     const div = `${testCase.root ?? ROOT}${testCase.inner}${MARKED}`;
     const evidence = testCase.evidence === undefined ? undefined : new Set(testCase.evidence);
     try {
-      if (!scannerAccepts(transformSection(div, evidence).div)) continue;
+      if (!scannerAccepts(transformSection(div, evidence).div)) {
+        broken.push(`t-case ${testCase.name}: accepted in t-cases.ts, refused by the scanner`);
+        continue;
+      }
       found.push({
         name: `t-case ${testCase.name}`,
         div,
@@ -156,8 +159,7 @@ for (const ratio of ratios) {
           const page = await openPage(browser.cdp, { div, mode, width });
           try {
             const elements = await readElements(page);
-            const markers =
-              model.markers.length > 0 ? await readMarkers(page) : new Map<number, string>();
+            const markers = await readMarkers(page);
             const mismatches = compareModel(model, elements, markers, ratio, mode);
             if (mode === "xml") mismatches.push(...compareText(model, await readTexts(page)));
             drawings += 1;

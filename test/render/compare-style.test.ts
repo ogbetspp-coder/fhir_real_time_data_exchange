@@ -11,6 +11,7 @@ import {
   parseColour,
   spacingAsDrawn,
   tolerance,
+  validateModel,
 } from "../../src/render/compare-style.js";
 import type { ChromeElement, ChromeText } from "../../src/render/measure.js";
 import { MODEL_CASES } from "../fixtures/render/model-cases.js";
@@ -266,6 +267,97 @@ describe("R3 on the recorded drawings", () => {
     expect(
       compare(reparented, "bordered-table").some(({ property }) => property === "parent"),
     ).toBe(true);
+  });
+
+  it.each([
+    ["a marker dropped", (m: Model) => m.markers.splice(1, 1)],
+    ["every marker dropped", (m: Model) => m.markers.splice(0)],
+    [
+      "a marker duplicated",
+      (m: Model) => m.markers.push(...structuredClone(m.markers.slice(0, 1))),
+    ],
+    ["a field 1.0.0 does not have", (m: Model) => Object.assign(m, { scanner: [] })],
+    ["a text entry keyed out of place", (m: Model) => ((m.text[1] ?? { key: 0 }).key = 5)],
+    [
+      "inter-element text that does not cover its offsets",
+      (m: Model) => ((m.text[2] ?? { start: 0 }).start += 1),
+    ],
+    ["a fold outside the section", (m: Model) => m.folds.push({ element: 9999, decision: "sup" })],
+    ["a fold of another kind", (m: Model) => m.folds.push({ element: 1, decision: "raise" })],
+    ["a waiver outside the text", (m: Model) => m.waivers.push({ start: 99999, end: 100000 })],
+  ])("refuses a model with %s", (_, mutate) => {
+    const model = modelOf("nested-lists");
+    mutate(model);
+    const found = compare(model, "nested-lists");
+    expect(found.length).toBeGreaterThan(0);
+    expect(found.every(({ reason }) => reason === "model-mismatch")).toBe(true);
+  });
+
+  it("accepts a well-formed waiver and refuses one out of order, and arrays that are not", () => {
+    const model = modelOf("offsets");
+    expect(
+      validateModel({
+        ...model,
+        waivers: [
+          { start: 0, end: 1 },
+          { start: 2, end: 3 },
+        ],
+      }),
+    ).toBeUndefined();
+    expect(
+      validateModel({
+        ...model,
+        waivers: [
+          { start: 2, end: 3 },
+          { start: 0, end: 1 },
+        ],
+      }),
+    ).toMatch(/waivers/);
+    expect(validateModel({ ...model, folds: {} as unknown as Model["folds"] })).toBe("arrays");
+  });
+
+  it("refuses a translucent background and a drawing with fewer elements than the model", () => {
+    const model = modelOf("backgrounds-and-colours");
+    const { elements, markers } = recording("backgrounds-and-colours", "html");
+    const translucent = structuredClone(elements);
+    const span = translucent.find(({ name }) => name === "span");
+    if (span !== undefined) span.style["background-color"] = "rgba(255, 255, 0, 0.5)";
+    expect(compareModel(model, translucent, new Map(markers), RATIO, "html")).toContainEqual(
+      expect.objectContaining({ property: "background-color" }),
+    );
+    expect(
+      compareModel(model, elements.slice(0, 3), new Map(markers), RATIO, "html"),
+    ).toContainEqual(expect.objectContaining({ property: "structure" }));
+  });
+
+  it("refuses a list item Chrome draws without a marker style", () => {
+    const model = modelOf("nested-lists");
+    const { elements, markers } = recording("nested-lists", "html");
+    const bare = structuredClone(elements);
+    const item = bare.find(({ name }) => name === "li");
+    if (item !== undefined) delete item.marker;
+    expect(compareModel(model, bare, new Map(markers), RATIO, "html")).toContainEqual(
+      expect.objectContaining({ property: "marker ::marker" }),
+    );
+  });
+
+  it("names a style of the wrong shape a mismatch, never a crash", () => {
+    const model = modelOf("offsets");
+    delete (element(model, "p").style as Partial<Model["elements"][number]["style"]>).borders;
+    expect(compare(model, "offsets")).toContainEqual(
+      expect.objectContaining({ property: "style", chrome: "(model malformed)" }),
+    );
+  });
+
+  it("requires every marker Chrome draws to be in the model", () => {
+    const model = modelOf("nested-lists");
+    const { elements } = recording("nested-lists", "html");
+    const extra = new Map(recording("nested-lists", "html").markers);
+    const div = elements.findIndex(({ name }) => name === "div");
+    extra.set(div, "• ");
+    expect(compareModel(model, elements, extra, RATIO, "html")).toContainEqual(
+      expect.objectContaining({ property: "marker", model: "none", chrome: "a marker" }),
+    );
   });
 
   it("does not compare a centred table's auto margins, which depend on the width", () => {

