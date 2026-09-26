@@ -1,7 +1,7 @@
 # The renderer gate: a pinned browser's evidence for every authority import (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25 (architecture approved by the owner the same day); twenty-second draft,
-  after twenty-one design reviews; R4's thresholds provisional, settled by 3c-C's measured design
+- Status: proposed, 2026-09-25 (architecture approved by the owner the same day); twenty-third draft,
+  after twenty-two design reviews; R4's thresholds provisional, settled by 3c-C's measured design
 - Decides: what `docs/design/authority-import-t.md`'s "What waits for PR 3c" left open: who draws,
   what is drawn and measured, the evidence record and its store, and the `rendering` stage
 - Amends: ADR 0003 (the second stated exception, contacts acknowledged; the third, zoomed out); ADR 0005 (decision 1's
@@ -322,8 +322,12 @@ and ratio of R2 (at 0.8 and 0.9 as the zoomed-out rule below states), is:
 **Zoomed out (binding).** At ratios 0.8 and 0.9 one kind of contact is neither shown nor
 recorded: an unshifted descender of one of P8(a)'s letters (with no mark below) against its own
 cell's bottom border or its own run's underline on its own line, shared pixels included, where the
-descender keeps at least one free row by P8(a)'s count; with none (a fused tail, "y" read as "v")
-it stays a contact. (A glyph at its own background's edge that meets P8(b) is clear at every ratio;
+tail stays visible: against an underline, at least one row of the tail's pixels at 40 % coverage
+or more lies below the drawn line (a row in a cut does not count, since a tail that fills its cut
+leaves the line looking unbroken); against a border, at least one free row by P8(a)'s count.
+Otherwise (a fused tail: "y" read as "v", "g" as "q", "j" as "i") it stays a contact. The kind
+covers only that one contact: the glyph's reach past its frame, where P6 finds it, and its other
+contacts stay judged. (A glyph at its own background's edge that meets P8(b) is clear at every ratio;
 one that does not stays a contact.) This is ADR 0003's third stated exception (the owner's decision of
 2026-09-26: at those sizes the label's descenders touch their own lines in hundreds of places that
 change no letter, and acknowledging them would make acknowledgement a rubber stamp). Every failure
@@ -370,7 +374,9 @@ clear. Geometry from layout (advances, boxes) is compared exactly, in Chrome's l
   descending part of one of P8(a)'s letters (with no mark below) against its own run's underline or
   its own cell's bottom border is judged by P4's rule, not by the line-through and hidden-part items
   above: a part lying wholly in the band (drawn or cut) or wholly in the border is a failure, and
-  sharing is a contact.
+  sharing is a contact. Only the part below the lowest baseline R4 allows is so judged; the
+  letter's ink above it hidden in, or crossed by, the border (the bowl of a "g" at a small
+  `line-height`) stays P3's failure.
 - **P4. What a font draws is not a contact.** Two characters adjacent in logical order on one line
   fragment (one line box of one block, never across cells), in whatever text nodes, neither shifted
   relative to the other (a raised "14" beside the "C" of "¹⁴C" is checked), are not checked against
@@ -494,7 +500,8 @@ Serif and Sans, regular and bold, and again in their italics and in Carlito); th
 
 Must be contacts: a "y" sharing pixels with its own underline, its tail showing below the line, at
 a ratio from 1 up where 3c-C finds one; a 5 pt serif "y" and "γ" at 0.8, underlined, with no free
-row; two glyphs 0.2 px apart across lines; a combining mark stacked into the line above;
+row; an 11 pt sans "g" and a 10 pt serif "μ" at 0.8, underlined, each tail ending inside its own
+cut (5.1's underlined "adjuvant" "j" at 0.8 and 320 px is one, measured); two glyphs 0.2 px apart across lines; a combining mark stacked into the line above;
 a raised digit against the underline of the line above; a raised 7 folded by 2.4 pt abutting its own
 cell's top border ("x 10⁷/l"); a descender touching a picture on the next line; a comma's tail
 touching its own cell's bottom border; a "ç" whose cedilla touches its own cell's bottom border; a
@@ -762,7 +769,7 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
   underlined text in a safety section refuses; one whose tail shares pixels with the line is a
   contact; 3c-C measures how often, on the pinned labels.
 - Zoomed out (0.8 and 0.9), a descender of P8(a)'s closed list of letters touching its own
-  underline or its own cell's bottom border, keeping a free row, is not shown to anyone (ADR 0003's
+  underline or its own cell's bottom border, its tail still visible, is not shown to anyone (ADR 0003's
   third stated exception; a tail wholly hidden is still a failure); below 0.8, nothing is judged.
 - A shifted glyph crossed through its body by its own run's underline (a lowered "2" in an
   underlined "AUC₀₋₂₄") is P3's failure even where it stays readable; 3c-C measures how often an
@@ -1063,3 +1070,14 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
     removed); P3 yields to P4's rule for an unshifted P8(a) letter against its own underline or its
     own cell's bottom border; seeds each way; the wording and counts as found. Measured: no failure
     in any carried section at any of the ten ratios.
+22. **Twenty-second independent review** (2026-09-26). High: the zoomed-out kind's one free row
+    could be the cut row its own tail fills, so at 0.8 and 0.9, at 9 to 11 pt, nearly every
+    underlined descender whose tail ended in its cut was left unjudged with the line looking
+    unbroken ("g" read as "q", "j" as "i", "μ" as "u"; 5.1's "adjuvant" at 0.8, withheld). No Medium.
+    Low: reach past the frame beside the kind; P3's border carve-out leaning on a rule P4 states for
+    underlines only, and silent on a border through a letter's body above the baseline; the ADRs'
+    wording ahead of the note's. Fixed in this draft: against an underline the tail must show a row
+    at 40 % or more below the drawn line, a cut row not counting; the kind covers one contact only,
+    reach stays judged; only the part below the lowest baseline is carved out; seeds added.
+    Measured: no failure in any carried section at any of the ten ratios; the zoomed-out kind leaves
+    4.6's and 4.8's underlined "y"s (their tails showing) unjudged.
