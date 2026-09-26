@@ -1,7 +1,7 @@
 # The renderer gate: a pinned browser's evidence for every authority import (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25 (architecture approved by the owner the same day); twenty-third draft,
-  after twenty-two design reviews; R4's thresholds provisional, settled by 3c-C's measured design
+- Status: proposed, 2026-09-25 (architecture approved by the owner the same day); twenty-fourth draft,
+  after twenty-three design reviews; R4's thresholds provisional, settled by 3c-C's measured design
 - Decides: what `docs/design/authority-import-t.md`'s "What waits for PR 3c" left open: who draws,
   what is drawn and measured, the evidence record and its store, and the `rendering` stage
 - Amends: ADR 0003 (the second stated exception, contacts acknowledged; the third, zoomed out); ADR 0005 (decision 1's
@@ -325,7 +325,7 @@ cell's bottom border or its own run's underline on its own line, shared pixels i
 tail stays visible: against an underline, at least one row of the tail's pixels at 40 % coverage
 or more lies below the drawn line (a row in a cut does not count, since a tail that fills its cut
 leaves the line looking unbroken); against a border, at least one free row by P8(a)'s count.
-Otherwise (a fused tail: "y" read as "v", "g" as "q", "j" as "i") it stays a contact. The kind
+Otherwise (a fused tail, which can read "y" as "v", "g" as "q", "j" as "i") it stays a contact. The kind
 covers only that one contact: the glyph's reach past its frame, where P6 finds it, and its other
 contacts stay judged. (A glyph at its own background's edge that meets P8(b) is clear at every ratio;
 one that does not stays a contact.) This is ADR 0003's third stated exception (the owner's decision of
@@ -500,8 +500,9 @@ Serif and Sans, regular and bold, and again in their italics and in Carlito); th
 
 Must be contacts: a "y" sharing pixels with its own underline, its tail showing below the line, at
 a ratio from 1 up where 3c-C finds one; a 5 pt serif "y" and "γ" at 0.8, underlined, with no free
-row; an 11 pt sans "g" and a 10 pt serif "μ" at 0.8, underlined, each tail ending inside its own
-cut (5.1's underlined "adjuvant" "j" at 0.8 and 320 px is one, measured); two glyphs 0.2 px apart across lines; a combining mark stacked into the line above;
+row; an 11 pt sans "g" and a 10 pt serif "μ" at 0.8, underlined, each tail's pixels at 40 % or more
+ending inside its own cut, with fainter ones below (5.1's underlined "adjuvant" "j" at 0.8 and 320
+px is one, measured); two glyphs 0.2 px apart across lines; a combining mark stacked into the line above;
 a raised digit against the underline of the line above; a raised 7 folded by 2.4 pt abutting its own
 cell's top border ("x 10⁷/l"); a descender touching a picture on the next line; a comma's tail
 touching its own cell's bottom border; a "ç" whose cedilla touches its own cell's bottom border; a
@@ -517,6 +518,12 @@ Must be clear: a `>` 0.36 em above its cell's bottom border in the pinned face (
 `line-height: normal` (4.4's "g" over "b"); `<span>T</span><span>he`; two adjacent `u` elements
 (4.2's "Posology for Ph+ ALL in children"); the waived `+` of 4.2's headings; an underlined "o" at
 ratio 1.25, resting on its underline (P4).
+
+Must not be failures, and not recorded (the zoomed-out kind): 4.6's underlined "y"s at 0.8
+("Fertility" at 360 px, "Pregnancy" at 1 024, 1 152 and 1 280 px; one pixel of tail at 0.45 to 0.46
+coverage below the line) and at 0.9, and 4.8's underlined "Laboratory" "y" at 0.9 (414 and 900 px),
+measured; 3c-C states R4's baseline estimator exact at 0.8 and 0.9 so that none of their ink above
+the lowest baseline is taken as hidden in the line.
 
 Must be clear (by P8 or plainly): 4.2's and 4.8's letter descenders touching their own cells'
 bottom borders; the "g"s of 4.2's underlined "Posology" at every ratio, and its "y" and the "p"s of
@@ -770,7 +777,9 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
   contact; 3c-C measures how often, on the pinned labels.
 - Zoomed out (0.8 and 0.9), a descender of P8(a)'s closed list of letters touching its own
   underline or its own cell's bottom border, its tail still visible, is not shown to anyone (ADR 0003's
-  third stated exception; a tail wholly hidden is still a failure); below 0.8, nothing is judged.
+  third stated exception; a fused tail, its pixels at 40 % or more ending in the line or its cut,
+  stays a contact, and a tail wholly hidden is still a failure); below 0.8, nothing is judged. The
+  label's unjudged "y"s rest on one pixel 0.05 above the 40 % threshold at 0.8, seeded (above).
 - A shifted glyph crossed through its body by its own run's underline (a lowered "2" in an
   underlined "AUC₀₋₂₄") is P3's failure even where it stays readable; 3c-C measures how often an
   underlined heading with a subscript is refused.
@@ -1081,3 +1090,12 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
     reach stays judged; only the part below the lowest baseline is carved out; seeds added.
     Measured: no failure in any carried section at any of the ten ratios; the zoomed-out kind leaves
     4.6's and 4.8's underlined "y"s (their tails showing) unjudged.
+23. **Twenty-third independent review** (2026-09-26). Round 22's High closed: a tail ending in its
+    cut is a contact (the seeded "g" and "μ", 5.1's "adjuvant"); no "g" ever falls in the zoomed-out
+    kind; the new P3 clause makes no failure in a carried section. Medium: ADR 0003's amendment still
+    said "a free row", which counts a cut row. Low: the label's pass at 0.8 and 0.9 rests on the
+    baseline estimator being exact there; the "g" and "μ" seeds' wording; the unjudged "y"s rest on
+    one pixel 0.05 above the threshold; the residual omitted the fused tail. Fixed in this draft:
+    ADR 0003 states the visible-tail rule; the label's unjudged "y"s seeded as neither failures nor
+    recorded, with the estimator exact at 0.8 and 0.9; the wording as found. Measured: no failure
+    in any carried section at any of the ten ratios.
