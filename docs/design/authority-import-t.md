@@ -37,7 +37,8 @@ right-aligned number against the next cell. So:
   where the markup alone cannot settle a question T refuses (ADR 0003).
 - **Geometry is measured, per publication.** An import is accepted only for a publication whose
   exact bytes a pinned browser has drawn, with T's output, and found free of overlapping,
-  hidden or displaced text: a renderer evidence record (PR 3c), in its own versioned store, bound to
+  hidden or displaced text, save the contacts a person has acknowledged (the renderer note's R4): a
+  renderer evidence record (PR 3c), in its own versioned store, bound to
   the document's and T's output's hashes and to the gate's own version, as D6 already requires
   evidence for pictures. T's geometric rules (T3b, T3c, T4's bounds) are the bounds
   within which that measurement is made, not a proof on their own.
@@ -458,6 +459,8 @@ Each refusal names the stage (`narrative`) and a closed reason: `markup`, `eleme
 | Brukinsa, Jentadueto, Nuvaxovid | as before (titles, shape, pictures)                        | not run (they stop earlier)                                                                            |
 
 ## What waits for PR 3c
+
+_Settled by `docs/design/authority-import-renderer.md` (the gate: records drawn and attested by a dedicated build, verified by the image build, looked up by Zone B; its thresholds, the frame tolerance among them, provisional until 3c-C's measured design) and `docs/design/authority-import-withheld.md` (5.1 is withheld, an EMA defect measured in Chrome), 2026-09-25. The list below is kept as the requirements those notes answer, or supersede on the owner's decisions (contacts acknowledged rather than refused)._
 
 - **The renderer gate** (ADR 0005's renderer cross-check, made a gate). A pinned headless browser
   draws each publication's sections as the authority serves them (inline styles, no class

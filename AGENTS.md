@@ -8,7 +8,8 @@ Google Cloud Healthcare API and observe their native near-real-time BigQuery str
 
 ## Non-negotiable rules
 
-- Never generate, summarize, or infer regulated clinical narrative. Preserve supplied XHTML. The
+- Never generate, summarize, or infer regulated clinical narrative. Preserve supplied XHTML (a
+  withheld section's fixed notice is the one generated div, under the exception below). The
   fidelity check proves its words, list numbers, table grids and embedded pictures; paragraph
   breaks, headings, bullets, list nesting and emphasis are kept, not proved. Its contract
   (`fidelity-norm/3.1.0`) qualifies structured sources only (an FHIR ePI); over a drawn
@@ -16,7 +17,10 @@ Google Cloud Healthcare API and observe their native near-real-time BigQuery str
   and cannot support an approval (the gate accepts a drawn submission only as a synthetic one,
   where `ALLOW_SYNTHETIC_SOURCES` is set). Presentation (styles, classes) may be dropped only by an
   authority import under ADR 0005.
-- Fail closed on missing, duplicate, or ambiguous mandatory QRD sections.
+- Fail closed on missing, duplicate, or ambiguous mandatory QRD sections. The one exception: an
+  authority import may carry a mandatory section as withheld only under
+  `docs/design/authority-import-withheld.md` (reviewed, measured evidence of the authority's defect,
+  never a safety section 4.2–4.9, the record marked incomplete).
 - Pin and checksum all external FHIR packages and examples.
 - Do not claim regulatory or GxP compliance. Produce qualification-supporting evidence.
 - Never log FHIR payloads, credentials, tokens, or clinical text.

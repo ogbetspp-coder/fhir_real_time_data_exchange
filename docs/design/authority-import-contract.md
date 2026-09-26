@@ -106,7 +106,8 @@ authority-publication source when `DRY_RUN` is false, so nothing is persisted an
 entitled to the query service or reach the agent. PR 5 adds the pilot status to their answers,
 then lifts the refusal. Recomputation proves that the named importer ran on those bytes, not
 that the importer is right: that rests on its tests, its golden vectors (D10) and ADR 0005's
-renderer cross-check (PR 3).
+renderer cross-check, made a gate of reproduced records whose hash the run manifest pins
+(`docs/design/authority-import-renderer.md`, PR 3c).
 
 **Bytes and JSON.** The gate hashes raw bytes after HTTP content decoding, never a re-serialised
 value (an exception to ADR 0002's hash-the-JSON-value convention, stated in its amendment). It
@@ -335,18 +336,23 @@ indexId, versionNumber, procedureNumber, authorityTimestamp }` (`authorityTimest
 
 The method is required exactly when the source is an authority publication, and every
 publication field must equal the source's and the graph's. `requestedBy` is a placeholder, like
-`approverId`, until roadmap item 2 binds it to an identity token (`docs/design/approval.md` gains
-the method).
+`approverId`, until roadmap item 2 binds it to an identity token (`docs/design/approval.md`'s amendment of
+2026-09-25 replaces the method: its fields move into the source record, and the request statement's
+signer replaces `requestedBy` and `requestedAt`).
 
 Stated residuals: which import is current when a later one supersedes it, and how a withdrawal
-reaches the record, belong to roadmap item 2's head and withdrawal; an older pinned publication
-cannot be imported after the authority replaces it (the gate's fetch refuses it), but a withdrawal
-after an import is not noticed until a re-import.
+reaches the record, belong to roadmap item 2's head and withdrawal (`docs/design/approval.md`,
+amended 2026-09-25: one List per product at a time until supersession is designed); a withdrawal
+after an import is not noticed until a re-import. Corrected 2026-09-26: the EMA keeps serving older
+Lists and documents as current after a new List version (Brukinsa's EPI/23/1009 has two current
+Lists), so an older pinned publication can still be imported after the authority has replaced it;
+the approval design's List rule, not the gate's fetch, keeps it from displacing a newer import.
 
 This amends ADR 0005 decision 4: a re-import after a normalisation change is possible only while
 the authority still serves the same bytes for the document and its List (the List changes when
 any document of the product changes); otherwise it is a new import of the current publication,
-and the earlier record is superseded or withdrawn under roadmap item 2.
+and the earlier record is withdrawn under roadmap item 2 (supersession across Lists awaits its own
+design; `docs/design/approval.md`, amended 2026-09-25: one List per product at a time).
 
 ### D9. The Type 1 record: every value and its origin
 

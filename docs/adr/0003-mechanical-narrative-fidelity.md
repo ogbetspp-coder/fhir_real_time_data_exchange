@@ -177,3 +177,46 @@ reader sees without the check seeing it._
   normalisation version even though no code changes.
 - The verifier is a second, independent narrative gate alongside the existing
   byte-preservation assertion in `src/fhir/transform.ts` (UR-01); the new control is UR-09.
+
+## Amendment (2026-09-25, a withheld section)
+
+The fidelity check covers "every section that carries the code and a `text.div`" except a
+**withheld** section of an authority import (`docs/design/authority-import-withheld.md`), whose
+only text is a fixed notice that is not narrative: `fidelity-norm/3.2.0` gives the report a
+`withheld` status, binds the section in `narrativeBindingSha256` and refuses the notice anywhere
+else. A section is withheld only on the renderer gate's evidence, from the browser's exact advances, its
+painted pixels and the pinned fonts' ink bounds, that the authority's own drawing cannot be read as
+written, confirmed by the
+person who requests the import, never on a refusal of ours, so no false pass
+of the authority's text enters the record by it: none of the section's text enters at all.
+
+## Amendment (2026-09-25, contacts acknowledged)
+
+A second stated exception to "false passes are not" (owner decisions of 2026-09-25;
+`docs/design/authority-import-renderer.md`, R4): the renderer gate sorts what it draws into clear,
+failures (clear misreadings, which refuse) and **contacts**, glyphs or lines that touch or stand
+closer than the gate can prove harmless, which pass only once the person who requests the import,
+an attested identity before anything is persisted, has been shown each one in the
+gate's captures of the record they name and acknowledged it legible (that they looked is their
+claim). No automatic limit passes a contact. Two drawings that
+cannot change a letter are clear by rule, not contacts, exactly as the renderer note's P8 states
+them (a descender of a closed list of letters on its own cell's bottom border or its own underline,
+keeping two rows of its own, with no shared pixel; a glyph at the edge of its own frame's background, not covered, keeping
+4.5:1 against both fills, an edge below it still judged as an underline). The EMA's Imatinib Teva film-coated tablets SmPC has tens of contacts at sampled widths from ratio 1
+up, most of them 4.2's raised 9 of "10⁹/l" against the line above (3c-C recounts them); the findings
+are reported to the authority.
+
+## Amendment (2026-09-26, zoomed out)
+
+A third stated exception to "false passes are not" (owner decision of 2026-09-26;
+`docs/design/authority-import-renderer.md`, R2 and R4): at device pixel ratios 0.8 and 0.9 (80 %
+and 90 % zoom on an ordinary display) the renderer gate does not judge one kind of contact that
+changes no letter, exactly as the renderer note's R4 states it: an unshifted descender of a closed
+list of letters, on its own line, against its own cell's bottom border or its own underline (that
+one contact only; its reach past its frame and its other contacts are still judged), while its tail stays visible (against an underline, a row of the tail at 40 %
+coverage or more below the drawn line, a row in its cut not counting; against a border, a free
+row), so a fused tail is still shown and a hidden one still refuses. At those sizes the
+tablets label's descenders touch their own lines in hundreds of places, and acknowledging them
+would make acknowledgement a rubber stamp. Every clear misreading and every refusal of the gate's
+own is still judged there, and every other contact (a comma, a digit or a symbol touching a line,
+one glyph against another) is still shown and acknowledged. Below 0.8, nothing is judged.

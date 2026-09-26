@@ -249,8 +249,10 @@ Three facts about that source meet three rules of the record:
   procedure number, the Bundle's timestamp) and who requested the import. A re-import after a
   normalisation change is possible only while the authority still serves the same bytes for the
   document and its List (the List changes whenever any document of the product changes);
-  otherwise it is a new import of the current publication, and the earlier record is superseded
-  or withdrawn under roadmap item 2.
+  otherwise it is a new import of the current publication (the EMA keeps serving older Lists as
+  current, so "current" is the product's one List under `docs/design/approval.md`'s amendment of
+  2026-09-25, until supersession is designed), and the earlier record is withdrawn
+  under roadmap item 2.
 
 ## Amendment (2026-09-24, `fidelity-norm/3.1.0`)
 
@@ -292,3 +294,46 @@ independent reviews, and changes this ADR as follows.
   document (ADR 0003, amended).
 - **What the pinned labels give:** both Imatinib Teva SmPCs pass T in 31 of their 32 sections;
   5.1 refuses (its tables need the renderer), and the import stops first at the pictures stage.
+
+## Amendment (2026-09-25, the renderer gate and a withheld section)
+
+`docs/design/authority-import-renderer.md` and `docs/design/authority-import-withheld.md`
+(roadmap 3a, PR 3c; owner decisions of 2026-09-25) change this ADR as follows.
+
+- **The renderer cross-check is a store of attested records.** A dedicated Cloud Build
+  configuration, under its own identity, draws every publication in a pinned image (Chrome for
+  Testing's headless shell, pinned metric-compatible fonts) from the importer's own pinned bytes,
+  regenerates each committed record twice and signs an attestation only if both reproduce it. The
+  image build that every deploy runs verifies each record's attestation offline against pinned
+  public keys and drops a record without one. The importer's `rendering` stage looks the record up
+  by the document's hash and each carried section's three output hashes (T(div), T's model output,
+  the scanner's text) and pictures; the run manifest pins the record's hash. The consequence "the
+  importer's CI job needs a headless browser" is that build, with a pre-check in CI.
+- **Decision 3 is narrowed: a withheld section.** A leaf section whose drawing, as the authority's
+  div draws with its inline styles, the renderer gate records as misleading a reader, each such
+  finding reviewed in the gate's captures and confirmed by the person who requests the import, who
+  names the record reviewed (two cells'
+  text running together, a line through the body of a letter, a character wholly off the page),
+  with no refusal of the gate's own, may be **withheld** by the person who requests the import;
+  never a safety section (4.2 to 4.9), and never on a refusal of ours, a contact, or a
+  failure that is not such a defect.
+  It keeps its heading and code, carries none of the authority's content, and carries our own
+  `emptyReason` code and a fixed notice; the Composition is `partial` and the record is marked
+  incomplete wherever it is read. The import refuses if a listed section is not shown so or a
+  failing one is not listed, and a document-level refusal still refuses it. A withheld section is
+  never repaired, answered from or quoted. Imatinib Teva's 5.1, whose at-risk table runs its
+  values together, is the first.
+- **A second stated exception** (ADR 0003, amended): a contact the renderer gate cannot prove harmless
+  (tens on the tablets label at sampled widths from ratio 1 up, most of them 4.2's raised "10⁹/l"
+  against the line above) passes only once the person who requests the import acknowledges it,
+  legible, in the gate's captures of the record they name; clear misreadings refuse.
+- **A third stated exception** (ADR 0003, amended 2026-09-26): at 80 % and 90 % zoom on an ordinary
+  display the renderer gate does not judge, exactly as the renderer note's R4 states it, the
+  unshifted descender of a closed list of letters on its own line touching its own underline or
+  cell border while its tail stays visible (that one contact only); every clear misreading, every refusal
+  of its own and every other contact is still judged there.
+- **Decision 3's pictures.** The EMA's viewer draws Imatinib Teva's two `~/_entity/annotation/…`
+  pictures as broken images, and the EMA's FHIR export of the same List carries them as contained
+  Binaries under the same ids. A reference is carried from the authority's own export of the same
+  publication, bound by hash and by the export's text equalling the document's (PR 3c-E, its own
+  note), which D6's "reference the authority's viewer resolves" did not foresee.

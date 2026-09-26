@@ -243,3 +243,45 @@ agent of its source files (each named by the authority's id and by hash), the re
 
 **Status.** Producers are `src/fixtures/synthetic-submission.ts` and, for authority imports,
 `scripts/authority/import.ts`, whose identity is not trusted (invariant 8).
+
+## Amendment (2026-09-25, a withheld section)
+
+`docs/design/authority-import-withheld.md` (roadmap 3a, PR 3c; owner decisions of 2026-09-25)
+lets an authority import carry a leaf section the renderer gate shows the authority drew unsound
+as **withheld**: its heading and code, none of the authority's content, our own `emptyReason` code
+and a fixed notice, `Composition.status` `partial`. Invariants 3, 4, 6 and 10 change for that case only:
+
+- **4.** A withheld section still has its provenance entry (no spans; `narrativeDivSha256` the
+  notice's hash, `normalizedTextSha256` that of the empty text), so the bijection holds; the
+  fidelity counts add `sectionsWithheld`, and `sectionsChecked` is verified plus withheld.
+- **6.** The notice is the one `text.div` outside the verified narratives that is accepted, and only
+  on a section the recomputed provenance of an `authority-publication` source lists as withheld,
+  byte for byte the constant; anywhere else, on any source, it refuses, as does any `emptyReason`,
+  and on an `authority-publication` source any `generated` narrative.
+- **3.** The binding recomputed from the Bundle takes the recomputed withheld list as its second
+  input; a withheld section's entry uses the sentinel fidelity §7 defines (`fidelity-norm/3.2.0`).
+- **10.** The notice is not narrative, so the rule that every synthetic narrative carrying text says
+  "not for clinical use" does not apply to it; it applies to every other narrative as before.
+
+The human decision that withholds is the import request's, hash-bound in the approved content as
+every request is (invariant 2); before PR 5 lifts the dry run it is bound to an attested identity.
+
+## Amendment (2026-09-25, the renderer gate's review)
+
+`docs/design/authority-import-renderer.md` (R5) and `docs/design/authority-import-withheld.md`
+(owner decisions of 2026-09-25) change the contract of an authority import:
+
+- **`CanonicalSubmission` 3.0.0**, a major under this ADR's rule (fields required for an authority
+  import; enums the gate branches on): the request's `renderEvidence`, `acknowledgedContacts` and
+  `withheld`, and the source record's `rendering` and `withheldSections`, are approved content,
+  covered by `approvedContentSha256` (invariant 2) as the request is. The run manifest moves to 3.0.0
+  with it, its 2.0.0 ingestion block frozen.
+- **Who judges content.** The 2026-09-24 amendment's "whether the words are right is what invariant 8
+  proves, not what a person attests" stays true of the words. Two judgements of drawing now rest on
+  a person, both stated exceptions: acknowledging a contact the renderer gate cannot prove harmless
+  as legible, and withholding a section on a confirmed defect. So a request that acknowledges or
+  withholds anything is bound to an attested identity before D1's dry run is lifted for it (PR 5); D8's
+  placeholder requester does not suffice, an attested identity is one roadmap item 2 authenticates and records, signing a `request`
+  statement in the `content-reviewer` role (`docs/design/approval.md`, amended 2026-09-25), and since the
+  tablets label has contacts (as any label with contacts will), it is not persisted until that
+  identity exists.
