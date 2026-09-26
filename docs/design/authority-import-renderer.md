@@ -1,7 +1,7 @@
 # The renderer gate: a pinned browser's evidence for every authority import (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25 (architecture approved by the owner the same day); twenty-sixth draft,
-  after twenty-five design reviews; R4's thresholds provisional, settled by 3c-C's measured design
+- Status: proposed, 2026-09-25 (architecture approved by the owner the same day); twenty-seventh draft,
+  after twenty-six design reviews; R4's thresholds provisional, settled by 3c-C's measured design
 - Decides: what `docs/design/authority-import-t.md`'s "What waits for PR 3c" left open: who draws,
   what is drawn and measured, the evidence record and its store, and the `rendering` stage
 - Amends: ADR 0003 (the second stated exception, contacts acknowledged; the third, zoomed out); ADR 0005 (decision 1's
@@ -250,16 +250,20 @@ computed from the pinned fonts and bounded:
   where P8(a)'s two rows hold with no slack); with `--disable-font-subpixel-positioning` (R6) Blink's Linux adjustment that
   moves a pixel from ascent to descent under sub-pixel positioning does not apply. Glyphs are
   drawn with the baseline snapped to whole device pixels, so the baseline is known to within one
-  device pixel, and every bound below allows for it, except at 0.8 and 0.9, where the zoomed-out
-  kind needs it exact (the rectangle-plus-ascent estimate was a device pixel off at 10 pt there,
-  measured). There the judge takes each candidate glyph's baseline from its own pixels, changing
-  nothing on the page: with positions in whole device pixels (R6), a glyph's raster is the same
-  wherever it is drawn, so its pixels in the drawing that isolates it (P1, layout asserted
-  unchanged) must equal, within ε, its raster on R4's calibration page (same face, size and ratio,
-  baseline known) at exactly one whole-pixel vertical offset, which gives its baseline; no offset,
-  or more than one, is a refusal of ours in the section. At those two ratios the lowest and highest
-  baseline R4 allows are both that baseline, for P3, P4, P8(a) and R8 alike (the rounding out below
-  keeps its widening, since an ink bound only nominates candidates).
+  device pixel, and every bound below allows for it, except for the **exact baseline** the zoomed-out
+  kind needs at 0.8 and 0.9 (the rectangle-plus-ascent estimate was a device pixel off at 10 pt
+  there, measured). Binding: at those ratios, and only for a descender of one of P8(a)'s letters
+  against its own underline or its own cell's bottom border, the judge may establish the glyph's
+  baseline exactly from the drawing; the method (3c-C's, provisional) changes nothing on the page
+  that is judged, derives every reference baseline from drawn pixels (never from the estimate),
+  accounts for whatever the raster depends on (the twenty-sixth review measured four horizontal
+  sub-pixel phases and a dependence on the text colour at 0.8 and 0.9 on the Mac shell, despite the
+  flag), and is checked in every record. Where it is established, it is both the lowest and the
+  highest baseline R4 allows for that glyph, for P3, P4, P8(a) and R8 alike; where it is not, the
+  glyph keeps the one-pixel allowance and the zoomed-out kind does not apply to it, so it is judged
+  as a contact or a failure by the other rules (never a refusal of ours, never unjudged). Every
+  other glyph keeps the allowance. A seed binds the method's result: the label's zoomed-out "y"s
+  (below).
 - **Ink bound.** For each character, the union of the ink boxes (the `glyf` bounding boxes,
   overhangs included) of every glyph reachable for it through the lookups of HarfBuzz's default
   features for the run's script and language, as the pinned face has them, displaced by every
@@ -272,19 +276,23 @@ computed from the pinned fonts and bounded:
   mark in a face with no mark lookup for its base (HarfBuzz's own fallback, and so every mark in
   Carlito) is a refusal of ours.
 - **Rounding out.** Each ink bound is widened by the baseline's snapping (one device pixel
-  vertically, and horizontally too since positions are whole pixels without sub-pixel
-  positioning), by anti-aliasing (one device pixel), and by the largest per-glyph difference
+  vertically, and horizontally one device pixel too, since horizontal positions can
+  fall between pixels: 3c-B measures on the pinned image whether the flag holds them to whole
+  pixels), by anti-aliasing (one device pixel), and by the largest per-glyph difference
   between the pinned and original outlines (measured once from the original fonts' files and
   stated), then rounded outwards to whole device pixels at the drawn ratio.
 - **Calibration, per record.** In every draw, for every (face, computed size, ratio) the record
   uses, at the fractional origins the page uses, the pixels a glyph paints on a page of its own
   must lie inside its rounded-out ink bound. A glyph that fails is a refusal of ours, not a
-  widened bound. At 0.8 and 0.9 the calibration page also holds each glyph's raster, with its
-  baseline, that the baseline match above uses.
+  widened bound.
 - **Glyph pixels** (P1 below). Where two candidate glyphs' boxes overlap, the judge isolates each by
-  drawing it alone (every other glyph's `::highlight()` made transparent, and every marker's
-  `::marker` too, layout asserted unchanged, and each drawing's computed colours asserted to have
-  taken effect, a drawing whose colours did not being a refusal of ours); elsewhere each pixel of the
+  drawing it alone (every other glyph made transparent, and every marker's `::marker` too, layout
+  asserted unchanged, and each drawing's computed colours asserted to have taken effect, a drawing
+  whose colours did not being a refusal of ours), by a method that does not clip the glyph's ink:
+  the isolated drawings must composite back to the drawing with only the glyphs within ε at every
+  pixel, and any ink lost is a refusal of ours (`::highlight()` clips a glyph to its own advance,
+  losing an italic "f"'s hook and tail and up to 5 px of a sans "y", measured, so 3c-C uses another
+  method, such as colour-only wrappers with every character rectangle asserted unchanged); elsewhere each pixel of the
   drawing with only the glyphs belongs to the glyph whose exact ink box, snapped to device pixels,
   contains it. For a failure, a glyph's pixels are
   those above a noise floor of 10 % coverage (so a faint 5 pt colon is still seen); for a defect
@@ -506,7 +514,9 @@ border; two cells' numbers 0.19 px apart (5.1's table 9 at 504 px); a glyph's pi
 a border through a letter; a line under a `<`; two cells' text running together; text wholly off the
 page; raised text above the section's top edge; a marker off the page; a picture over a glyph; a
 later box in the text's own colour over a glyph; a missing glyph (U+2070); an unpinned family
-(Verdana); a glyph too faint to judge.
+(Verdana); a glyph too faint to judge. Must be a contact: a 9 pt italic serif "f" at ratio 1 in "afa",
+its tail overhanging its advance and touching its cell's bottom border (lost under `::highlight()`
+isolation, measured).
 
 Must never be clear (a contact or a failure): a comma, semicolon, cedilla or mark below touching its
 own underline, at every size, face and ratio (measured over 3 840 cases per ratio in Liberation
@@ -537,8 +547,9 @@ ratio 1.25, resting on its underline (P4).
 Must not be failures, and not recorded (the zoomed-out kind): 4.6's underlined "y"s at 0.8
 ("Fertility" at 360 px, "Pregnancy" at 1 024, 1 152 and 1 280 px; one pixel of tail at 0.45 to 0.46
 coverage below the line) and at 0.9, and 4.8's underlined "Laboratory" "y" at 0.9 (414 and 900 px),
-measured; R4 takes each glyph's baseline from its own pixels at 0.8 and 0.9, so none of their ink
-above the baseline is taken as hidden in the line (a kerned "y," as in "Fertility," among them).
+measured; R4's exact baseline must be established for each of them (a kerned "y," as in
+"Fertility," among them), so none of their ink above the baseline is taken as hidden in the line;
+and a 10 pt serif "y" at 0.8 whose estimate is a device pixel off, its exact baseline established.
 
 Must be clear (by P8 or plainly): 4.2's and 4.8's letter descenders touching their own cells'
 bottom borders; the "g"s of 4.2's underlined "Posology" at every ratio, and its "y" and the "p"s of
@@ -1136,3 +1147,17 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
     calibration raster at one whole-pixel offset (no page change; no unique match refuses); that
     baseline serves P3, P4, P8(a) and R8 alike there; "unshifted" is T4's term, deleted shifts
     included; ADR 0005 cites R4.
+26. **Twenty-sixth independent review** (2026-09-26). High: P1's isolation by `::highlight()` clips a
+    glyph to its own advance, so overhanging ink (an italic "f"'s tail at its border) is in no
+    drawing, a false clear; the new baseline match relied on it. Medium: the raster is not the same
+    wherever a glyph is drawn (four horizontal sub-pixel phases and a colour dependence at 0.8 and
+    0.9, measured on the Mac shell despite the flag), so the match as written would refuse every
+    candidate, the label's seeded "y"s among them; the calibration page's baseline was undefined;
+    the exact baseline was required of every candidate. Low: which drawing is matched. Fixed in this
+    draft: isolation must composite back to the glyphs-only drawing, with no ink lost, by a method
+    that does not clip, and an overhang seed; the exact baseline is a binding requirement only for
+    P8(a)'s descenders against their own lines at 0.8 and 0.9, its method 3c-C's (no change to the
+    judged page, references from drawn pixels, the raster's dependences accounted for, checked per
+    record), and where it is not established the zoomed-out kind does not apply (judged, never a
+    refusal of ours); every other glyph keeps the allowance; rounding out's horizontal reason
+    corrected, 3c-B to measure the flag on the pinned image.
