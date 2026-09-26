@@ -1,6 +1,6 @@
 # A withheld section: importing a publication with an authority's defect recorded in place (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25; twenty-second draft, after twenty-one design reviews
+- Status: proposed, 2026-09-25; twenty-third draft, after twenty-two design reviews
 - Owner decisions (2026-09-25): withhold the Imatinib Teva tablets SmPC's 5.1 and import the
   other 31 sections; a section may be withheld only on reviewed, measured evidence of the
   authority's defect, the whole record is marked incomplete everywhere it is read, and the safety
@@ -559,3 +559,10 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
     point, written first, then the head, then `approvals/`, then the publish, with a roll-forward; the
     key and List from the signer's own recomputation, shown in the review and checked by the pipeline;
     head reads specified and failing closed; the rest as found.
+22. **Twenty-second independent review** (2026-09-26). No High. Its Mediums (the document head read
+    before the product chain; a committed product entry invisible to D9; the add-on click's
+    parameters unsigned; no lookup from a head's statement to its stored version) are item 2's own
+    signing and storage mechanics, which approval.md, not built, is to review again before phase 1.
+    So approval.md's amendment now separates what binds for roadmap 3a (seven requirements item 2
+    must meet before PR 5) from the proposed mechanics, which item 2's review settles with these
+    findings listed as its open questions.

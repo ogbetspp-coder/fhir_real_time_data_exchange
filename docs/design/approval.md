@@ -330,6 +330,45 @@ which sections are withheld on a confirmed defect. PR 5 persists an authority im
 person is attested, so phase 1 of this design gains the following, without changing what it
 decides for a Type 2 approval.
 
+**What binds now, and what item 2's own review settles.** This amendment is written for roadmap
+3a's PR 3c; item 2 is designed here, not built, and "is reviewed again before any of it runs". So
+only these requirements bind now, and item 2 must meet them before PR 5:
+
+1. A `request` statement, derived from the source kind, with its meaning codes; the requester is an
+   attested person in the `content-reviewer` role; the request is one content-reviewer's
+   judgement (whether production adds a countersignature is the owner's decision).
+2. What was shown is what is signed: a self-contained review, built by the signer from the
+   submission, its own recomputation of the import and the attested renderer record, shows every
+   acknowledged contact, every withheld section's confirmed and rejected defects, and the product
+   and List; the signer refuses a draft the gate would refuse.
+3. Who opened the review is recorded by a Google component, or the design says it is not.
+4. The statement pins the carried sections and the withheld set; the query service fails closed on
+   any disagreement, on a withheld safety or non-leaf section, and reads the defect kinds from the
+   signed statement.
+5. One List per product at a time, decided by a check that two racing requests cannot both pass,
+   with the product and List taken from the recomputed import, not the draft; supersession across
+   Lists waits for its own reviewed design.
+6. No head, and no product-level record, can be replaced, hidden or rolled back while it is
+   retained; a reader fails closed on anything malformed.
+7. Where the publication's fields go, and the versions, as stated below.
+
+The mechanics that follow (the heads bucket, the product chain's entries, write order and
+roll-forward, how a head is read, the grants, the Identity-Aware Proxy details) are the approach
+proposed to meet them. Item 2's own design review settles them, with these questions from roadmap
+3a's review rounds open: the document head must be read only after the product chain is read and
+rolled forward, and a lost race re-reads both (never reusing earlier positions), a head create that
+finds different bytes failing closed; a committed product entry whose head was never written must be
+visible to D9 (as the head, or rolled forward on a schedule); the click's parameters (review hash,
+kind, submission) are not signed by the add-on's tokens, so the receiver is a trust root to put
+under the signer's image allowlist, or the signer is the endpoint, with each token consumed once and
+a stated freshness window; D9 needs a lookup from the head's statement to its stored version (a
+second deterministic Provenance id from the statement's hash, or a bounded walk); Type 2 approvals
+have no product chain and write the head before `approvals/`; a withdraw's place in the product
+chain; roll-forward completing `approvals/` and the publish, verifying the entry, and treating an
+equal "exists" as success; D9's read count; a deny policy scoped by a tag on the heads bucket and
+covering `objects.move`; the bytes each hash covers; the reviews bucket's own retention; and the
+signer's egress to the authority and the wider surface of the process holding the key.
+
 - **A statement kind, `request`,** with its own meaning codes: for an import with renderer evidence,
   "I was shown the renderer gate's captures of this publication's record; each listed contact is
   legible; each listed defect is confirmed or rejected as stated; I request this import"; for a
