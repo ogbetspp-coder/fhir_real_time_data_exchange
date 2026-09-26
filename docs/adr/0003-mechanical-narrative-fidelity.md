@@ -202,6 +202,16 @@ claim). No automatic limit passes a contact. Two drawings that
 cannot change a letter are clear by rule, not contacts, exactly as the renderer note's P8 states
 them (a descender of a closed list of letters on its own cell's bottom border or its own underline,
 keeping two rows of its own, with no shared pixel; a glyph at the edge of its own frame's background, not covered, keeping
-4.5:1 against both fills, an edge below it still judged as an underline). The EMA's Imatinib Teva film-coated tablets SmPC has tens of contacts at sampled widths, nearly all
-4.2's raised 9 (3c-C recounts them), 4.2's raised 9 of "10⁹/l" against the line above among
-them; the findings are reported to the authority.
+4.5:1 against both fills, an edge below it still judged as an underline). The EMA's Imatinib Teva film-coated tablets SmPC has tens of contacts at sampled widths from ratio 1
+up, most of them 4.2's raised 9 of "10⁹/l" against the line above (3c-C recounts them); the findings
+are reported to the authority.
+
+## Amendment (2026-09-26, zoomed out)
+
+A third stated exception to "false passes are not" (owner decision of 2026-09-26;
+`docs/design/authority-import-renderer.md`, R2 and R4): at device pixel ratios 0.8 and 0.9 (80 %
+and 90 % zoom on an ordinary display) the renderer gate judges only clear misreadings (its
+failures, the defects among them) and its own refusals. A contact there, a touch that changes no
+sign, is neither shown nor acknowledged: at those sizes the tablets label's descenders touch their
+lines in hundreds of places, and acknowledging them would make acknowledgement a rubber stamp.
+Below 0.8, nothing is judged.

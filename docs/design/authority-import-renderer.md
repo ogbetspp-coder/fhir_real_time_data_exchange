@@ -1,10 +1,10 @@
 # The renderer gate: a pinned browser's evidence for every authority import (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25 (architecture approved by the owner the same day); nineteenth draft,
-  after eighteen design reviews; R4's thresholds provisional, settled by 3c-C's measured design
+- Status: proposed, 2026-09-25 (architecture approved by the owner the same day); twentieth draft,
+  after nineteen design reviews; R4's thresholds provisional, settled by 3c-C's measured design
 - Decides: what `docs/design/authority-import-t.md`'s "What waits for PR 3c" left open: who draws,
   what is drawn and measured, the evidence record and its store, and the `rendering` stage
-- Amends: ADR 0003 (the second stated exception, contacts acknowledged); ADR 0005 (decision 1's
+- Amends: ADR 0003 (the second stated exception, contacts acknowledged; the third, zoomed out); ADR 0005 (decision 1's
   renderer cross-check); `docs/design/authority-import-t.md` (the
   store and who writes it, settled; the frame; the gap between cells; the tolerances);
   `docs/design/authority-import-contract.md` (D1's trust statement, D2, D3 and D8 (the request's
@@ -182,16 +182,18 @@ recordSha256, capturesIndex, capturesSha256, documentSha256, pinsSha256, rendere
 - **Device pixel ratios.** An emulated ratio does not change layout, so each ratio is its own
   browser process launched with `--force-device-scale-factor`: 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2,
   2.625 and 3 (a page zoom times the display's ratio is the effective ratio: 80 %, 90 % and 110 % zoom
-  on an ordinary display, and a common phone's 2.625, are drawn; the others are not, so a glyph is
-  clear only with one device pixel of margin beyond its stated clearance, the snapping drift between
-  neighbouring ratios, R4's P2); at ratios other than 1, every integer width from 320 to 1 280 px
-  (R11 costs the four added ratios). Layout does change with the ratio (the tablets' 5.1 alone is
+  on an ordinary display, and a common phone's 2.625, are drawn); at ratios other than 1, every
+  integer width from 320 to 1 280 px (R11). At 0.8 and 0.9, **zoomed out**, the gate judges
+  failures and refusals of ours only (R4's classes; ADR 0003's third stated exception, the owner's
+  decision of 2026-09-26). Layout does change with the ratio (the tablets' 5.1 alone is
   10 776 px tall at 813 px and ratio 1, 10 730 px at ratio 3). A test asserts snapped border widths
   per ratio.
 - Fractional widths and ratios between those drawn can break lines in combinations no drawn
-  layout has, and can move a glyph a device pixel against a line or another glyph: a stated residual,
-  narrowed by the added ratios and P2's one-pixel margin (an 11 pt comma a blank row from its cell's
-  border at every drawn ratio of the eighteenth draft touched it at 1.1, measured).
+  layout has, and can move a glyph up to two device pixels against a line or another glyph: a stated
+  residual, narrowed by the added ratios, not bounded (the nineteenth review found an 11 pt serif
+  comma two blank rows from its cell's border at every drawn ratio touching it at 1.05, and a 12 pt
+  semicolon at 0.95; between 1.25 and 3 it found none). Ratios below 0.8 (Chrome's 75 %, 67 % and
+  50 % zoom on an ordinary display) and above 3 are not drawn, a stated residual.
 
 ### R3. T's model against the drawing, and the fonts of every section (PR 3c-B)
 
@@ -244,7 +246,7 @@ computed from the pinned fonts and bounded:
 
 - **Baseline.** The rectangle's top plus the face's ascent at the computed size, rounded at the
   device size as Blink rounds it (3c-C states the estimator and seeds 4.8's descenders at ratio 1,
-  where P8(a)'s two rows hold with no margin); with `--disable-font-subpixel-positioning` (R6) Blink's Linux adjustment that
+  where P8(a)'s two rows hold with no slack); with `--disable-font-subpixel-positioning` (R6) Blink's Linux adjustment that
   moves a pixel from ascent to descent under sub-pixel positioning does not apply. Glyphs are
   drawn with the baseline snapped to whole device pixels, so the baseline is known to within one
   device pixel, and every bound below allows for it.
@@ -304,7 +306,7 @@ costs are **provisional**, settled by 3c-C's own design note from the judge's me
 pinned labels, and reviewed there before any record is attested.
 
 **Three classes (binding).** Every glyph and every line of the authority's drawing, at every width
-and ratio of R2, is:
+and every ratio of R2 from 1 up, is:
 
 1. **clear**: proven, on pixels and exact geometry, to keep its stated clearance (at least one blank
    device pixel) from every other glyph, every line and every picture's box, inside its frame (its
@@ -315,6 +317,13 @@ and ratio of R2, is:
 3. **a contact**: neither proven clear nor a failure, which the gate never passes silently: it is
    recorded, captured, and must be acknowledged, legible, by the person who requests the import
    (R5), or the import refuses.
+
+**Zoomed out (binding).** At ratios 0.8 and 0.9 the gate judges only failures (P3, R8's defects
+included) and refusals of ours; a drawing there that is neither is not a contact and is not
+recorded (ADR 0003's third stated exception, the owner's decision of 2026-09-26: at those sizes the
+label's descenders touch their lines in hundreds of places that change no sign, and acknowledging
+them would make acknowledgement a rubber stamp). Everything else in this section applies there
+unchanged; a seed's failure binds at every ratio, and its other classes from ratio 1 up.
 
 A pixel value within ε of a threshold (R7) falls in the more severe class of the decision it belongs
 to: a failure where the threshold separates a failure, a contact where it separates a contact from
@@ -333,8 +342,8 @@ clear. Geometry from layout (advances, boxes) is compared exactly, in Chrome's l
   weight, size, ratio or sub-pixel phase, the seed binds its class at the configurations 3c-C
   measures and states; wherever the seed's stated geometry recurs it keeps the same class or a more
   severe one, and elsewhere it does not bind. Every clearance is stated in device pixels (or in em of
-  the glyph's own size where the reading depends on the size), at least one blank device pixel, and
-  "clear" needs one more device pixel of margin than the clearance (the drift between drawn ratios), set from the pinned labels' drawings at every ratio with a stated margin, and
+  the glyph's own size where the reading depends on the size), at least one blank device pixel,
+  set from the pinned labels' drawings at every ratio with a stated margin, and
   required to put every synthetic seeded case in its stated class at T's extremes (5 pt, every ratio)
   and every seed quoting the label in its class at the label's own sizes; never loosened by hand.
 - **P3. Failures: clear misreadings.** Each of these is a failure: two cells' text standing side by
@@ -359,9 +368,10 @@ clear. Geometry from layout (advances, boxes) is compared exactly, in Chrome's l
   glyph's pixels inside the underline's band (the rows the drawn line occupies, its skip-ink cuts
   counted as band) and on those 8-adjacent to the band from below; and, for a character whose pinned
   glyphs descend below the baseline by more than a stated overshoot (set by 3c-C at or above 0.03 em and below the smallest descent of the named descending classes,
-  with the glyphs between listed and classed: "ø", "Ø", "Φ", "/" and "\" in some pinned faces descend
-  0.036 to 0.051 em, measured; from R4's ink bound: a comma, a
-  semicolon, a cedilla, a mark below, a descender, a bracket), also on its ink below the highest
+  with every other glyph that descends past it listed and classed by its measured descent, including
+  "ø", "Ø", "Φ", "/" and "\" (0.036 to 0.051 em in some pinned faces) and "§", "†", "‡", "$", "¶",
+  "¢", "¼", "¾" and "@" (0.059 to 0.144 em, deeper than a comma in some faces), measured; from R4's
+  ink bound: a comma, a semicolon, a cedilla, a mark below, a descender, a bracket), also on its ink below the highest
   baseline R4 allows. A character resting on the baseline (its glyphs descending no more than the
   overshoot) is not judged on ink above the band that only touches it, so a letter resting on its
   underline is not a contact (P5 still judges that underline as an underline, and a shifted glyph
@@ -370,8 +380,10 @@ clear. Geometry from layout (advances, boxes) is compared exactly, in Chrome's l
   lowest baseline R4 allows) lying wholly in the band (drawn or cut), or sharing at least two
   8-connected pixels with the drawn line (a count within the anti-aliasing variance of two counting
   as two), is P3's failure (a comma merged into its
-  underline, "1,5" read as "1.5"; an "ạ" whose dot sits in a cut); any other touch is a contact,
-  cleared only by P8(a). A shifted glyph's part lying wholly in its own run's underline band, drawn or
+  underline, "1,5" read as "1.5"; an "ạ" whose dot sits in a cut), except that for P8(a)'s letters,
+  whose identity is drawn above the baseline, sharing is a contact and only a part wholly in the band
+  is a failure (the tail hidden, "y" read as "v"); any other touch is a contact, cleared only by
+  P8(a). A shifted glyph's part lying wholly in its own run's underline band, drawn or
   cut, is the same failure (a lowered hyphen in an underlined "AUC₀₋₂₄"). A low-line character under a
   decoration (U+005F, U+02CD, U+2017, U+0332 and the closed list 3c-C states) is a refusal of ours.
   The underline of another line of the same run is a foreign line; and the judge asserts that each line's visual order is its logical order; a
@@ -431,16 +443,19 @@ carried sections before P8 (178 descenders on their own borders in 4.8 and 9 in 
 reporting box's grey edges; 65 pairs of 4.2's raised 9 against the line above; two brackets on their
 own borders in 4.8; one in 5.2) and about 70 after it, 65 of them the raised 9's, in some 100 to 250
 distinct drawings; the seventeenth review counted about 49 own-underline contacts (descender tails
-touching their underline at ratio 1) under the rule then, which this draft's free cut row reduces;
-every integer width adds more, and 3c-C recounts before the cap is set. 3c-C measures the counts at every width and sets
+touching their underline at ratio 1) under the rule then, which the free cut row reduces; the
+nineteenth found more underlined "y"s as plain contacts at 1.1 (4.4 and 4.8), and, at 0.8 and 0.9,
+hundreds of descender contacts and two underlined "y"s sharing pixels with their line, which the
+zoomed-out rule and P4's letters leave unjudged; every integer width adds more, and 3c-C recounts
+before the cap is set. 3c-C measures the counts at every width and sets
 a cap, one gate constant in the record's `tolerances` (so changing it is a new gate version), on the
 number of contact identities and of distinct drawings across a record's carried sections; the lookup
 refuses above it (`renderer-contacts-exceeded`, a failure, never a refusal of ours), so
 acknowledgement never becomes a rubber stamp. The withheld sections' contacts are not counted. It is ADR 0003's second stated exception, amended (owner decisions of 2026-09-25): a
 contact the gate cannot prove harmless passes only by a person's acknowledgement.
 
-**Seeded cases (binding).** Each is a case of the judge's tests in both modes and at every ratio;
-where a case's class depends on the face, weight, size, ratio or sub-pixel phase, it binds at the
+**Seeded cases (binding).** Each is a case of the judge's tests in both modes and at every ratio
+(a failure) or every ratio from 1 up (any other class); where a case's class depends on the face, weight, size, ratio or sub-pixel phase, it binds at the
 configurations 3c-C measures and states (P2).
 
 Must be failures: a descender covered by a later line's inline background; an underscore under its
@@ -693,12 +708,12 @@ it used, not in a later one.
 ### R11. Cost
 
 The ten ratios of R2 make 1 601 layouts at ratio 1 and 961 at each of the nine others (10 250 per label). The reviews measured 211 ms to read the whole tablets label's 105 k rectangles per width on an
-M-series core, about 0.5 s per layout with the checks, so about 50 CPU-minutes per label per draw
-(6 406 layouts); a full-page capture of 5.1 at ratio 3 takes 2 to 6.5 s. So pixels are drawn only at widths and ratios where candidates exist, once per drawing (glyphs only, lines only,
+M-series core, about 0.5 s per layout with the checks, so about 85 CPU-minutes per label per draw
+(10 250 layouts; the zoomed-out ratios' failure checks cost less); a full-page capture of 5.1 at ratio 3 takes 2 to 6.5 s. So pixels are drawn only at widths and ratios where candidates exist, once per drawing (glyphs only, lines only,
 a box made transparent), and cropped locally; the advance-only defects are computed from the
 rectangles already read. The sixth review measured 709 to 741 own-frame candidates per layout in
 4.8 and a full-page capture of 4.8 at 0.13 s (ratio 1) to 0.73 s (ratio 3): about two CPU-hours per
-draw for 4.8 alone, which 3c-C measures again before setting the build's timeout. The render build runs on a
+draw for 4.8 alone at the eighteenth draft's six ratios, more at ten, which 3c-C measures again before setting the build's timeout. The render build runs on a
 high-CPU Cloud Build machine (a private pool in the project's region if the region's default pool
 has none), sharded by ratio and width range within one build, which alone signs, with a timeout set
 from 3c-C's measurement of the pinned labels (4.8's candidates the largest share); it runs only when
@@ -724,10 +739,12 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
 - The authority's viewer applies a stylesheet the gate does not, and its page margin may differ
   from the gate's 16 px, which `off-page` and check 6 depend on.
 - The visited link colour is judged statically (T3a).
-- A letter of P8(a) whose tail shares two pixels with its own underline, or lies wholly in its band,
-  at some layouts (a 5 pt "y"; every underlined serif descender at 5 to 7 pt at ratio 1) is P3's
-  failure though it reads correctly, so small underlined text in a safety section can refuse; 3c-C measures how often, on the pinned labels (none on the
-  tablets label's carried sections).
+- A letter of P8(a) whose tail lies wholly in its own underline's band at some layouts (a 5 pt "y")
+  is P3's failure though it may read correctly, so small underlined text in a safety section can
+  refuse; one whose tail shares pixels with the line is a contact; 3c-C measures how often, on the
+  pinned labels.
+- Zoomed out (0.8 and 0.9), a drawing that is neither a failure nor a refusal of ours is not shown
+  to anyone (ADR 0003's third stated exception); below 0.8, nothing is judged.
 - A shifted glyph crossed through its body by its own run's underline (a lowered "2" in an
   underlined "AUC₀₋₂₄") is P3's failure even where it stays readable; 3c-C measures how often an
   underlined heading with a subscript is refused.
@@ -754,12 +771,13 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
   `parsererror`, a border snapped differently at ratio 1.5, two glyphs 0.2 px apart across lines, a
   broken picture's box, a not-drawn picture drawn at its evidence's box, a first block's negative
   margin.
-- The three classes: every seeded case in its stated class; 4.2's and 4.8's contacts found and
+- The three classes: every seeded case in its stated class; at 0.8 and 0.9 every seeded failure
+  found and no contact recorded; 4.2's and 4.8's contacts found and
   captured at every distinct mask; an import that does not acknowledge every contact, or
   acknowledges one the record lacks, refuses.
 - Defects: the seeded controls are not defects; no carried section of a pinned label has one; the
   tablets' 5.1 shows `cells-run-together` in table 8 (from 320 to 419 px and at 671 px at ratio 1;
-  320 to 418 px at the other ratios).
+  320 to 418 px at 1.25 to 3, measured; 3c-C measures 0.8, 0.9, 1.1 and 2.625).
 - The render build refuses a record it cannot regenerate, one whose pinned bytes are missing, and a
   judge whose hash is not the lock's; it never runs outside `main`'s trigger; the image build drops a
   record without a valid attestation, and one attested in another environment or with a revoked key.
@@ -992,3 +1010,14 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
     0.9, 1.1 and 2.625 added, and "clear" needs a device pixel of margin beyond its clearance; P2's
     binding restated; the overshoot bounded and its in-between glyphs classed by 3c-C; the residual
     widened; a sharing-only seed; a shifted part in its own underline a failure; the rest as found.
+19. **Nineteenth independent review** (2026-09-26). No High. Medium: at the added ratios 0.8 and
+    0.9, two underlined "y"s in 4.8 and 4.6 shared pixels with their line, P3's failure in a safety
+    section, and P8(a)'s two rows failed for most of 4.8's descenders (hundreds of contacts); the
+    one-pixel margin left a band no class covered, made a descender one row from its border worse
+    than one touching it, and multiplied contacts (4.4's "g" over "b" a contact at 0.8); and the
+    margin was no bound (drift up to two device pixels; holes at 0.95 and 1.05). Low: glyphs deeper
+    than the overshoot's list; R11's figures; ADR 0003's garbled count; 5.1's defect widths at the
+    new ratios; more contacts at 1.1. Fixed in this draft: the owner decided (2026-09-26) that at
+    0.8 and 0.9 the gate judges failures and refusals only (ADR 0003's third stated exception); for
+    P8(a)'s letters, sharing with their own underline is a contact and only a tail wholly in the band
+    a failure; the margin removed and the residual stated as measured; the rest as found.
