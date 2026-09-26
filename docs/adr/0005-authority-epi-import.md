@@ -252,7 +252,7 @@ Three facts about that source meet three rules of the record:
   otherwise it is a new import of the current publication (the EMA keeps serving older Lists as
   current, so "current" is the product's one List under `docs/design/approval.md`'s amendment of
   2026-09-25, until supersession is designed), and the earlier record is withdrawn
-  or withdrawn under roadmap item 2.
+  under roadmap item 2.
 
 ## Amendment (2026-09-24, `fidelity-norm/3.1.0`)
 

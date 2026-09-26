@@ -336,8 +336,9 @@ indexId, versionNumber, procedureNumber, authorityTimestamp }` (`authorityTimest
 
 The method is required exactly when the source is an authority publication, and every
 publication field must equal the source's and the graph's. `requestedBy` is a placeholder, like
-`approverId`, until roadmap item 2 binds it to an identity token (`docs/design/approval.md` gains
-the method).
+`approverId`, until roadmap item 2 binds it to an identity token (`docs/design/approval.md`'s amendment of
+2026-09-25 replaces the method: its fields move into the source record, and the request statement's
+signer replaces `requestedBy` and `requestedAt`).
 
 Stated residuals: which import is current when a later one supersedes it, and how a withdrawal
 reaches the record, belong to roadmap item 2's head and withdrawal (`docs/design/approval.md`,

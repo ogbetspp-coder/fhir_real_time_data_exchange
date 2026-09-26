@@ -338,30 +338,44 @@ only these requirements bind now, and item 2 must meet them before PR 5:
    attested person in the `content-reviewer` role; the request is one content-reviewer's
    judgement (whether production adds a countersignature is the owner's decision).
 2. What was shown is what is signed: a self-contained review, built by the signer from the
-   submission, its own recomputation of the import and the attested renderer record, shows every
-   acknowledged contact, every withheld section's confirmed and rejected defects, and the product
-   and List; the signer refuses a draft the gate would refuse.
+   submission, its own recomputation of the import and the attested renderer record, after it has
+   verified, for this environment, the record's attestation, its captures index and each capture's
+   hash, shows every acknowledged contact, every withheld section's confirmed and rejected defects,
+   and the product and List; the signer refuses a draft the gate would refuse; nothing between the
+   person and the signer can change what their action names (the review's hash, the kind and the
+   submission); and the build's tests refuse a tampered capture, index or attestation, and one of
+   another environment.
 3. Who opened the review is recorded by a Google component, or the design says it is not.
 4. The statement pins the carried sections and the withheld set; the query service fails closed on
    any disagreement, on a withheld safety or non-leaf section, and reads the defect kinds from the
    signed statement.
-5. One List per product at a time, decided by a check that two racing requests cannot both pass,
-   with the product and List taken from the recomputed import, not the draft; supersession across
-   Lists waits for its own reviewed design.
+5. One List per product at a time: the statement signs `{ authority, epiId }` and the List, taken
+   from the recomputed import, not the draft; every document served as current for a product comes
+   from that product's one List, checked at signing (by a check that two racing requests cannot both
+   pass), at publish and on every answer; supersession across Lists waits for its own reviewed
+   design.
 6. No head, and no product-level record, can be replaced, hidden or rolled back while it is
-   retained; a reader fails closed on anything malformed.
+   retained; a reader fails closed on anything malformed; and a write sequence interrupted at any
+   point fails closed or is rolled forward, never leaving a state that breaks requirements 4 to 6.
 7. Where the publication's fields go, and the versions, as stated below.
+8. Phase 1's properties hold for requests: the person is asserted by a Google-signed token that the
+   signer verifies itself (D2); the statement is signed by an HSM key of its environment (D3, D4)
+   over the submission's `approvedContentSha256` and the review's hash, and the pipeline refuses a
+   mismatch; each stored version is linked to its statement (D5); the head is the current text
+   (D8); and the query service verifies all of it on every answer (D9). Item 2's review may change
+   how these are met, not whether.
 
-The mechanics that follow (the heads bucket, the product chain's entries, write order and
-roll-forward, how a head is read, the grants, the Identity-Aware Proxy details) are the approach
-proposed to meet them. Item 2's own design review settles them, with these questions from roadmap
+The bullets below elaborate these requirements. Those marked _proposed_ (the heads bucket, the
+product chain's entries, write order and roll-forward, how a head is read, beyond retention, reviews
+in the versioned bucket, the grants, the build order), and the flow's storage, link and
+Identity-Aware Proxy details, are the approach proposed to meet them; the rest bind as stated. Item 2's own design review settles them, with these questions from roadmap
 3a's review rounds open: the document head must be read only after the product chain is read and
 rolled forward, and a lost race re-reads both (never reusing earlier positions), a head create that
 finds different bytes failing closed; a committed product entry whose head was never written must be
 visible to D9 (as the head, or rolled forward on a schedule); the click's parameters (review hash,
 kind, submission) are not signed by the add-on's tokens, so the receiver is a trust root to put
 under the signer's image allowlist, or the signer is the endpoint, with each token consumed once and
-a stated freshness window; D9 needs a lookup from the head's statement to its stored version (a
+a stated freshness window, to meet requirement 2; D9 needs a lookup from the head's statement to its stored version (a
 second deterministic Provenance id from the statement's hash, or a bounded walk); Type 2 approvals
 have no product chain and write the head before `approvals/`; a withdraw's place in the product
 chain; roll-forward completing `approvals/` and the publish, verifying the entry, and treating an
@@ -439,7 +453,7 @@ signer's egress to the authority and the wider surface of the process holding th
   `renderEvidence` and is never persisted in production (the contract's D7). A synthetic import that
   withholds a section carries renderer evidence (the renderer note's R5) and is a request like any
   other.
-- **Heads under retention, in their own bucket.** The evidence bucket keeps object versions, and a
+- _Proposed._ **Heads under retention, in their own bucket.** The evidence bucket keeps object versions, and a
   retained live version can still be made noncurrent, which would hide the newest head from a
   listing; and retention forbids replacing an object, so D8's head cannot be one object updated by
   compare-and-swap. So heads live in a bucket of their own, `approval-heads`, with a retention policy
@@ -457,7 +471,7 @@ signer's egress to the authority and the wider surface of the process holding th
   delete or an overwrite is refused. This corrects D8, the flow, phase 1 and build step 3 for every
   statement kind. The worker's bucket-wide `objectCreator` on the evidence bucket is conditioned to
   exclude `approvals/` and `reviews/` in phase 1, not phase 2.
-- **The product chain: its entries, order and checks.** For a request, the statement also signs
+- _Proposed._ **The product chain: its entries, order and checks.** For a request, the statement also signs
   `productSequence` and `previousProductEntrySha256`, and the product chain's entry is the signed
   statement itself, the commit point. The order is: (1) the product entry,
   `products/<key>/<productSequence>`, create-if-absent; (2) the document head, the same bytes; (3)
@@ -473,7 +487,7 @@ signer's egress to the authority and the wider surface of the process holding th
   design) and takes `{ authority, epiId }` and the List's GUID, `versionNumber` and hash from it,
   never from the draft; the review shows the product and the List. The pipeline requires the
   statement's product and List to equal the recomputed source record's.
-- **Reading a head.** A reader (the signer, the pipeline, D9) lists the chain, takes the highest
+- _Proposed._ **Reading a head.** A reader (the signer, the pipeline, D9) lists the chain, takes the highest
   entry, and requires: its name matches `^\d{12}$` and equals the statement's sequence; the
   statement's document (or product) hashes to the prefix; its previous hash equals the entry below
   it; and, for a request, the head's bytes equal `products/<key>/<productSequence>`. A malformed or
@@ -481,10 +495,10 @@ signer's egress to the authority and the wider surface of the process holding th
   answers from the stored version linked to the head, not the newest stored version. Its reads per
   answered document are the linked Provenance, the head's listing and entry and, for a request, the
   product chain's listing and entry; `find_product`'s scan budget is recalculated from that.
-- **Beyond retention.** An IAM deny on `storage.objects.delete` for the heads bucket (the key-guard
+- _Proposed._ **Beyond retention.** An IAM deny on `storage.objects.delete` for the heads bucket (the key-guard
   pattern) and no lifecycle rule keep a head in place after its retention expires; before the policy
   is locked at the production gate, an administrator could remove it, stated.
-- **Reviews in the versioned evidence bucket.** A principal who may delete there could make
+- _Proposed._ **Reviews in the versioned evidence bucket.** A principal who may delete there could make
   `reviews/<hash>` noncurrent and create different bytes under the name; the IAP review service
   hashes the bytes before serving them, and for a direct download the deployers with delete rights on
   the bucket are the trust root, stated.
@@ -503,8 +517,8 @@ signer's egress to the authority and the wider surface of the process holding th
   authority's document id determines; a new id is a new chain, subject to the List rule (above).
   The authority keeps serving a document it has replaced, so a signed request still publishes it;
   the List rule keeps it from displacing a newer List's import.
-- **The role.** The signer requires `content-reviewer` for every request that carries renderer
-  evidence (every authority import but a synthetic one that withholds nothing).
+- **The role.** The signer requires `content-reviewer` for every request, including a synthetic
+  import's without renderer evidence.
 - **Segregation (D7) for a request.** A request is one content-reviewer's judgement in every
   environment: D7's bar on the principal that wrote the submission does not apply, since the
   requester drafts the decisions they sign, and the renderer record it rests on is regenerated
@@ -520,21 +534,21 @@ signer's egress to the authority and the wider surface of the process holding th
   point here (the withheld note's forward pointers), in the change that makes the move.
 - **Versions.** `ApprovalStatement` and `ReviewRecord` are new, so their 1.0.0 includes the `request`
   kind and its meaning codes, D3's shape extended with `{ authority, epiId }`, the List's GUID,
-  `versionNumber` and hash, `productSequence` and `previousProductEntrySha256`,
-  `sections` entries with `status: withheld`, the notice's hash and defect kinds, and the import
+  `versionNumber` and hash, whatever fields the settled mechanics add (proposed:
+  `productSequence` and `previousProductEntrySha256`), `sections` entries with `status: withheld`, the notice's hash and defect kinds, and the import
   review's shape. Item 2's majors of `CanonicalSubmission` and the query tools and roadmap 3a's (the
   renderer and withheld notes' 3.0.0) are one major each if they land together, and consecutive
   otherwise; whichever lands second takes the next number. The contract table above gains the
   `request` kind, `ReviewRecord`'s import review, `record-inconsistent` and `get_section`'s
   `section-withheld`.
-- **Identities.** The signer's grants become: `signerVerifier` on its key; create-only on
+- _Proposed._ **Identities.** The signer's grants become: `signerVerifier` on its key; create-only on
   `approvals/`; create, and `objectViewer` (read and list), on the heads bucket; create-if-absent and read on `reviews/`, except
   `reviews/fetches/`, which it only reads; read on the submissions it signs over; read on the render
   build's attestation and captures buckets. The IAP review service, if built, reads `reviews/` and
   creates `reviews/fetches/` only. The query service and the pipeline read and list the heads
   bucket. The approver map's members gain `storage.objectViewer` on the evidence bucket, conditioned
   on `reviews/` (or, under Identity-Aware Proxy, the web app user role, above).
-- **Build order.** Step 1's spike adds a review opened from a card link through the authenticated
+- _Proposed._ **Build order.** Step 1's spike adds a review opened from a card link through the authenticated
   browser download, rendered inline with its captures visible, and what the data-access log records
   of it; steps 2, 3 and 5 of phase 1 add request cases (the review library; a request signed over an
   authority import's review; a draft the gate would refuse, a tampered capture, index or attestation,

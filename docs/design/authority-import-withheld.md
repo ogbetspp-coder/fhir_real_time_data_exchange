@@ -566,3 +566,15 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
     So approval.md's amendment now separates what binds for roadmap 3a (seven requirements item 2
     must meet before PR 5) from the proposed mechanics, which item 2's review settles with these
     findings listed as its open questions.
+23. **Twenty-third independent review** (2026-09-26), a scope check of the seven. No High. Medium:
+    the base design's properties that the other notes rest on (the Google-asserted person, the
+    statement signed over `approvedContentSha256`, the version linked to its statement, the head as
+    the current text, verification on every answer) no longer bound; the signer's check of each
+    capture's hash not bound; the one-List rule checked only at signing, and an interrupted write
+    left unbound. Low: which bullets bind; the click's parameters; the role's scope; the roadmap's
+    item 2 and PR 5 wording; a doubled word in ADR 0005; the contract's stale pointer; the renderer
+    note stating proposed storage as settled. Fixed: an eighth requirement binds phase 1's
+    properties for requests (how, not whether, is item 2's); requirement 2 binds the capture checks,
+    the action's integrity and their tests; requirement 5 binds the product and List in the
+    statement and the rule at signing, publish and every answer; requirement 6 binds interrupted
+    writes; bullets marked _proposed_; the rest as found.

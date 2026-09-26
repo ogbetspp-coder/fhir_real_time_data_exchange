@@ -501,9 +501,10 @@ withheld section's confirmations are the withheld note's. Acknowledging a contac
 content, so, as for withholding, PR 5 lifts the dry run for a request that acknowledges any only once
 its requester is an attested identity (every Imatinib Teva import acknowledges some, so PR 5 needs that
 identity before any real label is persisted). The review the requester is shown is item 2's (`docs/design/approval.md`, its amendment of
-2026-09-25): the signer verifies the attestation, the index and each capture's hash, builds a review
-of every acknowledged contact (identical masks once, each with every identity it stands for) and
-stores it, and a Chat card links to it; that the requester opened it is a claim, not proven, a
+2026-09-25): as that amendment requires, the signer verifies the attestation, the index and each
+capture's hash and builds a review of every acknowledged contact (identical masks once, each with
+every identity it stands for); how it is stored and linked (a Chat card is proposed) is item 2's
+review's; that the requester opened it is a claim, not proven, a
 residual stated below. When several attestations of a record verify (key versions
 not revoked), the image build takes the one of the highest key version, and its captures are those a
 request names. The image build places, beside each record it keeps,
