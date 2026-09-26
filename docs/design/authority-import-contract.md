@@ -350,7 +350,8 @@ the approval design's List rule, not the gate's fetch, keeps it from displacing 
 This amends ADR 0005 decision 4: a re-import after a normalisation change is possible only while
 the authority still serves the same bytes for the document and its List (the List changes when
 any document of the product changes); otherwise it is a new import of the current publication,
-and the earlier record is superseded or withdrawn under roadmap item 2.
+and the earlier record is withdrawn under roadmap item 2 (supersession across Lists awaits its own
+design; `docs/design/approval.md`, amended 2026-09-25: one List per product at a time).
 
 ### D9. The Type 1 record: every value and its origin
 

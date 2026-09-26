@@ -1,6 +1,6 @@
 # A withheld section: importing a publication with an authority's defect recorded in place (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25; twentieth draft, after nineteen design reviews
+- Status: proposed, 2026-09-25; twenty-first draft, after twenty design reviews
 - Owner decisions (2026-09-25): withhold the Imatinib Teva tablets SmPC's 5.1 and import the
   other 31 sections; a section may be withheld only on reviewed, measured evidence of the
   authority's defect, the whole record is marked incomplete everywhere it is read, and the safety
@@ -311,7 +311,7 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
   provenance says why.
 - That a requester reviewed a withheld section's captures before confirming or rejecting its defects
   is their claim; at most the record shows who opened the review (approval.md's amendment: the log
-  redacts the principal of a browser download, so the approval service may serve it behind
+  redacts the principal of a browser download, so a separate review service may serve it behind
   Identity-Aware Proxy), never that they looked at each drawing.
 - The finding is of the FHIR div drawn with its inline styles in metric-compatible fonts; the
   EMA's viewer applies its own stylesheet, which the gate does not model.
@@ -539,3 +539,13 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
     precondition) every current import of a product comes from one List, which the statement signs;
     heads are append-only; the contract's residual corrected; a separate review service behind IAP
     writing a fetch record the signer checks; a request stated as one content-reviewer's judgement.
+20. **Twentieth independent review** (2026-09-26). Medium: "one List per product" could not be
+    enforced (heads keyed by document, the ePI id unsigned) and two requests could race past it;
+    append-only heads in a versioned bucket could be hidden (a retained live version can be made
+    noncurrent), rolling back to older text. Low: listing grants; what a head holds, its write order
+    and numeric order; stale compare-and-swap text; round 19's fixes incomplete in the contract,
+    ADR 0005, the roadmap and this note; the re-import case. Fixed in approval.md's amendment: the
+    statement signs `{ authority, epiId }`, and a per-product append-only chain, which every request
+    extends, names the product's List, so racing requests collide and the pipeline and D9 check it;
+    heads and product chains in their own unversioned bucket with retention, signed before they are
+    appended, numbered to sort; grants, stale text and pointers corrected.
