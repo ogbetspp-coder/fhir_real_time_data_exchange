@@ -35,7 +35,9 @@ const parts: string[] = [];
 BINDINGS.forEach(([family, face], f) => {
   FACES.forEach(([weight, style, suffix], s) => {
     const id = `f${f}s${s}`;
-    spans.push({ id, expected: `${face}-${suffix}` });
+    // The Liberation faces' regular PostScript names carry no suffix (measured in the image).
+    const regularBare = face.startsWith("Liberation") && suffix === "Regular";
+    spans.push({ id, expected: regularBare ? face : `${face}-${suffix}` });
     const quoted = family.includes(" ") ? `'${family}'` : family;
     parts.push(
       `<span id="${id}" style="font-family:${quoted};font-weight:${weight};font-style:${style}">Hamburgefonstiv 0123</span>`,
