@@ -222,12 +222,15 @@ recordSha256, capturesIndex, capturesSha256, documentSha256, pinsSha256, rendere
   raw, reference-decoded data. The render build's step 2 keys T's model output with the same
   function, tested to agree with the judge on every carried section.
 - **The output format.** T's model output is specified in 3c-B's addendum to this note
-  (`docs/design/authority-import-renderer-model.md`), reviewed independently before R3 lands: its entries in the index space above; each property as T models it (a size's range
-  under `smaller`, a colour's set under a link, a line height's kind, each element's fold); the
-  code-point offsets of T5's waivers and of the scanner's text for each drawn code point, which the
-  allowlist's neighbours need; how points compare with Chrome's serialised pixels; and the
-  per-section picture list (R2). Its serialiser is T's code, under D10's lock, and step 2 of the
-  render build (R1) emits it with the scanner's text and the picture list.
+  (`docs/design/authority-import-renderer-model.md`), reviewed independently before R3 lands: its
+  entries in the index space above; each property as T models it (a size's range under `smaller`,
+  a colour's set under a link, a line height's kind, each element's fold); the code-point offsets
+  of T5's waivers; and how points compare with Chrome's serialised pixels. The scanner's offsets
+  for each drawn code point, which the allowlist's neighbours need, are 3c-C's addition to the
+  model (`t-model/1.1.0`, a change to T's code under D10's lock, so a new importer version); the
+  per-section picture list (R2) is an output of its own, R8's, not part of the model. The
+  serialiser is T's code, under D10's lock, and step 2 of the render build (R1) emits the model
+  with the scanner's text and the picture list.
 - **What the record binds.** Not T's or the scanner's code but their outputs, per section: T(div)'s
   hash; the hash of T's model output (every text node's and list marker's modelled style, fold
   decision and waiver, serialised canonically); and the scanner's text hash (which holds the list

@@ -7,6 +7,23 @@ export type ModelCase = { name: string; inner: string };
 
 export const MODEL_CASES: ModelCase[] = [
   {
+    // A table's `border` attribute merged with declarations one longhand at a time, and a cell's
+    // attribute border colour inherited through its row, row group and table (the second review).
+    name: "border-attribute-longhands",
+    inner:
+      '<table border="1"><tr><td style="border-style:solid">a</td><td style="border-color:blue">b</td>' +
+      '<td style="border-width:2px">c</td><td style="border-top-style:dotted;border-left-color:blue">d</td></tr>' +
+      '<tr style="border-color:#008000"><td>e</td><td>f</td><td>g</td><td>h</td></tr></table>' +
+      '<table border="2" style="border-color:blue;border-top-width:1px"><thead style="border-color:#800080">' +
+      "<tr><td>i</td></tr></thead><tbody><tr><td>j</td></tr></tbody></table>" +
+      '<table border="2" style="border-style:solid"><tr><td>k</td></tr></table>',
+  },
+  {
+    // M1: a CR or LF by reference is the DOM's own code point; only raw CR LF and CR are joined.
+    name: "line-ends-by-reference",
+    inner: "<p>a&#13;&#10;b\r&#10;c&#13;\nd</p>",
+  },
+  {
     // M1: whitespace between table parts and list items, and CR LF, lone CR and a CR reference.
     name: "line-ends-and-inter-element-text",
     inner: "<table>\r\n <tr>\n<td>a\r\nb\rc&#13;d</td></tr></table><ul> <li>e</li>\n</ul>",

@@ -74,6 +74,19 @@ describe("T's model output", () => {
     expect(cell?.pointToDom).toEqual([0, 1, 1, 2, 3, 4, 5, 6]);
   });
 
+  it("keeps a CR or LF given by reference as the DOM's own code point", () => {
+    // Raw CR LF and lone CR are joined into one LF; &#13;&#10;, CR then &#10;, and &#13; then LF
+    // are two code points each (the second review, measured in both modes).
+    const [paragraph] = model("<p>a&#13;&#10;b\r&#10;c&#13;\nd</p>").text;
+    expect(paragraph).toEqual({ key: 0, element: 1, start: 0, end: 10 });
+  });
+
+  it("maps a waived sign after a raw CR LF to the DOM's offset", () => {
+    const waived = model("<p><u>Posology\r\nfor Ph+ ALL in children</u></p>", ["Ph+"]);
+    const plus = "Posology\nfor Ph+".length - 1;
+    expect(waived.waivers).toEqual([{ start: plus, end: plus + 1 }]);
+  });
+
   it("models weights, styles and markers as Chrome draws them", () => {
     const { elements, markers } = model(
       '<p style="font-weight:lighter"><b>a</b></p><h2><i>b</i></h2><ol start="2"><li>c<ul><li>d<ul><li>e</li></ul></li></ul></li></ol>',

@@ -1,6 +1,6 @@
 import { canonicalJson } from "../../lib/hash.js";
 import type { Rgb } from "./css.js";
-import type { Border, ComputedStyle, Size } from "./style.js";
+import type { ComputedStyle, Size } from "./style.js";
 import {
   analyseSection,
   colours,
@@ -138,15 +138,6 @@ function tableBorder(table: ElementNode | undefined): number {
   return value === undefined ? 0 : Number(value.trim());
 }
 
-function modelBorder(border: Border): ModelBorder {
-  if (border.style === "none") return "none";
-  return {
-    width: border.widthPt,
-    style: border.style,
-    colours: sortedColours(border.colours ?? []),
-  };
-}
-
 type Context = {
   analysis: Analysis;
   styles: Map<ElementNode, ModelStyle>;
@@ -186,27 +177,75 @@ function horizontalMargin(
   return exact(style.margin[side]);
 }
 
-function borders(element: ElementNode, style: ComputedStyle, own: Rgb[]): Sides<ModelBorder> {
+type Part = "width" | "style" | "color";
+
+// Whether the element declares one longhand of a border, through itself or a shorthand that
+// covers it. T's `declared` set holds the properties as written; border shorthands are expanded
+// here.
+function declaresPart(style: ComputedStyle, side: string, part: Part): boolean {
+  const { declared } = style;
+  return (
+    declared.has("border") ||
+    declared.has(`border-${side}`) ||
+    declared.has(`border-${part}`) ||
+    declared.has(`border-${side}-${part}`)
+  );
+}
+
+// A cell's border colour under a table's `border` attribute: inherited through its row, row group
+// and table from the nearest that declares one, else the cell's own colour (M3, "Tables").
+function inheritedBorderColours(
+  context: Context,
+  cell: ElementNode,
+  side: string,
+  own: Rgb[],
+): Rgb[] {
+  for (let node = cell.parent; node !== undefined; node = node.parent) {
+    const style = styleOf(context, node);
+    if (declaresPart(style, side, "color"))
+      return sortedColours(style.borders[side as "top"]?.colours ?? own);
+    if (node.name === "table") break;
+  }
+  return own;
+}
+
+// Each side's border, one longhand at a time (M3): a declared longhand over the presentational
+// one (a table's `border` attribute on the table and its cells, `hr`'s own), over the initial
+// value (`none`, `medium`, the element's colour).
+function borders(
+  context: Context,
+  element: ElementNode,
+  style: ComputedStyle,
+  own: Rgb[],
+): Sides<ModelBorder> {
+  const isCell = element.name === "td" || element.name === "th";
   const attributeWidth =
     element.name === "table"
       ? tableBorder(element)
-      : element.name === "td" || element.name === "th"
-        ? tableBorder(nearestTable(element)) > 0
-          ? 1
-          : 0
+      : isCell && tableBorder(nearestTable(element)) > 0
+        ? 1
         : 0;
   const result = {} as Sides<ModelBorder>;
   for (const side of SIDES) {
+    let width = 2.25;
+    let lineStyle = "none";
+    let lineColours = own;
+    if (element.name === "hr") {
+      width = 0.75;
+      lineStyle = "inset";
+    } else if (attributeWidth > 0) {
+      width = attributeWidth * 0.75;
+      lineStyle = element.name === "table" ? "outset" : "inset";
+      if (isCell) lineColours = inheritedBorderColours(context, element, side, own);
+    }
     const declared = style.borders[side];
-    if (declared !== undefined) result[side] = modelBorder(declared);
-    else if (element.name === "hr") result[side] = { width: 0.75, style: "inset", colours: own };
-    else if (attributeWidth > 0) {
-      result[side] = {
-        width: attributeWidth * 0.75,
-        style: element.name === "table" ? "outset" : "inset",
-        colours: own,
-      };
-    } else result[side] = "none";
+    if (declared !== undefined) {
+      if (declaresPart(style, side, "width")) width = declared.widthPt;
+      if (declaresPart(style, side, "style")) lineStyle = declared.style;
+      if (declaresPart(style, side, "color")) lineColours = sortedColours(declared.colours ?? own);
+    }
+    result[side] =
+      lineStyle === "none" ? "none" : { width, style: lineStyle, colours: lineColours };
   }
   return result;
 }
@@ -290,7 +329,7 @@ function modelStyle(context: Context, element: ElementNode): ModelStyle {
       bottom: exact(style.padding.bottom),
       left: exact(style.padding.left),
     },
-    borders: borders(element, style, own),
+    borders: borders(context, element, style, own),
     borderCollapse: tableStyle?.borderCollapse ?? "separate",
     borderSpacing:
       table === undefined ? 0 : spacing === undefined ? 1.5 : Number(spacing.trim()) * 0.75,

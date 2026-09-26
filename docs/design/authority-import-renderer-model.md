@@ -1,6 +1,6 @@
 # T's model output: what the renderer gate compares (roadmap 3a, PR 3c-B)
 
-- Status: proposed, 2026-09-26; second draft, after one design review
+- Status: proposed, 2026-09-26; third draft, after two design reviews
 - Decides: the output format the renderer note's R3 leaves to "3c-B's addendum": the entries T
   emits for each section, in R3's index space; each property as T models it; how each is compared
   with Chrome's computed style; the fold and waiver fields, and where the scanner offsets and the
@@ -36,16 +36,20 @@ One index space per section, the judge's (R3), from the authority's div as serve
 - **Elements** are keyed by their position in a pre-order walk of the XML-mode DOM of the div,
   the div itself `0`. T's tree (`readTree`) walks the same elements in the same order: T accepts
   only markup whose nesting and whose HTML tree agree (T1's "one tree"), and an element the HTML
-  parser inserts (a `tbody`) is not in the XML-mode DOM and has no key. A test asserts, on every
+  parser inserts (a `tbody`) is not in the XML-mode DOM and has no key: in HTML mode the judge
+  matches Chrome's elements to the keys in order and skips an inserted `tbody`, the only insertion
+  for markup T and the scanner accept (the scanner refuses a bare `tr` beside row groups). A test asserts, on every
   carried section of every pinned label and every accepted T case, that T's keys equal the judge's.
 - **Text nodes** are the XML-mode DOM's: keyed by their pre-order position among the div's text
   nodes, each covering a half-open range `[start, end)` of **code-point offsets** in the
-  concatenation, in that order, of their data: character references decoded, and a CR LF pair or a
-  lone CR counted as one LF, as XML parsing normalises it. `readTree` drops the ASCII whitespace
+  concatenation, in that order, of their data: character references decoded, and a raw CR LF pair or a
+  raw lone CR counted as one LF, as XML parsing normalises it; a CR or LF given by reference is its
+  own code point (`&#13;&#10;`, a raw CR before `&#10;`, and `&#13;` before a raw LF are two each,
+  measured in both modes). `readTree` drops the ASCII whitespace
   between table parts and between list items, which the XML-mode DOM keeps as text nodes (the
   first review measured 36 text nodes and 2 326 code points in the DOM of Imatinib Teva's 4.1,
   where T's walk has 25 and 2 315); so `readTree` records those runs too, as text nodes flagged
-  `interElement: true`, without changing what it accepts, and T's offsets are counted over them and
+  `interElement: true` (the member present only when true), without changing what it accepts, and T's offsets are counted over them and
   over the normalised line ends. The judge compares no style for an `interElement` node.
 - **Markers** are keyed by their `li` element's key.
 
@@ -58,7 +62,7 @@ For each section T accepts, the model output is one JSON object:
   "format": "t-model/1.0.0",
   "elements": [ { "key": 0, "name": "div", "style": { … } }, … ],
   "text": [ { "key": 0, "element": 3, "start": 0, "end": 14 }, … ],
-  "markers": [ { "element": 12, "text": "1.", "style": { … } }, … ],
+  "markers": [ { "element": 12, "text": "1. ", "style": { … } }, … ],
   "folds": [ { "element": 40, "decision": "sup" }, … ],
   "waivers": [ { "start": 812, "end": 813 }, … ]
 }
@@ -109,25 +113,25 @@ of `|v|` (a whole unit, since a value stored in single precision can land on a r
 Every other value matches only when equal. A set of colours is serialised sorted by red, green,
 blue.
 
-| Property            | Modelled as                                                                                                     | Chrome's value compared                                                                                                                                         |
-| ------------------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `fontSize`          | range, pt                                                                                                       | `font-size`                                                                                                                                                     |
-| `fontWeight`        | an integer, 100 to 900                                                                                          | `font-weight`                                                                                                                                                   |
-| `fontStyle`         | `normal`, `italic` or `oblique`                                                                                 | `font-style`                                                                                                                                                    |
-| `colours`           | the set of RGB triples the text may be drawn in (both link colours under a link with no author colour since it) | `color`, which must be opaque and in the set                                                                                                                    |
-| `lineHeight`        | `normal`, or a range, pt (a number emitted as the number times the element's own size)                          | `line-height` (`normal`, or pixels)                                                                                                                             |
-| `underline`         | boolean                                                                                                         | `-webkit-text-decorations-in-effect` is `underline` when true, `none` when false                                                                                |
-| `backgrounds`       | the list of painted background colours from the div down to the element, outermost first                        | each ancestor's and the element's own `background-color`, the opaque ones in that order; a transparent one skipped, and one with 0 < alpha < 1 a mismatch       |
-| `textIndent`        | range, pt                                                                                                       | `text-indent`                                                                                                                                                   |
-| `margin`, `padding` | per side, a range, pt                                                                                           | `margin-*`, `padding-*`                                                                                                                                         |
-| `borders`           | per side: `none`, or `{ width, style, colours }` with the width in pt                                           | `border-*-style` equal; for a side not `none`, `border-*-width` against the width **as drawn** (below) and `border-*-color` in the set; a `none` side's width 0 |
-| `borderCollapse`    | `collapse` or `separate`                                                                                        | `border-collapse`                                                                                                                                               |
-| `borderSpacing`     | pt                                                                                                              | `border-spacing`, as drawn (below), each of its one or two values                                                                                               |
-| `display`           | the display the element's name gives (below)                                                                    | `display`                                                                                                                                                       |
-| `position`          | `static` or `relative`                                                                                          | `position`                                                                                                                                                      |
-| `top`, `bottom`     | `auto`, or a range, pt                                                                                          | `top`, `bottom`                                                                                                                                                 |
-| `margin` sides      | a range, pt, or `auto` (below)                                                                                  | not compared where `auto`                                                                                                                                       |
-| `verticalAlign`     | `baseline`, `super`, `sub`, `top`, `middle`, `bottom`, or a range, pt                                           | `vertical-align`                                                                                                                                                |
+| Property         | Modelled as                                                                                                     | Chrome's value compared                                                                                                                                         |
+| ---------------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fontSize`       | range, pt                                                                                                       | `font-size`                                                                                                                                                     |
+| `fontWeight`     | an integer, 100 to 900                                                                                          | `font-weight`                                                                                                                                                   |
+| `fontStyle`      | `normal`, `italic` or `oblique`                                                                                 | `font-style`                                                                                                                                                    |
+| `colours`        | the set of RGB triples the text may be drawn in (both link colours under a link with no author colour since it) | `color`, which must be opaque and in the set                                                                                                                    |
+| `lineHeight`     | `normal`, or a range, pt (a number emitted as the number times the element's own size)                          | `line-height` (`normal`, or pixels)                                                                                                                             |
+| `underline`      | boolean                                                                                                         | `-webkit-text-decorations-in-effect` is `underline` when true, `none` when false                                                                                |
+| `backgrounds`    | the list of painted background colours from the div down to the element, outermost first                        | each ancestor's and the element's own `background-color`, the opaque ones in that order; a transparent one skipped, and one with 0 < alpha < 1 a mismatch       |
+| `textIndent`     | range, pt                                                                                                       | `text-indent`                                                                                                                                                   |
+| `padding`        | per side, a range, pt                                                                                           | `padding-*`                                                                                                                                                     |
+| `borders`        | per side: `none`, or `{ width, style, colours }` with the width in pt                                           | `border-*-style` equal; for a side not `none`, `border-*-width` against the width **as drawn** (below) and `border-*-color` in the set; a `none` side's width 0 |
+| `borderCollapse` | `collapse` or `separate`                                                                                        | `border-collapse`                                                                                                                                               |
+| `borderSpacing`  | pt                                                                                                              | `border-spacing`, as drawn (below), each of its one or two values                                                                                               |
+| `display`        | the display the element's name gives (below)                                                                    | `display`                                                                                                                                                       |
+| `position`       | `static` or `relative`                                                                                          | `position`                                                                                                                                                      |
+| `top`, `bottom`  | `auto`, or a range, pt                                                                                          | `top`, `bottom`                                                                                                                                                 |
+| `margin`         | per side, a range, pt, or `auto` (below)                                                                        | `margin-*`, not compared where `auto`                                                                                                                           |
+| `verticalAlign`  | `baseline`, `super`, `sub`, `top`, `middle`, `bottom`, or a range, pt                                           | `vertical-align`                                                                                                                                                |
 
 - **Widths as drawn.** Chrome snaps a border's width to whole device pixels, at least one where the
   width is above zero: at a ratio `r`, a modelled width `w` points is drawn as
@@ -160,11 +164,16 @@ blue.
   value, which depends on the width (377 px at 813), so the judge does not compare an `auto` side.
 - **Tables.** Outside any table, `border-spacing` is 0 and `border-collapse` is `separate`. Each
   `table` resets them: `border-spacing` to 2 px (1.5 pt) or its `cellspacing` attribute's pixels,
-  `border-collapse` to `separate` or its declaration; both inherit to its descendants, up to a
-  nested table, which resets them again. A `table` `border`
-  attribute of `N` other than `0` gives the table `N` px `outset` borders and each of its cells
-  1 px `inset` borders, each in the element's own `color` (measured: `rgb(0, 0, 0)` for black text);
-  a declared border replaces them side by side. A cell's `padding` is 1 px, or the
+  `border-collapse` to `separate` or its declaration; both inherit to its descendants (the scanner
+  refuses a table inside a table). A `table` `border` attribute of `N` other than `0` is a set of
+  presentational longhands: on the table, each side's `border-*-width` `N` px, `border-*-style`
+  `outset` and `border-*-color` its own colour; on each of its cells, 1 px, `inset`, and a colour
+  inherited through the cell's row, row group and table from the nearest that declares one, else
+  the cell's own colour. A declared longhand, directly or through a shorthand covering it, replaces
+  the presentational one of the same property and side, one property at a time, and a longhand
+  neither declares is initial (`none`, `medium`, the element's colour) (measured:
+  `td style="border-style:solid"` under `border="1"` draws 1 px solid; `border-color:blue` on a
+  `tr` draws its cells blue). A cell's `padding` is 1 px, or the
   `cellpadding` attribute's pixels, and a declaration replaces it.
 - **Vertical alignment.** A `thead`, `tbody` or `tfoot` is its `valign`, else `middle`; a `tr` is
   its own `valign`, else its group's value, else `middle` where its parent is the `table` itself; a
@@ -178,7 +187,9 @@ blue.
   `inline` (T refuses `display`).
 - **Shifts.** `position` is `relative` exactly where T3 read `position: relative`, with the `top`
   or `bottom` it declared (an `em` length a range under `smaller`, of the element's own size) and
-  the other side its negation, as Chrome resolves it (measured: `top:-5pt` has `bottom` 6.66667 px);
+  the other side its negation, as Chrome resolves it (measured: `top:-5pt` has `bottom` 6.66667 px;
+  a range's bounds are ordered, `lo` the smaller, even for a negative factor, and the negation of
+  `[lo, hi]` is `[−hi, −lo]`);
   elsewhere both are `auto`.
 
 A test asserts every default in this section (every element T accepts, alone and under each
@@ -190,7 +201,8 @@ before it fails a label.
 For every carried section, in HTML and XML mode, at 813 px at every ratio and at R2's other named
 widths (360 and 1 240 px) at ratio 1, the judge reads each element's computed style (in an isolated world, scripts disabled)
 and each list marker's text from the accessibility tree, and compares them with the model entry of
-the same key by M3. Any difference, a missing entry or an extra element, is a refusal of ours
+the same key by M3; a marker's style against `getComputedStyle(li, "::marker")` (size, weight,
+style, colour, line height, decorations in effect), and its backgrounds against the `li`'s chain. Any difference, a missing entry or an extra element, is a refusal of ours
 (`model-mismatch`, with the key, the property, T's value and Chrome's), and the record carries it.
 Widths are named because a computed style does not depend on the width, but for a centred table's
 `auto` margins, which are not compared (R2's widths for geometry are R4's); the ratio matters only
@@ -223,7 +235,9 @@ for widths as drawn.
 - T(div) and every refusal unchanged, on every T case and every section of every pinned label.
 - M1's keys and offsets equal the judge's on every carried section and every accepted T case,
   including one with whitespace between table parts and list items and one with CR LF line ends.
-- Every default of M3 asserted against the pinned image; the width rule asserted at every ratio.
+- Every default of M3 asserted against the pinned image, and every declaration layered over a
+  presentational default (a table's `border` attribute longhand by longhand, a row's or group's
+  border colour, `cellpadding`, `align="center"`, `valign`); the width rule asserted at every ratio.
 - R3 on every accepted T case, every synthetic model case (`test/fixtures/render/model-cases.ts`)
   and every carried section of the pinned labels, in both modes, at M4's widths and ratios: no
   mismatch (CI's Renderer job, in the pinned image); and a model entry deliberately altered in a test
@@ -242,3 +256,12 @@ for widths as drawn.
    gap, the one-tree scope, the comparison's wording, the empty `scanner` field, waiver offsets,
    colour order, residuals. Measured: a rough R3 over 185 carried sections of the five pinned
    labels at eight ratios found only the shift mismatch. Fixed in this draft as found.
+2. **Second independent review** (2026-09-26). No High; round 1's fixes measured correct in both
+   modes at all ten ratios, and a re-run over all 185 carried sections of the pinned labels found no
+   mismatch. Medium: a table's `border` attribute merges with declarations one longhand at a time,
+   not side by side, and a cell's attribute border colour is inherited through its row, row group
+   and table (ten cases measured; false refusals only, none on a pinned label). Low: range bounds
+   under negation; CR and LF by reference; `interElement`'s serialisation, the marker example and a
+   duplicated row; how a marker's style is read; nested tables unreachable; HTML mode's `tbody`;
+   the renderer note's pointer and 3c-C's version; declarations over defaults in Verification.
+   Fixed in this draft as found, with synthetic cases for each.
