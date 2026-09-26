@@ -1,6 +1,6 @@
 # The renderer gate: a pinned browser's evidence for every authority import (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25 (architecture approved by the owner the same day); twenty-seventh draft,
+- Status: proposed, 2026-09-25 (architecture approved by the owner the same day); twenty-eighth draft,
   after twenty-seven design reviews; R4's thresholds provisional, settled by 3c-C's measured design
 - Decides: what `docs/design/authority-import-t.md`'s "What waits for PR 3c" left open: who draws,
   what is drawn and measured, the evidence record and its store, and the `rendering` stage
