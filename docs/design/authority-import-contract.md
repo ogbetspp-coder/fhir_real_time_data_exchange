@@ -340,9 +340,12 @@ publication field must equal the source's and the graph's. `requestedBy` is a pl
 the method).
 
 Stated residuals: which import is current when a later one supersedes it, and how a withdrawal
-reaches the record, belong to roadmap item 2's head and withdrawal; an older pinned publication
-cannot be imported after the authority replaces it (the gate's fetch refuses it), but a withdrawal
-after an import is not noticed until a re-import.
+reaches the record, belong to roadmap item 2's head and withdrawal (`docs/design/approval.md`,
+amended 2026-09-25: one List per product at a time until supersession is designed); a withdrawal
+after an import is not noticed until a re-import. Corrected 2026-09-26: the EMA keeps serving older
+Lists and documents as current after a new List version (Brukinsa's EPI/23/1009 has two current
+Lists), so an older pinned publication can still be imported after the authority has replaced it;
+the approval design's List rule, not the gate's fetch, keeps it from displacing a newer import.
 
 This amends ADR 0005 decision 4: a re-import after a normalisation change is possible only while
 the authority still serves the same bytes for the document and its List (the List changes when

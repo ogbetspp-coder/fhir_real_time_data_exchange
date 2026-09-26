@@ -277,8 +277,9 @@ prevent.
 **Phase 2, the production gate: hardening, not the claim.** Each is a line on the production
 gate, so production cannot go live without it.
 
-- Segregation of duties (D7), for approvals and, with the change the amendment below states, for an
-  authority import's requests. In `dev` one person prepares and approves; the evidence says so.
+- Segregation of duties (D7), for approvals; for an authority import's requests, whether a second
+  content-reviewer countersigns (the amendment below). In `dev` one person prepares and approves;
+  the evidence says so.
 - `reject` and `withdraw` statements.
 - The image-digest allowlist, Binary Authorization on the signer, and paging on IAM changes to
   the key (Infrastructure).
@@ -326,8 +327,7 @@ decides for a Type 2 approval.
 
 - **A statement kind, `request`,** with its own meaning codes: for an import with renderer evidence,
   "I was shown the renderer gate's captures of this publication's record; each listed contact is
-  legible; each listed defect is confirmed or rejected as stated; I request this import" (with, when
-  it supersedes, "the listed older import is no longer the authority's current document"); for a
+  legible; each listed defect is confirmed or rejected as stated; I request this import"; for a
   synthetic import without renderer evidence, "I request this synthetic import". The signer derives
   the kind from the submission's source: `request` for an authority import (a document in the
   `authority-import:` namespace), `approve` for any other; D9 and the pipeline require exactly that
@@ -338,18 +338,16 @@ decides for a Type 2 approval.
   (an import's is `authority-import:ema:<id>`).
 - **The flow.** (1) The requester drafts the decisions: the producer writes the submission, whose
   request (approved content) lists every contact of the record (the lookup requires exactly those),
-  each withheld section's confirmed and rejected defects, and the import it supersedes, if any.
+  and each withheld section's confirmed and rejected defects.
   (2) The signer runs the lookup's evidence checks (the renderer note's R5) against its own image's
   verified store, at the same commit as the worker's (the record and captures the request names,
   the environment, the gate version and constants, no failure or refusal in a carried section, each
   withheld section's eligibility, the contact cap, and that the acknowledged contacts and the
   withheld sections' confirmed and rejected defects exactly partition the record's), verifies the
-  record's attestation, its captures index and each capture's hash, checks supersession (below), and
-  builds the review (D6) as a pure function of the submission, the attested record and, when it
-  supersedes, the older import's current statement: the record and captures named by
+  record's attestation, its captures index and each capture's hash, checks the List (below), and
+  builds the review (D6) as a pure function of the submission and the attested record: the record and captures named by
   `renderEvidence`; every acknowledged contact with its captures and every identity each drawing
-  stands for; each withheld section's confirmed and rejected defects with their captures; and both
-  documents' identities when it supersedes (title, document type, document id, List, version). It
+  stands for; and each withheld section's confirmed and rejected defects with their captures. It
   stores the review as one self-contained immutable file, `reviews/<reviewSha256>` (a PDF, or HTML
   with every capture inline as a `data:` PNG and no markup of the authority's inside), written
   create-if-absent; on "exists" it hashes the stored bytes before the card is sent. (3) The Chat card
@@ -362,35 +360,42 @@ decides for a Type 2 approval.
   outside the Google Cloud console, so it shows that the review was fetched, not by whom. Step 1's
   spike records what the log holds for a card-link download and for one from the console's object
   page (which may also need `storage.objects.list`, denied by the prefix condition). If neither names
-  the person, the signer's own Cloud Run service serves the review behind Identity-Aware Proxy (a
-  Google component): the approver map's members get the IAP-secured web app user role instead of
-  `objectViewer`, the IAP service agent gets the invoker role, the service reads `reviews/`, and
-  `iap.googleapis.com` data-access logging is enabled; the signer then refuses to sign unless its own
-  log shows the signing `sub` fetched `reviews/<reviewSha256>`. (4) The person opens it and clicks; to
+  the person, a separate review service on Cloud Run (not the add-on receiver, whose caller identity
+  IAP would replace) serves the review behind Identity-Aware Proxy (a Google component): the approver
+  map's members get `roles/iap.httpsResourceAccessor` instead of `objectViewer`, the IAP service agent
+  gets `roles/run.invoker`, the service reads `reviews/`, and on each fetch it writes, from the
+  verified IAP token, `reviews/fetches/<reviewSha256>/<sub>` create-if-absent; the signer then refuses
+  to sign unless that object exists for the signing `sub`. Step 1's spike and step 3 carry this path. (4) The person opens it and clicks; to
   change a drafted decision they decline (do not sign), and a new draft is made. What was shown is
   what is signed.
 - **The review has no diff.** D6 shows the diff from the document's current head; a request's content
   is the authority's publication, not an edit, so its review shows the decisions and identities, not
   a diff, and says so.
-- **Supersession, objective and pinned.** A request may name the import it supersedes: `supersedes`
-  (the older import's canonical `Bundle.identifier`) and `supersedesStatementSha256` (that import's
-  current head statement), both signed. The signer refuses it unless the older import is an
-  `authority-import:` chain of the same authority, the same List (ePI id), the same document type and
-  the same language, whose head is current and is that statement; and unless, in the List the gate
-  fetched for the new import, the older document id is absent and the new one present (the
-  authority's own index says which document is current: tablets and capsules are both listed, so
-  neither can supersede the other). The signer then writes the older head first, marked superseded by
-  this statement (compare-and-swap on `supersedesStatementSha256`), and only then the new head; the
-  pipeline publishes the new version only if the older head names this statement; D9 marks an older
-  version superseded only by verifying the superseding statement's signature and fields, never on a
-  marker alone. A superseded head is terminal: the signer refuses any further request on that chain.
-  A request that supersedes but then never publishes (the gate refuses it, or the authority replaces
-  the publication again) leaves the older import superseded with nothing current: closed, not open,
-  and recovered by a new request for the current document.
+- **One List per product at a time; supersession is not designed here.** The EMA issues a new List
+  version with every document under a new Bundle id, and it keeps serving older Lists and documents
+  as current (observed 2026-09-26: Brukinsa's EPI/23/1009 has two current Lists, and the older SmPC is
+  still served). So no check the signer can make at signing shows which document replaces which, nor
+  tells the tablets SmPC from the capsules one, which share a List and differ only in their text. Until
+  a separate, reviewed design settles supersession (a precondition of PR 5 for any product whose List
+  changes), the rule is closed: every current import of an ePI id comes from the same List, by its
+  GUID, `versionNumber` and hash, which the statement signs; the signer refuses a request whose List
+  differs from that of a current import of the same ePI id (`list-differs`), whether newer or older.
+  So a newer List's documents are imported only after the older imports are withdrawn (phase 2), and
+  an older List's never displace a newer one's. An import's text therefore stays current until then
+  even if the authority has replaced it, with its version and pilot status in every answer: stale, not
+  wrong, and stated.
 - **A request without renderer evidence.** A synthetic import that withholds nothing carries no
   `renderEvidence` and is never persisted in production (the contract's D7). A synthetic import that
   withholds a section carries renderer evidence (the renderer note's R5) and is a request like any
   other.
+- **Heads under retention.** The evidence bucket's retention policy forbids replacing or deleting an
+  object before it ages out, so D8's head cannot be one object updated by compare-and-swap. Heads
+  are append-only: each statement writes `approvals/heads/<document>/<sequence>`, create-if-absent
+  (`ifGenerationMatch=0`), and the current head is the highest sequence, read by a listing, which
+  Cloud Storage makes strongly consistent; two racing statements cannot both create the same
+  sequence. This corrects D8 for every statement kind. The worker's bucket-wide `objectCreator` is
+  conditioned to exclude `approvals/` and `reviews/` in phase 1, not phase 2, since phase 1's heads
+  depend on it; the query service and the pipeline gain read on `approvals/` (statements and heads).
 - **Its `sections`** list every carried section with narrative, by its `narrativeDivSha256`, and
   every withheld section, with `status: withheld`, the notice's hash and its confirmed defect kinds.
   D9 requires the served version's withheld set to equal the statement's exactly, every statement
@@ -402,20 +407,18 @@ decides for a Type 2 approval.
   withheld section's defect kinds from the signed statement, for every version.
 - **`reject` never moves the head,** for a request as for an approval; phase 1 does not build it,
   and declining to sign is how a draft is changed.
-- **The head (D8) applies to requests.** A request's `sequence` and `previousStatementSha256` chain
-  per document, keyed by the canonical `Bundle.identifier`, which the authority's document id
-  determines; a new id is a new chain, joined to the old only by a supersession (above). If the
-  authority replaces the publication between the signature and the pipeline's fetch, the head names
-  a statement that can never publish: closed, not open.
+- **The head (D8) applies to requests,** keyed by the canonical `Bundle.identifier`, which the
+  authority's document id determines; a new id is a new chain, subject to the List rule (above).
+  The authority keeps serving a document it has replaced, so a signed request still publishes it;
+  the List rule keeps it from displacing a newer List's import.
 - **The role.** The signer requires `content-reviewer` for every request that carries renderer
   evidence (every authority import but a synthetic one that withholds nothing).
-- **Segregation (D7) for a request.** In `dev`, one person prepares and signs, the known gap D7
-  records. At the production gate (phase 2), D7 applies to a request with one change: its bar on the
-  principal that wrote the submission does not apply, since the requester drafts the decisions they
-  sign; the requester may not be the principal that started the review, nor an editor of the record,
-  so preparing and signing still take two people. The renderer record the request rests on is
-  regenerated deterministically on `main` (the renderer note's R1), so its proposer has no discretion
-  over it.
+- **Segregation (D7) for a request.** A request is one content-reviewer's judgement in every
+  environment: D7's bar on the principal that wrote the submission does not apply, since the
+  requester drafts the decisions they sign, and the renderer record it rests on is regenerated
+  deterministically on `main` (the renderer note's R1), so its proposer has no discretion over it.
+  Whether production requires a second content-reviewer to countersign a request is a production-gate
+  decision for the owner, stated, not assumed.
 - **Where the publication's approval goes.** Item 2 removes `approval` from the submission. For an
   authority import the publication's fields (ePI id, document, List, version number, procedure
   number, the Bundle's timestamp) and `authorityStatus: pilot` move into the source record
@@ -424,7 +427,7 @@ decides for a Type 2 approval.
   over them through `approvedContentSha256`. ADR 0005 decision 4 and the contract design's D8 will
   point here (the withheld note's forward pointers), in the change that makes the move.
 - **Versions.** `ApprovalStatement` and `ReviewRecord` are new, so their 1.0.0 includes the `request`
-  kind and its meaning codes, D3's shape extended with `supersedes` and `supersedesStatementSha256`,
+  kind and its meaning codes, D3's shape extended with the List's GUID, `versionNumber` and hash,
   `sections` entries with `status: withheld`, the notice's hash and defect kinds, and the import
   review's shape. Item 2's majors of `CanonicalSubmission` and the query tools and roadmap 3a's (the
   renderer and withheld notes' 3.0.0) are one major each if they land together, and consecutive
@@ -440,6 +443,6 @@ decides for a Type 2 approval.
   browser download, rendered inline with its captures visible, and what the data-access log records
   of it; steps 2, 3 and 5 of phase 1 add request cases (the review library; a request signed over an
   authority import's review; a draft the gate would refuse, a tampered capture, index or attestation,
-  and one of another environment, refused; a supersession of another product, of a document still
-  listed, or of a stale head, refused; a valid supersession writing the older head first; the query
-  service verifying a request, its withheld set and a superseded import), before PR 5.
+  and one of another environment, refused; a request from a List other than a current import's
+  refused; append-only heads under retention, two racing statements refused; the query service
+  verifying a request and its withheld set), before PR 5.
