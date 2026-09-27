@@ -4,11 +4,24 @@ import { transformDocument } from "../../src/authority/t/document.js";
 import { TRefusal, transformSection } from "../../src/authority/t/transform.js";
 import { xhtmlToText, XhtmlError } from "../../src/fidelity/xhtml.js";
 import { launchChrome, type Browser } from "../../src/render/cdp.js";
-import { compareDrawings, readDrawing, type Drawing } from "../../src/render/drawing.js";
+import {
+  comparePictureLists,
+  compareDrawings,
+  listPictures,
+  readDrawing,
+  type Drawing,
+  type DrawingMismatch,
+  type ListedPicture,
+} from "../../src/render/drawing.js";
 import { readPage } from "../../src/render/measure.js";
 import { checkPage } from "../../src/render/page-checks.js";
 import { openPage, type Mode, type Resource } from "../../src/render/page.js";
-import { preparePictures, type Contained, type Picture } from "../../src/render/pictures.js";
+import {
+  PictureError,
+  preparePictures,
+  UNPINNED_URL,
+  type Contained,
+} from "../../src/render/pictures.js";
 import { T_CASES } from "../../test/fixtures/authority/t-cases.js";
 import { DRAWING_CASES, PICTURE_FORMS } from "../../test/fixtures/render/drawing-cases.js";
 import { MODEL_CASES } from "../../test/fixtures/render/model-cases.js";
@@ -122,7 +135,17 @@ function sections(): Section[] {
 
 const failures: string[] = [];
 
-type Drawn = { drawing: Drawing; pictures: Picture[]; page: string[] };
+// The second drawing's comparison: the drawings, and the picture lists.
+function compare(authority: Drawn, t: Drawn): DrawingMismatch[] {
+  return [
+    ...compareDrawings(authority.drawing, t.drawing),
+    ...comparePictureLists(authority.pictures, t.pictures),
+  ];
+}
+
+// A drawing, its picture list, and the page's own refusals: R2's page, and a picture not drawn as
+// prepared, or a request failed other than the unpinned picture's.
+type Drawn = { drawing: Drawing; pictures: ListedPicture[]; page: string[] };
 
 async function draw(
   browser: Browser,
@@ -131,7 +154,14 @@ async function draw(
   mode: Mode,
   width: number,
 ): Promise<Drawn> {
-  const prepared = preparePictures(div, contained);
+  let prepared: ReturnType<typeof preparePictures>;
+  try {
+    prepared = preparePictures(div, contained);
+  } catch (error) {
+    if (!(error instanceof PictureError)) throw error;
+    const drawing = { text: "", markers: [], tables: [], pictures: [] };
+    return { drawing, pictures: [], page: [`picture-grammar: ${error.message}`] };
+  }
   const page = await openPage(browser.cdp, {
     div: prepared.div,
     mode,
@@ -142,7 +172,13 @@ async function draw(
     const refusals = checkPage(await readPage(page), width, mode).map(
       ({ refusal, detail }) => `${refusal}: ${detail}`,
     );
-    return { drawing: await readDrawing(page), pictures: prepared.pictures, page: refusals };
+    const drawing = await readDrawing(page);
+    const { list, problems } = listPictures(prepared.pictures, prepared.urls, drawing);
+    refusals.push(...problems);
+    for (const url of page.failed) {
+      if (url !== UNPINNED_URL) refusals.push(`request-failed: ${url.slice(0, 80)}`);
+    }
+    return { drawing, pictures: list, page: refusals };
   } finally {
     await page.close();
   }
@@ -161,44 +197,43 @@ try {
         const problems = [
           ...authority.page,
           ...t.page.map((problem) => `T(div) ${problem}`),
-          ...compareDrawings(authority.drawing, t.drawing).map(
+          ...compare(authority, t).map(
             ({ property, authority: a, t: b }) =>
               `second-drawing ${property}: ${a.slice(0, 120)} / ${b.slice(0, 120)}`,
           ),
         ];
-        const hashes = (pictures: Picture[]): string =>
-          pictures.map(({ sha256 }) => sha256).join(",");
-        if (hashes(authority.pictures) !== hashes(t.pictures)) {
-          problems.push(
-            `second-drawing picture hashes: ${hashes(authority.pictures)} / ${hashes(t.pictures)}`,
-          );
-        }
         if (problems.length > 0)
           failures.push(`${section.name} (${mode}, ${width} px): ${problems.join("; ")}`);
       }
     }
   }
+  // Each seed in both modes, refused for its property and drawn with no refusal of its page.
   for (const seeded of DRAWING_CASES) {
-    const authority = await draw(browser, seeded.div, new Map(), "html", 813);
-    const t = await draw(browser, seeded.output, new Map(), "html", 813);
-    const found = compareDrawings(authority.drawing, t.drawing).map(({ property }) => property);
-    if (!found.includes(seeded.property)) {
-      failures.push(
-        `seeded ${seeded.name}: expected ${seeded.property}, got ${found.join(", ") || "nothing"}`,
-      );
+    for (const mode of MODES) {
+      const authority = await draw(browser, seeded.div, new Map(), mode, 813);
+      const t = await draw(browser, seeded.output, new Map(), mode, 813);
+      const found = compare(authority, t).map(({ property }) => property);
+      const page = [...authority.page, ...t.page];
+      if (!found.includes(seeded.property) || page.length > 0) {
+        failures.push(
+          `seeded ${seeded.name} (${mode}): expected ${seeded.property}, got ${found.join(", ") || "nothing"}` +
+            (page.length > 0 ? `; page: ${page.join("; ")}` : ""),
+        );
+      }
     }
   }
   for (const mode of MODES) {
     const forms = await draw(browser, PICTURE_FORMS.div, PICTURE_FORMS.contained, mode, 813);
+    if (forms.page.length > 0) failures.push(`picture forms (${mode}): ${forms.page.join("; ")}`);
     const got = forms.pictures.map(({ form }) => form);
     if (JSON.stringify(got) !== JSON.stringify(PICTURE_FORMS.forms)) {
       failures.push(`picture forms (${mode}): ${got.join(", ")}`);
     }
-    const boxes = forms.drawing.pictures;
     for (const [index, expected] of PICTURE_FORMS.boxes.entries()) {
-      if (JSON.stringify(boxes[index]) !== JSON.stringify(expected)) {
+      const box = forms.pictures[index]?.box;
+      if (JSON.stringify(box) !== JSON.stringify(expected)) {
         failures.push(
-          `picture ${index} (${mode}) drawn at ${JSON.stringify(boxes[index])}, not ${JSON.stringify(expected)}`,
+          `picture ${index} (${mode}) drawn at ${JSON.stringify(box)}, not ${JSON.stringify(expected)}`,
         );
       }
     }

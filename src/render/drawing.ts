@@ -1,5 +1,6 @@
 import { readMarkers } from "./measure.js";
 import type { Page } from "./page.js";
+import type { Picture } from "./pictures.js";
 
 // R2's second drawing (docs/design/authority-import-renderer.md): the text, list numbers, table
 // grids and pictures of the authority's drawing, which do not depend on the width, compared with
@@ -16,9 +17,12 @@ export type Drawing = {
   markers: string[];
   // Each table's cells (not its caption), in document order, by their rectangles.
   tables: Rect[][];
-  // Each picture's drawn box, in document order.
-  pictures: { width: number; height: number }[];
+  // Each picture, in document order: its drawn box, whether Chrome decoded an image from it
+  // (`complete` with a natural width), and the URL it was drawn from (`currentSrc`).
+  pictures: DrawnPicture[];
 };
+
+export type DrawnPicture = { width: number; height: number; decoded: boolean; source: string };
 
 const READ_DRAWING = `(() => {
   const root = document.body.firstElementChild;
@@ -37,7 +41,12 @@ const READ_DRAWING = `(() => {
   const pictures = [];
   for (const picture of root.querySelectorAll("img")) {
     const r = picture.getBoundingClientRect();
-    pictures.push({ width: r.width, height: r.height });
+    pictures.push({
+      width: r.width,
+      height: r.height,
+      decoded: picture.complete && picture.naturalWidth > 0,
+      source: picture.currentSrc,
+    });
   }
   return { text: root.innerText, tables, pictures };
 })()`;
@@ -101,6 +110,50 @@ export function compareDrawings(authority: Drawing, t: Drawing): DrawingMismatch
   authority.tables.forEach((cells, index) => {
     differ(`table ${index}`, grid(cells), grid(t.tables[index] ?? []));
   });
-  differ("pictures", authority.pictures, t.pictures);
+  const boxes = (drawing: Drawing): unknown =>
+    drawing.pictures.map(({ width, height, decoded }) => ({ width, height, decoded }));
+  differ("pictures", boxes(authority), boxes(t));
   return found;
+}
+
+// R2's per-section picture list, `{ reference, form, sha256 | "none", box }`: each picture as the
+// import carries it (src/render/pictures.ts) with the box Chrome drew it at. R8's record holds it
+// (3c-C); here the authority's list and T(div)'s are compared, and each is checked against the
+// page: one drawn picture per prepared one, drawn from the URL prepared, decoded unless unpinned.
+export type ListedPicture = Picture & { box: { width: number; height: number } };
+
+export function listPictures(
+  prepared: readonly Picture[],
+  urls: readonly string[],
+  drawing: Drawing,
+): { list: ListedPicture[]; problems: string[] } {
+  const problems: string[] = [];
+  if (drawing.pictures.length !== prepared.length) {
+    problems.push(`picture-count: ${drawing.pictures.length} drawn, ${prepared.length} prepared`);
+  }
+  const list = prepared.map((picture, index) => {
+    const drawn = drawing.pictures[index];
+    if (drawn !== undefined) {
+      if (drawn.source !== urls[index]) {
+        problems.push(`picture-source: picture ${index} drawn from another URL`);
+      }
+      if (drawn.decoded !== (picture.form !== "unpinned")) {
+        problems.push(
+          `picture-decoded: picture ${index} (${picture.form}) ${drawn.decoded ? "decoded" : "not decoded"}`,
+        );
+      }
+    }
+    return { ...picture, box: { width: drawn?.width ?? 0, height: drawn?.height ?? 0 } };
+  });
+  return { list, problems };
+}
+
+// The two lists' forms, hashes and boxes (a reference T keeps as served).
+export function comparePictureLists(
+  authority: readonly ListedPicture[],
+  t: readonly ListedPicture[],
+): DrawingMismatch[] {
+  const a = JSON.stringify(authority.map(({ form, sha256, box }) => ({ form, sha256, box })));
+  const b = JSON.stringify(t.map(({ form, sha256, box }) => ({ form, sha256, box })));
+  return a === b ? [] : [{ property: "picture list", authority: a, t: b }];
 }

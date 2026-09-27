@@ -20,7 +20,7 @@ export const MODEL_CASES: ModelCase[] = [
     // picture, a `tfoot` with its own alignment and border colour.
     name: "abbr-picture-and-footer",
     inner:
-      '<p><abbr>SmPC</abbr> x <img src="data:image/png;base64,iVBORw0KGgo="/> y</p>' +
+      '<p><abbr>SmPC</abbr> x <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAUCAIAAAAVyRqTAAAAH0lEQVR42mM4wcBAI8QwavSo0aNGjxo9avSo0UPRaACAGNTQpbL55QAAAABJRU5ErkJggg=="/> y</p>' +
       '<table><tbody><tr><td>y</td></tr></tbody><tfoot valign="bottom" style="border-color:#009900">' +
       '<tr><td style="border-top-style:solid">x</td></tr></tfoot></table>',
   },

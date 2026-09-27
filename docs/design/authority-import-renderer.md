@@ -854,24 +854,35 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
    the character map only (the third review drew eleven whitespace code points alone in eight
    faces: each was reported in the bound face, never a fallback).
 
-   3c-B2b's measurements in the image (240 carried sections and cases, 2 880 drawings) add two
+   3c-B2b's measurements in the image (240 carried sections and cases, 2 880 drawings) add these
    findings. A table's grid is read from where its cells start, not where they end: T drops
    `border-collapse` and `cellspacing`, so T(div) draws with Chrome's default 2 px spacing where the
    authority's collapsed table draws none, and a grid built from both edges counted each gap as a
-   column or row of its own (48 false refusals in the first run, in two T cases, a model case and
-   the tables of `Composition.section[3].section[1].section[0]` and `[3].section[7]` of each pinned
-   label). A cell's column and row are the lines it starts on, its spans
-   the lines it covers, edges within half a CSS pixel one line; so the grid does not depend on the
-   spacing, the widths or the borders T drops, and a change of span, of cell count or of a cell's
-   place is refused (a seed). And Chrome draws an unpinned picture with no `alt` as its 16 × 16
-   broken-image icon in both modes, asserted with the `data` (30 × 20) and `contained` (12 × 8)
-   forms. The second drawing compares `innerText` (the words, with the drawing's line and cell
-   breaks), the markers in document order, the grid of each table (its own cells, not a nested
-   table's), each picture's drawn box, and the SHA-256 of the bytes each picture is drawn from, at
-   ratio 1: none of them depends on the ratio, and each ratio's geometry is 3c-C's. In the pinned
-   labels' carried sections every picture is a `data:` URI (the scanner refuses the others in a
-   carried section), so the `contained` and `unpinned` forms are drawn by the seeded page only
-   until 3c-W and 3c-E carry them.
+   column or row of its own (48 false refusals in the first run, in three T cases, a model case,
+   and the tables of `Composition.section[0].section[3].section[1].section[0]` and
+   `Composition.section[0].section[3].section[7]` of the two Imatinib Teva labels, the only pinned
+   labels whose carried sections hold tables). A cell's column and row are the lines it starts on,
+   its spans the lines it covers, edges within half a CSS pixel one line; so the grid does not
+   depend on the spacing, the widths or the borders T drops, and a change of cell count, a column
+   span moved and a row span moved, each with the same text, are refused (seeds). Chrome draws an
+   unpinned picture as its broken-image box: its 16 × 16 icon with no `alt`, its `alt` box
+   (69.78125 × 18 for "Figure 1"), or its declared size, in both modes; each is asserted, with the
+   `data` (30 × 20) and `contained` (12 × 8) forms.
+
+   The second drawing compares `innerText` (the words, with the drawing's line and cell breaks),
+   the markers in document order, the grid of each table (its own cells, not a nested table's),
+   and R2's picture list of each drawing: each picture's form, the SHA-256 of the bytes it is drawn
+   from and its drawn box (a seed differs in the bytes alone). Each drawing's list is checked
+   against its page: one drawn `img` per picture prepared, each drawn from the URL prepared,
+   decoded unless unpinned (a picture whose bytes Chrome cannot decode is refused, not drawn as a
+   broken box and passed), and no request failed but the unpinned picture's. Pictures are read by
+   the scanner's own tokens, so an attribute holding `>` or ` src=` cannot move the `src` read, and
+   a `data:` URI is a picture exactly where the scanner's rule takes it (a test asserts the two
+   agree). All of this is at ratio 1: none of it depends on the ratio, and each ratio's geometry is
+   3c-C's; R8's record holds the list (3c-C). No carried section of the pinned labels holds a
+   picture yet (every EMA picture declares its size in a `style` T refuses, or is a reference), so
+   the carried pictures drawn are the cases' `data` pictures, and the `contained` and `unpinned`
+   forms are drawn by the seeded page only until 3c-W and 3c-E carry them.
 
 2. **3c-C**: its measured design of R4 (reviewed first), with R3's exact character box model
    before R4's baseline estimator, then R4, R7, R8, R9, R11; the render build, its trigger and
