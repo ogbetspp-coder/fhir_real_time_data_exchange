@@ -854,6 +854,25 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
    the character map only (the third review drew eleven whitespace code points alone in eight
    faces: each was reported in the bound face, never a fallback).
 
+   3c-B2b's measurements in the image (240 carried sections and cases, 2 880 drawings) add two
+   findings. A table's grid is read from where its cells start, not where they end: T drops
+   `border-collapse` and `cellspacing`, so T(div) draws with Chrome's default 2 px spacing where the
+   authority's collapsed table draws none, and a grid built from both edges counted each gap as a
+   column or row of its own (48 false refusals in the first run, in two T cases, a model case and
+   the tables of `Composition.section[3].section[1].section[0]` and `[3].section[7]` of each pinned
+   label). A cell's column and row are the lines it starts on, its spans
+   the lines it covers, edges within half a CSS pixel one line; so the grid does not depend on the
+   spacing, the widths or the borders T drops, and a change of span, of cell count or of a cell's
+   place is refused (a seed). And Chrome draws an unpinned picture with no `alt` as its 16 × 16
+   broken-image icon in both modes, asserted with the `data` (30 × 20) and `contained` (12 × 8)
+   forms. The second drawing compares `innerText` (the words, with the drawing's line and cell
+   breaks), the markers in document order, the grid of each table (its own cells, not a nested
+   table's), each picture's drawn box, and the SHA-256 of the bytes each picture is drawn from, at
+   ratio 1: none of them depends on the ratio, and each ratio's geometry is 3c-C's. In the pinned
+   labels' carried sections every picture is a `data:` URI (the scanner refuses the others in a
+   carried section), so the `contained` and `unpinned` forms are drawn by the seeded page only
+   until 3c-W and 3c-E carry them.
+
 2. **3c-C**: its measured design of R4 (reviewed first), with R3's exact character box model
    before R4's baseline estimator, then R4, R7, R8, R9, R11; the render build, its trigger and
    attestations; the records of the pinned labels.

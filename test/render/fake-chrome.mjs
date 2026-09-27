@@ -111,6 +111,17 @@ function reply(message) {
           },
         });
       }
+      if (String(params.expression).includes("innerText")) {
+        return answer({
+          result: {
+            value: {
+              text: "a\nb",
+              tables: [[{ left: 0, top: 0, right: 10, bottom: 5 }]],
+              pictures: [{ width: 30, height: 20 }],
+            },
+          },
+        });
+      }
       if (String(params.expression).includes("parsererror")) {
         return answer({
           result: {

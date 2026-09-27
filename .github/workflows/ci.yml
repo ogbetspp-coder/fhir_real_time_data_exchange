@@ -148,6 +148,12 @@ jobs:
       - name: Check the fonts and pages
         run: npm run renderer:fonts
 
+      # R2's second drawing: the authority's and T(div)'s text, list numbers, grids and pictures,
+      # the same at the named widths in both modes, and the picture forms drawn as stated
+      # (docs/design/authority-import-renderer.md, Delivery 3c-B2b).
+      - name: Compare the two drawings
+        run: npm run renderer:drawings
+
   zone-a:
     name: Zone A
     runs-on: ubuntu-24.04

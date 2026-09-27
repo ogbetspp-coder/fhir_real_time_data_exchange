@@ -21,6 +21,7 @@ const NOT_RUN_LOCALLY = new Set([
   "npm run renderer:smoke",
   "npm run renderer:check",
   "npm run renderer:fonts",
+  "npm run renderer:drawings",
 ]);
 
 const commands = [...workflow.matchAll(/^[ \t]+run:[ \t]*(\S.*)$/gm)].map((match) =>
