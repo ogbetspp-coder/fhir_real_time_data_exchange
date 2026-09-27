@@ -218,8 +218,9 @@ export async function readRuns(page: Page, withFaces = true): Promise<ChromeRun[
   const found: ChromeRun[] = [];
   for (const [at, run] of runs.entries()) {
     // A node of whitespace alone: DevTools keeps none (DOM.requestNode answers 0, after a walk of
-    // the parent's children, quadratic in a long list of them: the second review), and nothing of
-    // it is drawn in a face, so it is not asked; the check holds its code points to the map.
+    // the parent's children, quadratic in a long list of them: the second review), so it is not
+    // asked; the check holds its code points to the bound face's map, which is what guards it (a
+    // no-break space is drawn in the bound face).
     if (/^\p{White_Space}*$/u.test(run.text)) {
       found.push({ ...run, drawnIn: [] });
       continue;
@@ -280,8 +281,8 @@ export function readPage(page: Page): Promise<ChromePage> {
   return page.evaluate<ChromePage>(READ_PAGE);
 }
 
-// Every drawn character's box height, by the element it stands in (R3: each must equal the box
-// of its face at its size and ratio). Characters with no box (collapsed whitespace) are skipped.
+// Every drawn character's box height, by the element it stands in (R3: each is held to its bound
+// face's box at its size and ratio). Characters with no box (collapsed whitespace) are skipped.
 export type ChromeHeights = { element: number; heights: number[] }[];
 
 const READ_HEIGHTS = `(() => {

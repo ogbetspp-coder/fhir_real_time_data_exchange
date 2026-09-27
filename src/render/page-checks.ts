@@ -5,8 +5,8 @@ import type { ChromeHeights, ChromePage, ChromeRun } from "./measure.js";
 
 // R2's page and R3's character boxes (docs/design/authority-import-renderer.md): a section whose
 // XML does not parse, whose div has padding or a border of its own, or whose div's content box is
-// not the width drawn, is a refusal of ours; so is a character whose box is not its bound face's
-// ascent and descent at its size and ratio, as Chrome rounds them.
+// not the width drawn, is a refusal of ours; so is a character whose box is not within a device
+// pixel of its bound face's ascent and descent at its size and ratio.
 
 export type PageRefusal = "parsererror" | "div-box" | "div-width" | "char-height";
 
@@ -34,10 +34,11 @@ export function checkPage(page: ChromePage, width: number, mode: "html" | "xml")
 // FreeType does. That fits every size in points first measured (448 of 448) but misses by one
 // device pixel at some sizes in em, %, `smaller` and at fractional ratios (about 1 to 3 % of a
 // sweep), by a path not yet found. So a box is held to within one device pixel of it, plus the
-// 1/64 CSS pixel Chrome reports heights in: a box of the bound face's metrics passes, a box
-// another face would draw (a fallback's, which `font-face` refuses too) or a box stretched by
-// anything is refused. The exact box model is 3c-C's, with R4's baseline, which assumes the same
-// one device pixel.
+// 1/64 CSS pixel Chrome reports heights in: a box of the bound face's metrics passes, and a box
+// another face would draw or a stretched box is refused where it differs by more than that (at
+// 5 to 7 pt the pinned faces' boxes, and stretches of several per cent, are within it; a
+// fallback is refused as `font-face`, and T refuses what could stretch a box). The exact box
+// model is 3c-C's, before R4's baseline, which needs the exact ascent.
 export function boxHeight(metrics: Metrics, pixels: number, ratio: number): number {
   const size = Math.floor(Math.fround(Math.fround(pixels) * ratio) * 64) / 64;
   const ascent = Math.round((metrics.hheaAscender / metrics.unitsPerEm) * size);

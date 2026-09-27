@@ -134,6 +134,16 @@ describe("R2's page", () => {
     await expect(readRuns(page)).rejects.toThrow(/CSS agent is not enabled/);
   });
 
+  it("never asks DevTools about a node of whitespace alone", async () => {
+    const page = await openPage(fake("with-whitespace").cdp, {
+      div: DIV,
+      mode: "html",
+      width: 813,
+    });
+    const runs = await readRuns(page);
+    expect(runs.map(({ drawnIn }) => drawnIn)).toEqual([["LiberationSerif"], []]);
+  });
+
   it("fails a read whose page-side node cannot be resolved by reference", async () => {
     const page = await openPage(fake("unresolved").cdp, { div: DIV, mode: "html", width: 813 });
     await expect(readRuns(page)).rejects.toThrow(/text node 0 could not be resolved/);

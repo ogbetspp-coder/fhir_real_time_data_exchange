@@ -214,7 +214,8 @@ recordSha256, capturesIndex, capturesSha256, documentSha256, pinsSha256, rendere
   difference is a refusal of ours. List numbers come from the accessibility tree and are compared
   with the scanner's; each table's grid from cell rectangles, compared with T(div)'s. Each character
   box's height must equal the pinned face's ascent plus descent at its computed size, rounded at the
-  device size (R4).
+  device size (R4); 3c-B2a holds it to within one device pixel, a stated tolerance, and the exact
+  box model is 3c-C's (Delivery).
 - **The index space.** Every section, carried or withheld, T's or not, has one index space, which
   the judge assigns itself from the XML-mode DOM of the authority's div (source order; an element the
   HTML parser inserts, such as a `tbody`, has no key; a marker placed before its `li`'s first child;
@@ -805,7 +806,8 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
      accept (T drops the styles, so its drawing can fall back where the authority's did not);
      R6's coverage (`font-coverage`, the U+2070 seed, and pixel tests in the image's smoke check
      of the substitutions and of each range of the closed list of code points drawn as nothing);
-     each character box's height against R3's, in both modes at every ratio; a `parsererror` as
+     each character box's height of the authority's drawing of every carried section, against
+     R3's within one device pixel, in both modes at every ratio; a `parsererror` as
      its own refusal; and R2's
      assertion that the div's content box is the width, with the refusal of a div with its own
      padding or border (`div-box`, `div-width`). Every section of every pinned label is checked
@@ -828,24 +830,33 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
    draws the Hangul fillers (U+115F, U+1160, U+3164, U+FFA0) and U+1BCA0 to U+1BCA3 as .notdef,
    so the code points drawn as nothing are a closed list, each range asserted by pixels, and
    every other code point is judged by the character map (the second review drew every listed
-   code point in eight faces: none draws anything). And R3's box is not exact: the face's hhea
+   code point in eight of the sixteen pinned faces, the four families' regular and bold italic:
+   none draws anything). And R3's box is not exact: the face's hhea
    ascent and descent, each rounded at the device size after Chrome's single-precision size is
    quantised down to 1/64 of a device pixel, fits every size in points first measured (448 of 448) but misses by one device pixel at some sizes in em, %, `smaller` and at fractional ratios
    (about 1 to 3 % of a sweep), by a path not yet found. So 3c-B2a holds each box to within one
    device pixel of it, compared in device pixels with the 1/64 CSS pixel Chrome reports heights
    in, a stated tolerance: a box of the bound face's metrics passes, a stretched box is refused
    (a seed), and a box of another face's metrics is refused where it differs by more (a fallback
-   face is refused as `font-face` anyway). The exact box model is 3c-C's, with R4's baseline,
-   which assumes the same one device pixel.
+   face is refused as `font-face` anyway; T refuses every property that could stretch a box). So
+   in 3c-B2a the box check is a coarse canary that Chrome's font size is the computed one. R4's
+   baseline needs more: it adds the face's ascent to the rectangle's top, and its one-pixel
+   allowance is for snapping only, so the measured misses, which are in the ascent, would put it
+   up to two device pixels out (at 0.8 and 0.9 among others). 3c-C therefore takes R3's exact box
+   model, before R4's baseline estimator.
 
    Stated residuals of 3c-B2a: a face is read at ratio 1 and 813 px, since it does not depend on
    the width or the ratio; text outside the light DOM's text nodes (a broken picture's `alt`, a
    `::marker`, which T keeps to ASCII) is not font-checked; coverage does not follow HarfBuzz's
-   composition, so a decomposed letter a face has only precomposed is refused, never passed; and
-   a family name `namedFamily` cannot read (a comma inside quotes) is refused, never passed.
+   composition, so a decomposed letter a face has only precomposed is refused, never passed; a
+   family name `namedFamily` cannot read (a comma inside quotes) is refused, never passed; and a
+   text node of whitespace alone is not asked for its face (DevTools keeps none) and is held to
+   the character map only (the third review drew eleven whitespace code points alone in eight
+   faces: each was reported in the bound face, never a fallback).
 
-2. **3c-C**: its measured design of R4 (reviewed first), then R4, R7, R8, R9, R11; the render build,
-   its trigger and attestations; the records of the pinned labels.
+2. **3c-C**: its measured design of R4 (reviewed first), with R3's exact character box model
+   before R4's baseline estimator, then R4, R7, R8, R9, R11; the render build, its trigger and
+   attestations; the records of the pinned labels.
    It also takes R1 but the image build's verification and the deploy routes' download of
    attestations (3c-D's): the render build in its attest and propose modes, their identities
    and buckets, the captures, their index and the bucket's retention, the pull request's

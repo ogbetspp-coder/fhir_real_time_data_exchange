@@ -87,6 +87,11 @@ describe("R3's fonts", () => {
     expect(checkTextNode(node("\u2003", '"Times New Roman"', []), FACES)).toEqual([
       expect.objectContaining({ refusal: "font-coverage", codePoint: 0x2003 }),
     ]);
+    // A node of code points drawn as nothing is still held to its face where one is reported.
+    expect(checkTextNode(node("\u200b", '"Times New Roman"', ["Carlito-Regular"]), FACES)).toEqual([
+      expect.objectContaining({ refusal: "font-face" }),
+    ]);
+    expect(checkTextNode(node("\u200b", '"Times New Roman"', []), FACES)).toEqual([]);
     // Whitespace alone is not judged: nothing of it is drawn in a face.
     expect(checkTextNode(node("\n  \t", "Verdana", []), FACES)).toEqual([]);
   });

@@ -6,7 +6,8 @@
 // page asks for itself again and navigates after it loaded), "refuse-replies" (replies to paused
 // requests and the target's close fail), "no-load" (the page never loads), "unresolved" (a
 // page-side node cannot be resolved by reference), "whitespace-node" and "lost-node" (DevTools
-// keeps no node for the text), "fonts-error" (another protocol error).
+// keeps no node for the text), "fonts-error" (another protocol error), "with-whitespace" (a
+// node of whitespace alone beside the text).
 import { createReadStream, createWriteStream } from "node:fs";
 import { setTimeout } from "node:timers";
 
@@ -103,7 +104,12 @@ function reply(message) {
           size: "16px",
           text: "ab",
         };
-        return answer({ result: { value: [run] } });
+        // A node of whitespace alone beside it, which the read never asks DevTools for.
+        return answer({
+          result: {
+            value: mode === "with-whitespace" ? [run, { ...run, text: "\u00a0 " }] : [run],
+          },
+        });
       }
       if (String(params.expression).includes("parsererror")) {
         return answer({

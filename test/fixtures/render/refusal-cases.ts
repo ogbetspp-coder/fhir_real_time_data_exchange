@@ -62,10 +62,18 @@ export const REFUSAL_CASES: RefusalCase[] = [
     div: div("<p>x</p>", '<div xmlns="http://www.w3.org/1999/xhtml" style="padding:4px">'),
     refusal: "div-box",
   },
-  // A box stretched by a transform: not the face's ascent and descent at its size.
+  // Boxes stretched by a transform, far past and just past the tolerance (at 12 pt, 15 % is
+  // refused and 3 % passes: the third review, measured).
   {
     name: "stretched-box",
     div: div('<p><span style="display:inline-block;transform:scaleY(2)">Dose</span></p>'),
+    refusal: "char-height",
+  },
+  {
+    name: "stretched-box-edge",
+    div: div(
+      '<p style="font-size:12pt"><span style="display:inline-block;transform:scaleY(1.15)">Dose</span></p>',
+    ),
     refusal: "char-height",
   },
   // A div whose content box is narrower than the width drawn.

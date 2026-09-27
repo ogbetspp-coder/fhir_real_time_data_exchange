@@ -3,9 +3,9 @@
 # (the `check` job), then the Zone A and Agent jobs, step for step. The official HL7 validator
 # (`npm run validate:official`) is left out: it needs Java 21 and ~200 MB of downloads, and it is
 # its own CI job for the same reason. The renderer image (`npm run renderer:image`,
-# `npm run renderer:smoke`, `renderer:check` and `renderer:fonts`) is left out too: it needs Docker and ~200 MB of downloads, and it is
-# its own CI job. test/ci/check-all.test.ts fails if a CI step is missing
-# here, so the two cannot drift apart silently.
+# `renderer:smoke`, `renderer:check` and `renderer:fonts`) is left out too: it needs Docker and
+# ~200 MB of downloads, and it is its own CI job. test/ci/check-all.test.ts fails if a CI step is
+# missing here, so the two cannot drift apart silently.
 #
 # uv is taken from $UV, then agent/.uv-bootstrap/bin/uv, then zone-a/.uv-bootstrap/bin/uv, then
 # PATH (agent/README.md shows how to make a bootstrap one). Python 3.14 must be installed.
