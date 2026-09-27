@@ -167,9 +167,11 @@ export function readTexts(page: Page): Promise<ChromeText[]> {
 
 // A text node, for R3's font checks: its element's pre-order index within the div and that
 // element's computed family, weight, style and size, its data, and the faces Chrome reports
-// drawing it in. CSS.getPlatformFontsForNode is asked of the text node itself: asked of an
-// element it reports its descendants' faces too (measured in the image: a paragraph holding an
-// italic word reported both faces).
+// drawing it in. CSS.getPlatformFontsForNode is asked of the text node itself (asked of an
+// element it reports its descendants' faces too, measured), and each node is found by identity
+// (DOM.requestNode on the node the page-side walk holds), never paired by count: DevTools' own
+// tree leaves out nodes of whitespace alone, by a rule of its own (the first code review: a node
+// of U+3000 alone was left out there and not here).
 export type ChromeRun = {
   element: number;
   family: string;
@@ -180,59 +182,52 @@ export type ChromeRun = {
   drawnIn: string[];
 };
 
+const RUNS_GLOBAL = "__rendererJudgeTexts";
+
 const READ_RUNS = `(() => {
   const root = document.body.firstElementChild;
   const out = [];
+  const nodes = [];
   let index = 0;
   const visit = (element) => {
     const own = index;
     index += 1;
     const c = getComputedStyle(element);
     for (const child of element.childNodes) {
-      // DevTools' DOM tree leaves out a text node of whitespace alone, which draws no face.
-      if (child.nodeType === 3 && !/^[\\t\\n\\v\\f\\r ]*$/.test(child.data)) {
+      if (child.nodeType === 3) {
+        nodes.push(child);
         out.push({ element: own, family: c.fontFamily, weight: Number(c.fontWeight), style: c.fontStyle, size: c.fontSize, text: child.data });
       }
     }
     for (const child of element.children) visit(child);
   };
   if (root !== null) visit(root);
+  globalThis.${RUNS_GLOBAL} = nodes;
   return out;
 })()`;
 
 // Each text node of the div, with the faces it is drawn in; `withFaces` false leaves `drawnIn`
-// empty (the faces do not depend on the width or ratio).
+// empty (the faces do not depend on the width).
 export async function readRuns(page: Page, withFaces = true): Promise<ChromeRun[]> {
   const runs = await page.evaluate<Omit<ChromeRun, "drawnIn">[]>(READ_RUNS);
   if (!withFaces) return runs.map((run) => ({ ...run, drawnIn: [] }));
   await page.send("DOM.enable");
   await page.send("CSS.enable");
-  const { root } = (await page.send("DOM.getDocument", { depth: -1 })) as { root: DomNode };
-  const find = (node: DomNode): DomNode | undefined => {
-    if (node.nodeType === 1 && node.localName === "body") return node;
-    for (const child of node.children ?? []) {
-      const found = find(child);
-      if (found !== undefined) return found;
-    }
-    return undefined;
-  };
-  const div = find(root)?.children?.find((child) => child.nodeType === 1);
-  // The text nodes in the page-side walk's order: each element's own text children, then its
-  // element children in turn.
-  const textIds: number[] = [];
-  const visit = (node: DomNode): void => {
-    for (const child of node.children ?? []) if (child.nodeType === 3) textIds.push(child.nodeId);
-    for (const child of node.children ?? []) if (child.nodeType === 1) visit(child);
-  };
-  if (div !== undefined) visit(div);
-  if (textIds.length !== runs.length) {
-    throw new Error(`${runs.length} text nodes read, ${textIds.length} in the DOM tree`);
-  }
+  await page.send("DOM.getDocument", { depth: 0 });
   const found: ChromeRun[] = [];
   for (const [at, run] of runs.entries()) {
-    const { fonts } = (await page.send("CSS.getPlatformFontsForNode", {
-      nodeId: textIds[at],
-    })) as { fonts: { postScriptName: string }[] };
+    const { result } = (await page.send("Runtime.evaluate", {
+      expression: `globalThis.${RUNS_GLOBAL}[${at}]`,
+      contextId: page.contextId,
+      returnByValue: false,
+    })) as { result: { objectId?: string } };
+    if (result.objectId === undefined) throw new Error(`text node ${at} could not be resolved`);
+    const { nodeId } = (await page.send("DOM.requestNode", { objectId: result.objectId })) as {
+      nodeId: number;
+    };
+    const { fonts } = (await page.send("CSS.getPlatformFontsForNode", { nodeId })) as {
+      fonts: { postScriptName: string }[];
+    };
     found.push({ ...run, drawnIn: fonts.map(({ postScriptName }) => postScriptName) });
   }
   return found;

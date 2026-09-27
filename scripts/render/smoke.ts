@@ -1,4 +1,5 @@
 import { launchChrome } from "../../src/render/cdp.js";
+import { NOT_DRAWN_RANGES } from "../../src/render/fonts.js";
 import { openPage } from "../../src/render/page.js";
 
 // The renderer image's smoke check (docs/design/authority-import-renderer.md, R6), run inside the
@@ -113,6 +114,42 @@ try {
       if (shots[0] !== shots[1])
         failures.push(`${family}: the ${what} is not drawn as its substitute`);
     }
+    // Each range of R3's closed list of code points drawn as nothing (src/render/fonts.ts,
+    // NOT_DRAWN_RANGES), its first and last, between letters: the same pixels as the letters alone.
+    const plainPage = await openPage(browser.cdp, {
+      div: `<div xmlns="http://www.w3.org/1999/xhtml"><p style="margin:0;font-family:${family};font-size:24px">abc</p></div>`,
+      mode: "html",
+      width: 200,
+    });
+    const plainShot = (
+      (await plainPage.send("Page.captureScreenshot", {
+        format: "png",
+        clip: { x: 16, y: 16, width: 200, height: 40, scale: 1 },
+      })) as { data: string }
+    ).data;
+    await plainPage.close();
+    for (const [low, high] of NOT_DRAWN_RANGES) {
+      for (const codePoint of new Set([low, high])) {
+        // ASCII whitespace controls and the soft hyphen are drawn as a space or at a break.
+        if (codePoint < 0x20 || codePoint === 0xad) continue;
+        const page = await openPage(browser.cdp, {
+          div: `<div xmlns="http://www.w3.org/1999/xhtml"><p style="margin:0;font-family:${family};font-size:24px">a${String.fromCodePoint(codePoint)}bc</p></div>`,
+          mode: "html",
+          width: 200,
+        });
+        const { data } = (await page.send("Page.captureScreenshot", {
+          format: "png",
+          clip: { x: 16, y: 16, width: 200, height: 40, scale: 1 },
+        })) as { data: string };
+        await page.close();
+        if (data !== plainShot) {
+          failures.push(
+            `${family}: U+${codePoint.toString(16).toUpperCase()} is drawn as something`,
+          );
+        }
+      }
+    }
+
     // At a line break the soft hyphen is drawn, as a hyphen: its box has the hyphen's width.
     const page = await openPage(browser.cdp, {
       div: `<div xmlns="http://www.w3.org/1999/xhtml"><p style="margin:0;font-family:${family};font-size:24px">aaaaaaaaaa\u00adbbbbbbbbbb</p><p style="margin:0;font-family:${family};font-size:24px"><span id="h">-</span></p></div>`,

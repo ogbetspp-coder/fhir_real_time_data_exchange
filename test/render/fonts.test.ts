@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Font } from "../../src/render/font.js";
 import { boundFace, checkTextNode, namedFamily } from "../../src/render/fonts.js";
-import { calibrationDiv, checkHeights, checkPage, styleKey } from "../../src/render/page-checks.js";
+import { allowedBoxes, boxHeight, checkHeights, checkPage } from "../../src/render/page-checks.js";
 
 // R3's fonts and scripts, R6's coverage, R2's page and R3's character boxes, as rules on what
 // Chrome reports (the renderer image's run of scripts/render/check-fonts.ts draws them).
@@ -25,7 +25,7 @@ const face = (postScriptName: string, points: string): Font => ({
   metrics: METRICS,
 });
 const FACES = new Map([
-  ["LiberationSerif", face("LiberationSerif", " -abcdo\u00a0\u03bc\u0416")],
+  ["LiberationSerif", face("LiberationSerif", " -abcdo\u00a0\u03bc\u0416\u2010")],
   ["Carlito-Bold", face("Carlito-Bold", " abc")],
 ]);
 const node = (
@@ -48,6 +48,10 @@ describe("R3's fonts", () => {
     expect(namedFamily("Verdana, Arial")).toBe("Verdana");
     expect(boundFace('"Times New Roman"', 400, "normal")).toBe("LiberationSerif");
     expect(boundFace("TIMES", 600, "normal")).toBe("LiberationSerif-Bold");
+    // Above 500 is bold (550 measured bold), 500 regular; an oblique with an angle upright.
+    expect(boundFace("Times", 550, "normal")).toBe("LiberationSerif-Bold");
+    expect(boundFace("Times", 500, "normal")).toBe("LiberationSerif");
+    expect(boundFace("Times", 400, "oblique 10deg")).toBe("LiberationSerif");
     expect(boundFace("Arial", 700, "oblique")).toBe("LiberationSans-BoldItalic");
     expect(boundFace("sans-serif", 500, "italic")).toBe("LiberationSans-Italic");
     expect(boundFace("Calibri", 400, "normal")).toBe("Carlito-Regular");
@@ -71,6 +75,14 @@ describe("R3's fonts", () => {
     expect(checkTextNode(node("a\u2011b", "Calibri", ["Carlito-Bold"], 700), FACES)).toEqual([
       expect.objectContaining({ refusal: "font-coverage", codePoint: 0x2011 }),
     ]);
+    // A Hangul filler is drawn as .notdef, never hidden (the first code review): judged by the map.
+    // (It is Hangul too, outside R3's scripts.)
+    expect(checkTextNode(node("\u3164"), FACES).map(({ refusal }) => refusal)).toEqual([
+      "script",
+      "font-coverage",
+    ]);
+    // The script bound holds whatever is drawn: a node of a character HarfBuzz hides, too.
+    expect(checkTextNode(node("\u0416", "Verdana", []), FACES)[0]?.refusal).toBe("script");
     // Whitespace alone is not judged: nothing of it is drawn in a face.
     expect(checkTextNode(node("\n  \t", "Verdana", []), FACES)).toEqual([]);
   });
@@ -116,27 +128,33 @@ describe("R2's page and R3's character boxes", () => {
     expect(checkPage({ ...page, divWidth: 812 }, 813, "html")[0]?.refusal).toBe("div-width");
   });
 
-  it("draws a calibration of each face and size, and holds every box to it", () => {
+  it("computes R3's box as Chrome rounds it, and holds every box to it", () => {
+    // Liberation Serif's hhea: 1825 and -443 of 2048.
+    const metrics = { ...METRICS, hheaAscender: 1825, hheaDescender: -443 };
+    // 8 pt at ratio 1: 10.667 px, quantised to 10.656 in FreeType's 26.6, gives 9 + 2 (the
+    // rectangle-plus-ascent estimate said 12; Chrome draws 11, measured).
+    expect(boxHeight(metrics, 32 / 3, 1)).toBe(11);
+    expect(boxHeight(metrics, 16, 1)).toBe(17);
+    expect(boxHeight(metrics, 16, 2.625)).toBeCloseTo(46 / 2.625, 10);
+    expect(allowedBoxes(metrics, "10.6667px", 1)).toEqual([11]);
+    expect(allowedBoxes(metrics, "auto", 1)).toEqual([]);
+    const face = { postScriptName: "LiberationSerif", codePoints: new Set<number>(), metrics };
+    const faces = new Map([["LiberationSerif", face]]);
     const run = {
       element: 2,
       family: '"Times New Roman"',
-      weight: 700,
-      style: "italic",
-      size: "14.6667px",
+      weight: 400,
+      style: "normal",
+      size: "16px",
       text: "x",
       drawnIn: [],
     };
-    const key = styleKey(run);
-    expect(calibrationDiv([key])).toBe(
-      '<div xmlns="http://www.w3.org/1999/xhtml"><p style="margin:0"><span id="c0" style="font-family:\'Times New Roman\';font-weight:700;font-style:italic;font-size:14.6667px">x</span></p></div>',
-    );
-    const calibration = new Map([[key, 17]]);
-    expect(checkHeights([run], [{ element: 2, heights: [17, 17.0001] }], calibration)).toEqual([]);
-    expect(checkHeights([run], [{ element: 2, heights: [17, 18] }], calibration)[0]?.refusal).toBe(
+    expect(checkHeights([run], [{ element: 2, heights: [17, 17.0005] }], faces, 1)).toEqual([]);
+    expect(checkHeights([run], [{ element: 2, heights: [17, 18] }], faces, 1)[0]?.refusal).toBe(
       "char-height",
     );
-    expect(checkHeights([run], [{ element: 3, heights: [17] }], calibration)[0]?.detail).toMatch(
-      /no calibration/,
+    expect(checkHeights([run], [{ element: 3, heights: [17] }], faces, 1)[0]?.detail).toMatch(
+      /no bound face/,
     );
   });
 });

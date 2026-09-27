@@ -4,8 +4,8 @@
 // Fetch.requestPaused events. Behaviour is chosen by FAKE_CHROME: "ok", "navigate-error",
 // "evaluate-throws", "garbage", "crash" (the target crashes instead of loading), "renavigate" (the
 // page asks for itself again and navigates after it loaded), "refuse-replies" (replies to paused
-// requests and the target's close fail), "no-load" (the page never loads), "runs-mismatch" (the
-// page-side read gives more text nodes than the DOM tree).
+// requests and the target's close fail), "no-load" (the page never loads), "unresolved" (a
+// page-side node cannot be resolved by reference).
 import { createReadStream, createWriteStream } from "node:fs";
 import { setTimeout } from "node:timers";
 
@@ -82,6 +82,15 @@ function reply(message) {
       if (mode === "evaluate-throws")
         return answer({ result: {}, exceptionDetails: { text: "Uncaught" } });
       if (params.expression === "handled") return answer({ result: { value: fulfilled } });
+      // A page-side node, by reference (DOM.requestNode resolves it).
+      if (params.returnByValue === false) {
+        return answer({
+          result:
+            mode === "unresolved"
+              ? { type: "undefined" }
+              : { objectId: `node-${String(params.expression)}` },
+        });
+      }
       // The judge's page-side reads (src/render/measure.ts), answered for the tree DOM.getDocument
       // gives: one text node, under the ol.
       if (String(params.expression).includes("fontFamily")) {
@@ -93,7 +102,7 @@ function reply(message) {
           size: "16px",
           text: "ab",
         };
-        return answer({ result: { value: mode === "runs-mismatch" ? [run, run] : [run] } });
+        return answer({ result: { value: [run] } });
       }
       if (String(params.expression).includes("parsererror")) {
         return answer({
@@ -156,6 +165,8 @@ function reply(message) {
           ],
         },
       });
+    case "DOM.requestNode":
+      return answer({ nodeId: 13 });
     case "CSS.getPlatformFontsForNode":
       return answer({
         fonts: [

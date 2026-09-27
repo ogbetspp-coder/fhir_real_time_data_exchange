@@ -40,13 +40,15 @@ export function namedFamily(computed: string): string {
 }
 
 // The PostScript name of the pinned face R6 binds to a computed family, weight and style, or
-// undefined for a family it does not bind. Chrome draws a weight of 600 or more in the bold face
-// and `oblique` in the italic one (measured in the image).
+// undefined for a family it does not bind. With a 400 and a 700 face, CSS font matching draws a
+// weight above 500 in the bold face (measured: 550 and 600 bold, 500 regular), and `italic` or a
+// bare `oblique` in the italic one; an oblique with an angle is expected upright, so any angle
+// Chrome draws otherwise is a `font-face` refusal, never a pass.
 export function boundFace(family: string, weight: number, style: string): string | undefined {
   const pinned = BINDINGS.get(namedFamily(family).toLowerCase());
   if (pinned === undefined) return undefined;
-  const bold = weight >= 600;
-  const italic = style === "italic" || style.startsWith("oblique");
+  const bold = weight > 500;
+  const italic = style === "italic" || style === "oblique";
   const suffix = bold ? (italic ? "BoldItalic" : "Bold") : italic ? "Italic" : "Regular";
   // Liberation's regular faces carry no suffix in their PostScript names.
   if (suffix === "Regular" && pinned.startsWith("Liberation")) return pinned;
@@ -56,18 +58,44 @@ export function boundFace(family: string, weight: number, style: string): string
 // The scripts R3 bounds.
 const SCRIPT = /^[\p{Script=Latin}\p{Script=Greek}\p{Script=Common}\p{Script=Inherited}]$/u;
 
-// Code points Chrome does not draw as a glyph of their own: ASCII whitespace controls (a line
-// break or a space), the soft hyphen (a hyphen only at a line break, drawn with U+002D), and
-// the default-ignorable code points.
-const NOT_DRAWN = /^[\t\n\f\r\u00ad\p{Default_Ignorable_Code_Point}]$/u;
+// Code points Chrome draws as nothing of their own, a closed list, each range asserted by a pixel
+// test of the image (scripts/render/smoke.ts: drawn between two letters, the same pixels as the
+// letters alone): ASCII whitespace controls (a line break or a space), the soft hyphen (a
+// hyphen only at a line break), and the default-ignorable code points HarfBuzz hides. The
+// default-ignorables HarfBuzz draws as glyphs (the Hangul fillers U+115F, U+1160, U+3164, U+FFA0
+// and U+1BCA0 to U+1BCA3, drawn as .notdef: the first code review, measured) are not on it, so
+// the character map judges them; nor are the bidirectional marks, embeddings and isolates, which
+// can reorder what is drawn (T refuses them).
+export const NOT_DRAWN_RANGES: readonly (readonly [number, number])[] = [
+  [0x0009, 0x0009],
+  [0x000a, 0x000a],
+  [0x000c, 0x000d],
+  [0x00ad, 0x00ad],
+  [0x034f, 0x034f],
+  [0x061c, 0x061c],
+  [0x17b4, 0x17b5],
+  [0x180b, 0x180f],
+  [0x200b, 0x200d],
+  [0x2060, 0x2065],
+  [0x206a, 0x206f],
+  [0xfe00, 0xfe0f],
+  [0xfeff, 0xfeff],
+  [0xfff0, 0xfff8],
+  [0x1d173, 0x1d17a],
+  [0xe0000, 0xe0fff],
+];
+function notDrawn(character: string): boolean {
+  const codePoint = character.codePointAt(0) ?? 0;
+  return NOT_DRAWN_RANGES.some(([first, last]) => codePoint >= first && codePoint <= last);
+}
 
 // The closed list of substitutions (R6): a code point drawn with another's glyph where the face
 // lacks its own, in the faces where a pixel test of the image asserts it (scripts/render/smoke.ts).
 // The non-breaking hyphen is drawn as the hyphen only in Liberation's faces; Chrome draws it in
 // Carlito and Caladea from another pinned face (measured), which `font-face` refuses.
 const SUBSTITUTIONS: readonly { codePoint: number; glyphOf: number; faces: RegExp }[] = [
-  { codePoint: 0x00a0, glyphOf: 0x0020, faces: /^(?:Liberation(?:Serif|Sans)|Carlito|Caladea)/u },
-  { codePoint: 0x2011, glyphOf: 0x002d, faces: /^Liberation(?:Serif|Sans)/u },
+  // HarfBuzz draws U+2011 with U+2010's glyph (the first code review), which Liberation has.
+  { codePoint: 0x2011, glyphOf: 0x2010, faces: /^Liberation(?:Serif|Sans)/u },
 ];
 
 export type FontCheck = {
@@ -84,16 +112,17 @@ export function checkTextNode(
   faces: ReadonlyMap<string, Font>,
 ): FontCheck[] {
   const found: FontCheck[] = [];
-  // Only whitespace and code points Chrome does not draw: nothing is drawn, no face to judge (the
-  // whitespace between table parts and list items, a node of only a soft hyphen).
-  if (Array.from(node.text).every((character) => character === " " || NOT_DRAWN.test(character))) {
-    return found;
-  }
+  // The script bound holds for every node, whatever is drawn of it.
   for (const character of node.text) {
     if (!SCRIPT.test(character)) {
       const codePoint = character.codePointAt(0) ?? 0;
       found.push({ refusal: "script", codePoint, detail: `U+${hex(codePoint)}` });
     }
+  }
+  // Only spaces and code points Chrome draws as nothing: no face to judge (the whitespace between
+  // table parts and list items, a node of only a soft hyphen).
+  if (Array.from(node.text).every((character) => character === " " || notDrawn(character))) {
+    return found;
   }
   const expected = boundFace(node.family, node.weight, node.style);
   if (expected === undefined) {
@@ -109,7 +138,7 @@ export function checkTextNode(
     return found;
   }
   for (const character of node.text) {
-    if (NOT_DRAWN.test(character)) continue;
+    if (notDrawn(character)) continue;
     const codePoint = character.codePointAt(0) ?? 0;
     if (face.codePoints.has(codePoint)) continue;
     const substitute = SUBSTITUTIONS.find(

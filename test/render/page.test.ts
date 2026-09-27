@@ -124,9 +124,9 @@ describe("R2's page", () => {
     expect(await readHeights(page)).toEqual([{ element: 1, heights: [18, 18] }]);
   });
 
-  it("refuses to pair text nodes the page and the DOM tree count differently", async () => {
-    const page = await openPage(fake("runs-mismatch").cdp, { div: DIV, mode: "html", width: 813 });
-    await expect(readRuns(page)).rejects.toThrow(/2 text nodes read, 1 in the DOM tree/);
+  it("fails a read whose page-side node cannot be resolved by reference", async () => {
+    const page = await openPage(fake("unresolved").cdp, { div: DIV, mode: "html", width: 813 });
+    await expect(readRuns(page)).rejects.toThrow(/text node 0 could not be resolved/);
   });
 
   it("refuses a page that does not load in time", async () => {

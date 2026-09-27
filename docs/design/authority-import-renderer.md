@@ -801,9 +801,12 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
      both modes at every ratio, and of its text ranges with the XML-mode DOM, as the CI
      pre-check. The importer moves to 2.1.0.
    - **3c-B2a**: R3's fonts and scripts of every section, T's or not (`font-unpinned`, `font-face`,
-     the script bound, `script`); R6's coverage (`font-coverage`, the U+2070 seed, the pixel tests
-     of the substitutions in the image's smoke check); each character box's height against the
-     box of its face at its size and ratio; a `parsererror` as its own refusal; and R2's
+     the script bound, `script`), and of T(div)'s drawing of every section T and the scanner
+     accept (T drops the styles, so its drawing can fall back where the authority's did not);
+     R6's coverage (`font-coverage`, the U+2070 seed, and pixel tests in the image's smoke check
+     of the substitutions and of each range of the closed list of code points drawn as nothing);
+     each character box's height against R3's, in both modes at every ratio; a `parsererror` as
+     its own refusal; and R2's
      assertion that the div's content box is the width, with the refusal of a div with its own
      padding or border (`div-box`, `div-width`). Every section of every pinned label is checked
      in both modes; a section T and the scanner accept, and every case, must pass, and every
@@ -814,17 +817,28 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
      `contained`, `unpinned` rewritten to a failing URL), each asserted by a test, with the
      per-section picture list for them.
 
-   Three findings of 3c-B2a's measurements in the image stand beside R3 and R6. Where another
+   Four findings of 3c-B2a's measurements in the image stand beside R3 and R6. Where another
    pinned face has a glyph the bound face lacks, Chrome draws it from that face and
    `CSS.getPlatformFontsForNode` reports both (U+2070 from Carlito, Greek in Cambria from Liberation
    Serif), which is `font-face`; asked of an element it reports its descendants' faces too, so it
-   is asked of each text node. Chrome draws a
-   family R6 does not bind (Verdana, Segoe UI, Symbol, Courier New, `monospace`, any unknown name)
-   silently in a pinned face, so `font-unpinned` is decided on the family the node names, the first
-   of its computed `font-family`, not on the face drawn. And a character's box is its face's
-   ascent and descent each rounded at the device size in 439 of 448 measured cases, the rest
-   differing at Chrome's own rounding of a half; so each box is compared with the box Chrome draws
-   for the same face, size and ratio alone on a calibration page, which the same rounding makes.
+   is asked of each text node, found by identity. Chrome draws a family R6 does not bind
+   (Verdana, Segoe UI, Symbol, Courier New, `monospace`, any unknown name) silently in a pinned
+   face, so `font-unpinned` is decided on the family the node names, the first of its computed
+   `font-family`, not on the face drawn. HarfBuzz hides most default-ignorable code points but
+   draws the Hangul fillers (U+115F, U+1160, U+3164, U+FFA0) and U+1BCA0 to U+1BCA3 as .notdef,
+   so the code points drawn as nothing are a closed list, each range asserted by pixels, and
+   every other code point is judged by the character map. And R3's box is exact once Chrome's
+   own arithmetic is followed (448 of 448 measured boxes): the font size held in single
+   precision, scaled by the ratio and quantised down to 1/64 of a device pixel as FreeType does,
+   the face's hhea ascent and descent each rounded at that size; since Chrome serialises the size
+   to six significant digits, every box the formula gives within one unit of the last of them is
+   allowed (one, or two where a rounding falls inside).
+
+   Stated residuals of 3c-B2a: a face is read at ratio 1 and 813 px, since it does not depend on
+   the width or the ratio; text outside the light DOM's text nodes (a broken picture's `alt`, a
+   `::marker`, which T keeps to ASCII) is not font-checked; coverage does not follow HarfBuzz's
+   composition, so a decomposed letter a face has only precomposed is refused, never passed; and
+   a family name `namedFamily` cannot read (a comma inside quotes) is refused, never passed.
 
 2. **3c-C**: its measured design of R4 (reviewed first), then R4, R7, R8, R9, R11; the render build,
    its trigger and attestations; the records of the pinned labels.

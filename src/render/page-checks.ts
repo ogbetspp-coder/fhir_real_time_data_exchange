@@ -1,10 +1,12 @@
 import { parsePixels, tolerance } from "./compare-style.js";
+import type { Font, Metrics } from "./font.js";
+import { boundFace } from "./fonts.js";
 import type { ChromeHeights, ChromePage, ChromeRun } from "./measure.js";
 
 // R2's page and R3's character boxes (docs/design/authority-import-renderer.md): a section whose
 // XML does not parse, whose div has padding or a border of its own, or whose div's content box is
-// not the width drawn, is a refusal of ours; so is a character whose box is not the box of its
-// face at its size and ratio.
+// not the width drawn, is a refusal of ours; so is a character whose box is not its bound face's
+// ascent and descent at its size and ratio, as Chrome rounds them.
 
 export type PageRefusal = "parsererror" | "div-box" | "div-width" | "char-height";
 
@@ -26,42 +28,57 @@ export function checkPage(page: ChromePage, width: number, mode: "html" | "xml")
   return found;
 }
 
-// A run's face and size, the key of its calibration.
-export function styleKey(run: Pick<ChromeRun, "family" | "weight" | "style" | "size">): string {
-  return JSON.stringify([run.family, run.weight, run.style, run.size]);
+// R3's character box (the first code review of 3c-B2a, 448 of 448 measured boxes): Chrome holds
+// the font size in single precision, scales it by the device pixel ratio, and FreeType quantises
+// it down to 1/64 of a device pixel; the box is the face's hhea ascent and descent, each rounded
+// at that size, in CSS pixels.
+export function boxHeight(metrics: Metrics, pixels: number, ratio: number): number {
+  const size = Math.floor(Math.fround(Math.fround(pixels) * ratio) * 64) / 64;
+  const ascent = Math.round((metrics.hheaAscender / metrics.unitsPerEm) * size);
+  const descent = Math.round((-metrics.hheaDescender / metrics.unitsPerEm) * size);
+  return (ascent + descent) / ratio;
 }
 
-// A page of one character per face and size the section uses, each alone on its own line, whose
-// box heights are the calibration: Chrome's own box for that face, size and ratio.
-export function calibrationDiv(keys: readonly string[]): string {
-  const spans = keys.map((key, index) => {
-    const [family, weight, style, size] = JSON.parse(key) as [string, number, string, string];
-    const css = `font-family:${family.replace(/"/gu, "'")};font-weight:${weight};font-style:${style};font-size:${size}`;
-    return `<p style="margin:0"><span id="c${index}" style="${css}">x</span></p>`;
-  });
-  return `<div xmlns="http://www.w3.org/1999/xhtml">${spans.join("")}</div>`;
+// The boxes a computed size allows: Chrome serialises the size to six significant digits, so the
+// exact size is anywhere within one unit of the last of them, and each box the formula gives
+// across that interval is allowed (one, or two where a rounding falls inside it).
+export function allowedBoxes(metrics: Metrics, computedSize: string, ratio: number): number[] {
+  const pixels = parsePixels(computedSize);
+  if (pixels === undefined) return [];
+  const spread = tolerance(pixels);
+  const found = new Set<number>();
+  const steps = 64;
+  for (let step = 0; step <= steps; step += 1) {
+    found.add(boxHeight(metrics, pixels - spread + (2 * spread * step) / steps, ratio));
+  }
+  return [...found];
 }
 
-// Every character's box against its calibration.
+// Every character's box against R3's, from its bound face's metrics.
 export function checkHeights(
   runs: readonly ChromeRun[],
   heights: ChromeHeights,
-  calibration: ReadonlyMap<string, number>,
+  faces: ReadonlyMap<string, Font>,
+  ratio: number,
 ): PageCheck[] {
-  const keyOf = new Map(runs.map((run) => [run.element, styleKey(run)]));
+  const allowed = new Map<number, number[]>();
+  for (const run of runs) {
+    if (allowed.has(run.element)) continue;
+    const face = faces.get(boundFace(run.family, run.weight, run.style) ?? "");
+    if (face !== undefined) allowed.set(run.element, allowedBoxes(face.metrics, run.size, ratio));
+  }
   const found: PageCheck[] = [];
   for (const { element, heights: boxes } of heights) {
-    const key = keyOf.get(element);
-    const expected = key === undefined ? undefined : calibration.get(key);
-    if (expected === undefined) {
-      found.push({ refusal: "char-height", detail: `element ${element} has no calibration` });
+    const expected = allowed.get(element);
+    if (expected === undefined || expected.length === 0) {
+      found.push({ refusal: "char-height", detail: `element ${element} has no bound face` });
       continue;
     }
-    const wrong = boxes.find((height) => Math.abs(height - expected) > 1e-3);
+    const wrong = boxes.find((height) => !expected.some((box) => Math.abs(height - box) <= 1e-3));
     if (wrong !== undefined) {
       found.push({
         refusal: "char-height",
-        detail: `element ${element}: a box ${wrong} px high, not ${expected}`,
+        detail: `element ${element}: a box ${wrong} px high, not ${expected.join(" or ")}`,
       });
     }
   }
