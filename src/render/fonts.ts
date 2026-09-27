@@ -74,7 +74,8 @@ export const NOT_DRAWN_RANGES: readonly (readonly [number, number])[] = [
   [0x034f, 0x034f],
   [0x061c, 0x061c],
   [0x17b4, 0x17b5],
-  [0x180b, 0x180f],
+  // U+180F, the fourth Mongolian variation selector, is drawn as something (CI's pixel test).
+  [0x180b, 0x180e],
   [0x200b, 0x200d],
   [0x2060, 0x2065],
   [0x206a, 0x206f],
