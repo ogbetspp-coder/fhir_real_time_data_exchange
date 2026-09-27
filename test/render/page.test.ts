@@ -124,6 +124,16 @@ describe("R2's page", () => {
     expect(await readHeights(page)).toEqual([{ element: 1, heights: [18, 18] }]);
   });
 
+  it("reports no face for text DevTools keeps no node of, and fails on any other error", async () => {
+    for (const mode of ["whitespace-node", "lost-node"]) {
+      const page = await openPage(fake(mode).cdp, { div: DIV, mode: "html", width: 813 });
+      expect((await readRuns(page))[0]?.drawnIn).toEqual([]);
+      await browser?.close();
+    }
+    const page = await openPage(fake("fonts-error").cdp, { div: DIV, mode: "html", width: 813 });
+    await expect(readRuns(page)).rejects.toThrow(/CSS agent is not enabled/);
+  });
+
   it("fails a read whose page-side node cannot be resolved by reference", async () => {
     const page = await openPage(fake("unresolved").cdp, { div: DIV, mode: "html", width: 813 });
     await expect(readRuns(page)).rejects.toThrow(/text node 0 could not be resolved/);

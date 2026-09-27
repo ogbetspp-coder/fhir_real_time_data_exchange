@@ -130,7 +130,12 @@ export function checkTextNode(
     return [...found, { refusal: "font-unpinned", detail: namedFamily(node.family) }];
   }
   const drawn = [...new Set(node.drawnIn)];
-  if (drawn.length !== 1 || drawn[0] !== expected) {
+  // A node of whitespace alone (U+3000, the wide spaces) has no node in DevTools' tree, so no face
+  // is reported for it (src/render/measure.ts); its code points are still held to the map.
+  const whitespaceAlone = Array.from(node.text).every((character) =>
+    /^\p{White_Space}$/u.test(character),
+  );
+  if (!(whitespaceAlone && drawn.length === 0) && (drawn.length !== 1 || drawn[0] !== expected)) {
     found.push({ refusal: "font-face", detail: `${drawn.join(", ") || "none"}, not ${expected}` });
   }
   const face = faces.get(expected);

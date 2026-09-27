@@ -1,3 +1,4 @@
+import { CdpError } from "./cdp.js";
 import type { Page } from "./page.js";
 
 // What the judge reads of a drawn section for R3 (docs/design/authority-import-renderer.md, and
@@ -225,10 +226,22 @@ export async function readRuns(page: Page, withFaces = true): Promise<ChromeRun[
     const { nodeId } = (await page.send("DOM.requestNode", { objectId: result.objectId })) as {
       nodeId: number;
     };
-    const { fonts } = (await page.send("CSS.getPlatformFontsForNode", { nodeId })) as {
-      fonts: { postScriptName: string }[];
-    };
-    found.push({ ...run, drawnIn: fonts.map(({ postScriptName }) => postScriptName) });
+    // DevTools keeps no node of whitespace alone (by its own rule: U+3000 and the other wide
+    // spaces too), so no face is reported for it: `drawnIn` stays empty, and the check judges
+    // its code points, skipping ASCII whitespace and refusing anything else (CI, measured).
+    let drawnIn: string[] = [];
+    if (nodeId !== 0) {
+      try {
+        const { fonts } = (await page.send("CSS.getPlatformFontsForNode", { nodeId })) as {
+          fonts: { postScriptName: string }[];
+        };
+        drawnIn = fonts.map(({ postScriptName }) => postScriptName);
+      } catch (error) {
+        if (!(error instanceof CdpError) || !error.message.includes("Could not find node"))
+          throw error;
+      }
+    }
+    found.push({ ...run, drawnIn });
   }
   return found;
 }

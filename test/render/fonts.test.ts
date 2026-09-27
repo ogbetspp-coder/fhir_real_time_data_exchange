@@ -83,6 +83,10 @@ describe("R3's fonts", () => {
     ]);
     // The script bound holds whatever is drawn: a node of a character HarfBuzz hides, too.
     expect(checkTextNode(node("\u0416", "Verdana", []), FACES)[0]?.refusal).toBe("script");
+    // A wide space alone is reported in no face; its map still judges it.
+    expect(checkTextNode(node("\u2003", '"Times New Roman"', []), FACES)).toEqual([
+      expect.objectContaining({ refusal: "font-coverage", codePoint: 0x2003 }),
+    ]);
     // Whitespace alone is not judged: nothing of it is drawn in a face.
     expect(checkTextNode(node("\n  \t", "Verdana", []), FACES)).toEqual([]);
   });

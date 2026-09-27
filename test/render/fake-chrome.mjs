@@ -5,7 +5,8 @@
 // "evaluate-throws", "garbage", "crash" (the target crashes instead of loading), "renavigate" (the
 // page asks for itself again and navigates after it loaded), "refuse-replies" (replies to paused
 // requests and the target's close fail), "no-load" (the page never loads), "unresolved" (a
-// page-side node cannot be resolved by reference).
+// page-side node cannot be resolved by reference), "whitespace-node" and "lost-node" (DevTools
+// keeps no node for the text), "fonts-error" (another protocol error).
 import { createReadStream, createWriteStream } from "node:fs";
 import { setTimeout } from "node:timers";
 
@@ -166,8 +167,12 @@ function reply(message) {
         },
       });
     case "DOM.requestNode":
-      return answer({ nodeId: 13 });
+      return answer({ nodeId: mode === "whitespace-node" ? 0 : 13 });
     case "CSS.getPlatformFontsForNode":
+      if (mode === "lost-node")
+        return write({ id, error: { code: -32000, message: "Could not find node with given id" } });
+      if (mode === "fonts-error")
+        return write({ id, error: { code: -32601, message: "CSS agent is not enabled" } });
       return answer({
         fonts: [
           {
