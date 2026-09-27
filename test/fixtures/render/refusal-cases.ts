@@ -24,16 +24,16 @@ export const REFUSAL_CASES: RefusalCase[] = [
     refusal: "font-unpinned",
   },
   // U+2070, which Liberation Serif lacks (R6's seed): Chrome draws it from Carlito.
-  { name: "superscript-zero", div: div("<p>10⁰</p>"), refusal: "font-coverage" },
-  { name: "superscript-zero-face", div: div("<p>10⁰</p>"), refusal: "font-face" },
+  { name: "superscript-zero", div: div("<p>10\u2070</p>"), refusal: "font-coverage" },
+  { name: "superscript-zero-face", div: div("<p>10\u2070</p>"), refusal: "font-face" },
   // Greek in Cambria, whose Caladea has none: drawn from Liberation Serif.
   {
     name: "greek-in-cambria",
-    div: div('<p style="font-family:Cambria">μ</p>'),
+    div: div('<p style="font-family:Cambria">\u03bc</p>'),
     refusal: "font-face",
   },
   // A script R3 does not bound.
-  { name: "cyrillic", div: div("<p>Ж</p>"), refusal: "script" },
+  { name: "cyrillic", div: div("<p>\u0416</p>"), refusal: "script" },
   // An entity XML does not define: the page does not parse in XML mode.
   { name: "parsererror", div: div("<p>a&nbsp;b</p>"), refusal: "parsererror" },
   // A div with padding of its own.

@@ -59,14 +59,16 @@ const SCRIPT = /^[\p{Script=Latin}\p{Script=Greek}\p{Script=Common}\p{Script=Inh
 // Code points Chrome does not draw as a glyph of their own: ASCII whitespace controls (a line
 // break or a space), the soft hyphen (a hyphen only at a line break, drawn with U+002D), and
 // the default-ignorable code points.
-const NOT_DRAWN = /^[\t\n\f\r­\p{Default_Ignorable_Code_Point}]$/u;
+const NOT_DRAWN = /^[\t\n\f\r\u00ad\p{Default_Ignorable_Code_Point}]$/u;
 
-// The closed list of substitutions (R6): the code point drawn with another's glyph where the
-// face lacks its own, each asserted by a pixel test of the image (scripts/render/smoke.ts).
-const SUBSTITUTIONS: ReadonlyMap<number, number> = new Map([
-  [0x00a0, 0x0020], // no-break space, the space's glyph
-  [0x2011, 0x002d], // non-breaking hyphen, the hyphen's
-]);
+// The closed list of substitutions (R6): a code point drawn with another's glyph where the face
+// lacks its own, in the faces where a pixel test of the image asserts it (scripts/render/smoke.ts).
+// The non-breaking hyphen is drawn as the hyphen only in Liberation's faces; Chrome draws it in
+// Carlito and Caladea from another pinned face (measured), which `font-face` refuses.
+const SUBSTITUTIONS: readonly { codePoint: number; glyphOf: number; faces: RegExp }[] = [
+  { codePoint: 0x00a0, glyphOf: 0x0020, faces: /^(?:Liberation(?:Serif|Sans)|Carlito|Caladea)/u },
+  { codePoint: 0x2011, glyphOf: 0x002d, faces: /^Liberation(?:Serif|Sans)/u },
+];
 
 export type FontCheck = {
   refusal: FontRefusal;
@@ -110,8 +112,10 @@ export function checkTextNode(
     if (NOT_DRAWN.test(character)) continue;
     const codePoint = character.codePointAt(0) ?? 0;
     if (face.codePoints.has(codePoint)) continue;
-    const substitute = SUBSTITUTIONS.get(codePoint);
-    if (substitute !== undefined && face.codePoints.has(substitute)) continue;
+    const substitute = SUBSTITUTIONS.find(
+      (entry) => entry.codePoint === codePoint && entry.faces.test(expected),
+    );
+    if (substitute !== undefined && face.codePoints.has(substitute.glyphOf)) continue;
     found.push({
       refusal: "font-coverage",
       codePoint,

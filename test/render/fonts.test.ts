@@ -25,7 +25,7 @@ const face = (postScriptName: string, points: string): Font => ({
   metrics: METRICS,
 });
 const FACES = new Map([
-  ["LiberationSerif", face("LiberationSerif", " -abcdo μЖ")],
+  ["LiberationSerif", face("LiberationSerif", " -abcdo\u00a0\u03bc\u0416")],
   ["Carlito-Bold", face("Carlito-Bold", " abc")],
 ]);
 const node = (
@@ -58,13 +58,19 @@ describe("R3's fonts", () => {
   });
 
   it("passes text drawn in its bound face, whose map has every code point drawn", () => {
-    expect(checkTextNode(node("a b c-d ­​\n"), FACES)).toEqual([]);
+    expect(checkTextNode(node("a b\u00a0c-d \u00ad\u200b\n"), FACES)).toEqual([]);
     // The non-breaking hyphen is drawn with the hyphen's glyph (R6's substitutions).
-    expect(checkTextNode(node("1‑2", '"Times New Roman"', ["LiberationSerif"]), FACES)).toEqual([
+    expect(
+      checkTextNode(node("1\u20112", '"Times New Roman"', ["LiberationSerif"]), FACES),
+    ).toEqual([
       expect.objectContaining({ refusal: "font-coverage", codePoint: 0x31 }),
       expect.objectContaining({ refusal: "font-coverage", codePoint: 0x32 }),
     ]);
-    expect(checkTextNode(node("a‑b"), FACES)).toEqual([]);
+    expect(checkTextNode(node("a\u2011b"), FACES)).toEqual([]);
+    // ... in Liberation's faces only: Carlito draws it from another face, and lacks it.
+    expect(checkTextNode(node("a\u2011b", "Calibri", ["Carlito-Bold"], 700), FACES)).toEqual([
+      expect.objectContaining({ refusal: "font-coverage", codePoint: 0x2011 }),
+    ]);
     // Whitespace alone is not judged: nothing of it is drawn in a face.
     expect(checkTextNode(node("\n  \t", "Verdana", []), FACES)).toEqual([]);
   });
@@ -75,11 +81,11 @@ describe("R3's fonts", () => {
     ]);
     expect(
       checkTextNode(
-        node("a⁰", '"Times New Roman"', ["LiberationSerif", "Carlito-Regular"]),
+        node("a\u2070", '"Times New Roman"', ["LiberationSerif", "Carlito-Regular"]),
         FACES,
       ).map(({ refusal }) => refusal),
     ).toEqual(["font-face", "font-coverage"]);
-    expect(checkTextNode(node("Ж"), FACES)).toEqual([
+    expect(checkTextNode(node("\u0416"), FACES)).toEqual([
       { refusal: "script", codePoint: 0x416, detail: "U+0416" },
     ]);
     expect(checkTextNode(node("abc", "Calibri", ["Carlito-Regular"]), FACES)).toEqual([

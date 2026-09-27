@@ -87,13 +87,15 @@ try {
   // as a hyphen. Each pair is drawn alone at the same place and captured; equal PNG bytes are
   // equal pixels.
   const families = ["'Times New Roman'", "Arial", "Calibri", "Cambria"];
-  const pairs: [string, string, string][] = [
-    ["no-break space", "a\u00a0b", "a b"],
-    ["non-breaking hyphen", "1\u20112", "1-2"],
-    ["soft hyphen within a line", "ab\u00adcd", "abcd"],
+  const pairs: [string, string, string, readonly string[]][] = [
+    ["no-break space", "a\u00a0b", "a b", families],
+    // Only in Liberation's faces (src/render/fonts.ts, SUBSTITUTIONS).
+    ["non-breaking hyphen", "1\u20112", "1-2", ["'Times New Roman'", "Arial"]],
+    ["soft hyphen within a line", "ab\u00adcd", "abcd", families],
   ];
   for (const family of families) {
-    for (const [what, substituted, plain] of pairs) {
+    for (const [what, substituted, plain, where] of pairs) {
+      if (!where.includes(family)) continue;
       const shots: string[] = [];
       for (const text of [substituted, plain]) {
         const page = await openPage(browser.cdp, {
