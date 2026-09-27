@@ -28,20 +28,23 @@ export function checkPage(page: ChromePage, width: number, mode: "html" | "xml")
   return found;
 }
 
-// R3's character box (the first code review of 3c-B2a, 448 of 448 measured boxes): Chrome holds
-// the font size in single precision, scales it by the device pixel ratio, and FreeType quantises
-// it down to 1/64 of a device pixel; the box is the face's hhea ascent and descent, each rounded
-// at that size, in CSS pixels.
-export function boxHeight(metrics: Metrics, pixels: number, ratio: number): number {
-  const size = Math.floor(Math.fround(Math.fround(pixels) * ratio) * 64) / 64;
+// R3's character box: Chrome holds the font size in single precision and scales it by the device
+// pixel ratio, FreeType quantises it to 1/64 of a device pixel, and the box is the face's hhea
+// ascent and descent, each rounded at that size, in CSS pixels. The quantisation is down for
+// every size the first code review of 3c-B2a measured (448 of 448, sizes in points) and to the
+// nearest for two headings' sizes in em CI measured (h5 at ratio 3, h6 at 1.1), so `down` picks
+// which, and both are allowed (they differ by a device pixel only where a rounding falls).
+export function boxHeight(metrics: Metrics, pixels: number, ratio: number, down = true): number {
+  const scaled = Math.fround(Math.fround(pixels) * ratio) * 64;
+  const size = (down ? Math.floor(scaled) : Math.round(scaled)) / 64;
   const ascent = Math.round((metrics.hheaAscender / metrics.unitsPerEm) * size);
   const descent = Math.round((-metrics.hheaDescender / metrics.unitsPerEm) * size);
   return (ascent + descent) / ratio;
 }
 
 // The boxes a computed size allows: Chrome serialises the size to six significant digits, so the
-// exact size is anywhere within one unit of the last of them, and each box the formula gives
-// across that interval is allowed (one, or two where a rounding falls inside it).
+// exact size is anywhere within one unit of the last of them, and each box either quantisation
+// gives across that interval is allowed (one, or two where a rounding falls inside it).
 export function allowedBoxes(metrics: Metrics, computedSize: string, ratio: number): number[] {
   const pixels = parsePixels(computedSize);
   if (pixels === undefined) return [];
@@ -49,7 +52,9 @@ export function allowedBoxes(metrics: Metrics, computedSize: string, ratio: numb
   const found = new Set<number>();
   const steps = 64;
   for (let step = 0; step <= steps; step += 1) {
-    found.add(boxHeight(metrics, pixels - spread + (2 * spread * step) / steps, ratio));
+    const size = pixels - spread + (2 * spread * step) / steps;
+    found.add(boxHeight(metrics, size, ratio, true));
+    found.add(boxHeight(metrics, size, ratio, false));
   }
   return [...found];
 }

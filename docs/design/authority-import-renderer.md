@@ -830,9 +830,12 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
    every other code point is judged by the character map. And R3's box is exact once Chrome's
    own arithmetic is followed (448 of 448 measured boxes): the font size held in single
    precision, scaled by the ratio and quantised down to 1/64 of a device pixel as FreeType does,
-   the face's hhea ascent and descent each rounded at that size; since Chrome serialises the size
-   to six significant digits, every box the formula gives within one unit of the last of them is
-   allowed (one, or two where a rounding falls inside).
+   the face's hhea ascent and descent each rounded at that size. The quantisation is down for
+   every size in points measured and to the nearest for two sizes in em (h5 at ratio 3, h6 at
+   1.1, measured in CI), by a path not yet found, so both are allowed; and since Chrome
+   serialises the size to six significant digits, every box either gives within one unit of the
+   last of them is allowed. So a box may be a device pixel off where a rounding falls, a stated
+   tolerance; a box of another face's metrics is still refused.
 
    Stated residuals of 3c-B2a: a face is read at ratio 1 and 813 px, since it does not depend on
    the width or the ratio; text outside the light DOM's text nodes (a broken picture's `alt`, a

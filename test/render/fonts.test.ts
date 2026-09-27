@@ -140,7 +140,18 @@ describe("R2's page and R3's character boxes", () => {
     expect(boxHeight(metrics, 32 / 3, 1)).toBe(11);
     expect(boxHeight(metrics, 16, 1)).toBe(17);
     expect(boxHeight(metrics, 16, 2.625)).toBeCloseTo(46 / 2.625, 10);
-    expect(allowedBoxes(metrics, "10.6667px", 1)).toEqual([11]);
+    // Both quantisations are allowed, a device pixel apart where a rounding falls (Chrome draws 11).
+    expect(allowedBoxes(metrics, "10.6667px", 1)).toEqual([11, 12]);
+    expect(allowedBoxes(metrics, "16px", 1)).toEqual([17]);
+    // h6 (0.67 em of 16 px) at 1.1: quantised down it is 13 device pixels, to the nearest 14,
+    // which Chrome draws (CI, measured).
+    expect(boxHeight(metrics, 10.72, 1.1) * 1.1).toBeCloseTo(13, 9);
+    expect(boxHeight(metrics, 10.72, 1.1, false) * 1.1).toBeCloseTo(14, 9);
+    expect(
+      allowedBoxes(metrics, "10.72px", 1.1)
+        .map((box) => Math.round(box * 1.1))
+        .sort(),
+    ).toEqual([13, 14]);
     expect(allowedBoxes(metrics, "auto", 1)).toEqual([]);
     const face = { postScriptName: "LiberationSerif", codePoints: new Set<number>(), metrics };
     const faces = new Map([["LiberationSerif", face]]);
