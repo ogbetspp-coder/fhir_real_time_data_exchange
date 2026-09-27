@@ -11,6 +11,7 @@ import {
   readRuns,
   readTexts,
 } from "../../src/render/measure.js";
+import { readDrawing } from "../../src/render/drawing.js";
 import { ORIGIN, openPage, pageDocument } from "../../src/render/page.js";
 
 const FAKE = fileURLToPath(new URL("./fake-chrome.mjs", import.meta.url));
@@ -147,6 +148,16 @@ describe("R2's page", () => {
   it("fails a read whose page-side node cannot be resolved by reference", async () => {
     const page = await openPage(fake("unresolved").cdp, { div: DIV, mode: "html", width: 813 });
     await expect(readRuns(page)).rejects.toThrow(/text node 0 could not be resolved/);
+  });
+
+  it("reads a drawing's text, markers in document order, tables and pictures", async () => {
+    const page = await openPage(fake("ok").cdp, { div: DIV, mode: "html", width: 813 });
+    expect(await readDrawing(page)).toEqual({
+      text: "a\nb",
+      tables: [[{ left: 0, top: 0, right: 10, bottom: 5 }]],
+      pictures: [{ width: 30, height: 20 }],
+      markers: ["1. "],
+    });
   });
 
   it("refuses a page that does not load in time", async () => {
