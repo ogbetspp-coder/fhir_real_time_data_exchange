@@ -58,10 +58,12 @@ export function boundFace(family: string, weight: number, style: string): string
 // The scripts R3 bounds.
 const SCRIPT = /^[\p{Script=Latin}\p{Script=Greek}\p{Script=Common}\p{Script=Inherited}]$/u;
 
-// Code points Chrome draws as nothing of their own, a closed list, each range asserted by a pixel
-// test of the image (scripts/render/smoke.ts: drawn between two letters, the same pixels as the
-// letters alone): ASCII whitespace controls (a line break or a space), the soft hyphen (a
-// hyphen only at a line break), and the default-ignorable code points HarfBuzz hides. The
+// Code points Chrome draws as nothing of their own, a closed list: tab, line feed and carriage
+// return (a space or a line break), the soft hyphen (a hyphen only at a line break, its own pixel
+// test), and the default-ignorable code points HarfBuzz hides, each of whose ranges a pixel test
+// of the image asserts at both ends (scripts/render/smoke.ts: drawn between two letters, the
+// same pixels as the letters alone; the second review drew every one of them in eight faces).
+// Some of these the script bound refuses anyway (Khmer, Mongolian, unassigned tags). The
 // default-ignorables HarfBuzz draws as glyphs (the Hangul fillers U+115F, U+1160, U+3164, U+FFA0
 // and U+1BCA0 to U+1BCA3, drawn as .notdef: the first code review, measured) are not on it, so
 // the character map judges them; nor are the bidirectional marks, embeddings and isolates, which
@@ -69,10 +71,9 @@ const SCRIPT = /^[\p{Script=Latin}\p{Script=Greek}\p{Script=Common}\p{Script=Inh
 export const NOT_DRAWN_RANGES: readonly (readonly [number, number])[] = [
   [0x0009, 0x0009],
   [0x000a, 0x000a],
-  [0x000c, 0x000d],
+  [0x000d, 0x000d],
   [0x00ad, 0x00ad],
   [0x034f, 0x034f],
-  [0x061c, 0x061c],
   [0x17b4, 0x17b5],
   // U+180F, the fourth Mongolian variation selector, is drawn as something (CI's pixel test).
   [0x180b, 0x180e],
@@ -120,9 +121,13 @@ export function checkTextNode(
       found.push({ refusal: "script", codePoint, detail: `U+${hex(codePoint)}` });
     }
   }
-  // Only spaces and code points Chrome draws as nothing: no face to judge (the whitespace between
-  // table parts and list items, a node of only a soft hyphen).
-  if (Array.from(node.text).every((character) => character === " " || notDrawn(character))) {
+  // Only spaces and code points Chrome draws as nothing, with no face reported: nothing to judge
+  // (the whitespace between table parts and list items). Where a face is reported, it is still
+  // held to the bound one: a fallback moves the line box even where it draws nothing.
+  if (
+    node.drawnIn.length === 0 &&
+    Array.from(node.text).every((character) => character === " " || notDrawn(character))
+  ) {
     return found;
   }
   const expected = boundFace(node.family, node.weight, node.style);

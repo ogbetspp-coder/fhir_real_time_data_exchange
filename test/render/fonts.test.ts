@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Font } from "../../src/render/font.js";
 import { boundFace, checkTextNode, namedFamily } from "../../src/render/fonts.js";
-import { allowedBoxes, boxHeight, checkHeights, checkPage } from "../../src/render/page-checks.js";
+import { boxFits, boxHeight, checkHeights, checkPage } from "../../src/render/page-checks.js";
 
 // R3's fonts and scripts, R6's coverage, R2's page and R3's character boxes, as rules on what
 // Chrome reports (the renderer image's run of scripts/render/check-fonts.ts draws them).
@@ -132,27 +132,20 @@ describe("R2's page and R3's character boxes", () => {
     expect(checkPage({ ...page, divWidth: 812 }, 813, "html")[0]?.refusal).toBe("div-width");
   });
 
-  it("computes R3's box as Chrome rounds it, and holds every box to it", () => {
+  it("holds every box to within a device pixel of the face's ascent and descent", () => {
     // Liberation Serif's hhea: 1825 and -443 of 2048.
     const metrics = { ...METRICS, hheaAscender: 1825, hheaDescender: -443 };
-    // 8 pt at ratio 1: 10.667 px, quantised to 10.656 in FreeType's 26.6, gives 9 + 2 (the
-    // rectangle-plus-ascent estimate said 12; Chrome draws 11, measured).
+    // 8 pt at ratio 1: 10.667 px, quantised to 10.656 in FreeType's 26.6, gives 9 + 2 (Chrome 11).
     expect(boxHeight(metrics, 32 / 3, 1)).toBe(11);
     expect(boxHeight(metrics, 16, 1)).toBe(17);
     expect(boxHeight(metrics, 16, 2.625)).toBeCloseTo(46 / 2.625, 10);
-    // Both quantisations are allowed, a device pixel apart where a rounding falls (Chrome draws 11).
-    expect(allowedBoxes(metrics, "10.6667px", 1)).toEqual([11, 12]);
-    expect(allowedBoxes(metrics, "16px", 1)).toEqual([17]);
-    // h6 (0.67 em of 16 px) at 1.1: quantised down it is 13 device pixels, to the nearest 14,
-    // which Chrome draws (CI, measured).
-    expect(boxHeight(metrics, 10.72, 1.1) * 1.1).toBeCloseTo(13, 9);
-    expect(boxHeight(metrics, 10.72, 1.1, false) * 1.1).toBeCloseTo(14, 9);
-    expect(
-      allowedBoxes(metrics, "10.72px", 1.1)
-        .map((box) => Math.round(box * 1.1))
-        .sort(),
-    ).toEqual([13, 14]);
-    expect(allowedBoxes(metrics, "auto", 1)).toEqual([]);
+    // Chrome's own boxes one device pixel off the formula (the second review, measured) fit.
+    expect(boxFits(27, boxHeight(metrics, 24.13, 1), 1)).toBe(true);
+    expect(boxFits(14 / 1.1, boxHeight(metrics, 11.7333, 1.1), 1.1)).toBe(true);
+    // A height Chrome reports in 1/64 CSS px at a fractional ratio fits.
+    expect(boxFits(14.546875, 16 / 1.1, 1.1)).toBe(true);
+    // Two device pixels off does not.
+    expect(boxFits(19, 17, 1)).toBe(false);
     const face = { postScriptName: "LiberationSerif", codePoints: new Set<number>(), metrics };
     const faces = new Map([["LiberationSerif", face]]);
     const run = {
@@ -164,12 +157,16 @@ describe("R2's page and R3's character boxes", () => {
       text: "x",
       drawnIn: [],
     };
-    expect(checkHeights([run], [{ element: 2, heights: [17, 17.0005] }], faces, 1)).toEqual([]);
-    expect(checkHeights([run], [{ element: 2, heights: [17, 18] }], faces, 1)[0]?.refusal).toBe(
+    expect(checkHeights([run], [{ element: 2, heights: [17, 18, 16] }], faces, 1)).toEqual([]);
+    expect(checkHeights([run], [{ element: 2, heights: [17, 19] }], faces, 1)[0]?.refusal).toBe(
       "char-height",
     );
     expect(checkHeights([run], [{ element: 3, heights: [17] }], faces, 1)[0]?.detail).toMatch(
       /no bound face/,
     );
+    expect(
+      checkHeights([{ ...run, size: "auto" }], [{ element: 2, heights: [17] }], faces, 1)[0]
+        ?.detail,
+    ).toMatch(/no bound face/);
   });
 });

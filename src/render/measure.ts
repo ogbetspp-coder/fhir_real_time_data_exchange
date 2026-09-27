@@ -217,6 +217,13 @@ export async function readRuns(page: Page, withFaces = true): Promise<ChromeRun[
   await page.send("DOM.getDocument", { depth: 0 });
   const found: ChromeRun[] = [];
   for (const [at, run] of runs.entries()) {
+    // A node of whitespace alone: DevTools keeps none (DOM.requestNode answers 0, after a walk of
+    // the parent's children, quadratic in a long list of them: the second review), and nothing of
+    // it is drawn in a face, so it is not asked; the check holds its code points to the map.
+    if (/^\p{White_Space}*$/u.test(run.text)) {
+      found.push({ ...run, drawnIn: [] });
+      continue;
+    }
     const { result } = (await page.send("Runtime.evaluate", {
       expression: `globalThis.${RUNS_GLOBAL}[${at}]`,
       contextId: page.contextId,

@@ -827,15 +827,16 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
    `font-family`, not on the face drawn. HarfBuzz hides most default-ignorable code points but
    draws the Hangul fillers (U+115F, U+1160, U+3164, U+FFA0) and U+1BCA0 to U+1BCA3 as .notdef,
    so the code points drawn as nothing are a closed list, each range asserted by pixels, and
-   every other code point is judged by the character map. And R3's box is exact once Chrome's
-   own arithmetic is followed (448 of 448 measured boxes): the font size held in single
-   precision, scaled by the ratio and quantised down to 1/64 of a device pixel as FreeType does,
-   the face's hhea ascent and descent each rounded at that size. The quantisation is down for
-   every size in points measured and to the nearest for two sizes in em (h5 at ratio 3, h6 at
-   1.1, measured in CI), by a path not yet found, so both are allowed; and since Chrome
-   serialises the size to six significant digits, every box either gives within one unit of the
-   last of them is allowed. So a box may be a device pixel off where a rounding falls, a stated
-   tolerance; a box of another face's metrics is still refused.
+   every other code point is judged by the character map (the second review drew every listed
+   code point in eight faces: none draws anything). And R3's box is not exact: the face's hhea
+   ascent and descent, each rounded at the device size after Chrome's single-precision size is
+   quantised down to 1/64 of a device pixel, fits every size in points first measured (448 of 448) but misses by one device pixel at some sizes in em, %, `smaller` and at fractional ratios
+   (about 1 to 3 % of a sweep), by a path not yet found. So 3c-B2a holds each box to within one
+   device pixel of it, compared in device pixels with the 1/64 CSS pixel Chrome reports heights
+   in, a stated tolerance: a box of the bound face's metrics passes, a stretched box is refused
+   (a seed), and a box of another face's metrics is refused where it differs by more (a fallback
+   face is refused as `font-face` anyway). The exact box model is 3c-C's, with R4's baseline,
+   which assumes the same one device pixel.
 
    Stated residuals of 3c-B2a: a face is read at ratio 1 and 813 px, since it does not depend on
    the width or the ratio; text outside the light DOM's text nodes (a broken picture's `alt`, a

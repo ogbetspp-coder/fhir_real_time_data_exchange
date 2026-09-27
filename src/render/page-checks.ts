@@ -28,35 +28,26 @@ export function checkPage(page: ChromePage, width: number, mode: "html" | "xml")
   return found;
 }
 
-// R3's character box: Chrome holds the font size in single precision and scales it by the device
-// pixel ratio, FreeType quantises it to 1/64 of a device pixel, and the box is the face's hhea
-// ascent and descent, each rounded at that size, in CSS pixels. The quantisation is down for
-// every size the first code review of 3c-B2a measured (448 of 448, sizes in points) and to the
-// nearest for two headings' sizes in em CI measured (h5 at ratio 3, h6 at 1.1), so `down` picks
-// which, and both are allowed (they differ by a device pixel only where a rounding falls).
-export function boxHeight(metrics: Metrics, pixels: number, ratio: number, down = true): number {
-  const scaled = Math.fround(Math.fround(pixels) * ratio) * 64;
-  const size = (down ? Math.floor(scaled) : Math.round(scaled)) / 64;
+// R3's character box, as a measured tolerance, not an exact model (the second review of 3c-B2a):
+// the face's hhea ascent and descent at the computed size and ratio, each rounded at the device
+// size, after Chrome's single-precision size quantised down to 1/64 of a device pixel as
+// FreeType does. That fits every size in points first measured (448 of 448) but misses by one
+// device pixel at some sizes in em, %, `smaller` and at fractional ratios (about 1 to 3 % of a
+// sweep), by a path not yet found. So a box is held to within one device pixel of it, plus the
+// 1/64 CSS pixel Chrome reports heights in: a box of the bound face's metrics passes, a box
+// another face would draw (a fallback's, which `font-face` refuses too) or a box stretched by
+// anything is refused. The exact box model is 3c-C's, with R4's baseline, which assumes the same
+// one device pixel.
+export function boxHeight(metrics: Metrics, pixels: number, ratio: number): number {
+  const size = Math.floor(Math.fround(Math.fround(pixels) * ratio) * 64) / 64;
   const ascent = Math.round((metrics.hheaAscender / metrics.unitsPerEm) * size);
   const descent = Math.round((-metrics.hheaDescender / metrics.unitsPerEm) * size);
   return (ascent + descent) / ratio;
 }
 
-// The boxes a computed size allows: Chrome serialises the size to six significant digits, so the
-// exact size is anywhere within one unit of the last of them, and each box either quantisation
-// gives across that interval is allowed (one, or two where a rounding falls inside it).
-export function allowedBoxes(metrics: Metrics, computedSize: string, ratio: number): number[] {
-  const pixels = parsePixels(computedSize);
-  if (pixels === undefined) return [];
-  const spread = tolerance(pixels);
-  const found = new Set<number>();
-  const steps = 64;
-  for (let step = 0; step <= steps; step += 1) {
-    const size = pixels - spread + (2 * spread * step) / steps;
-    found.add(boxHeight(metrics, size, ratio, true));
-    found.add(boxHeight(metrics, size, ratio, false));
-  }
-  return [...found];
+// Whether a reported box height fits the formula's box within the tolerance, in device pixels.
+export function boxFits(height: number, box: number, ratio: number): boolean {
+  return Math.abs(height * ratio - box * ratio) <= 1 + ratio / 64 + 1e-9;
 }
 
 // Every character's box against R3's, from its bound face's metrics.
@@ -66,24 +57,27 @@ export function checkHeights(
   faces: ReadonlyMap<string, Font>,
   ratio: number,
 ): PageCheck[] {
-  const allowed = new Map<number, number[]>();
+  const expected = new Map<number, number>();
   for (const run of runs) {
-    if (allowed.has(run.element)) continue;
+    if (expected.has(run.element)) continue;
     const face = faces.get(boundFace(run.family, run.weight, run.style) ?? "");
-    if (face !== undefined) allowed.set(run.element, allowedBoxes(face.metrics, run.size, ratio));
+    const pixels = parsePixels(run.size);
+    if (face !== undefined && pixels !== undefined) {
+      expected.set(run.element, boxHeight(face.metrics, pixels, ratio));
+    }
   }
   const found: PageCheck[] = [];
   for (const { element, heights: boxes } of heights) {
-    const expected = allowed.get(element);
-    if (expected === undefined || expected.length === 0) {
+    const box = expected.get(element);
+    if (box === undefined) {
       found.push({ refusal: "char-height", detail: `element ${element} has no bound face` });
       continue;
     }
-    const wrong = boxes.find((height) => !expected.some((box) => Math.abs(height - box) <= 1e-3));
+    const wrong = boxes.find((height) => !boxFits(height, box, ratio));
     if (wrong !== undefined) {
       found.push({
         refusal: "char-height",
-        detail: `element ${element}: a box ${wrong} px high, not ${expected.join(" or ")}`,
+        detail: `element ${element}: a box ${wrong} px high, not within a device pixel of ${box}`,
       });
     }
   }

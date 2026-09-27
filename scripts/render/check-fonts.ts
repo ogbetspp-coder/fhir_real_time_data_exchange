@@ -168,7 +168,21 @@ try {
   for (const seeded of REFUSAL_CASES) {
     const drawn = seeded.drawing === "t" ? transformSection(seeded.div).div : seeded.div;
     const refusals: string[] = [];
-    for (const mode of MODES) refusals.push(...(await pageAndFonts(first, drawn, mode)).refusals);
+    for (const mode of MODES) {
+      const { refusals: found, runs } = await pageAndFonts(first, drawn, mode);
+      refusals.push(...found);
+      // The box check runs on carried sections at every ratio; a seed of it runs here at ratio 1.
+      if (seeded.refusal === "char-height") {
+        const page = await openPage(first.cdp, { div: drawn, mode, width: WIDTH });
+        try {
+          for (const { refusal, detail } of checkHeights(runs, await readHeights(page), faces, 1)) {
+            refusals.push(`${refusal}: ${detail}`);
+          }
+        } finally {
+          await page.close();
+        }
+      }
+    }
     if (!refusals.some((refusal) => refusal.startsWith(`${seeded.refusal}:`))) {
       failures.push(
         `seeded ${seeded.name}: expected ${seeded.refusal}, got ${refusals.join("; ") || "nothing"}`,
