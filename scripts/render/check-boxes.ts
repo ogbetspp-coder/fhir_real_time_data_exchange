@@ -146,11 +146,17 @@ for (const ratio of RATIOS) {
           // The letter drawn at 105 % is its face's at its own size; and, where Chrome drew it
           // taller than this letter, it is judged at this letter's size: how many such stretched
           // boxes the model still passes (where this letter's interval holds two pairs) is
-          // measured and pinned, so a looser model fails.
+          // measured and pinned, so a model that passes more boxes above the letter's fails (the
+          // undecided count guards the interval's lower end). A 105 % box never draws shorter.
           const stretchedPixels = Number.parseFloat(stretchedSize);
+          const taller = Math.round(stretchedHeight * ratio) - Math.round(height * ratio);
           if (resolveBox(face.metrics, stretchedPixels, ratio, stretchedHeight) === undefined) {
             failures.push(`${face.postScriptName} ${stretchedSize} at ${ratio}: the 105 % box`);
-          } else if (Math.round(stretchedHeight * ratio) !== Math.round(height * ratio)) {
+          } else if (taller < 0) {
+            failures.push(
+              `${face.postScriptName} ${stretchedSize} at ${ratio}: a shorter 105 % box`,
+            );
+          } else if (taller > 0) {
             stretched += 1;
             if (resolveBox(face.metrics, pixels, ratio, stretchedHeight) !== undefined) {
               stretchedPassed += 1;
