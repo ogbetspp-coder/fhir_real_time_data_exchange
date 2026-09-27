@@ -256,13 +256,19 @@ computed from the pinned fonts and bounded:
   face's ascent at Chrome's size, rounded half up, less the pixel Blink's Linux adjustment moves
   to the descent when the descent rounds down (it applies despite
   `--disable-font-subpixel-positioning`, measured; this note first said otherwise). Measured
-  against a baseline marker in 135 840 boxes, that is the layout's baseline exactly, a whole
-  device pixel, wherever the model decides the adjustment, and within one device pixel where it
+  against a baseline marker in 135 840 boxes, the layout's baseline lies exactly that ascent (a
+  whole number of device pixels) below the rectangle's top wherever the model decides the
+  adjustment, and within one device pixel where it
   does not (1 708 of them); 3c-C2 states which glyphs keep an allowance and seeds 4.8's descenders
   at ratio 1, where P8(a)'s two rows hold with no slack. Until 3c-C2 settles it, the baseline is
   taken as known to within one device pixel, and every bound below allows for it, except for the **exact baseline** the zoomed-out
   kind needs at 0.8 and 0.9 (the rectangle-plus-ascent estimate was a device pixel off at 10 pt
-  there, measured). Binding: at those ratios, and only for a descender of one of P8(a)'s letters
+  there, measured; 3c-C1 found that miss was Blink's adjustment, which the amended estimate
+  includes: 10 pt Liberation Serif at 0.8 has an ascent of 8, decided, measured. Where R3's model
+  decides the adjustment the amended estimate is the layout's baseline, so 3c-C2 states whether
+  the method below is still needed at 0.8 and 0.9 and for which glyphs, those whose adjustment
+  the model leaves undecided at least, and whether a decided estimate, checked by the same
+  controls in every record, may count as established; until then this item stands as written). Binding: at those ratios, and only for a descender of one of P8(a)'s letters
   against its own underline or its own cell's bottom border, the judge may establish the glyph's
   baseline exactly from the drawing; the method (3c-C's, provisional) changes nothing on the page
   that is judged, derives every reference baseline from drawn pixels (never from the estimate),
@@ -567,8 +573,8 @@ Must not be failures, and not recorded (the zoomed-out kind): 4.6's underlined "
 coverage below the line) and at 0.9, and 4.8's underlined "Laboratory" "y" at 0.9 (414 and 900 px),
 measured; R4's exact baseline must be established for each of them (a kerned "y," as in
 "Fertility," among them), so none of their ink above the baseline is taken as hidden in the line;
-and a 10 pt serif "y" at 0.8, underlined, its tail showing below the drawn line, whose estimate is
-a device pixel off, its exact baseline established.
+and a 10 pt serif "y" at 0.8, underlined, its tail showing below the drawn line, whose estimate
+without Blink's adjustment was a device pixel off (3c-C1), its exact baseline established.
 
 Must be clear (by P8 or plainly): 4.2's and 4.8's letter descenders touching their own cells'
 bottom borders; the "g"s of 4.2's underlined "Posology" at every ratio, and its "y" and the "p"s of
@@ -906,9 +912,12 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
    ratio in single precision, floored to 1/100 px (Blink's `EffectiveFontSize`), not to FreeType's
    1/64: that alone fits the 448 boxes 3c-B2a first measured and the misses it found. Its font
    cache keys a face by that size times 100 in single precision, truncated, so two neighbouring
-   sizes can share a key (9.97 and 9.98 both 997, 9.99 999) and are drawn at whichever size the
-   process drew first: a 9.97333 px Carlito letter is 12 px alone and 13 px after a 9.984 px one,
-   measured, so a box depends on what the process drew before it, within one 1/100 step. And
+   sizes can share a key (9.97 and 9.98 both 997, 9.99 999; one key covers at most two steps, and
+   each size has one key) and are drawn at the size of the first element laid out with that key
+   and still alive, even one that draws nothing: a 9.97333 px Carlito letter is 12 px alone and
+   13 px after a 9.984 px one, or after an empty span of that size in an earlier paragraph
+   (measured; not after it, nor under `display: none`), so a box depends on what was laid out
+   before it, within one 1/100 step. And
    DevTools reports the computed size to six significant digits. So the model takes the size in
    an interval (the nominal less a relative 2e-5 and two 1/100 steps, to the nominal plus 2e-5 and
    one step), over which the face's rounded ascent and descent only step up; so the box, their
@@ -916,12 +925,21 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
    takes a pixel from the ascent (R4's baseline, amended); the model decides it except where the
    exact descent crosses a whole pixel inside the interval (1 708 of the 135 840 boxes), and there
    the ascent is a one-pixel range. Every box of the sweep is on its face's pair, every baseline
-   where the model puts it (exactly where decided), and a box one device pixel taller than the
-   face's tallest is refused; every carried section's 3 020 620 boxes at the ten ratios are
+   where the model puts it (exactly where decided), and the number undecided is pinned; beside
+   each letter a second one drawn at 105 % of its size and judged at the letter's own is refused
+   wherever the model's boxes for the two sizes differ (a stretched box Chrome draws, the seed:
+   108 660 of them); every carried section's 3 020 620 boxes at the ten ratios are
    exactly R3's (`renderer:fonts`). Stated: the interval is set from Blink's code at the pinned
    version and the sweep, not proven for every size; a size whose drawn box falls outside it is a
    refusal of ours, never a pass. Below an ascent of 3 device pixels Blink keeps fractional
-   metrics, which T's 5 pt floor never reaches (the model refuses it).
+   metrics, which T's 5 pt floor never reaches (the model refuses it); a face whose OS/2 table asks
+   for its typographic metrics is drawn with them, and the model refuses a face whose typographic
+   ascent and descent differ from its hhea's (none of the pinned faces: Caladea asks, and its are
+   equal). Stated residual: because an element that draws nothing can set a later letter's size
+   by one 1/100 step, T(div), which deletes such elements, can draw a letter one step from the
+   authority's drawing, its box at most a device pixel different; the second drawing (R2) compares
+   text, markers, grids and pictures, not boxes, so this is of the order of a fractional ratio's
+   residual, stated rather than checked.
    It also takes R1 but the image build's verification and the deploy routes' download of
    attestations (3c-D's): the render build in its attest and propose modes, their identities
    and buckets, the captures, their index and the bucket's retention, the pull request's

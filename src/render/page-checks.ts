@@ -36,8 +36,9 @@ export function checkPage(page: ChromePage, width: number, mode: "html" | "xml")
 // from the ascent (Blink's subpixel-positioning borrow, which `--disable-font-subpixel-positioning`
 // does not turn off, measured with a baseline marker). Blink's font cache keys a face by that size
 // times 100, in single precision, truncated, so two neighbouring sizes can share a key (9.97 and
-// 9.98 both 997; 9.99 is 999) and both are drawn at whichever the process drew first (measured:
-// a 9.97333 px letter drawn after a 9.984 px one takes its box). And the computed size DevTools
+// 9.98 both 997; 9.99 is 999) and both are drawn at the size of the first element laid out with
+// that key, even one that draws nothing (measured: a 9.97333 px letter after a 9.984 px one, or
+// after an empty span of that size, takes its box). And the computed size DevTools
 // reports has six significant digits. So the size is known only within an interval: from the
 // nominal size less a relative error of 2e-5, less the 1/100 floor and one more 1/100 step, to the
 // nominal plus that error plus one 1/100 step. Over it the ascent and descent only step up, so
@@ -59,8 +60,21 @@ function sizeInterval(pixels: number, ratio: number): [number, number] {
   return [nominal * (1 - RELATIVE) - 2 * STEP, nominal * (1 + RELATIVE) + STEP];
 }
 
+// Whether the model holds for a face: an ascent above the baseline and a descent below it, and,
+// where the OS/2 table asks for its typographic metrics (Skia then draws with them), those equal
+// to the hhea's (Caladea asks, and its are equal).
+function modelled(metrics: Metrics): boolean {
+  if (metrics.hheaAscender <= 0 || metrics.hheaDescender >= 0) return false;
+  return (
+    !metrics.useTypoMetrics ||
+    (metrics.typoAscender === metrics.hheaAscender &&
+      metrics.typoDescender === metrics.hheaDescender)
+  );
+}
+
 // The (ascent, descent) pairs, before the borrow, the face takes over the size interval.
 export function boxPairs(metrics: Metrics, pixels: number, ratio: number): [number, number][] {
+  if (!modelled(metrics)) return [];
   const [low, high] = sizeInterval(pixels, ratio);
   const ascent = metrics.hheaAscender / metrics.unitsPerEm;
   const descent = -metrics.hheaDescender / metrics.unitsPerEm;

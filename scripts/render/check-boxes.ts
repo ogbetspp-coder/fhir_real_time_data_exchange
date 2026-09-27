@@ -8,8 +8,9 @@ import { openPage } from "../../src/render/page.js";
 // and nested chains, at every ratio of R2. Each box must be the bound face's ascent plus descent
 // exactly (`resolveBox`), and the baseline, read from a zero-size inline block beside the letter
 // on a page of its own, must lie the ascent the model names below the box's top: exactly where
-// the borrow is decided, within the model's one-pixel range where it is not. A seeded box one
-// device pixel taller than the face's tallest must be refused.
+// the borrow is decided, within the model's one-pixel range where it is not; the number of the
+// latter is pinned. Beside each letter a second one drawn at 105 % of its size must be its face's
+// at its own size and be refused at the letter's wherever the model's boxes for the two differ.
 //
 // usage (inside the image): node --import tsx scripts/render/check-boxes.ts
 
@@ -67,14 +68,17 @@ for (const family of FAMILIES) {
     body += `<p style="font-family:${family};font-weight:${weight};font-style:${style}">`;
     for (const chain of chains()) {
       keys.push(face);
-      const letter = `<b data-i="${keys.length - 1}" style="font-weight:inherit">H<i style="display:inline-block;width:0;height:0"></i></b>`;
+      const letter =
+        `<b data-i="${keys.length - 1}" style="font-weight:inherit">H<i style="display:inline-block;width:0;height:0"></i></b>` +
+        '<b style="font-weight:inherit;font-size:105%">H</b>';
       body += `${chain.reduceRight((inner, size) => `<span style="font-size:${size}">${inner}</span>`, letter)} `;
     }
     body += "</p>";
   }
 }
 
-// Per letter: its computed size, its box's height and the baseline's distance below its top.
+// Per letter: its computed size, its box's height and the baseline's distance below its top; and
+// the computed size and box height of the letter drawn beside it at 105 %.
 const READ = `(() => {
   const out = [];
   for (const element of document.querySelectorAll("b[data-i]")) {
@@ -83,7 +87,17 @@ const READ = `(() => {
     range.setEnd(element.firstChild, 1);
     const box = range.getClientRects()[0];
     const baseline = element.lastElementChild.getBoundingClientRect().bottom;
-    out.push([getComputedStyle(element).fontSize, box.height, baseline - box.top]);
+    const stretched = element.nextElementSibling;
+    const other = new Range();
+    other.setStart(stretched.firstChild, 0);
+    other.setEnd(stretched.firstChild, 1);
+    out.push([
+      getComputedStyle(element).fontSize,
+      box.height,
+      baseline - box.top,
+      getComputedStyle(stretched).fontSize,
+      other.getClientRects()[0].height,
+    ]);
   }
   return out;
 })()`;
@@ -91,6 +105,10 @@ const READ = `(() => {
 const failures: string[] = [];
 let boxes = 0;
 let undecided = 0;
+let stretched = 0;
+// The boxes whose ascent the model leaves a one-pixel range, measured in the image (3c-C1): a
+// change of the model or of Chrome that moves it is reviewed, not passed.
+const UNDECIDED = 1708;
 for (const ratio of RATIOS) {
   const browser = launchChrome({ executable: EXECUTABLE, ratio, noSandbox: NO_SANDBOX });
   try {
@@ -100,8 +118,8 @@ for (const ratio of RATIOS) {
       width: 813,
     });
     try {
-      const read = await page.evaluate<[string, number, number][]>(READ);
-      read.forEach(([size, height, above], index) => {
+      const read = await page.evaluate<[string, number, number, string, number][]>(READ);
+      read.forEach(([size, height, above, stretchedSize, stretchedHeight], index) => {
         const face = faces.get(keys[index] ?? "");
         const pixels = Number.parseFloat(size);
         if (face === undefined) {
@@ -119,10 +137,19 @@ for (const ratio of RATIOS) {
           );
         } else {
           if (box.ascent.low !== box.ascent.high) undecided += 1;
-          // The seed: a box one device pixel taller than the face's tallest is refused.
-          const tallest = Math.max(...boxPairs(face.metrics, pixels, ratio).map(([a, d]) => a + d));
-          if (resolveBox(face.metrics, pixels, ratio, (tallest + 1) / ratio) !== undefined) {
-            failures.push(`${face.postScriptName} ${size} at ${ratio}: a taller box passed`);
+          // The seed: the letter drawn at 105 % is its face's at its own size, and refused at
+          // this letter's wherever the model's boxes for the two sizes differ.
+          const stretchedPixels = Number.parseFloat(stretchedSize);
+          const sums = (at: number): Set<number> =>
+            new Set(boxPairs(face.metrics, at, ratio).map(([a, d]) => a + d));
+          const own = sums(pixels);
+          if (resolveBox(face.metrics, stretchedPixels, ratio, stretchedHeight) === undefined) {
+            failures.push(`${face.postScriptName} ${stretchedSize} at ${ratio}: the 105 % box`);
+          } else if (![...sums(stretchedPixels)].some((sum) => own.has(sum))) {
+            stretched += 1;
+            if (resolveBox(face.metrics, pixels, ratio, stretchedHeight) !== undefined) {
+              failures.push(`${face.postScriptName} ${size} at ${ratio}: a 105 % box passed`);
+            }
           }
         }
       });
@@ -134,6 +161,10 @@ for (const ratio of RATIOS) {
   }
 }
 
+if (undecided !== UNDECIDED) {
+  failures.push(`${undecided} ascents undecided, not ${UNDECIDED}`);
+}
+if (stretched === 0) failures.push("no 105 % box the model tells apart");
 if (failures.length > 0) {
   console.error(failures.slice(0, 60).join("\n"));
   console.error(`boxes: ${failures.length} failures`);
@@ -141,5 +172,6 @@ if (failures.length > 0) {
 }
 console.log(
   `boxes: ${boxes} character boxes in 16 faces at ${RATIOS.length} ratios, each the bound face's ascent plus descent exactly, ` +
-    `each baseline where the model puts it (${undecided} within the model's one-pixel range, the rest exactly); a box one pixel taller refused`,
+    `each baseline where the model puts it (${undecided} within the model's one-pixel range, the rest exactly); ` +
+    `${stretched} boxes drawn at 105 % refused at the letter's size`,
 );

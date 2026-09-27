@@ -173,6 +173,37 @@ describe("R2's page and R3's character boxes", () => {
       ascent: { low: 20, high: 21 },
       descent: { low: 5, high: 6 },
     });
+    // 12 px: 10.69 and 2.60 round to 11 and 3, the descent rounded up, so nothing moves.
+    expect(resolveBox(metrics, 12, 1, 14)).toEqual({ ascent: one(11), descent: one(3) });
+    // The interval's edges: the ascent steps from 10 to 11 at 11.7832 px, which lies above
+    // 11.77's interval (to 11.77 + 0.01) and inside 11.775's, and below 11.805's (from
+    // 11.805 - 0.02) and inside 11.8's.
+    expect(boxPairs(metrics, 11.77, 1)).toEqual([[10, 3]]);
+    expect(boxPairs(metrics, 11.775, 1)).toEqual([
+      [10, 3],
+      [11, 3],
+    ]);
+    expect(boxPairs(metrics, 11.8, 1)).toEqual([
+      [10, 3],
+      [11, 3],
+    ]);
+    expect(boxPairs(metrics, 11.805, 1)).toEqual([[11, 3]]);
+    expect(resolveBox(metrics, 11.77, 1, 14)).toBeUndefined();
+    expect(resolveBox(metrics, 11.805, 1, 13)).toBeUndefined();
+    // Below an ascent of 3 device pixels Blink keeps fractional metrics: refused.
+    expect(boxPairs(metrics, 3, 1)).toEqual([[3, 1]]);
+    expect(resolveBox(metrics, 3, 1, 4)).toBeUndefined();
+    // A face the model does not hold for: no descent below the baseline, or typographic metrics
+    // asked for and not the hhea's.
+    expect(boxPairs({ ...metrics, hheaDescender: 0 }, 12, 1)).toEqual([]);
+    expect(boxPairs({ ...metrics, useTypoMetrics: true }, 12, 1)).toEqual([]);
+    expect(
+      boxPairs(
+        { ...metrics, useTypoMetrics: true, typoAscender: 1825, typoDescender: -443 },
+        12,
+        1,
+      ),
+    ).toEqual([[11, 3]]);
     // A height off Chrome's 1/64 CSS px grid is no box.
     expect(resolveBox(metrics, 16, 1, 17.03)).toBeUndefined();
     const face = { postScriptName: "LiberationSerif", codePoints: new Set<number>(), metrics };
