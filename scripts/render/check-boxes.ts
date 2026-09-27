@@ -1,16 +1,18 @@
 import { launchChrome } from "../../src/render/cdp.js";
 import { boundFace, loadFaces } from "../../src/render/fonts.js";
-import { boxPairs, resolveBox } from "../../src/render/page-checks.js";
+import { resolveBox } from "../../src/render/page-checks.js";
 import { openPage } from "../../src/render/page.js";
 
 // R3's exact character box (docs/design/authority-import-renderer.md, Delivery 3c-C1), in the
 // renderer image: an "H" in each of the sixteen pinned faces at sizes in pt, px, em, %, keywords
 // and nested chains, at every ratio of R2. Each box must be the bound face's ascent plus descent
 // exactly (`resolveBox`), and the baseline, read from a zero-size inline block beside the letter
-// on a page of its own, must lie the ascent the model names below the box's top: exactly where
-// the borrow is decided, within the model's one-pixel range where it is not; the number of the
-// latter is pinned. Beside each letter a second one drawn at 105 % of its size must be its face's
-// at its own size and be refused at the letter's wherever the model's boxes for the two differ.
+// (all the letters of a ratio on one page), must lie the ascent the model names below the box's
+// top: exactly where the borrow is decided, within the model's one-pixel range where it is not;
+// the number of the latter is pinned, the guard of the model's tightness. Beside each letter a
+// second one drawn at 105 % of its size must be its face's at its own size; where it is taller
+// than the letter it is judged at the letter's size, and the number the model still passes is
+// pinned.
 //
 // usage (inside the image): node --import tsx scripts/render/check-boxes.ts
 
@@ -106,9 +108,13 @@ const failures: string[] = [];
 let boxes = 0;
 let undecided = 0;
 let stretched = 0;
+let stretchedPassed = 0;
 // The boxes whose ascent the model leaves a one-pixel range, measured in the image (3c-C1): a
 // change of the model or of Chrome that moves it is reviewed, not passed.
 const UNDECIDED = 1708;
+// Of the 105 % boxes Chrome drew taller than their letter, those the model passes at the
+// letter's size, measured in the image (3c-C1).
+const STRETCHED_PASSED = 932;
 for (const ratio of RATIOS) {
   const browser = launchChrome({ executable: EXECUTABLE, ratio, noSandbox: NO_SANDBOX });
   try {
@@ -137,18 +143,17 @@ for (const ratio of RATIOS) {
           );
         } else {
           if (box.ascent.low !== box.ascent.high) undecided += 1;
-          // The seed: the letter drawn at 105 % is its face's at its own size, and refused at
-          // this letter's wherever the model's boxes for the two sizes differ.
+          // The letter drawn at 105 % is its face's at its own size; and, where Chrome drew it
+          // taller than this letter, it is judged at this letter's size: how many such stretched
+          // boxes the model still passes (where this letter's interval holds two pairs) is
+          // measured and pinned, so a looser model fails.
           const stretchedPixels = Number.parseFloat(stretchedSize);
-          const sums = (at: number): Set<number> =>
-            new Set(boxPairs(face.metrics, at, ratio).map(([a, d]) => a + d));
-          const own = sums(pixels);
           if (resolveBox(face.metrics, stretchedPixels, ratio, stretchedHeight) === undefined) {
             failures.push(`${face.postScriptName} ${stretchedSize} at ${ratio}: the 105 % box`);
-          } else if (![...sums(stretchedPixels)].some((sum) => own.has(sum))) {
+          } else if (Math.round(stretchedHeight * ratio) !== Math.round(height * ratio)) {
             stretched += 1;
             if (resolveBox(face.metrics, pixels, ratio, stretchedHeight) !== undefined) {
-              failures.push(`${face.postScriptName} ${size} at ${ratio}: a 105 % box passed`);
+              stretchedPassed += 1;
             }
           }
         }
@@ -164,7 +169,11 @@ for (const ratio of RATIOS) {
 if (undecided !== UNDECIDED) {
   failures.push(`${undecided} ascents undecided, not ${UNDECIDED}`);
 }
-if (stretched === 0) failures.push("no 105 % box the model tells apart");
+if (stretchedPassed !== STRETCHED_PASSED) {
+  failures.push(
+    `${stretchedPassed} of ${stretched} taller 105 % boxes passed at the letter's size, not ${STRETCHED_PASSED}`,
+  );
+}
 if (failures.length > 0) {
   console.error(failures.slice(0, 60).join("\n"));
   console.error(`boxes: ${failures.length} failures`);
@@ -173,5 +182,6 @@ if (failures.length > 0) {
 console.log(
   `boxes: ${boxes} character boxes in 16 faces at ${RATIOS.length} ratios, each the bound face's ascent plus descent exactly, ` +
     `each baseline where the model puts it (${undecided} within the model's one-pixel range, the rest exactly); ` +
-    `${stretched} boxes drawn at 105 % refused at the letter's size`,
+    `of ${stretched} boxes drawn at 105 % and taller than their letter, ${stretched - stretchedPassed} refused at the letter's size ` +
+    `and ${stretchedPassed} passed (the letter's interval holding two pairs)`,
 );

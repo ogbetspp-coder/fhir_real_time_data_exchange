@@ -925,10 +925,12 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
    takes a pixel from the ascent (R4's baseline, amended); the model decides it except where the
    exact descent crosses a whole pixel inside the interval (1 708 of the 135 840 boxes), and there
    the ascent is a one-pixel range. Every box of the sweep is on its face's pair, every baseline
-   where the model puts it (exactly where decided), and the number undecided is pinned; beside
-   each letter a second one drawn at 105 % of its size and judged at the letter's own is refused
-   wherever the model's boxes for the two sizes differ (a stretched box Chrome draws, the seed:
-   108 660 of them); every carried section's 3 020 620 boxes at the ten ratios are
+   where the model puts it (exactly where decided), and the number undecided is pinned (the guard of the
+   model's tightness: every loosening or tightening of the interval tried moves it); beside each
+   letter a second one drawn at 105 % of its size must be its face's at its own size, and where
+   Chrome drew it taller than the letter it is judged at the letter's size: of 110 740 such
+   stretched boxes the model refuses 109 808 and passes 932 (where the letter's interval holds
+   two pairs), a count pinned too; every carried section's 3 020 620 boxes at the ten ratios are
    exactly R3's (`renderer:fonts`). Stated: the interval is set from Blink's code at the pinned
    version and the sweep, not proven for every size; a size whose drawn box falls outside it is a
    refusal of ours, never a pass. Below an ascent of 3 device pixels Blink keeps fractional
@@ -937,9 +939,15 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
    ascent and descent differ from its hhea's (none of the pinned faces: Caladea asks, and its are
    equal). Stated residual: because an element that draws nothing can set a later letter's size
    by one 1/100 step, T(div), which deletes such elements, can draw a letter one step from the
-   authority's drawing, its box at most a device pixel different; the second drawing (R2) compares
-   text, markers, grids and pictures, not boxes, so this is of the order of a fractional ratio's
-   residual, stated rather than checked.
+   authority's drawing, its box at most a device pixel different and its baseline too, even with the
+   box unchanged (Caladea Bold at 32.00 and 32.01 px: a box of 37 both, an ascent of 29 and 28);
+   the second drawing (R2) compares text, markers, grids and pictures, not boxes, so this is of the
+   order of a fractional ratio's residual, stated rather than checked, and R4 judges the
+   authority's drawing, not T(div)'s, so 3c-C2 states whether a verdict with no slack (P8(a)'s
+   two rows, the zoomed-out kind) must allow for it. 3c-C2 also adds a seed of the zoomed-out
+   kind where the model leaves the adjustment undecided (28.9 px Liberation Serif at 0.8: an
+   ascent of 20 or 21, Chrome drew 20), since the 10 pt seed's estimate is now exact and no
+   longer tells an estimate from a baseline established from pixels.
    It also takes R1 but the image build's verification and the deploy routes' download of
    attestations (3c-D's): the render build in its attest and propose modes, their identities
    and buckets, the captures, their index and the bucket's retention, the pull request's

@@ -197,6 +197,21 @@ describe("R2's page and R3's character boxes", () => {
     // asked for and not the hhea's.
     expect(boxPairs({ ...metrics, hheaDescender: 0 }, 12, 1)).toEqual([]);
     expect(boxPairs({ ...metrics, useTypoMetrics: true }, 12, 1)).toEqual([]);
+    expect(boxPairs({ ...metrics, hheaAscender: 0 }, 12, 1)).toEqual([]);
+    expect(
+      boxPairs(
+        { ...metrics, useTypoMetrics: true, typoAscender: 1825, typoDescender: -442 },
+        12,
+        1,
+      ),
+    ).toEqual([]);
+    expect(
+      boxPairs(
+        { ...metrics, useTypoMetrics: true, typoAscender: 1824, typoDescender: -443 },
+        12,
+        1,
+      ),
+    ).toEqual([]);
     expect(
       boxPairs(
         { ...metrics, useTypoMetrics: true, typoAscender: 1825, typoDescender: -443 },
