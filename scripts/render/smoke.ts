@@ -81,6 +81,52 @@ try {
     }
     await page.close();
   }
+
+  // R6's substitutions, by pixels, in every pinned family: a no-break space drawn as the space's
+  // glyph, a non-breaking hyphen as the hyphen's, and a soft hyphen drawn only at a line break,
+  // as a hyphen. Each pair is drawn alone at the same place and captured; equal PNG bytes are
+  // equal pixels.
+  const families = ["'Times New Roman'", "Arial", "Calibri", "Cambria"];
+  const pairs: [string, string, string][] = [
+    ["no-break space", "a\u00a0b", "a b"],
+    ["non-breaking hyphen", "1\u20112", "1-2"],
+    ["soft hyphen within a line", "ab\u00adcd", "abcd"],
+  ];
+  for (const family of families) {
+    for (const [what, substituted, plain] of pairs) {
+      const shots: string[] = [];
+      for (const text of [substituted, plain]) {
+        const page = await openPage(browser.cdp, {
+          div: `<div xmlns="http://www.w3.org/1999/xhtml"><p style="margin:0;font-family:${family};font-size:24px">${text}</p></div>`,
+          mode: "html",
+          width: 200,
+        });
+        const { data } = (await page.send("Page.captureScreenshot", {
+          format: "png",
+          clip: { x: 16, y: 16, width: 200, height: 40, scale: 1 },
+        })) as { data: string };
+        shots.push(data);
+        await page.close();
+      }
+      if (shots[0] !== shots[1])
+        failures.push(`${family}: the ${what} is not drawn as its substitute`);
+    }
+    // At a line break the soft hyphen is drawn, as a hyphen: its box has the hyphen's width.
+    const page = await openPage(browser.cdp, {
+      div: `<div xmlns="http://www.w3.org/1999/xhtml"><p style="margin:0;font-family:${family};font-size:24px">aaaaaaaaaa\u00adbbbbbbbbbb</p><p style="margin:0;font-family:${family};font-size:24px"><span id="h">-</span></p></div>`,
+      mode: "html",
+      width: 150,
+    });
+    const [soft, hyphen] = await page.evaluate<[number, number]>(
+      `(() => { const t = document.querySelector("p").firstChild; const r = new Range(); const at = t.data.indexOf("\u00ad"); r.setStart(t, at); r.setEnd(t, at + 1); const b = r.getBoundingClientRect(); return [b.width, document.getElementById("h").getBoundingClientRect().width]; })()`,
+    );
+    if (Math.abs(soft - hyphen) > 0.01 || hyphen <= 0) {
+      failures.push(
+        `${family}: a soft hyphen at a line break is ${soft} px wide, a hyphen ${hyphen} px`,
+      );
+    }
+    await page.close();
+  }
 } finally {
   await browser.close();
 }
@@ -90,5 +136,5 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  `renderer image: both modes load offline, requests but the page's fail, ${spans.length} family and face bindings drawn in their pinned faces`,
+  `renderer image: both modes load offline, requests but the page's fail, ${spans.length} family and face bindings drawn in their pinned faces, R6's substitutions drawn as their substitutes`,
 );

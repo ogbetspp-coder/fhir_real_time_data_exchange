@@ -89,6 +89,7 @@ export function readElements(page: Page): Promise<ChromeElement[]> {
 }
 
 type DomNode = {
+  nodeId: number;
   nodeType: number;
   localName: string;
   backendNodeId: number;
@@ -162,4 +163,140 @@ const READ_TEXTS = `(() => {
 
 export function readTexts(page: Page): Promise<ChromeText[]> {
   return page.evaluate<ChromeText[]>(READ_TEXTS);
+}
+
+// A text node, for R3's font checks: its element's pre-order index within the div and that
+// element's computed family, weight, style and size, its data, and the faces Chrome reports
+// drawing it in. CSS.getPlatformFontsForNode is asked of the text node itself: asked of an
+// element it reports its descendants' faces too (measured in the image: a paragraph holding an
+// italic word reported both faces).
+export type ChromeRun = {
+  element: number;
+  family: string;
+  weight: number;
+  style: string;
+  size: string;
+  text: string;
+  drawnIn: string[];
+};
+
+const READ_RUNS = `(() => {
+  const root = document.body.firstElementChild;
+  const out = [];
+  let index = 0;
+  const visit = (element) => {
+    const own = index;
+    index += 1;
+    const c = getComputedStyle(element);
+    for (const child of element.childNodes) {
+      // DevTools' DOM tree leaves out a text node of whitespace alone, which draws no face.
+      if (child.nodeType === 3 && !/^[\\t\\n\\v\\f\\r ]*$/.test(child.data)) {
+        out.push({ element: own, family: c.fontFamily, weight: Number(c.fontWeight), style: c.fontStyle, size: c.fontSize, text: child.data });
+      }
+    }
+    for (const child of element.children) visit(child);
+  };
+  if (root !== null) visit(root);
+  return out;
+})()`;
+
+// Each text node of the div, with the faces it is drawn in; `withFaces` false leaves `drawnIn`
+// empty (the faces do not depend on the width or ratio).
+export async function readRuns(page: Page, withFaces = true): Promise<ChromeRun[]> {
+  const runs = await page.evaluate<Omit<ChromeRun, "drawnIn">[]>(READ_RUNS);
+  if (!withFaces) return runs.map((run) => ({ ...run, drawnIn: [] }));
+  await page.send("DOM.enable");
+  await page.send("CSS.enable");
+  const { root } = (await page.send("DOM.getDocument", { depth: -1 })) as { root: DomNode };
+  const find = (node: DomNode): DomNode | undefined => {
+    if (node.nodeType === 1 && node.localName === "body") return node;
+    for (const child of node.children ?? []) {
+      const found = find(child);
+      if (found !== undefined) return found;
+    }
+    return undefined;
+  };
+  const div = find(root)?.children?.find((child) => child.nodeType === 1);
+  // The text nodes in the page-side walk's order: each element's own text children, then its
+  // element children in turn.
+  const textIds: number[] = [];
+  const visit = (node: DomNode): void => {
+    for (const child of node.children ?? []) if (child.nodeType === 3) textIds.push(child.nodeId);
+    for (const child of node.children ?? []) if (child.nodeType === 1) visit(child);
+  };
+  if (div !== undefined) visit(div);
+  if (textIds.length !== runs.length) {
+    throw new Error(`${runs.length} text nodes read, ${textIds.length} in the DOM tree`);
+  }
+  const found: ChromeRun[] = [];
+  for (const [at, run] of runs.entries()) {
+    const { fonts } = (await page.send("CSS.getPlatformFontsForNode", {
+      nodeId: textIds[at],
+    })) as { fonts: { postScriptName: string }[] };
+    found.push({ ...run, drawnIn: fonts.map(({ postScriptName }) => postScriptName) });
+  }
+  return found;
+}
+
+// The section's page as R2 requires it: no parser error (XML mode), and a div with no padding or
+// border of its own whose content box is the width drawn.
+export type ChromePage = {
+  parserError: boolean;
+  divPadding: string;
+  divBorder: string;
+  divWidth: number;
+};
+
+const READ_PAGE = `(() => {
+  const root = document.body.firstElementChild;
+  const parserError = document.getElementsByTagNameNS("*", "parsererror").length > 0;
+  if (root === null) return { parserError, divPadding: "", divBorder: "", divWidth: -1 };
+  const c = getComputedStyle(root);
+  const sides = ["top", "right", "bottom", "left"];
+  return {
+    parserError,
+    divPadding: sides.map((s) => c.getPropertyValue("padding-" + s)).join(" "),
+    divBorder: sides.map((s) => c.getPropertyValue("border-" + s + "-width")).join(" "),
+    divWidth: root.getBoundingClientRect().width,
+  };
+})()`;
+
+export function readPage(page: Page): Promise<ChromePage> {
+  return page.evaluate<ChromePage>(READ_PAGE);
+}
+
+// Every drawn character's box height, by the element it stands in (R3: each must equal the box
+// of its face at its size and ratio). Characters with no box (collapsed whitespace) are skipped.
+export type ChromeHeights = { element: number; heights: number[] }[];
+
+const READ_HEIGHTS = `(() => {
+  const root = document.body.firstElementChild;
+  const out = [];
+  let index = 0;
+  const visit = (element) => {
+    const own = index;
+    index += 1;
+    const heights = [];
+    for (const child of element.childNodes) {
+      if (child.nodeType !== 3) continue;
+      const data = child.data;
+      for (let at = 0; at < data.length; ) {
+        const size = data.codePointAt(at) > 0xffff ? 2 : 1;
+        const range = new Range();
+        range.setStart(child, at);
+        range.setEnd(child, at + size);
+        const rects = range.getClientRects();
+        if (rects.length > 0 && !/^[\\t\\n\\v\\f\\r ]$/.test(data.slice(at, at + size))) heights.push(rects[0].height);
+        at += size;
+      }
+    }
+    if (heights.length > 0) out.push({ element: own, heights });
+    for (const child of element.children) visit(child);
+  };
+  if (root !== null) visit(root);
+  return out;
+})()`;
+
+export function readHeights(page: Page): Promise<ChromeHeights> {
+  return page.evaluate<ChromeHeights>(READ_HEIGHTS);
 }

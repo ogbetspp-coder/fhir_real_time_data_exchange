@@ -3,7 +3,14 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { launchChrome, type Browser } from "../../src/render/cdp.js";
-import { readElements, readMarkers, readTexts } from "../../src/render/measure.js";
+import {
+  readElements,
+  readHeights,
+  readMarkers,
+  readPage,
+  readRuns,
+  readTexts,
+} from "../../src/render/measure.js";
 import { ORIGIN, openPage, pageDocument } from "../../src/render/page.js";
 
 const FAKE = fileURLToPath(new URL("./fake-chrome.mjs", import.meta.url));
@@ -92,6 +99,34 @@ describe("R2's page", () => {
     const page = await openPage(fake("refuse-replies").cdp, { div: DIV, mode: "html", width: 813 });
     expect(page.failed).toEqual(["https://renderer.invalid/p.png", "https://example.org/x.png"]);
     await expect(page.close()).resolves.toBeUndefined();
+  });
+
+  it("reads each text node's faces from the text node itself, the page's box and the character boxes", async () => {
+    const page = await openPage(fake("ok").cdp, { div: DIV, mode: "html", width: 813 });
+    expect(await readRuns(page)).toEqual([
+      {
+        element: 1,
+        family: '"Times New Roman"',
+        weight: 400,
+        style: "normal",
+        size: "16px",
+        text: "ab",
+        drawnIn: ["LiberationSerif"],
+      },
+    ]);
+    expect((await readRuns(page, false))[0]?.drawnIn).toEqual([]);
+    expect(await readPage(page)).toEqual({
+      parserError: false,
+      divPadding: "0px 0px 0px 0px",
+      divBorder: "0px 0px 0px 0px",
+      divWidth: 813,
+    });
+    expect(await readHeights(page)).toEqual([{ element: 1, heights: [18, 18] }]);
+  });
+
+  it("refuses to pair text nodes the page and the DOM tree count differently", async () => {
+    const page = await openPage(fake("runs-mismatch").cdp, { div: DIV, mode: "html", width: 813 });
+    await expect(readRuns(page)).rejects.toThrow(/2 text nodes read, 1 in the DOM tree/);
   });
 
   it("refuses a page that does not load in time", async () => {

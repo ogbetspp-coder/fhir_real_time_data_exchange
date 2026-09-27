@@ -4,7 +4,8 @@
 // Fetch.requestPaused events. Behaviour is chosen by FAKE_CHROME: "ok", "navigate-error",
 // "evaluate-throws", "garbage", "crash" (the target crashes instead of loading), "renavigate" (the
 // page asks for itself again and navigates after it loaded), "refuse-replies" (replies to paused
-// requests and the target's close fail), "no-load" (the page never loads).
+// requests and the target's close fail), "no-load" (the page never loads), "runs-mismatch" (the
+// page-side read gives more text nodes than the DOM tree).
 import { createReadStream, createWriteStream } from "node:fs";
 import { setTimeout } from "node:timers";
 
@@ -81,6 +82,34 @@ function reply(message) {
       if (mode === "evaluate-throws")
         return answer({ result: {}, exceptionDetails: { text: "Uncaught" } });
       if (params.expression === "handled") return answer({ result: { value: fulfilled } });
+      // The judge's page-side reads (src/render/measure.ts), answered for the tree DOM.getDocument
+      // gives: one text node, under the ol.
+      if (String(params.expression).includes("fontFamily")) {
+        const run = {
+          element: 1,
+          family: '"Times New Roman"',
+          weight: 400,
+          style: "normal",
+          size: "16px",
+          text: "ab",
+        };
+        return answer({ result: { value: mode === "runs-mismatch" ? [run, run] : [run] } });
+      }
+      if (String(params.expression).includes("parsererror")) {
+        return answer({
+          result: {
+            value: {
+              parserError: false,
+              divPadding: "0px 0px 0px 0px",
+              divBorder: "0px 0px 0px 0px",
+              divWidth: 813,
+            },
+          },
+        });
+      }
+      if (String(params.expression).includes("getClientRects")) {
+        return answer({ result: { value: [{ element: 1, heights: [18, 18] }] } });
+      }
       return answer({
         result: { value: { expression: params.expression, contextId: params.contextId } },
       });
@@ -114,7 +143,7 @@ function reply(message) {
                           backendNodeId: 11,
                           children: [
                             { nodeType: 1, localName: "li", backendNodeId: 12 },
-                            { nodeType: 3, localName: "", backendNodeId: 13 },
+                            { nodeType: 3, nodeId: 13, localName: "", backendNodeId: 13 },
                             { nodeType: 1, localName: "li", backendNodeId: 14 },
                           ],
                         },
@@ -126,6 +155,16 @@ function reply(message) {
             },
           ],
         },
+      });
+    case "CSS.getPlatformFontsForNode":
+      return answer({
+        fonts: [
+          {
+            postScriptName: `LiberationSerif`,
+            familyName: `Liberation Serif`,
+            glyphCount: params.nodeId,
+          },
+        ],
       });
     case "Accessibility.getFullAXTree":
       return answer({

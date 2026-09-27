@@ -111,7 +111,7 @@ jobs:
   renderer:
     name: Renderer
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     defaults:
       run:
         shell: bash --noprofile --norc -eo pipefail {0}
@@ -141,6 +141,12 @@ jobs:
       # (docs/design/authority-import-renderer-model.md, M4). Any mismatch fails.
       - name: Compare T's model with the drawn page
         run: npm run renderer:check
+
+      # R2's page, R3's fonts and scripts, R6's coverage and R3's character boxes, on every section
+      # of every pinned label, T's or not, and every seeded refusal
+      # (docs/design/authority-import-renderer.md, Delivery 3c-B2a).
+      - name: Check the fonts and pages
+        run: npm run renderer:fonts
 
   zone-a:
     name: Zone A
