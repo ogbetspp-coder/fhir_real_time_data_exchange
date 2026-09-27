@@ -148,6 +148,12 @@ jobs:
       - name: Check the fonts and pages
         run: npm run renderer:fonts
 
+      # R3's exact character box: every size form in every pinned face at every ratio, each box
+      # the bound face's ascent plus descent and each baseline where the model puts it
+      # (docs/design/authority-import-renderer.md, Delivery 3c-C1).
+      - name: Check the character box model
+        run: npm run renderer:boxes
+
       # R2's second drawing: the authority's and T(div)'s text, list numbers, grids and pictures,
       # the same at the named widths in both modes, and the picture forms drawn as stated
       # (docs/design/authority-import-renderer.md, Delivery 3c-B2b).

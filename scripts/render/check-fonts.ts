@@ -186,7 +186,7 @@ try {
     // A box seed must be refused for its height, not for having no face.
     const expected = (refusal: string): boolean =>
       refusal.startsWith(`${seeded.refusal}:`) &&
-      (seeded.refusal !== "char-height" || refusal.includes("not within a device pixel"));
+      (seeded.refusal !== "char-height" || refusal.includes("not the bound face's"));
     if (!refusals.some(expected)) {
       failures.push(
         `seeded ${seeded.name}: expected ${seeded.refusal}, got ${refusals.join("; ") || "nothing"}`,
@@ -236,6 +236,6 @@ if (failures.length > 0) {
 }
 console.log(
   `fonts and page: ${all.filter(({ carried }) => carried).length} carried sections and cases pass in both modes, T(div) too; ` +
-    `${REFUSAL_CASES.length} seeded refusals caught; ${boxes} character boxes within a device pixel of R3's in both modes at ${RATIOS.length} ratios; ` +
+    `${REFUSAL_CASES.length} seeded refusals caught; ${boxes} character boxes exactly R3's in both modes at ${RATIOS.length} ratios; ` +
     `sections T refuses report: ${refusedSummary}`,
 );

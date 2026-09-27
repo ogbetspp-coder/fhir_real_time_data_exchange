@@ -213,9 +213,9 @@ recordSha256, capturesIndex, capturesSha256, documentSha256, pinsSha256, rendere
   cell padding and spacing, `display`, `position`, `top`, `bottom` and `vertical-align`. Any
   difference is a refusal of ours. List numbers come from the accessibility tree and are compared
   with the scanner's; each table's grid from cell rectangles, compared with T(div)'s. Each character
-  box's height must equal the pinned face's ascent plus descent at its computed size, rounded at the
-  device size (R4); 3c-B2a holds it to within one device pixel, a stated tolerance, and the exact
-  box model is 3c-C's (Delivery).
+  box's height must be the pinned face's ascent plus descent at its computed size and ratio,
+  exactly, as R3's box model names them (`resolveBox`, Delivery 3c-C1); a box on no pair of the
+  face is a refusal of ours (`char-height`).
 - **The index space.** Every section, carried or withheld, T's or not, has one index space, which
   the judge assigns itself from the XML-mode DOM of the authority's div (source order; an element the
   HTML parser inserts, such as a `tbody`, has no key; a marker placed before its `li`'s first child;
@@ -252,12 +252,15 @@ exact advance and whose vertical extent is the face's content area; Chrome split
 advance evenly across its characters, and a mark takes its cluster's rectangle. Everything else is
 computed from the pinned fonts and bounded:
 
-- **Baseline.** The rectangle's top plus the face's ascent at the computed size, rounded at the
-  device size as Blink rounds it (3c-C states the estimator and seeds 4.8's descenders at ratio 1,
-  where P8(a)'s two rows hold with no slack); with `--disable-font-subpixel-positioning` (R6) Blink's Linux adjustment that
-  moves a pixel from ascent to descent under sub-pixel positioning does not apply. Glyphs are
-  drawn with the baseline snapped to whole device pixels, so the baseline is known to within one
-  device pixel, and every bound below allows for it, except for the **exact baseline** the zoomed-out
+- **Baseline.** The rectangle's top plus the ascent R3's box model names (Delivery 3c-C1): the
+  face's ascent at Chrome's size, rounded half up, less the pixel Blink's Linux adjustment moves
+  to the descent when the descent rounds down (it applies despite
+  `--disable-font-subpixel-positioning`, measured; this note first said otherwise). Measured
+  against a baseline marker in 135 840 boxes, that is the layout's baseline exactly, a whole
+  device pixel, wherever the model decides the adjustment, and within one device pixel where it
+  does not (1 708 of them); 3c-C2 states which glyphs keep an allowance and seeds 4.8's descenders
+  at ratio 1, where P8(a)'s two rows hold with no slack. Until 3c-C2 settles it, the baseline is
+  taken as known to within one device pixel, and every bound below allows for it, except for the **exact baseline** the zoomed-out
   kind needs at 0.8 and 0.9 (the rectangle-plus-ascent estimate was a device pixel off at 10 pt
   there, measured). Binding: at those ratios, and only for a descender of one of P8(a)'s letters
   against its own underline or its own cell's bottom border, the judge may establish the glyph's
@@ -807,7 +810,7 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
      R6's coverage (`font-coverage`, the U+2070 seed, and pixel tests in the image's smoke check
      of the substitutions and of each range of the closed list of code points drawn as nothing);
      each character box's height of the authority's drawing of every carried section, against
-     R3's within one device pixel, in both modes at every ratio; a `parsererror` as
+     R3's within one device pixel (exact since 3c-C1), in both modes at every ratio; a `parsererror` as
      its own refusal; and R2's
      assertion that the div's content box is the width, with the refusal of a div with its own
      padding or border (`div-box`, `div-width`). Every section of every pinned label is checked
@@ -831,7 +834,7 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
    so the code points drawn as nothing are a closed list, each range asserted by pixels, and
    every other code point is judged by the character map (the second review drew every listed
    code point in eight of the sixteen pinned faces, the four families' regular and bold italic:
-   none draws anything). And R3's box is not exact: the face's hhea
+   none draws anything). And R3's box was not exact in 3c-B2a (3c-C1 made it so): the face's hhea
    ascent and descent, each rounded at the device size after Chrome's single-precision size is
    quantised down to 1/64 of a device pixel, fits every size in points first measured (448 of 448) but misses by one device pixel at some sizes in em, %, `smaller` and at fractional ratios
    (about 1 to 3 % of a sweep), by a path not yet found. So 3c-B2a holds each box to within one
@@ -843,7 +846,7 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
    baseline needs more: it adds the face's ascent to the rectangle's top, and its one-pixel
    allowance is for snapping only, so the measured misses, which are in the ascent, would put it
    up to two device pixels out (at 0.8 and 0.9 among others). 3c-C therefore takes R3's exact box
-   model, before R4's baseline estimator.
+   model, before R4's baseline estimator (3c-C1, below).
 
    Stated residuals of 3c-B2a: a face is read at ratio 1 and 813 px, since it does not depend on
    the width or the ratio; text outside the light DOM's text nodes (a broken picture's `alt`, a
@@ -892,7 +895,33 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
 
 2. **3c-C**: its measured design of R4 (reviewed first), with R3's exact character box model
    before R4's baseline estimator, then R4, R7, R8, R9, R11; the render build, its trigger and
-   attestations; the records of the pinned labels.
+   attestations; the records of the pinned labels. In five changes: **3c-C1** R3's exact box model;
+   **3c-C2** R4's measured design note; **3c-C3** the judge; **3c-C4** the record, R7 and R9's lock;
+   **3c-C5** the render build, its infrastructure and the first records.
+
+   **3c-C1**, measured in the image (`scripts/render/check-boxes.ts`, `npm run renderer:boxes`, a
+   CI step: an "H" in each of the sixteen pinned faces at sizes in pt, px, em, %, keywords and
+   nested chains, 135 840 boxes at the ten ratios, each with a zero-size inline block beside it
+   whose bottom is the baseline). Chrome's size in device pixels is the computed size times the
+   ratio in single precision, floored to 1/100 px (Blink's `EffectiveFontSize`), not to FreeType's
+   1/64: that alone fits the 448 boxes 3c-B2a first measured and the misses it found. Its font
+   cache keys a face by that size times 100 in single precision, truncated, so two neighbouring
+   sizes can share a key (9.97 and 9.98 both 997, 9.99 999) and are drawn at whichever size the
+   process drew first: a 9.97333 px Carlito letter is 12 px alone and 13 px after a 9.984 px one,
+   measured, so a box depends on what the process drew before it, within one 1/100 step. And
+   DevTools reports the computed size to six significant digits. So the model takes the size in
+   an interval (the nominal less a relative 2e-5 and two 1/100 steps, to the nominal plus 2e-5 and
+   one step), over which the face's rounded ascent and descent only step up; so the box, their
+   sum, names exactly one pair, and a box on no pair is refused. On Linux a descent rounded down
+   takes a pixel from the ascent (R4's baseline, amended); the model decides it except where the
+   exact descent crosses a whole pixel inside the interval (1 708 of the 135 840 boxes), and there
+   the ascent is a one-pixel range. Every box of the sweep is on its face's pair, every baseline
+   where the model puts it (exactly where decided), and a box one device pixel taller than the
+   face's tallest is refused; every carried section's 3 020 620 boxes at the ten ratios are
+   exactly R3's (`renderer:fonts`). Stated: the interval is set from Blink's code at the pinned
+   version and the sweep, not proven for every size; a size whose drawn box falls outside it is a
+   refusal of ours, never a pass. Below an ascent of 3 device pixels Blink keeps fractional
+   metrics, which T's 5 pt floor never reaches (the model refuses it).
    It also takes R1 but the image build's verification and the deploy routes' download of
    attestations (3c-D's): the render build in its attest and propose modes, their identities
    and buckets, the captures, their index and the bucket's retention, the pull request's
@@ -901,6 +930,7 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
    mode's geometry of text, markers and cells against HTML mode's at the named widths and every
    ratio; and the renderer image's own build (`cloudbuild.renderer-image.yaml`, the
    `renderer-images` repository), with the repository connection only the owner can make.
+
 3. **3c-D**: R5 and R10: the lookup, the image build's verification, the manifest, re-verification
    (the review a requester signs is item 2's, before PR 5).
 4. **3c-W**: the withheld section (its note), including the lookup's withheld part.
