@@ -1,4 +1,5 @@
 import { launchChrome } from "../../src/render/cdp.js";
+import { NOT_DRAWN_RANGES } from "../../src/render/fonts.js";
 import { openPage } from "../../src/render/page.js";
 
 // The renderer image's smoke check (docs/design/authority-import-renderer.md, R6), run inside the
@@ -81,6 +82,90 @@ try {
     }
     await page.close();
   }
+
+  // R6's substitutions, by pixels, in every pinned family: a no-break space drawn as the space's
+  // glyph, a non-breaking hyphen as the hyphen's, and a soft hyphen drawn only at a line break,
+  // as a hyphen. Each pair is drawn alone at the same place and captured; equal PNG bytes are
+  // equal pixels.
+  const families = ["'Times New Roman'", "Arial", "Calibri", "Cambria"];
+  const pairs: [string, string, string, readonly string[]][] = [
+    ["no-break space", "a\u00a0b", "a b", families],
+    // Only in Liberation's faces (src/render/fonts.ts, SUBSTITUTIONS).
+    ["non-breaking hyphen", "1\u20112", "1-2", ["'Times New Roman'", "Arial"]],
+    ["soft hyphen within a line", "ab\u00adcd", "abcd", families],
+  ];
+  for (const family of families) {
+    for (const [what, substituted, plain, where] of pairs) {
+      if (!where.includes(family)) continue;
+      const shots: string[] = [];
+      for (const text of [substituted, plain]) {
+        const page = await openPage(browser.cdp, {
+          div: `<div xmlns="http://www.w3.org/1999/xhtml"><p style="margin:0;font-family:${family};font-size:24px">${text}</p></div>`,
+          mode: "html",
+          width: 200,
+        });
+        const { data } = (await page.send("Page.captureScreenshot", {
+          format: "png",
+          clip: { x: 16, y: 16, width: 200, height: 40, scale: 1 },
+        })) as { data: string };
+        shots.push(data);
+        await page.close();
+      }
+      if (shots[0] !== shots[1])
+        failures.push(`${family}: the ${what} is not drawn as its substitute`);
+    }
+    // Each range of R3's closed list of code points drawn as nothing (src/render/fonts.ts,
+    // NOT_DRAWN_RANGES), its first and last, between letters: the same pixels as the letters alone.
+    const plainPage = await openPage(browser.cdp, {
+      div: `<div xmlns="http://www.w3.org/1999/xhtml"><p style="margin:0;font-family:${family};font-size:24px">abc</p></div>`,
+      mode: "html",
+      width: 200,
+    });
+    const plainShot = (
+      (await plainPage.send("Page.captureScreenshot", {
+        format: "png",
+        clip: { x: 16, y: 16, width: 200, height: 40, scale: 1 },
+      })) as { data: string }
+    ).data;
+    await plainPage.close();
+    for (const [low, high] of NOT_DRAWN_RANGES) {
+      for (const codePoint of new Set([low, high])) {
+        // ASCII whitespace controls and the soft hyphen are drawn as a space or at a break.
+        if (codePoint < 0x20 || codePoint === 0xad) continue;
+        const page = await openPage(browser.cdp, {
+          div: `<div xmlns="http://www.w3.org/1999/xhtml"><p style="margin:0;font-family:${family};font-size:24px">a${String.fromCodePoint(codePoint)}bc</p></div>`,
+          mode: "html",
+          width: 200,
+        });
+        const { data } = (await page.send("Page.captureScreenshot", {
+          format: "png",
+          clip: { x: 16, y: 16, width: 200, height: 40, scale: 1 },
+        })) as { data: string };
+        await page.close();
+        if (data !== plainShot) {
+          failures.push(
+            `${family}: U+${codePoint.toString(16).toUpperCase()} is drawn as something`,
+          );
+        }
+      }
+    }
+
+    // At a line break the soft hyphen is drawn, as a hyphen: its box has the hyphen's width.
+    const page = await openPage(browser.cdp, {
+      div: `<div xmlns="http://www.w3.org/1999/xhtml"><p style="margin:0;font-family:${family};font-size:24px">aaaaaaaaaa\u00adbbbbbbbbbb</p><p style="margin:0;font-family:${family};font-size:24px"><span id="h">-</span></p></div>`,
+      mode: "html",
+      width: 150,
+    });
+    const [soft, hyphen] = await page.evaluate<[number, number]>(
+      `(() => { const t = document.querySelector("p").firstChild; const r = new Range(); const at = t.data.indexOf("\u00ad"); r.setStart(t, at); r.setEnd(t, at + 1); const b = r.getBoundingClientRect(); return [b.width, document.getElementById("h").getBoundingClientRect().width]; })()`,
+    );
+    if (Math.abs(soft - hyphen) > 0.01 || hyphen <= 0) {
+      failures.push(
+        `${family}: a soft hyphen at a line break is ${soft} px wide, a hyphen ${hyphen} px`,
+      );
+    }
+    await page.close();
+  }
 } finally {
   await browser.close();
 }
@@ -90,5 +175,5 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  `renderer image: both modes load offline, requests but the page's fail, ${spans.length} family and face bindings drawn in their pinned faces`,
+  `renderer image: both modes load offline, requests but the page's fail, ${spans.length} family and face bindings drawn in their pinned faces, R6's substitutions drawn as their substitutes`,
 );

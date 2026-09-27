@@ -3,7 +3,14 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { launchChrome, type Browser } from "../../src/render/cdp.js";
-import { readElements, readMarkers, readTexts } from "../../src/render/measure.js";
+import {
+  readElements,
+  readHeights,
+  readMarkers,
+  readPage,
+  readRuns,
+  readTexts,
+} from "../../src/render/measure.js";
 import { ORIGIN, openPage, pageDocument } from "../../src/render/page.js";
 
 const FAKE = fileURLToPath(new URL("./fake-chrome.mjs", import.meta.url));
@@ -92,6 +99,54 @@ describe("R2's page", () => {
     const page = await openPage(fake("refuse-replies").cdp, { div: DIV, mode: "html", width: 813 });
     expect(page.failed).toEqual(["https://renderer.invalid/p.png", "https://example.org/x.png"]);
     await expect(page.close()).resolves.toBeUndefined();
+  });
+
+  it("reads each text node's faces from the text node itself, the page's box and the character boxes", async () => {
+    const page = await openPage(fake("ok").cdp, { div: DIV, mode: "html", width: 813 });
+    expect(await readRuns(page)).toEqual([
+      {
+        element: 1,
+        family: '"Times New Roman"',
+        weight: 400,
+        style: "normal",
+        size: "16px",
+        text: "ab",
+        drawnIn: ["LiberationSerif"],
+      },
+    ]);
+    expect((await readRuns(page, false))[0]?.drawnIn).toEqual([]);
+    expect(await readPage(page)).toEqual({
+      parserError: false,
+      divPadding: "0px 0px 0px 0px",
+      divBorder: "0px 0px 0px 0px",
+      divWidth: 813,
+    });
+    expect(await readHeights(page)).toEqual([{ element: 1, heights: [18, 18] }]);
+  });
+
+  it("reports no face for text DevTools keeps no node of, and fails on any other error", async () => {
+    for (const mode of ["whitespace-node", "lost-node"]) {
+      const page = await openPage(fake(mode).cdp, { div: DIV, mode: "html", width: 813 });
+      expect((await readRuns(page))[0]?.drawnIn).toEqual([]);
+      await browser?.close();
+    }
+    const page = await openPage(fake("fonts-error").cdp, { div: DIV, mode: "html", width: 813 });
+    await expect(readRuns(page)).rejects.toThrow(/CSS agent is not enabled/);
+  });
+
+  it("never asks DevTools about a node of whitespace alone", async () => {
+    const page = await openPage(fake("with-whitespace").cdp, {
+      div: DIV,
+      mode: "html",
+      width: 813,
+    });
+    const runs = await readRuns(page);
+    expect(runs.map(({ drawnIn }) => drawnIn)).toEqual([["LiberationSerif"], []]);
+  });
+
+  it("fails a read whose page-side node cannot be resolved by reference", async () => {
+    const page = await openPage(fake("unresolved").cdp, { div: DIV, mode: "html", width: 813 });
+    await expect(readRuns(page)).rejects.toThrow(/text node 0 could not be resolved/);
   });
 
   it("refuses a page that does not load in time", async () => {

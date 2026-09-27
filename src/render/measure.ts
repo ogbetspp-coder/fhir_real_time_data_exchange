@@ -1,3 +1,4 @@
+import { CdpError } from "./cdp.js";
 import type { Page } from "./page.js";
 
 // What the judge reads of a drawn section for R3 (docs/design/authority-import-renderer.md, and
@@ -89,6 +90,7 @@ export function readElements(page: Page): Promise<ChromeElement[]> {
 }
 
 type DomNode = {
+  nodeId: number;
   nodeType: number;
   localName: string;
   backendNodeId: number;
@@ -162,4 +164,155 @@ const READ_TEXTS = `(() => {
 
 export function readTexts(page: Page): Promise<ChromeText[]> {
   return page.evaluate<ChromeText[]>(READ_TEXTS);
+}
+
+// A text node, for R3's font checks: its element's pre-order index within the div and that
+// element's computed family, weight, style and size, its data, and the faces Chrome reports
+// drawing it in. CSS.getPlatformFontsForNode is asked of the text node itself (asked of an
+// element it reports its descendants' faces too, measured), and each node is found by identity
+// (DOM.requestNode on the node the page-side walk holds), never paired by count: DevTools' own
+// tree leaves out nodes of whitespace alone, by a rule of its own (the first code review: a node
+// of U+3000 alone was left out there and not here).
+export type ChromeRun = {
+  element: number;
+  family: string;
+  weight: number;
+  style: string;
+  size: string;
+  text: string;
+  drawnIn: string[];
+};
+
+const RUNS_GLOBAL = "__rendererJudgeTexts";
+
+const READ_RUNS = `(() => {
+  const root = document.body.firstElementChild;
+  const out = [];
+  const nodes = [];
+  let index = 0;
+  const visit = (element) => {
+    const own = index;
+    index += 1;
+    const c = getComputedStyle(element);
+    for (const child of element.childNodes) {
+      if (child.nodeType === 3) {
+        nodes.push(child);
+        out.push({ element: own, family: c.fontFamily, weight: Number(c.fontWeight), style: c.fontStyle, size: c.fontSize, text: child.data });
+      }
+    }
+    for (const child of element.children) visit(child);
+  };
+  if (root !== null) visit(root);
+  globalThis.${RUNS_GLOBAL} = nodes;
+  return out;
+})()`;
+
+// Each text node of the div, with the faces it is drawn in; `withFaces` false leaves `drawnIn`
+// empty (the faces do not depend on the width).
+export async function readRuns(page: Page, withFaces = true): Promise<ChromeRun[]> {
+  const runs = await page.evaluate<Omit<ChromeRun, "drawnIn">[]>(READ_RUNS);
+  if (!withFaces) return runs.map((run) => ({ ...run, drawnIn: [] }));
+  await page.send("DOM.enable");
+  await page.send("CSS.enable");
+  await page.send("DOM.getDocument", { depth: 0 });
+  const found: ChromeRun[] = [];
+  for (const [at, run] of runs.entries()) {
+    // A node of whitespace alone: DevTools keeps none (DOM.requestNode answers 0, after a walk of
+    // the parent's children, quadratic in a long list of them: the second review), so it is not
+    // asked; the check holds its code points to the bound face's map, which is what guards it (a
+    // no-break space is drawn in the bound face).
+    if (/^\p{White_Space}*$/u.test(run.text)) {
+      found.push({ ...run, drawnIn: [] });
+      continue;
+    }
+    const { result } = (await page.send("Runtime.evaluate", {
+      expression: `globalThis.${RUNS_GLOBAL}[${at}]`,
+      contextId: page.contextId,
+      returnByValue: false,
+    })) as { result: { objectId?: string } };
+    if (result.objectId === undefined) throw new Error(`text node ${at} could not be resolved`);
+    const { nodeId } = (await page.send("DOM.requestNode", { objectId: result.objectId })) as {
+      nodeId: number;
+    };
+    // DevTools keeps no node of whitespace alone (by its own rule: U+3000 and the other wide
+    // spaces too), so no face is reported for it: `drawnIn` stays empty, and the check judges
+    // its code points, skipping ASCII whitespace and refusing anything else (CI, measured).
+    let drawnIn: string[] = [];
+    if (nodeId !== 0) {
+      try {
+        const { fonts } = (await page.send("CSS.getPlatformFontsForNode", { nodeId })) as {
+          fonts: { postScriptName: string }[];
+        };
+        drawnIn = fonts.map(({ postScriptName }) => postScriptName);
+      } catch (error) {
+        if (!(error instanceof CdpError) || !error.message.includes("Could not find node"))
+          throw error;
+      }
+    }
+    found.push({ ...run, drawnIn });
+  }
+  return found;
+}
+
+// The section's page as R2 requires it: no parser error (XML mode), and a div with no padding or
+// border of its own whose content box is the width drawn.
+export type ChromePage = {
+  parserError: boolean;
+  divPadding: string;
+  divBorder: string;
+  divWidth: number;
+};
+
+const READ_PAGE = `(() => {
+  const root = document.body.firstElementChild;
+  const parserError = document.getElementsByTagNameNS("*", "parsererror").length > 0;
+  if (root === null) return { parserError, divPadding: "", divBorder: "", divWidth: -1 };
+  const c = getComputedStyle(root);
+  const sides = ["top", "right", "bottom", "left"];
+  return {
+    parserError,
+    divPadding: sides.map((s) => c.getPropertyValue("padding-" + s)).join(" "),
+    divBorder: sides.map((s) => c.getPropertyValue("border-" + s + "-width")).join(" "),
+    divWidth: root.getBoundingClientRect().width,
+  };
+})()`;
+
+export function readPage(page: Page): Promise<ChromePage> {
+  return page.evaluate<ChromePage>(READ_PAGE);
+}
+
+// Every drawn character's box height, by the element it stands in (R3: each is held to its bound
+// face's box at its size and ratio). Characters with no box (collapsed whitespace) are skipped.
+export type ChromeHeights = { element: number; heights: number[] }[];
+
+const READ_HEIGHTS = `(() => {
+  const root = document.body.firstElementChild;
+  const out = [];
+  let index = 0;
+  const visit = (element) => {
+    const own = index;
+    index += 1;
+    const heights = [];
+    for (const child of element.childNodes) {
+      if (child.nodeType !== 3) continue;
+      const data = child.data;
+      for (let at = 0; at < data.length; ) {
+        const size = data.codePointAt(at) > 0xffff ? 2 : 1;
+        const range = new Range();
+        range.setStart(child, at);
+        range.setEnd(child, at + size);
+        const rects = range.getClientRects();
+        if (rects.length > 0 && !/^[\\t\\n\\v\\f\\r ]$/.test(data.slice(at, at + size))) heights.push(rects[0].height);
+        at += size;
+      }
+    }
+    if (heights.length > 0) out.push({ element: own, heights });
+    for (const child of element.children) visit(child);
+  };
+  if (root !== null) visit(root);
+  return out;
+})()`;
+
+export function readHeights(page: Page): Promise<ChromeHeights> {
+  return page.evaluate<ChromeHeights>(READ_HEIGHTS);
 }

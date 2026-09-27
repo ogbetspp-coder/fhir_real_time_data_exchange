@@ -4,7 +4,10 @@
 // Fetch.requestPaused events. Behaviour is chosen by FAKE_CHROME: "ok", "navigate-error",
 // "evaluate-throws", "garbage", "crash" (the target crashes instead of loading), "renavigate" (the
 // page asks for itself again and navigates after it loaded), "refuse-replies" (replies to paused
-// requests and the target's close fail), "no-load" (the page never loads).
+// requests and the target's close fail), "no-load" (the page never loads), "unresolved" (a
+// page-side node cannot be resolved by reference), "whitespace-node" and "lost-node" (DevTools
+// keeps no node for the text), "fonts-error" (another protocol error), "with-whitespace" (a
+// node of whitespace alone beside the text).
 import { createReadStream, createWriteStream } from "node:fs";
 import { setTimeout } from "node:timers";
 
@@ -81,6 +84,48 @@ function reply(message) {
       if (mode === "evaluate-throws")
         return answer({ result: {}, exceptionDetails: { text: "Uncaught" } });
       if (params.expression === "handled") return answer({ result: { value: fulfilled } });
+      // A page-side node, by reference (DOM.requestNode resolves it).
+      if (params.returnByValue === false) {
+        return answer({
+          result:
+            mode === "unresolved"
+              ? { type: "undefined" }
+              : { objectId: `node-${String(params.expression)}` },
+        });
+      }
+      // The judge's page-side reads (src/render/measure.ts), answered for the tree DOM.getDocument
+      // gives: one text node, under the ol.
+      if (String(params.expression).includes("fontFamily")) {
+        const run = {
+          element: 1,
+          family: '"Times New Roman"',
+          weight: 400,
+          style: "normal",
+          size: "16px",
+          text: "ab",
+        };
+        // A node of whitespace alone beside it, which the read never asks DevTools for.
+        return answer({
+          result: {
+            value: mode === "with-whitespace" ? [run, { ...run, text: "\u00a0 " }] : [run],
+          },
+        });
+      }
+      if (String(params.expression).includes("parsererror")) {
+        return answer({
+          result: {
+            value: {
+              parserError: false,
+              divPadding: "0px 0px 0px 0px",
+              divBorder: "0px 0px 0px 0px",
+              divWidth: 813,
+            },
+          },
+        });
+      }
+      if (String(params.expression).includes("getClientRects")) {
+        return answer({ result: { value: [{ element: 1, heights: [18, 18] }] } });
+      }
       return answer({
         result: { value: { expression: params.expression, contextId: params.contextId } },
       });
@@ -114,7 +159,7 @@ function reply(message) {
                           backendNodeId: 11,
                           children: [
                             { nodeType: 1, localName: "li", backendNodeId: 12 },
-                            { nodeType: 3, localName: "", backendNodeId: 13 },
+                            { nodeType: 3, nodeId: 13, localName: "", backendNodeId: 13 },
                             { nodeType: 1, localName: "li", backendNodeId: 14 },
                           ],
                         },
@@ -126,6 +171,22 @@ function reply(message) {
             },
           ],
         },
+      });
+    case "DOM.requestNode":
+      return answer({ nodeId: mode === "whitespace-node" ? 0 : 13 });
+    case "CSS.getPlatformFontsForNode":
+      if (mode === "lost-node")
+        return write({ id, error: { code: -32000, message: "Could not find node with given id" } });
+      if (mode === "fonts-error")
+        return write({ id, error: { code: -32601, message: "CSS agent is not enabled" } });
+      return answer({
+        fonts: [
+          {
+            postScriptName: `LiberationSerif`,
+            familyName: `Liberation Serif`,
+            glyphCount: params.nodeId,
+          },
+        ],
       });
     case "Accessibility.getFullAXTree":
       return answer({
