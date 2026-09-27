@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Font } from "../../src/render/font.js";
 import { boundFace, checkTextNode, namedFamily } from "../../src/render/fonts.js";
-import { boxFits, boxHeight, checkHeights, checkPage } from "../../src/render/page-checks.js";
+import { boxPairs, checkHeights, checkPage, resolveBox } from "../../src/render/page-checks.js";
 
 // R3's fonts and scripts, R6's coverage, R2's page and R3's character boxes, as rules on what
 // Chrome reports (the renderer image's run of scripts/render/check-fonts.ts draws them).
@@ -137,20 +137,90 @@ describe("R2's page and R3's character boxes", () => {
     expect(checkPage({ ...page, divWidth: 812 }, 813, "html")[0]?.refusal).toBe("div-width");
   });
 
-  it("holds every box to within a device pixel of the face's ascent and descent", () => {
-    // Liberation Serif's hhea: 1825 and -443 of 2048.
+  it("names each box's exact ascent and descent from the bound face, or refuses it", () => {
+    // Liberation Serif's hhea: 1825 and -443 of 2048; Sans's 1854 and -434; Carlito's 1950 and -550.
     const metrics = { ...METRICS, hheaAscender: 1825, hheaDescender: -443 };
-    // 8 pt at ratio 1: 10.667 px, quantised to 10.656 in FreeType's 26.6, gives 9 + 2 (Chrome 11).
-    expect(boxHeight(metrics, 32 / 3, 1)).toBe(11);
-    expect(boxHeight(metrics, 16, 1)).toBe(17);
-    expect(boxHeight(metrics, 16, 2.625)).toBeCloseTo(46 / 2.625, 10);
-    // Chrome's own boxes one device pixel off the formula (the second review, measured) fit.
-    expect(boxFits(27, boxHeight(metrics, 24.13, 1), 1)).toBe(true);
-    expect(boxFits(14 / 1.1, boxHeight(metrics, 11.7333, 1.1), 1.1)).toBe(true);
-    // A height Chrome reports in 1/64 CSS px at a fractional ratio fits.
-    expect(boxFits(14.546875, 16 / 1.1, 1.1)).toBe(true);
-    // Two device pixels off does not.
-    expect(boxFits(19, 17, 1)).toBe(false);
+    const sans = { ...METRICS, hheaAscender: 1854, hheaDescender: -434 };
+    const carlito = { ...METRICS, hheaAscender: 1950, hheaDescender: -550 };
+    const one = (value: number) => ({ low: value, high: value });
+    // 16 px at ratio 1: 14.26 and 3.46 round to 14 and 3, and the descent rounded down takes a
+    // pixel from the ascent (measured with a baseline marker): 13 above the baseline, 4 below.
+    expect(boxPairs(metrics, 16, 1)).toEqual([[14, 3]]);
+    expect(resolveBox(metrics, 16, 1, 17)).toEqual({ ascent: one(13), descent: one(4) });
+    expect(resolveBox(metrics, 16, 1, 18)).toBeUndefined();
+    expect(resolveBox(metrics, 16, 1, 19)).toBeUndefined();
+    // The boxes the tolerance of 3c-B2a let through, each Chrome's (measured): the size floored
+    // to 1/100 px, never to FreeType's 1/64.
+    expect(resolveBox(metrics, 16 * 0.67, 1.1, 14 / 1.1)).toBeDefined();
+    expect(resolveBox(metrics, 16 * 0.83, 3, 15)).toBeDefined();
+    expect(resolveBox(sans, 21.4133, 0.8, 23.75)).toBeDefined();
+    expect(resolveBox(carlito, 16.3, 0.8, 20)).toBeDefined();
+    // Two sizes sharing Blink's font cache key are drawn in whichever the process drew first: a
+    // 9.97333 px Carlito letter is 12 px alone and 13 px after a 9.984 px one (measured); both
+    // are its face's.
+    expect(resolveBox(carlito, 9.97333, 1, 12)).toBeDefined();
+    expect(resolveBox(carlito, 9.97333, 1, 13)).toBeDefined();
+    // A size whose ascent crosses a rounding step inside the interval has two pairs; the box
+    // names one.
+    const two = boxPairs(metrics, 17.4 / 0.9, 0.9);
+    expect(two.length).toBe(2);
+    expect(two.map(([a, d]) => resolveBox(metrics, 17.4 / 0.9, 0.9, (a + d) / 0.9))).not.toContain(
+      undefined,
+    );
+    // 28.9 px at 0.8: the exact descent is 5.00 within the interval, so whether it took a pixel
+    // is not decided; the ascent is known within one device pixel (Chrome drew 20).
+    expect(resolveBox(metrics, 28.9, 0.8, 26 / 0.8)).toEqual({
+      ascent: { low: 20, high: 21 },
+      descent: { low: 5, high: 6 },
+    });
+    // 12 px: 10.69 and 2.60 round to 11 and 3, the descent rounded up, so nothing moves.
+    expect(resolveBox(metrics, 12, 1, 14)).toEqual({ ascent: one(11), descent: one(3) });
+    // The interval's edges: the ascent steps from 10 to 11 at 11.7832 px, which lies above
+    // 11.77's interval (to 11.77 + 0.01) and inside 11.775's, and below 11.805's (from
+    // 11.805 - 0.02) and inside 11.8's.
+    expect(boxPairs(metrics, 11.77, 1)).toEqual([[10, 3]]);
+    expect(boxPairs(metrics, 11.775, 1)).toEqual([
+      [10, 3],
+      [11, 3],
+    ]);
+    expect(boxPairs(metrics, 11.8, 1)).toEqual([
+      [10, 3],
+      [11, 3],
+    ]);
+    expect(boxPairs(metrics, 11.805, 1)).toEqual([[11, 3]]);
+    expect(resolveBox(metrics, 11.77, 1, 14)).toBeUndefined();
+    expect(resolveBox(metrics, 11.805, 1, 13)).toBeUndefined();
+    // Below an ascent of 3 device pixels Blink keeps fractional metrics: refused.
+    expect(boxPairs(metrics, 3, 1)).toEqual([[3, 1]]);
+    expect(resolveBox(metrics, 3, 1, 4)).toBeUndefined();
+    // A face the model does not hold for: no descent below the baseline, or typographic metrics
+    // asked for and not the hhea's.
+    expect(boxPairs({ ...metrics, hheaDescender: 0 }, 12, 1)).toEqual([]);
+    expect(boxPairs({ ...metrics, useTypoMetrics: true }, 12, 1)).toEqual([]);
+    expect(boxPairs({ ...metrics, hheaAscender: 0 }, 12, 1)).toEqual([]);
+    expect(
+      boxPairs(
+        { ...metrics, useTypoMetrics: true, typoAscender: 1825, typoDescender: -442 },
+        12,
+        1,
+      ),
+    ).toEqual([]);
+    expect(
+      boxPairs(
+        { ...metrics, useTypoMetrics: true, typoAscender: 1824, typoDescender: -443 },
+        12,
+        1,
+      ),
+    ).toEqual([]);
+    expect(
+      boxPairs(
+        { ...metrics, useTypoMetrics: true, typoAscender: 1825, typoDescender: -443 },
+        12,
+        1,
+      ),
+    ).toEqual([[11, 3]]);
+    // A height off Chrome's 1/64 CSS px grid is no box.
+    expect(resolveBox(metrics, 16, 1, 17.03)).toBeUndefined();
     const face = { postScriptName: "LiberationSerif", codePoints: new Set<number>(), metrics };
     const faces = new Map([["LiberationSerif", face]]);
     const run = {
@@ -162,10 +232,11 @@ describe("R2's page and R3's character boxes", () => {
       text: "x",
       drawnIn: [],
     };
-    expect(checkHeights([run], [{ element: 2, heights: [17, 18, 16] }], faces, 1)).toEqual([]);
-    expect(checkHeights([run], [{ element: 2, heights: [17, 19] }], faces, 1)[0]?.refusal).toBe(
-      "char-height",
-    );
+    expect(checkHeights([run], [{ element: 2, heights: [17, 17] }], faces, 1)).toEqual([]);
+    expect(checkHeights([run], [{ element: 2, heights: [17, 18] }], faces, 1)[0]).toEqual({
+      refusal: "char-height",
+      detail: "element 2: a box 18 px high, not the bound face's (17)",
+    });
     expect(checkHeights([run], [{ element: 3, heights: [17] }], faces, 1)[0]?.detail).toMatch(
       /no bound face/,
     );

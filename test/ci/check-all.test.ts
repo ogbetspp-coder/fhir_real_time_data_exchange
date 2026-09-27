@@ -21,6 +21,7 @@ const NOT_RUN_LOCALLY = new Set([
   "npm run renderer:smoke",
   "npm run renderer:check",
   "npm run renderer:fonts",
+  "npm run renderer:boxes",
   "npm run renderer:drawings",
 ]);
 

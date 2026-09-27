@@ -42,7 +42,8 @@
     "renderer:smoke": "docker run --rm --network none --read-only --tmpfs /tmp --shm-size=1g --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=2048 --memory=6g --env RENDERER_NO_SANDBOX=1 --volume \"$PWD:/work:ro\" renderer:local node --import tsx scripts/render/smoke.ts",
     "renderer:check": "docker run --rm --network none --read-only --tmpfs /tmp --shm-size=1g --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=2048 --memory=6g --env RENDERER_NO_SANDBOX=1 --volume \"$PWD:/work:ro\" renderer:local node --import tsx scripts/render/check.ts",
     "renderer:fonts": "docker run --rm --network none --read-only --tmpfs /tmp --shm-size=1g --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=2048 --memory=6g --env RENDERER_NO_SANDBOX=1 --volume \"$PWD:/work:ro\" renderer:local node --import tsx scripts/render/check-fonts.ts",
-    "renderer:drawings": "docker run --rm --network none --read-only --tmpfs /tmp --shm-size=1g --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=2048 --memory=6g --env RENDERER_NO_SANDBOX=1 --volume \"$PWD:/work:ro\" renderer:local node --import tsx scripts/render/check-drawings.ts"
+    "renderer:drawings": "docker run --rm --network none --read-only --tmpfs /tmp --shm-size=1g --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=2048 --memory=6g --env RENDERER_NO_SANDBOX=1 --volume \"$PWD:/work:ro\" renderer:local node --import tsx scripts/render/check-drawings.ts",
+    "renderer:boxes": "docker run --rm --network none --read-only --tmpfs /tmp --shm-size=1g --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=2048 --memory=6g --env RENDERER_NO_SANDBOX=1 --volume \"$PWD:/work:ro\" renderer:local node --import tsx scripts/render/check-boxes.ts"
   },
   "repository": {
     "type": "git",
