@@ -874,15 +874,21 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
    and R2's picture list of each drawing: each picture's form, the SHA-256 of the bytes it is drawn
    from and its drawn box (a seed differs in the bytes alone). Each drawing's list is checked
    against its page: one drawn `img` per picture prepared, each drawn from the URL prepared,
-   decoded unless unpinned (a picture whose bytes Chrome cannot decode is refused, not drawn as a
-   broken box and passed), and no request failed but the unpinned picture's. Pictures are read by
-   the scanner's own tokens, so an attribute holding `>` or ` src=` cannot move the `src` read, and
-   a `data:` URI is a picture exactly where the scanner's rule takes it (a test asserts the two
-   agree). All of this is at ratio 1: none of it depends on the ratio, and each ratio's geometry is
-   3c-C's; R8's record holds the list (3c-C). No carried section of the pinned labels holds a
-   picture yet (every EMA picture declares its size in a `style` T refuses, or is a reference), so
-   the carried pictures drawn are the cases' `data` pictures, and the `contained` and `unpinned`
-   forms are drawn by the seeded page only until 3c-W and 3c-E carry them.
+   sized unless unpinned (`complete` with a natural width: a picture Chrome cannot size, such as
+   a PNG of its signature alone, is refused, not drawn as a broken box and passed; bytes past a
+   valid header that fail to decode are not detected, and are drawn the same in both drawings),
+   and no request failed but the unpinned picture's. A seed is refused for exactly the properties it names.
+   Pictures are read by the scanner's own tokens, so an attribute holding `>` or ` src=` cannot
+   move the `src` read, and a `data:` URI is a picture exactly where the scanner's rule takes it,
+   on the value as written (a test asserts the two agree, character references included). All of
+   this is at ratio 1: none of it depends on the ratio, and each ratio's geometry is 3c-C's; R8's
+   record holds the list (3c-C), whose comparison with the import's list must state how the
+   scanner's picture hash (of the `src` as written) maps to the list's (of the bytes drawn). No
+   carried section of the pinned labels holds a picture yet (every EMA picture declares its size
+   in a `style` T refuses, or is a reference), so the carried pictures drawn are the cases' `data`
+   pictures, and the `contained` and `unpinned` forms are drawn by the seeded page only until 3c-W
+   and 3c-E carry them; a `#id` is matched as written (XML's references decoded, no space trimmed,
+   no HTML named reference), which those changes must resolve as Chrome does, or refuse.
 
 2. **3c-C**: its measured design of R4 (reviewed first), with R3's exact character box model
    before R4's baseline estimator, then R4, R7, R8, R9, R11; the render build, its trigger and

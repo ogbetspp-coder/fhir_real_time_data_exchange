@@ -15,28 +15,29 @@ export const BLUE_PNG =
 export const GREEN_PNG =
   "iVBORw0KGgoAAAANSUhEUgAAAB4AAAAUCAIAAAAVyRqTAAAAHklEQVR42mNgaGCgFRo1etToUaNHjR41etTooWg0AK2SLBCEg9ZVAAAAAElFTkSuQmCC";
 
-// Pairs whose second drawing differs, each of which the comparison must refuse for the property
-// named: the authority's div, and a stand-in for T(div) that changes what T never may.
-export type DrawingCase = { name: string; div: string; output: string; property: string };
+// Pairs whose second drawing differs, each of which the comparison must refuse for exactly the
+// properties named: the authority's div, and a stand-in for T(div) that changes what T never may.
+export type DrawingCase = { name: string; div: string; output: string; properties: string[] };
 
 export const DRAWING_CASES: DrawingCase[] = [
   {
     name: "text",
     div: div("<p>Take 2 tablets</p>"),
     output: div("<p>Take 20 tablets</p>"),
-    property: "text",
+    properties: ["text"],
   },
   {
     name: "list numbers",
     div: div("<ol><li>a</li><li>b</li></ol>"),
     output: div('<ol start="2"><li>a</li><li>b</li></ol>'),
-    property: "markers",
+    properties: ["markers"],
   },
   {
     name: "grid",
     div: div("<table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>"),
     output: div('<table><tr><td colspan="2">a b</td></tr><tr><td>c</td><td>d</td></tr></table>'),
-    property: "table 0",
+    // A cell fewer: its row's text is read without a tab.
+    properties: ["text", "table 0"],
   },
   // A span moved: the same text (`innerText` reads a row's cells with tabs) and the same cells.
   {
@@ -47,26 +48,27 @@ export const DRAWING_CASES: DrawingCase[] = [
     output: div(
       '<table><tr><td>a</td><td colspan="2">b</td></tr><tr><td>c</td><td>d</td><td>e</td></tr></table>',
     ),
-    property: "table 0",
+    properties: ["table 0"],
   },
   {
     name: "grid, a row span moved",
     div: div('<table><tr><td rowspan="2">a</td><td>b</td></tr><tr><td>c</td></tr></table>'),
     output: div('<table><tr><td>a</td><td rowspan="2">b</td></tr><tr><td>c</td></tr></table>'),
-    property: "table 0",
+    properties: ["table 0"],
   },
   {
     name: "picture",
     div: div(`<p>x <img src="data:image/png;base64,${RED_PNG}"/> y</p>`),
     output: div(`<p>x <img src="data:image/png;base64,${BLUE_PNG}"/> y</p>`),
-    property: "pictures",
+    // Another box from other bytes: the drawing's boxes and the list's hashes and boxes.
+    properties: ["pictures", "picture list"],
   },
   // The same box from other bytes: refused by the picture list's hashes alone.
   {
     name: "picture bytes",
     div: div(`<p>x <img src="data:image/png;base64,${RED_PNG}"/> y</p>`),
     output: div(`<p>x <img src="data:image/png;base64,${GREEN_PNG}"/> y</p>`),
-    property: "picture list",
+    properties: ["picture list"],
   },
 ];
 

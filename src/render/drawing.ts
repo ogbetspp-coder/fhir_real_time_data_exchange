@@ -17,8 +17,9 @@ export type Drawing = {
   markers: string[];
   // Each table's cells (not its caption), in document order, by their rectangles.
   tables: Rect[][];
-  // Each picture, in document order: its drawn box, whether Chrome decoded an image from it
-  // (`complete` with a natural width), and the URL it was drawn from (`currentSrc`).
+  // Each picture, in document order: its drawn box, whether Chrome sized an image from it
+  // (`complete` with a natural width: a valid header, not every pixel decoded), and the URL it
+  // was drawn from (`currentSrc`).
   pictures: DrawnPicture[];
 };
 

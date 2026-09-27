@@ -13,12 +13,7 @@ import {
   type Rect,
 } from "../../src/render/drawing.js";
 import { ORIGIN } from "../../src/render/page.js";
-import {
-  isPictureData,
-  PictureError,
-  preparePictures,
-  UNPINNED_URL,
-} from "../../src/render/pictures.js";
+import { PictureError, preparePictures, UNPINNED_URL } from "../../src/render/pictures.js";
 import { BLUE_PNG, GREEN_PNG, PICTURE_FORMS, RED_PNG } from "../fixtures/render/drawing-cases.js";
 
 // R2's pictures and second drawing, as rules on what the page is given and what Chrome reports
@@ -112,9 +107,12 @@ describe("R2's pictures", () => {
       "data:image/png;base64,ab=c",
       "data:image/png;base64,a===",
       "data:image/png,abcd",
+      `data:image/png;base64,${RED_PNG.slice(0, -2)}&#61;&#x3D;`,
+      `data:image/png;base64,${RED_PNG.replace("A", "&#65;")}`,
       "#a",
     ]) {
-      expect(isPictureData(value), value).toBe(scanned(value));
+      const div = `<p><img src="${value}"/></p>`;
+      expect(preparePictures(div).pictures[0]?.form === "data", value).toBe(scanned(value));
     }
   });
 });

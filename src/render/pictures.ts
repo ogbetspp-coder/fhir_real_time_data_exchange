@@ -46,7 +46,7 @@ const PICTURE_DATA_PREFIXES = ["data:image/png;base64,", "data:image/jpeg;base64
 const PICTURE_DATA_LIMIT = 1_398_104;
 const BASE64_ALPHABET = /^[A-Za-z0-9+/]*$/;
 
-export function isPictureData(value: string): boolean {
+function isPictureData(value: string): boolean {
   const prefix = PICTURE_DATA_PREFIXES.find((candidate) => value.startsWith(candidate));
   if (prefix === undefined) return false;
   const body = value.slice(prefix.length);
@@ -139,7 +139,9 @@ export function preparePictures(
     const valueStart = valueEnd - raw.length;
     const reference = decode(raw);
     let url: string;
-    if (isPictureData(reference)) {
+    // Classified on the value as written, as the scanner does: a reference spelled with a
+    // character reference is not a picture the scanner takes.
+    if (isPictureData(raw)) {
       const body = reference.slice(reference.indexOf(",") + 1);
       pictures.push({ reference, form: "data", sha256: sha256(Buffer.from(body, "base64")) });
       url = reference;

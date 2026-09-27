@@ -31,7 +31,7 @@ import { MODEL_CASES } from "../../test/fixtures/render/model-cases.js";
 // authority's drawing and T(div)'s, in both modes at R2's named widths, each with its pictures
 // drawn as the import carries them: the text, list numbers, table grids and pictures must be
 // the same, and each page's content box must be its width. The seeded pairs of
-// test/fixtures/render/drawing-cases.ts must each be refused for the property named, and the
+// test/fixtures/render/drawing-cases.ts must each be refused for exactly the properties named, and the
 // picture forms drawn as stated.
 //
 // usage (inside the image): node --import tsx scripts/render/check-drawings.ts
@@ -207,16 +207,16 @@ try {
       }
     }
   }
-  // Each seed in both modes, refused for its property and drawn with no refusal of its page.
+  // Each seed in both modes, refused for exactly its properties and drawn with no refusal of its page.
   for (const seeded of DRAWING_CASES) {
     for (const mode of MODES) {
       const authority = await draw(browser, seeded.div, new Map(), mode, 813);
       const t = await draw(browser, seeded.output, new Map(), mode, 813);
       const found = compare(authority, t).map(({ property }) => property);
       const page = [...authority.page, ...t.page];
-      if (!found.includes(seeded.property) || page.length > 0) {
+      if (found.join(", ") !== seeded.properties.join(", ") || page.length > 0) {
         failures.push(
-          `seeded ${seeded.name} (${mode}): expected ${seeded.property}, got ${found.join(", ") || "nothing"}` +
+          `seeded ${seeded.name} (${mode}): expected ${seeded.properties.join(", ")}, got ${found.join(", ") || "nothing"}` +
             (page.length > 0 ? `; page: ${page.join("; ")}` : ""),
         );
       }
