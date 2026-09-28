@@ -21,7 +21,8 @@ substitutions:
 # with BuildKit, which has never run here: its provenance attestations would make each pushed tag
 # an OCI index that scripts/gcp/deploy.sh's digest lookup does not ask for. The move is its own
 # rehearsed change (audit batch B13). Until then this builder builds with the legacy builder, so
-# the Dockerfiles it builds use nothing BuildKit alone accepts (test/ci/images.test.ts), CI's
+# the Dockerfiles it builds use nothing BuildKit alone accepts (test/ci/images.test.ts), each
+# build step says DOCKER_BUILDKIT=0 rather than relying on the builder's default, CI's
 # Images job builds them the same way (DOCKER_BUILDKIT=0), and scripts/ci/pin-freshness.mjs
 # reports the pin as held, with this reason, rather than as behind.
 #
@@ -38,6 +39,7 @@ steps:
   - id: build-app-image
     name: gcr.io/cloud-builders/docker@sha256:001fb4a870a84485cf198c80002f7af42f6456f2dbc261d70a0b5f0111470df4
     waitFor: ["-"]
+    env: ["DOCKER_BUILDKIT=0"]
     args:
       - build
       - --target
@@ -59,6 +61,7 @@ steps:
   - id: build-validator-image
     name: gcr.io/cloud-builders/docker@sha256:001fb4a870a84485cf198c80002f7af42f6456f2dbc261d70a0b5f0111470df4
     waitFor: ["pull-validator-cache"]
+    env: ["DOCKER_BUILDKIT=0"]
     args:
       - build
       - --file
@@ -116,6 +119,7 @@ steps:
   - id: build-query-image
     name: gcr.io/cloud-builders/docker@sha256:001fb4a870a84485cf198c80002f7af42f6456f2dbc261d70a0b5f0111470df4
     waitFor: ["-"]
+    env: ["DOCKER_BUILDKIT=0"]
     args:
       - build
       - --target

@@ -9,16 +9,21 @@ import path from "node:path";
 export const PACKAGE_LOCK = "fhir/validator-packages.lock";
 const REGISTRY = "https://packages2.fhir.org/packages";
 
-// Comment lines dropped and continuation lines joined, as the builder reads them.
+// The instructions, joined as the builder joins them (moby's parser; audit B07 follow-up, review
+// L3-b): a trailing backslash, and the spaces or tabs after it, are removed and the next line is
+// appended as it stands, with no space added, so `ap\` then `t-get` is `apt-get`; comment lines
+// and blank lines are dropped, inside a continuation too, where neither ends the instruction.
+// Until then this joined with a space, and a blank line ended the instruction, so a name split
+// across lines, or a flag after a blank line, was not the text the builder ran.
 export function instructions(text) {
   const joined = [];
   let open = null;
   for (const line of text.split(/\r?\n/)) {
-    if (/^\s*#/.test(line)) continue;
-    const continued = /\\\s*$/.test(line);
-    const body = continued ? line.replace(/\\\s*$/, "") : line;
+    if (/^\s*#/.test(line) || /^\s*$/.test(line)) continue;
+    const continued = /\\[ \t]*$/.test(line);
+    const body = continued ? line.replace(/\\[ \t]*$/, "") : line;
     if (open === null) open = body;
-    else open += ` ${body.trim()}`;
+    else open += body;
     if (!continued) {
       joined.push(open);
       open = null;

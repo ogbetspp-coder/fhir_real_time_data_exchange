@@ -2,9 +2,9 @@ import { mkdir, readdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { format, resolveConfig } from "prettier";
-import { z } from "zod";
 
 import { CONTRACTS, contractId, type ContractDefinition } from "../../src/contracts/index.js";
+import { contractJsonSchema } from "../../src/contracts/json-schema.js";
 import { sha256 } from "../../src/lib/hash.js";
 
 // Emits one JSON Schema (draft 2020-12) per contract root plus an index with content hashes.
@@ -16,13 +16,7 @@ await mkdir(output, { recursive: true });
 const prettierOptions = { ...(await resolveConfig(output)), parser: "json" as const };
 
 export function buildJsonSchema(contract: ContractDefinition): Record<string, unknown> {
-  const generated = z.toJSONSchema(contract.schema, {
-    target: "draft-2020-12",
-    io: "input",
-    unrepresentable: "throw",
-    cycles: "ref",
-    reused: "inline",
-  });
+  const generated = contractJsonSchema(contract.schema, "input");
   const { $schema, ...rest } = generated;
   return {
     $schema: $schema ?? "https://json-schema.org/draft/2020-12/schema",

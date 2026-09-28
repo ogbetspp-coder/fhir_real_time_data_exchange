@@ -6,21 +6,21 @@
       "version": "2.0.0",
       "$id": "https://khs.dev/contracts/canonical-submission/2.0.0/schema.json",
       "file": "canonical-submission.schema.json",
-      "sha256": "88e8c6fdab513dc78f46116c9a4f42ba7f05369da650212e2ebc56ddcf99bfb6"
+      "sha256": "97186ea65f3de3baebeec18759e58ae5828df7c2bdaf3f29ee6a371fc937dda9"
     },
     {
       "name": "ingestion-provenance",
       "version": "1.0.0",
       "$id": "https://khs.dev/contracts/ingestion-provenance/1.0.0/schema.json",
       "file": "ingestion-provenance.schema.json",
-      "sha256": "bf19e0ea82a1f8f901042320017ef203b660ca7782a45cd16885251d081aacfa"
+      "sha256": "e95be97c46cff484152dc75bff38a9eaf88e4c19d7fa3e8352df3e56dfd491be"
     },
     {
       "name": "fidelity-report",
       "version": "1.0.0",
       "$id": "https://khs.dev/contracts/fidelity-report/1.0.0/schema.json",
       "file": "fidelity-report.schema.json",
-      "sha256": "84687c7b29f80f86605a9a6f39550f1e8c8f951d6c8ece2b7d27ff01e2b797c2"
+      "sha256": "68496888fcca97c87a6a70a1f29e6c1b75cadae02e23472df35c9c25bba423ff"
     },
     {
       "name": "source-document-text",
@@ -41,21 +41,21 @@
       "version": "4.0.0",
       "$id": "https://khs.dev/contracts/query-tools/4.0.0/schema.json",
       "file": "query-tools.schema.json",
-      "sha256": "a11016b32f5c28cc6e0afc1b0dfd68a15af35d20169afb0225407fbdcf3382a4"
+      "sha256": "44db03f7d026bde2cd35ab233b18168135be8876dd379ad146628ebb3f5eb15b"
     },
     {
       "name": "agent-turn",
       "version": "1.1.0",
       "$id": "https://khs.dev/contracts/agent-turn/1.1.0/schema.json",
       "file": "agent-turn.schema.json",
-      "sha256": "22f8a86f956971da9a30e8d9b79dc3a3bfca8dd20079e5bf726b6fd3a767bba6"
+      "sha256": "4313b7e4857c66747ef28692447190d1c6a449284424f9cf80ba64f7b225638e"
     },
     {
       "name": "run-manifest",
       "version": "4.0.0",
       "$id": "https://khs.dev/contracts/run-manifest/4.0.0/schema.json",
       "file": "run-manifest.schema.json",
-      "sha256": "ef73dded7bfee4d348ecdb3cc7c52ac66c8090a4cd8bb352d688b1278e7c52f3"
+      "sha256": "4b4de5abe5bd058f63939d64b42d2e2b8e532da457e7e967b0afbd235ddd1cc9"
     }
   ]
 }

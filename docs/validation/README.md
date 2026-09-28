@@ -407,3 +407,4 @@ order.
 - [The fidelity proof's hardening, the `codePoints` vectors, importer 2.1.2, 2026-09-28](changes/2026-09-28-fidelity-proof-hardening-importer-2-1-2.md)
 - [The importer's hardening, importer 2.2.0, 2026-09-28](changes/2026-09-28-importer-hardening-2-2-0.md)
 - [Run manifest 4.0.0, the Global ePI package at its versioned URL, and the image runtimes, 2026-09-28](changes/2026-09-28-run-manifest-4-0-0-global-epi-stu1.md)
+- [The published contract patterns name ASCII digits (no version change), 2026-09-28](changes/2026-09-28-contract-patterns-ascii-digits.md)
