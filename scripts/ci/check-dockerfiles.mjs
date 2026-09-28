@@ -8,12 +8,14 @@ import path from "node:path";
 // image pin different digests. A tag can be rebuilt and move the runtime's Unicode database
 // under the normalisation the fidelity check depends on (ADR 0003); a digest cannot.
 //
-// Three places pull image bytes and all three are scanned: `FROM <ref>`, `--from=<ref>` on COPY
-// and ADD, and `from=<ref>` inside a `--mount=` flag on RUN. A reference that names a stage
-// declared in the same file (`FROM ... AS build`, or a stage index such as `--from=0`) pulls no
-// registry bytes and is skipped. One name is excluded from that skip: a `FROM`'s own `AS` name,
-// which the instruction declares rather than refers to, so `FROM busybox AS busybox` is judged
-// as the image reference `busybox` and not as a stage.
+// Four places pull image bytes and all four are scanned: `FROM <ref>`, `--from=<ref>` on COPY
+// and ADD, `from=<ref>` inside a `--mount=` flag on RUN, and the `syntax` parser directive. The
+// directive (`# syntax=<ref>`) names the frontend image BuildKit pulls and hands the whole file
+// to before any FROM is read, so an unpinned one is a build program that can move. A reference
+// that names a stage declared in the same file (`FROM ... AS build`, or a stage index such as
+// `--from=0`) pulls no registry bytes and is skipped. One name is excluded from that skip: a
+// `FROM`'s own `AS` name, which the instruction declares rather than refers to, so
+// `FROM busybox AS busybox` is judged as the image reference `busybox` and not as a stage.
 //
 // The scan is textual. It does not resolve build arguments (`FROM ${BASE}`, `--from=$STAGE`),
 // it does not contact a registry, and a digest it accepts is only as good as the registry
@@ -61,6 +63,33 @@ function instructions(text) {
   return joined;
 }
 
+// The frontend images a file names through the `syntax` parser directive, with their lines.
+// BuildKit honours the directive only in the leading run of directive lines, in the `#` form or
+// the `//` one, or as a `syntax` key when the whole file is JSON. Every line of either form is
+// read here wherever it stands, which fails closed: a directive BuildKit would honour is never
+// missed, at the cost of rewording a later comment that merely looks like one.
+const SYNTAX_DIRECTIVE = /^\uFEFF?\s*(?:#|\/\/)\s*syntax\s*=\s*(.*?)\s*$/i;
+
+function syntaxDirectives(text) {
+  const found = [];
+  text.split(/\r?\n/).forEach((line, index) => {
+    const directive = SYNTAX_DIRECTIVE.exec(line);
+    if (directive !== null) found.push({ line: index + 1, ref: unquote(directive[1]) });
+  });
+  let json;
+  try {
+    json = JSON.parse(text.replace(/^\uFEFF/, ""));
+  } catch {
+    json = undefined;
+  }
+  if (json !== null && typeof json === "object" && !Array.isArray(json)) {
+    for (const [key, value] of Object.entries(json)) {
+      if (key.toLowerCase() === "syntax") found.push({ line: 1, ref: String(value) });
+    }
+  }
+  return found;
+}
+
 function unquote(value) {
   return value.replace(/^["']/, "").replace(/["']$/, "");
 }
@@ -94,7 +123,13 @@ const failures = [];
 const nodeDigests = new Map();
 
 for (const name of dockerfiles) {
-  const lines = instructions(readFileSync(path.join(root, name), "utf8"));
+  const source = readFileSync(path.join(root, name), "utf8");
+  for (const { line, ref } of syntaxDirectives(source)) {
+    if (!DIGEST.test(ref)) {
+      failures.push(`${name}:${line}: # syntax ${ref} is not pinned by @sha256 digest`);
+    }
+  }
+  const lines = instructions(source);
 
   // Stages are collected as the file is walked, so a reference resolves to a stage only if that
   // stage was declared ABOVE it. That is Docker's own rule — `COPY --from` and `RUN --mount`

@@ -153,3 +153,43 @@ describe("every workflow's permissions", () => {
     expect(holding).toEqual(["deploy.yml:deploy", "plan.yml:plan"]);
   });
 });
+
+// Every checkout drops its credentials. actions/checkout otherwise leaves the job's GITHUB_TOKEN
+// in .git/config, where every install script, test and tool the job runs afterwards can read it;
+// no workflow here pushes with git, and a step that calls the API is given the token by name.
+// The deploy job's checkout is the one not yet changed: deploy.yml is changed only in its own
+// reviewed pull request. Remove it from this list when that lands.
+const NOT_YET_WITHOUT_CREDENTIALS = new Set(["deploy.yml:deploy"]);
+
+describe("every checkout", () => {
+  const checkouts = workflows.flatMap(({ name, text }) =>
+    [...jobs(text)].flatMap(([job, body]) =>
+      body
+        .split(/\n(?= {6}- )/)
+        .filter((step) => step.includes("uses: actions/checkout@"))
+        .map((step) => ({ where: `${name}:${job}`, step })),
+    ),
+  );
+
+  it("finds the checkouts it is about", () => {
+    expect(checkouts.map(({ where }) => where)).toEqual(
+      expect.arrayContaining([
+        "ci.yml:check",
+        "ci.yml:official-validation",
+        "ci.yml:zone-a",
+        "ci.yml:agent",
+        "plan.yml:plan",
+        "vulnerabilities.yml:scan",
+      ]),
+    );
+  });
+
+  it("keeps no credentials in the repository it checks out", () => {
+    const persisting = checkouts
+      .filter(({ step }) => !/^ {10}persist-credentials: false$/m.test(step))
+      .map(({ where }) => where);
+    for (const where of persisting) {
+      expect([where, NOT_YET_WITHOUT_CREDENTIALS.has(where)]).toEqual([where, true]);
+    }
+  });
+});
