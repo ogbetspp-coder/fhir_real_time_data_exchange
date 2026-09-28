@@ -8,7 +8,11 @@ import {
   type CanonicalSubmission,
   type SectionProvenance,
 } from "../../src/contracts/index.js";
-import type { SourceDocumentText } from "../../src/fidelity/index.js";
+import {
+  NORMALIZATION_VERSION,
+  verifyNarrativeFidelity,
+  type SourceDocumentText,
+} from "../../src/fidelity/index.js";
 import { loadEmaMapping, type EmaMapping } from "../../src/fhir/mapping.js";
 import {
   createSyntheticSubmission,
@@ -279,6 +283,101 @@ describe("canonical submission contract", () => {
     expect(reject(submission).issues).toContain(
       "Unverified free text in a property name at entry[0].resource",
     );
+  });
+
+  // Each key is an identifier, but 5,000 of them carried ~290,000 characters past the 40,000
+  // aggregate budget while it counted strings only.
+  it("counts property names toward the aggregate budget", () => {
+    const submission = clone();
+    const organization = submission.bundle.entry[1]?.resource as
+      Record<string, unknown> | undefined;
+    if (organization === undefined) throw new Error("Synthetic bundle requires a second entry");
+    organization.note = Object.fromEntries(
+      Array.from({ length: 5_000 }, (_, index) => [
+        `TakeOneTabletTwiceDailyWithFoodAndPlentyOfWater${index}`,
+        true,
+      ]),
+    );
+
+    const parsed = CanonicalSubmissionSchema.safeParse(seal(submission));
+    expect(parsed.success).toBe(true);
+    expect(reject(submission).issues).toEqual([
+      "Unverified strings and property names exceed 40000 characters in total",
+    ]);
+  });
+
+  // JSON.parse makes an own `__proto__` member; zod's parse drops it, so every hash the gate
+  // checked was over a view without it, while the stored object kept it.
+  it("rejects an own __proto__ member the parse would drop", () => {
+    const text = JSON.stringify(fixture.submission).replace(
+      '"bundle":{',
+      '"bundle":{"__proto__":{"note":"Take one tablet twice daily with food, and never more."},',
+    );
+    const submission = JSON.parse(text) as CanonicalSubmission;
+    expect(Object.keys(submission.bundle)).toContain("__proto__");
+    expect(sha256(submission.bundle)).not.toBe(submission.bundleSha256);
+
+    expect(reject(submission).issues).toEqual([
+      "submission carries the reserved property name __proto__",
+    ]);
+  });
+
+  // A report that failed, and says so consistently: its hash recomputes, the submission names it,
+  // and re-executing the check reproduces it. Only its status stands between it and acceptance.
+  it("rejects a self-consistent fidelity report that failed", () => {
+    const { narrativeSections } = verifyDocumentSubmission(
+      {
+        submission: fixture.submission,
+        fidelityReport: fixture.fidelityReport,
+        sourceText: fixture.sourceText,
+      },
+      mapping.sourceCodeSystem,
+      SYNTHETIC,
+    );
+    const sourceText = structuredClone(fixture.sourceText);
+    for (const page of sourceText.pages) page.text = page.text.replace(/[a-z]/g, "q");
+    const submission = clone();
+    const failed = verifyNarrativeFidelity({
+      normalizationVersion: NORMALIZATION_VERSION,
+      source: sourceText,
+      sections: narrativeSections,
+      provenance: submission.provenance.sections,
+    });
+    expect(failed.status).toBe("failed");
+    expect(failed.summary.verified).toBe(0);
+    submission.provenance.sourceDocument.extractedText.sha256 = sha256(sourceText);
+    submission.provenance.fidelity.reportSha256 = failed.reportHash;
+
+    let caught: unknown;
+    try {
+      verifyDocumentSubmission(
+        { submission: seal(submission), fidelityReport: failed, sourceText },
+        mapping.sourceCodeSystem,
+        SYNTHETIC,
+      );
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(SubmissionRejectedError);
+    expect((caught as SubmissionRejectedError).issues).toEqual([
+      "Fidelity report status must be passed",
+    ]);
+  });
+
+  it("rejects a narrative outside the verified sections", () => {
+    const submission = clone();
+    const composition = submission.bundle.entry[0]?.resource as Record<string, unknown> | undefined;
+    if (composition === undefined) throw new Error("Synthetic bundle requires a Composition");
+    composition.text = {
+      status: "generated",
+      div: '<div xmlns="http://www.w3.org/1999/xhtml">Not for clinical use.</div>',
+    };
+
+    const parsed = CanonicalSubmissionSchema.safeParse(seal(submission));
+    expect(parsed.success).toBe(true);
+    expect(reject(submission).issues).toEqual([
+      "Narrative outside verified sections at entry[0].resource.text.div",
+    ]);
   });
 
   it("rejects prose in a provenance identifier field", () => {

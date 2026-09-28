@@ -95,6 +95,10 @@ function ingestionEvidence(
   const { provenance, approval, submissionId, graphType } = gate.submission;
   const { parser, model, promptTemplate, extractionRunId } = provenance.extraction;
   const source = provenance.sourceDocument;
+  // The signed manifest states the report's own status, never an assumed one; the gate refuses
+  // any other, and this holds even if that check were lost.
+  const { status } = gate.report;
+  if (status !== "passed") throw new Error("Only a passed fidelity report reaches run evidence");
 
   return {
     submissionId,
@@ -108,7 +112,7 @@ function ingestionEvidence(
     ...(model === undefined ? {} : { modelId: model.id }),
     ...(promptTemplate === undefined ? {} : { promptTemplateVersion: promptTemplate.version }),
     fidelity: {
-      status: "passed",
+      status,
       normalizationVersion: gate.report.normalizationVersion,
       sectionsChecked: gate.report.summary.total,
       sectionsMatched: gate.report.summary.verified,

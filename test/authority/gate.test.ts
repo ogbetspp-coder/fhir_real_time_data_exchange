@@ -81,7 +81,7 @@ describe("the authority gate", () => {
       OPTIONS,
       serving(syntheticPublication(mapping)),
     );
-    expect(result.importerVersion).toBe("2.1.0");
+    expect(result.importerVersion).toBe("2.1.1");
     expect(result.fetched.map(({ url }) => url.split("/")[3])).toEqual(["document", "index"]);
     expect(result.gate.submission.graphType).toBe("type1");
   });
@@ -194,6 +194,35 @@ describe("the authority gate", () => {
     expect(await issues(unlocated)).toEqual(["An authority import names its report's location"]);
     const found = await issues({ ...imported(), submission: { schemaVersion: "2.0.0" } });
     expect(found.length).toBeGreaterThan(0);
+  });
+
+  // The parse's refinement hashes the Bundle, so the shape bound has to come first, as in the
+  // ordinary gate: a pathological document is a classified rejection, never a RangeError.
+  it("bounds the submission's shape before it parses or hashes it, and fetches nothing", async () => {
+    const input = imported();
+    let nested: unknown = "x";
+    for (let depth = 0; depth < 20_000; depth += 1) nested = [nested];
+    (input.submission.bundle as unknown as Record<string, unknown>).extension = nested;
+    const unreachable: AuthorityFetcher = {
+      fetch: () => Promise.reject(new Error("the gate fetched")),
+    };
+
+    expect(await issues(input, unreachable)).toEqual(["submission nesting exceeds depth 48"]);
+  });
+
+  it("refuses a member the parse would drop, and fetches nothing", async () => {
+    const { submission, ...rest } = imported();
+    const text = JSON.stringify(submission).replace(
+      '"bundle":{',
+      '"bundle":{"__proto__":{"note":"Take one tablet twice daily with food."},',
+    );
+    const unreachable: AuthorityFetcher = {
+      fetch: () => Promise.reject(new Error("the gate fetched")),
+    };
+
+    expect(await issues({ ...rest, submission: JSON.parse(text) }, unreachable)).toEqual([
+      "submission carries the reserved property name __proto__",
+    ]);
   });
 });
 
