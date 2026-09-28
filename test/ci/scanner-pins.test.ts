@@ -62,10 +62,12 @@ describe.each(scanners)("$script", ({ script, version, url, binary, download, sh
   });
 });
 
-// What .gitleaks.toml may hold, statement by statement: `[extend]` once with `useDefault = true`
-// and nothing else, then `[[allowlists]]` tables of the keys the narrow-exception rule uses. Any
-// other table or key (disabledRules, [[rules]], a per-rule or global allowlist, commits,
-// stopwords, another base config) is a problem. Returns the problems found.
+// What .gitleaks.toml may hold, statement by statement: `[[allowlists]]` tables of the keys the
+// narrow-exception rule uses, and nothing else. The scan appends it to gitleaks' pinned default
+// configuration, so any other table or key could weaken a default rule: `[extend]` (useDefault
+// would bring back the default's global path exemptions, `path` another base, disabledRules),
+// [[rules]], a per-rule or global allowlist, commits, stopwords, a top-level key. Returns the
+// problems found.
 const ALLOWLIST_KEYS = new Set([
   "description",
   "condition",
@@ -78,7 +80,6 @@ const ALLOWLIST_KEYS = new Set([
 function configProblems(text: string): string[] {
   const problems: string[] = [];
   let table: string | undefined;
-  let extendSeen = 0;
   let keys = new Set<string>();
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim();
@@ -86,8 +87,7 @@ function configProblems(text: string): string[] {
     if (line.startsWith("[")) {
       table = line;
       keys = new Set();
-      if (line === "[extend]") extendSeen += 1;
-      else if (line !== "[[allowlists]]") problems.push(`table ${line}`);
+      if (line !== "[[allowlists]]") problems.push(`table ${line}`);
       continue;
     }
     const key = /^([A-Za-z]+)\s*=/.exec(line)?.[1];
@@ -97,15 +97,11 @@ function configProblems(text: string): string[] {
     }
     if (keys.has(key)) problems.push(`${key} twice in ${table ?? "the top level"}`);
     keys.add(key);
-    if (table === "[extend]") {
-      if (line !== "useDefault = true") problems.push(`[extend] ${line}`);
-    } else if (table === "[[allowlists]]") {
-      if (!ALLOWLIST_KEYS.has(key)) problems.push(`[[allowlists]] ${key}`);
-    } else if (table === undefined) {
-      problems.push(`top-level ${key}`);
+    if (table === undefined) problems.push(`top-level ${key}`);
+    else if (table === "[[allowlists]]" && !ALLOWLIST_KEYS.has(key)) {
+      problems.push(`[[allowlists]] ${key}`);
     }
   }
-  if (extendSeen !== 1) problems.push(`[extend] ${extendSeen} times`);
   return problems;
 }
 
@@ -136,6 +132,10 @@ describe("the secret scan in CI", () => {
       'expect found "a secret introduced by a merge, in the whole history" "$merge" --all',
       'expect found "a secret in a -diff file, in the range" "$attribute" HEAD~2..HEAD',
       'expect found "a secret in a file with a NUL byte, in the range" "$nul" HEAD~2..HEAD',
+      "for file in creds.bin sub/package-lock.json; do",
+      'expect found "a secret in ${file}, in the tree" "$named"',
+      'expect found "a secret in ${file}, in the range" "$named" HEAD~1..HEAD',
+      'expect found "a secret in a commit message, in the range" "$message" HEAD~1..HEAD',
       'expect found "a secret marked gitleaks:allow, in the tree" "$inline"',
       'expect refused "a secret listed in .gitleaksignore, in the tree" "$ignored"',
     ]) {
@@ -156,6 +156,12 @@ describe("the secret scan in CI", () => {
     expect(script).toMatch(/if \[\[ -e "\$ROOT\/\.gitleaksignore" \]\]; then\n.*\n\s+exit 1\n/);
     expect(script).toContain('git --log-opts="-m --text ${SECRET_SCAN_RANGE}" "$ROOT"');
     expect(script.match(/--log-opts=/g)).toHaveLength(1);
+    // The same commits' messages, through the same configuration and flags.
+    expect(script).toContain(
+      'git -C "$ROOT" log --format=\'commit %H%n%B\' ${SECRET_SCAN_RANGE} >"$WORK/messages.txt"',
+    );
+    expect(script).toContain('--messages "$WORK/messages.txt" stdin 3>&1');
+    expect(script).toMatch(/"\$message_findings" != "0"/);
     const tracked = execFileSync(
       "git",
       ["ls-files", "--", ".gitleaksignore", "**/.gitleaksignore"],
@@ -179,8 +185,27 @@ describe("the secret scan in CI", () => {
     expect(writer).not.toMatch(/\bbash scripts\//);
   });
 
-  it("uses every default rule, and each exception needs a rule, a path and a pattern at once", () => {
-    expect(config).toMatch(/^\[extend\]\nuseDefault = true$/m);
+  it("applies gitleaks' pinned default rules to every file, without its global path exemptions", () => {
+    const script = readFileSync("scripts/ci/secret-scan.sh", "utf8");
+    expect(script).toContain(
+      'DEFAULT_CONFIG_URL="https://raw.githubusercontent.com/gitleaks/gitleaks/v${VERSION}/config/gitleaks.toml"',
+    );
+    expect(script).toMatch(/^DEFAULT_CONFIG_SHA="e163e53b9e7e8a85[0-9a-f]{48}"$/m);
+    // Downloaded, verified, then turned into the configuration the scan passes.
+    const download = script.indexOf('-o "$WORK/default.toml" "$DEFAULT_CONFIG_URL"');
+    const verify = script.indexOf('echo "${DEFAULT_CONFIG_SHA}  ${WORK}/default.toml" | sha256sum');
+    const build = script.indexOf('python3 - "$WORK/default.toml" "$EXCEPTIONS" "$CONFIG"');
+    expect(download).toBeGreaterThan(-1);
+    expect(verify).toBeGreaterThan(download);
+    expect(build).toBeGreaterThan(verify);
+    expect(script.indexOf('CONFIG="$WORK/config.toml"')).toBeLessThan(build);
+    expect(script.indexOf("common=(--no-banner")).toBeGreaterThan(build);
+    // The global allowlist's paths are dropped, and a failure to drop them stops the scan.
+    expect(script).toContain(`re.subn(r"^paths = \\[\\n(?:    '''.*''',\\n)+\\]\\n", "", table`);
+    expect(script).toContain('if dropped != 1 or re.search(r"^paths\\b", table, re.M):');
+  });
+
+  it("holds exceptions that each need a rule, a path and a pattern at once", () => {
     const exceptions = config.split(/^\[\[allowlists\]\]$/m).slice(1);
     expect(exceptions.length).toBeGreaterThan(0);
     for (const exception of exceptions) {
@@ -195,27 +220,20 @@ describe("the secret scan in CI", () => {
 
   it("holds nothing else that could weaken a rule: the config's whole shape is fixed", () => {
     expect(configProblems(config)).toEqual([]);
+    const narrow = `[[allowlists]]\ncondition = "AND"\ntargetRules = ["x"]\n`;
+    expect(configProblems(narrow)).toEqual([]);
     // Each way a gitleaks config can switch off or narrow a default rule is refused.
     for (const [weakening, text] of [
-      ["a disabled rule", "[extend]\nuseDefault = true\ndisabledRules = ['github-pat']\n"],
-      ["a default rule redefined", '[extend]\nuseDefault = true\n[[rules]]\nid = "github-pat"\n'],
-      [
-        "a per-rule allowlist",
-        "[extend]\nuseDefault = true\n[[rules.allowlists]]\npaths = ['''.*''']\n",
-      ],
-      [
-        "the older per-rule form",
-        "[extend]\nuseDefault = true\n[rules.allowlist]\npaths = ['''.*''']\n",
-      ],
-      ["a global allowlist", "[extend]\nuseDefault = true\n[allowlist]\npaths = ['''.*''']\n"],
-      [
-        "an allowlist by commit",
-        "[extend]\nuseDefault = true\n[[allowlists]]\ncommits = ['abc']\n",
-      ],
-      ["a stopword", "[extend]\nuseDefault = true\n[[allowlists]]\nstopwords = ['ghp']\n"],
-      ["another base config", "[extend]\nuseDefault = true\npath = 'other.toml'\n"],
-      ["no defaults", "[extend]\nuseDefault = false\n"],
-      ["a top-level key", 'title = "x"\n[extend]\nuseDefault = true\n'],
+      ["the default's path exemptions back", `[extend]\nuseDefault = true\n${narrow}`],
+      ["a disabled rule", `[extend]\ndisabledRules = ['github-pat']\n${narrow}`],
+      ["another base config", `[extend]\npath = 'other.toml'\n${narrow}`],
+      ["a default rule redefined", `${narrow}[[rules]]\nid = "github-pat"\n`],
+      ["a per-rule allowlist", `${narrow}[[rules.allowlists]]\npaths = ['''.*''']\n`],
+      ["the older per-rule form", `${narrow}[rules.allowlist]\npaths = ['''.*''']\n`],
+      ["a global allowlist", `${narrow}[allowlist]\npaths = ['''.*''']\n`],
+      ["an allowlist by commit", `${narrow}commits = ['abc']\n`],
+      ["a stopword", `${narrow}stopwords = ['ghp']\n`],
+      ["a top-level key", `title = "x"\n${narrow}`],
     ] as const) {
       expect([weakening, configProblems(text).length > 0]).toEqual([weakening, true]);
     }

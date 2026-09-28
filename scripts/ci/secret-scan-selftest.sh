@@ -10,6 +10,9 @@
 #     git log prints no patch for a merge unless asked (-m);
 #   - a secret in a file git takes as binary, by a `-diff` attribute or a NUL byte, committed and
 #     removed: git log prints no patch for one unless asked (--text);
+#   - a secret in a file gitleaks' default configuration exempts by name (creds.bin,
+#     sub/package-lock.json): the scan drops those global path exemptions;
+#   - a secret in a commit message, which git log -p gives gitleaks no patch line of;
 #   - a secret on a line marked `gitleaks:allow`: gitleaks honours the comment unless told not to;
 #   - a secret whose fingerprint a committed .gitleaksignore lists: gitleaks reads the one at the
 #     scanned root whatever it is told, so the scan refuses to run while one is there (this case
@@ -62,13 +65,14 @@ merged() { # <repository> <file> <content>: a side branch merged into main, the 
 failures=0
 expect() { # <found|clean> <case> <repository> [range]
   local want="$1" name="$2" code=0 verdict
-  env SECRET_SCAN_ROOT="$3" SECRET_SCAN_RANGE="${4:-}" SECRET_REPORT="$WORK/$name.md" \
-    bash "$HERE/secret-scan.sh" >"$WORK/$name.log" 2>&1 || code=$?
-  if [[ "$code" == 1 ]] && grep -q '^| github-pat |' "$WORK/$name.md" 2>/dev/null; then
+  local out="$WORK/case-${name//[^A-Za-z0-9]/-}"
+  env SECRET_SCAN_ROOT="$3" SECRET_SCAN_RANGE="${4:-}" SECRET_REPORT="$out.md" \
+    bash "$HERE/secret-scan.sh" >"$out.log" 2>&1 || code=$?
+  if [[ "$code" == 1 ]] && grep -q '^| github-pat |' "$out.md" 2>/dev/null; then
     verdict=found
-  elif [[ "$code" == 1 ]] && grep -q '^::error::\.gitleaksignore is not honoured' "$WORK/$name.log"; then
+  elif [[ "$code" == 1 ]] && grep -q '^::error::\.gitleaksignore is not honoured' "$out.log"; then
     verdict=refused
-  elif [[ "$code" == 0 ]] && grep -q '^No secrets found\.$' "$WORK/$name.log"; then
+  elif [[ "$code" == 0 ]] && grep -q '^No secrets found\.$' "$out.log"; then
     verdict=clean
   else
     verdict="an error (exit ${code})"
@@ -77,7 +81,7 @@ expect() { # <found|clean> <case> <repository> [range]
     echo "ok: ${name}: ${verdict}"
   else
     echo "::error::Secret scan self-test, ${name}: expected ${want}, got ${verdict}." >&2
-    cat "$WORK/$name.log" >&2
+    cat "$out.log" >&2
     failures=$((failures + 1))
   fi
 }
@@ -114,6 +118,24 @@ git -C "$nul" commit -q -m secret
 git -C "$nul" rm -q config.env
 git -C "$nul" commit -q -m "remove it"
 expect found "a secret in a file with a NUL byte, in the range" "$nul" HEAD~2..HEAD
+
+# Secrets in files gitleaks' default configuration exempts by name, in the tree and the range.
+for file in creds.bin sub/package-lock.json; do
+  named="$(planted "named-${file//[^a-z]/-}")"
+  mkdir -p "$(dirname "$named/$file")"
+  printf 'TOKEN=%s\n' "$token" >"$named/$file"
+  git -C "$named" add "$file"
+  git -C "$named" commit -q -m named
+  expect found "a secret in ${file}, in the tree" "$named"
+  expect found "a secret in ${file}, in the range" "$named" HEAD~1..HEAD
+done
+
+# A secret in a commit message only.
+message="$(planted message)"
+printf 'x\n' >"$message/x"
+git -C "$message" add x
+git -C "$message" commit -q -m "TOKEN=${token}"
+expect found "a secret in a commit message, in the range" "$message" HEAD~1..HEAD
 
 # A secret its own line marks as allowed.
 inline="$(planted inline)"
