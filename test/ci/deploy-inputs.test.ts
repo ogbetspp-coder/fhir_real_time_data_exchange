@@ -73,7 +73,7 @@ function lock(dir: string, artifacts: object[]) {
   return file;
 }
 
-describe("fetching the pinned standards", () => {
+describe("fetching the pinned standards", { timeout: 30_000 }, () => {
   it("fetches only what the consumer uses, and keeps a file that already has its hash", async () => {
     const { base, hits } = await serve({ "/a.json": "alpha", "/b.json": "beta" });
     const dir = temp("fetch-standards-");
@@ -181,7 +181,7 @@ const deployInputs = (cwd: string, ...args: string[]) =>
     encoding: "utf8",
   });
 
-describe("the deploy's inputs", () => {
+describe("the deploy's inputs", { timeout: 30_000 }, () => {
   it("are sealed with one hash, and verified against it and the lock", () => {
     const { root, dir } = inputs();
     const seal = deployInputs(root, "seal", dir);

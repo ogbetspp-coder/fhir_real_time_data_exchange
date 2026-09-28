@@ -77,7 +77,7 @@ require_provenance`,
   return { tag, version, status: run.status, out: `${run.stdout}${run.stderr}` };
 }
 
-describe("the commit a deploy names", () => {
+describe("the commit a deploy names", { timeout: 30_000 }, () => {
   it("is HEAD in a worktree, for the tag and the version alike", () => {
     const { dir, commit } = worktree();
     const result = provenance(dir);

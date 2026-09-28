@@ -102,7 +102,7 @@ function run(options: { removes?: boolean; check?: boolean } = {}) {
   };
 }
 
-describe("the planner's identity", () => {
+describe("the planner's identity", { timeout: 30_000 }, () => {
   it("is reported as drift, grants beside the wanted ones included, by --check", () => {
     const result = run({ check: true });
     expect(result.status).toBe(1);

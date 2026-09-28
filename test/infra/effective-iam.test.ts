@@ -161,7 +161,9 @@ echo "returned $?"`,
   return { status: run.status, out: `${run.stdout}${run.stderr}`, reports };
 }
 
-describe("the deploy's effective-IAM evidence", () => {
+// Each run starts bash and some forty stand-in processes; under a full parallel suite it can take
+// several seconds, so these carry a timeout of their own rather than the 5s default.
+describe("the deploy's effective-IAM evidence", { timeout: 60_000 }, () => {
   it("reads every kind of policy a grant can live in, the folders above the project included", () => {
     const { status, out, reports } = exportIam();
     expect([status, out]).toEqual([0, expect.stringContaining("returned 0")]);

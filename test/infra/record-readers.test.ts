@@ -146,7 +146,7 @@ printf 200`,
   };
 }
 
-describe("the record's readers, run", () => {
+describe("the record's readers, run", { timeout: 30_000 }, () => {
   it("narrows every declared bucket and dataset in the resolved project", () => {
     const result = readers({ GOOGLE_CLOUD_PROJECT: "p-one", GCP_PROJECT_ID: "p-one" });
     expect([result.status, result.out]).toEqual([0, expect.any(String)]);

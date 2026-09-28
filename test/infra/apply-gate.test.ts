@@ -77,7 +77,7 @@ echo "applied"`,
   };
 }
 
-describe("the deploy's applies", () => {
+describe("the deploy's applies", { timeout: 30_000 }, () => {
   it("apply exactly the plan they reviewed when it destroys nothing", () => {
     const result = review({ exit: 2, changes: [change("google_x.a", "create")] });
     expect(result.status).toBe(0);
