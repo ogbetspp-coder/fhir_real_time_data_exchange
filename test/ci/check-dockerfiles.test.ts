@@ -109,6 +109,28 @@ describe("Dockerfile image pinning gate", () => {
     expect(result.stderr).toContain("Dockerfile:2: RUN --mount from busybox:latest is not pinned");
   });
 
+  // Joined as the builder joins them (audit B07 follow-up, review L3-b): no space added, and a
+  // comment or a blank line inside a continuation does not end the instruction.
+  it.each([
+    [
+      "a flag split across lines",
+      ["RUN --mo\\", "unt=type=bind,from=busybox:latest,target=/mnt true"],
+    ],
+    [
+      "a mount after a comment inside a continuation",
+      ["RUN \\", "# the mount", "  --mount=type=bind,from=busybox:latest,target=/mnt true"],
+    ],
+    [
+      "a mount after a blank line inside a continuation",
+      ["RUN \\", "", "  --mount=type=bind,from=busybox:latest,target=/mnt true"],
+    ],
+  ])("fails an unpinned mount reached through %s", (_, lines) => {
+    const result = check({ Dockerfile: [`FROM ${PINNED_NODE} AS build`, ...lines].join("\n") });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Dockerfile:2: RUN --mount from busybox:latest is not pinned");
+  });
+
   it("fails a reference to a stage declared below it, because Docker resolves it as an image", () => {
     // Docker only lets `COPY --from` name a stage declared above it, so `runtime` here is not
     // the stage two lines down: it is an image reference, unpinned. Treating it as a stage

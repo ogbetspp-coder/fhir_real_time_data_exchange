@@ -548,6 +548,34 @@ describe("the renderer image's pins", () => {
         ),
       /an apt source or configuration is written/,
     ],
+    // Review L3-b: the reader joins lines as the builder does, with no space added.
+    [
+      "an apt name split across two lines",
+      (text) =>
+        text.replace(
+          "RUN set -eu; \\\n    unzip -q",
+          "RUN set -eu; \\\n    ap\\\nt-get install x; \\\n    unzip -q",
+        ),
+      APT_REFUSED,
+    ],
+    [
+      "a curl split across two lines",
+      (text) =>
+        text.replace(
+          "RUN set -eu; \\\n    unzip -q",
+          "RUN set -eu; \\\n    cu\\\nrl -fsSL https://e/x -o x; \\\n    unzip -q",
+        ),
+      /downloads with curl without a SHA-256 check/,
+    ],
+    [
+      "an apt command after a comment inside a continuation",
+      (text) =>
+        text.replace(
+          "RUN set -eu; \\\n    unzip -q",
+          "RUN set -eu; \\\n# a comment\n    apt-get install x; \\\n    unzip -q",
+        ),
+      APT_REFUSED,
+    ],
     [
       "apt-get reinstall in place of the pinned install",
       (text) =>

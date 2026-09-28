@@ -223,25 +223,29 @@ export function readRendererPins(dockerfile = RENDERER_DOCKERFILE) {
   };
 }
 
-// The HTTPS rule above constrains the RUN that writes the snapshot's sources. These close the ways
-// around it (audit B07, carried from B11's review, and its follow-up, Low-3). They are an
-// allowlist: every apt-family command the file may run is written out below, and any other
-// mention of apt, apt-get, apt-cache, apt-helper and the like, aptitude or dpkg, anywhere, is
-// refused. The second review found the denylist before it passed an apt command reached through a
-// variable, xargs, a function, eval, `sh -c` with the name split across quotes, aptitude, and the
-// reinstall, satisfy and build-dep actions. A name split with quotes or backslashes is read
-// joined. Still not a proof: a name the shell assembles from nothing that looks like it (a
-// printf of octal escapes, say) is not read.
+// The HTTPS rule above constrains the RUN that writes the snapshot's sources. These rules guard
+// the ways around it (audit B07, carried from B11's review, and its follow-up, Low-3). They are a
+// best-effort check of the text, backed by review of Dockerfile.renderer (which branch protection
+// does not yet require), and they claim no more than they enforce:
 //
-// In the snapshot's RUN, only: clearing and writing its sources, `apt-get update` inside
-// snapshot(), reading each suite's Release, the two `apt-get install --yes
-// --no-install-recommends <packages>`, and clearing the lists. Anywhere else, only the purge of
-// the download tools. apt's configuration and sources are refused by name anywhere, with or
-// without their /etc/apt/ directory, as are the options that re-point or unverify it.
+// - The apt-family text the file may contain is written out below. In the snapshot's RUN: clearing
+//   and writing its sources, `apt-get update` inside snapshot(), reading each suite's Release, the
+//   two `apt-get install --yes --no-install-recommends <packages>`, and clearing the lists.
+//   Anywhere else: the purge of the download tools.
+// - Any other occurrence of the words apt, apt-get, apt-cache, apt-helper and the like, aptitude
+//   or dpkg is refused, read with quotes and backslashes removed and lines joined as the builder
+//   joins them; so are apt's sources and configuration by name, with or without /etc/apt/, and
+//   the options that re-point it or switch off its verification.
+//
+// Not proven absent: a command name the shell assembles from text that does not contain it (a
+// printf of octal escapes, a glob such as /usr/bin/ap?-get, a variable set from a file or the
+// environment), and anything run by a script the image COPYs in. The reader sees the Dockerfile's
+// text, not what the shell executes.
 const APT_FAMILY =
   /(?:^|[^A-Za-z0-9_])(?:apt(?:-[a-z]+)?|aptitude|dpkg(?:-[a-z]+)?)(?![A-Za-z0-9_])/i;
 const APT_CONFIGURATION = /sources\.list|apt\.conf|trusted\.gpg|preferences\.d|\bAPT_CONFIG\b/i;
-const PINNED_INSTALL = /apt-get install --yes --no-install-recommends(?: [a-z0-9][a-z0-9.+-]*)+;/g;
+const PINNED_INSTALL =
+  /apt-get install --yes --no-install-recommends(?:[ \t]+[a-z0-9][a-z0-9.+-]*)+;/g;
 const ELSEWHERE = ["apt-get purge --yes --auto-remove curl unzip;"];
 const IN_SNAPSHOT_RUN = [
   "rm -rf /etc/apt/sources.list /etc/apt/sources.list.d/* /var/lib/apt/lists/*;",

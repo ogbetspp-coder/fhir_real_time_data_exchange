@@ -35,20 +35,33 @@ export function asciiDigits(pattern: string): string {
   return out;
 }
 
+// Every `pattern` of the document, at any depth: a string with two `.regex()` calls is emitted as
+// `allOf: [{ pattern }, { pattern }]`, which a per-node hook that saw only the string's own node
+// missed (audit B07 follow-up, review L2-b).
+function asciiPatterns(node: unknown): void {
+  if (Array.isArray(node)) {
+    for (const item of node) asciiPatterns(item);
+    return;
+  }
+  if (node === null || typeof node !== "object") return;
+  const record = node as Record<string, unknown>;
+  for (const [key, value] of Object.entries(record)) {
+    if (key === "pattern" && typeof value === "string") record[key] = asciiDigits(value);
+    else asciiPatterns(value);
+  }
+}
+
 export function contractJsonSchema(
   schema: z.ZodType,
   io: "input" | "output",
 ): Record<string, unknown> {
-  return z.toJSONSchema(schema, {
+  const document = z.toJSONSchema(schema, {
     target: "draft-2020-12",
     io,
     unrepresentable: "throw",
     cycles: "ref",
     reused: "inline",
-    override: ({ jsonSchema }) => {
-      if (typeof jsonSchema.pattern === "string") {
-        jsonSchema.pattern = asciiDigits(jsonSchema.pattern);
-      }
-    },
   });
+  asciiPatterns(document);
+  return document;
 }

@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { instructions as readInstructions } from "../../scripts/ci/validator-pins.mjs";
+
 // The worker's and the query service's image (audit B07, S-1 and S-5): one Dockerfile with a
 // target for each; the pinned Node binary on a Debian base Dependabot refreshes; the runtime ADR
 // 0003 pins asserted inside the image; no install scripts at build; and the standards lock the
@@ -50,14 +52,11 @@ function cloudbuildDockerfiles(): string[] {
 // the newer COPY and ADD flags, and the automatic platform arguments. Continuation lines are joined
 // first, as the builder joins them.
 function buildkitOnly(text: string): string[] {
-  // Directives are read from the raw file; instructions after continuation lines are joined, as
-  // the builder joins them, and an ONBUILD trigger is judged as the instruction it defers.
+  // Directives are read from the raw file; instructions are joined by the shared reader, as the
+  // builder joins them (comment and blank lines inside a continuation skipped, no space added;
+  // review L3-b), and an ONBUILD trigger is judged as the instruction it defers.
   const directives = text.split(/\r?\n/).filter((line) => /^\s*#/.test(line));
-  const instructions = text
-    .replace(/\\\s*\n\s*/g, " ")
-    .split(/\r?\n/)
-    .filter((line) => !/^\s*#/.test(line))
-    .map((line) => line.replace(/^\s*ONBUILD\s+/i, ""));
+  const instructions = readInstructions(text).map((line) => line.replace(/^\s*ONBUILD\s+/i, ""));
   const directiveRules: [string, RegExp][] = [
     ["# syntax= directive", /^\s*#\s*syntax\s*=/i],
     // The legacy builder reads it; it is refused because it changes the line continuation this
@@ -166,7 +165,13 @@ describe("the Cloud Build configuration", () => {
   });
 
   // Every step runs one of two pinned images, and every build runs the held builder with BuildKit
-  // off by name, not by the builder's default (audit B07 follow-up, Low-1).
+  // off by name, not by the builder's default (audit B07 follow-up, Low-1). What it reads, and so
+  // what it holds: the text of cloudbuild.images.yaml, split at each top-level `- id:`; in each
+  // step its `name:`, a one-line flow-style `env: [...]` and the `- ` items of its `args:`. A
+  // build is a step whose first argument is `build`. It does not parse YAML (an anchor, a
+  // block-style env list or a quoted key is not read), and it does not read a docker build run
+  // from inside another step's script (`entrypoint: bash` with `-c`): images:check pins every
+  // step's image, and review holds the rest.
   it("runs every step in the held builder or the pinned node image, and builds with BuildKit off", () => {
     const nodeImage = /^FROM (node:\S+@sha256:[0-9a-f]{64}) AS build$/m.exec(dockerfile)?.[1];
     const steps = cloudbuildSteps();
@@ -232,6 +237,16 @@ describe("the Cloud Build configuration", () => {
     ["ADD --checksum", "FROM x\nADD --checksum=sha256:00 https://e/x /x\n"],
     ["an automatic platform argument", "FROM --platform=$BUILDPLATFORM x\n"],
     ["a line continued into a mount", "FROM x\nRUN \\\n    --mount=type=secret,id=a true\n"],
+    // Review L3-b/L4-a: continuations joined as the builder joins them.
+    [
+      "a mount after a comment inside a continuation",
+      "FROM x\nRUN \\\n# a comment\n    --mount=type=secret,id=a true\n",
+    ],
+    [
+      "a mount after a blank line inside a continuation",
+      "FROM x\nRUN \\\n\n    --mount=type=secret,id=a true\n",
+    ],
+    ["a flag split across lines", "FROM x\nRUN --mo\\\nunt=type=secret,id=a true\n"],
     // Review round 2 (audit B07 follow-up, Low-4).
     ["an ONBUILD RUN --mount", "FROM x\nONBUILD RUN --mount=type=cache,target=/c true\n"],
     ["an ONBUILD COPY --chmod", "FROM x\nONBUILD COPY --chmod=755 a /a\n"],

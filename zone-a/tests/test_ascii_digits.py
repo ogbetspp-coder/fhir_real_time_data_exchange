@@ -11,15 +11,28 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Annotated
 
 import pytest
 from pydantic import RootModel, ValidationError
 
-from zone_a.contracts import canonical_submission, run_manifest
+from zone_a.contracts import (
+    canonical_submission,
+    fidelity_report,
+    ingestion_provenance,
+    run_manifest,
+)
 
 CONTRACTS = Path(__file__).resolve().parents[1] / "src" / "zone_a" / "contracts"
 ARABIC_INDIC_THREE = chr(0x0663)
 FULLWIDTH_THREE = chr(0xFF13)
+
+
+class SectionResultPath(RootModel[str]):
+    """``SectionResult.path`` alone: the field's own annotation, pattern included."""
+
+    root: Annotated[str, *fidelity_report.SectionResult.model_fields["path"].metadata]
+
 
 CASES: list[tuple[type[RootModel[str]], str, str]] = [
     (run_manifest.PackageRef, "hl7.terminology.r5#7.3.0", "hl7.terminology.r5#7.3.D"),
@@ -27,6 +40,10 @@ CASES: list[tuple[type[RootModel[str]], str, str]] = [
     (run_manifest.IsoDateTime, "2026-09-28T00:00:03Z", "2026-09-28T00:00:0DZ"),
     (run_manifest.HttpUrl, "https://example.org:8443/a", "https://example.org:844D/a"),
     (canonical_submission.TargetPath, "Composition.section[3]", "Composition.section[D]"),
+    # Review L2-c: the ingestion provenance's paths and the fidelity report's section path.
+    (ingestion_provenance.SectionPath, "Composition.section[3]", "Composition.section[D]"),
+    (ingestion_provenance.SourcePath, "Bundle.entry[3].resource", "Bundle.entry[D].resource"),
+    (SectionResultPath, "Composition.section[3].section[0]", "Composition.section[D].section[0]"),
 ]
 
 

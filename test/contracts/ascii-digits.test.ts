@@ -7,6 +7,8 @@ import {
   PackageRef,
   TargetPath,
 } from "../../src/contracts/common.js";
+import { SectionResultSchema } from "../../src/contracts/fidelity-report.js";
+import { SectionPath, SourcePath } from "../../src/contracts/ingestion-provenance.js";
 
 // Zone B's half of the digit parity (audit B07 follow-up, Low-2). Each value below is refused by
 // Zod, and zone-a/tests/test_ascii_digits.py holds Zone A's generated models to the same answer:
@@ -28,6 +30,15 @@ const DIGIT_CASES: [
   ["IsoDateTime", IsoDateTime, "2026-09-28T00:00:03Z", "2026-09-28T00:00:0DZ"],
   ["HttpUrl", HttpUrl, "https://example.org:8443/a", "https://example.org:844D/a"],
   ["TargetPath", TargetPath, "Composition.section[3]", "Composition.section[D]"],
+  // Review L2-c: the ingestion provenance's paths and the fidelity report's section path.
+  ["SectionPath", SectionPath, "Composition.section[3]", "Composition.section[D]"],
+  ["SourcePath", SourcePath, "Bundle.entry[3].resource", "Bundle.entry[D].resource"],
+  [
+    "SectionResult.path",
+    SectionResultSchema.shape.path,
+    "Composition.section[3].section[0]",
+    "Composition.section[D].section[0]",
+  ],
 ];
 
 describe("contract digits", () => {

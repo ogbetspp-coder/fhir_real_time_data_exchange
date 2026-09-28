@@ -61,12 +61,14 @@ says about them. This change is neither:
 What changes is the spelling of patterns, so that validators which do not implement the declared
 dialect (Rust `regex`, Python `re`) compute the language the contract always meant. That is the
 correction of a generator defect, not a contract change. So no version moves, and no `$id` moves.
-The contract index's content hashes do move, and the index records them.
+The contract index's content hashes do move, and the index records them. So the same `$id` now
+names different bytes: an outside verifier that pinned the hashes in `contracts/generated/index.json`
+will see them change for these six contracts, with no change of version to announce it.
 
 A bump would be harmful as well as unrequired:
 
 - `CanonicalSubmission`'s `schemaVersion` is part of `approvedContentSha256`. Any change to it,
-  patch included, would refuse every submission made against 3.0.0 and require every approval to be
+  patch included, would refuse every submission made against 2.0.0 and require every approval to be
   made again, for a change that alters no accepted document.
 - The run manifest, the query tools and the agent turn would each cut a version for no difference
   a reader could observe.
@@ -98,13 +100,15 @@ it declares, and its descriptions unchanged, is not a version change".
 3. No fidelity vector changed.
 4. Adversarial tests:
    - `test/contracts/ascii-digits.test.ts`: Zod accepts ASCII digits and refuses an Arabic-Indic
-     and a fullwidth digit in `PackageRef`, `NormalizationVersion`, `IsoDateTime`, `HttpUrl` and
-     `TargetPath`.
+     and a fullwidth digit in `PackageRef`, `NormalizationVersion`, `IsoDateTime`, `HttpUrl`,
+     `TargetPath`, `SectionPath`, `SourcePath` and `SectionResult.path`.
    - `zone-a/tests/test_ascii_digits.py`: the generated models give the same answers. They failed on
      main's models, which accepted them.
    - `test/contracts/schema-generation.test.ts`: no published pattern uses a shorthand class. The
      rewrite handles `\d` inside and outside a character class, leaves an escaped backslash alone,
-     and refuses every other shorthand.
+     and refuses every other shorthand. It walks the whole generated document, so the patterns Zod
+     emits under `allOf` for a string with two `.regex()` calls are rewritten and refused too (the
+     review's L2-b; no current contract has one).
    - `zone-a/tests/test_ascii_digits.py`: no generated model's pattern uses one either.
 5. ADR 0002's rule is unchanged. Its amendment, naming this class of change, is listed for B17.
 6. None.

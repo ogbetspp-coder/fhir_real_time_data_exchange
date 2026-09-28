@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   HERMETIC_PROPERTIES,
   PACKAGE_LOCK,
+  instructions,
   networkUse,
   offlineStartVerdict,
   packageSummary,
@@ -133,6 +134,38 @@ describe("the validator image's runtime", () => {
       .filter((line) => !/^\s*#/.test(line))
       .join("\n");
     expect(code).not.toMatch(/apt-get\s+(update|install)|apt\s+(update|install)/);
+  });
+});
+
+// The reader every pin check shares joins lines as moby's parser does (audit B07 follow-up,
+// review L3-b): the backslash removed and the next line appended as it stands, no space added;
+// comment and blank lines dropped, inside a continuation too, where neither ends the instruction.
+describe("the Dockerfile reader", () => {
+  it.each([
+    ["a name split across lines", "RUN ap\\\nt-get install x\n", ["RUN apt-get install x"]],
+    [
+      "a download split across lines",
+      "RUN cu\\\nrl -o x https://e/x\n",
+      ["RUN curl -o x https://e/x"],
+    ],
+    [
+      "a blank line inside a continuation, which does not end it",
+      "RUN a \\\n\n   \n    b\nUSER x\n",
+      ["RUN a     b", "USER x"],
+    ],
+    [
+      "a comment inside a continuation, which is dropped",
+      "RUN a \\\n# not an instruction\n    --mount=type=cache,target=/c b\n",
+      ["RUN a     --mount=type=cache,target=/c b"],
+    ],
+    ["spaces after the backslash", "RUN a \\  \t\n  b\n", ["RUN a   b"]],
+    [
+      "comments and blank lines between instructions",
+      "# c\n\nFROM x\n\n# d\nRUN y\n",
+      ["FROM x", "RUN y"],
+    ],
+  ])("joins %s as the builder does", (_, text, expected) => {
+    expect(instructions(text)).toEqual(expected);
   });
 });
 

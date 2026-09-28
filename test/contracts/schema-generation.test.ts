@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { CONTRACTS, contractId, type ContractDefinition } from "../../src/contracts/index.js";
 import { asciiDigits, contractJsonSchema } from "../../src/contracts/json-schema.js";
@@ -114,6 +115,25 @@ describe("generated contract JSON Schemas", () => {
     expect(patterns.length).toBeGreaterThan(20);
     for (const pattern of patterns)
       expect([pattern, /\\[dDwWsSbB]/.test(pattern)]).toEqual([pattern, false]);
+  });
+
+  // Zod emits a string with two .regex() calls as allOf: [{ pattern }, { pattern }]; the rewrite
+  // and the refusal reach every pattern at any depth (review L2-b).
+  it("rewrites and refuses the patterns of an allOf, nested in an object", () => {
+    const refused = z.strictObject({ a: z.string().regex(/^\d+$/).regex(/^\w+$/) });
+    expect(() => contractJsonSchema(refused, "input")).toThrow(/uses \\w, which Zone A's regex/);
+
+    const digits = z.strictObject({
+      a: z
+        .string()
+        .regex(/^\d+$/)
+        .regex(/^[a-z0-9]+\d$/),
+    });
+    const published = JSON.stringify(contractJsonSchema(digits, "input"));
+    expect(published).toContain('"allOf"');
+    expect(published).toContain('"pattern":"^[0-9]+$"');
+    expect(published).toContain('"pattern":"^[a-z0-9]+[0-9]$"');
+    expect(published).not.toMatch(/\\\\d/);
   });
 
   it("rewrites \\d to the ASCII class, inside and outside a class, and refuses other shorthands", () => {
