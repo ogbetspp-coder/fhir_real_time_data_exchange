@@ -11,7 +11,8 @@ places or paints one text over another (a band of border or background over a li
 smaller than the text in it, a block overflowing its table cell, a margin drawing a paragraph over
 its list number, text at the bounds' edge, a combining mark on a space drawn as a stroke, text
 moved far to the right, off a printed page, a bottom border on a block or cell drawn under a lone
-sign as "≤"), the reader refuses only the cases listed below, and the rest is a stated residual;
+sign as "≤", text shifted by up to 6pt over the line above or below), the reader refuses only the
+cases listed below, and the rest is a stated residual;
 rendering the page and comparing it with this reading is ADR 0005's renderer cross-check. Nor does
 it parse the div as a browser does: it parses XML, and a browser the EMA's div as HTML. Where the
 two build different trees it refuses the cases listed below (processing instructions, comments,
@@ -41,12 +42,16 @@ What a section's text is:
   the HTML tokenizer reads it ("tag open state"); the EMA writes "GFR < 60" that way. Each
   section where this happened says so in ``Section.notes``, because it is not valid XHTML.
 
-What is marked (``Paragraph.marks``, the Word reader's kinds): ``sup`` and ``vertical-align: super``
-as superscript, ``sub`` and ``vertical-align: sub`` as subscript, ``s``, ``strike`` and
+What is marked (``Paragraph.marks``, the Word reader's kinds): ``sup``, ``vertical-align: super``
+and a ``position: relative`` shift up by a point or more as superscript, ``sub``,
+``vertical-align: sub`` and such a shift down as subscript, ``s``, ``strike`` and
 ``text-decoration: line-through`` as strike, a background other than white as ``shading-<colour>``,
-a text colour other than black as ``color-<colour>`` (white or a nearly white colour as faint
-instead, a nearly black one as nothing; ``#abc`` and ``rgb()`` are written as ``#aabbcc``, and any
-other colour notation refuses the section), a font size under two points as faint, and ``u``, ``a``
+text whose colour has a contrast under 1.33:1 (WCAG 2) with the background painted under it (the
+nearest one, else the white page) as faint, whatever the two colours are (white on white, black
+on black, navy on navy; white on black is read), other text in a colour other than black as
+``color-<colour>`` (a nearly black one as nothing; ``#abc`` and ``rgb()`` are written as
+``#aabbcc``, and any other colour notation refuses the section), a font size under two points as
+faint, and ``u``, ``a``
 with an ``href``, ``text-decoration: underline`` and a bottom border on an inline element as
 underline (an underline turns a sign into another: "<" underlined is drawn "≤", and "1" with an
 underlined "a" reads "1ª"), and a border on another side of an inline element as border (drawn as a
@@ -66,9 +71,13 @@ What refuses a section (``SectionRefusal.code``):
   read as label text.
 - ``reserved-character``: U+FFFC in the text, which the reader uses for a picture.
 - ``format-character``: an invisible formatting character (Unicode category Cf: soft hyphen,
-  zero-width characters, bidirectional controls), which a browser hides or which reorders
-  what it shows, or a control character (U+007F or a C1 control, literal or as ``&#127;``),
-  which a browser draws as a blank or a box.
+  zero-width characters, bidirectional controls) or any other code point Unicode says to ignore
+  (Default_Ignorable_Code_Point: a variation selector, a Hangul filler), which a browser hides or
+  which reorders what it shows, or a control character (U+007F or a C1 control, literal or as
+  ``&#127;``), which a browser draws as a blank or a box.
+- ``private-use-character``: a private-use code point (category Co), whose glyph is the font's
+  choice (a Symbol font's U+F0B3 is drawn "≥").
+- ``unassigned-character``: a code point Unicode 16.0 does not assign (category Cn).
 
 Also refused as ``malformed-xhtml``: a root that is not a ``div``, a lone surrogate (in a div read
 on its own; in a Bundle the document refuses first), a ``br``, ``img`` or ``hr`` with content,
@@ -91,10 +100,17 @@ block's top or bottom, vertical padding on inline text and any padding on it ove
 border on it wider than a hairline, a height outside table parts and pictures, a line height below
 12pt, 100% or 1em, a font above 14pt); a font outside a closed list of Unicode text fonts (a symbol
 font draws other glyphs); a border value on inline text a browser would not accept whole, or one
-inherited from the parent; a style CSS would split otherwise than the reader (a quote outside a
-font family name or inside a quoted one, a comment, an escape, a bracket outside ``rgb()``, a
-character outside ASCII letters, digits, whitespace and ``# % ! . , : ; ' " ( ) -``); and a margin
-or indent with a value a browser drops (the wrong number of values, ``text-indent: auto``).
+inherited from the parent; a shift other than ``position: relative`` with exactly one of ``top``
+and ``bottom`` on an inline element other than ``sup`` and ``sub``, without ``vertical-align``,
+by at most 6pt (``top`` or ``bottom`` alone included; a background on or inside a shifted element,
+which is painted over the text around it; a shift inside another, or inside a ``sup``, ``sub``
+or ``vertical-align``, and one of a point or more around one, since each is bounded only on its
+own); a colour or background keyword a browser drops (``color: none``, ``background-color:
+auto``), which leaves the declaration before it in force; a style CSS would split otherwise than
+the reader (a quote outside a font family name or inside a quoted one, a comment, an escape, a
+bracket outside ``rgb()``, a character outside ASCII letters, digits, whitespace and
+``# % ! . , : ; ' " ( ) -``); and a margin or indent with a value a browser drops (the wrong
+number of values, ``text-indent: auto``).
 
 What refuses the document (``EpiRefusedError``): not UTF-8 JSON (or JSON with an integer longer
 than Python's digit limit), a lone surrogate anywhere in it, not a document Bundle, not the shape
@@ -113,8 +129,11 @@ from dataclasses import dataclass, field
 from typing import Any, Final
 
 from zone_a.docx.reader import Mark, Numbering, Paragraph
+from zone_a.fidelity.normalize import is_default_ignorable
 
-READER_VERSION = "epi-reader/1.1.0"
+# The version of the rules above. A change to this file changes its hash in versions.lock.json,
+# and tests/test_versions_lock.py then requires a new version here.
+READER_VERSION = "epi-reader/1.2.0"
 XHTML = "http://www.w3.org/1999/xhtml"
 OBJECT = "\ufffc"
 _COLLAPSIBLE = " \t\n\r\f"
@@ -144,12 +163,13 @@ _ATTRIBUTES: dict[str, set[str]] = {
 }
 
 # CSS properties that move or frame text but cannot hide it, change a character or change what
-# it means. Anything not here, and not handled in ``_style``, refuses the section.
+# it means (``tab-stops``, like the ``mso-`` properties, is Word's own and a browser ignores it).
+# Anything not here, and not handled in ``_style``, refuses the section.
 _LAYOUT = re.compile(
     r"(margin|padding|border)(-(top|bottom|left|right))?(-(width|style|color))?"
     r"|border-(collapse|image|spacing)|line-height|text-align|text-indent|width|height"
     r"|min-width|min-height|break-(before|after|inside)|page-break-(before|after|inside)"
-    r"|font-family|font-weight|font-style|layout-grid-mode|mso-[a-z-]+"
+    r"|font-family|font-weight|font-style|layout-grid-mode|mso-[a-z-]+|tab-stops"
 )
 _BLACK = {"black", "windowtext", "#000000", "auto", "initial"}
 _WHITE = {"white", "#ffffff", "transparent"}
@@ -301,9 +321,69 @@ def _channels(colour: str) -> tuple[int, int, int] | None:
 
 
 def _light(colour: str) -> bool:
-    """Nearly white: hard to see on the page (Word's light theme colours included)."""
+    """Nearly white: a background that reads as the page (Word's light theme colours included)."""
     channels = _channels(colour)
     return channels is not None and min(channels) >= 0xE0
+
+
+# The named colours ``_NAMED`` accepts, as channels (CSS Color 4; ``windowtext`` is black).
+_NAMED_CHANNELS: Final[dict[str, tuple[int, int, int]]] = {
+    "black": (0, 0, 0),
+    "windowtext": (0, 0, 0),
+    "silver": (0xC0, 0xC0, 0xC0),
+    "gray": (0x80, 0x80, 0x80),
+    "grey": (0x80, 0x80, 0x80),
+    "white": (0xFF, 0xFF, 0xFF),
+    "maroon": (0x80, 0, 0),
+    "red": (0xFF, 0, 0),
+    "purple": (0x80, 0, 0x80),
+    "fuchsia": (0xFF, 0, 0xFF),
+    "green": (0, 0x80, 0),
+    "lime": (0, 0xFF, 0),
+    "olive": (0x80, 0x80, 0),
+    "yellow": (0xFF, 0xFF, 0),
+    "navy": (0, 0, 0x80),
+    "blue": (0, 0, 0xFF),
+    "teal": (0, 0x80, 0x80),
+    "aqua": (0, 0xFF, 0xFF),
+    "lightgrey": (0xD3, 0xD3, 0xD3),
+    "lightgray": (0xD3, 0xD3, 0xD3),
+    "darkgray": (0xA9, 0xA9, 0xA9),
+    "darkgrey": (0xA9, 0xA9, 0xA9),
+}
+# Text is faint (a reader cannot see it) where its colour's contrast with what is painted under
+# it (WCAG 2's ratio) is below 1.33:1: #e0e0e0 on white, the palest grey read as faint since
+# epi-reader/1.0.0, is 1.32:1, and black on a black or #111111 background is 1:1 and 1.1:1.
+_FAINT_CONTRAST: Final = 1.33
+# The mark for text faint by its colour, kept apart from a tiny font's while the walk carries
+# marks down (a descendant may set a colour that can be seen); ``_marks`` writes it as faint.
+_FAINT_COLOUR: Final = "faint-colour"
+
+
+def _rgb(colour: str | None, default: tuple[int, int, int]) -> tuple[int, int, int]:
+    """The channels of a colour in ``_colour``'s spelling; ``default`` for None."""
+    if colour is None:
+        return default
+    channels = _channels(colour) or _NAMED_CHANNELS.get(colour)
+    if channels is None:
+        # ``_paint`` stores only a colour of ``_NAMED_CHANNELS`` or ``#rrggbb``.
+        raise ValueError(f"not a colour: {colour!r}")
+    return channels
+
+
+def _luminance(channels: tuple[int, int, int]) -> float:
+    def linear(channel: int) -> float:
+        value = channel / 255
+        return value / 12.92 if value <= 0.03928 else ((value + 0.055) / 1.055) ** 2.4
+
+    red, green, blue = (linear(channel) for channel in channels)
+    return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+
+
+def _contrast(first: tuple[int, int, int], second: tuple[int, int, int]) -> float:
+    """WCAG 2's contrast ratio of two colours, as ``src/authority/t/css.ts`` computes it."""
+    light, dark = sorted((_luminance(first), _luminance(second)), reverse=True)
+    return (light + 0.05) / (dark + 0.05)
 
 
 def _dark(colour: str) -> bool:
@@ -505,6 +585,17 @@ _TEXT_FONTS: Final = frozenset(
 )
 
 
+# Keywords ``_colour`` passes that are no value of the property: a browser drops the declaration
+# and keeps the one before it ("color: black; color: none" is black), where the reader would read
+# the last. The reader refuses them rather than follow two readings. ``background: none`` is valid
+# (no image, and the colour reset to transparent).
+_DROPPED: Final[dict[str, frozenset[str]]] = {
+    "color": frozenset({"none", "auto"}),
+    "background-color": frozenset({"none", "auto"}),
+    "background": frozenset({"auto"}),
+}
+
+
 def _style(style: str) -> set[str]:
     """The mark kinds a style attribute asks for, or a refusal."""
     kinds: set[str] = set()
@@ -525,16 +616,16 @@ def _style(style: str) -> set[str]:
             if value != "visible":
                 raise _RefusedError("unsupported-style", f"visibility: {value}")
         elif name == "color":
-            colour = _colour(value)
-            if colour in _KEYWORDS - {"transparent"}:
-                # Not a colour of its own: a browser keeps the colour the text already has.
-                continue
-            if colour in _WHITE or _light(colour):
-                kinds.add("faint")
-            elif colour not in _BLACK and not _dark(colour):
-                kinds.add(f"color-{colour}")
+            # Checked here; the colour is judged against what is painted under it (``_paint``).
+            if _colour(value) in _DROPPED[name]:
+                raise _RefusedError("unsupported-style", f"{name}: {value} (a browser drops it)")
+        elif name in ("position", "top", "bottom"):
+            # A shift, read with the element it is on (``_shift``).
+            continue
         elif name in ("background", "background-color"):
             colour = _colour(value)
+            if colour in _DROPPED[name]:
+                raise _RefusedError("unsupported-style", f"{name}: {value} (a browser drops it)")
             if colour not in _WHITE and colour not in _KEYWORDS and not _light(colour):
                 kinds.add(f"shading-{colour}")
         elif name == "font-size":
@@ -559,6 +650,130 @@ def _style(style: str) -> set[str]:
         else:
             raise _RefusedError("unsupported-style", f"{name}: {value}")
     return kinds
+
+
+# A relative shift moves text off its line by at most half the smallest line the reader allows
+# (``_SMALLEST_LINE_POINTS``); one of a point or more raises or lowers it as a superscript or a
+# subscript does.
+_SHIFT_BOUND_POINTS: Final = 6.0
+_SHIFT_MARK_POINTS: Final = 1.0
+_SHIFT_LENGTH: Final = re.compile(r"([+-]?)([0-9]+(?:\.[0-9]*)?|\.[0-9]+)(pt|px|pc|in|cm|mm|em)?")
+
+
+def _shift(name: str, style: str) -> set[str]:
+    """The mark a ``position: relative`` shift asks for (superscript, subscript or none).
+
+    As the authority import's T accepts it (``docs/design/authority-import-t.md``, T4): on an
+    inline element other than ``sup`` and ``sub``, with exactly one of ``top`` and ``bottom``,
+    and no ``vertical-align``; ``top`` or ``bottom`` without it, or any other ``position``,
+    refuses. The shift is bounded by ``_SHIFT_BOUND_POINTS`` (an ``em`` counted at the largest
+    font the reader allows); what a shift within it still draws over the line above or below is
+    a stated residual.
+    """
+    declared = dict(_importance_ordered(style))
+    position, top, bottom = declared.get("position"), declared.get("top"), declared.get("bottom")
+    if position is None and top is None and bottom is None:
+        return set()
+    shape = f"{name}: position {position}, top {top}, bottom {bottom}"
+    if (
+        position != "relative"
+        or name not in _INLINE
+        or name in ("sup", "sub")
+        or (top is None) == (bottom is None)
+        or "vertical-align" in declared
+    ):
+        raise _RefusedError("unsupported-style", shape)
+    offset = _SHIFT_LENGTH.fullmatch(top if top is not None else str(bottom))
+    if offset is None or (offset.group(3) is None and float(offset.group(2)) != 0):
+        raise _RefusedError("unsupported-style", shape)
+    unit = offset.group(3)
+    size = float(offset.group(2)) * (
+        0.0 if unit is None else _LARGEST_FONT_POINTS if unit == "em" else _POINTS[unit]
+    )
+    # A positive ``top`` moves the text down; a positive ``bottom`` moves it up.
+    raised = size * (-1 if offset.group(1) == "-" else 1) * (-1 if top is not None else 1)
+    if abs(raised) > _SHIFT_BOUND_POINTS:
+        raise _RefusedError("unsupported-style", shape)
+    if raised >= _SHIFT_MARK_POINTS:
+        return {"superscript"}
+    if raised <= -_SHIFT_MARK_POINTS:
+        return {"subscript"}
+    return set()
+
+
+def _paint(style: str, builder: _Builder) -> bool:
+    """Carry an element's text colour, and the background painted under its text, down the walk.
+
+    The last declaration of each wins, ``!important`` ones last. A colour keyword keeps the
+    colour the text already has (``initial`` is black); a background that paints nothing keeps
+    what is under it, and ``currentcolor`` paints the text's own colour. Whether the element
+    paints a background.
+    """
+    colour: str | None = None
+    background: str | None = None
+    for name, value in _importance_ordered(style):
+        if name == "color":
+            colour = _colour(value)
+        elif name in ("background", "background-color"):
+            background = _colour(value)
+    if colour == "initial":
+        builder.colour = None
+    elif colour is not None and colour not in _KEYWORDS - {"transparent"}:
+        builder.colour = colour
+    if background == "currentcolor":
+        if builder.colour == "transparent":
+            return False
+        builder.backdrop = builder.colour or "black"
+        return True
+    if background is not None and background not in _KEYWORDS:
+        builder.backdrop = background
+        return True
+    return False
+
+
+def _paint_element(style: str, builder: _Builder, name: str) -> None:
+    """``_paint`` for an element, and the refusals that depend on the elements around it.
+
+    As T4: a shifted box is painted over the text around it, so a background on or inside one is
+    refused; and a shift is bounded only on its own, so one inside another shift or inside a
+    superscript, a subscript or a ``vertical-align`` is refused (five nested 6pt shifts move text
+    30pt), and so is one of a point or more around them. One under a point may hold a
+    superscript (Imatinib Teva's 5.1 writes "m" and a raised "2" in a 0.5pt shift). T drops a
+    shift only under 0.1 of the smallest text beneath it and refuses a larger one around a
+    superscript, so between that bound and a point (0.9pt around a superscript of 12pt text) the
+    two differ: a recorded divergence of the shared style cases (``generate_style_cases.py``).
+    """
+    painted = _paint(style, builder)
+    declared = dict(_importance_ordered(style))
+    shifted = "position" in declared
+    # Inline text raised or lowered (``vertical-align`` on a table part aligns it in its row).
+    aligned = name in ("sup", "sub") or (
+        name in _INLINE and declared.get("vertical-align", "baseline") != "baseline"
+    )
+    if shifted and (builder.shifted or builder.raised):
+        raise _RefusedError("unsupported-style", f"{name}: a shift inside a shifted or raised text")
+    if aligned and builder.moved:
+        raise _RefusedError("unsupported-style", f"{name}: a raised text inside a shifted one")
+    builder.shifted = builder.shifted or shifted
+    # A shift under a point may hold a superscript (see the docstring for T's own bound).
+    builder.moved = builder.moved or bool(shifted and _shift(name, style))
+    builder.raised = builder.raised or aligned
+    if painted and builder.shifted:
+        raise _RefusedError("unsupported-style", f"{name}: a background on a shifted element")
+
+
+def _colour_kinds(builder: _Builder) -> set[str]:
+    """Faint where the text's colour cannot be told from what is under it, else its colour."""
+    if builder.colour == "transparent":
+        return {_FAINT_COLOUR}
+    text = _rgb(builder.colour, (0, 0, 0))
+    under = _rgb(builder.backdrop, (0xFF, 0xFF, 0xFF))
+    if _contrast(text, under) < _FAINT_CONTRAST:
+        return {_FAINT_COLOUR}
+    colour = builder.colour
+    if colour is None or colour in _BLACK or _dark(colour):
+        return set()
+    return {f"color-{colour}"}
 
 
 # --- paragraphs -----------------------------------------------------------------------------
@@ -587,6 +802,21 @@ class _Builder:
     open_li: bool = False
     open_a: bool = False
     cell: Any = None
+    # The text's colour and the background painted under it, in ``_colour``'s spelling (None:
+    # black text, the white page), and whether an element above is shifted (``_shift``) or
+    # raised or lowered otherwise (``sup``, ``sub``, ``vertical-align``).
+    colour: str | None = None
+    backdrop: str | None = None
+    shifted: bool = False
+    moved: bool = False
+    raised: bool = False
+
+    def paint_state(self) -> tuple[str | None, str | None, bool, bool, bool]:
+        """What an element's colour, background and shift set, to restore after it."""
+        return self.colour, self.backdrop, self.shifted, self.moved, self.raised
+
+    def restore_paint(self, state: tuple[str | None, str | None, bool, bool, bool]) -> None:
+        self.colour, self.backdrop, self.shifted, self.moved, self.raised = state
 
     def text(self, text: str, marks: frozenset[str]) -> None:
         for character in text:
@@ -596,11 +826,19 @@ class _Builder:
                 continue
             if character == OBJECT:
                 raise _RefusedError("reserved-character", "U+FFFC stands for a picture")
-            if unicodedata.category(character) in ("Cf", "Cc"):
+            category = unicodedata.category(character)
+            if category in ("Cf", "Cc") or is_default_ignorable(ord(character)):
                 # Soft hyphens, zero-width characters and bidirectional controls: a browser
-                # hides them or reorders the text around them. A control (U+007F, a C1 control;
-                # XML admits no other) it draws as a blank or a box.
+                # hides them or reorders the text around them, and so any code point Unicode
+                # says to ignore (a variation selector, a Hangul filler). A control (U+007F, a
+                # C1 control; XML admits no other) it draws as a blank or a box.
                 raise _RefusedError("format-character", f"U+{ord(character):04X}")
+            if category == "Co":
+                # What a private-use code point shows is the font's choice: a Symbol font's
+                # U+F0B3 is drawn "≥", another font draws a box.
+                raise _RefusedError("private-use-character", f"U+{ord(character):04X}")
+            if category == "Cn":
+                raise _RefusedError("unassigned-character", f"U+{ord(character):04X}")
             self._emit(character, marks)
 
     def _emit(self, character: str, marks: frozenset[str]) -> None:
@@ -642,6 +880,7 @@ class _Builder:
 
 
 def _marks(kinds: list[frozenset[str]]) -> tuple[Mark, ...]:
+    kinds = [frozenset("faint" if k == _FAINT_COLOUR else k for k in each) for each in kinds]
     out: list[Mark] = []
     for kind in sorted(set().union(*kinds)) if kinds else []:
         start: int | None = None
@@ -758,7 +997,7 @@ def _check_attributes(element: ET.Element, name: str) -> set[str]:
             raise _RefusedError("embedded-comment", f"{name} class {value!r}")
     style = element.get("style", "")
     _refuse_overprint(name, style)
-    return _style(style)
+    return _style(style) | _shift(name, style)
 
 
 # How deep elements may nest (the fidelity scanner allows 32 below the root), and how far left of
@@ -809,12 +1048,14 @@ def _walk(element: ET.Element, builder: _Builder, marks: frozenset[str], depth: 
     builder.nesting += 1
     saved_left, saved_indent = builder.left, builder.indent
     saved_open = builder.open_p, builder.open_li, builder.open_a
+    saved_paint = builder.paint_state()
     try:
         _walk_element(element, builder, marks, depth)
     finally:
         builder.nesting -= 1
         builder.left, builder.indent = saved_left, saved_indent
         builder.open_p, builder.open_li, builder.open_a = saved_open
+        builder.restore_paint(saved_paint)
 
 
 def _enter_block(name: str, style: str, builder: _Builder) -> None:
@@ -868,7 +1109,11 @@ def _walk_element(
         builder.open_li = True
     elif name == "a":
         builder.open_a = True
-    kinds = set(marks) | _check_attributes(element, name)
+    # The colour marks are the parent's; this element's are judged again below.
+    inherited = {k for k in marks if k != _FAINT_COLOUR and not k.startswith("color-")}
+    kinds = inherited | _check_attributes(element, name)
+    _paint_element(element.get("style", ""), builder, name)
+    kinds |= _colour_kinds(builder)
     if name == "sup":
         kinds.add("superscript")
     elif name == "sub":
@@ -954,10 +1199,17 @@ def _table_rows(element: ET.Element, builder: _Builder, marks: frozenset[str], d
         part_marks = _check_attributes(part, part_name) if part_name != "tr" else set()
         _, own = _left_offsets(part.get("style", ""))
         part_indent = own if own is not None else builder.indent
+        # A row group's and a row's colour and background reach their cells' text.
+        table_paint = builder.paint_state()
+        if part_name != "tr":
+            _paint_element(part.get("style", ""), builder, part_name)
+        part_paint = builder.paint_state()
         for row in rows:
             if _local(row) != "tr":
                 raise _RefusedError("unsupported-element", f"{_local(row)} in a table body")
             row_marks = frozenset(set(marks) | part_marks | _check_attributes(row, "tr"))
+            builder.restore_paint(part_paint)
+            _paint_element(row.get("style", ""), builder, "tr")
             _, own = _left_offsets(row.get("style", "") if row is not part else "")
             builder.part_indent = own if own is not None else part_indent
             _no_stray_text(row.text)
@@ -972,6 +1224,7 @@ def _table_rows(element: ET.Element, builder: _Builder, marks: frozenset[str], d
                 _walk(cell, builder, row_marks, depth)
                 builder.flush()
             row_index += 1
+        builder.restore_paint(table_paint)
     builder.table = outer
     builder.part_indent = saved_part
 

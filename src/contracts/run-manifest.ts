@@ -22,15 +22,33 @@ import {
 } from "./ingestion-provenance.js";
 
 // Evidence schema for the signed run manifest (AGENTS.md: "update the mapping manifest and
-// evidence schema together"). Versions 1.0.0 and 1.1.0 are kept so ledger rows written before
-// the ingestion block, and before authority imports, remain readable through
-// `AnyRunManifestSchema`.
+// evidence schema together"). Versions 1.0.0, 1.1.0 and 2.0.0 are kept so ledger rows written
+// before the ingestion block, before authority imports, and before the manifest was signed ahead
+// of persistence remain readable through `AnyRunManifestSchema`.
+//
+// 3.0.0 is signed BEFORE the FHIR transaction, so a persist-mode manifest cannot say the run
+// persisted: its status is `authorised`, and it names the exact transaction it authorises
+// (`persistence.transactionSha256`, the SHA-256 of the transaction Bundle sent, kept as the run's
+// `persist-transaction` evidence object). Only the ledger row, written after the transaction
+// succeeded, says `persisted`; the response's hash and the Bundle version it wrote are in the
+// run's `commit` evidence object and the ledger row. A signed manifest with no ledger row is a
+// run that did not commit (the transaction never ran, or was refused, atomically) or one that
+// committed but went unrecorded (the transaction succeeded and the commit object or the ledger
+// write then failed, after bounded retries). The two are told apart by reading the target store:
+// the second left a Bundle version whose transaction hashes to `transactionSha256`.
+//
+// The two statuses are two shapes, a discriminated union on `status`, so the published JSON
+// Schema (and every model generated from it) enforces that an authorised run, and only one,
+// names its transaction and is not a dry run.
 
-export const RUN_MANIFEST_VERSION = "2.0.0";
+export const RUN_MANIFEST_VERSION = "3.0.0";
 
-export const RunStatus = z
+// `rejected` and `failed` were never written: a refused or failed run leaves no manifest, only
+// its log line. They are kept for the older versions and dropped from 3.0.0, and `persisted`
+// moved to the ledger row.
+const LegacyRunStatus = z
   .enum(["validated", "persisted", "rejected", "failed"])
-  .meta({ id: "RunStatus" });
+  .meta({ id: "LegacyRunStatus" });
 
 const StandardsSchema = z
   .strictObject({
@@ -58,8 +76,13 @@ const TransformationSchema = z
   .meta({ id: "ManifestTransformation" });
 
 const PersistenceSchema = z
-  .strictObject({ targetStore: NonEmptyString, transactionResponseHash: Sha256Hex })
+  .strictObject({ targetStore: NonEmptyString, transactionSha256: Sha256Hex })
   .meta({ id: "ManifestPersistence" });
+
+// Up to 2.0.0 a manifest was signed after the transaction and hashed its response.
+const LegacyPersistenceSchema = z
+  .strictObject({ targetStore: NonEmptyString, transactionResponseHash: Sha256Hex })
+  .meta({ id: "LegacyManifestPersistence" });
 
 const RuntimeSchema = z
   .strictObject({
@@ -69,17 +92,22 @@ const RuntimeSchema = z
   })
   .meta({ id: "ManifestRuntime" });
 
+// The fields every version shares; status, dryRun and persistence are each version's own.
 const manifestBody = {
   runId: Uuid,
   startedAt: IsoDateTime,
   completedAt: IsoDateTime,
-  status: RunStatus,
-  dryRun: z.boolean(),
   standards: StandardsSchema,
   validation: ValidationSchema,
   transformation: TransformationSchema,
-  persistence: PersistenceSchema.optional(),
   runtime: RuntimeSchema,
+};
+
+const legacyManifestBody = {
+  ...manifestBody,
+  status: LegacyRunStatus,
+  dryRun: z.boolean(),
+  persistence: LegacyPersistenceSchema.optional(),
 };
 
 export const RunManifestV1Schema = z
@@ -90,7 +118,7 @@ export const RunManifestV1Schema = z
       resource: NonEmptyString,
       hash: Sha256Hex,
     }),
-    ...manifestBody,
+    ...legacyManifestBody,
   })
   .meta({ id: "RunManifestV1" });
 
@@ -218,32 +246,64 @@ export const RunManifestV11Schema = z
   .strictObject({
     schemaVersion: z.literal("1.1.0"),
     source: runSource,
-    ...manifestBody,
+    ...legacyManifestBody,
     ingestion: IngestionEvidenceV1Schema.optional(),
   })
   .superRefine(documentRunsCarryIngestion)
   .meta({ id: "RunManifestV11" });
 
-export const RunManifestSchema = z
+// 2.0.0, frozen: signed after the transaction, over its response's hash.
+export const RunManifestV2Schema = z
   .strictObject({
-    schemaVersion: z.literal(RUN_MANIFEST_VERSION),
-    source: z.strictObject({
-      kind: z.enum(["fixture", "healthcare-api", "document"]),
-      resource: NonEmptyString,
-      hash: Sha256Hex,
-    }),
-    ...manifestBody,
+    schemaVersion: z.literal("2.0.0"),
+    source: runSource,
+    ...legacyManifestBody,
     ingestion: IngestionEvidenceSchema.optional(),
   })
   .superRefine(documentRunsCarryIngestion)
+  .meta({ id: "RunManifestV2" });
+
+const currentManifestBody = {
+  schemaVersion: z.literal(RUN_MANIFEST_VERSION),
+  source: runSource,
+  ...manifestBody,
+  ingestion: IngestionEvidenceSchema.optional(),
+};
+
+// A dry run: validated, nothing persisted, no transaction named.
+export const ValidatedRunManifestSchema = z
+  .strictObject({
+    ...currentManifestBody,
+    status: z.literal("validated"),
+    dryRun: z.literal(true),
+  })
+  .meta({ id: "ValidatedRunManifest" });
+
+// A persist-mode run, signed before its transaction: validated and authorised to write exactly
+// the transaction it names. `completedAt` is when validation and the transformation completed,
+// which is before the transaction; the commit's time is the ledger row's `completed_at`.
+export const AuthorisedRunManifestSchema = z
+  .strictObject({
+    ...currentManifestBody,
+    status: z.literal("authorised"),
+    dryRun: z.literal(false),
+    persistence: PersistenceSchema,
+  })
+  .meta({ id: "AuthorisedRunManifest" });
+
+export const RunManifestSchema = z
+  .discriminatedUnion("status", [ValidatedRunManifestSchema, AuthorisedRunManifestSchema])
+  .superRefine(documentRunsCarryIngestion)
   .meta({ id: "RunManifest" });
 
-export const AnyRunManifestSchema = z.discriminatedUnion("schemaVersion", [
+export const AnyRunManifestSchema = z.union([
   RunManifestV1Schema,
   RunManifestV11Schema,
+  RunManifestV2Schema,
   RunManifestSchema,
 ]);
 
 export type RunManifestV1 = z.infer<typeof RunManifestV1Schema>;
 export type RunManifest = z.infer<typeof RunManifestSchema>;
+export type ManifestPersistence = z.infer<typeof PersistenceSchema>;
 export type IngestionEvidence = z.infer<typeof IngestionEvidenceSchema>;

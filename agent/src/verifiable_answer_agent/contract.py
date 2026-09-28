@@ -11,11 +11,14 @@ query-tools 4.0.0. Since 2.0.0, ``FindProductOutput`` carries ``truncated``, and
 ``not-entitled`` is no longer an error code a caller can see — outside the caller's entitlement
 the service answers ``document-not-found``. Nothing here ever matched on an error code (an
 ``isError`` result is unavailable whatever its code), so that change alters no behaviour at this
-end. 2.0.1 changed descriptions and made ``verify_quote``'s ``match`` stricter. 4.0.0 makes
-``QuoteVerification`` a union on ``result``: a ``match`` without its location, or over no
-section, no longer validates, so it is unavailable here rather than a match. The schema cannot
-say that ``startOffset`` comes before ``endOffset``; ``postcheck`` holds every offset to the
-chunk's own, which is stricter.
+end. 2.0.1 changed descriptions and made ``verify_quote``'s ``match`` stricter. 3.0.0 is a major
+(an output grammar widened and error delivery changed): a product identifier's value may carry
+"/" (an EMA ePI id), which this module now accepts as the schema does, and an ``isError`` result
+no longer carries ``structuredContent``, which nothing here read; this agent must be deployed
+with 3.0.0 or later no later than the service. 4.0.0 makes ``QuoteVerification`` a union on
+``result``: a ``match`` without its location, or over no section, no longer validates, so it is
+unavailable here rather than a match. The schema cannot say that ``startOffset`` comes before
+``endOffset``; ``postcheck`` holds every offset to the chunk's own, which is stricter.
 
 Every tool result is validated against the schema before anything reads it. A result that does
 not validate is *unavailable*: it is never composed, never rendered, and never quoted. That is

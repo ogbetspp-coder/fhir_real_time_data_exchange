@@ -191,6 +191,8 @@ resource "google_bigquery_table" "transformation_runs" {
     { name = "ingestion_source_hash", type = "STRING", mode = "NULLABLE", description = "SHA-256 of the source document: a drawn document, or the authority's pinned document" },
     { name = "fidelity_status", type = "STRING", mode = "NULLABLE", description = "Narrative fidelity outcome; only passed can be persisted" },
     { name = "approval_hash", type = "STRING", mode = "NULLABLE", description = "SHA-256 of the approved content: approved by a person, or an authority's publication imported at a person's request" },
+    { name = "transaction_sha256", type = "STRING", mode = "NULLABLE", description = "SHA-256 of the FHIR transaction the signed manifest authorised and the run committed; null before run manifest 3.0.0" },
+    { name = "target_bundle_version_id", type = "STRING", mode = "NULLABLE", description = "The EMA document Bundle version the transaction wrote, as its response named it" },
   ])
 
   # Never destroyed by an apply (docs/foundations.md; docs/design/cmek-rollout.md, step 0).
@@ -244,6 +246,14 @@ resource "google_healthcare_dataset" "record" {
   lifecycle {
     prevent_destroy = true
   }
+}
+
+# The two stores in the form a store-level IAM grant names them. The stores themselves are created
+# by scripts/gcp/reconcile-fhir-stores.sh, which scripts/gcp/deploy.sh runs before an apply when
+# either is missing, so a grant on a store never precedes the store.
+locals {
+  source_fhir_store_path = "${var.project_id}/${var.region}/${google_healthcare_dataset.record.name}/${local.source_fhir_store_id}"
+  target_fhir_store_path = "${var.project_id}/${var.region}/${google_healthcare_dataset.record.name}/${local.target_fhir_store_id}"
 }
 
 resource "google_bigquery_dataset_iam_member" "healthcare_stream_writer" {

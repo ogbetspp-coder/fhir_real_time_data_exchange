@@ -1,0 +1,761 @@
+[
+ {
+  "element": "span",
+  "style": "",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "span",
+  "style": "color: red",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"color: red\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "color-red"
+  ],
+  "t": "refused:contrast",
+  "why": "T refuses text under 4.5:1 contrast with what is painted under it (T3a); the reader reads it, marked as its colour, or as faint under 1.33:1, and the QRD check reports either"
+ },
+ {
+  "element": "span",
+  "style": "color: #231f20",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"color: #231f20\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "color-#231f20"
+  ]
+ },
+ {
+  "element": "span",
+  "style": "color: white",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"color: white\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "faint"
+  ],
+  "t": "refused:contrast",
+  "why": "T refuses text under 4.5:1 contrast with what is painted under it (T3a); the reader reads it, marked as its colour, or as faint under 1.33:1, and the QRD check reports either"
+ },
+ {
+  "element": "span",
+  "style": "color: #e0e0e0",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"color: #e0e0e0\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "faint"
+  ],
+  "t": "refused:contrast",
+  "why": "T refuses text under 4.5:1 contrast with what is painted under it (T3a); the reader reads it, marked as its colour, or as faint under 1.33:1, and the QRD check reports either"
+ },
+ {
+  "element": "span",
+  "style": "color: #808080",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"color: #808080\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "color-#808080"
+  ],
+  "t": "refused:contrast",
+  "why": "T refuses text under 4.5:1 contrast with what is painted under it (T3a); the reader reads it, marked as its colour, or as faint under 1.33:1, and the QRD check reports either"
+ },
+ {
+  "element": "span",
+  "style": "background: yellow",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"background: yellow\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "shading-yellow"
+  ]
+ },
+ {
+  "element": "span",
+  "style": "background: black",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"background: black\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "faint",
+   "shading-black"
+  ],
+  "t": "refused:contrast",
+  "why": "T refuses text under 4.5:1 contrast with what is painted under it (T3a); the reader reads it, marked as its colour, or as faint under 1.33:1, and the QRD check reports either"
+ },
+ {
+  "element": "span",
+  "style": "background: #d9d9d9",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"background: #d9d9d9\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "shading-#d9d9d9"
+  ]
+ },
+ {
+  "element": "span",
+  "style": "font-size: 7pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"font-size: 7pt\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "span",
+  "style": "font-size: 1pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"font-size: 1pt\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "faint"
+  ],
+  "t": "refused:font-size",
+  "why": "T refuses text under its smallest font (T3b); the reader marks text under 2pt faint"
+ },
+ {
+  "element": "span",
+  "style": "font-size: 20pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"font-size: 20pt\">9</span> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style",
+  "t": "accepted",
+  "why": "the reader refuses a font above 14pt, a bound in place of a layout; T compares each font with the line it is on (T3b)"
+ },
+ {
+  "element": "span",
+  "style": "font-family: 'Times New Roman'",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"font-family: 'Times New Roman'\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "span",
+  "style": "font-family: Arial, sans-serif",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"font-family: Arial, sans-serif\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "span",
+  "style": "font-family: Verdana",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"font-family: Verdana\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [],
+  "t": "refused:font",
+  "why": "T takes only the fonts the renderer draws with (T3); the reader takes any Unicode text font on its list, which draws the same characters"
+ },
+ {
+  "element": "span",
+  "style": "font-family: Symbol",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"font-family: Symbol\">9</span> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "span",
+  "style": "font-weight: bold",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"font-weight: bold\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "span",
+  "style": "font-style: italic",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"font-style: italic\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "span",
+  "style": "text-decoration: underline",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"text-decoration: underline\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "underline"
+  ]
+ },
+ {
+  "element": "span",
+  "style": "text-decoration: line-through",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"text-decoration: line-through\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "strike"
+  ],
+  "t": "refused:css-value",
+  "why": "T takes only an underline (T3); the reader marks struck text, which the QRD check reports"
+ },
+ {
+  "element": "span",
+  "style": "text-decoration: none",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"text-decoration: none\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "span",
+  "style": "vertical-align: super",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"vertical-align: super\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "superscript"
+  ]
+ },
+ {
+  "element": "span",
+  "style": "vertical-align: sub",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"vertical-align: sub\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "subscript"
+  ]
+ },
+ {
+  "element": "span",
+  "style": "vertical-align: top",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"vertical-align: top\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [],
+  "t": "refused:css-value",
+  "why": "T takes baseline, super, sub or a length on inline text (T4); the reader also takes top, middle and bottom as layout"
+ },
+ {
+  "element": "span",
+  "style": "position: relative; top: -5pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"position: relative; top: -5pt\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "superscript"
+  ]
+ },
+ {
+  "element": "span",
+  "style": "position: relative; top: .5pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"position: relative; top: .5pt\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "span",
+  "style": "position: relative; top: 1.5pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"position: relative; top: 1.5pt\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "subscript"
+  ],
+  "t": "refused:baseline-shift",
+  "why": "T refuses a shift it can neither drop (under 0.1 of the font) nor write as sup or sub (from 0.2 of the font, T4); the reader marks any shift of a point or more, up to 6pt, none inside another"
+ },
+ {
+  "element": "span",
+  "style": "position: relative; top: -7pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"position: relative; top: -7pt\">9</span> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "span",
+  "style": "position: absolute; top: -5pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"position: absolute; top: -5pt\">9</span> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "span",
+  "style": "top: -5pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"top: -5pt\">9</span> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "span",
+  "style": "position: relative; top: -5pt; background: yellow",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"position: relative; top: -5pt; background: yellow\">9</span> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "span",
+  "style": "font-size: 7.0pt; color: #231f20; position: relative; top: -5.0pt;",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"font-size: 7.0pt; color: #231f20; position: relative; top: -5.0pt;\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "color-#231f20",
+   "superscript"
+  ]
+ },
+ {
+  "element": "span",
+  "style": "color: #231f20; position: relative; top: .5pt;",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"color: #231f20; position: relative; top: .5pt;\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "color-#231f20"
+  ]
+ },
+ {
+  "element": "sup",
+  "style": "position: relative; top: -5pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <sup style=\"position: relative; top: -5pt\">9</sup> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "span in shifted span",
+  "style": "position: relative; top: -3pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"position: relative; top: -3pt\">9<span style=\"position: relative; top: -3pt\">9</span></span> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "span in shifted span",
+  "style": "vertical-align: super",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"position: relative; top: -3pt\">9<span style=\"vertical-align: super\">9</span></span> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "span in shifted span",
+  "style": "",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"position: relative; top: -3pt\">9<span style=\"\">9</span></span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "superscript"
+  ]
+ },
+ {
+  "element": "sup in shifted span",
+  "style": "",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"position: relative; top: -3pt\">9<sup style=\"\">2</sup></span> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "sup in slightly shifted span",
+  "style": "",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"position: relative; top: .5pt\">m<sup style=\"\">2</sup></span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "superscript"
+  ]
+ },
+ {
+  "element": "span in sup",
+  "style": "position: relative; top: -3pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at 9<sup><span style=\"position: relative; top: -3pt\">2</span></sup> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "span holding a sup",
+  "style": "position: relative; top: .5pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at m<span style=\"position: relative; top: .5pt\">x<sup>2</sup></span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "superscript"
+  ]
+ },
+ {
+  "element": "span holding a sup",
+  "style": "position: relative; top: -0.9pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at m<span style=\"position: relative; top: -0.9pt\">x<sup>2</sup></span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "superscript"
+  ],
+  "t": "refused:baseline-shift",
+  "why": "T drops a shift only under 0.1 of the smallest text beneath it (T4: under 0.9pt around a superscript of 12pt text, less under a smaller font) and refuses one around a superscript otherwise; the reader, which does not follow font sizes, lets any shift under a point hold one"
+ },
+ {
+  "element": "span holding a sup",
+  "style": "position: relative; top: -1.3px",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at m<span style=\"position: relative; top: -1.3px\">x<sup>2</sup></span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "superscript"
+  ],
+  "t": "refused:baseline-shift",
+  "why": "T drops a shift only under 0.1 of the smallest text beneath it (T4: under 0.9pt around a superscript of 12pt text, less under a smaller font) and refuses one around a superscript otherwise; the reader, which does not follow font sizes, lets any shift under a point hold one"
+ },
+ {
+  "element": "span holding a sup",
+  "style": "font-size: 10pt; position: relative; top: -0.8pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at m<span style=\"font-size: 10pt; position: relative; top: -0.8pt\">x<sup>2</sup></span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "superscript"
+  ],
+  "t": "refused:baseline-shift",
+  "why": "T drops a shift only under 0.1 of the smallest text beneath it (T4: under 0.9pt around a superscript of 12pt text, less under a smaller font) and refuses one around a superscript otherwise; the reader, which does not follow font sizes, lets any shift under a point hold one"
+ },
+ {
+  "element": "span holding a sup",
+  "style": "position: relative; top: -1pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at m<span style=\"position: relative; top: -1pt\">x<sup>2</sup></span> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "span",
+  "style": "color: black; color: none",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"color: black; color: none\">9</span> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "span",
+  "style": "background-color: black; background-color: auto",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"background-color: black; background-color: auto\">9</span> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "span",
+  "style": "background: black; background: none",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"background: black; background: none\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "shading-black"
+  ],
+  "t": "refused:css-value",
+  "why": "T takes only a colour as a background (T3a); the reader takes the shorthand's none, which a browser reads as no background (a colour keyword a browser drops refuses in both)"
+ },
+ {
+  "element": "span",
+  "style": "tab-stops: 35.4pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"tab-stops: 35.4pt\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "span",
+  "style": "mso-bidi-font-size: 11pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"mso-bidi-font-size: 11pt\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "span",
+  "style": "layout-grid-mode: line",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"layout-grid-mode: line\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [],
+  "t": "refused:css-property",
+  "why": "a Word property a browser ignores, on the reader's list and not on T's, which refuses any property it does not name (T3)"
+ },
+ {
+  "element": "span",
+  "style": "text-autospace: none",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"text-autospace: none\">9</span> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style",
+  "t": "accepted",
+  "why": "a property T takes (T3) that is not on the reader's closed list, which refuses any property it does not name"
+ },
+ {
+  "element": "span",
+  "style": "widows: 2",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"widows: 2\">9</span> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style",
+  "t": "accepted",
+  "why": "a property T takes (T3) that is not on the reader's closed list, which refuses any property it does not name"
+ },
+ {
+  "element": "span",
+  "style": "border-bottom: 1px solid",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"border-bottom: 1px solid\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "underline"
+  ],
+  "t": "refused:css-property",
+  "why": "T takes borders, widths and heights on table parts only (T3); the reader marks a hairline border on inline text as an underline or a border, and takes a block's border and a width as layout"
+ },
+ {
+  "element": "span",
+  "style": "border-top: 1px solid",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"border-top: 1px solid\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "border"
+  ],
+  "t": "refused:css-property",
+  "why": "T takes borders, widths and heights on table parts only (T3); the reader marks a hairline border on inline text as an underline or a border, and takes a block's border and a width as layout"
+ },
+ {
+  "element": "span",
+  "style": "margin-left: -2pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"margin-left: -2pt\">9</span> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "span",
+  "style": "padding-top: 2pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"padding-top: 2pt\">9</span> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "span",
+  "style": "line-height: 107%",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"line-height: 107%\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "span",
+  "style": "line-height: 11.7pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"line-height: 11.7pt\">9</span> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "span",
+  "style": "display: none",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"display: none\">9</span> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "span",
+  "style": "visibility: hidden",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"visibility: hidden\">9</span> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "span",
+  "style": "visibility: visible",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"visibility: visible\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [],
+  "t": "refused:css-property",
+  "why": "T refuses visibility of any value (T3); the reader takes visible, which hides nothing"
+ },
+ {
+  "element": "span",
+  "style": "letter-spacing: 1pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"letter-spacing: 1pt\">9</span> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "span",
+  "style": "width: 10pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"width: 10pt\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [],
+  "t": "refused:css-property",
+  "why": "T takes borders, widths and heights on table parts only (T3); the reader marks a hairline border on inline text as an underline or a border, and takes a block's border and a width as layout"
+ },
+ {
+  "element": "p",
+  "style": "",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"\">Store at 9 C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "p",
+  "style": "margin: 0cm",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"margin: 0cm\">Store at 9 C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "p",
+  "style": "margin-left: 36pt; text-indent: -18pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"margin-left: 36pt; text-indent: -18pt\">Store at 9 C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "p",
+  "style": "margin-left: -100pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"margin-left: -100pt\">Store at 9 C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "p",
+  "style": "text-align: justify",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"text-align: justify\">Store at 9 C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "p",
+  "style": "line-height: 107%",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"line-height: 107%\">Store at 9 C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "p",
+  "style": "line-height: 11.7pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"line-height: 11.7pt\">Store at 9 C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "p",
+  "style": "line-height: normal; mso-pagination: none; tab-stops: 35.4pt;",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"line-height: normal; mso-pagination: none; tab-stops: 35.4pt;\">Store at 9 C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "p",
+  "style": "page-break-after: avoid",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"page-break-after: avoid\">Store at 9 C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "p",
+  "style": "break-before: page",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"break-before: page\">Store at 9 C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "p",
+  "style": "width: 100pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"width: 100pt\">Store at 9 C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [],
+  "t": "refused:css-property",
+  "why": "T takes borders, widths and heights on table parts only (T3); the reader marks a hairline border on inline text as an underline or a border, and takes a block's border and a width as layout"
+ },
+ {
+  "element": "p",
+  "style": "height: 10pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"height: 10pt\">Store at 9 C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "p",
+  "style": "background: #d9d9d9",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"background: #d9d9d9\">Store at 9 C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "shading-#d9d9d9"
+  ]
+ },
+ {
+  "element": "p",
+  "style": "position: relative; top: -5pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"position: relative; top: -5pt\">Store at 9 C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "p",
+  "style": "border-bottom: 1px solid",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"border-bottom: 1px solid\">Store at 9 C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [],
+  "t": "refused:css-property",
+  "why": "T takes borders, widths and heights on table parts only (T3); the reader marks a hairline border on inline text as an underline or a border, and takes a block's border and a width as layout"
+ },
+ {
+  "element": "p",
+  "style": "padding: 5pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"padding: 5pt\">Store at 9 C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "p",
+  "style": "font-size: 11pt; font-family: Calibri",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"font-size: 11pt; font-family: Calibri\">Store at 9 C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "li",
+  "style": "margin-left: 0pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><ul><li style=\"margin-left: 0pt\">Store at 9 C, not for clinical use.</li></ul></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "ul",
+  "style": "margin-top: 0cm",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><ul style=\"margin-top: 0cm\"><li>Store at 9 C, not for clinical use.</li></ul></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "table",
+  "style": "border-collapse: collapse",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table style=\"border-collapse: collapse\"><tr><td>Store at 9 C, not for clinical use.</td></tr></table></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "table",
+  "style": "width: 100%",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table style=\"width: 100%\"><tr><td>Store at 9 C, not for clinical use.</td></tr></table></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "table",
+  "style": "border: 1px solid",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table style=\"border: 1px solid\"><tr><td>Store at 9 C, not for clinical use.</td></tr></table></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "tbody",
+  "style": "background: black",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tbody style=\"background: black\"><tr><td>Store at 9 C, not for clinical use.</td></tr></tbody></table></div>",
+  "reader": "read",
+  "marks": [
+   "faint",
+   "shading-black"
+  ],
+  "t": "refused:contrast",
+  "why": "T refuses text under 4.5:1 contrast with what is painted under it (T3a); the reader reads it, marked as its colour, or as faint under 1.33:1, and the QRD check reports either"
+ },
+ {
+  "element": "tr",
+  "style": "height: 10pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr style=\"height: 10pt\"><td>Store at 9 C, not for clinical use.</td></tr></table></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "tr",
+  "style": "background: yellow",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr style=\"background: yellow\"><td>Store at 9 C, not for clinical use.</td></tr></table></div>",
+  "reader": "read",
+  "marks": [
+   "shading-yellow"
+  ]
+ },
+ {
+  "element": "td",
+  "style": "width: 50pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td style=\"width: 50pt\">Store at 9 C, not for clinical use.</td></tr></table></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "td",
+  "style": "border: 1px solid black",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td style=\"border: 1px solid black\">Store at 9 C, not for clinical use.</td></tr></table></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "td",
+  "style": "border-bottom: 1px solid #000000",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td style=\"border-bottom: 1px solid #000000\">Store at 9 C, not for clinical use.</td></tr></table></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "td",
+  "style": "padding: 0cm 5.4pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td style=\"padding: 0cm 5.4pt\">Store at 9 C, not for clinical use.</td></tr></table></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "td",
+  "style": "vertical-align: top",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td style=\"vertical-align: top\">Store at 9 C, not for clinical use.</td></tr></table></div>",
+  "reader": "read",
+  "marks": []
+ },
+ {
+  "element": "td",
+  "style": "background: #d9d9d9",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td style=\"background: #d9d9d9\">Store at 9 C, not for clinical use.</td></tr></table></div>",
+  "reader": "read",
+  "marks": [
+   "shading-#d9d9d9"
+  ]
+ },
+ {
+  "element": "td",
+  "style": "height: 20pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><table><tr><td style=\"height: 20pt\">Store at 9 C, not for clinical use.</td></tr></table></div>",
+  "reader": "read",
+  "marks": []
+ }
+]

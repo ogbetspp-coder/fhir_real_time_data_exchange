@@ -276,7 +276,8 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
   (`docs/design/approval.md`),
   and version 1.0.0 of our `withheld-reason` CodeSystem and `ext-record-incomplete` extension, defined
   as FHIR artefacts beside the mapping.
-- `QUERY_TOOLS_VERSION`'s next major (3.0.0 unless item 2's lands first) (`incomplete` required; the `record-inconsistent` error code; `get_section`'s `section-withheld`
+- `QUERY_TOOLS_VERSION`'s next major after 3.0.0 (4.0.0 unless the agent's contract change, audit
+  batch B01, takes it first) (`incomplete` required; the `record-inconsistent` error code; `get_section`'s `section-withheld`
   variant with its defect kinds; `get_provenance`'s withheld sections, record hash, contacts
   acknowledged and requester); the agent's turn record's next major (`AGENT_TURN_VERSION`, a required
   `incomplete`); the `ingestion-provenance` schema's published `$id`, its next major, from a constant

@@ -1,8 +1,10 @@
 """Shared fixture and vector loading.
 
-Every oracle this test suite uses lives in the Zone B repository, one directory up: the golden
-vectors and the exported contract fixtures. Nothing here writes to them and nothing here prints
-their content — see ``test_no_narrative_leak.py``, which enforces that mechanically.
+The oracles this test suite loads here live in the repository, one directory up: the golden
+vectors and the exported contract fixtures. Other tests read the pinned EMA files and labels
+(``qrd/``, ``labels/ema-epi/``) and the section mapping directly, and the generators they check
+write the importer's shared cases (README, "Set-up"). No test prints what it reads — see
+``test_no_narrative_leak.py``, which enforces that mechanically.
 """
 
 from __future__ import annotations

@@ -165,6 +165,18 @@ export const T_CASES: TCase[] = [
     inner: '<p>CrCl &gt;<span style="margin-left: -1.65pt">_</span></p>',
     expected: no("offset"),
   },
+  // An inline element's own text indent: a browser ignores it, so T refuses any other than the
+  // one it inherits.
+  {
+    name: "indent-on-inline",
+    inner: '<p>Dose <span style="text-indent: 10pt">5 mg</span></p>',
+    expected: no("offset"),
+  },
+  {
+    name: "inherited-indent-restated-on-inline",
+    inner: '<p style="text-indent: 10pt">Dose <span style="text-indent: 10pt">5 mg</span></p>',
+    expected: ok("<p>Dose 5 mg</p>"),
+  },
   { name: "em-on-a-margin", inner: '<p style="margin-left: 1em">x</p>', expected: no("css-value") },
   {
     name: "margin-beyond-bound",

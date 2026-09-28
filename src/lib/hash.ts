@@ -18,23 +18,88 @@ function isOmittedMember(child: unknown): boolean {
 // numeric order whatever the insertion order, which silently discards the sort and yields a
 // hash no other language reproduces. Scalars and strings go through JSON.stringify so their
 // formatting (numbers, escapes, lone surrogates as \udXXX) is exactly its own.
+//
+// The walk is iterative, over an explicit stack, rather than recursive: a value nested a few
+// thousand levels deep — six kilobytes of brackets in a request body — would otherwise exhaust
+// the call stack with a RangeError, and a hash that cannot be taken is an audit record that
+// cannot be written. The string is the one the recursive form wrote, for every value; only the
+// depth it can reach changed.
+//
+// A value that contains itself has no JSON form. The recursive walk met one as a RangeError; this
+// one would loop until memory ran out, so it keeps the containers it is inside and refuses a
+// repeat with a TypeError, as JSON.stringify does. A container reached twice by different paths
+// (not inside itself) is written twice, as before.
+const VALUE = 0;
+const TEXT = 1;
+// Closes the container on the pending stack: writes its bracket and leaves it.
+const CLOSE = 2;
+
 export function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) {
-    return `[${value.map((child) => canonicalJson(child)).join(",")}]`;
-  }
+  let out = "";
+  // Two parallel stacks, popped last in, first out, so each container pushes its closing mark
+  // first and its first child last: what to write next, and what kind of entry it is — a value
+  // still to be written, literal text (a comma, a key), or a container to close.
+  const pending: unknown[] = [value];
+  const kind: number[] = [VALUE];
+  const inside = new Set<object>();
+  while (pending.length > 0) {
+    const current = pending.pop();
+    const entry = kind.pop();
+    if (entry === TEXT) {
+      out += current as string;
+      continue;
+    }
+    if (entry === CLOSE) {
+      inside.delete(current as object);
+      out += Array.isArray(current) ? "]" : "}";
+      continue;
+    }
 
-  if (value !== null && typeof value === "object") {
-    const members = Object.entries(value as Record<string, unknown>)
-      .filter(([, child]) => !isOmittedMember(child))
-      .sort(([left], [right]) => compareKeys(left, right))
-      .map(([key, child]) => `${JSON.stringify(key)}:${canonicalJson(child)}`);
-    return `{${members.join(",")}}`;
-  }
+    if (current !== null && typeof current === "object") {
+      if (inside.has(current)) throw new TypeError("canonicalJson: the value contains itself");
+      inside.add(current);
+      pending.push(current);
+      kind.push(CLOSE);
+    }
 
-  // JSON.stringify is typed as always returning a string; it returns undefined for these, and
-  // an array element of that kind is written as null.
-  if (isOmittedMember(value)) return "null";
-  return JSON.stringify(value);
+    if (Array.isArray(current)) {
+      out += "[";
+      for (let index = current.length - 1; index >= 0; index -= 1) {
+        // A hole in a sparse array writes nothing, as Array.prototype.map left it.
+        if (index in current) {
+          pending.push(current[index]);
+          kind.push(VALUE);
+        }
+        if (index > 0) {
+          pending.push(",");
+          kind.push(TEXT);
+        }
+      }
+      continue;
+    }
+
+    if (current !== null && typeof current === "object") {
+      const members = Object.entries(current as Record<string, unknown>)
+        .filter(([, child]) => !isOmittedMember(child))
+        .sort(([left], [right]) => compareKeys(left, right));
+      out += "{";
+      for (let index = members.length - 1; index >= 0; index -= 1) {
+        const [key, child] = members[index] ?? ["", undefined];
+        pending.push(child, `${JSON.stringify(key)}:`);
+        kind.push(VALUE, TEXT);
+        if (index > 0) {
+          pending.push(",");
+          kind.push(TEXT);
+        }
+      }
+      continue;
+    }
+
+    // JSON.stringify is typed as always returning a string; it returns undefined for these, and
+    // an array element of that kind is written as null.
+    out += isOmittedMember(current) ? "null" : JSON.stringify(current);
+  }
+  return out;
 }
 
 export function sha256(value: unknown): string {

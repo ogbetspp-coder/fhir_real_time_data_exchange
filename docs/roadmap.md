@@ -271,6 +271,13 @@ So the claim is narrow and should stay narrow:
   `ALERT_NOTIFICATION_EMAIL` repository variable through `deploy.yml` and `deploy.sh`; the
   metric already existed, so the channel and the policy (more than five denials in a rolling
   hour) are created on the first deploy after the address is set.
+- Delete dev's old e-mail channel, "EMA Flow query entitlement denials (dev)", by hand, after
+  the first green deploy since #138. Terraform forgets it rather than deleting it, because a
+  delete would run before the policies stop naming it and the Monitoring API refuses to delete a
+  channel in use. Find it with
+  `gcloud beta monitoring channels list --project=sage-ship-509104-b8 --filter='displayName="EMA Flow query entitlement denials (dev)"' --format='value(name)'`
+  and delete it with `gcloud beta monitoring channels delete <name> --project=sage-ship-509104-b8`.
+  Leave out `--force`, so the API still refuses while any policy names it.
 
 ### Production gate — required before any environment holds a client's real content
 
@@ -290,8 +297,14 @@ that skips one is not a production deploy.
   production, leave `ALLOW_SYNTHETIC_SOURCES` unset, which does it by default.
 - ~~**The worker's Healthcare role scoped to the dataset**~~ done 2026-09-21 with the CMEK
   rollout: the worker holds `fhirResourceEditor` on the record dataset only.
-- **Real addresses for alerts and security reports.** The alert channel and `SECURITY.md` carry
-  placeholders (`you@khsadvisory.com`, `security@khsadvisory.com`); production needs monitored ones.
+- **Before production or any real data: set a real, monitored alert address; prod refuses to
+  deploy without one.** `dev` has none, by the owner's decision of 2026-09-28 (early development):
+  its alert policies exist but page no one, and its deploy ignores the `ALERT_NOTIFICATION_EMAIL`
+  repository variable, still the placeholder `you@khsadvisory.com`. Only `dev` may go without
+  (`require_alert_recipient`, `scripts/gcp/environments/dev.env`); every other environment refuses
+  an apply with no recipient or a placeholder one.
+- **A real address for security reports.** `SECURITY.md` carries a placeholder,
+  `security@khsadvisory.com`; production needs a monitored one.
 - **Registry vulnerability scanning and Binary Authorization in production.** `dev` scans with
   OSV-Scanner in CI (foundations C1); production turns on Artifact Analysis, where it is charged
   per image and deploys are rare.

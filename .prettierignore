@@ -45,3 +45,7 @@ labels/ema-epi/lists/
 src/authority/data/underline-letters.json
 test/fixtures/authority/underline-cases.json
 test/fixtures/authority/vectors.json
+# Written by Zone A's scripts and compared byte for byte with what they write
+# (zone-a/scripts/check_labels.py, zone-a/scripts/generate_style_cases.py).
+labels/ema-epi/checks/
+test/fixtures/authority/style-cases.json

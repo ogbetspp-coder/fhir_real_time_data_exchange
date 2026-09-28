@@ -4,8 +4,13 @@ import { loadEmaMapping, type EmaMapping } from "../src/fhir/mapping.js";
 import { transformType2ToEma } from "../src/fhir/transform.js";
 import type { FhirResource } from "../src/fhir/types.js";
 import { createSyntheticType2Bundle } from "../src/fixtures/synthetic.js";
-import { HealthcareApiClient, HealthcareApiError } from "../src/gcp/healthcare.js";
-import { sha256 } from "../src/lib/hash.js";
+import {
+  HEALTHCARE_TIMEOUT_MS,
+  HealthcareApiClient,
+  HealthcareApiError,
+  buildPersistTransaction,
+} from "../src/gcp/healthcare.js";
+import { sha256Utf8 } from "../src/lib/hash.js";
 
 // The worker's Cloud Healthcare API client, over a stubbed `fetch` and a stubbed Application
 // Default Credentials token: what it sends (URL, method, headers, body) and what it makes of what
@@ -41,7 +46,7 @@ type Sent = { url: string; init: RequestInit; headers: Headers };
 
 let mapping: EmaMapping;
 let sent: Sent[];
-let answer: () => Response;
+let answer: () => Response | Promise<Response>;
 
 function respond(status: number, body: unknown): () => Response {
   return () =>
@@ -63,7 +68,7 @@ beforeEach(() => {
     "fetch",
     vi.fn((url: string, init: RequestInit = {}) => {
       sent.push({ url, init, headers: new Headers(init.headers) });
-      return Promise.resolve(answer());
+      return Promise.resolve().then(answer);
     }),
   );
 });
@@ -100,6 +105,19 @@ describe("reading a source resource", () => {
     expect(request.init.method).toBeUndefined();
     expectStandardHeaders(request.headers);
   });
+
+  // Encoding leaves `.` and `..` alone and the URL parser resolves them: `Bundle/..` is the store.
+  it.each([".", ".."])(
+    "refuses the id %s, which names no resource, before any request",
+    async (id) => {
+      const client = new HealthcareApiClient(OPTIONS);
+
+      await expect(client.readSourceResource("Bundle", id, RUN_ID)).rejects.toThrow(
+        "A source resource id must be a single path segment",
+      );
+      expect(sent).toEqual([]);
+    },
+  );
 
   it("refuses without a source store, before any request", async () => {
     const client = new HealthcareApiClient({ ...OPTIONS, SOURCE_FHIR_STORE_ID: undefined });
@@ -159,42 +177,80 @@ describe("validating a resource", () => {
   });
 });
 
-describe("persisting a package", () => {
-  it("POSTs one transaction Bundle to the validated store's base", async () => {
-    const target = transformType2ToEma(createSyntheticType2Bundle(mapping), mapping);
+function transaction(extras: FhirResource[] = []) {
+  const target = transformType2ToEma(createSyntheticType2Bundle(mapping), mapping);
+  return buildPersistTransaction(target.list, target.documentBundle, RUN_ID, extras);
+}
+
+describe("executing the transaction", () => {
+  it("POSTs exactly the transaction it is given to the validated store's base", async () => {
     const extra: FhirResource = { resourceType: "Provenance", id: "prov-1" };
+    const built = transaction([extra]);
     const response = { resourceType: "Bundle", type: "transaction-response", entry: [] };
     answer = respond(200, response);
     const client = new HealthcareApiClient(OPTIONS);
 
-    expect(
-      await client.persistPackage(target.list, target.documentBundle, RUN_ID, [extra]),
-    ).toEqual(response);
+    expect(await client.executeTransaction(built, RUN_ID)).toEqual(response);
 
     const request = only();
     expect(request.url).toBe(`${BASE}/validated/fhir`);
     expect(request.init.method).toBe("POST");
     expectStandardHeaders(request.headers);
-    const transaction = JSON.parse(request.init.body as string) as {
-      resourceType: string;
-      type: string;
-      identifier: { value: string };
-      entry: { request: { method: string; url: string }; resource: FhirResource }[];
-    };
-    expect(transaction.resourceType).toBe("Bundle");
-    expect(transaction.type).toBe("transaction");
-    expect(transaction.identifier.value).toBe(RUN_ID);
-    expect(transaction.entry).toHaveLength(target.documentBundle.entry.length + 3);
-    expect(transaction.entry.at(-1)?.request).toEqual({ method: "PUT", url: "Provenance/prov-1" });
+    expect(JSON.parse(request.init.body as string)).toEqual(built);
+    expect(built.entry.at(-1)?.request).toEqual({ method: "PUT", url: "Provenance/prov-1" });
   });
 
   it("refuses without a validated store, before any request", async () => {
-    const target = transformType2ToEma(createSyntheticType2Bundle(mapping), mapping);
     const client = new HealthcareApiClient({ ...OPTIONS, TARGET_FHIR_STORE_ID: undefined });
-    await expect(client.persistPackage(target.list, target.documentBundle, RUN_ID)).rejects.toThrow(
+    await expect(client.executeTransaction(transaction(), RUN_ID)).rejects.toThrow(
       "TARGET_FHIR_STORE_ID is required",
     );
     expect(sent).toEqual([]);
+  });
+});
+
+describe("an answer that is not a FHIR response", () => {
+  const HTML = "<html><body>502 Bad Gateway: Take two tablets</body></html>";
+
+  // A Google front end answers an overload or a gateway fault with HTML. `response.json()` made
+  // that a SyntaxError, `unclassified`, with the status and the operation lost.
+  it.each([502, 503, 429])(
+    "keeps the operation and the %i status of an HTML error page",
+    async (status) => {
+      answer = () => new Response(HTML, { status, headers: { "content-type": "text/html" } });
+      const error = await new HealthcareApiClient(OPTIONS)
+        .validate({ resourceType: "List" }, "p", RUN_ID)
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(HealthcareApiError);
+      const refusal = error as HealthcareApiError;
+      expect([refusal.operation, refusal.status, refusal.codes]).toEqual(["validate", status, []]);
+      expect(refusal.responseSha256).toBe(sha256Utf8(HTML));
+      expect(refusal.message).not.toContain("tablets");
+    },
+  );
+
+  it("refuses a success whose body is not a JSON object", async () => {
+    answer = () => new Response(HTML, { status: 200 });
+    await expect(
+      new HealthcareApiClient(OPTIONS).validate({ resourceType: "List" }, "p", RUN_ID),
+    ).rejects.toThrow("Healthcare API returned a response that is not a JSON object");
+  });
+
+  it("gives up on a call that does not answer in time", async () => {
+    answer = () => Promise.reject(new DOMException("The operation timed out", "TimeoutError"));
+    await expect(
+      new HealthcareApiClient(OPTIONS).validate({ resourceType: "List" }, "p", RUN_ID),
+    ).rejects.toThrow("Healthcare API request timed out");
+    expect(only().init.signal).toBeInstanceOf(AbortSignal);
+    expect(HEALTHCARE_TIMEOUT_MS).toBeLessThan(1_800_000);
+  });
+
+  it("lets any other transport failure through as it is", async () => {
+    answer = () => Promise.reject(new TypeError("fetch failed"));
+    await expect(
+      new HealthcareApiClient(OPTIONS).validate({ resourceType: "List" }, "p", RUN_ID),
+    ).rejects.toThrow("fetch failed");
   });
 });
 
@@ -233,9 +289,9 @@ describe("a refusal from the Healthcare API", () => {
     expect(refusal.operation).toBe("validate");
     expect(refusal.status).toBe(422);
     expect(refusal.codes).toEqual(["invalid", "invalid_full_url", "processing"]);
-    expect(refusal.responseSha256).toBe(sha256(body));
+    expect(refusal.responseSha256).toBe(sha256Utf8(JSON.stringify(body)));
     expect(refusal.message).toBe(
-      `Healthcare API refused validate with 422 (response sha256 ${sha256(body)}, 3 codes)`,
+      `Healthcare API refused validate with 422 (response sha256 ${sha256Utf8(JSON.stringify(body))}, 3 codes)`,
     );
     // Nothing of the body's prose reaches the error.
     const { operation, status, codes, responseSha256, message } = refusal;
@@ -255,10 +311,7 @@ describe("a refusal from the Healthcare API", () => {
     ],
     [
       "execute-bundle",
-      async (client: HealthcareApiClient) => {
-        const target = transformType2ToEma(createSyntheticType2Bundle(mapping), mapping);
-        return client.persistPackage(target.list, target.documentBundle, RUN_ID);
-      },
+      (client: HealthcareApiClient) => client.executeTransaction(transaction(), RUN_ID),
     ],
   ] as const)("names %s as the refused operation", async (operation, call) => {
     answer = respond(403, { error: { code: 403, message: PROSE } });

@@ -1,12 +1,16 @@
+import { readFileSync } from "node:fs";
+
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { loadConfig, type AppConfig } from "../src/config.js";
 import { loadEmaMapping, type EmaMapping } from "../src/fhir/mapping.js";
 import { createSyntheticSubmission } from "../src/fixtures/synthetic-submission.js";
 import { createSyntheticType2Bundle } from "../src/fixtures/synthetic.js";
-import { GcpEvidenceStore, ledgerRow, type LedgerRow } from "../src/gcp/evidence.js";
+import { ledgerRow, type LedgerRow } from "../src/gcp/evidence.js";
 import { runPipeline } from "../src/pipeline.js";
 import { drawn } from "./support/submission.js";
+
+const COMMIT = { committedAt: "2026-09-27T16:47:12.000Z", bundleVersionId: "MTc5MDUyNzYz" };
 
 let mapping: EmaMapping;
 let config: AppConfig;
@@ -32,21 +36,7 @@ async function fixtureRow(): Promise<LedgerRow> {
     mapping,
     config,
   );
-  return ledgerRow(result.evidence);
-}
-
-async function fixtureManifest() {
-  const result = await runPipeline(
-    {
-      runId: "66666666-6666-4666-a666-666666666666",
-      source: createSyntheticType2Bundle(mapping),
-      sourceKind: "fixture",
-      sourceResource: "fixture:test",
-    },
-    mapping,
-    config,
-  );
-  return result.evidence.manifest;
+  return ledgerRow(result.evidence, COMMIT);
 }
 
 async function documentRow(): Promise<LedgerRow> {
@@ -63,7 +53,7 @@ async function documentRow(): Promise<LedgerRow> {
     mapping,
     config,
   );
-  return ledgerRow(result.evidence);
+  return ledgerRow(result.evidence, COMMIT);
 }
 
 describe("transformation ledger row", () => {
@@ -89,6 +79,18 @@ describe("transformation ledger row", () => {
     expect(row.approval_hash).toBe(submission.approval.approvedContentSha256);
   });
 
+  // The row is written by the worker and read by BigQuery: a column the row names that the table
+  // lacks is refused at insert, and a table column the row never fills stays null forever.
+  it("names exactly the columns the ledger table declares", async () => {
+    const terraform = readFileSync("infra/main.tf", "utf8");
+    const table = terraform.slice(
+      terraform.indexOf('resource "google_bigquery_table" "transformation_runs"'),
+    );
+    const schema = table.slice(table.indexOf("schema = jsonencode(["), table.indexOf("])"));
+    const columns = [...schema.matchAll(/name = "([a-z0-9_]+)"/g)].map(([, name]) => name);
+    expect(Object.keys(await fixtureRow()).sort()).toEqual(columns.sort());
+  });
+
   // Every queryable column is a hash, an enumeration, a timestamp, or an identifier: the ledger
   // is indexed by regulators' auditors, not read by them for content.
   it("keeps every queryable column free of prose and markup", async () => {
@@ -105,40 +107,54 @@ describe("transformation ledger row", () => {
 
 // Cloud KMS signs with a crypto key VERSION. Terraform passed the crypto KEY, so every run wrote
 // its five evidence artefacts and then stopped at signing, with no signed manifest and a failure
-// the pipeline could only call `unclassified`. The shape is checked before the network call so
-// the configuration is named as the fault.
+// the pipeline could only call `unclassified`. The shape is now checked when the configuration
+// loads, so a deployment with the wrong key does not start.
 describe("the manifest signing key", () => {
-  it("is refused when it names a crypto key rather than a crypto key version", async () => {
-    const store = new GcpEvidenceStore(
-      loadConfig({
-        ALLOW_SYNTHETIC_SOURCES: "true",
-        NODE_ENV: "test",
-        DRY_RUN: "true",
-        GCP_LOCATION: "europe-west4",
-        GOOGLE_CLOUD_PROJECT: "test-project",
-        KMS_MANIFEST_KEY:
-          "projects/p/locations/europe-west4/keyRings/evidence/cryptoKeys/manifest-signing",
-      }),
-    );
+  const KEY = "projects/p/locations/europe-west4/keyRings/evidence/cryptoKeys/manifest-signing";
 
-    await expect(store.signManifest(await fixtureManifest())).rejects.toThrow(
+  it("is refused at startup when it names a crypto key rather than a crypto key version", () => {
+    expect(() => loadConfig({ NODE_ENV: "test", DRY_RUN: "true", KMS_MANIFEST_KEY: KEY })).toThrow(
       /must name a crypto key version/,
     );
-  });
-
-  it("leaves the manifest unsigned rather than guessing when no key is configured", async () => {
-    const store = new GcpEvidenceStore(
+    expect(
       loadConfig({
-        ALLOW_SYNTHETIC_SOURCES: "true",
         NODE_ENV: "test",
         DRY_RUN: "true",
-        GCP_LOCATION: "europe-west4",
-        GOOGLE_CLOUD_PROJECT: "test-project",
-      }),
-    );
-    const signed = await store.signManifest(await fixtureManifest());
-
-    expect(signed.signature).toBeUndefined();
-    expect(signed.manifestHash).toMatch(/^[0-9a-f]{64}$/);
+        KMS_MANIFEST_KEY: `${KEY}/cryptoKeyVersions/1`,
+      }).KMS_MANIFEST_KEY,
+    ).toBe(`${KEY}/cryptoKeyVersions/1`);
   });
+});
+
+// A persisted run used to start without a signing key or a ledger dataset, then write an
+// unsigned manifest named `signed-manifest.json` and no ledger row.
+describe("a persist-mode configuration", () => {
+  const PERSIST = {
+    NODE_ENV: "test",
+    DRY_RUN: "false",
+    GOOGLE_CLOUD_PROJECT: "synthetic-project",
+    HEALTHCARE_DATASET_ID: "dataset",
+    SOURCE_FHIR_STORE_ID: "source",
+    TARGET_FHIR_STORE_ID: "target",
+    EVIDENCE_BUCKET: "evidence",
+    FHIR_VALIDATOR_URL: "http://validator.invalid",
+    FHIR_ANALYTICS_DATASET: "analytics",
+    KMS_MANIFEST_KEY:
+      "projects/p/locations/europe-west4/keyRings/evidence/cryptoKeys/manifest-signing/cryptoKeyVersions/1",
+    TRANSFORMATION_LEDGER_DATASET: "ledger",
+  };
+
+  it("starts with a signing key and a ledger dataset", () => {
+    expect(loadConfig(PERSIST).DRY_RUN).toBe(false);
+  });
+
+  it.each(["KMS_MANIFEST_KEY", "TRANSFORMATION_LEDGER_DATASET"] as const)(
+    "does not start without %s",
+    (key) => {
+      const environment: Record<string, string> = Object.fromEntries(
+        Object.entries(PERSIST).filter(([name]) => name !== key),
+      );
+      expect(() => loadConfig(environment)).toThrow(`${key} is required when DRY_RUN=false`);
+    },
+  );
 });

@@ -2,6 +2,8 @@ import { launchChrome } from "../../src/render/cdp.js";
 import { boundFace, loadFaces } from "../../src/render/fonts.js";
 import { resolveBox } from "../../src/render/page-checks.js";
 import { openPage } from "../../src/render/page.js";
+import { RATIOS, ROOT } from "../../src/render/sections.js";
+import { EXECUTABLE, FONTS, NO_SANDBOX } from "./sections.js";
 
 // R3's exact character box (docs/design/authority-import-renderer.md, Delivery 3c-C1), in the
 // renderer image: an "H" in each of the sixteen pinned faces at sizes in pt, px, em, %, keywords
@@ -16,12 +18,6 @@ import { openPage } from "../../src/render/page.js";
 //
 // usage (inside the image): node --import tsx scripts/render/check-boxes.ts
 
-const EXECUTABLE =
-  process.env.RENDERER_CHROME ??
-  "/opt/renderer/chrome-headless-shell-linux64/chrome-headless-shell";
-const FONTS = process.env.RENDERER_FONTS ?? "/opt/renderer/fonts";
-const NO_SANDBOX = process.env.RENDERER_NO_SANDBOX === "1";
-const RATIOS = [0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.625, 3];
 const FAMILIES = ["'Times New Roman'", "Arial", "Calibri", "Cambria"];
 const STYLES: [number, string][] = [
   [400, "normal"],
@@ -119,7 +115,7 @@ for (const ratio of RATIOS) {
   const browser = launchChrome({ executable: EXECUTABLE, ratio, noSandbox: NO_SANDBOX });
   try {
     const page = await openPage(browser.cdp, {
-      div: `<div xmlns="http://www.w3.org/1999/xhtml">${body}</div>`,
+      div: `${ROOT}${body}</div>`,
       mode: "html",
       width: 813,
     });

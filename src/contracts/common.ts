@@ -78,12 +78,24 @@ export const SourceKey = z
       "Canonical SmPC section identifier from the mapping manifest, e.g. smpc.4.2.posology.",
   });
 
-// FHIR id grammar (R5 primitive types). Values are interpolated into store URLs, so they are
-// constrained here rather than trusted to be harmless once encoded.
+// FHIR id grammar (R5 primitive types). It admits `.` and `..`, which encoding leaves as they are
+// and the URL parser resolves, so it is not safe as a URL path segment on its own: a value that is
+// interpolated into a store URL is an `AddressableFhirId`.
 export const FhirId = z
   .string()
   .regex(/^[A-Za-z0-9\-.]{1,64}$/)
   .meta({ id: "FhirId" });
+
+// A FHIR id that is also a single URL path segment: the R5 grammar, beginning with a letter or a
+// digit, so never `.` or `..`. Values are interpolated into store URLs, so they are constrained
+// here rather than trusted to be harmless once encoded.
+export const AddressableFhirId = z
+  .string()
+  .regex(/^[A-Za-z0-9][A-Za-z0-9\-.]{0,63}$/)
+  .meta({
+    id: "AddressableFhirId",
+    description: "FHIR id that begins with a letter or digit, so a single URL path segment.",
+  });
 
 export const NonEmptyString = z.string().min(1).max(1024);
 

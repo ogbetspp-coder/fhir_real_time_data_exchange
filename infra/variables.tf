@@ -52,9 +52,22 @@ variable "submission_retention_days" {
 }
 
 variable "alert_notification_channels" {
-  description = "Existing Cloud Monitoring notification channel resource names."
+  description = <<-EOT
+    Existing Cloud Monitoring notification channel resource names
+    (projects/<project>/notificationChannels/<id>), paged by every alert policy beside the
+    alert_notification_email channel. At least one of the two must be given, unless
+    require_alert_recipient is false (dev only): an apply with neither is refused.
+  EOT
   type        = list(string)
   default     = []
+
+  validation {
+    condition = alltrue([
+      for channel in var.alert_notification_channels :
+      can(regex("^projects/[^/\\s]+/notificationChannels/[^/\\s]+$", channel))
+    ])
+    error_message = "Every alert_notification_channels entry must be a channel resource name, projects/<project>/notificationChannels/<id>."
+  }
 }
 
 variable "deletion_protection" {
@@ -137,6 +150,14 @@ variable "query_invokers" {
   EOT
   type        = list(string)
   default     = []
+
+  validation {
+    condition = alltrue([
+      for member in var.query_invokers :
+      can(regex("^(user|group|serviceAccount):[^\\s]+$", member))
+    ])
+    error_message = "Every query_invokers entry must be user:, group:, or serviceAccount: followed by an identifier. allUsers and allAuthenticatedUsers are not accepted."
+  }
 }
 
 variable "query_token_creators" {
@@ -173,11 +194,13 @@ variable "query_entitlements_json" {
   default     = "{}"
   sensitive   = false
 
-  # Checks the same four things src/query/entitlements.ts checks at container start (a JSON
-  # object; PrincipalId keys; each value an object whose only key is `bundles`; FhirId members),
-  # including the strictObject rule that rejects an unknown key such as a carried-forward
-  # `organisation`. The decode and each shape check are wrapped in can()/try() so a malformed
-  # value produces this error message rather than an evaluation error.
+  # Checks what src/query/entitlements.ts checks at container start (a JSON object; PrincipalId
+  # keys; each value an object whose only key is `bundles`; at most 10,000 FhirId members, each a
+  # JSON string), including the strictObject rule that rejects an unknown key such as a
+  # carried-forward `organisation`. Each member's type is read from its own JSON encoding, because
+  # regex() and tolist() convert a number or a bool to a string, which let `"bundles": [5]` pass
+  # here and then stop the service at startup. The decode and each shape check are wrapped in
+  # can()/try() so a malformed value produces this error message rather than an evaluation error.
   validation {
     condition = (
       can(keys(jsondecode(var.query_entitlements_json)))
@@ -186,13 +209,14 @@ variable "query_entitlements_json" {
         can(regex("^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$", principal))
         && try(keys(entitlement), []) == ["bundles"]
         && can(tolist(entitlement.bundles))
-        && alltrue([
-          for bundle in try(tolist(entitlement.bundles), ["invalid bundle id"]) :
-          can(regex("^[A-Za-z0-9.-]{1,64}$", bundle))
-        ])
+        && try(length(entitlement.bundles), 10001) <= 10000
+        && try(alltrue([
+          for bundle in entitlement.bundles :
+          startswith(jsonencode(bundle), "\"") && can(regex("^[A-Za-z0-9.-]{1,64}$", bundle))
+        ]), false)
       ])
     )
-    error_message = "query_entitlements_json must be a JSON object whose keys match ^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$ and whose values are objects carrying exactly one key, \"bundles\", a list of FHIR ids (^[A-Za-z0-9.-]{1,64}$). An extra key such as \"organisation\" is rejected here because the service rejects it at startup."
+    error_message = "query_entitlements_json must be a JSON object whose keys match ^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$ and whose values are objects carrying exactly one key, \"bundles\", a list of at most 10,000 FHIR ids, each a JSON string matching ^[A-Za-z0-9.-]{1,64}$. An extra key such as \"organisation\" is rejected here because the service rejects it at startup."
   }
 }
 
@@ -262,8 +286,11 @@ variable "service_version" {
 
 variable "alert_notification_email" {
   description = <<-EOT
-    E-mail address that receives the query entitlement-denial alert. Empty (the default) creates
-    the log-based metric but no notification channel and no alerting policy.
+    E-mail address paged by every alert policy: an encryption key made unavailable, a failed
+    pipeline run, and query entitlement denials. Empty (the default) creates no e-mail channel,
+    and an apply with no alert_notification_channels either is refused, unless
+    require_alert_recipient is false (dev only): every alert policy is always declared and must
+    reach someone. A placeholder is refused in every environment, dev included.
   EOT
   type        = string
   default     = ""
@@ -271,6 +298,34 @@ variable "alert_notification_email" {
   validation {
     condition     = var.alert_notification_email == "" || can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.alert_notification_email))
     error_message = "alert_notification_email must be empty or an e-mail address."
+  }
+
+  # A placeholder pages nobody: a domain reserved by RFC 2606 (example.com/.org/.net, and the
+  # .test, .invalid, .example and .localhost top-level domains) or a template's you@.
+  validation {
+    condition     = !can(regex("(?i)^you@|@([^@]+\\.)?example\\.(com|org|net)$|[@.](test|invalid|example|localhost)$", var.alert_notification_email))
+    error_message = "alert_notification_email is a placeholder (a reserved example or test domain, or a you@ address); set a real, watched address."
+  }
+}
+
+variable "require_alert_recipient" {
+  description = <<-EOT
+    Whether an apply must name an alert recipient (alert_notification_email or
+    alert_notification_channels). True, the default, everywhere but dev. The owner decided on
+    2026-09-28 that dev, while it is early development, need not have a real address: dev sets
+    this false (scripts/gcp/environments/dev.env), and its alert policies are still created, so
+    they show in the console, but page no one. No channel is created for a stand-in address, since
+    Google would mail a verification to it and it would look real in the console. False is
+    refused in any other environment; before production or any real data, a real, monitored
+    address is required.
+  EOT
+  type        = bool
+  default     = true
+  nullable    = false
+
+  validation {
+    condition     = var.require_alert_recipient || var.environment == "dev"
+    error_message = "require_alert_recipient may be false only in dev: every other environment's alerts must page someone."
   }
 }
 

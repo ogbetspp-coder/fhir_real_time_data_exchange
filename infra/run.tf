@@ -192,16 +192,19 @@ resource "google_cloud_run_v2_service" "worker" {
   # The ledger table is listed so its schema is patched before a revision that writes the new
   # columns is created. That orders the apply; it does not close the window entirely, because
   # BigQuery's streaming path caches a table's schema for a few minutes, so an insert naming a
-  # freshly added column can still be rejected shortly after the patch. Columns are only
-  # populated by document runs, which no Zone A service produces yet, so the window is currently
-  # unreachable; a retry on writeLedger is the fix when it stops being.
+  # freshly added column can still be rejected shortly after the patch. The run manifest 3.0.0
+  # columns (transaction_sha256, target_bundle_version_id) are written by every persisted run,
+  # the deploy's smoke run first, so the window is reachable: writeLedger retries a "no such
+  # field" refusal for about six minutes (src/gcp/evidence.ts, LEDGER_SCHEMA_RETRY_DELAYS_MS).
+  # A cache slower than that answers `committed-unrecorded` for a run that did commit.
   depends_on = [
     google_project_service.required,
-    google_healthcare_dataset_iam_member.worker_fhir_editor,
+    google_healthcare_fhir_store_iam_member.worker_source_reader,
+    google_healthcare_fhir_store_iam_member.worker_validated_editor,
     google_storage_bucket_iam_member.worker_evidence_writer,
     google_storage_bucket_iam_member.worker_submission_reader,
     google_kms_crypto_key_iam_member.worker_manifest_signer_hsm,
-    google_bigquery_dataset_iam_member.worker_ledger_writer,
+    google_bigquery_table_iam_member.worker_ledger_appender,
     google_bigquery_table.transformation_runs,
   ]
 }

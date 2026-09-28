@@ -1,10 +1,11 @@
 // Sections each of which the renderer gate's page and font checks must refuse
 // (docs/design/authority-import-renderer.md, R2, R3 and R6), drawn by scripts/render/check-fonts.ts
-// in the renderer image. `div` is the whole section; the refusal is the one it must produce.
-// Not for clinical use.
+// in the renderer image. `div` is the whole section; the refusal is the one it must produce, in
+// each of `modes` (both, unless it names one). Not for clinical use.
 
 import type { FontRefusal } from "../../../src/render/fonts.js";
 import type { PageRefusal } from "../../../src/render/page-checks.js";
+import type { Mode } from "../../../src/render/page.js";
 
 // `drawing` "t" checks T(div)'s drawing instead of the authority's (R2's second drawing): T drops
 // the styles, so its drawing can fall back where the authority's did not.
@@ -13,6 +14,8 @@ export type RefusalCase = {
   div: string;
   refusal: FontRefusal | PageRefusal;
   drawing?: "t";
+  // At least one: a seed judged in no mode would pass without being drawn.
+  modes?: readonly [Mode, ...Mode[]];
 };
 
 const div = (inner: string, root = '<div xmlns="http://www.w3.org/1999/xhtml">'): string =>
@@ -54,8 +57,8 @@ export const REFUSAL_CASES: RefusalCase[] = [
   },
   // A script R3 does not bound.
   { name: "cyrillic", div: div("<p>\u0416</p>"), refusal: "script" },
-  // An entity XML does not define: the page does not parse in XML mode.
-  { name: "parsererror", div: div("<p>a&nbsp;b</p>"), refusal: "parsererror" },
+  // An entity XML does not define: the page does not parse in XML mode (HTML knows it).
+  { name: "parsererror", div: div("<p>a&nbsp;b</p>"), refusal: "parsererror", modes: ["xml"] },
   // A div with padding of its own.
   {
     name: "div-padding",

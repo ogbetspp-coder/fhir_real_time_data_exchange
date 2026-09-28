@@ -49,6 +49,41 @@ export function readRendererPins(dockerfile = RENDERER_DOCKERFILE) {
     return value;
   };
   const debianSnapshot = required("DEBIAN_SNAPSHOT", /^\d{8}T\d{6}Z$/);
+  // Each suite's Release date, which the build holds apt's Release to (a downgrade fails it):
+  // pinned, and read by a RUN line.
+  const debianReleases = Object.fromEntries(
+    [
+      ["bookworm", "DEBIAN_BOOKWORM_DATE"],
+      ["bookworm-updates", "DEBIAN_BOOKWORM_UPDATES_DATE"],
+      ["bookworm-security", "DEBIAN_BOOKWORM_SECURITY_DATE"],
+    ].map(([suite, key]) => {
+      const date = required(key, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+      if (!lines.some((line) => /^\s*RUN\b/.test(line) && line.includes(`"${suite} \${${key}}"`))) {
+        throw new Error(`${name}: ARG ${key} is not checked against ${suite}'s Release`);
+      }
+      return [suite, date];
+    }),
+  );
+  // The Debian packages come over HTTPS: the snapshot's sources are written for a scheme, its
+  // first pass (HTTP, the base having no CA certificates) installs the CA certificates alone, and
+  // the second, over HTTPS, everything else. No source names the snapshot over plain HTTP.
+  const apt = lines.filter(
+    (line) => /^\s*RUN\b/.test(line) && line.includes("/etc/apt/sources.list.d/"),
+  );
+  const https =
+    /snapshot http;\s*apt-get install --yes --no-install-recommends ca-certificates;\s*snapshot https;\s*apt-get install\b/;
+  if (
+    apt.length !== 1 ||
+    !https.test(apt[0]) ||
+    (apt[0].match(/\bapt-get install\b/g) ?? []).length !== 2 ||
+    !/"URIs: \$1:\/\/snapshot\.debian\.org\/archive\/debian\/\$\{DEBIAN_SNAPSHOT\}"/.test(apt[0]) ||
+    !/"URIs: \$1:\/\/snapshot\.debian\.org\/archive\/debian-security\/\$\{DEBIAN_SNAPSHOT\}"/.test(
+      apt[0],
+    ) ||
+    lines.some((line) => /http:\/\/snapshot\.debian\.org/.test(line))
+  ) {
+    throw new Error(`${name}: the Debian packages are not installed over HTTPS as pinned`);
+  }
   const chromeVersion = required("CHROME_VERSION", /^\d+\.\d+\.\d+\.\d+$/);
   const googleFontsCommit = required("GOOGLE_FONTS_COMMIT", /^[0-9a-f]{40}$/);
 
@@ -178,6 +213,7 @@ export function readRendererPins(dockerfile = RENDERER_DOCKERFILE) {
   return {
     base,
     debianSnapshot,
+    debianReleases,
     chromeVersion,
     googleFontsCommit,
     chrome,

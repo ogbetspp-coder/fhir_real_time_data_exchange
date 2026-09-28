@@ -1,11 +1,20 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
+import {
+  FONTCONFIG,
+  readRendererPins,
+  RENDERER_DOCKERFILE,
+} from "../../scripts/ci/renderer-pins.mjs";
 import type { Font } from "../../src/render/font.js";
-import { boundFace, checkTextNode, namedFamily } from "../../src/render/fonts.js";
+import { BINDINGS, boundFace, checkTextNode, namedFamily } from "../../src/render/fonts.js";
 import { boxPairs, checkHeights, checkPage, resolveBox } from "../../src/render/page-checks.js";
+import { REFUSAL_CASES } from "../fixtures/render/refusal-cases.js";
 
 // R3's fonts and scripts, R6's coverage, R2's page and R3's character boxes, as rules on what
-// Chrome reports (the renderer image's run of scripts/render/check-fonts.ts draws them).
+// Chrome reports (the renderer image's runs of scripts/render/check.ts and check-fonts.ts draw
+// them).
 
 const METRICS = {
   unitsPerEm: 2048,
@@ -40,6 +49,50 @@ const node = (
   style,
   drawnIn,
   text,
+});
+
+describe("the seeded refusals", () => {
+  it("are each drawn in at least one mode, and every mode named is one", () => {
+    expect(REFUSAL_CASES.length).toBeGreaterThan(10);
+    for (const { name, modes } of REFUSAL_CASES) {
+      const drawn = modes ?? ["html", "xml"];
+      expect([name, drawn.length > 0]).toEqual([name, true]);
+      for (const mode of drawn) expect(["html", "xml"]).toContain(mode);
+    }
+  });
+});
+
+describe("R6's bindings", () => {
+  it("are the fontconfig's strong aliases, in its order, and nothing else", () => {
+    const conf = readFileSync(FONTCONFIG, "utf8");
+    const aliases = [
+      ...conf.matchAll(
+        /<alias binding="strong"><family>([^<]+)<\/family><prefer><family>([^<]+)<\/family><\/prefer><\/alias>/gu,
+      ),
+    ].map(([, family, pinned]) => [family, (pinned ?? "").replaceAll(" ", "")]);
+    expect(conf.match(/<alias\b/gu)?.length).toBe(aliases.length);
+    expect(aliases).toEqual(BINDINGS.map(([family, pinned]) => [family, pinned]));
+  });
+
+  it("bind only families whose four faces the image pins", () => {
+    const dockerfile = readFileSync(RENDERER_DOCKERFILE, "utf8");
+    const liberation = /for face in ([A-Za-z -]+); do/u.exec(dockerfile)?.[1]?.split(" ") ?? [];
+    const files = new Set([
+      ...liberation.map((face) => `Liberation${face}.ttf`),
+      ...readRendererPins().fonts.map(({ file }) => file),
+    ]);
+    expect(files.size).toBe(16);
+    for (const [, pinned] of BINDINGS) {
+      for (const suffix of ["Regular", "Bold", "Italic", "BoldItalic"]) {
+        expect([pinned, files.has(`${pinned}-${suffix}.ttf`)]).toEqual([pinned, true]);
+      }
+    }
+  });
+
+  it("binds a family whichever way its name is cased, as CSS matches it", () => {
+    expect(boundFace("TIMES NEW ROMAN", 400, "normal")).toBe("LiberationSerif");
+    expect(boundFace("calibri", 700, "italic")).toBe("Carlito-BoldItalic");
+  });
 });
 
 describe("R3's fonts", () => {

@@ -136,7 +136,7 @@
               },
               "value": {
                 "type": "string",
-                "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+                "pattern": "^[A-Za-z0-9._:/-]{1,128}$"
               }
             },
             "required": ["system", "value"],
@@ -547,7 +547,8 @@
         }
       },
       "required": ["tool", "error"],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "A failed call: `isError: true` and one text content item that is exactly `error`, one of the closed codes. No structured content, no message, no detail."
     },
     "QueryToolName": {
       "type": "string",
@@ -615,6 +616,10 @@
         },
         "turnId": {
           "$ref": "#/$defs/Uuid"
+        },
+        "degraded": {
+          "type": "string",
+          "enum": ["arguments-unhashable", "record-rejected"]
         }
       },
       "required": [

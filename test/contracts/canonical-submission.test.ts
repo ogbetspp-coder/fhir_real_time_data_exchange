@@ -2,13 +2,20 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import {
   CanonicalSubmissionSchema,
+  MAX_NARRATIVE_LENGTH,
+  MAX_SPANS,
+  MAX_SPANS_PER_SECTION,
   SubmissionRejectedError,
   approvedContent,
   verifyDocumentSubmission,
   type CanonicalSubmission,
   type SectionProvenance,
 } from "../../src/contracts/index.js";
-import type { SourceDocumentText } from "../../src/fidelity/index.js";
+import {
+  NORMALIZATION_VERSION,
+  verifyNarrativeFidelity,
+  type SourceDocumentText,
+} from "../../src/fidelity/index.js";
 import { loadEmaMapping, type EmaMapping } from "../../src/fhir/mapping.js";
 import {
   createSyntheticSubmission,
@@ -229,6 +236,49 @@ describe("canonical submission contract", () => {
     rejectedByParse(seal(submission), "fidelity.normalizationVersion must be fidelity-norm/3.1.0");
   });
 
+  // Audit 2026-09-27 (F-1): the spans the gate re-executes are bounded, per section and in all.
+  it("bounds the spans of a section and of the whole provenance", () => {
+    const submission = clone();
+    const first = firstSection(submission);
+    const [span] = first.spans;
+    if (span === undefined) throw new Error("Synthetic provenance requires a span");
+    first.spans = Array.from({ length: MAX_SPANS_PER_SECTION + 1 }, () => ({ ...span }));
+    rejectedByParse(
+      seal(submission),
+      `provenance.sections[0] has more than ${MAX_SPANS_PER_SECTION} spans`,
+    );
+
+    const many = clone();
+    const template = firstSection(many);
+    const sections = Math.ceil((MAX_SPANS + 1) / MAX_SPANS_PER_SECTION);
+    many.provenance.sections = Array.from({ length: sections }, (_, position) => ({
+      ...structuredClone(template),
+      sourceKey: `smpc.99.${position}`,
+      spans: Array.from({ length: MAX_SPANS_PER_SECTION }, () => ({ ...span })),
+    }));
+    const parsed = CanonicalSubmissionSchema.safeParse(seal(many));
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues.map(({ message }) => message)).toContain(
+      `provenance.sections have more than ${MAX_SPANS} spans`,
+    );
+  });
+
+  // Audit 2026-09-27 (F-3): a narrative is scanned several times at this gate, so its length is
+  // bounded before the first scan.
+  it("bounds a narrative's length before scanning it", () => {
+    const submission = clone();
+    const composition = submission.bundle.entry[0]?.resource as
+      { section?: { text?: { div: string } }[] } | undefined;
+    const section = composition?.section?.find(({ text }) => text !== undefined);
+    if (section?.text === undefined) throw new Error("Synthetic bundle requires a narrative");
+    section.text.div = `<div xmlns="http://www.w3.org/1999/xhtml"><p>${"a".repeat(MAX_NARRATIVE_LENGTH)}</p></div>`;
+
+    const issues = reject(seal(submission)).issues;
+    expect(issues.filter((issue) => issue.includes("narrative exceeds"))).toEqual([
+      `Composition.section[${composition?.section?.indexOf(section) ?? -1}] narrative exceeds ${MAX_NARRATIVE_LENGTH} UTF-16 code units`,
+    ]);
+  });
+
   it("rejects source text that does not match sourceDocument.extractedText.sha256", () => {
     const altered = structuredClone(fixture.sourceText);
     const [page] = altered.pages;
@@ -279,6 +329,101 @@ describe("canonical submission contract", () => {
     expect(reject(submission).issues).toContain(
       "Unverified free text in a property name at entry[0].resource",
     );
+  });
+
+  // Each key is an identifier, but 5,000 of them carried ~290,000 characters past the 40,000
+  // aggregate budget while it counted strings only.
+  it("counts property names toward the aggregate budget", () => {
+    const submission = clone();
+    const organization = submission.bundle.entry[1]?.resource as
+      Record<string, unknown> | undefined;
+    if (organization === undefined) throw new Error("Synthetic bundle requires a second entry");
+    organization.note = Object.fromEntries(
+      Array.from({ length: 5_000 }, (_, index) => [
+        `TakeOneTabletTwiceDailyWithFoodAndPlentyOfWater${index}`,
+        true,
+      ]),
+    );
+
+    const parsed = CanonicalSubmissionSchema.safeParse(seal(submission));
+    expect(parsed.success).toBe(true);
+    expect(reject(submission).issues).toEqual([
+      "Unverified strings and property names exceed 40000 characters in total",
+    ]);
+  });
+
+  // JSON.parse makes an own `__proto__` member; zod's parse drops it, so every hash the gate
+  // checked was over a view without it, while the stored object kept it.
+  it("rejects an own __proto__ member the parse would drop", () => {
+    const text = JSON.stringify(fixture.submission).replace(
+      '"bundle":{',
+      '"bundle":{"__proto__":{"note":"Take one tablet twice daily with food, and never more."},',
+    );
+    const submission = JSON.parse(text) as CanonicalSubmission;
+    expect(Object.keys(submission.bundle)).toContain("__proto__");
+    expect(sha256(submission.bundle)).not.toBe(submission.bundleSha256);
+
+    expect(reject(submission).issues).toEqual([
+      "submission carries the reserved property name __proto__",
+    ]);
+  });
+
+  // A report that failed, and says so consistently: its hash recomputes, the submission names it,
+  // and re-executing the check reproduces it. Only its status stands between it and acceptance.
+  it("rejects a self-consistent fidelity report that failed", () => {
+    const { narrativeSections } = verifyDocumentSubmission(
+      {
+        submission: fixture.submission,
+        fidelityReport: fixture.fidelityReport,
+        sourceText: fixture.sourceText,
+      },
+      mapping.sourceCodeSystem,
+      SYNTHETIC,
+    );
+    const sourceText = structuredClone(fixture.sourceText);
+    for (const page of sourceText.pages) page.text = page.text.replace(/[a-z]/g, "q");
+    const submission = clone();
+    const failed = verifyNarrativeFidelity({
+      normalizationVersion: NORMALIZATION_VERSION,
+      source: sourceText,
+      sections: narrativeSections,
+      provenance: submission.provenance.sections,
+    });
+    expect(failed.status).toBe("failed");
+    expect(failed.summary.verified).toBe(0);
+    submission.provenance.sourceDocument.extractedText.sha256 = sha256(sourceText);
+    submission.provenance.fidelity.reportSha256 = failed.reportHash;
+
+    let caught: unknown;
+    try {
+      verifyDocumentSubmission(
+        { submission: seal(submission), fidelityReport: failed, sourceText },
+        mapping.sourceCodeSystem,
+        SYNTHETIC,
+      );
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(SubmissionRejectedError);
+    expect((caught as SubmissionRejectedError).issues).toEqual([
+      "Fidelity report status must be passed",
+    ]);
+  });
+
+  it("rejects a narrative outside the verified sections", () => {
+    const submission = clone();
+    const composition = submission.bundle.entry[0]?.resource as Record<string, unknown> | undefined;
+    if (composition === undefined) throw new Error("Synthetic bundle requires a Composition");
+    composition.text = {
+      status: "generated",
+      div: '<div xmlns="http://www.w3.org/1999/xhtml">Not for clinical use.</div>',
+    };
+
+    const parsed = CanonicalSubmissionSchema.safeParse(seal(submission));
+    expect(parsed.success).toBe(true);
+    expect(reject(submission).issues).toEqual([
+      "Narrative outside verified sections at entry[0].resource.text.div",
+    ]);
   });
 
   it("rejects prose in a provenance identifier field", () => {

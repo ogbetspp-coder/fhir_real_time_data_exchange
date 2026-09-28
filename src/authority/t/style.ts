@@ -1,3 +1,4 @@
+import { BLOCK_ELEMENTS } from "../../fidelity/xhtml.js";
 import {
   absolute,
   colour,
@@ -70,45 +71,19 @@ export type ComputedStyle = {
   // Which of the shift-bearing properties the element declared (T3: not both).
   declaredPosition: boolean;
   declaredVerticalAlign: string | undefined;
-  hasWidthOrHeight: boolean;
   // Every property the element declares, shorthands expanded to their longhands.
   declared: ReadonlySet<string>;
 };
 
-export const ROOT_SIZE: Size = { lo: 12, hi: 12 };
+const ROOT_SIZE: Size = { lo: 12, hi: 12 };
 const WHITE: Rgb = [255, 255, 255];
 export const LINK_COLOURS: readonly Rgb[] = [
   [0x00, 0x00, 0xee],
   [0x55, 0x1a, 0x8b],
 ];
 
-export const BLOCKS = new Set([
-  "div",
-  "p",
-  "h1",
-  "h2",
-  "h3",
-  "h4",
-  "h5",
-  "h6",
-  "ul",
-  "ol",
-  "li",
-  "table",
-  "thead",
-  "tbody",
-  "tfoot",
-  "tr",
-  "td",
-  "th",
-  "caption",
-  "blockquote",
-  "dl",
-  "dt",
-  "dd",
-  "hr",
-  "br",
-]);
+// The scanner's block elements and `br` (fidelity section 5).
+export const BLOCKS: ReadonlySet<string> = new Set([...BLOCK_ELEMENTS, "br"]);
 export const TABLE_PARTS = new Set([
   "table",
   "thead",
@@ -273,7 +248,6 @@ export function computeStyle(context: ElementContext): ComputedStyle {
     shift: name === "sup" ? { kind: "super" } : name === "sub" ? { kind: "sub" } : { kind: "none" },
     declaredPosition: false,
     declaredVerticalAlign: undefined,
-    hasWidthOrHeight: false,
     declared: new Set(),
   };
   const declaredNames = new Set<string>();
@@ -380,7 +354,6 @@ export function computeStyle(context: ElementContext): ComputedStyle {
         if ("em" in parsed) throw new CssRefusal("css-value");
         if (("points" in parsed ? parsed.points : parsed.percent) < 0)
           throw new CssRefusal("css-value");
-        style.hasWidthOrHeight = true;
         break;
       }
       case "border-collapse":
@@ -545,7 +518,6 @@ export function rootStyle(): ComputedStyle {
     shift: { kind: "none" },
     declaredPosition: false,
     declaredVerticalAlign: undefined,
-    hasWidthOrHeight: false,
     declared: new Set(),
   };
 }

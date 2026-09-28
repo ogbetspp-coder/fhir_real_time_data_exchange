@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FhirResource } from "../../src/fhir/types.js";
-import { sha256 } from "../../src/lib/hash.js";
+import { sha256, sha256Utf8 } from "../../src/lib/hash.js";
 import {
   FhirReadError,
   HealthcareFhirReader,
   PROVENANCE_PAGE_SIZE,
+  STORE_READ_TIMEOUT_MS,
   latestProvenance,
 } from "../../src/query/fhir-reader.js";
 
@@ -13,13 +14,15 @@ import {
 // it is replaced here at that boundary, and `fetch` is stubbed, so nothing below touches a
 // credential or the network.
 const auth = vi.hoisted(() => {
-  const state: { token: string | null } = { token: "test-token" };
+  // `hang`: the credential lookup never answers, as a metadata server that has stopped would.
+  const state: { token: string | null; hang: boolean } = { token: "test-token", hang: false };
   return state;
 });
 
 vi.mock("google-auth-library", () => ({
   GoogleAuth: class {
     getAccessToken(): Promise<string | null> {
+      if (auth.hang) return new Promise<never>(() => undefined);
       return Promise.resolve(auth.token);
     }
   },
@@ -145,6 +148,7 @@ function respond(status: number, body: unknown, statusText = ""): () => Response
 
 beforeEach(() => {
   auth.token = "test-token";
+  auth.hang = false;
   sent = [];
   answer = respond(200, {});
   vi.stubGlobal(
@@ -226,6 +230,7 @@ describe("reading a document Bundle", () => {
 
     expect(error).toBeInstanceOf(FhirReadError);
     expect((error as FhirReadError).name).toBe("FhirReadError");
+    expect((error as FhirReadError).httpStatus).toBe(403);
     expect((error as FhirReadError).message).toBe(
       `Healthcare API 403 Forbidden (response sha256 ${sha256(body)}, 2 issues)`,
     );
@@ -240,6 +245,90 @@ describe("reading a document Bundle", () => {
     await expect(reader.readBundleVersion("bundle-1", "1")).rejects.toThrow(
       `Healthcare API 500 Internal Server Error (response sha256 ${sha256(body)}, 0 issues)`,
     );
+  });
+
+  it("names the status of a refusal whose body is not JSON, and quotes nothing from it", async () => {
+    // An HTML error page from a proxy in front of the store: before, response.json() threw a
+    // bare SyntaxError and the status was lost.
+    const page = "<html><body>502 Bad Gateway: take two tablets</body></html>";
+    answer = () => new Response(page, { status: 502, statusText: "Bad Gateway" });
+    const reader = new HealthcareFhirReader(OPTIONS);
+
+    const error = await reader.readBundle("bundle-1").catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(FhirReadError);
+    expect((error as FhirReadError).httpStatus).toBe(502);
+    expect((error as FhirReadError).message).toBe(
+      `Healthcare API 502 Bad Gateway (non-JSON response sha256 ${sha256Utf8(page)})`,
+    );
+    expect((error as FhirReadError).message).not.toContain("tablets");
+  });
+
+  it("releases the body of a missing resource without reading it", async () => {
+    const answered: Response[] = [];
+    answer = () => {
+      const response = new Response(JSON.stringify({ resourceType: "OperationOutcome" }), {
+        status: 404,
+      });
+      answered.push(response);
+      return response;
+    };
+    const reader = new HealthcareFhirReader(OPTIONS);
+
+    expect(await reader.readBundle("bundle-1")).toBeUndefined();
+    expect(answered[0]?.bodyUsed).toBe(true);
+  });
+
+  it("bounds every read by a timeout, and cancels it with the request", async () => {
+    answer = respond(200, DOCUMENT);
+    const reader = new HealthcareFhirReader(OPTIONS);
+
+    // No request signal: the read still carries its own timeout.
+    await reader.readBundle("bundle-1");
+    const alone = sent[0]?.init.signal;
+    expect(alone).toBeInstanceOf(AbortSignal);
+    expect(alone?.aborted).toBe(false);
+
+    // With one: aborting the request aborts the read.
+    const request = new AbortController();
+    await reader.findProvenanceForBundle("bundle-1", request.signal);
+    const joined = sent[1]?.init.signal;
+    expect(joined?.aborted).toBe(false);
+    request.abort();
+    expect(joined?.aborted).toBe(true);
+  });
+
+  it("stops waiting for a credential when the request ends", async () => {
+    auth.hang = true;
+    const reader = new HealthcareFhirReader(OPTIONS);
+    const request = new AbortController();
+
+    const pending = reader.readBundle("bundle-1", request.signal).catch((e: unknown) => e);
+    request.abort();
+    const error = await pending;
+
+    expect((error as Error).name).toBe("AbortError");
+    expect(sent).toEqual([]);
+  });
+
+  it("stops waiting for a credential at the read's own timeout", async () => {
+    auth.hang = true;
+    // AbortSignal.timeout runs on the runtime's own timer, which fake timers do not drive; the
+    // read's timeout is replaced by one that has already fired, and the read is asked for it.
+    const timeout = vi
+      .spyOn(AbortSignal, "timeout")
+      .mockImplementation(() =>
+        AbortSignal.abort(new DOMException("The operation timed out.", "TimeoutError")),
+      );
+    try {
+      const reader = new HealthcareFhirReader(OPTIONS);
+      const error = await reader.readBundle("bundle-1").catch((e: unknown) => e);
+      expect(timeout).toHaveBeenCalledWith(STORE_READ_TIMEOUT_MS);
+      expect((error as Error).name).toBe("TimeoutError");
+      expect(sent).toEqual([]);
+    } finally {
+      timeout.mockRestore();
+    }
   });
 
   it("refuses when Application Default Credentials yield no token, before any request", async () => {

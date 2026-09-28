@@ -639,7 +639,9 @@ record does not change them.
 ### R6. The image: pinned browser, pinned fonts
 
 `Dockerfile.renderer`, pinned as `Dockerfile.validator` is, its pins read by one reader
-(`scripts/ci/renderer-pins.mjs`) used by the Dockerfile check and the lock. The renderer image build
+(`scripts/ci/renderer-pins.mjs`), held to its rules by a unit test and to be used by the lock (3c-C4).
+Its Debian packages come over HTTPS (the CA certificates alone over HTTP), each suite's signed
+Release held to its pinned date. The renderer image build
 (`cloudbuild.renderer-image.yaml`, R1) builds it when its pins change and pushes it to
 `renderer-images`; it is used by digest
 (`rendererImageDigest`, in the lock and in every attestation), so a draw does not download Chrome or
@@ -665,9 +667,13 @@ depend on `snapshot.debian.org`:
 **Coverage.** `CSS.getPlatformFontsForNode` counts a missing glyph under the font, so it proves only
 the face. Every code point is checked against the cmap of the pinned face that draws it; a code
 point the face lacks is a refusal of ours (`font-coverage`), except a closed list of substitutions
-Blink and HarfBuzz make, each asserted by a pixel test: U+00A0 drawn as the space's glyph, U+2011
-as the hyphen's, U+00AD drawn as a hyphen only at a line break. A test seeds U+2070, which
-Liberation Serif lacks.
+Blink and HarfBuzz make, each asserted by a pixel test (`SUBSTITUTIONS` in `src/render/fonts.ts`):
+one, U+2011 drawn with U+2010's glyph, in the Liberation faces only (Chrome draws it in Carlito and
+Caladea from another pinned face, which `font-face` refuses). The code points drawn as nothing are
+a closed list of their own (`NOT_DRAWN_RANGES`), each range asserted by pixels, among them U+00AD,
+drawn as a hyphen only at a line break (its own pixel test); U+00A0 is in every pinned face's map,
+and a pixel test asserts it is drawn as the space's glyph. A test seeds U+2070, which Liberation
+Serif lacks.
 
 ### R7. Determinism
 
@@ -930,8 +936,8 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
    letter a second one drawn at 105 % of its size must be its face's at its own size, and where
    Chrome drew it taller than the letter it is judged at the letter's size: of 110 740 such
    stretched boxes the model refuses 109 808 and passes 932 (where the letter's interval holds
-   two pairs), a count pinned too; every carried section's 3 020 620 boxes at the ten ratios are
-   exactly R3's (`renderer:fonts`). Stated: the interval is set from Blink's code at the pinned
+   two pairs), a count pinned too; every carried section's 3 021 100 boxes at the ten ratios are
+   exactly R3's (`renderer:check`). Stated: the interval is set from Blink's code at the pinned
    version and the sweep, not proven for every size; a size whose drawn box falls outside it is a
    refusal of ours, never a pass. Below an ascent of 3 device pixels Blink keeps fractional
    metrics, which T's 5 pt floor never reaches (the model refuses it); a face whose OS/2 table asks
@@ -1002,7 +1008,13 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
 ## Verification
 
 - Unit tests of the judge on recorded Chrome outputs (`test/render/`), so `npm run check` needs
-  no browser; a coverage floor.
+  no browser; a coverage floor. The recording names the pinned browser and each case's div by
+  hash, and CI records it again in the image (`renderer:record`).
+- One enumeration of what is drawn (`src/render/sections.ts`): it fails on a case T or the scanner
+  now refuses, an empty lock, a label with no sections, and a label whose bytes are not the lock's.
+  The sweep (`scripts/render/check.ts`) draws each page once per ratio and every check reads it,
+  each keeping its own verdict and counting the carried sections it judged against the
+  enumeration's; a seed is judged in each mode it names.
 - Seeded cases, each caught: a wrong model entry, overlapping cells, text off the page, raised text
   above the section, a marker off the page, a line under a `<`, a border through a letter, a missing
   glyph (U+2070), an unpinned family (Verdana), a Greek run bounded, a script in the div, an XML

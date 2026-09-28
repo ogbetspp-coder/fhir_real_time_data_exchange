@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { serviceAccountRoles, terraformBlocks } from "../support/terraform.js";
+import { serviceAccountRoles, terraformBlocks, withoutResources } from "../support/terraform.js";
+import { TRANSITIONAL_GRANTS } from "../infra/transitional-grants.js";
 
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -779,6 +780,116 @@ describe("ePI query service, phase 1", () => {
     }
   });
 
+  it("find_product finds a product whose identifier is an EMA ePI id", async () => {
+    const seeded = store.documents.get(store.bundleIdA);
+    if (seeded === undefined) throw new Error("expected a seeded document");
+    // Every EMA ePI id carries "/" ("EPI/23/1047", the importer writes it verbatim), and under
+    // query-tools 2.0.x one such identifier refused the whole summary: the product was left out
+    // and the answer still said `truncated: false`.
+    const emaId = stableUuid("ema-bundle", "ema-epi-id");
+    const ema = {
+      ...seeded,
+      bundle: withProduct(seeded.bundle, "Synthetic Linagliptin 5 mg tablets", "EPI/23/1047"),
+    };
+    // An identifier the contract cannot carry at all (a space) costs the summary that
+    // identifier, never the product.
+    const spacedId = stableUuid("ema-bundle", "spaced-identifier");
+    const spaced = {
+      ...seeded,
+      bundle: withProduct(seeded.bundle, "Synthetic Metformin 500 mg tablets", "EPI 23 1047"),
+    };
+    const harness = await connectHarness({
+      store,
+      principal: PRINCIPAL_A,
+      entitlements: { bundles: [emaId, spacedId] },
+      documents: new Map<string, SeededDocument>([
+        [emaId, ema],
+        [spacedId, spaced],
+      ]),
+    });
+    try {
+      const byName = FindProductOutputSchema.parse(
+        (await callTool(harness, "find_product", { query: "Linagliptin" })).structured,
+      );
+      expect(byName).toMatchObject({ truncated: false });
+      expect(byName.products.map(({ document }) => document.bundleId)).toEqual([emaId]);
+      expect(byName.products[0]?.identifiers).toEqual([
+        { system: "https://khs.dev/fhir/identifier/product", value: "EPI/23/1047" },
+      ]);
+
+      const byIdentifier = FindProductOutputSchema.parse(
+        (await callTool(harness, "find_product", { query: "epi/23/1047" })).structured,
+      );
+      expect(byIdentifier.products.map(({ document }) => document.bundleId)).toEqual([emaId]);
+
+      const withoutIdentifier = FindProductOutputSchema.parse(
+        (await callTool(harness, "find_product", { query: "Metformin" })).structured,
+      );
+      expect(withoutIdentifier).toMatchObject({ truncated: false });
+      expect(withoutIdentifier.products.map(({ document }) => document.bundleId)).toEqual([
+        spacedId,
+      ]);
+      expect(withoutIdentifier.products[0]?.identifiers).toEqual([]);
+    } finally {
+      await harness.close();
+    }
+  });
+
+  it("find_product counts a document it could not summarise as unsearched", async () => {
+    const seeded = store.documents.get(store.bundleIdA);
+    if (seeded === undefined) throw new Error("expected a seeded document");
+    // A stored product name longer than the contract's bound cannot be summarised, and a stored
+    // Bundle that does not say its version cannot be cited. Neither is a product the caller can
+    // be shown, and neither may make an empty answer read as "that is all there is".
+    const longId = stableUuid("ema-bundle", "long-product-name");
+    const long = { ...seeded, bundle: withProduct(seeded.bundle, "L".repeat(301), "SYN-LONG") };
+    const unversionedId = stableUuid("ema-bundle", "unversioned");
+    const unversioned = { ...seeded, bundle: { ...seeded.bundle, meta: {} } };
+    for (const [bundleId, document] of [
+      [longId, long],
+      [unversionedId, unversioned],
+    ] as const) {
+      const harness = await connectHarness({
+        store,
+        principal: PRINCIPAL_A,
+        entitlements: { bundles: [bundleId, store.bundleIdA] },
+        documents: new Map<string, SeededDocument>([
+          [bundleId, document],
+          [store.bundleIdA, seeded],
+        ]),
+      });
+      try {
+        const answer = FindProductOutputSchema.parse(
+          (await callTool(harness, "find_product", { query: "synthetic" })).structured,
+        );
+        expect(answer.products.map(({ document: found }) => found.bundleId)).toEqual([
+          store.bundleIdA,
+        ]);
+        expect([bundleId, answer.truncated]).toEqual([bundleId, true]);
+        expect(onlyAudit(harness.audits)).toMatchObject({ outcome: "ok", truncated: true });
+      } finally {
+        await harness.close();
+      }
+    }
+
+    // A document the store does not hold has nothing in it to find: not truncated.
+    const missingId = stableUuid("ema-bundle", "never-stored");
+    const harness = await connectHarness({
+      store,
+      principal: PRINCIPAL_A,
+      entitlements: { bundles: [missingId, store.bundleIdA] },
+      documents: new Map<string, SeededDocument>([[store.bundleIdA, seeded]]),
+    });
+    try {
+      const answer = FindProductOutputSchema.parse(
+        (await callTool(harness, "find_product", { query: "synthetic" })).structured,
+      );
+      expect(answer).toMatchObject({ truncated: false });
+    } finally {
+      await harness.close();
+    }
+  });
+
   it("find_product reads at most the scan horizon, and stops at the limit", async () => {
     const seeded = store.documents.get(store.bundleIdA);
     if (seeded === undefined) throw new Error("expected a seeded document");
@@ -1135,7 +1246,14 @@ describe("ePI query service, phase 1", () => {
     expect(declared).toContain("query");
     expect(declared).toContain("caller");
 
-    const roles = serviceAccountRoles(terraform, "query");
+    // Until phase 2 of audit B04 the query identity also holds its old dataset-wide reader,
+    // exactly that and nothing more; the set proven below is what remains once it is removed.
+    expect(serviceAccountRoles(terraform, "query")).toContainEqual({
+      type: "google_healthcare_dataset_iam_member",
+      role: "roles/healthcare.fhirResourceReader",
+    });
+    expect(serviceAccountRoles(terraform, "query")).toHaveLength(3);
+    const roles = serviceAccountRoles(withoutResources(terraform, TRANSITIONAL_GRANTS), "query");
     expect(new Set(roles.map(({ role }) => role))).toEqual(
       new Set(["roles/healthcare.fhirResourceReader", "roles/logging.logWriter"]),
     );
@@ -1143,8 +1261,12 @@ describe("ePI query service, phase 1", () => {
 
     const reader = roles.find(({ role }) => role === "roles/healthcare.fhirResourceReader");
     const writer = roles.find(({ role }) => role === "roles/logging.logWriter");
-    // The FHIR reader role is bound on the dataset, never on the project.
-    expect(reader?.type).toBe("google_healthcare_dataset_iam_member");
+    // The FHIR reader role is bound on the validated store, never on the dataset (which also
+    // holds the unvalidated source store) or the project.
+    expect(reader?.type).toBe("google_healthcare_fhir_store_iam_member");
+    expect(
+      blocks.find(({ type, name }) => type === reader?.type && name === "query_fhir_reader")?.body,
+    ).toMatch(/fhir_store_id\s*=\s*local\.target_fhir_store_path\n/);
     expect(writer?.type).toBe("google_project_iam_member");
 
     // The impersonation-only caller identity may invoke the query service and do nothing else.

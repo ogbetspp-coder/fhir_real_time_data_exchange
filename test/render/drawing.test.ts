@@ -17,7 +17,7 @@ import { PictureError, preparePictures, UNPINNED_URL } from "../../src/render/pi
 import { BLUE_PNG, GREEN_PNG, PICTURE_FORMS, RED_PNG } from "../fixtures/render/drawing-cases.js";
 
 // R2's pictures and second drawing, as rules on what the page is given and what Chrome reports
-// (the renderer image's run of scripts/render/check-drawings.ts draws them).
+// (the renderer image's runs of scripts/render/check.ts and check-drawings.ts draw them).
 
 const hash = (base64: string): string =>
   createHash("sha256").update(Buffer.from(base64, "base64")).digest("hex");

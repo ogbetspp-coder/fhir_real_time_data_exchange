@@ -1,11 +1,14 @@
-# gitleaks configuration for scripts/ci/secret-scan.sh (docs/foundations.md, D4).
+# This repository's exceptions to the secret scan (scripts/ci/secret-scan.sh; docs/foundations.md,
+# D4), and nothing else: [[allowlists]] tables only.
 #
-# Every default rule applies. An exception here must be as narrow as the false positive it
-# covers: one rule, one file, one line shape, all three required (condition AND), with the reason.
-# A path-only or rule-only exception would also hide a real secret added beside it.
-
-[extend]
-useDefault = true
+# The scan appends them to gitleaks' own default configuration for its pinned version, fetched
+# and checksummed like the binary, with that configuration's global path exemptions dropped. So
+# every default rule applies, to every file, and this file is not a configuration on its own (no
+# `[extend] useDefault`: that would bring the path exemptions back).
+#
+# An exception here must be as narrow as the false positive it covers: one rule, one file, one
+# line shape, all three required (condition AND), with the reason. A path-only or rule-only
+# exception would also hide a real secret added beside it.
 
 # deploy.sh authenticates to Artifact Registry's Docker v2 API with HTTP Basic, the fixed user
 # `oauth2accesstoken` and a freshly minted access token as the password. The line carries a

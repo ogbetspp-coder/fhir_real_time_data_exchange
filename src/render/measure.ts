@@ -207,11 +207,9 @@ const READ_RUNS = `(() => {
   return out;
 })()`;
 
-// Each text node of the div, with the faces it is drawn in; `withFaces` false leaves `drawnIn`
-// empty (the faces do not depend on the width).
-export async function readRuns(page: Page, withFaces = true): Promise<ChromeRun[]> {
+// Each text node of the div, with the faces it is drawn in.
+export async function readRuns(page: Page): Promise<ChromeRun[]> {
   const runs = await page.evaluate<Omit<ChromeRun, "drawnIn">[]>(READ_RUNS);
-  if (!withFaces) return runs.map((run) => ({ ...run, drawnIn: [] }));
   await page.send("DOM.enable");
   await page.send("CSS.enable");
   await page.send("DOM.getDocument", { depth: 0 });
@@ -234,9 +232,10 @@ export async function readRuns(page: Page, withFaces = true): Promise<ChromeRun[
     const { nodeId } = (await page.send("DOM.requestNode", { objectId: result.objectId })) as {
       nodeId: number;
     };
-    // DevTools keeps no node of whitespace alone (by its own rule: U+3000 and the other wide
-    // spaces too), so no face is reported for it: `drawnIn` stays empty, and the check judges
-    // its code points, skipping ASCII whitespace and refusing anything else (CI, measured).
+    // A node DevTools still keeps none of (whitespace alone was skipped above) answers 0, and one
+    // it has dropped since fails to be found: no face is reported for either, so `drawnIn` stays
+    // empty and the check (checkTextNode) passes it only if it draws nothing, spaces and the code
+    // points drawn as nothing alone, and refuses it as `font-face` otherwise.
     let drawnIn: string[] = [];
     if (nodeId !== 0) {
       try {

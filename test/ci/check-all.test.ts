@@ -12,13 +12,16 @@ const script = readFileSync("scripts/check-all.sh", "utf8");
 // Installing Node dependencies is the caller's `npm ci`; the official HL7 validator needs Java
 // and ~200 MB of downloads and stays its own CI job (the script's header says so).
 // A local checkout already has origin/main; CI's shallow checkout fetches the importer lock's
-// base. The renderer image needs Docker and ~200 MB of downloads, and is its own CI job too.
+// base. The renderer image needs Docker and ~200 MB of downloads, and is its own CI job too, with
+// the step that decides whether it runs.
 const NOT_RUN_LOCALLY = new Set([
   "npm ci --no-audit --no-fund",
   "npm run validate:official",
   "bash scripts/ci/lock-base.sh",
+  'node scripts/ci/renderer-inputs.mjs >> "$GITHUB_OUTPUT"',
   "npm run renderer:image",
   "npm run renderer:smoke",
+  "npm run renderer:record",
   "npm run renderer:check",
   "npm run renderer:fonts",
   "npm run renderer:boxes",
