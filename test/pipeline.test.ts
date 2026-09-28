@@ -76,6 +76,31 @@ describe("pipeline", () => {
     expect(() => RunManifestSchema.parse(result.evidence.manifest)).not.toThrow();
   });
 
+  // The allowlist held only at the HTTP surface let scripts/dev/run-pipeline.ts run a fixture
+  // against a deployment that enables only `document`, and persist it signed.
+  it.each([
+    ["the no-synthetic default", {}],
+    [
+      "an explicit document-only list",
+      { ALLOW_SYNTHETIC_SOURCES: "true", ENABLED_RUN_SOURCES: "document" },
+    ],
+  ])("refuses a source the deployment disabled, under %s", async (_, environment) => {
+    const disabled = loadConfig({ NODE_ENV: "test", DRY_RUN: "true", ...environment });
+    expect(disabled.ENABLED_RUN_SOURCES).toEqual(["document"]);
+    await expect(
+      runPipeline(
+        {
+          runId: FIXTURE_RUN_ID,
+          source: createSyntheticType2Bundle(mapping),
+          sourceKind: "fixture",
+          sourceResource: "fixture:test",
+        },
+        mapping,
+        disabled,
+      ),
+    ).rejects.toThrow(/^Run source is disabled$/);
+  });
+
   it("publishes an approved document submission with ingestion evidence", async () => {
     const { submission, fidelityReport, sourceText } = createSyntheticSubmission(mapping);
     const fixture = await runPipeline(
