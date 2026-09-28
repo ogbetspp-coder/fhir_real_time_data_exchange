@@ -13,8 +13,8 @@
 #     there is one arrives as a digest bump from Dependabot. The report makes them visible.
 #
 # The scanner is downloaded at a pinned version and verified against a pinned SHA-256, like every
-# other third-party dependency in CI. An exception to the lockfile verdict goes in
-# osv-scanner.toml with a reason and an expiry, in a reviewed pull request.
+# other third-party dependency in CI. An exception to the lockfile verdict goes in the root
+# osv-scanner.toml with a reason and an expiry, in a reviewed pull request; no other is read.
 #
 #   bash scripts/ci/vuln-scan.sh             # lockfiles, then images if docker is available
 #   OSV_SKIP_IMAGES=true bash scripts/ci/vuln-scan.sh
@@ -59,15 +59,21 @@ PY
 }
 
 : >"$REPORT"
-config=()
-[[ -f "$ROOT/osv-scanner.toml" ]] && config=(--config "$ROOT/osv-scanner.toml")
+# Always an explicit --config: without one, OSV-Scanner loads an osv-scanner.toml it finds beside
+# any lockfile it scans, so a file dropped next to agent/uv.lock could ignore advisories without
+# touching the reviewed root one. With no root file, an empty one stands in and ignores nothing.
+config="$ROOT/osv-scanner.toml"
+if [[ ! -f "$config" ]]; then
+  config="$WORK/osv-scanner.toml"
+  : >"$config"
+fi
 
 # 1. Lockfiles: the verdict.
 # VULN_LOCKFILES overrides the list, so the verdict itself can be proved on a known-bad lockfile.
 read -r -a lockfiles <<<"${VULN_LOCKFILES:-$ROOT/package-lock.json $ROOT/agent/uv.lock $ROOT/zone-a/uv.lock}"
 lock_args=()
 for lockfile in "${lockfiles[@]}"; do lock_args+=(-L "$lockfile"); done
-"$WORK/osv-scanner" scan source ${config[@]+"${config[@]}"} --format json "${lock_args[@]}" \
+"$WORK/osv-scanner" scan source --config "$config" --format json "${lock_args[@]}" \
   >"$WORK/locks.json" 2>"$WORK/locks.err" || true
 if ! python3 -c "import json,sys;json.load(open(sys.argv[1]))" "$WORK/locks.json" 2>/dev/null; then
   cat "$WORK/locks.err" >&2
@@ -92,7 +98,7 @@ fi
 
 cat "$REPORT"
 if [[ "$lock_findings" != "0" ]]; then
-  echo "::error::${lock_findings} known vulnerabilit(ies) in the lockfiles. Upgrade, or record a reviewed exception in osv-scanner.toml." >&2
+  echo "::error::${lock_findings} known vulnerabilit(ies) in the lockfiles. Upgrade, or record a reviewed exception in the root osv-scanner.toml." >&2
   exit 1
 fi
 echo "No known vulnerabilities in the lockfiles."

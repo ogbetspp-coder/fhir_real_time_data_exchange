@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
@@ -74,6 +75,61 @@ describe("the secret scan in CI", () => {
     expect(workflow).toContain("fetch-depth: 0");
   });
 
+  it("proves the scan on planted secrets before it trusts a clean one", () => {
+    const proof = workflow.indexOf(
+      "- name: Prove the secret scan on planted secrets\n        if: success() || failure()\n        run: bash scripts/ci/secret-scan-selftest.sh\n",
+    );
+    expect(proof).toBeGreaterThan(-1);
+    expect(proof).toBeLessThan(workflow.indexOf("- name: Scan for secrets"));
+    const selftest = readFileSync("scripts/ci/secret-scan-selftest.sh", "utf8");
+    // Each place the scan once missed a secret, and the clean control.
+    for (const planted of [
+      'expect clean "a clean repository with a merge" "$clean" --all',
+      'expect found "a secret introduced by a merge, in the range" "$merge" "${base}..HEAD"',
+      'expect found "a secret introduced by a merge, in the whole history" "$merge" --all',
+      'expect found "a secret marked gitleaks:allow, in the tree" "$inline"',
+      'expect refused "a secret listed in .gitleaksignore, in the tree" "$ignored"',
+    ]) {
+      expect(selftest).toContain(planted);
+    }
+    // The planted token is built at run time; the file carries none of its own.
+    expect(selftest).not.toMatch(/ghp_[0-9A-Za-z]{36}/);
+  });
+
+  it("honours no exception but .gitleaks.toml, and reads merge commits", () => {
+    const script = readFileSync("scripts/ci/secret-scan.sh", "utf8");
+    const common = /^common=\(([^)]*)\)$/m.exec(script)?.[1] ?? "";
+    expect(common).toContain('--config "$CONFIG"');
+    expect(common).toContain("--ignore-gitleaks-allow");
+    expect(common).toContain('--gitleaks-ignore-path "$WORK/no-ignore-file"');
+    expect(script).toContain('mkdir "$WORK/no-ignore-file"');
+    // gitleaks reads the scanned root's .gitleaksignore whatever the flag says: refused outright.
+    expect(script).toMatch(/if \[\[ -e "\$ROOT\/\.gitleaksignore" \]\]; then\n.*\n\s+exit 1\n/);
+    expect(script).toContain('git --log-opts="-m ${SECRET_SCAN_RANGE}" "$ROOT"');
+    expect(script.match(/--log-opts=/g)).toHaveLength(1);
+    const tracked = execFileSync(
+      "git",
+      ["ls-files", "--", ".gitleaksignore", "**/.gitleaksignore"],
+      {
+        encoding: "utf8",
+      },
+    );
+    expect(tracked).toBe("");
+  });
+
+  it("lets only a weekly, checkout-free job write issues", () => {
+    const head = workflow.slice(0, workflow.indexOf("\njobs:\n"));
+    expect(head).toMatch(/^permissions:\n {2}contents: read\n(?! )/m);
+    const jobs = workflow.slice(workflow.indexOf("\njobs:\n")).split(/\n(?= {2}[a-z-]+:\n)/);
+    const writers = jobs.filter((job) => job.includes("issues: write"));
+    expect(writers).toHaveLength(1);
+    const [writer = ""] = writers;
+    expect(writer).toMatch(/^ {4}if: failure\(\) && github\.event_name == 'schedule'$/m);
+    expect(writer).toMatch(/^ {4}needs: scan$/m);
+    expect(writer).not.toContain("actions/checkout");
+    expect(writer).not.toMatch(/\bbash scripts\//);
+  });
+
   it("uses every default rule, and each exception needs a rule, a path and a pattern at once", () => {
     expect(config).toMatch(/^\[extend\]\nuseDefault = true$/m);
     const exceptions = config.split(/^\[\[allowlists\]\]$/m).slice(1);
@@ -86,5 +142,14 @@ describe("the secret scan in CI", () => {
     }
     // No global allowlist, which would exempt its paths or patterns from every rule.
     expect(config).not.toMatch(/^\[allowlist\]$/m);
+  });
+});
+
+describe("the vulnerability scan's exceptions", () => {
+  it("always names its config, so no osv-scanner.toml beside a lockfile is read", () => {
+    const script = readFileSync("scripts/ci/vuln-scan.sh", "utf8");
+    expect(script).toContain('"$WORK/osv-scanner" scan source --config "$config" ');
+    expect(script).toMatch(/^config="\$ROOT\/osv-scanner\.toml"$/m);
+    expect(script).toMatch(/^ {2}config="\$WORK\/osv-scanner\.toml"\n {2}: >"\$config"$/m);
   });
 });

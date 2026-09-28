@@ -10,13 +10,21 @@
 #   - the working tree: every tracked file, and every untracked file git does not ignore, copied
 #     out first so node_modules, .venv and build output are never read;
 #   - the pushed commits: every commit in SECRET_SCAN_RANGE (a git revision range such as
-#     base..head), so a secret added in one commit and removed in the next is still found. Unset,
-#     only the working tree is scanned.
+#     base..head, or --all), so a secret added in one commit and removed in the next is still
+#     found. Merge commits are read against each parent (git log -m): without it git prints no
+#     patch for a merge, and a secret the merge itself introduced was never read. Unset, only the
+#     working tree is scanned.
 #
 # The scanner is downloaded at a pinned version and verified against a pinned SHA-256 before it
 # runs, like OSV-Scanner in vuln-scan.sh. Findings are redacted: the report names the rule, the
 # file, the line and the commit, never the matched text. An exception goes in .gitleaks.toml, as
-# narrow as the known false positive it covers, in a reviewed pull request.
+# narrow as the known false positive it covers, in a reviewed pull request, and nowhere else:
+# gitleaks' own escape hatches, an inline `gitleaks:allow` comment (ignored) and a .gitleaksignore
+# file of fingerprints (refused), are both closed, since either lets the change that adds a secret
+# exempt it.
+#
+# SECRET_SCAN_ROOT scans another repository with this one's .gitleaks.toml, so the verdict itself
+# can be proved on planted secrets (scripts/ci/secret-scan-selftest.sh).
 #
 #   bash scripts/ci/secret-scan.sh
 #   SECRET_SCAN_RANGE=origin/main..HEAD bash scripts/ci/secret-scan.sh
@@ -28,7 +36,14 @@ case "$(uname -s)-$(uname -m)" in
   Darwin-arm64) ASSET="gitleaks_${VERSION}_darwin_arm64.tar.gz"; SHA="b40ab0ae55c505963e365f271a8d3846efbc170aa17f2607f13df610a9aeb6a5" ;;
   *) echo "No pinned gitleaks build for $(uname -s)-$(uname -m)." >&2; exit 1 ;;
 esac
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+CONFIG="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/.gitleaks.toml"
+ROOT="$(cd "${SECRET_SCAN_ROOT:-$(dirname "${BASH_SOURCE[0]}")/../..}" && pwd)"
+# gitleaks 8.30.1 reads a .gitleaksignore at the root of the directory or repository it scans
+# whatever --gitleaks-ignore-path says (measured), so one there is refused, not silently honoured.
+if [[ -e "$ROOT/.gitleaksignore" ]]; then
+  echo "::error::.gitleaksignore is not honoured: remove it, and record a reviewed exception in .gitleaks.toml for a false positive." >&2
+  exit 1
+fi
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 REPORT="${SECRET_REPORT:-$WORK/report.md}"
@@ -41,8 +56,12 @@ tar -xzf "$WORK/gitleaks.tar.gz" -C "$WORK" gitleaks
 chmod +x "$WORK/gitleaks"
 
 # --exit-code 3 separates "found something" from an error of the scanner itself (1), which must
-# also fail the check rather than read as clean.
-common=(--no-banner --no-color --redact --exit-code 3 --config "$ROOT/.gitleaks.toml" --report-format json)
+# also fail the check rather than read as clean. --ignore-gitleaks-allow reports a line even when
+# it carries `gitleaks:allow`; --gitleaks-ignore-path names an empty directory, so the working
+# directory's .gitleaksignore is not read either (the scanned root's is refused above).
+mkdir "$WORK/no-ignore-file"
+common=(--no-banner --no-color --redact --exit-code 3 --config "$CONFIG" --report-format json
+  --ignore-gitleaks-allow --gitleaks-ignore-path "$WORK/no-ignore-file")
 
 summarise() { # <json> <title> -> markdown on stdout; prints the finding count on fd 3
   python3 - "$1" "$2" 3>&3 <<'PY'
@@ -90,7 +109,7 @@ tree_findings="$(cd "$tree" && scan "Working tree" "$WORK/tree.json" dir . 3>&1 
 # 2. The commits being pushed or merged.
 range_findings=0
 if [[ -n "${SECRET_SCAN_RANGE:-}" ]]; then
-  range_findings="$(scan "Commits ${SECRET_SCAN_RANGE}" "$WORK/range.json" git --log-opts="${SECRET_SCAN_RANGE}" "$ROOT" 3>&1 1>>"$REPORT")"
+  range_findings="$(scan "Commits ${SECRET_SCAN_RANGE}" "$WORK/range.json" git --log-opts="-m ${SECRET_SCAN_RANGE}" "$ROOT" 3>&1 1>>"$REPORT")"
 else
   printf '_No commit range given (SECRET_SCAN_RANGE); the working tree only._\n\n' >>"$REPORT"
 fi
