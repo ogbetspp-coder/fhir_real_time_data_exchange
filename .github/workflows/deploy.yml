@@ -242,8 +242,9 @@ jobs:
       # runs the Node checks alone, so until then a push by an administrator, or a merge while
       # Renderer or Official validation was red, deployed unattended. The gate job ran alongside
       # CI, so this waits only for what CI has left. A dispatch on any ref but main is refused at
-      # once, and one on a commit with no such run at the deadline (scripts/ci/workflow-runs.mjs). The job's token is given to this step by name, as
-      # to the issue steps, for the runs it reads (actions: read).
+      # once, and one on a commit with no such run at the deadline; a poll GitHub cannot answer is
+      # "not yet" (scripts/ci/workflow-runs.mjs). The job's token is given to this step by name,
+      # as to the issue steps, for the runs it reads (actions: read).
       - name: Wait for CI on this commit
         env:
           GH_TOKEN: ${{ github.token }}

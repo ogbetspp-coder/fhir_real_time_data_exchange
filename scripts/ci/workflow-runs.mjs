@@ -113,6 +113,29 @@ export function retryDelay(status, headers, attempt, backoff) {
     : backoff * 2 ** attempt;
 }
 
+// When a primary rate limit resets (403 or 429 with no requests remaining and a reset time, in
+// epoch seconds), in epoch milliseconds; undefined for any other answer. Asking again after a few
+// seconds would only spend the retries: the quota comes back at the reset, not before.
+export function rateLimitReset(status, headers) {
+  if ((status !== 403 && status !== 429) || headers["x-ratelimit-remaining"] !== "0") {
+    return undefined;
+  }
+  const reset = Number(headers["x-ratelimit-reset"]);
+  return Number.isFinite(reset) && reset > 0 ? reset * 1000 : undefined;
+}
+
+// A failed request. `transient` when asking later may succeed: the retries spent on a server
+// error, a connection that failed or timed out, or an answer that was not JSON; or a primary rate
+// limit, which also carries when it resets (`resetAt`). Otherwise (a 401, a 404, a plain 403) the
+// answer is final.
+export class ApiError extends Error {
+  constructor(message, { transient, resetAt, cause } = {}) {
+    super(message, cause === undefined ? undefined : { cause });
+    this.transient = transient === true;
+    this.resetAt = resetAt;
+  }
+}
+
 export const API_TRIES = 3;
 
 async function api(path) {
@@ -122,6 +145,7 @@ async function api(path) {
   const backoff = Number(process.env.WORKFLOW_RUNS_BACKOFF_MS ?? "2000");
   const route = path.split("?")[0];
   for (let attempt = 0; ; attempt += 1) {
+    const last = attempt + 1 >= API_TRIES;
     let response;
     try {
       response = await fetch(`${base}${path}`, {
@@ -134,21 +158,44 @@ async function api(path) {
       });
     } catch (error) {
       // A connection that failed or timed out is retried like a server error.
-      if (attempt + 1 >= API_TRIES) {
-        throw new Error(`GitHub API ${route} unreachable: ${error}`, { cause: error });
+      if (last) {
+        throw new ApiError(`GitHub API ${route} unreachable: ${error}`, {
+          transient: true,
+          cause: error,
+        });
       }
       await sleep(backoff * 2 ** attempt);
       continue;
     }
-    if (response.ok) return await response.json();
-    const delay = retryDelay(
-      response.status,
-      Object.fromEntries(response.headers),
-      attempt,
-      backoff,
-    );
-    if (delay === undefined || attempt + 1 >= API_TRIES) {
-      throw new Error(`GitHub API ${route} answered ${response.status}`);
+    if (response.ok) {
+      const text = await response.text();
+      try {
+        return JSON.parse(text);
+      } catch (error) {
+        // A 200 that is not JSON (a proxy's page, a cut body) is retried like a server error.
+        if (last) {
+          throw new ApiError(`GitHub API ${route} answered 200 with a body that is not JSON`, {
+            transient: true,
+            cause: error,
+          });
+        }
+        await sleep(backoff * 2 ** attempt);
+        continue;
+      }
+    }
+    const headers = Object.fromEntries(response.headers);
+    const resetAt = rateLimitReset(response.status, headers);
+    if (resetAt !== undefined) {
+      throw new ApiError(`GitHub API ${route} answered ${response.status}: rate limit exhausted`, {
+        transient: true,
+        resetAt,
+      });
+    }
+    const delay = retryDelay(response.status, headers, attempt, backoff);
+    if (delay === undefined || last) {
+      throw new ApiError(`GitHub API ${route} answered ${response.status}`, {
+        transient: delay !== undefined,
+      });
     }
     console.log(`GitHub API ${route} answered ${response.status}; asking again in ${delay} ms.`);
     await sleep(delay);
@@ -187,24 +234,47 @@ async function awaitCi() {
   const poll = Number(process.env.AWAIT_CI_POLL_SECONDS ?? "30") * 1000;
   const deadline = Date.now() + minutes * 60_000;
   for (;;) {
-    const { workflow_runs: runs } = await api(
-      `/repos/${repo}/actions/workflows/ci.yml/runs?head_sha=${commit}&event=push&branch=main&per_page=20`,
-    );
-    const run = ciRunFor(runs, commit);
-    const verdict = ciVerdict(run, run?.status === "completed" ? await jobsOf(repo, run.id) : []);
+    // A poll that could not be answered is "not yet", not a verdict: the loop goes on until the
+    // deadline (review round 2 of audit B15; one failed poll used to fail the deploy). Only an
+    // answer that is final (a 401, a 404, a plain 403) fails at once.
+    let verdict;
+    let run;
+    let wait = poll;
+    let limited = false;
+    try {
+      const { workflow_runs: runs } = await api(
+        `/repos/${repo}/actions/workflows/ci.yml/runs?head_sha=${commit}&event=push&branch=main&per_page=20`,
+      );
+      run = ciRunFor(runs, commit);
+      verdict = ciVerdict(run, run?.status === "completed" ? await jobsOf(repo, run.id) : []);
+    } catch (error) {
+      if (!(error instanceof ApiError) || !error.transient) throw error;
+      run = undefined;
+      verdict = { state: "wait", reason: error.message };
+      // A primary rate limit: wait for its reset, not a poll, and never past the deadline.
+      if (error.resetAt !== undefined) {
+        limited = true;
+        wait = Math.max(0, Math.min(error.resetAt - Date.now(), deadline - Date.now()));
+        console.log(
+          `::warning::${error.message}; waiting until ${new Date(Date.now() + wait).toISOString()}.`,
+        );
+      } else {
+        console.log(`::warning::${error.message}; not yet, polling again.`);
+      }
+    }
     console.log(`CI on ${commit}: ${verdict.reason}${run ? ` (${run.html_url})` : ""}`);
     if (verdict.state === "pass") return 0;
     if (verdict.state === "fail") {
       console.log(`::error::The deploy waits for CI on this commit, and ${verdict.reason}.`);
       return 1;
     }
-    if (Date.now() + poll > deadline) {
+    if (Date.now() >= deadline || (!limited && Date.now() + poll > deadline)) {
       console.log(
         `::error::CI on this commit did not finish within ${minutes} minutes: ${verdict.reason}.`,
       );
       return 1;
     }
-    await sleep(poll);
+    await sleep(wait);
   }
 }
 

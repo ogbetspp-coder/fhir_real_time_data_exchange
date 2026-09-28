@@ -35,6 +35,15 @@ export const DEPLOY_JOB: string;
 export const MUTATING_STEPS: readonly string[];
 export const CLOCK_MARGIN_MS: number;
 export const API_TRIES: number;
+export function rateLimitReset(status: number, headers: Record<string, string>): number | undefined;
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    options?: { transient?: boolean; resetAt?: number; cause?: unknown },
+  );
+  transient: boolean;
+  resetAt: number | undefined;
+}
 export function retryDelay(
   status: number,
   headers: Record<string, string>,

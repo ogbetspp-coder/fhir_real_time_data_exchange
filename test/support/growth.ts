@@ -15,10 +15,16 @@
 // review). The lowest leans the other way: load on the small runs in every round could hide a
 // quadratic cost. That is the chosen trade, a missed regression on a loaded machine rather than a
 // failed gate on correct code; test/support/growth.test.ts shows quadratic work still reads ~16.
+// `now` is the clock, performance.now unless a test scripts one to check the rounds exactly.
 export function growth(
   prepare: (size: number) => () => unknown,
   size: number,
-  { factor = 4, tries = 5, rounds = 3 }: { factor?: number; tries?: number; rounds?: number } = {},
+  {
+    factor = 4,
+    tries = 5,
+    rounds = 3,
+    now = () => performance.now(),
+  }: { factor?: number; tries?: number; rounds?: number; now?: () => number } = {},
 ): number {
   const small = prepare(size);
   const large = prepare(size * factor);
@@ -29,12 +35,12 @@ export function growth(
     let fastestSmall = Number.POSITIVE_INFINITY;
     let fastestLarge = Number.POSITIVE_INFINITY;
     for (let attempt = 0; attempt < tries; attempt += 1) {
-      let started = performance.now();
+      let started = now();
       small();
-      fastestSmall = Math.min(fastestSmall, performance.now() - started);
-      started = performance.now();
+      fastestSmall = Math.min(fastestSmall, now() - started);
+      started = now();
       large();
-      fastestLarge = Math.min(fastestLarge, performance.now() - started);
+      fastestLarge = Math.min(fastestLarge, now() - started);
     }
     // A clock too coarse to time the small input says nothing about growth.
     if (fastestSmall < 1) {

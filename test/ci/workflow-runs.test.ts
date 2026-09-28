@@ -10,8 +10,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   API_TRIES,
+  ApiError,
   CI_JOBS,
   MUTATING_STEPS,
+  rateLimitReset,
   retryDelay,
   ciRunFor,
   ciVerdict,
@@ -331,7 +333,10 @@ describe("scripts/ci/workflow-runs.mjs", () => {
   let server: Server;
   let base = "";
   let routes: Record<string, unknown> = {};
-  let failures: Record<string, { status: number; headers?: Record<string, string> }[]> = {};
+  let failures: Record<
+    string,
+    { status: number; headers?: Record<string, string>; body?: string }[]
+  > = {};
   const requests: string[] = [];
   let work = "";
 
@@ -342,7 +347,7 @@ describe("scripts/ci/workflow-runs.mjs", () => {
       const failure = failures[route]?.shift();
       if (failure !== undefined) {
         response.writeHead(failure.status, failure.headers ?? {});
-        response.end("{}");
+        response.end(failure.body ?? "{}");
         return;
       }
       const body = routes[route];
@@ -442,18 +447,103 @@ describe("scripts/ci/workflow-runs.mjs", () => {
     expect(recovered.stdout).toContain("answered 502; asking again");
     expect(recovered.stdout).toContain("answered 429; asking again in 0 ms");
 
+    failures = {};
+  }, 60_000);
+
+  // A poll whose retries are spent is "not yet": the wait goes on to the deadline.
+  const waiting = { AWAIT_CI_MINUTES: "0.5", AWAIT_CI_POLL_SECONDS: "0.05" };
+
+  it("treats a poll that could not be answered as not yet, and polls again", async () => {
+    const runs = "/repos/owner/repo/actions/workflows/ci.yml/runs";
+    routes = {
+      [runs]: { workflow_runs: [run({ id: 42 })] },
+      "/repos/owner/repo/actions/runs/42/jobs": { jobs: succeeded },
+    };
+    // Three 503s spend one poll's retries; a 200 that is not JSON three times spends the next.
+    failures = {
+      [runs]: [
+        { status: 503 },
+        { status: 503 },
+        { status: 503 },
+        { status: 200, body: "<html>" },
+        { status: 200, body: "<html>" },
+        { status: 200, body: "<html>" },
+      ],
+    };
+    const recovered = await node(["await-ci"], waiting);
+    expect(recovered.code).toBe(0);
+    expect(recovered.stdout).toContain(
+      `::warning::GitHub API ${runs} answered 503; not yet, polling again.`,
+    );
+    expect(recovered.stdout).toContain(
+      `::warning::GitHub API ${runs} answered 200 with a body that is not JSON; not yet`,
+    );
+
+    // Still unanswered at the deadline: refused, naming why.
     failures = { [runs]: [{ status: 503 }, { status: 503 }, { status: 503 }] };
     const down = await node(["await-ci"]);
     expect(down.code).toBe(1);
-    expect(down.stdout).toContain(`::error::GitHub API ${runs} answered 503`);
-
-    // A plain 403 is an answer, not a limit: no second request.
-    requests.length = 0;
-    failures = { [runs]: [{ status: 403 }] };
-    expect((await node(["await-ci"])).code).toBe(1);
-    expect(requests).toHaveLength(1);
+    expect(down.stdout).toContain(
+      `::error::CI on this commit did not finish within 0 minutes: GitHub API ${runs} answered 503.`,
+    );
     failures = {};
   }, 60_000);
+
+  it("fails at once on a final answer: 401, a plain 403, 404", async () => {
+    const runs = "/repos/owner/repo/actions/workflows/ci.yml/runs";
+    routes = { [runs]: { workflow_runs: [run({ id: 42 })] } };
+    for (const status of [401, 403, 404]) {
+      requests.length = 0;
+      failures = { [runs]: [{ status }] };
+      const refused = await node(["await-ci"], { AWAIT_CI_MINUTES: "75" });
+      expect([status, refused.code]).toEqual([status, 1]);
+      expect(refused.stdout).toContain(`::error::GitHub API ${runs} answered ${status}`);
+      expect([status, requests]).toEqual([status, [expect.stringContaining(runs)]]);
+    }
+    failures = {};
+  }, 60_000);
+
+  it("waits for a primary rate limit's reset, never past the deadline", async () => {
+    const runs = "/repos/owner/repo/actions/workflows/ci.yml/runs";
+    routes = {
+      [runs]: { workflow_runs: [run({ id: 42 })] },
+      "/repos/owner/repo/actions/runs/42/jobs": { jobs: succeeded },
+    };
+    const limit = (reset: number) => ({
+      status: 403,
+      headers: { "x-ratelimit-remaining": "0", "x-ratelimit-reset": String(reset) },
+    });
+    // Reset a second from now: one request, no retries spent against it, then the wait.
+    requests.length = 0;
+    failures = { [runs]: [limit(Math.ceil(Date.now() / 1000) + 1)] };
+    const reset = await node(["await-ci"], waiting);
+    expect(reset.code).toBe(0);
+    expect(reset.stdout).toMatch(/rate limit exhausted; waiting until \d{4}-\d\d-\d\dT/);
+    expect(requests.filter((url) => url.startsWith(runs))).toHaveLength(2);
+
+    // A reset an hour away, with a deadline three seconds away: the wait stops at the deadline.
+    // The poll at the deadline is limited again, so the wait ends there, refused.
+    const hour = Math.ceil(Date.now() / 1000) + 3600;
+    failures = { [runs]: [limit(hour), limit(hour)] };
+    const capped = await node(["await-ci"], { AWAIT_CI_MINUTES: "0.05" });
+    expect(capped.code).toBe(1);
+    expect(capped.stdout).toContain("did not finish within 0.05 minutes");
+    expect(capped.stdout).toContain("rate limit exhausted");
+    failures = {};
+  }, 60_000);
+
+  it("reads a primary rate limit's reset, and nothing else as one", () => {
+    const at = { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "1790000000" };
+    expect(rateLimitReset(403, at)).toBe(1_790_000_000_000);
+    expect(rateLimitReset(429, at)).toBe(1_790_000_000_000);
+    expect(rateLimitReset(403, { ...at, "x-ratelimit-remaining": "5" })).toBeUndefined();
+    expect(rateLimitReset(403, { "x-ratelimit-remaining": "0" })).toBeUndefined();
+    expect(rateLimitReset(503, at)).toBeUndefined();
+    expect(new ApiError("x", { transient: true, resetAt: 1 })).toMatchObject({
+      transient: true,
+      resetAt: 1,
+    });
+  });
 
   it("marks a plan that overlapped a deploy unreliable, at the top of its summary", async () => {
     const now = new Date();
