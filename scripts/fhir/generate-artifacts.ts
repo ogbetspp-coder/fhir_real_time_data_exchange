@@ -90,7 +90,7 @@ const structureMap = {
       rule: [
         {
           name: "deriveDocumentIdentifier",
-          documentation: `The target identifier is not the source's: its system is ${EMA_DOCUMENT_IDENTIFIER_SYSTEM} and its value is derived from the source Bundle.identifier.value (src/lib/hash.ts stableUuid, namespace "${EMA_DOCUMENT_ID_NAMESPACE}": the first 32 hex digits of the SHA-256 of the namespace, a colon and the value, written as a UUID with its version digit set to 5 and its variant digit to a) and is also the target Bundle's id. The FHIR mapping language has no transform for that derivation, so this rule sets the system and leaves the value to the implementation.`,
+          documentation: `The target identifier is not the source's: its system is ${EMA_DOCUMENT_IDENTIFIER_SYSTEM} and its value is derived from the source Bundle.identifier.value and is also the target Bundle's id (src/lib/hash.ts stableUuid, namespace "${EMA_DOCUMENT_ID_NAMESPACE}"): take the SHA-256 of the UTF-8 string "${EMA_DOCUMENT_ID_NAMESPACE}:" followed by the value, in lowercase hex; keep its first 32 hex digits; set the 13th digit to 5 and the 17th digit to a; and write the 32 digits as a UUID, in groups of 8-4-4-4-12 joined by hyphens. The FHIR mapping language has no transform for that derivation, so this rule sets the system and leaves the value to the implementation.`,
           source: [{ context: "src", element: "identifier", variable: "identifier" }],
           target: [
             {

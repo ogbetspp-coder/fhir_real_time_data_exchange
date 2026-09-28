@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 import { beforeAll, describe, expect, it } from "vitest";
@@ -79,6 +80,49 @@ describe("the published StructureMap", () => {
     expect(namespace).toBeDefined();
     expect(targetIdentifier.value).toBe(stableUuid(namespace ?? "", sourceIdentifier.value));
     expect(documentBundle.id).toBe(targetIdentifier.value);
+  });
+
+  // The documented algorithm, carried out here from the text alone rather than through
+  // stableUuid, so a change to either the code or the text that parts them fails.
+  it("documents a derivation that, carried out independently, gives the transform's value", () => {
+    const documentation = rule("deriveDocumentIdentifier").documentation ?? "";
+    const namespace = /namespace "([^"]+)"/.exec(documentation)?.[1] ?? "";
+    for (const step of [
+      `the SHA-256 of the UTF-8 string "${namespace}:" followed by the value, in lowercase hex`,
+      "keep its first 32 hex digits",
+      "set the 13th digit to 5 and the 17th digit to a",
+      "in groups of 8-4-4-4-12 joined by hyphens",
+    ]) {
+      expect(documentation).toContain(step);
+    }
+
+    const independently = (value: string): string => {
+      const first32 = createHash("sha256")
+        .update(`${namespace}:${value}`, "utf8")
+        .digest("hex")
+        .slice(0, 32);
+      // The 13th digit (index 12) is 5 and the 17th (index 16) is a.
+      const hex = `${first32.slice(0, 12)}5${first32.slice(13, 16)}a${first32.slice(17)}`;
+      return [
+        hex.slice(0, 8),
+        hex.slice(8, 12),
+        hex.slice(12, 16),
+        hex.slice(16, 20),
+        hex.slice(20, 32),
+      ].join("-");
+    };
+    const source = createSyntheticType2Bundle(mapping, { product: SMOKE_PRODUCT_ID });
+    const sourceValue = (source.identifier as { value: string }).value;
+    const { documentBundle } = transformType2ToEma(source, mapping);
+    expect(independently(sourceValue)).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-a[0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    expect(independently(sourceValue)).toBe(stableUuid(namespace, sourceValue));
+    expect(independently(sourceValue)).toBe((documentBundle.identifier as { value: string }).value);
+    // And for values other than the fixture's, non-ASCII among them.
+    for (const value of ["", "x", "EPI/24/35", "ünïcode-ε"]) {
+      expect(independently(value)).toBe(stableUuid(namespace, value));
+    }
   });
 
   it("copies the timestamp, as the transform does", () => {
