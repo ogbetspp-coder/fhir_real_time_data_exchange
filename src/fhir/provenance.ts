@@ -1,6 +1,7 @@
 import type { CanonicalSubmission } from "../contracts/index.js";
 import type { FidelityReport } from "../fidelity/index.js";
 import { stableUuid } from "../lib/hash.js";
+import { SPOR_ORGANISATIONS } from "./standards.js";
 import type { FhirResource } from "./types.js";
 
 // Pure projection of an approved submission into a FHIR R5 Provenance. Hashes, identifiers,
@@ -27,8 +28,6 @@ export const APPROVAL_CONTENT_EXTENSION_URL =
 // `role` so a reader learns it from the resource rather than inferring it from the participant
 // type.
 export const APPROVER_ROLE_SYSTEM = "https://khs.dev/fhir/CodeSystem/approver-role";
-
-type ProvenanceTarget = { identifier?: unknown; reference?: string };
 
 type AgentWho = { display: string } | { identifier: { system: string; value: string } };
 
@@ -59,7 +58,6 @@ export const IMPORT_REQUESTER_IDENTIFIER_SYSTEM =
   "https://khs.dev/fhir/identifier/import-requester";
 // The authority's own files an import read, by the authority's id and by the served bytes' hash.
 export const AUTHORITY_FILE_IDENTIFIER_SYSTEM = "https://khs.dev/fhir/identifier/authority-file";
-const SPOR_ORGANISATIONS = "https://spor.ema.europa.eu/v1/organisations/";
 // Who publishes: the EMA by its SPOR organisation id; the synthetic authority by a synthetic one.
 const AUTHORITY_ORGANISATION = { EMA: "ORG-100013412", synthetic: "SYNTHETIC-AUTHORITY" } as const;
 
@@ -164,10 +162,4 @@ export function toProvenanceResource(
     ],
     entity: [sourceEntity(SOURCE_DOCUMENT_IDENTIFIER_SYSTEM, source.sha256), reportEntity],
   };
-}
-
-export function withEmaTarget(provenance: FhirResource, emaBundleId: string): FhirResource {
-  const { target } = provenance;
-  const existing: ProvenanceTarget[] = Array.isArray(target) ? (target as ProvenanceTarget[]) : [];
-  return { ...provenance, target: [...existing, { reference: `Bundle/${emaBundleId}` }] };
 }

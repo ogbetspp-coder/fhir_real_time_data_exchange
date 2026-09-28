@@ -4,7 +4,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { QueryAuditRecord } from "../../src/contracts/query-tools.js";
 import { verifyDocumentSubmission } from "../../src/contracts/index.js";
 import type { EmaMapping } from "../../src/fhir/mapping.js";
-import { toProvenanceResource, withEmaTarget } from "../../src/fhir/provenance.js";
+import { toProvenanceResource } from "../../src/fhir/provenance.js";
 import { transformType2ToEma } from "../../src/fhir/transform.js";
 import {
   isComposition,
@@ -148,6 +148,13 @@ function setProduct(bundle: FhirBundle, productName: string, identifierValue: st
   product.identifier = [
     { system: "https://khs.dev/fhir/identifier/product", value: identifierValue },
   ];
+}
+
+// The same Provenance, also naming a further EMA document Bundle: a store where one approval
+// covers several documents.
+function withEmaTarget(provenance: FhirResource, emaBundleId: string): FhirResource {
+  const existing = Array.isArray(provenance.target) ? (provenance.target as unknown[]) : [];
+  return { ...provenance, target: [...existing, { reference: `Bundle/${emaBundleId}` }] };
 }
 
 function cloneDocument(bundle: FhirBundle, bundleId: string): FhirBundle {

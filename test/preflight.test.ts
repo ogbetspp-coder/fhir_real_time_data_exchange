@@ -212,6 +212,23 @@ describe("the Type 2 preflight", () => {
     },
   ];
 
+  // The transform leaves out an absent optional child, so every later child moves up one place.
+  // A positional preflight then compared each of them with its rule's neighbour.
+  it("passes a package whose absent optional child section left the others out of place", () => {
+    const optional = structuredClone(mapping);
+    const rule = optional.root.children?.[1];
+    if (rule === undefined) throw new Error("mapping has no second child");
+    rule.required = false;
+    const bundle = structuredClone(documentBundle);
+    const root = rootSection(bundle);
+    root.section = (root.section ?? []).filter((_child, position) => position !== 1);
+
+    const outcome = validateEmaPreflight(structuredClone(list), bundle, optional);
+
+    expect(errors(outcome.issue)).toEqual([]);
+    expect(hasValidationErrors(outcome)).toBe(false);
+  });
+
   it.each(cases)("refuses $name", ({ mutate, expected }) => {
     const bundle = structuredClone(source);
     mutate(bundle);
@@ -390,16 +407,16 @@ describe("the EMA preflight", () => {
       ],
     },
     {
-      name: "a missing child section, named by its position",
+      name: "a missing child section, named by its EMA code",
       mutate: (_list, bundle) => {
         const root = rootSection(bundle);
         root.section = (root.section ?? []).slice(0, 3);
       },
       expected: () =>
-        (mapping.root.children ?? []).slice(3).map((rule, offset) => ({
+        (mapping.root.children ?? []).slice(3).map((rule) => ({
           code: "required",
           diagnostics: `Missing EMA section ${rule.targetCode}`,
-          expression: [`Composition.section[0].section[${String(3 + offset)}]`],
+          expression: ["Composition.section[0].section"],
         })),
     },
     {
@@ -414,17 +431,30 @@ describe("the EMA preflight", () => {
         if (rule === undefined) throw new Error("mapping has no third child");
         return [
           {
-            code: "value",
-            diagnostics: `Expected EMA code ${rule.targetCode}, received 111111111111`,
-            expression: ["Composition.section[0].section[2].code"],
+            code: "required",
+            diagnostics: `Missing EMA section ${rule.targetCode}`,
+            expression: ["Composition.section[0].section"],
           },
           {
-            code: "value",
-            diagnostics: `Expected title "${rule.title}"`,
-            expression: ["Composition.section[0].section[2].title"],
+            code: "structure",
+            diagnostics: "Unexpected EMA section 111111111111",
+            expression: ["Composition.section[0].section[2]"],
           },
         ];
       },
+    },
+    {
+      name: "a child section with the right code and the wrong title",
+      mutate: (_list, bundle) => {
+        childSection(bundle, 2).title = "3. Something else";
+      },
+      expected: () => [
+        {
+          code: "value",
+          diagnostics: `Expected title "${mapping.root.children?.[2]?.title ?? ""}"`,
+          expression: ["Composition.section[0].section[2].title"],
+        },
+      ],
     },
     {
       name: "a child section carrying the source code system's code but not the EMA one",
@@ -441,13 +471,65 @@ describe("the EMA preflight", () => {
       },
       expected: () => [
         {
-          code: "value",
-          diagnostics: `Expected EMA code ${mapping.root.children?.[0]?.targetCode ?? ""}, received none`,
-          expression: ["Composition.section[0].section[0].code"],
+          code: "required",
+          diagnostics: `Missing EMA section ${mapping.root.children?.[0]?.targetCode ?? ""}`,
+          expression: ["Composition.section[0].section"],
+        },
+        {
+          code: "structure",
+          diagnostics: "Unexpected EMA section without an EMA code",
+          expression: ["Composition.section[0].section[0]"],
+        },
+      ],
+    },
+    {
+      name: "two child sections in the other order",
+      mutate: (_list, bundle) => {
+        const root = rootSection(bundle);
+        const [first, second, ...rest] = root.section ?? [];
+        if (first === undefined || second === undefined) throw new Error("too few children");
+        root.section = [second, first, ...rest];
+      },
+      expected: () => [
+        {
+          code: "structure",
+          diagnostics: `EMA section ${mapping.root.children?.[1]?.targetCode ?? ""} is out of the manifest's order`,
+          expression: ["Composition.section[0].section[0]"],
+        },
+      ],
+    },
+    {
+      name: "a child section repeated",
+      mutate: (_list, bundle) => {
+        const root = rootSection(bundle);
+        root.section = [...(root.section ?? []), structuredClone(childSection(bundle, 0))];
+      },
+      expected: () => [
+        {
+          code: "duplicate",
+          diagnostics: `Duplicate EMA section ${mapping.root.children?.[0]?.targetCode ?? ""}`,
+          expression: ["Composition.section[0].section"],
         },
       ],
     },
   ];
+
+  // The transform leaves out an absent optional child, so every later child moves up one place.
+  // A positional preflight then compared each of them with its rule's neighbour.
+  it("passes a package whose absent optional child section left the others out of place", () => {
+    const optional = structuredClone(mapping);
+    const rule = optional.root.children?.[1];
+    if (rule === undefined) throw new Error("mapping has no second child");
+    rule.required = false;
+    const bundle = structuredClone(documentBundle);
+    const root = rootSection(bundle);
+    root.section = (root.section ?? []).filter((_child, position) => position !== 1);
+
+    const outcome = validateEmaPreflight(structuredClone(list), bundle, optional);
+
+    expect(errors(outcome.issue)).toEqual([]);
+    expect(hasValidationErrors(outcome)).toBe(false);
+  });
 
   it.each(cases)("refuses $name", ({ mutate, expected }) => {
     const target = structuredClone(list);

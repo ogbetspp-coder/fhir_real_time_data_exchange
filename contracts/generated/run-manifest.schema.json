@@ -1,14 +1,24 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://khs.dev/contracts/run-manifest/2.0.0/schema.json",
+  "$id": "https://khs.dev/contracts/run-manifest/3.0.0/schema.json",
   "$ref": "#/$defs/RunManifest",
   "$defs": {
     "RunManifest": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ValidatedRunManifest"
+        },
+        {
+          "$ref": "#/$defs/AuthorisedRunManifest"
+        }
+      ]
+    },
+    "ValidatedRunManifest": {
       "type": "object",
       "properties": {
         "schemaVersion": {
           "type": "string",
-          "const": "2.0.0"
+          "const": "3.0.0"
         },
         "source": {
           "type": "object",
@@ -38,12 +48,6 @@
         "completedAt": {
           "$ref": "#/$defs/IsoDateTime"
         },
-        "status": {
-          "$ref": "#/$defs/RunStatus"
-        },
-        "dryRun": {
-          "type": "boolean"
-        },
         "standards": {
           "$ref": "#/$defs/ManifestStandards"
         },
@@ -53,14 +57,19 @@
         "transformation": {
           "$ref": "#/$defs/ManifestTransformation"
         },
-        "persistence": {
-          "$ref": "#/$defs/ManifestPersistence"
-        },
         "runtime": {
           "$ref": "#/$defs/ManifestRuntime"
         },
         "ingestion": {
           "$ref": "#/$defs/IngestionEvidence"
+        },
+        "status": {
+          "type": "string",
+          "const": "validated"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "const": true
         }
       },
       "required": [
@@ -69,12 +78,12 @@
         "runId",
         "startedAt",
         "completedAt",
-        "status",
-        "dryRun",
         "standards",
         "validation",
         "transformation",
-        "runtime"
+        "runtime",
+        "status",
+        "dryRun"
       ],
       "additionalProperties": false
     },
@@ -93,10 +102,6 @@
       "format": "date-time",
       "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
       "description": "RFC 3339 timestamp with Z or a numeric offset."
-    },
-    "RunStatus": {
-      "type": "string",
-      "enum": ["validated", "persisted", "rejected", "failed"]
     },
     "ManifestStandards": {
       "type": "object",
@@ -191,21 +196,6 @@
         }
       },
       "required": ["inputHash", "outputHash", "decisions"],
-      "additionalProperties": false
-    },
-    "ManifestPersistence": {
-      "type": "object",
-      "properties": {
-        "targetStore": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
-        },
-        "transactionResponseHash": {
-          "$ref": "#/$defs/Sha256Hex"
-        }
-      },
-      "required": ["targetStore", "transactionResponseHash"],
       "additionalProperties": false
     },
     "ManifestRuntime": {
@@ -564,6 +554,99 @@
         }
       },
       "required": ["importerVersion", "fetched"],
+      "additionalProperties": false
+    },
+    "AuthorisedRunManifest": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "string",
+          "const": "3.0.0"
+        },
+        "source": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": ["fixture", "healthcare-api", "document"]
+            },
+            "resource": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "hash": {
+              "$ref": "#/$defs/Sha256Hex"
+            }
+          },
+          "required": ["kind", "resource", "hash"],
+          "additionalProperties": false
+        },
+        "runId": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "startedAt": {
+          "$ref": "#/$defs/IsoDateTime"
+        },
+        "completedAt": {
+          "$ref": "#/$defs/IsoDateTime"
+        },
+        "standards": {
+          "$ref": "#/$defs/ManifestStandards"
+        },
+        "validation": {
+          "$ref": "#/$defs/ManifestValidation"
+        },
+        "transformation": {
+          "$ref": "#/$defs/ManifestTransformation"
+        },
+        "runtime": {
+          "$ref": "#/$defs/ManifestRuntime"
+        },
+        "ingestion": {
+          "$ref": "#/$defs/IngestionEvidence"
+        },
+        "status": {
+          "type": "string",
+          "const": "authorised"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "const": false
+        },
+        "persistence": {
+          "$ref": "#/$defs/ManifestPersistence"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "source",
+        "runId",
+        "startedAt",
+        "completedAt",
+        "standards",
+        "validation",
+        "transformation",
+        "runtime",
+        "status",
+        "dryRun",
+        "persistence"
+      ],
+      "additionalProperties": false
+    },
+    "ManifestPersistence": {
+      "type": "object",
+      "properties": {
+        "targetStore": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "transactionSha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        }
+      },
+      "required": ["targetStore", "transactionSha256"],
       "additionalProperties": false
     }
   }

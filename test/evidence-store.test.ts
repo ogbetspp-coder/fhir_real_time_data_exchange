@@ -1,10 +1,13 @@
+import { constants, generateKeyPairSync, sign, verify } from "node:crypto";
+
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { loadConfig, type AppConfig } from "../src/config.js";
 import { loadEmaMapping } from "../src/fhir/mapping.js";
 import { createSyntheticType2Bundle } from "../src/fixtures/synthetic.js";
 import { GcpEvidenceStore, ledgerRow, type SignedManifest } from "../src/gcp/evidence.js";
-import { sha256 } from "../src/lib/hash.js";
+import { crc32c } from "../src/lib/crc32c.js";
+import { canonicalJson, sha256 } from "../src/lib/hash.js";
 import { runPipeline } from "../src/pipeline.js";
 
 // The evidence store's writes, with the three Google clients replaced at their method boundary:
@@ -13,13 +16,28 @@ import { runPipeline } from "../src/pipeline.js";
 // content, metadata, row — and what it refuses to ask for. Nothing here holds a credential or
 // reaches the network.
 
+type SignRequest = {
+  name: string;
+  digest: { sha256: Buffer };
+  digestCrc32c?: { value: number };
+};
+
 type GoogleCalls = {
   storageOptions: unknown[];
   bigQueryOptions: unknown[];
   saves: { bucket: string; object: string; content: string; options: unknown }[];
-  inserts: { dataset: string; table: string; rows: unknown[] }[];
-  signs: { name: string; digest: { sha256: Buffer } }[];
-  signature: Buffer | Uint8Array | null;
+  // Failures the next saves answer with, in order; `landed` means the object was written anyway
+  // (an answer lost on the way back).
+  saveErrors: (Error & { landed?: boolean })[];
+  inserts: { dataset: string; table: string; rows: unknown[]; options: unknown }[];
+  insertErrors: Error[];
+  signs: SignRequest[];
+  // What KMS signs with, given the request: a fixed value by default, a real RSA-PSS key in
+  // the round trip below.
+  signer: (request: SignRequest) => Buffer | Uint8Array | null;
+  // Overrides of what KMS reports about the request, for the refusals below.
+  answer: { name?: string; verifiedDigestCrc32c?: boolean; signatureCrc32c?: string | null };
+  crc: (bytes: Uint8Array) => number;
 };
 
 const google = vi.hoisted(() => {
@@ -27,9 +45,13 @@ const google = vi.hoisted(() => {
     storageOptions: [],
     bigQueryOptions: [],
     saves: [],
+    saveErrors: [],
     inserts: [],
+    insertErrors: [],
     signs: [],
-    signature: Buffer.from("synthetic-signature"),
+    signer: () => Buffer.from("synthetic-signature"),
+    answer: {},
+    crc: () => 0,
   };
   return calls;
 });
@@ -43,8 +65,11 @@ vi.mock("@google-cloud/storage", () => ({
       return {
         file: (object: string) => ({
           save: (content: string, options: unknown) => {
-            google.saves.push({ bucket, object, content, options });
-            return Promise.resolve();
+            const failure = google.saveErrors.shift();
+            if (failure === undefined || failure.landed === true) {
+              google.saves.push({ bucket, object, content, options });
+            }
+            return failure === undefined ? Promise.resolve() : Promise.reject(failure);
           },
         }),
       };
@@ -60,8 +85,10 @@ vi.mock("@google-cloud/bigquery", () => ({
     dataset(dataset: string) {
       return {
         table: (table: string) => ({
-          insert: (rows: unknown[]) => {
-            google.inserts.push({ dataset, table, rows });
+          insert: (rows: unknown[], options: unknown) => {
+            const failure = google.insertErrors.shift();
+            if (failure !== undefined) return Promise.reject(failure);
+            google.inserts.push({ dataset, table, rows, options });
             return Promise.resolve([{}]);
           },
         }),
@@ -70,20 +97,51 @@ vi.mock("@google-cloud/bigquery", () => ({
   },
 }));
 
+// Answers as Cloud KMS does: whether the digest matched the CRC-32C it was sent, the key version
+// that signed, and the signature's own CRC-32C.
 vi.mock("@google-cloud/kms", () => ({
   KeyManagementServiceClient: class {
-    asymmetricSign(request: { name: string; digest: { sha256: Buffer } }) {
+    asymmetricSign(request: SignRequest) {
       google.signs.push(request);
-      return Promise.resolve([{ signature: google.signature }]);
+      const signature = google.signer(request);
+      const verifiedDigestCrc32c =
+        google.answer.verifiedDigestCrc32c ??
+        request.digestCrc32c?.value === google.crc(request.digest.sha256);
+      const signatureCrc32c =
+        google.answer.signatureCrc32c === undefined
+          ? signature === null
+            ? null
+            : { value: String(google.crc(signature)) }
+          : google.answer.signatureCrc32c === null
+            ? null
+            : { value: google.answer.signatureCrc32c };
+      return Promise.resolve([
+        {
+          signature,
+          name: google.answer.name ?? request.name,
+          verifiedDigestCrc32c,
+          signatureCrc32c,
+        },
+      ]);
     }
   },
 }));
+
+google.crc = crc32c;
 
 const RUN_ID = "77777777-7777-4777-a777-777777777777";
 const KEY_VERSION =
   "projects/p/locations/europe-west4/keyRings/evidence/cryptoKeys/manifest-signing/cryptoKeyVersions/1";
 
 let signed: SignedManifest;
+// The same run as a persist-mode manifest, as the ledger receives it.
+let authorised: SignedManifest;
+const COMMIT = { committedAt: "2026-09-27T16:47:12.000Z", bundleVersionId: "MTc5MDUyNzYz" };
+const NO_WAIT = [0, 0, 0];
+
+function error(message: string, code?: number | string, landed?: boolean): Error {
+  return Object.assign(new Error(message), { code, landed });
+}
 
 function config(overrides: Record<string, string> = {}): AppConfig {
   return loadConfig({
@@ -111,6 +169,15 @@ beforeAll(async () => {
     config(),
   );
   signed = result.evidence;
+  authorised = {
+    ...signed,
+    manifest: {
+      ...signed.manifest,
+      status: "authorised",
+      dryRun: false,
+      persistence: { targetStore: "validated", transactionSha256: "e".repeat(64) },
+    },
+  };
 });
 
 beforeEach(() => {
@@ -119,13 +186,19 @@ beforeEach(() => {
   google.saves.length = 0;
   google.inserts.length = 0;
   google.signs.length = 0;
-  google.signature = Buffer.from("synthetic-signature");
+  google.saveErrors.length = 0;
+  google.insertErrors.length = 0;
+  google.signer = () => Buffer.from("synthetic-signature");
+  google.answer = {};
 });
 
 describe("constructing the evidence store", () => {
   it("binds Storage and BigQuery to the configured project", () => {
     new GcpEvidenceStore(config());
-    expect(google.storageOptions).toEqual([{ projectId: "synthetic-project" }]);
+    // Storage's own retries are off: writeJson decides what a retried write's 412 means.
+    expect(google.storageOptions).toEqual([
+      { projectId: "synthetic-project", retryOptions: { autoRetry: false } },
+    ]);
     expect(google.bigQueryOptions).toEqual([{ projectId: "synthetic-project" }]);
   });
 
@@ -151,10 +224,55 @@ describe("writing an evidence artefact", () => {
         options: {
           contentType: "application/json",
           resumable: false,
+          // Never over an existing object: the run's first write claims its runId.
+          preconditionOpts: { ifGenerationMatch: 0 },
           metadata: { metadata: { runId: RUN_ID, sha256: sha256(value) } },
         },
       },
     ]);
+  });
+
+  it("names a runId whose evidence already exists on the first attempt", async () => {
+    const store = new GcpEvidenceStore(config(), NO_WAIT);
+    google.saveErrors.push(error("Precondition Failed", 412));
+    await expect(store.writeJson(RUN_ID, "source-type2", {})).rejects.toThrow(
+      "Run evidence already exists for this run id",
+    );
+  });
+
+  it("names Cloud Storage refusing the write, without retrying it", async () => {
+    const store = new GcpEvidenceStore(config(), NO_WAIT);
+    google.saveErrors.push(error("Forbidden", 403), error("unexpected second attempt", 500));
+    await expect(store.writeJson(RUN_ID, "source-type2", {})).rejects.toThrow(
+      "Cloud Storage refused an evidence write",
+    );
+    expect(google.saveErrors).toHaveLength(1);
+  });
+
+  it("retries a transient failure and writes the object", async () => {
+    const store = new GcpEvidenceStore(config(), NO_WAIT);
+    google.saveErrors.push(error("socket hang up", "ECONNRESET"), error("Unavailable", 503));
+    await store.writeJson(RUN_ID, "commit", { a: 1 });
+    expect(google.saves).toHaveLength(1);
+  });
+
+  // A lost answer: the first attempt wrote the object, and the retry's precondition finds it.
+  // That is this run's object, not a replay's, so a fresh run is not reported as a reused runId.
+  it("takes a 412 on a retry after an unanswered attempt as its own write", async () => {
+    const store = new GcpEvidenceStore(config(), NO_WAIT);
+    google.saveErrors.push(error("Service Unavailable", 503, true), error("Precondition", 412));
+    await expect(store.writeJson(RUN_ID, "commit", { a: 1 })).resolves.toBe(
+      `gs://synthetic-evidence/runs/${RUN_ID}/commit.json`,
+    );
+    expect(google.saves).toHaveLength(1);
+  });
+
+  it("gives up after its bounded retries, and passes a non-transient failure through", async () => {
+    const store = new GcpEvidenceStore(config(), [0]);
+    google.saveErrors.push(error("Unavailable", 503), error("Unavailable", 503));
+    await expect(store.writeJson(RUN_ID, "commit", {})).rejects.toThrow("Unavailable");
+    google.saveErrors.push(error("Bad Request", 400));
+    await expect(store.writeJson(RUN_ID, "commit", {})).rejects.toThrow("Bad Request");
   });
 
   it("refuses without an evidence bucket, before any write", async () => {
@@ -167,19 +285,48 @@ describe("writing an evidence artefact", () => {
 });
 
 describe("writing the ledger row", () => {
-  it("inserts exactly the ledger projection of the signed manifest into the configured table", async () => {
+  it("inserts exactly the ledger row of the committed run into the configured table", async () => {
     const store = new GcpEvidenceStore(config({ TRANSFORMATION_LEDGER_TABLE: "runs_v2" }));
 
-    await store.writeLedger(signed);
+    await store.writeLedger(authorised, COMMIT);
 
     expect(google.inserts).toEqual([
-      { dataset: "ema_flow_ledger_dev", table: "runs_v2", rows: [ledgerRow(signed)] },
+      {
+        dataset: "ema_flow_ledger_dev",
+        table: "runs_v2",
+        // The runId as insertId, so a retried insert is deduplicated.
+        rows: [{ insertId: RUN_ID, json: ledgerRow(authorised, COMMIT) }],
+        options: { raw: true },
+      },
     ]);
   });
 
-  it("writes nothing, and does not fail, when no ledger dataset is configured", async () => {
+  it("records the commit: persisted, when, the transaction and the Bundle version", () => {
+    expect(ledgerRow(authorised, COMMIT)).toMatchObject({
+      status: "persisted",
+      completed_at: COMMIT.committedAt,
+      transaction_sha256: "e".repeat(64),
+      target_bundle_version_id: COMMIT.bundleVersionId,
+    });
+  });
+
+  // BigQuery's streaming path can refuse a row naming a freshly added column for a few minutes.
+  it("retries a refused insert within its bound, then gives up", async () => {
+    const store = new GcpEvidenceStore(config(), [0, 0]);
+    google.insertErrors.push(error("no such field: transaction_sha256"));
+    await store.writeLedger(authorised, COMMIT);
+    expect(google.inserts).toHaveLength(1);
+
+    google.insertErrors.push(error("one"), error("two"), error("three"));
+    await expect(store.writeLedger(authorised, COMMIT)).rejects.toThrow("three");
+  });
+
+  // The ledger row is the run's commit record; a persisted run without one is not recorded.
+  it("refuses, rather than skipping the row, when no ledger dataset is configured", async () => {
     const store = new GcpEvidenceStore({ ...config(), TRANSFORMATION_LEDGER_DATASET: undefined });
-    await expect(store.writeLedger(signed)).resolves.toBeUndefined();
+    await expect(store.writeLedger(authorised, COMMIT)).rejects.toThrow(
+      "TRANSFORMATION_LEDGER_DATASET is required",
+    );
     expect(google.inserts).toEqual([]);
   });
 });
@@ -193,6 +340,9 @@ describe("signing the manifest", () => {
     expect(google.signs).toHaveLength(1);
     expect(google.signs[0]?.name).toBe(KEY_VERSION);
     expect(google.signs[0]?.digest.sha256.toString("hex")).toBe(sha256(signed.manifest));
+    expect(google.signs[0]?.digestCrc32c).toEqual({
+      value: crc32c(Buffer.from(sha256(signed.manifest), "hex")),
+    });
     expect(result).toEqual({
       manifest: signed.manifest,
       manifestHash: sha256(signed.manifest),
@@ -205,24 +355,93 @@ describe("signing the manifest", () => {
   });
 
   it("accepts a signature KMS returns as a plain Uint8Array", async () => {
-    google.signature = new Uint8Array([1, 2, 3]);
+    google.signer = () => new Uint8Array([1, 2, 3]);
     const store = new GcpEvidenceStore(config({ KMS_MANIFEST_KEY: KEY_VERSION }));
     const result = await store.signManifest(signed.manifest);
     expect(result.signature?.valueBase64).toBe(Buffer.from([1, 2, 3]).toString("base64"));
   });
 
   it("refuses an answer that carries no signature", async () => {
-    google.signature = null;
+    google.signer = () => null;
     const store = new GcpEvidenceStore(config({ KMS_MANIFEST_KEY: KEY_VERSION }));
     await expect(store.signManifest(signed.manifest)).rejects.toThrow(
       "Cloud KMS returned no manifest signature",
     );
   });
 
-  it("never calls KMS with a crypto key rather than a version", async () => {
-    const store = new GcpEvidenceStore(
-      config({ KMS_MANIFEST_KEY: KEY_VERSION.replace("/cryptoKeyVersions/1", "") }),
+  it.each([
+    [
+      "a digest KMS did not verify",
+      { verifiedDigestCrc32c: false },
+      "Cloud KMS did not verify the manifest digest's checksum",
+    ],
+    [
+      "another key version",
+      { name: `${KEY_VERSION.slice(0, -1)}2` },
+      "Cloud KMS signed with a key version other than the configured one",
+    ],
+    [
+      "a signature whose checksum does not match",
+      { signatureCrc32c: "1" },
+      "Cloud KMS returned a signature that fails its checksum",
+    ],
+    [
+      "a signature with no checksum",
+      { signatureCrc32c: null },
+      "Cloud KMS returned a signature that fails its checksum",
+    ],
+  ])("refuses an answer with %s", async (_name, answer, message) => {
+    google.answer = answer;
+    const store = new GcpEvidenceStore(config({ KMS_MANIFEST_KEY: KEY_VERSION }));
+    await expect(store.signManifest(signed.manifest)).rejects.toThrow(message);
+  });
+
+  // There is no unsigned fallback: the store is used only in persist mode, and a persisted run's
+  // manifest is always signed.
+  it("refuses to sign, rather than returning an unsigned manifest, when no key is configured", async () => {
+    const store = new GcpEvidenceStore(config());
+    await expect(store.signManifest(signed.manifest)).rejects.toThrow(
+      "KMS_MANIFEST_KEY is required",
     );
+    expect(google.signs).toEqual([]);
+  });
+
+  // Every other test's KMS returns a fixed string, so nothing had ever checked that a signature
+  // verifies. This one signs with a real RSA-PSS key as KMS's RSA_SIGN_PSS_2048_SHA256 does
+  // (SHA-256, MGF1 SHA-256, a 32-byte salt) and verifies against the object as it was stored.
+  it("writes a signed manifest whose signature verifies over the stored manifest", async () => {
+    const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    const pss = { padding: constants.RSA_PKCS1_PSS_PADDING, saltLength: 32 };
+    // KMS signs a digest; this stand-in signs the message the digest was taken of, so it only
+    // answers for a digest of the manifest's canonical JSON.
+    const messages = new Map([[sha256(signed.manifest), canonicalJson(signed.manifest)]]);
+    google.signer = (request) => {
+      const message = messages.get(request.digest.sha256.toString("hex"));
+      if (message === undefined) throw new Error("KMS was asked to sign an unknown digest");
+      return sign("sha256", Buffer.from(message), { key: privateKey, ...pss });
+    };
+    const store = new GcpEvidenceStore(config({ KMS_MANIFEST_KEY: KEY_VERSION }));
+
+    await store.writeJson(RUN_ID, "signed-manifest", await store.signManifest(signed.manifest));
+
+    const stored = JSON.parse(google.saves[0]?.content ?? "") as SignedManifest;
+    expect(stored.manifestHash).toBe(sha256(stored.manifest));
+    const signature = Buffer.from(stored.signature?.valueBase64 ?? "", "base64");
+    const verifies = (manifest: unknown): boolean =>
+      verify("sha256", Buffer.from(canonicalJson(manifest)), { key: publicKey, ...pss }, signature);
+    expect(verifies(stored.manifest)).toBe(true);
+    expect(verifies({ ...stored.manifest, runId: "00000000-0000-4000-8000-000000000000" })).toBe(
+      false,
+    );
+  });
+
+  // The configuration refuses such a key at startup (test/evidence.test.ts); the store still
+  // checks, for a configuration built without loadConfig.
+  it("never calls KMS with a crypto key rather than a version", async () => {
+    const store = new GcpEvidenceStore({
+      ...config(),
+      KMS_MANIFEST_KEY: KEY_VERSION.replace("/cryptoKeyVersions/1", ""),
+    });
     await expect(store.signManifest(signed.manifest)).rejects.toThrow(
       /must name a crypto key version/,
     );

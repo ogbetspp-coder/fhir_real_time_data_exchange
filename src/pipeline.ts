@@ -12,6 +12,7 @@ import {
   type DocumentGateResult,
   type DocumentSubmissionInput,
   type IngestionEvidence,
+  type ManifestPersistence,
 } from "./contracts/index.js";
 import { OfficialFhirValidatorClient } from "./fhir/official-validator.js";
 import {
@@ -23,8 +24,14 @@ import { toProvenanceResource } from "./fhir/provenance.js";
 import { sourceIdentifierValue, transformType2ToEma } from "./fhir/transform.js";
 import { mappingReference, type EmaMapping } from "./fhir/mapping.js";
 import type { FhirBundle, FhirResource, OperationOutcome } from "./fhir/types.js";
+import { GLOBAL_TYPE2_BUNDLE_PROFILE } from "./fhir/standards.js";
 import { GcpEvidenceStore, type RunManifest, type SignedManifest } from "./gcp/evidence.js";
-import { HealthcareApiClient } from "./gcp/healthcare.js";
+import {
+  HealthcareApiClient,
+  buildPersistTransaction,
+  persistedVersion,
+  type PersistedVersion,
+} from "./gcp/healthcare.js";
 import { GcpLineagePublisher } from "./gcp/lineage.js";
 import { defaultFetcher, type AuthorityFetcher } from "./authority/fetch.js";
 import { verifyAuthorityImport, type AuthorityGateResult } from "./authority/gate.js";
@@ -32,8 +39,7 @@ import { sha256Bytes } from "./authority/import.js";
 import { sha256 } from "./lib/hash.js";
 import { log } from "./lib/logger.js";
 
-const GLOBAL_TYPE2_PROFILE =
-  "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/Bundle-uv-epi";
+const GLOBAL_TYPE2_PROFILE = GLOBAL_TYPE2_BUNDLE_PROFILE;
 
 type BaseInput = {
   runId?: string;
@@ -51,7 +57,9 @@ export type PipelineInput =
 
 export type PipelineResult = {
   runId: string;
-  status: RunManifest["status"];
+  // `validated` for a dry run; `persisted` once the transaction committed and the ledger recorded
+  // it. The signed manifest itself says `authorised`: it was signed before the transaction.
+  status: "validated" | "persisted";
   emaList: FhirResource;
   emaBundle: FhirBundle;
   mappingDecisions: ReturnType<typeof transformType2ToEma>["mappingDecisions"];
@@ -63,6 +71,9 @@ export type PipelineResult = {
   };
   evidence: SignedManifest;
   artifactUris: string[];
+  // The version of the EMA document Bundle the transaction wrote, as its response named it;
+  // absent for a dry run, or when the response did not say.
+  persistedBundle?: PersistedVersion;
 };
 
 function countErrors(outcomes: OperationOutcome[]): number {
@@ -269,17 +280,20 @@ export async function runPipeline(
     mapping.profiles.bundle,
     ...mapping.profiles.composition,
   ];
+  // A dry run's manifest is `validated`; a persist-mode run's is `authorised`, signed before its
+  // transaction and naming it. Only the ledger row, written after the commit, says `persisted`.
   const composeManifest = (
     completedAt: string,
     validation: RunManifest["validation"],
-    persistence: RunManifest["persistence"],
+    outcome:
+      | { status: "validated"; dryRun: true }
+      | { status: "authorised"; dryRun: false; persistence: ManifestPersistence },
   ): RunManifest => ({
     schemaVersion: RUN_MANIFEST_VERSION,
     runId,
     startedAt,
     completedAt,
-    status: config.DRY_RUN ? "validated" : "persisted",
-    dryRun: config.DRY_RUN,
+    ...outcome,
     source: {
       kind: input.sourceKind,
       resource: input.sourceResource,
@@ -299,7 +313,6 @@ export async function runPipeline(
       outputHash: transformed.outputHash,
       decisions: transformed.mappingDecisions.length,
     },
-    ...(persistence === undefined ? {} : { persistence }),
     runtime: {
       sourceCommit: process.env.GIT_COMMIT ?? "development",
       imageDigest: process.env.IMAGE_DIGEST ?? "development",
@@ -308,123 +321,190 @@ export async function runPipeline(
     ...(ingestion === undefined ? {} : { ingestion }),
   });
 
-  // Prove the manifest shape before any side effect: a schema drift must never leave resources
-  // persisted without a signed manifest, evidence objects, and a ledger row.
-  RunManifestSchema.parse(
-    composeManifest(
-      startedAt,
-      {
-        preflightErrors: countErrors([sourcePreflight, emaPreflight]),
-        officialValidationExecuted: !config.DRY_RUN,
-        officialProfileErrors: 0,
-        cloudValidationExecuted: !config.DRY_RUN,
-        cloudProfileErrors: 0,
-        profiles,
-      },
-      undefined,
-    ),
-  );
-
   const cloudOutcomes: OperationOutcome[] = [];
   const officialOutcomes: OperationOutcome[] = [];
-  let transactionResponseHash: string | undefined;
   const artifactUris: string[] = [];
+  const validation = (): RunManifest["validation"] => ({
+    preflightErrors: countErrors([sourcePreflight, emaPreflight]),
+    officialValidationExecuted: !config.DRY_RUN,
+    officialProfileErrors: countErrors(officialOutcomes),
+    cloudValidationExecuted: !config.DRY_RUN,
+    cloudProfileErrors: countErrors(cloudOutcomes),
+    profiles,
+  });
 
-  if (!config.DRY_RUN) {
-    const validatorUrl = config.FHIR_VALIDATOR_URL;
-    if (validatorUrl === undefined) throw new Error("FHIR_VALIDATOR_URL is required");
-    const officialValidator = new OfficialFhirValidatorClient(validatorUrl);
-    officialOutcomes.push(await officialValidator.validate(source, [GLOBAL_TYPE2_PROFILE]));
-    officialOutcomes.push(
-      await officialValidator.validate(transformed.list, [mapping.profiles.list]),
-    );
-    officialOutcomes.push(
-      await officialValidator.validate(transformed.documentBundle, [mapping.profiles.bundle]),
-    );
-    const targetComposition = transformed.documentBundle.entry[0]?.resource;
-    if (targetComposition === undefined) throw new Error("Transformed Composition is missing");
-    officialOutcomes.push(
-      await officialValidator.validate(targetComposition, mapping.profiles.composition),
-    );
-    if (officialOutcomes.some(hasValidationErrors)) {
-      throw new Error("Official HL7 FHIR profile validation failed");
-    }
-
-    const healthcare = new HealthcareApiClient(config);
-    cloudOutcomes.push(await healthcare.validate(source, GLOBAL_TYPE2_PROFILE, runId));
-    cloudOutcomes.push(await healthcare.validate(transformed.list, mapping.profiles.list, runId));
-    cloudOutcomes.push(
-      await healthcare.validate(transformed.documentBundle, mapping.profiles.bundle, runId),
-    );
-    const composition = transformed.documentBundle.entry[0]?.resource;
-    if (composition === undefined) throw new Error("Transformed Composition is missing");
-    for (const profile of mapping.profiles.composition) {
-      cloudOutcomes.push(await healthcare.validate(composition, profile, runId));
-    }
-    if (cloudOutcomes.some(hasValidationErrors)) {
-      throw new Error("Cloud Healthcare API profile validation failed");
-    }
-
-    const transactionResponse = await healthcare.persistPackage(
-      transformed.list,
-      transformed.documentBundle,
+  const finish = (
+    status: PipelineResult["status"],
+    signed: SignedManifest,
+    persistedBundle: PersistedVersion | undefined,
+  ): PipelineResult => {
+    log("info", "ePI interoperability run completed", {
       runId,
-      provenanceResource === undefined ? [] : [provenanceResource],
-    );
-    transactionResponseHash = sha256(transactionResponse);
-  }
+      stage: "pipeline",
+      outcome: status,
+      durationMs: Date.now() - stageStarted,
+      mappingDecisions: transformed.mappingDecisions.length,
+    });
 
-  const completedAt = new Date().toISOString();
-  const manifest = composeManifest(
-    completedAt,
-    {
-      preflightErrors: countErrors([sourcePreflight, emaPreflight]),
-      officialValidationExecuted: !config.DRY_RUN,
-      officialProfileErrors: countErrors(officialOutcomes),
-      cloudValidationExecuted: !config.DRY_RUN,
-      cloudProfileErrors: countErrors(cloudOutcomes),
-      profiles,
-    },
-    transactionResponseHash === undefined
-      ? undefined
-      : { targetStore: config.TARGET_FHIR_STORE_ID ?? "unknown", transactionResponseHash },
-  );
-  RunManifestSchema.parse(manifest);
-
-  let evidence: SignedManifest = {
-    manifest,
-    manifestHash: sha256(manifest),
-  };
-  if (!config.DRY_RUN) {
-    const store = new GcpEvidenceStore(config);
-    artifactUris.push(await store.writeJson(runId, "source-type2", source));
-    artifactUris.push(await store.writeJson(runId, "ema-list", transformed.list));
-    artifactUris.push(
-      await store.writeJson(runId, "ema-document-bundle", transformed.documentBundle),
-    );
-    artifactUris.push(
-      await store.writeJson(runId, "mapping-decisions", transformed.mappingDecisions),
-    );
-    artifactUris.push(
-      await store.writeJson(runId, "validation-outcomes", {
+    return {
+      runId,
+      status,
+      emaList: transformed.list,
+      emaBundle: transformed.documentBundle,
+      mappingDecisions: transformed.mappingDecisions,
+      outcomes: {
         sourcePreflight,
         emaPreflight,
-        officialOutcomes,
-        cloudOutcomes,
+        official: officialOutcomes,
+        cloud: cloudOutcomes,
+      },
+      evidence: signed,
+      artifactUris,
+      ...(persistedBundle === undefined ? {} : { persistedBundle }),
+    };
+  };
+
+  if (config.DRY_RUN) {
+    const manifest = composeManifest(new Date().toISOString(), validation(), {
+      status: "validated",
+      dryRun: true,
+    });
+    RunManifestSchema.parse(manifest);
+    return finish("validated", { manifest, manifestHash: sha256(manifest) }, undefined);
+  }
+
+  const validatorUrl = config.FHIR_VALIDATOR_URL;
+  if (validatorUrl === undefined) throw new Error("FHIR_VALIDATOR_URL is required");
+  const officialValidator = new OfficialFhirValidatorClient(validatorUrl);
+  officialOutcomes.push(await officialValidator.validate(source, [GLOBAL_TYPE2_PROFILE]));
+  officialOutcomes.push(
+    await officialValidator.validate(transformed.list, [mapping.profiles.list]),
+  );
+  officialOutcomes.push(
+    await officialValidator.validate(transformed.documentBundle, [mapping.profiles.bundle]),
+  );
+  const targetComposition = transformed.documentBundle.entry[0]?.resource;
+  if (targetComposition === undefined) throw new Error("Transformed Composition is missing");
+  officialOutcomes.push(
+    await officialValidator.validate(targetComposition, mapping.profiles.composition),
+  );
+  if (officialOutcomes.some(hasValidationErrors)) {
+    throw new Error("Official HL7 FHIR profile validation failed");
+  }
+
+  const healthcare = new HealthcareApiClient(config);
+  cloudOutcomes.push(await healthcare.validate(source, GLOBAL_TYPE2_PROFILE, runId));
+  cloudOutcomes.push(await healthcare.validate(transformed.list, mapping.profiles.list, runId));
+  cloudOutcomes.push(
+    await healthcare.validate(transformed.documentBundle, mapping.profiles.bundle, runId),
+  );
+  for (const profile of mapping.profiles.composition) {
+    cloudOutcomes.push(await healthcare.validate(targetComposition, profile, runId));
+  }
+  if (cloudOutcomes.some(hasValidationErrors)) {
+    throw new Error("Cloud Healthcare API profile validation failed");
+  }
+
+  // The commit order (docs/architecture.md): evidence, then the signed manifest, then the FHIR
+  // transaction, then the commit object and the ledger row that record it. The manifest says
+  // `authorised`, names the exact transaction by hash, and is signed before anything reaches the
+  // FHIR store, so no version is ever live without a signed manifest over its transaction. A
+  // failure before the transaction, or the transaction's own refusal, leaves nothing live. The
+  // transaction commits when the store accepts it; a failure after that (the commit object or the
+  // ledger insert, each retried within a bound) leaves a committed run with no record, answered
+  // as `committed-unrecorded` and logged with the run's manifest hash. So a signed manifest with
+  // no ledger row is one of the two, and the target store tells them apart: only the second left
+  // a Bundle version, written by the `persist-transaction` object's transaction. Nothing is written
+  // before the manifest is proved against its schema.
+  const transaction = buildPersistTransaction(
+    transformed.list,
+    transformed.documentBundle,
+    runId,
+    provenanceResource === undefined ? [] : [provenanceResource],
+  );
+  const transactionSha256 = sha256(transaction);
+  const manifest = composeManifest(new Date().toISOString(), validation(), {
+    status: "authorised",
+    dryRun: false,
+    persistence: { targetStore: config.TARGET_FHIR_STORE_ID ?? "unknown", transactionSha256 },
+  });
+  RunManifestSchema.parse(manifest);
+
+  // Every write is conditional on its object not existing, so the first one claims the runId: a
+  // runId already used is refused here, before the FHIR store is touched.
+  const store = new GcpEvidenceStore(config);
+  artifactUris.push(await store.writeJson(runId, "source-type2", source));
+  artifactUris.push(await store.writeJson(runId, "ema-list", transformed.list));
+  artifactUris.push(
+    await store.writeJson(runId, "ema-document-bundle", transformed.documentBundle),
+  );
+  artifactUris.push(
+    await store.writeJson(runId, "mapping-decisions", transformed.mappingDecisions),
+  );
+  artifactUris.push(
+    await store.writeJson(runId, "validation-outcomes", {
+      sourcePreflight,
+      emaPreflight,
+      officialOutcomes,
+      cloudOutcomes,
+    }),
+  );
+  if (gate !== undefined && provenanceResource !== undefined) {
+    artifactUris.push(await store.writeJson(runId, "canonical-submission", gate.submission));
+    artifactUris.push(
+      await store.writeJson(runId, "ingestion-provenance", gate.submission.provenance),
+    );
+    artifactUris.push(await store.writeJson(runId, "fidelity-report", gate.report));
+    artifactUris.push(await store.writeJson(runId, "provenance-resource", provenanceResource));
+  }
+  artifactUris.push(await store.writeJson(runId, "persist-transaction", transaction));
+  const evidence = await store.signManifest(manifest);
+  artifactUris.push(await store.writeJson(runId, "signed-manifest", evidence));
+
+  const transactionResponse = await healthcare.executeTransaction(transaction, runId);
+  const committedAt = new Date().toISOString();
+  const persistedBundle = persistedVersion(transactionResponse, "Bundle", emaBundleId);
+  if (persistedBundle === undefined) {
+    log("warning", "Transaction response names no version of the document Bundle", {
+      runId,
+      stage: "persist",
+    });
+  }
+  try {
+    // Hashes and identifiers only: what the transaction answered, bound to what was signed.
+    artifactUris.push(
+      await store.writeJson(runId, "commit", {
+        runId,
+        manifestHash: evidence.manifestHash,
+        transactionSha256,
+        transactionResponseSha256: sha256(transactionResponse),
+        committedAt,
+        targetBundle: {
+          id: emaBundleId,
+          versionId: persistedBundle?.versionId ?? null,
+          lastUpdated: persistedBundle?.lastUpdated ?? null,
+        },
       }),
     );
-    if (gate !== undefined && provenanceResource !== undefined) {
-      artifactUris.push(await store.writeJson(runId, "canonical-submission", gate.submission));
-      artifactUris.push(
-        await store.writeJson(runId, "ingestion-provenance", gate.submission.provenance),
-      );
-      artifactUris.push(await store.writeJson(runId, "fidelity-report", gate.report));
-      artifactUris.push(await store.writeJson(runId, "provenance-resource", provenanceResource));
-    }
-    evidence = await store.signManifest(manifest);
-    artifactUris.push(await store.writeJson(runId, "signed-manifest", evidence));
-    await store.writeLedger(evidence);
+    await store.writeLedger(evidence, {
+      committedAt,
+      bundleVersionId: persistedBundle?.versionId ?? null,
+    });
+  } catch (error) {
+    // The transaction is live. What reconciles it: this line, the signed manifest and the
+    // `persist-transaction` object, and the Bundle version in the target store.
+    log("error", "A committed run could not be recorded", {
+      runId,
+      stage: "commit",
+      manifestHash: evidence.manifestHash,
+      errorType: error instanceof Error ? error.name : typeof error,
+    });
+    throw new Error("The run committed but its record could not be written", { cause: error });
+  }
 
+  // Lineage is published after the commit and is best effort: a Data Lineage failure no longer
+  // turns a committed run into a 500 that invites a retry.
+  try {
     const project = config.GOOGLE_CLOUD_PROJECT ?? "unknown";
     const dataset = config.HEALTHCARE_DATASET_ID ?? "unknown";
     const sourceStore = config.SOURCE_FHIR_STORE_ID ?? "unknown";
@@ -447,38 +527,22 @@ export async function runPipeline(
     const lineageResources = await lineage.publish({
       runId,
       startedAt,
-      completedAt,
+      completedAt: manifest.completedAt,
       mapping: mappingReference(mapping),
       sourceFqn,
-      targetFhirFqn: `healthcare:${project}.${config.GCP_LOCATION}.${dataset}.${targetStore}.Bundle.${transformed.documentBundle.id ?? "unknown"}`,
+      targetFhirFqn: `healthcare:${project}.${config.GCP_LOCATION}.${dataset}.${targetStore}.Bundle.${emaBundleId}`,
       targetBigQueryFqn: `bigquery:${project}.${config.FHIR_ANALYTICS_DATASET ?? "unknown"}.Bundle`,
       inputHash: transformed.inputHash,
       outputHash: transformed.outputHash,
     });
     artifactUris.push(await store.writeJson(runId, "lineage-resources", lineageResources));
+  } catch (error) {
+    log("warning", "Lineage was not published for a committed run", {
+      runId,
+      stage: "lineage",
+      errorType: error instanceof Error ? error.name : typeof error,
+    });
   }
 
-  log("info", "ePI interoperability run completed", {
-    runId,
-    stage: "pipeline",
-    outcome: manifest.status,
-    durationMs: Date.now() - stageStarted,
-    mappingDecisions: transformed.mappingDecisions.length,
-  });
-
-  return {
-    runId,
-    status: manifest.status,
-    emaList: transformed.list,
-    emaBundle: transformed.documentBundle,
-    mappingDecisions: transformed.mappingDecisions,
-    outcomes: {
-      sourcePreflight,
-      emaPreflight,
-      official: officialOutcomes,
-      cloud: cloudOutcomes,
-    },
-    evidence,
-    artifactUris,
-  };
+  return finish("persisted", evidence, persistedBundle);
 }

@@ -1,4 +1,5 @@
 import type { EmaMapping, SectionRule } from "../fhir/mapping.js";
+import { GLOBAL_EPI_PROFILE_BASE } from "../fhir/standards.js";
 import type {
   CompositionSection,
   FhirBundle,
@@ -48,9 +49,6 @@ function entry(resource: FhirResource): { fullUrl: string; resource: FhirResourc
     resource,
   };
 }
-
-const GLOBAL_EPI_PROFILE_BASE =
-  "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/";
 
 // Every product-graph resource declares the Global ePI profile the Bundle-uv-epi entry slice
 // expects of it. The validator resolves a Reference to an entry and matches the target against
@@ -269,6 +267,13 @@ export function createSyntheticType2Bundle(
   };
 }
 
+// The identifier of the document scripts/gcp/bootstrap.sh seeds into the source store for the
+// ungated `healthcare-api` run source. Its own, never a demonstration label's: the transform keys
+// the EMA document Bundle id on it, and it used to be `synthetic-type2-smpc-v1`, the paracetamol
+// label's, so running the seeded source wrote an ungated version, with no Provenance, over the
+// label the demonstration quotes, which was then served with the previous version's approval.
+export const SEEDED_SOURCE_IDENTIFIER = "synthetic-seeded-type2-v1";
+
 export function createSyntheticSmpcFromPublishedType2(
   publishedType2: FhirBundle,
   mapping: EmaMapping,
@@ -289,7 +294,7 @@ export function createSyntheticSmpcFromPublishedType2(
   result.id = "synthetic-type2-smpc";
   result.identifier = {
     system: "https://khs.dev/fhir/identifier/type2-document",
-    value: "synthetic-type2-smpc-v1",
+    value: SEEDED_SOURCE_IDENTIFIER,
   };
   result.timestamp = "2026-09-19T00:00:00Z";
   result.entry[0] = {

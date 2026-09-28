@@ -11,7 +11,6 @@ import {
   PARTICIPANT_TYPE_ATTESTER,
   PARTICIPANT_TYPE_SYSTEM,
   toProvenanceResource,
-  withEmaTarget,
 } from "../src/fhir/provenance.js";
 import type { FhirResource } from "../src/fhir/types.js";
 import { createSyntheticSubmission } from "../src/fixtures/synthetic-submission.js";
@@ -138,17 +137,6 @@ describe("ingestion Provenance projection", () => {
     expect(toProvenanceResource(again, fidelityReport, OUTPUT).id).not.toBe(
       toProvenanceResource(submission, fidelityReport, OUTPUT).id,
     );
-  });
-
-  it("appends a further EMA Bundle target without disturbing the others", () => {
-    const { submission, fidelityReport } = createSyntheticSubmission(mapping);
-    const base = toProvenanceResource(submission, fidelityReport, OUTPUT);
-
-    const linked = withEmaTarget(base, "ema-document-bundle-2");
-
-    expect(arrayField(linked, "target")).toHaveLength(4);
-    expect(arrayField(linked, "target")[3]).toEqual({ reference: "Bundle/ema-document-bundle-2" });
-    expect(linked.id).toBe(base.id);
   });
 });
 

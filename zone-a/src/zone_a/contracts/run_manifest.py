@@ -44,13 +44,6 @@ class IsoDateTime(RootModel[str]):
     ]
 
 
-class RunStatus(StrEnum):
-    validated = "validated"
-    persisted = "persisted"
-    rejected = "rejected"
-    failed = "failed"
-
-
 class ManifestStandards(BaseModel):
     model_config = ConfigDict(extra="forbid")
     fhir: Literal["5.0.0"]
@@ -76,12 +69,6 @@ class ManifestTransformation(BaseModel):
     inputHash: Sha256Hex
     outputHash: Sha256Hex
     decisions: Annotated[int, Field(ge=0, le=9007199254740991)]
-
-
-class ManifestPersistence(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    targetStore: Annotated[str, Field(max_length=1024, min_length=1)]
-    transactionResponseHash: Sha256Hex
 
 
 class ManifestRuntime(BaseModel):
@@ -189,6 +176,19 @@ class AuthorityFetch(BaseModel):
     fetched: Annotated[list[FetchedItem], Field(min_length=2)]
 
 
+class Source1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Kind
+    resource: Annotated[str, Field(max_length=1024, min_length=1)]
+    hash: Sha256Hex
+
+
+class ManifestPersistence(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    targetStore: Annotated[str, Field(max_length=1024, min_length=1)]
+    transactionSha256: Sha256Hex
+
+
 class Source(BaseModel):
     model_config = ConfigDict(extra="forbid")
     kind: Kind
@@ -272,21 +272,41 @@ class IngestionEvidence(BaseModel):
     provenanceResourceId: Uuid
 
 
-class RunManifest(BaseModel):
+class AuthorisedRunManifest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    schemaVersion: Literal["2.0.0"]
+    schemaVersion: Literal["3.0.0"]
+    source: Source1
+    runId: Uuid
+    startedAt: IsoDateTime
+    completedAt: IsoDateTime
+    standards: ManifestStandards
+    validation: ManifestValidation
+    transformation: ManifestTransformation
+    runtime: ManifestRuntime
+    ingestion: IngestionEvidence | None = None
+    status: Literal["authorised"]
+    dryRun: Literal[False]
+    persistence: ManifestPersistence
+
+
+class ValidatedRunManifest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    schemaVersion: Literal["3.0.0"]
     source: Source
     runId: Uuid
     startedAt: IsoDateTime
     completedAt: IsoDateTime
-    status: RunStatus
-    dryRun: bool
     standards: ManifestStandards
     validation: ManifestValidation
     transformation: ManifestTransformation
-    persistence: ManifestPersistence | None = None
     runtime: ManifestRuntime
     ingestion: IngestionEvidence | None = None
+    status: Literal["validated"]
+    dryRun: Literal[True]
+
+
+class RunManifest(RootModel[ValidatedRunManifest | AuthorisedRunManifest]):
+    root: ValidatedRunManifest | AuthorisedRunManifest
 
 
 class Model(RootModel[RunManifest]):

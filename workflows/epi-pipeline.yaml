@@ -5,9 +5,17 @@ main:
         assign:
           - runId: ${sys.get_env("GOOGLE_CLOUD_WORKFLOW_EXECUTION_ID")}
           - serviceUrl: ${sys.get_env("EMA_FLOW_SERVICE_URL")}
-          - sourceKind: ${default(map.get(args, "source"), "healthcare-api")}
+          # Required: there is no default source. The old default, healthcare-api, is an ungated
+          # source that production disables, so an execution without one failed late, at the worker.
+          - sourceKind: ${map.get(args, "source")}
           - bundleId: ${map.get(args, "bundleId")}
           - submissionRef: ${map.get(args, "submissionRef")}
+    - requireSource:
+        switch:
+          - condition: ${sourceKind == null}
+            raise: "The workflow requires a source argument: document, healthcare-api or fixture"
+    - buildRequest:
+        assign:
           - requestBody:
               source: ${sourceKind}
               runId: ${runId}
@@ -40,6 +48,12 @@ main:
           timeout: 1800
           body: ${requestBody}
         result: pipelineResponse
+    # The stream check looks for the version this run wrote, not for the Bundle id: the id is the
+    # same across every version of a label, so a row from an earlier version used to satisfy it.
+    - requirePersistedVersion:
+        switch:
+          - condition: ${pipelineResponse.body.status != "persisted" or map.get(pipelineResponse.body, "targetBundleVersionId") == null}
+            raise: "The pipeline reported no persisted version of the document Bundle, so its stream cannot be checked"
     - initialiseStreamCheck:
         assign:
           - attempts: 0
@@ -51,7 +65,7 @@ main:
           body:
             useLegacySql: false
             timeoutMs: 10000
-            query: ${"SELECT id, meta.lastUpdated AS last_updated FROM `" + sys.get_env("GOOGLE_CLOUD_PROJECT_ID") + "." + sys.get_env("EMA_FLOW_BIGQUERY_DATASET") + ".Bundle` WHERE id = @bundle_id LIMIT 1"}
+            query: ${"SELECT id, meta.lastUpdated AS last_updated FROM `" + sys.get_env("GOOGLE_CLOUD_PROJECT_ID") + "." + sys.get_env("EMA_FLOW_BIGQUERY_DATASET") + ".Bundle` WHERE id = @bundle_id AND meta.versionId = @version_id LIMIT 1"}
             parameterMode: NAMED
             queryParameters:
               - name: bundle_id
@@ -59,6 +73,11 @@ main:
                   type: STRING
                 parameterValue:
                   value: ${pipelineResponse.body.targetBundleId}
+              - name: version_id
+                parameterType:
+                  type: STRING
+                parameterValue:
+                  value: ${pipelineResponse.body.targetBundleVersionId}
         result: streamQuery
     - evaluateStreamCheck:
         assign:
