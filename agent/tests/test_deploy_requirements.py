@@ -2,16 +2,48 @@
 
 The first real deploy (2026-09-22) failed on Google's Linux build because a hand reading of the
 lock dropped the markers and asked for ``pywin32``, which exists only for Windows. The list now
-comes from ``uv export``; these tests hold it to that."""
+comes from ``uv export``; these tests hold it to that.
+
+Resolving for Google's build platform reads package metadata from the index, so the two tests
+that resolve are skipped, not passed, where the index cannot be reached: until 2026-09-27 the
+conflict test passed offline because the resolver failed for want of a network, not because it
+found the conflict (audit AG-11)."""
 
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
+from typing import Any
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "deploy"))
 
 import deploy_agent_engine
+
+# What uv writes when it could not reach the index: the answer is then about the network.
+_OFFLINE = (
+    "failed to fetch",
+    "error sending request",
+    "dns error",
+    "network",
+    "connection",
+    "offline",
+    "timed out",
+)
+
+
+def _resolve(requirements: list[str]) -> str | None:
+    """``None`` when the set resolves; otherwise uv's own words. Skips when uv is offline."""
+    try:
+        deploy_agent_engine.check_resolves(requirements)
+    except SystemExit as refusal:
+        message = str(refusal)
+        if any(sign in message.lower() for sign in _OFFLINE):
+            pytest.skip("the package index cannot be reached; nothing was resolved")
+        return message
+    return None
 
 
 def test_every_requirement_is_pinned_exactly() -> None:
@@ -34,7 +66,134 @@ def test_the_runtime_gets_both_sdks_and_cloudpickle_pinned() -> None:
 
 
 def test_a_conflicting_set_is_refused_before_upload() -> None:
-    import pytest
+    refusal = _resolve(["google-genai==2.24.0", "google-genai==1.0.0"])
+    assert refusal is not None
+    assert "do not resolve" in refusal
+    # uv's own finding, not a failure to look.
+    assert "no solution found" in refusal.lower()
 
-    with pytest.raises(SystemExit, match="do not resolve"):
-        deploy_agent_engine.check_resolves(["google-genai==2.24.0", "google-genai==1.0.0"])
+
+def test_a_set_that_resolves_is_let_through() -> None:
+    assert _resolve(["google-genai==2.24.0"]) is None
+
+
+# --- what is deployed, and under which version (audit AG-9, AG-11) ------------------------
+
+ENV = {
+    "AGENT_ENGINE_PROJECT": "synthetic-project",
+    "AGENT_ENGINE_LOCATION": "europe-west4",
+    "AGENT_ENGINE_STAGING_BUCKET": "gs://synthetic-bucket",
+    "QUERY_SERVICE_MCP_URL": "https://query.invalid/mcp",
+    "AGENT_MODEL": "gemini-2.5-flash",
+}
+
+
+def _environment(monkeypatch: pytest.MonkeyPatch, **extra: str) -> None:
+    for name in (
+        "AGENT_SERVICE_VERSION",
+        "MCP_TIMEOUT_SECONDS",
+        "AGENT_PRINCIPAL_DIGEST_SECRET",
+        "AGENT_ENGINE_SERVICE_ACCOUNT",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    for name, value in (ENV | extra).items():
+        monkeypatch.setenv(name, value)
+
+
+def test_a_typed_service_version_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    _environment(monkeypatch, AGENT_SERVICE_VERSION="agent/0.1.0")
+    with pytest.raises(SystemExit, match="unset AGENT_SERVICE_VERSION"):
+        deploy_agent_engine.read_environment()
+
+
+def test_the_version_names_the_commit_and_a_changed_tree_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    answers = {"status": "", "rev-parse": "0123abc" * 5 + "01234\n", "merge-base": ""}
+    released = [True]
+
+    def git(*arguments: str) -> str:
+        if arguments[0] == "merge-base" and not released[0]:
+            raise subprocess.CalledProcessError(1, ["git", *arguments])
+        return answers[arguments[0]]
+
+    monkeypatch.setattr(deploy_agent_engine, "_git", git)
+    version = deploy_agent_engine.service_version()
+    assert version.startswith("agent/")
+    assert version.endswith("+" + answers["rev-parse"].strip())
+    # A commit that is not on origin/main has not been through the merge gate (review, L4).
+    released[0] = False
+    with pytest.raises(SystemExit, match="is not on origin/main"):
+        deploy_agent_engine.service_version()
+    answers["status"] = " M src/verifiable_answer_agent/finish.py\n"
+    with pytest.raises(SystemExit, match="differs from its commit"):
+        deploy_agent_engine.service_version()
+
+
+def test_the_upload_is_the_package_as_the_commit_holds_it(tmp_path: Path) -> None:
+    # Taken with git archive, so no ignored or untracked file in the working tree (a
+    # __pycache__, a stray .pyc) can reach the upload (review of PR #129, L4).
+    stray = (
+        Path(deploy_agent_engine.AGENT_ROOT)
+        / "src"
+        / "verifiable_answer_agent"
+        / "__pycache__"
+        / "stray.pyc"
+    )
+    stray.parent.mkdir(exist_ok=True)
+    stray.write_bytes(b"not in the commit")
+    try:
+        root = deploy_agent_engine.export_package("HEAD", tmp_path)
+    finally:
+        stray.unlink()
+    exported = sorted(
+        path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file()
+    )
+    committed = sorted(
+        "verifiable_answer_agent/" + name
+        for name in deploy_agent_engine._git(
+            "ls-tree", "-r", "--name-only", "HEAD", "src/verifiable_answer_agent/"
+        )
+        .strip()
+        .replace("src/verifiable_answer_agent/", "")
+        .splitlines()
+    )
+    assert exported == committed
+    assert not any("__pycache__" in name for name in exported)
+
+
+def test_the_runtime_gets_its_settings_and_a_secret_by_reference_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _environment(
+        monkeypatch,
+        MCP_TIMEOUT_SECONDS="20",
+        AGENT_PRINCIPAL_DIGEST_SECRET="agent-principal-digest-key",
+        AGENT_ENGINE_SERVICE_ACCOUNT="ema-flow-agent@synthetic-project.iam.gserviceaccount.com",
+    )
+    monkeypatch.setattr(deploy_agent_engine, "requirements_from_lock", list)
+    settings = deploy_agent_engine.read_environment()
+    settings["AGENT_SERVICE_VERSION"] = "agent/0.1.0+abc"
+    config: dict[str, Any] = deploy_agent_engine.build_config(settings)
+    assert config["env_vars"] == {
+        "QUERY_SERVICE_MCP_URL": "https://query.invalid/mcp",
+        "AGENT_MODEL": "gemini-2.5-flash",
+        "AGENT_SERVICE_VERSION": "agent/0.1.0+abc",
+        "MCP_TIMEOUT_SECONDS": "20",
+        "AGENT_PRINCIPAL_DIGEST_KEY": {"secret": "agent-principal-digest-key", "version": "latest"},
+    }
+    assert config["service_account"] == ("ema-flow-agent@synthetic-project.iam.gserviceaccount.com")
+
+
+def test_without_the_optional_settings_nothing_is_invented(monkeypatch: pytest.MonkeyPatch) -> None:
+    _environment(monkeypatch)
+    monkeypatch.setattr(deploy_agent_engine, "requirements_from_lock", list)
+    settings = deploy_agent_engine.read_environment()
+    settings["AGENT_SERVICE_VERSION"] = "agent/0.1.0+abc"
+    config = deploy_agent_engine.build_config(settings)
+    assert sorted(config["env_vars"]) == [
+        "AGENT_MODEL",
+        "AGENT_SERVICE_VERSION",
+        "QUERY_SERVICE_MCP_URL",
+    ]
+    assert "service_account" not in config

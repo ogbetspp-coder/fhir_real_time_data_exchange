@@ -23,10 +23,17 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../scripts/gcp" && pwd)/common.s
 # GCP_PROJECT_ID first, as before; otherwise GOOGLE_CLOUD_PROJECT or the gcloud configuration,
 # and no project at all fails rather than falling back to a hard-coded one.
 PROJECT_ID="${GCP_PROJECT_ID:-$(ema_flow_resolve_project)}"
-REGION="${GCP_REGION:-europe-west4}"
 ROLE_ID="emaFlowAgentInvoker"
 PERMISSIONS="aiplatform.reasoningEngines.get,aiplatform.reasoningEngines.query"
 : "${AGENT_RESOURCE:?AGENT_RESOURCE names the reasoning engine, as deploy_agent_engine.py printed}"
+# The regional endpoint is the engine's own region, read from its name: a region typed
+# separately can disagree with it, and the call then goes to an endpoint that does not hold it.
+if [[ "$AGENT_RESOURCE" =~ ^projects/[^/]+/locations/([a-z0-9-]+)/reasoningEngines/[0-9]+$ ]]; then
+  REGION="${BASH_REMATCH[1]}"
+else
+  echo "AGENT_RESOURCE must be projects/<p>/locations/<region>/reasoningEngines/<id>" >&2
+  exit 1
+fi
 
 PROJECT_NUMBER="$(gcloud --quiet projects describe "$PROJECT_ID" --format='value(projectNumber)')"
 MEMBER="serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-discoveryengine.iam.gserviceaccount.com"
@@ -36,8 +43,19 @@ CHECK="false"
 [[ "${1:-}" == "--check" ]] && CHECK="true"
 TOKEN="$(gcloud --quiet auth print-access-token)"
 
-policy="$(curl --silent --show-error --request POST --header "Authorization: Bearer ${TOKEN}" \
-  --header "Content-Type: application/json" --data '{}' "${API}:getIamPolicy")"
+# The access token reaches curl on its standard input, as a config line, never as an argument:
+# an argument is visible to every process on the machine for the life of the call.
+google_curl() {
+  printf 'header = "Authorization: Bearer %s"\n' "$TOKEN" | curl --config - --silent --show-error "$@"
+}
+
+# --fail-with-body: an error answer is a failure, not a policy. Without it an error body was
+# parsed as the policy and, on the grant path, posted back as one.
+policy="$(google_curl --fail-with-body --request POST \
+  --header "Content-Type: application/json" --data '{}' "${API}:getIamPolicy")" || {
+  echo "getIamPolicy failed: ${policy}" >&2
+  exit 1
+}
 granted="$(printf '%s' "$policy" | python3 -c "
 import json, sys
 policy = json.load(sys.stdin)
@@ -76,9 +94,12 @@ import json, sys
 policy = json.load(sys.stdin)
 policy.setdefault('bindings', []).append({'role': sys.argv[1], 'members': [sys.argv[2]]})
 json.dump({'policy': policy}, open(sys.argv[3], 'w'))" "$ROLE" "$MEMBER" "$request"
-  curl --silent --show-error --request POST --header "Authorization: Bearer ${TOKEN}" \
+  answer="$(google_curl --fail-with-body --request POST \
     --header "Content-Type: application/json" --data-binary "@${request}" \
-    "${API}:setIamPolicy" >/dev/null
+    "${API}:setIamPolicy")" || {
+    echo "setIamPolicy failed: ${answer}" >&2
+    exit 1
+  }
   echo "granted ${ROLE_ID} to Gemini Enterprise on this agent"
 fi
 

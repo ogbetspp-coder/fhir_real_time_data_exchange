@@ -9,9 +9,18 @@ from google.adk.agents import LlmAgent
 from google.adk.tools.mcp_tool import McpToolset
 
 from verifiable_answer_agent.agent import AGENT_NAME, build_agent
-from verifiable_answer_agent.config import AgentConfig, MissingConfigurationError
+from verifiable_answer_agent.config import (
+    AgentConfig,
+    MissingConfigurationError,
+    principal_digest_key,
+)
 from verifiable_answer_agent.instruction import SYSTEM_INSTRUCTION
-from verifiable_answer_agent.tools import QUERY_TOOL_NAMES, bearer_header_provider, begin_turn
+from verifiable_answer_agent.tools import (
+    QUERY_TOOL_NAMES,
+    ToolCallLog,
+    bearer_header_provider,
+    begin_turn,
+)
 
 CONFIG = AgentConfig(
     query_service_url="https://example.invalid/mcp",
@@ -59,6 +68,71 @@ def test_the_configuration_has_no_defaults_to_fall_back_on() -> None:
         del env[missing]
         with pytest.raises(MissingConfigurationError, match=missing):
             AgentConfig.from_env(env)
+
+
+BASE_ENV = {
+    "QUERY_SERVICE_MCP_URL": "https://example.invalid/mcp",
+    "AGENT_MODEL": "gemini-3.5-flash",
+    "AGENT_SERVICE_VERSION": "agent/0.1.0",
+}
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://example.invalid/mcp",
+        "http://10.0.0.7/mcp",
+        "ftp://example.invalid/mcp",
+        "example.invalid/mcp",
+        "https:///mcp",
+    ],
+)
+def test_a_url_that_would_send_the_token_in_clear_is_refused(url: str) -> None:
+    # Every request carries the user's bearer token (audit AG-11).
+    with pytest.raises(ValueError, match="https"):
+        AgentConfig.from_env(BASE_ENV | {"QUERY_SERVICE_MCP_URL": url})
+
+
+def test_loopback_may_be_plain_http_for_the_tests_fake_service() -> None:
+    config = AgentConfig.from_env(BASE_ENV | {"QUERY_SERVICE_MCP_URL": "http://127.0.0.1:9/mcp"})
+    assert config.query_service_url == "http://127.0.0.1:9/mcp"
+
+
+@pytest.mark.parametrize("timeout", ["nan", "inf", "0", "-1", "601"])
+def test_a_timeout_outside_the_bound_is_refused(timeout: str) -> None:
+    with pytest.raises(ValueError, match="MCP_TIMEOUT_SECONDS"):
+        AgentConfig.from_env(BASE_ENV | {"MCP_TIMEOUT_SECONDS": timeout})
+
+
+def test_the_timeout_is_read_and_the_digest_key_never_enters_the_configuration() -> None:
+    # The configuration is pickled with the agent at deploy time; the key is read at run time
+    # from the runtime's own environment, so it is never in the pickle.
+    env = BASE_ENV | {"MCP_TIMEOUT_SECONDS": "12.5", "AGENT_PRINCIPAL_DIGEST_KEY": "s3cret-key"}
+    config = AgentConfig.from_env(env)
+    assert config.timeout_seconds == 12.5
+    assert "s3cret" not in repr(config)
+    assert principal_digest_key(env) == b"s3cret-key"
+    assert principal_digest_key(BASE_ENV) is None
+
+
+def test_the_instruction_never_asks_the_model_to_write_label_text_ids_or_hashes() -> None:
+    # Checked blocks are composed from get_section by code; whatever the model writes lands in
+    # the unchecked assistant part. Until 2026-09-27 it was told to quote and to write each
+    # quotation's ids and hash itself (audit AG-3).
+    flat = " ".join(SYSTEM_INSTRUCTION.lower().split())
+    assert "every quotation carries" not in flat
+    assert "do not reproduce, quote, paraphrase or summarise label text" in flat
+    assert "never write a bundleid, versionid, sourcekey, checksum or hash" in flat
+
+
+def test_every_query_tool_call_is_logged_by_the_agents_own_callbacks() -> None:
+    agent = build_agent(CONFIG)
+    for callback in (
+        agent.before_tool_callback,
+        agent.after_tool_callback,
+        agent.on_tool_error_callback,
+    ):
+        assert isinstance(getattr(callback, "__self__", None), ToolCallLog)
 
 
 def test_the_instruction_says_the_four_things_it_is_meant_to_say() -> None:

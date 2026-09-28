@@ -22,7 +22,7 @@ import socket
 import threading
 import time
 from collections.abc import Iterator, Mapping
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Final, final
@@ -318,6 +318,8 @@ class FakeQueryService:
     # Each verify_quote answer, in call order, as (quote, result). Test-side only: the real
     # service keeps no quote text.
     seen_quotes: list[tuple[str, str]] = field(default_factory=list)
+    # The JSON-RPC method of every request, in arrival order.
+    seen_methods: list[str] = field(default_factory=list)
     corrupt_section: str | None = None
     break_schema_for: str | None = None
     truncate_find_product: bool = False
@@ -403,6 +405,12 @@ def _build_server(state: FakeQueryService) -> Any:
             # The real service answers with an error result; FastMCP turns this into one.
             state.seen_quotes.append((quote, "invalid-request"))
             raise ValueError("invalid-request")
+        # As the service does: a named section is the only one searched (src/query/tools.ts).
+        candidates = {
+            key: section
+            for key, section in state.sections.items()
+            if sourceKey is None or key == sourceKey
+        }
         result: dict[str, Any] = {
             "document": {
                 "bundleId": BUNDLE_ID,
@@ -412,9 +420,9 @@ def _build_server(state: FakeQueryService) -> Any:
             "result": "no-match",
             "normalizationVersion": NORMALIZATION_VERSION,
             "quoteSha256": _sha256_hex(quote),
-            "sectionsSearched": len(state.sections),
+            "sectionsSearched": len(candidates),
         }
-        for key, section in state.sections.items():
+        for key, section in candidates.items():
             if key == state.corrupt_section:
                 # This section is "changed in the store since composition": nothing matches it.
                 continue
@@ -425,7 +433,7 @@ def _build_server(state: FakeQueryService) -> Any:
                 continue
             result["result"] = "match"
             result["match"] = {
-                "sourceKey": key if sourceKey is None else sourceKey,
+                "sourceKey": key,
                 "startOffset": located[0],
                 "endOffset": located[1],
                 "normalizedTextSha256": section.payload["normalizedTextSha256"],
@@ -445,7 +453,23 @@ def _build_server(state: FakeQueryService) -> Any:
                 headers = {key.decode(): value.decode() for key, value in scope["headers"]}
                 state.seen_authorization.append(headers.get("authorization"))
                 state.seen_turn_id.append(headers.get("x-query-turn-id"))
-            await self._inner(scope, receive, send)
+            body: list[bytes] = []
+
+            async def peek() -> Any:
+                # The JSON-RPC method of each request, read as it passes: a test counts
+                # tools/list round trips by it.
+                message = await receive()
+                if message.get("type") == "http.request":
+                    body.append(message.get("body", b""))
+                    if not message.get("more_body"):
+                        with suppress(ValueError):
+                            parsed = json.loads(b"".join(body) or b"null")
+                            for item in parsed if isinstance(parsed, list) else [parsed]:
+                                if isinstance(item, dict) and "method" in item:
+                                    state.seen_methods.append(str(item["method"]))
+                return message
+
+            await self._inner(scope, peek, send)
 
     return _Capture(app)
 

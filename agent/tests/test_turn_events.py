@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import contextlib
 import copy
+import json
 from collections.abc import AsyncGenerator
 
 import pytest
@@ -36,6 +37,7 @@ from verifiable_answer_agent.tools import USER_TOKEN_STATE_KEY
 
 from .conftest import TEST_PRINCIPAL, TEST_TOKEN, config_for
 from .fake_query_service import BUNDLE_ID, FakeQueryService
+from .markdown_view import shown_assistant, shown_blocks
 
 SECTION_KEY = "smpc.4.4"
 
@@ -160,9 +162,11 @@ async def test_the_only_text_that_leaves_the_agent_is_the_checked_answer(
     # The checked answer: the store's text under the verified label, the model's words after it,
     # under their own label.
     stored = query_service.sections[SECTION_KEY].text
-    assert shown.startswith(VERIFIED_LABEL + "\n" + stored.split("\n")[0])
-    assistant = shown[shown.index(ASSISTANT_LABEL) :]
-    assert shown.index(ASSISTANT_LABEL) > shown.index(stored.split("\n")[0])
+    # As a reader sees it, once the Markdown is rendered.
+    (block,) = shown_blocks(shown)
+    assert (block.status, block.text) == (VERIFIED_LABEL, stored)
+    assistant = shown_assistant(shown)
+    assert shown.index(ASSISTANT_LABEL) > shown.index(VERIFIED_LABEL)
     # The draft's imitation of a checked block is gone from the assistant's words; what it said
     # in its own voice is still there, under the assistant's label. The held text reached the
     # turn's end, which is what a deep copy used to break.
@@ -193,9 +197,26 @@ async def test_the_tool_loop_still_runs_and_the_quote_is_rechecked(
     assert len(model.requests) == 2
     # get_section, then the post-check's verify_quote, all under the turn's one id. The verified
     # label is verify_quote's answer: nothing else puts it on a block.
-    assert _texts(events)[-1][1].startswith(VERIFIED_LABEL)
+    assert shown_blocks(_texts(events)[-1][1])[0].status == VERIFIED_LABEL
     turn_ids = {value for value in query_service.seen_turn_id if value is not None}
     assert len(turn_ids) == 1
+
+
+@pytest.mark.parametrize("deployed", [True, False], ids=["deep-copy", "original"])
+async def test_the_record_lists_every_call_of_the_turn_as_it_ran(
+    query_service: FakeQueryService, capsys: pytest.CaptureFixture[str], deployed: bool
+) -> None:
+    # The model's get_section, recorded by the agent's tool callbacks, and the post-check's
+    # verify_quote, recorded by the turn's end, in one record under the turn's id. Before
+    # 2026-09-27 the deployed record listed get_section alone, read back from the events, with a
+    # duration of 0 (audit AG-5).
+    await _run_turn(query_service.url, ScriptedModel(), deployed=deployed)
+    lines = [line for line in capsys.readouterr().out.splitlines() if line.startswith("{")]
+    (record,) = [json.loads(line) for line in lines]
+    assert record["outcome"] == "answered"
+    assert [call["tool"] for call in record["tools"]] == ["get_section", "verify_quote"]
+    assert all(call["outcome"] == "ok" for call in record["tools"])
+    assert record["turnId"] in set(query_service.seen_turn_id)
 
 
 async def test_the_model_is_not_asked_when_the_label_service_cannot_be_reached() -> None:

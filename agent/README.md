@@ -3,8 +3,8 @@
 Delivered (was roadmap item 1b); its post-check seen in a live turn is roadmap item 1. A small Agent
 Development Kit agent, its own deployable under ADR 0004 — own `pyproject.toml`, own lock, own
 identity, own CI job — that shares nothing with the worker or with Zone A except two published
-artefacts: `contracts/generated/query-tools.schema.json` (2.0.1, the query service's surface) and
-`contracts/generated/agent-turn.schema.json` (1.0.0, the shape of this agent's own audit record).
+artefacts: `contracts/generated/query-tools.schema.json` (4.0.0, the query service's surface) and
+`contracts/generated/agent-turn.schema.json` (1.1.0, the shape of this agent's own audit record).
 
 It does four things and refuses to do a fifth.
 
@@ -12,12 +12,14 @@ It does four things and refuses to do a fifth.
    bearer token on every request, with no fallback credential, and one `X-Query-Turn-Id`
    header per turn so the service's audit lines can be joined to this agent's.
 2. Composes answers in a fixed shape: verbatim blocks from tool results, each with its
-   citation, and the assistant's own words in a separate labelled part.
-3. Runs the post-check — every verbatim block back through `verify_quote` — and flags any
-   `no-match` on the block itself.
-4. Emits one structured audit record per turn, in the shape the `agent-turn` contract
-   publishes: tools called, spans verified and flagged, principal, durations. Never narrative,
-   never arguments, never the token.
+   citation and the product and language named for its document version, and the
+   assistant's own words in a separate labelled part.
+3. Runs the post-check — every verbatim block back through `verify_quote`, held to exact
+   coverage and matching hashes — and flags anything short of that on the block itself.
+4. Emits one structured audit record per turn, however the turn ends, in the shape the
+   `agent-turn` contract publishes: how it ended, tools called, spans verified and flagged,
+   principal (never an e-mail address), durations. Never narrative, never arguments, never the
+   token.
 
 The design is `docs/design/verifiable-answers.md`. The promise it implements, stated narrowly
 enough to be true: _every sentence an answer presents as label content is verbatim from the
@@ -27,30 +29,38 @@ layer 1 and the system instruction is layer 3.
 
 ## What is proven, and where
 
-| Claim                                                                        | Where                                                |
-| ---------------------------------------------------------------------------- | ---------------------------------------------------- |
-| The real ADK toolset exposes exactly the contract's four tools               | `tests/test_toolset_wiring.py`                       |
-| The end user's token reaches the service on every request                    | `tests/test_toolset_wiring.py`                       |
-| The turn id is made before any tool call and reaches the service on each one | `tests/test_toolset_wiring.py`, `tests/test_turn.py` |
-| Without a turn id in state, only `Authorization` is sent                     | `tests/test_toolset_wiring.py`                       |
-| A `find_product` result without `truncated` fails the contract               | `tests/test_contract.py`                             |
-| A missing or blank token fails the call closed, attempting nothing           | `tests/test_toolset_wiring.py`                       |
-| A tool result that fails the contract's schema is unavailable, never content | `tests/test_contract.py`, `tests/test_turn.py`       |
-| Composition is a deterministic function of the tool results                  | `tests/test_compose.py`                              |
-| An altered quotation comes back `no-match` and is flagged on the card        | `tests/test_postcheck.py`, `tests/test_turn.py`      |
-| A block that was never checked is unverified, not assumed good               | `tests/test_postcheck.py`                            |
-| No answer can be rendered without passing through the post-check             | `tests/test_postcheck.py`                            |
-| The A2UI card carries quote, citation and status per block                   | `tests/test_render.py`                               |
-| The audit record carries no narrative and no arguments at any depth          | `tests/test_audit.py`                                |
-| An emitted record validates against the vendored `agent-turn` schema         | `tests/test_audit.py`                                |
-| Nothing under `src/` prints or logs, and nothing here quotes a fixture       | `tests/test_no_narrative_leak.py`                    |
-| The only text a turn emits is the checked answer, streamed or not            | `tests/test_turn_events.py`                          |
-| The model's thoughts and asides never leave the agent                        | `tests/test_turn_events.py`                          |
-| Without the four query tools the model is not called, and the person is told | `tests/test_turn_events.py`                          |
-| A failed model call ends the turn with a notice, not a platform error        | `tests/test_turn_events.py`                          |
-| All of the above hold for a deep copy of the agent, which is what deploys    | `tests/test_turn_events.py`                          |
-| The assistant cannot write the labels reserved for checked text              | `tests/test_render.py`, `tests/test_turn_events.py`  |
-| A failure at the turn's end shows a notice, never the model's draft          | `tests/test_finish_turn.py`                          |
+| Claim                                                                           | Where                                                    |
+| ------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| The real ADK toolset exposes exactly the contract's four tools                  | `tests/test_toolset_wiring.py`                           |
+| The end user's token reaches the service on every request                       | `tests/test_toolset_wiring.py`                           |
+| The turn id is made before any tool call and reaches the service on each one    | `tests/test_toolset_wiring.py`, `tests/test_turn.py`     |
+| Without a turn id in state, only `Authorization` is sent                        | `tests/test_toolset_wiring.py`                           |
+| A `find_product` result without `truncated` fails the contract                  | `tests/test_contract.py`                                 |
+| A missing or blank token fails the call closed, attempting nothing              | `tests/test_toolset_wiring.py`                           |
+| A tool result that fails the contract's schema is unavailable, never content    | `tests/test_contract.py`, `tests/test_turn.py`           |
+| Composition is a deterministic function of the tool results                     | `tests/test_compose.py`                                  |
+| An altered quotation comes back `no-match` and is flagged on the card           | `tests/test_postcheck.py`, `tests/test_turn.py`          |
+| A block that was never checked is unverified, not assumed good                  | `tests/test_postcheck.py`                                |
+| No answer can be rendered without passing through the post-check                | `tests/test_postcheck.py`                                |
+| Both surfaces carry quote, status, product, citation per block                  | `tests/test_render.py`                                   |
+| The audit record carries no narrative and no arguments at any depth             | `tests/test_audit.py`                                    |
+| An emitted record validates against the vendored `agent-turn` schema            | `tests/test_audit.py`, `tests/test_finish_turn.py`       |
+| Nothing under `src/` prints or logs, and nothing here quotes a fixture          | `tests/test_no_narrative_leak.py`                        |
+| The only text a turn emits is the checked answer, streamed or not               | `tests/test_turn_events.py`                              |
+| The model's thoughts and asides never leave the agent                           | `tests/test_turn_events.py`                              |
+| Without the four query tools the model is not called, and the person is told    | `tests/test_turn_events.py`                              |
+| A failed model call ends the turn with a notice, not a platform error           | `tests/test_turn_events.py`                              |
+| All of the above hold for a deep copy of the agent, which is what deploys       | `tests/test_turn_events.py`                              |
+| The assistant cannot write the labels reserved for checked text, disguised      | `tests/test_render.py`, `tests/test_turn_events.py`      |
+| A failure at the turn's end shows a notice, never the model's draft             | `tests/test_finish_turn.py`                              |
+| An e-mail user id gets its checked answer and a record without the address      | `tests/test_finish_turn.py`, `tests/test_audit.py`       |
+| A record that cannot be built never hides the checked answer                    | `tests/test_finish_turn.py`                              |
+| Every way a turn ends writes one record saying which                            | `tests/test_finish_turn.py`                              |
+| The record lists every call the turn made, the post-check's included, timed     | `tests/test_finish_turn.py`, `tests/test_turn_events.py` |
+| A match not at the chunk's own offsets, or with a hash that disagrees, fails    | `tests/test_postcheck.py`                                |
+| A table or picture is not sent and says it cannot be checked yet                | `tests/test_postcheck.py`                                |
+| Checksums, identifiers and repeated label text in the model's words are handled | `tests/test_render.py`                                   |
+| The instruction never asks the model to write label text, ids or hashes         | `tests/test_agent.py`                                    |
 
 No test calls a language model. `tests/test_agent.py` constructs the `LlmAgent` and never runs
 it. `tests/test_turn_events.py` runs it through a real ADK `Runner` against the fake query
@@ -78,10 +88,52 @@ copy's callbacks and turn's end share one hold and the model's own toolset. The 
 this fix used a closure and would have split them; the deep-copy cases in
 `tests/test_turn_events.py` fail if that comes back.
 
-The assistant's own words are still shown, under their own label, and are not checked. What is
-enforced is that they cannot pass for a checked block: `render` removes any line of them that
-opens with a label reserved for checked text, and says how many it removed. Checking the
-assistant's words themselves — any quotation in them, against the store — is not done yet.
+The assistant's own words are still shown, under their own label and before an end line, and
+are not checked. **Structurally, they cannot render as a checked block:** on the text surface
+they sit inside a fenced code block (`render._fenced`) one backtick longer than any run of
+backticks in them, so no Markdown or HTML they contain is rendered and no line of them closes
+the fence. A fence rather than escaping, because CommonMark parses nothing inside one, it
+closes only on a line of as many backticks, and on a surface that renders no Markdown it still
+shows two marker lines around the words; escaping would rely on every escape being honoured,
+show backslashes where one is not, and draw no boundary.
+
+**The same fence carries every checked block** (review of PR #129, M2). Gemini Enterprise
+renders the answer as Markdown, and a label's own text is not Markdown: in
+`ALT <ULN and bilirubin >1.5 x ULN` the renderer took `<ULN and bilirubin >` for an HTML tag and
+dropped it, `_not_` became emphasis, `&micro;` an entity, a label opening `# ` or `1. ` a heading
+or a list, and a `<!--` in a label swallowed the rest of the answer. Each block (its status line,
+its quotation, its citation and checksums) is now one fenced code block, the quotation wrapped at
+spaces to 80 characters (a normalised section is a single line, and a code block does not wrap),
+so the lines joined by single spaces are the stored text exactly. Only this module's own fixed
+sentences stand between the fences, each its own paragraph. The verbatim display of a quotation
+therefore depends on the fence: `tests/test_render.py` renders adversarial label text and the
+reviewer's escape attempts through a CommonMark parser (markdown-it-py, a test-only dependency)
+and checks that each quotation comes back out of its fence exactly and nothing leaks outside one.
+The A2UI renderer gives each part its own `Text` component and does not fence it; A2UI is not
+sent, and before it is the same question has to be settled for that surface.
+
+As defence in depth (`render.sanitise_assistant`), the words are cut at 20,000 characters (with a
+marker saying so), split on every kind of line break (`str.splitlines`: carriage return,
+U+0085, U+2028 as well as line feed), and **shown as written**, less only the code points that
+draw nothing and can hide or reorder what is drawn (zero-width space, word joiner, bidirectional
+controls, byte order mark, control characters); the joiners U+200C and U+200D are kept, since
+Persian words and emoji are spelt with them. The patterns read a folded copy — compatibility-folded
+per code point, format characters dropped — mapped back to the line as written, so a checksum or
+identifier found there is cut from the original where it stands and a folded line is never
+shown: round 1 of the review showed the folded line, which turned "10⁹/L" into "109/L" and
+"m²" into "m2" (round 2, M1). The filters: a line that
+opens with a label reserved for checked text, or has the citation line's whole shape ("From
+section … of document version"), is removed — compared as letters and digits only, after HTML
+entities are decoded, HTML comments and tags dropped and Cyrillic and Greek look-alikes folded,
+so emphasis, an entity, a comment, a tag, a backslash, a zero-width space, an emoji, a list
+number or a table bar does not hide one; the unverified status is reserved only in its own
+capitals, so "Not verified by me" stays. Runs of 32 or more hexadecimal digits (however Markdown
+is threaded through them) are removed, and so is an identifier named by its field when its
+value looks like one (`versionId 7`, not "the version ID shown"). Eight or more words in a row
+shared with a block are pointed out as label text that is not checked. Each is said in the
+answer and recorded as an `assistantFlags` value. The instruction asks the model never to write
+any of it (`instruction.py`). Checking a quotation in the assistant's words against the store is
+not done.
 
 ## The invariant, in the types
 
@@ -95,16 +147,26 @@ checked. It is not a comment; it is the shape of the code.
   obtain a `CheckedAnswer` is `post_check()` — which takes the `verify_quote` results as an
   argument and therefore cannot have skipped them.
 - A block with no verification is **unverified**, not verified-by-default. So are
-  `no-match`, a match in a different section from the one cited, and an answer about a
-  different document version.
+  `no-match`, a match in a different section from the one cited, an answer about a
+  different document version, and — since 2026-09-27 (audit AG-4) — a match that does not tile
+  the block: each chunk's match must sit at exactly the code-point offsets the splitter cut that
+  chunk from (`contract.chunk_spans`), so the matches run from the block's first code point to
+  its last with nothing between them but the spaces the cuts dropped (`coverage-gap`); and any
+  hash that disagrees — a match naming another text hash than the section's, an answer whose
+  `quoteSha256` is not the chunk's, a block whose text or XHTML does not hash to what its
+  citation shows, or an answer under another normalisation version than `fidelity-norm/3.1.0`
+  (`checksum-mismatch`). A match that does not say where, or over no section, is refused by
+  the contract since query-tools 4.0.0 and by the post-check too.
 
 `tests/test_postcheck.py` asserts all three: that a `CheckedAnswer` cannot be constructed, that
 every renderer's first parameter is annotated `CheckedAnswer`, and that `post_check` and
 `run_post_check` are the only public functions in the module that return one.
 
 `post_check` is pure — `(draft, verifications) → CheckedAnswer`. `run_post_check` is the driver
-that makes the calls. Splitting them is what lets the decision procedure be tested exhaustively
-without a server and the wiring be tested without a model.
+that makes the calls, four at a time, keeping each answer at its chunk's index. Splitting them
+is what lets the decision procedure be tested exhaustively without a server and the wiring be
+tested without a model. The only hashing here is SHA-256 over the UTF-8 of strings the service
+returned, compared with the hashes it returned beside them; nothing is normalised.
 
 ## Why 3.14
 
@@ -207,6 +269,15 @@ contracts:check` regenerates it and fails on drift; `tests/test_quote_edge.py` a
 and the fake, over the wire, reproduce every answer and offset, and that the port's three
 character sets are the ones in `src/query/tools.ts`.
 
+Like the service, the fake searches only the section a `verify_quote` call names, and reports
+the section it searched; it also records the JSON-RPC method of each request, so a test can
+count `tools/list` round trips.
+
+Two tests are not hermetic: `tests/test_deploy_requirements.py` resolves the runtime's
+requirements against the package index for Google's build platform, and **skips** when the
+index cannot be reached. Until 2026-09-27 its conflict test passed offline because the resolver
+failed for want of a network; it now asserts uv's own "No solution found".
+
 No test mints Cloud Run's edge token: `tests/conftest.py` stubs `tools.edge_auth_token` for
 every test, because on a machine with no runtime identity each attempt waited about 3.4 s on
 the metadata server and the suite took three minutes. `tests/test_tools_edge_auth.py` tests the
@@ -284,6 +355,21 @@ flagged `no-match`. The splitter now cuts only where the quote-edge rule holds o
 only: `get_provenance` for an earlier version is `unavailable`, which this agent reads as it
 reads any other `unavailable`.
 
+## query-tools 4.0.0
+
+`QuoteVerification` is a union on `result` (audit AG-4). A `match` must carry `match`, must
+have searched at least one section, and its `endOffset` is at least 1; a `no-match` must not
+carry `match`. Before 4.0.0 a `match` with no location validated, and a post-check that read
+`result` alone — this one, until 2026-09-27 — stamped it verified. The service never produced
+one, so the change is defence in depth: an answer the union refuses is unavailable here, never a
+match. The schema cannot say that `startOffset` comes before `endOffset` (zod checks it at the
+service); the post-check's own rule is stricter anyway, since every match must sit at its
+chunk's exact offsets. A `verify_quote` answer from a service on an earlier version validates
+here unchanged, because the service never produced an instance 4.0.0 refuses. 4.0.0 is built on
+3.0.0, the query service's own batch of the same audit (a `/` in a product identifier; errors
+without `structuredContent`), merged from `main` with the schemas regenerated: the agent is
+adapted to both.
+
 ## The turn id
 
 The service's audit record and this agent's are joined on one value. `tools.begin_turn`, the
@@ -327,16 +413,72 @@ inside such a run would be a certain `no-match`, reported as if the text were no
 the longer chunk is not sent (the contract refuses it) and the block is flagged
 `verification-unavailable`. Neither verifies the block; only the second says why truthfully.
 
+The splitter reads each cut's sign from an index built once over the whole block, exactly as
+the service reads it over the section, and measures each window once: 200,000 code points of
+`( ` split in about a tenth of a second, where the bounded walk back from every space took
+21.9 s (audit AG-12). It gives each chunk's offsets (`chunk_spans`), which is what the
+post-check holds every match to. The chunks are then evened out: the smallest window that needs
+no more chunks than the full one is used, so a block just over 2,000 units is two halves, not a
+full chunk and a sliver of a few words.
+
+**A normalisation-version bump needs this agent first.** The post-check accepts answers under
+`fidelity-norm/3.1.0` only (`quote_edge.NORMALIZATION_VERSION`, held to the service's own export
+by a test). When Zone B moves to a new normalisation version, port the quote-edge rule to it and
+redeploy the agent **before** the service answers under it; until then every block is flagged
+`checksum-mismatch` and shown unverified.
+
+**Tables and pictures cannot be checked yet.** A section's text carries the scanner's grid
+markers (U+FDD0–U+FDEF) and a picture's U+FFFC, and `verify_quote` refuses any quote holding
+one (`invalid-request`). A chunk holding one is therefore not sent, and the block is flagged
+`table-not-quotable` — before 2026-09-27 it was sent and came back `verification-unavailable`,
+which told the reader the service had failed. Every section with a table or a picture is shown
+unverified, which includes Imatinib Teva's 4.2 and 4.8, the 3a demonstration sections; cell-level
+quoting is roadmap 3a PR 5.
+
+**A repeated chunk fails closed.** The service answers the first occurrence the quote-edge rule
+accepts. A chunk whose text also occurs earlier in its section matches there, at other offsets,
+and the block is flagged `coverage-gap` although it is the label's text. For a chunk of up to
+2,000 units in a real label this has not been seen, and evening the chunks out keeps a short last
+chunk from making it likely; it is a false failure, never a false pass.
+
 ## Audit
 
-`TurnAuditRecord` is the `AgentTurnRecord` of `contracts/generated/agent-turn.schema.json`:
-the same eleven fields, tool names restricted to the four `QueryToolName` values, flags to the
-six `VerificationFlag` values, and `serviceVersion`, `principal` and `turnId` held to the
-contract's patterns in the pydantic model, so a record the contract would refuse cannot be
-built. `tools` is capped at the contract's 200; a turn that made more calls gets no record
-rather than a cut one, and `answer_turn` raises. `tests/test_audit.py` serialises a record and
-validates it with `jsonschema` against the vendored schema, and asserts the patterns and the
-cap are the schema's own values.
+`TurnAuditRecord` is the `AgentTurnRecord` of `contracts/generated/agent-turn.schema.json`
+1.1.0: the same fields, tool names restricted to the four `QueryToolName` values, flags to the
+nine `VerificationFlag` values, `outcome` and `assistantFlags` to theirs, and `serviceVersion`,
+`principal`, `principalDigest`, `turnId` and `errorClass` held to the contract's patterns in the
+pydantic model, so a record the contract would refuse cannot be built. An optional field left
+empty is omitted, never `null`. `tools` is capped at the contract's 200; a turn that made more
+calls gets no full record rather than a cut one. `tests/test_audit.py` serialises a record and
+validates it with `jsonschema` against the vendored schema, and asserts the patterns, the
+enumerations and the cap are the schema's own values.
+
+**The principal is never an e-mail address** (audit AG-1). Gemini Enterprise gives the agent the
+user's e-mail as the session's user id; the contract's `principal` refuses one, and until
+2026-09-27 that refusal was raised inside the post-check's guard, so every live turn showed "could
+not be verified" and wrote nothing. Now only a known opaque form — a numeric subject or a URN —
+is carried as it is; anything else, a name that fits the contract's characters included, is
+withheld (`session-user-withheld`), with an HMAC-SHA256 of it, casefolded, under
+`AGENT_PRINCIPAL_DIGEST_KEY` in `principalDigest` when the runtime has that key and it is at
+least 32 bytes (`deploy/README.md`, step 2); a shorter key is not used. The principal the query service verified from the user's token is
+on its own records of the same `turnId`.
+
+**Every turn writes one record, and the record never costs the answer** (audit AG-1, AG-6). The
+turn's end (`finish.py`) decides what is shown first and builds the record apart from it:
+`outcome` says which way the turn ended — `answered`, `tools-unavailable`, `model-failed`,
+`turn-id-missing` (with the nil UUID as `turnId`), `internal-error` — and `errorClass` names the
+exception's class where one ended it, never its message. If the full record cannot be built or
+written, a minimal one (the tools if they fit, the class of that failure, and — for an answered
+turn — the checked answer's own counts and flags, otherwise zeros) is written instead, and the
+checked answer is still shown. Nothing else in the package may log, so
+the record is the only trace a failed turn leaves.
+
+**Every call is recorded as it ran** (audit AG-5). `tools.ToolCallLog` is the agent's
+`before_tool_callback`, `after_tool_callback` and `on_tool_error_callback`, so each of the
+model's calls is timed as it runs; the post-check adds each of its `verify_quote` calls the same
+way. Each `resultCount` is the service's own (the products found, one section or provenance, one
+match or none). Until 2026-09-27 the deployed record listed the model's `get_section` calls
+alone, read back from the turn's events with a duration of 0, and none of the post-check's.
 
 What is identical to `QueryAuditRecord` is what is absent. No narrative. **No argument digest
 either**, unlike `QueryAuditRecord`: a `verify_quote` argument _is_ narrative, and a digest of
@@ -358,8 +500,18 @@ default destination.
 - **No custom frontend.** The surfaces are Gemini Enterprise and Google Chat, both Google's.
 - **No deploy from CI.** `deploy/` is run by the owner by hand (first deployed 2026-09-22); see
   `deploy/README.md`.
-- **No agent-side normalisation, hashing, or fidelity checking.** Those live where the
-  specification lives.
+- **No agent-side normalisation or fidelity checking.** Those live where the specification
+  lives. The one hash the agent computes is SHA-256 over UTF-8, of strings the service returned,
+  to compare with the hashes it returned beside them.
+- **No A2UI in the deployed path.** `render_a2ui` is built and tested; the deployed agent renders
+  for the `text` surface, because nothing it is served through advertises the A2UI extension.
+  Its `Text` components carry quotations and the assistant's words unfenced; whether that is
+  safe depends on whether the surface parses Markdown in a `Text`, to be settled before it is
+  sent.
+- **No selection of blocks by the model.** Every section the model fetched in the turn is shown
+  (at most eight, `compose.MAX_BLOCKS`; the answer says how many more were read), labelled as
+  the sections read, not as the answer; the model's own words say which of them answer the
+  question.
 
 ## The residual risk this does not close
 

@@ -6,6 +6,7 @@ import {
   FhirId,
   IsoDateTime,
   NormalizationVersion,
+  PositiveInt,
   PrincipalId,
   Sha256Hex,
   SourceKey,
@@ -54,8 +55,15 @@ import { ApproverRole } from "./ingestion-provenance.js";
 // and a widened output grammar — a 2.0.x consumer validating a 3.0.0 answer refuses the
 // identifier — and a changed error delivery are neither ("Versioning": anything else is a new
 // major `$id`).
+//
+// 4.0.0: `QuoteVerification` is a union on `result`. A `match` answer must carry `match` (with
+// `startOffset` before `endOffset`, which zod checks and JSON Schema cannot say) and must have
+// searched at least one section; a `no-match` answer must not carry `match`. Before 4.0.0 a
+// `match` with no location validated, and a client reading `result` alone would have stamped it
+// verified (audit AG-4). Major because instances earlier versions accepted are now refused
+// (ADR 0002, "Versioning"); the service never produced one, so nothing it answers changes.
 
-export const QUERY_TOOLS_VERSION = "3.0.0";
+export const QUERY_TOOLS_VERSION = "4.0.0";
 
 // A product identifier's value: letters, digits and ". _ : / -". The slash is what an EMA ePI
 // id ("EPI/23/1047") and an EU marketing authorisation number ("EU/1/12/780/003") are built
@@ -232,36 +240,72 @@ export const VerifyQuoteInputSchema = z
   })
   .meta({ id: "VerifyQuoteInput" });
 
-export const QuoteVerificationSchema = z
-  .strictObject({
-    document: DocumentRefSchema,
-    // `match`: the normalised quote is a contiguous slice of a section's normalised text under
-    // the same normalisation the publishing gate uses — so case, quotation marks, dashes, and
-    // superscripts all still have to agree — and both of its edges hold under the quote-edge
-    // rule (src/query/tools.ts), which is stricter than the gate's span-edge rule: the slice may
-    // not begin or end inside a word, nor stop at punctuation that still binds a number or a
-    // word to it ("Take 2" of "Take 2.5 mg", "20 °C" of "-20 °C"). It does not promise that
-    // nothing follows: "Take 5" still matches "Take 5 mg daily". Anything else is `no-match`;
-    // the service does not guess at near misses, because a near miss is exactly what a
-    // reviewer must see for themselves.
-    result: z.enum(["match", "no-match"]),
-    normalizationVersion: NormalizationVersion,
-    quoteSha256: Sha256Hex,
-    sectionsSearched: Count,
-    match: z
-      .strictObject({
-        sourceKey: SourceKey,
-        startOffset: Count,
-        endOffset: Count,
-        normalizedTextSha256: Sha256Hex,
-      })
-      .optional(),
+const quoteMatchFields = {
+  sourceKey: SourceKey,
+  startOffset: Count,
+  endOffset: Count,
+  normalizedTextSha256: Sha256Hex,
+};
+
+// Where a `match` was found: the section, and code-point offsets in its normalised text.
+export const QuoteMatchSchema = z
+  // A quote is never empty, so neither is where it matched: `endOffset` is at least 1.
+  .strictObject({ ...quoteMatchFields, endOffset: PositiveInt })
+  // JSON Schema cannot compare two fields, so the published schema does not carry this one; a
+  // client that must hold it checks it itself (the agent does: agent/.../postcheck.py).
+  .refine((match) => match.startOffset < match.endOffset, {
+    message: "startOffset must be before endOffset",
+    path: ["endOffset"],
   })
+  .meta({ id: "QuoteMatch" });
+
+// The fields both answers carry.
+const quoteVerificationFields = {
+  document: DocumentRefSchema,
+  normalizationVersion: NormalizationVersion,
+  quoteSha256: Sha256Hex,
+};
+
+// `match`: the normalised quote is a contiguous slice of a section's normalised text under the
+// same normalisation the publishing gate uses — so case, quotation marks, dashes, and
+// superscripts all still have to agree — and both of its edges hold under the quote-edge rule
+// (src/query/tools.ts), which is stricter than the gate's span-edge rule: the slice may not
+// begin or end inside a word, nor stop at punctuation that still binds a number or a word to it
+// ("Take 2" of "Take 2.5 mg", "20 °C" of "-20 °C"). It does not promise that nothing follows:
+// "Take 5" still matches "Take 5 mg daily". Anything else is `no-match`; the service does not
+// guess at near misses, because a near miss is exactly what a reviewer must see for themselves.
+// Since 4.0.0 a `match` always says where, and a `no-match` never does.
+export const QuoteVerificationSchema = z
+  .discriminatedUnion("result", [
+    z.strictObject({
+      ...quoteVerificationFields,
+      result: z.literal("match"),
+      sectionsSearched: PositiveInt,
+      match: QuoteMatchSchema,
+    }),
+    z.strictObject({
+      ...quoteVerificationFields,
+      result: z.literal("no-match"),
+      sectionsSearched: Count,
+      // A no-match has no location. Declared (as never present) so a reader may still ask.
+      match: z.never().optional(),
+    }),
+  ])
   .meta({
     id: "QuoteVerification",
     description:
-      "Mechanical answer to 'is this quote what the label says?': match with the section and code-point offsets, or no-match. A match is a contiguous slice of the normalised section text whose edges fall on boundaries: never inside a word, never at punctuation joined to a number or word (a decimal point, a slash, a sign, an apostrophe). It proves the words the quote contains, not that nothing follows them. Never a paraphrase, never a suggestion.",
+      "Mechanical answer to 'is this quote what the label says?': match with the section and code-point offsets, or no-match. A match is a contiguous slice of the normalised section text whose edges fall on boundaries: never inside a word, never at punctuation joined to a number or word (a decimal point, a slash, a sign, an apostrophe). It proves the words the quote contains, not that nothing follows them. A match always carries its location, startOffset before endOffset, and has searched at least one section; a no-match carries no location. Never a paraphrase, never a suggestion.",
   });
+
+// What the MCP server advertises as verify_quote's `outputSchema`. MCP requires an object schema
+// at the root and the union above is not one; every answer the service returns has passed the
+// union first (src/query/tools.ts), so this looser shape is only what `tools/list` shows.
+export const QuoteVerificationWireSchema = z.strictObject({
+  ...quoteVerificationFields,
+  result: z.enum(["match", "no-match"]),
+  sectionsSearched: Count,
+  match: z.strictObject(quoteMatchFields).optional(),
+});
 
 // --- errors and audit --------------------------------------------------------------------------
 
@@ -374,6 +418,7 @@ export type GetProvenanceInput = z.infer<typeof GetProvenanceInputSchema>;
 export type ProvenanceDetail = z.infer<typeof ProvenanceDetailSchema>;
 export type VerifyQuoteInput = z.infer<typeof VerifyQuoteInputSchema>;
 export type QuoteVerification = z.infer<typeof QuoteVerificationSchema>;
+export type QuoteMatch = z.infer<typeof QuoteMatchSchema>;
 export type QueryError = z.infer<typeof QueryErrorSchema>;
 export type QueryAuditOutcome = z.infer<typeof QueryAuditOutcome>;
 export type QueryAuditRecord = z.infer<typeof QueryAuditRecordSchema>;

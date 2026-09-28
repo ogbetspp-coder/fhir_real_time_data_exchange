@@ -18,6 +18,9 @@ dependencies = ["google-adk[mcp]==2.9.2", "jsonschema==4.26.0", "pydantic==2.13.
 
 [dependency-groups]
 dev = [
+  # A CommonMark renderer (the Python port of markdown-it), for the test that the answer shows
+  # each quotation verbatim once rendered as Markdown (tests/test_render.py). Tests only.
+  "markdown-it-py==4.2.0",
   "mypy==2.3.1",
   "pytest==9.1.1",
   "pytest-asyncio==1.4.0",

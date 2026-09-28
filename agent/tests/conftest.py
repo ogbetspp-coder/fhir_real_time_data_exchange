@@ -37,15 +37,17 @@ def query_service() -> Iterator[FakeQueryService]:
 
 
 def invocation_context(
-    *, token: str | None = TEST_TOKEN, turn_id: object = None
+    *, token: str | None = TEST_TOKEN, turn_id: object = None, user_id: str = TEST_PRINCIPAL
 ) -> InvocationContext:
     """A minimal ADK invocation context, with or without the token and a turn id in state.
+
+    ``user_id`` is the session user id a host supplies: Gemini Enterprise's is an e-mail address.
 
     ``turn_id`` is put in state as given — a test can plant a value that is not a UUID.
     """
     from verifiable_answer_agent.tools import TURN_ID_STATE_KEY, USER_TOKEN_STATE_KEY
 
-    session = Session(id="synthetic-session", app_name="agent-tests", user_id=TEST_PRINCIPAL)
+    session = Session(id="synthetic-session", app_name="agent-tests", user_id=user_id)
     if token is not None:
         session.state[USER_TOKEN_STATE_KEY] = token
     if turn_id is not None:

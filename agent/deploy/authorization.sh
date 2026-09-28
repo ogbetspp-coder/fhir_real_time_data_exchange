@@ -10,9 +10,11 @@
 # constant. The token is the end user's, for the same OAuth client the MCP connector uses, so the
 # query service sees the same principal, entitlement and audit identity either way.
 #
-# The client secret is read from the terminal, never from an argument or a file, and sent once
-# to the API, which stores it encrypted. Run by the owner: it is the same consent screen decision
-# as the connector's client.
+# The client secret is never a command-line argument and is never printed or written by this
+# script: it is read from the clipboard, from Google's client_secret JSON download or a file
+# holding it alone, or from a hidden prompt (the modes below), and sent once to the API, which
+# stores it encrypted. Run by the owner: it is the same consent screen decision as the
+# connector's client.
 #
 # The OAuth client must list BOTH redirect URIs, or the consent window never closes:
 #   https://vertexaisearch.cloud.google.com/oauth-redirect          (the MCP connector)
@@ -31,21 +33,35 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../scripts/gcp" && pwd)/common.s
 # and no project at all fails rather than falling back to a hard-coded one.
 PROJECT_ID="${GCP_PROJECT_ID:-$(ema_flow_resolve_project)}"
 AUTHORIZATION_ID="query_service_bearer_token"
-CLIENT_ID="${GEMINI_OAUTH_CLIENT_ID:-398017980210-mgn6flks5a9nmlbkgkhh1pple9tv2075.apps.googleusercontent.com}"
+# No default: the connector's OAuth client is a per-tenant console decision. The dev client's id
+# is in deploy/README.md. Required below, once --check (which does not use it) has returned.
+CLIENT_ID="${GEMINI_OAUTH_CLIENT_ID:-}"
 BASE="https://discoveryengine.googleapis.com/v1alpha"
 
 PROJECT_NUMBER="$(gcloud --quiet projects describe "$PROJECT_ID" --format='value(projectNumber)')"
 NAME="projects/${PROJECT_NUMBER}/locations/global/authorizations/${AUTHORIZATION_ID}"
 TOKEN="$(gcloud --quiet auth print-access-token)"
 
-status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
-  --header "Authorization: Bearer ${TOKEN}" --header "X-Goog-User-Project: ${PROJECT_ID}" "${BASE}/${NAME}")"
+# The access token reaches curl on its standard input, as a config line, never as an argument:
+# an argument is visible to every process on the machine for the life of the call.
+google_curl() {
+  printf 'header = "Authorization: Bearer %s"\n' "$TOKEN" | curl --config - --silent --show-error "$@"
+}
+
+status="$(google_curl --output /dev/null --write-out '%{http_code}' \
+  --header "X-Goog-User-Project: ${PROJECT_ID}" "${BASE}/${NAME}")" || status="curl-failed"
 if [[ "${1:-}" == "--check" ]]; then
   if [[ "$status" == "200" ]]; then echo "authorization ${AUTHORIZATION_ID}: present"; exit 0; fi
   echo "authorization ${AUTHORIZATION_ID}: missing (HTTP ${status})" >&2
   exit 1
 fi
+# Present (200) or absent (404); anything else is a failure to find out, not "absent".
+if [[ "$status" != "200" && "$status" != "404" ]]; then
+  echo "reading authorization ${AUTHORIZATION_ID} failed (HTTP ${status})" >&2
+  exit 1
+fi
 
+: "${CLIENT_ID:?GEMINI_OAUTH_CLIENT_ID names the OAuth client the connector uses}"
 echo "project ${PROJECT_ID} (${PROJECT_NUMBER}); authorization ${AUTHORIZATION_ID} will be created or updated."
 
 # Three ways to supply the secret, because a hidden prompt refuses a paste in some terminals:
@@ -168,9 +184,11 @@ fi
 echo "sending ${verb} to the Discovery Engine API…"
 response_file="$(mktemp)"
 trap 'rm -f "$body_file" "$response_file"' EXIT
-code="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' --request "$verb" \
-  --header "Authorization: Bearer ${TOKEN}" --header "X-Goog-User-Project: ${PROJECT_ID}" \
-  --header "Content-Type: application/json" --data-binary "@${body_file}" "$url")" || code="curl-failed"
+# --fail-with-body: an error status fails the call, and the body still lands in the file to be
+# reported below (the code is kept too; the script stops on anything but 200).
+code="$(google_curl --fail-with-body --output "$response_file" --write-out '%{http_code}' \
+  --request "$verb" --header "X-Goog-User-Project: ${PROJECT_ID}" \
+  --header "Content-Type: application/json" --data-binary "@${body_file}" "$url")" || true
 rm -f "$body_file"
 echo "HTTP ${code}"
 # Only the name, or the error, is printed: the response echoes the client id, never the secret.
@@ -183,11 +201,15 @@ except Exception:
 if 'error' in d:
     print('error:',d['error'].get('status'),d['error'].get('message')); sys.exit(1)
 print('authorization:',d['name'])" "$response_file"
+[[ "$code" == "200" ]] || { echo "the ${verb} was not accepted (HTTP ${code:-none})" >&2; exit 1; }
 
 # Read it back: the response echoes what was sent, not what was stored. The redirect_uri proves
 # the update applied; the secret can never be read back at all.
-stored="$(curl --silent --header "Authorization: Bearer ${TOKEN}" \
-  --header "X-Goog-User-Project: ${PROJECT_ID}" "${BASE}/${NAME}")"
+stored="$(google_curl --fail-with-body --header "X-Goog-User-Project: ${PROJECT_ID}" \
+  "${BASE}/${NAME}")" || {
+  echo "reading the authorization back failed: ${stored}" >&2
+  exit 1
+}
 python3 -c "
 import json, sys, urllib.parse
 d = json.loads(sys.argv[1])
