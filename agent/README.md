@@ -365,10 +365,10 @@ one, so the change is defence in depth: an answer the union refuses is unavailab
 match. The schema cannot say that `startOffset` comes before `endOffset` (zod checks it at the
 service); the post-check's own rule is stricter anyway, since every match must sit at its
 chunk's exact offsets. A `verify_quote` answer from a service on an earlier version validates
-here unchanged, because the service never produced an instance 4.0.0 refuses. (4.0.0 is numbered
-to follow 3.0.0, the query service's own batch of the same audit, which has not merged at the
-time of writing: this branch is to be rebased onto it and the schemas regenerated, after which
-the agent is adapted to both. Until then it is adapted to 4.0.0 over 2.0.1.)
+here unchanged, because the service never produced an instance 4.0.0 refuses. 4.0.0 is built on
+3.0.0, the query service's own batch of the same audit (a `/` in a product identifier; errors
+without `structuredContent`), merged from `main` with the schemas regenerated: the agent is
+adapted to both.
 
 ## The turn id
 

@@ -2,9 +2,9 @@
 
 _Follows the procedure in `docs/validation/README.md`, "Change control for shared, evidenced
 libraries" (steps 0–8). Audit batch B01 of the 2026-09-27 repository audit (PR #129), with its
-first two review rounds' findings closed. Numbered to follow `query-tools` 3.0.0 (audit batch
-B03, PR #127, recorded in `2026-09-27-query-tools-3-0-0.md`); this change is to be rebased onto
-that one and its generated schemas regenerated, never hand-merged._
+first three review rounds' findings closed. Built on `query-tools` 3.0.0 (audit batch B03,
+PR #127, recorded in `2026-09-27-query-tools-3-0-0.md`), merged from `main` with its generated
+schemas regenerated, never hand-merged: 4.0.0 carries every 3.0.0 change._
 
 **What changed.**
 
@@ -72,7 +72,7 @@ live proof turn (roadmap item 1).
 (`sync_contract.py --check` passes). `npm run contracts:check` shows no other generated artefact
 moved. 3: no fidelity vector changed. 4: the adversarial cases are in
 `test/contracts/quote-verification.test.ts` (a match without a location, over no section, ending
-where it starts, ending before it starts; a no-match with a location — each accepted by 2.0.1),
+where it starts, ending before it starts; a no-match with a location — each accepted by 3.0.0),
 `agent/tests/test_postcheck.py` (the audit's loose match, a prefix, chunks that do not tile, each
 wrong hash and version) and `agent/tests/test_audit.py` and `agent/tests/test_finish_turn.py`
 (every `outcome`, `errorClass`, `principalDigest`, `assistantFlags`, validated against the

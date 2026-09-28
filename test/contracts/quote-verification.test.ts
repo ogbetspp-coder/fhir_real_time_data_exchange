@@ -6,7 +6,7 @@ import {
 } from "../../src/contracts/query-tools.js";
 
 // query-tools 4.0.0: a `match` that does not say where it matched is not a match a client can
-// use, and under 2.0.1 it validated (audit AG-4). Each case below was accepted then.
+// use, and under 2.x and 3.0.0 it validated (audit AG-4). Each case below was accepted then.
 
 const base = {
   document: { bundleId: "synthetic-smpc", versionId: "1", lastUpdated: "2026-09-19T00:00:00Z" },
