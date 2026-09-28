@@ -21,7 +21,9 @@
 # state through objectViewer on the state bucket alone. It cannot take the state lock, so plans
 # run with -lock=false, which is safe because a plan writes nothing.
 #
-# Idempotent; `--check` reports drift without changing anything.
+# Idempotent, and convergent: a grant beyond the ones below is removed, not only a missing one
+# added, and an apply ends by running the check itself, so it cannot report success over drift it
+# left (audit B08, D-7). `--check` reports drift without changing anything.
 #
 #   bash scripts/gcp/plan-identity.sh
 #   bash scripts/gcp/plan-identity.sh --check
@@ -29,9 +31,9 @@ set -euo pipefail
 
 # shellcheck source=scripts/gcp/common.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
-# GCP_PROJECT_ID first, as before; otherwise GOOGLE_CLOUD_PROJECT or the gcloud configuration,
-# and no project at all fails rather than falling back to a hard-coded one.
-PROJECT_ID="${GCP_PROJECT_ID:-$(ema_flow_resolve_project)}"
+# GOOGLE_CLOUD_PROJECT or GCP_PROJECT_ID (refused when the two differ), else the gcloud
+# configuration; no project at all fails rather than falling back to a hard-coded one.
+PROJECT_ID="$(ema_flow_resolve_project)"
 ENVIRONMENT="${EMA_FLOW_ENVIRONMENT:-dev}"
 REPOSITORY="ogbetspp-coder/fhir_real_time_data_exchange"
 REPOSITORY_ID="1376667427"
@@ -136,6 +138,12 @@ if [[ "$project_roles" != "projects/${PROJECT_ID}/roles/${ROLE_ID}" ]]; then
     gcloud projects add-iam-policy-binding "$PROJECT_ID" --quiet --condition=None \
       --member="serviceAccount:${SA}" --role="projects/${PROJECT_ID}/roles/${ROLE_ID}" >/dev/null
     echo "project role granted"
+    for role in ${project_roles//,/ }; do
+      [[ "$role" == "projects/${PROJECT_ID}/roles/${ROLE_ID}" ]] && continue
+      gcloud projects remove-iam-policy-binding "$PROJECT_ID" --quiet --all \
+        --member="serviceAccount:${SA}" --role="$role" >/dev/null
+      echo "project role ${role} removed"
+    done
   fi
 fi
 state_policy="$(gcloud storage buckets get-iam-policy "gs://${STATE_BUCKET}" --format=json)" ||
@@ -148,6 +156,12 @@ if [[ "$state_roles" != "roles/storage.objectViewer" ]]; then
     gcloud storage buckets add-iam-policy-binding "gs://${STATE_BUCKET}" --quiet \
       --member="serviceAccount:${SA}" --role=roles/storage.objectViewer >/dev/null
     echo "state bucket objectViewer granted"
+    for role in ${state_roles//,/ }; do
+      [[ "$role" == "roles/storage.objectViewer" ]] && continue
+      gcloud storage buckets remove-iam-policy-binding "gs://${STATE_BUCKET}" --quiet \
+        --member="serviceAccount:${SA}" --role="$role" >/dev/null
+      echo "state bucket role ${role} removed"
+    done
   fi
 fi
 
@@ -207,6 +221,13 @@ if [[ "$sa_members" != "roles/iam.workloadIdentityUser ${member}" ]]; then
     gcloud iam service-accounts add-iam-policy-binding "$SA" --project="$PROJECT_ID" --quiet \
       --role=roles/iam.workloadIdentityUser --member="$member" >/dev/null
     echo "workloadIdentityUser granted to the plan pool"
+    # Everyone else who may act as the planner, or hold any other role on it, loses that.
+    while IFS= read -r grant; do
+      [[ -z "$grant" || "$grant" == "roles/iam.workloadIdentityUser ${member}" ]] && continue
+      gcloud iam service-accounts remove-iam-policy-binding "$SA" --project="$PROJECT_ID" --quiet \
+        --all --role="${grant%% *}" --member="${grant#* }" >/dev/null
+      echo "${grant%% *} removed from a member other than the plan pool"
+    done < <(printf '%s' "$sa_members" | tr ',' '\n')
   fi
 fi
 
@@ -215,4 +236,9 @@ if [[ "$CHECK" == "true" ]]; then
 else
   echo "provider: projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${POOL}/providers/${PROVIDER}"
   echo "service account: ${SA}"
+  # What was applied, read back: an apply that left drift fails here rather than reporting done.
+  if [[ "$drift" == "1" ]]; then
+    echo "Checking what was applied."
+    bash "${BASH_SOURCE[0]}" --check
+  fi
 fi

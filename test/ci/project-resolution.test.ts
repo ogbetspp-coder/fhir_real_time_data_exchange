@@ -40,6 +40,12 @@ describe("operator scripts resolve the project, never default it", () => {
         /^source "\$\(cd "\$\(dirname "\$\{BASH_SOURCE\[0\]\}"\)(?:\/\.\.\/\.\.\/scripts\/gcp)?" && pwd\)\/common\.sh"$/m;
       expect([file, sourced.test(text) || file === "scripts/gcp/deploy.sh"]).toEqual([file, true]);
       expect([file, text.includes("ema_flow_resolve_project")]).toEqual([file, true]);
+      // Through the function alone: `${GCP_PROJECT_ID:-$(…)}` skipped it, and with it the refusal
+      // of two variables that disagree (audit B08, D-5).
+      expect([file, text.includes("${GCP_PROJECT_ID:-$(ema_flow_resolve_project)}")]).toEqual([
+        file,
+        false,
+      ]);
     }
   });
 
@@ -64,22 +70,29 @@ describe("the resolution itself", () => {
       "bash",
       [
         "-c",
-        'set -euo pipefail; source scripts/gcp/common.sh; PROJECT_ID="${GCP_PROJECT_ID:-$(ema_flow_resolve_project)}"; printf %s "$PROJECT_ID"',
+        'set -euo pipefail; source scripts/gcp/common.sh; PROJECT_ID="$(ema_flow_resolve_project)"; printf %s "$PROJECT_ID"',
       ],
       { encoding: "utf8", env: { PATH: `${stub}:/usr/bin:/bin`, ...env } },
     );
     return { status: run.status, out: run.stdout };
   }
 
-  it("keeps GCP_PROJECT_ID when it is set, even beside GOOGLE_CLOUD_PROJECT", () => {
+  it("refuses GCP_PROJECT_ID and GOOGLE_CLOUD_PROJECT naming different projects", () => {
+    // Until audit B08 deploy.sh took GOOGLE_CLOUD_PROJECT here and record-readers.sh took
+    // GCP_PROJECT_ID, so one deploy acted on two projects.
     expect(resolve({ GCP_PROJECT_ID: "p-one", GOOGLE_CLOUD_PROJECT: "p-two" })).toEqual({
-      status: 0,
-      out: "p-one",
+      status: 1,
+      out: "",
     });
   });
 
-  it("falls back to GOOGLE_CLOUD_PROJECT", () => {
+  it("takes either variable alone, or both naming the same project", () => {
     expect(resolve({ GOOGLE_CLOUD_PROJECT: "p-two" })).toEqual({ status: 0, out: "p-two" });
+    expect(resolve({ GCP_PROJECT_ID: "p-one" })).toEqual({ status: 0, out: "p-one" });
+    expect(resolve({ GCP_PROJECT_ID: "p-one", GOOGLE_CLOUD_PROJECT: "p-one" })).toEqual({
+      status: 0,
+      out: "p-one",
+    });
   });
 
   it("fails when nothing names a project", () => {

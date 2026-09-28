@@ -113,10 +113,24 @@ export function readSidecarPins(dockerfile) {
     if (!flags.includes(required)) throw new Error(`${name}: CMD does not carry ${required}`);
   }
   if (packages.length === 0) throw new Error(`${name}: CMD loads no -ig package`);
-  const expectedPackages = artefacts.filter(({ file }) => file !== "validator_cli.jar");
-  if (packages.length !== expectedPackages.length) {
+  // The same packages, each once: compared as sets, with a repeat on either side refused. A count
+  // alone passed a CMD that loaded one package twice and another not at all (audit B08, D-7).
+  const expectedPackages = artefacts
+    .filter(({ file }) => file !== "validator_cli.jar")
+    .map(({ file }) => file);
+  for (const [list, where] of [
+    [packages, "CMD loads"],
+    [expectedPackages, "the RUN line downloads"],
+  ]) {
+    const repeated = list.filter((file, index) => list.indexOf(file) !== index);
+    if (repeated.length > 0) {
+      throw new Error(`${name}: ${where} ${[...new Set(repeated)].join(", ")} more than once`);
+    }
+  }
+  const unloaded = expectedPackages.filter((file) => !packages.includes(file));
+  if (unloaded.length > 0 || packages.length !== expectedPackages.length) {
     throw new Error(
-      `${name}: CMD loads ${packages.length} packages but the RUN line downloads ${expectedPackages.length}`,
+      `${name}: CMD loads ${packages.length} packages but the RUN line downloads ${expectedPackages.length}; not loaded: ${unloaded.join(", ") || "none"}`,
     );
   }
 
@@ -248,4 +262,35 @@ export function packageSummary(lines) {
     .split(",")
     .map((entry) => entry.trim())
     .filter((entry) => entry !== "");
+}
+
+// The verdict on the validator image started with no network at all (cloudbuild.images.yaml,
+// step validator-offline-verdict), from its log. It sorts each line with networkUse above, so
+// the image build and the CI gate cannot disagree about what counts as reaching for the network
+// (until audit B08 the build repeated this classification in grep). Fails on any install, on any
+// fetch that got as far as a socket, on a validator that never started, and on a jurisdiction or
+// locale other than the pinned ones. `evidence` is the log lines worth keeping, cut to 200
+// characters: what it loaded and how it was configured.
+export function offlineStartVerdict(lines) {
+  const { installs, other } = networkUse(lines);
+  const failures = [];
+  if (installs.length > 0) {
+    failures.push("The validator needed a package that is not installed in the image.");
+  }
+  if (other.length > 0) {
+    failures.push("The validator attempted a network request that its policy did not refuse.");
+  }
+  if (!lines.some((line) => line.includes("FHIR Validator HTTP Service started"))) {
+    failures.push("The validator did not start with networking disabled.");
+  }
+  if (!lines.some((line) => line.includes("Jurisdiction: Global (Whole world)"))) {
+    failures.push("The validator is not validating under universal jurisdiction.");
+  }
+  if (!lines.some((line) => line.includes("Locale: United States/US"))) {
+    failures.push("The validator is not running in the pinned locale.");
+  }
+  const evidence = lines
+    .filter((line) => /Jurisdiction:|Locale:|Package Summary|HTTP Service started/.test(line))
+    .map((line) => line.slice(0, 200));
+  return { ok: failures.length === 0, failures, installs, other, evidence };
 }

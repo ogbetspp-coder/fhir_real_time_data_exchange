@@ -9,45 +9,111 @@ cd "$ROOT"
 PHASE="${1:-all}"
 trap 'echo "::error title=Phase ${PHASE} failed::${BASH_COMMAND} exited $?"' ERR
 PROJECT_ID="$(ema_flow_resolve_project)"
+# Exported unconditionally, both names, so every script this one runs (record-readers.sh,
+# bootstrap.sh, reconcile-fhir-stores.sh) acts on the project this one resolved.
 export GOOGLE_CLOUD_PROJECT="$PROJECT_ID"
-export GCP_PROJECT_ID="${GCP_PROJECT_ID:-$PROJECT_ID}"
+export GCP_PROJECT_ID="$PROJECT_ID"
 export CLOUDSDK_CORE_PROJECT="$PROJECT_ID"
 REGION="${GCP_REGION:-europe-west4}"
-ENVIRONMENT="${EMA_FLOW_ENVIRONMENT:-dev}"
+# No default (audit B08, L1): until then an unset or empty EMA_FLOW_ENVIRONMENT read as dev, and
+# dev's inputs (alerts that page no one, synthetic sources accepted) applied to whatever project
+# the shell named.
+ENVIRONMENT="${EMA_FLOW_ENVIRONMENT:?EMA_FLOW_ENVIRONMENT names the environment to deploy (dev, validation or prod); it has no default}"
+export EMA_FLOW_ENVIRONMENT="$ENVIRONMENT"
 
 # The environment's own inputs (QUERY_LOG_REJECTION_REASON, ALLOW_SYNTHETIC_SOURCES,
-# REQUIRE_ALERT_RECIPIENT), set in one file that the pull-request plan and the deploy both read through this script, so the plan is
-# what applies. A missing file is refused rather than read as "all defaults".
+# REQUIRE_ALERT_RECIPIENT, EXPECTED_PROJECT_ID), set in one file that the pull-request plan and
+# the deploy both read through this script, so the plan is what applies. A missing file is
+# refused rather than read as "all defaults". Each is cleared first, so an input the file leaves
+# unset takes its default and never a value from the caller's shell: prod.env sets nothing, and
+# ALLOW_SYNTHETIC_SOURCES=true left exported in a shell must not reach a prod deploy.
 ENVIRONMENT_INPUTS="${ROOT}/scripts/gcp/environments/${ENVIRONMENT}.env"
 if [[ ! -f "$ENVIRONMENT_INPUTS" ]]; then
   echo "No inputs file for environment ${ENVIRONMENT}: ${ENVIRONMENT_INPUTS#"${ROOT}/"} does not exist." >&2
   exit 1
 fi
+unset QUERY_LOG_REJECTION_REASON ALLOW_SYNTHETIC_SOURCES REQUIRE_ALERT_RECIPIENT EXPECTED_PROJECT_ID
 # shellcheck source=/dev/null
 source "$ENVIRONMENT_INPUTS"
 
-if [[ -d .git ]]; then
-  TAG="$(git rev-parse --short=12 HEAD)"
-else
-  TAG="${GITHUB_SHA:-manual}"
-  TAG="${TAG:0:12}"
+# Each environment names the one project it may be deployed to, and any other is refused: the
+# environment and the project come from different places (a workflow's env, a repository
+# variable, an operator's shell), and nothing else ties them together. An environment that names
+# no project yet cannot be deployed anywhere.
+if [[ -z "${EXPECTED_PROJECT_ID:-}" ]]; then
+  echo "::error title=No project for ${ENVIRONMENT}::${ENVIRONMENT_INPUTS#"${ROOT}/"} names no EXPECTED_PROJECT_ID, so ${ENVIRONMENT} cannot be deployed to any project." >&2
+  exit 1
 fi
+if [[ "$PROJECT_ID" != "$EXPECTED_PROJECT_ID" ]]; then
+  echo "::error title=Wrong project for ${ENVIRONMENT}::${ENVIRONMENT} is deployed to ${EXPECTED_PROJECT_ID} only (${ENVIRONMENT_INPUTS#"${ROOT}/"}), not to ${PROJECT_ID}." >&2
+  exit 1
+fi
+
+# Which commit is being deployed, named the same way in the image tag (TAG), in every audit record
+# and run manifest (SERVICE_VERSION: QUERY_SERVICE_VERSION and GIT_COMMIT), and in each image's
+# org.opencontainers.image.revision label (audit B08, D-4). Both come from one `git rev-parse
+# HEAD`, found with `git rev-parse --git-dir`, which a worktree answers too (its .git is a file,
+# and the `-d .git` test this replaced sent every worktree deploy to the shared tag "manual").
+#
+# The image build (phase_images) uploads the working tree, not the commit, so a tree that differs
+# from HEAD -- a changed tracked file, or an untracked one .gitignore does not exclude, which the
+# upload honours too -- is not that commit. Both names then carry -dirty-<tree>: the id of the
+# tree the working copy would commit as, so the same edits give the same name and different edits
+# never share one. Without git, GITHUB_SHA names the commit; with neither, nothing is built or applied
+# (require_provenance). In Actions, a checkout whose HEAD is not GITHUB_SHA is refused the same way.
+deploy_provenance() {
+  local commit="" suffix="" index tree
+  PROVENANCE_ERROR=""
+  if git rev-parse --git-dir >/dev/null 2>&1; then
+    commit="$(git rev-parse HEAD)"
+    # A scratch index read from HEAD, so every file is hashed afresh rather than trusted by its
+    # timestamp, and the repository's own index is left alone.
+    index="$(mktemp -d)"
+    tree="$(GIT_INDEX_FILE="${index}/index" git read-tree HEAD 2>/dev/null &&
+      GIT_INDEX_FILE="${index}/index" git add -A >/dev/null 2>&1 &&
+      GIT_INDEX_FILE="${index}/index" git write-tree 2>/dev/null || true)"
+    rm -rf "$index"
+    if [[ -z "$tree" ]]; then
+      PROVENANCE_ERROR="could not read the working tree to compare it with ${commit}"
+    elif [[ "$tree" != "$(git rev-parse 'HEAD^{tree}')" ]]; then
+      suffix="-dirty-${tree:0:12}"
+    fi
+    if [[ -n "${GITHUB_SHA:-}" && "$GITHUB_SHA" != "$commit" ]]; then
+      PROVENANCE_ERROR="the checkout is at ${commit}, not GITHUB_SHA ${GITHUB_SHA}"
+    fi
+  elif [[ -n "${GITHUB_SHA:-}" ]]; then
+    commit="$GITHUB_SHA"
+  else
+    PROVENANCE_ERROR="this is not a git checkout and GITHUB_SHA is not set, so no commit names what would be built"
+  fi
+  if [[ -z "$commit" ]]; then
+    # "local" is the Terraform default for an apply outside this script; nothing is built or
+    # applied under it (require_provenance).
+    TAG="local"
+    SERVICE_VERSION="local"
+  else
+    TAG="${commit:0:12}${suffix}"
+    SERVICE_VERSION="${commit}${suffix}"
+  fi
+}
+
+# Names the commit, and stops a phase that builds or applies when it cannot.
+require_provenance() {
+  deploy_provenance
+  if [[ -n "$PROVENANCE_ERROR" ]]; then
+    echo "::error title=Deploy provenance::Not building or applying: ${PROVENANCE_ERROR}." >&2
+    exit 1
+  fi
+  if [[ "$SERVICE_VERSION" == *-dirty-* ]]; then
+    echo "::warning title=Uncommitted changes::The working tree differs from ${SERVICE_VERSION%%-dirty-*}; images, audit records and run manifests name ${SERVICE_VERSION}."
+  fi
+}
+
 # The image repository: named once, here. It is encrypted with the `artifacts` key
 # (infra/main.tf, google_artifact_registry_repository.images_cmek; CMEK step 4). The builds, the
 # digest lookups and the Cloud Run image references all take it from this variable.
 REPOSITORY_ID="ema-flow-images"
 REPOSITORY="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY_ID}"
-
-# Recorded by the query service in every audit record as QUERY_SERVICE_VERSION, so a record
-# can be tied to the commit that produced it. GITHUB_SHA is the full commit in Actions; a
-# local run uses HEAD; "local" (the Terraform default) marks a checkout without git.
-if [[ -n "${GITHUB_SHA:-}" ]]; then
-  SERVICE_VERSION="$GITHUB_SHA"
-elif SERVICE_VERSION="$(git rev-parse HEAD 2>/dev/null)" && [[ -n "$SERVICE_VERSION" ]]; then
-  :
-else
-  SERVICE_VERSION="local"
-fi
 
 tf_common_vars=(
   -var="project_id=${PROJECT_ID}"
@@ -133,10 +199,11 @@ tf_deploy_vars() {
   fi
   # A placeholder is no recipient either: an address in a domain reserved so that nothing is ever
   # delivered there (RFC 2606: example.com/.org/.net, and the .test, .invalid, .example and
-  # .localhost top-level domains), or a `you@` local part left from a template, pages nobody,
-  # however well-formed. The address is not printed; infra/variables.tf refuses the same shapes.
+  # .localhost top-level domains, with or without a trailing dot), or a `you@` local part left
+  # from a template, pages nobody, however well-formed. The address is not printed;
+  # infra/variables.tf refuses the same shapes.
   if [[ -n "$alert_notification_email" ]] &&
-    printf '%s' "$alert_notification_email" | grep -Eiq '^you@|@([^@]+\.)?example\.(com|org|net)$|[@.](test|invalid|example|localhost)$'; then
+    printf '%s' "$alert_notification_email" | grep -Eiq '^you@|@([^@]+\.)?example\.(com|org|net)\.?$|[@.](test|invalid|example|localhost)\.?$'; then
     echo "::error title=Placeholder alert recipient::ALERT_NOTIFICATION_EMAIL is a placeholder (a reserved example or test domain, or a you@ address). Set it to a real, watched address." >&2
     return 1
   fi
@@ -171,6 +238,7 @@ tf_deploy_vars() {
 
 phase_preflight() {
   echo "=== preflight ==="
+  deploy_provenance
   echo "project=${PROJECT_ID} region=${REGION} environment=${ENVIRONMENT} tag=${TAG}"
   terraform version
   # `gcloud version` can exit 1 when component updates exist; do not fail deploy on that.
@@ -190,6 +258,16 @@ phase_deps() {
   # The lockfile or nothing: npm ci fails on a missing or out-of-date package-lock.json, and
   # there is no npm install fallback that would resolve fresh versions at deploy time.
   npm ci --no-audit --no-fund
+}
+
+# The deploy inputs, made here for a local `all` run (the workflow makes them in its gate job,
+# which holds no credential; scripts/gcp/deploy-inputs.sh says why). This runs the installed
+# packages, so it is never a phase of the workflow's deploy job.
+phase_inputs() {
+  echo "=== deploy inputs: the standards bootstrap imports, and the synthetic fixture ==="
+  DEPLOY_INPUTS_DIR="$(mktemp -d)/deploy-inputs"
+  DEPLOY_INPUTS_SHA256="$(bash scripts/gcp/deploy-inputs.sh "$DEPLOY_INPUTS_DIR" | tail -n 1)"
+  export DEPLOY_INPUTS_DIR DEPLOY_INPUTS_SHA256
 }
 
 phase_init() {
@@ -244,6 +322,62 @@ complete_pending_moves() {
   done <<<"$pairs"
 }
 
+# The deploy applies only a plan it has read (audit B08, D-2). Until then phase_apis and
+# phase_apply ran `terraform apply -auto-approve`, and the check that a plan destroys nothing ran
+# only on the pull request (.github/workflows/plan.yml): a push to main by an administrator skips
+# that check, and a plan made before another merge no longer describes what merges. So each apply
+# is a plan saved to a file, judged by the same summary and verdict as the pull request's
+# (scripts/ci/plan-summary.py: 0 no destroy, 4 a destroy or replace, anything else an error), and
+# then an apply of exactly that file (REVIEWED_PLAN), never a fresh one.
+#
+# A plan that destroys or replaces anything is applied only when ALLOW_REPLACE_COMMIT names the
+# commit being deployed (SERVICE_VERSION, in full): an acknowledgement is for one commit's plan and
+# is never carried to the next. In Actions it is the deploy workflow's allow_replace_commit input,
+# given on a manual run once the destroy has been reviewed. Anything the verdict cannot read fails.
+#   plan_reviewed <label> <terraform plan arguments...>
+plan_reviewed() {
+  local label="$1" plan_file plan_text plan_json summary code=0 verdict=0
+  shift
+  plan_file="$(mktemp)"
+  plan_text="$(mktemp)"
+  plan_json="$(mktemp)"
+  summary="$(mktemp)"
+  echo "--- ${label}: plan ---"
+  terraform -chdir=infra plan -input=false -no-color -detailed-exitcode -out="$plan_file" "$@" \
+    >"$plan_text" 2>&1 || code=$?
+  cat "$plan_text"
+  if [[ "$code" != "1" ]] && ! terraform -chdir=infra show -json "$plan_file" >"$plan_json"; then
+    code=1
+  fi
+  if [[ "$code" == "1" ]]; then
+    rm -f "$plan_file" "$plan_text" "$plan_json" "$summary"
+    echo "::error title=Plan failed::${label}: terraform could not plan; nothing was applied." >&2
+    return 1
+  fi
+  python3 scripts/ci/plan-summary.py "$plan_json" "$plan_text" "$summary" "$code" || verdict=$?
+  rm -f "$plan_text" "$plan_json" "$summary"
+  case "$verdict" in
+    0) ;;
+    4)
+      deploy_provenance
+      if [[ -z "$PROVENANCE_ERROR" && -n "${ALLOW_REPLACE_COMMIT:-}" &&
+        "$ALLOW_REPLACE_COMMIT" == "$SERVICE_VERSION" ]]; then
+        echo "::warning title=Destroy acknowledged::${label}: the plan destroys or replaces the resources listed above, and ALLOW_REPLACE_COMMIT names this commit, so it is applied."
+      else
+        rm -f "$plan_file"
+        echo "::error title=Destroy not acknowledged::${label}: the plan destroys or replaces the resources listed above, and nothing was applied. Once they are reviewed, deploy again with ALLOW_REPLACE_COMMIT=${SERVICE_VERSION} (in Actions, run the deploy workflow with allow_replace_commit set to it)." >&2
+        return 3
+      fi
+      ;;
+    *)
+      rm -f "$plan_file"
+      echo "::error title=Plan unreadable::${label}: scripts/ci/plan-summary.py could not judge the plan (exit ${verdict}); nothing was applied." >&2
+      return 1
+      ;;
+  esac
+  REVIEWED_PLAN="$plan_file"
+}
+
 phase_apis() {
   echo "=== enable APIs and artifact registry ==="
   gcloud --quiet services enable \
@@ -286,9 +420,7 @@ phase_apis() {
   # not run against a project since the query service was added: that is what the -target list
   # implies, not something observed. If an apply here ever fails on that error message, the
   # -target list is reaching further than it reads.
-  terraform -chdir=infra apply \
-    -input=false \
-    -auto-approve \
+  plan_reviewed apis \
     -target=google_project_service.required \
     -target=google_artifact_registry_repository.images_cmek \
     -target=google_service_account.build \
@@ -303,6 +435,8 @@ phase_apis() {
     -var="worker_image=us-docker.pkg.dev/cloudrun/container/hello" \
     -var="validator_image=us-docker.pkg.dev/cloudrun/container/hello" \
     -var="query_image=us-docker.pkg.dev/cloudrun/container/hello"
+  terraform -chdir=infra apply -input=false "$REVIEWED_PLAN"
+  rm -f "$REVIEWED_PLAN"
 
   # google_logging_project_sink.regulated_audit's auto-provisioned writer_identity
   # isn't reliably readable back through Terraform (two separate apply passes both
@@ -323,6 +457,7 @@ phase_apis() {
 
 phase_images() {
   echo "=== cloud build images ==="
+  require_provenance
   # Regional, staged in the EU, and run as the build identity (infra/build.tf,
   # docs/foundations.md A2/B3). Without these three flags gcloud defaults to a global
   # build as the default compute service account, staging the source in a US bucket.
@@ -342,7 +477,7 @@ phase_images() {
       --service-account="projects/${PROJECT_ID}/serviceAccounts/${build_account}" \
       --gcs-source-staging-dir="$staging_dir" \
       --config=cloudbuild.images.yaml \
-      --substitutions="_REGION=${REGION},_REPOSITORY=${REPOSITORY_ID},_IMAGE_TAG=${TAG}" \
+      --substitutions="_REGION=${REGION},_REPOSITORY=${REPOSITORY_ID},_IMAGE_TAG=${TAG},_REVISION=${SERVICE_VERSION}" \
       . 2>&1 | tee "$build_log"; then
       rm -f "$build_log"
       return 0
@@ -375,12 +510,15 @@ phase_images() {
 resolve_image_digest() {
   local image_name="$1"
   local tag="$2"
-  local digest
+  local digest token
   # Artifact Registry's docker v2 endpoint authenticates like `docker login`
   # does: HTTP Basic with the fixed username `oauth2accesstoken` and a GCP
   # access token as the password (not a raw Authorization: Bearer header).
+  # The header is read from a pipe, not given as --user, which would put the token in curl's
+  # argument list (common.sh, ema_flow_header).
+  token="$(ema_flow_access_token)"
   digest="$(curl --fail --silent --show-error --head \
-    --user "oauth2accesstoken:$(ema_flow_access_token)" \
+    --header @<(ema_flow_header Authorization "Basic $(printf 'oauth2accesstoken:%s' "$token" | base64 | tr -d '\n')") \
     --header "Accept: application/vnd.docker.distribution.manifest.v2+json,application/vnd.oci.image.manifest.v1+json" \
     "https://${REGION}-docker.pkg.dev/v2/${PROJECT_ID}/${REPOSITORY_ID}/${image_name}/manifests/${tag}" \
     | tr -d '\r' | grep -i '^docker-content-digest:' | awk '{print $2}')"
@@ -391,109 +529,192 @@ resolve_image_digest() {
   printf '%s' "$digest"
 }
 
-# Effective IAM of the worker and query service accounts as the project and the Healthcare
-# dataset report it after an apply (UR-18 in docs/validation/README.md, ADR 0004 decision 5).
-# Terraform state says which bindings this configuration declares; these exports say which
-# bindings the platform actually holds, including any added outside Terraform. Every step is
-# guarded: a missing permission, a missing output, or a failed upload prints a warning line and
-# the function still returns 0, so evidence collection never fails a deploy.
+# Effective IAM of the service identities, wherever the deploy can read a grant, after an apply
+# (UR-18 in docs/validation/README.md, ADR 0004 decision 5; audit B08, D-3). Terraform state says
+# which bindings this configuration declares; this reads what the platform holds. Until audit B08
+# it read only the project and the Healthcare dataset (and later the stores), so a grant inherited
+# from a folder, or held on a bucket, a BigQuery dataset or table, a key, a topic, a repository, a
+# Cloud Run service or another service account, was in no export, and the deployer was not
+# exported at all. It now reads every IAM policy of those kinds in the project, and the policies
+# of the folders and organisation above it, and scripts/ci/effective-iam.py reports, per identity,
+# every grant it holds and each role Terraform does not declare for it. The deployer's grants are
+# exported and not judged: its roles are made outside Terraform (docs/architecture.md, "Grants
+# outside Terraform").
+#
+# Evidence, never a gate: a policy that cannot be read, an undeclared role, a missing output or a
+# failed upload is a warning annotation, and the function returns 0. Only the per-identity reports
+# leave this function (the deploy log, and gs://<evidence bucket>/deploy-evidence/...): the raw
+# policies name every other principal too, and are deleted with the Terraform state read here.
+IAM_EVIDENCE_INDEX=""
+IAM_EVIDENCE_COUNT=0
+
+# Records one policy read by the command given, or that it could not be read.
+#   iam_evidence_read <scope> <resource> <kind: iam | bigquery-dataset> <command...>
+iam_evidence_read() {
+  local scope="$1" resource="$2" kind="$3" file
+  shift 3
+  IAM_EVIDENCE_COUNT=$((IAM_EVIDENCE_COUNT + 1))
+  file="${IAM_EVIDENCE_INDEX%/*}/policy-${IAM_EVIDENCE_COUNT}.json"
+  if "$@" >"$file" 2>/dev/null; then
+    printf '%s\t%s\t%s\t%s\n' "$file" "$scope" "$resource" "$kind" >>"$IAM_EVIDENCE_INDEX"
+  else
+    rm -f "$file"
+    printf -- '-\t%s\t%s\tunread\n' "$scope" "$resource" >>"$IAM_EVIDENCE_INDEX"
+  fi
+}
+
+# The resources of one kind, one per line, from the listing command given; a listing that fails
+# is recorded as unread and lists nothing.
+#   iam_evidence_list <scope> <command...>
+iam_evidence_list() {
+  local scope="$1"
+  shift
+  if ! "$@" 2>/dev/null; then
+    printf -- '-\t%s\t(every one: the listing failed)\tunread\n' "$scope" >>"$IAM_EVIDENCE_INDEX"
+  fi
+}
+
+# A BigQuery REST read (GET, or POST with an empty body for getIamPolicy), the token read from a
+# pipe (common.sh, ema_flow_header).
+bigquery_evidence_request() {
+  local method="$1" url="$2" token
+  token="$(ema_flow_access_token)" || return 1
+  if [[ "$method" == "POST" ]]; then
+    curl --fail --silent --show-error --request POST --data '{}' \
+      --header 'Content-Type: application/json' \
+      --header @<(ema_flow_header Authorization "Bearer ${token}") "$url"
+  else
+    curl --fail --silent --show-error --header @<(ema_flow_header Authorization "Bearer ${token}") "$url"
+  fi
+}
+
 export_effective_iam() {
-  echo "=== effective IAM policy export ==="
-  local out_dir dataset bucket stamp date_path sa short_name policy_file store exported=0
-  local source_store target_store
+  echo "=== effective IAM export ==="
+  local out_dir stamp date_path bucket dataset store ancestors id kind name ring key deployer
+  local bq="https://bigquery.googleapis.com/bigquery/v2/projects/${PROJECT_ID}"
   if ! out_dir="$(mktemp -d)"; then
     echo "::warning::Could not create a temporary directory for the effective IAM export; skipping it."
     return 0
   fi
+  mkdir -p "${out_dir}/policies" "${out_dir}/reports"
+  IAM_EVIDENCE_INDEX="${out_dir}/policies/index.tsv"
+  IAM_EVIDENCE_COUNT=0
+  : >"$IAM_EVIDENCE_INDEX"
   stamp="$(date -u +%Y%m%dT%H%M%SZ)"
   date_path="$(date -u +%Y/%m/%d)"
-  dataset="$(terraform -chdir=infra output -raw healthcare_dataset_id 2>/dev/null || true)"
   bucket="$(terraform -chdir=infra output -raw evidence_bucket 2>/dev/null || true)"
-  source_store="$(terraform -chdir=infra output -raw source_fhir_store_id 2>/dev/null || true)"
-  target_store="$(terraform -chdir=infra output -raw target_fhir_store_id 2>/dev/null || true)"
+  dataset="$(terraform -chdir=infra output -raw healthcare_dataset_id 2>/dev/null || true)"
 
-  # The third account is the impersonation-only caller (google_service_account.caller). It is
-  # expected to hold no project, dataset or store role at all, so each of its exports is
-  # expected to be empty: that emptiness is the evidence, since its only declared binding is
-  # roles/run.invoker on one Cloud Run service, which none of these policies covers.
-  for sa in "ema-flow-worker-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com" \
-    "ema-flow-query-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com" \
-    "ema-flow-caller-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com"; do
-    short_name="${sa%%@*}"
+  # The project, and every folder and the organisation above it.
+  iam_evidence_read project "$PROJECT_ID" iam gcloud --quiet projects get-iam-policy "$PROJECT_ID" --format=json
+  if ancestors="$(gcloud --quiet projects get-ancestors "$PROJECT_ID" --format='value(id,type)' 2>/dev/null)"; then
+    while read -r id kind; do
+      case "$kind" in
+        folder) iam_evidence_read folder "$id" iam gcloud --quiet resource-manager folders get-iam-policy "$id" --format=json ;;
+        organization) iam_evidence_read organization "$id" iam gcloud --quiet organizations get-iam-policy "$id" --format=json ;;
+      esac
+    done <<<"$ancestors"
+  else
+    printf -- '-\tfolders and organisation\t(above %s)\tunread\n' "$PROJECT_ID" >>"$IAM_EVIDENCE_INDEX"
+  fi
 
-    echo "--- project ${PROJECT_ID}: roles held by ${sa} ---"
-    policy_file="${out_dir}/project-iam-${short_name}.json"
-    if gcloud --quiet projects get-iam-policy "$PROJECT_ID" \
-      --flatten='bindings[].members' \
-      --filter="bindings.members:serviceAccount:${sa}" \
-      --format='json(bindings.role,bindings.members,bindings.condition)' >"$policy_file"; then
-      cat "$policy_file"
-      exported=$((exported + 1))
-    else
-      rm -f "$policy_file"
-      echo "::warning::Could not read the project IAM policy for ${sa}. Grant the deployer resourcemanager.projects.getIamPolicy (roles/iam.securityReviewer) to record this evidence."
-    fi
-
-    if [[ -z "$dataset" ]]; then
-      continue
-    fi
-    echo "--- healthcare dataset ${dataset}: roles held by ${sa} ---"
-    policy_file="${out_dir}/dataset-iam-${short_name}.json"
-    if gcloud --quiet healthcare datasets get-iam-policy "$dataset" \
-      --location="$REGION" \
-      --project="$PROJECT_ID" \
-      --flatten='bindings[].members' \
-      --filter="bindings.members:serviceAccount:${sa}" \
-      --format='json(bindings.role,bindings.members,bindings.condition)' >"$policy_file"; then
-      cat "$policy_file"
-      exported=$((exported + 1))
-    else
-      rm -f "$policy_file"
-      echo "::warning::Could not read the Healthcare dataset IAM policy for ${sa}. Grant the deployer healthcare.datasets.getIamPolicy to record this evidence."
-    fi
-
-    # The services' FHIR roles are bound on each store since audit B04. Until its phase 2 removes
-    # the transitional dataset-wide grants (test/infra/transitional-grants.ts), the dataset export
-    # above still shows the worker's fhirResourceEditor and the query service's
-    # fhirResourceReader; from phase 2 on it is expected to be empty for both, and these store
-    # exports carry the evidence.
-    for store in "$source_store" "$target_store"; do
+  # The Healthcare dataset and its FHIR stores (the services' FHIR roles are bound on each store).
+  if [[ -n "$dataset" ]]; then
+    iam_evidence_read healthcare-dataset "$dataset" iam gcloud --quiet healthcare datasets get-iam-policy "$dataset" \
+      --location="$REGION" --project="$PROJECT_ID" --format=json
+    for store in "$(terraform -chdir=infra output -raw source_fhir_store_id 2>/dev/null || true)" \
+      "$(terraform -chdir=infra output -raw target_fhir_store_id 2>/dev/null || true)"; do
       [[ -z "$store" ]] && continue
-      echo "--- FHIR store ${store}: roles held by ${sa} ---"
-      policy_file="${out_dir}/store-iam-${store}-${short_name}.json"
-      if gcloud --quiet healthcare fhir-stores get-iam-policy "$store" \
-        --dataset="$dataset" \
-        --location="$REGION" \
-        --project="$PROJECT_ID" \
-        --flatten='bindings[].members' \
-        --filter="bindings.members:serviceAccount:${sa}" \
-        --format='json(bindings.role,bindings.members,bindings.condition)' >"$policy_file"; then
-        cat "$policy_file"
-        exported=$((exported + 1))
-      else
-        rm -f "$policy_file"
-        echo "::warning::Could not read the IAM policy of FHIR store ${store} for ${sa}. Grant the deployer healthcare.fhirStores.getIamPolicy to record this evidence."
-      fi
+      iam_evidence_read fhir-store "$store" iam gcloud --quiet healthcare fhir-stores get-iam-policy "$store" \
+        --dataset="$dataset" --location="$REGION" --project="$PROJECT_ID" --format=json
     done
-  done
-
-  if [[ -z "$dataset" ]]; then
-    echo "::warning::terraform output healthcare_dataset_id was empty; the dataset-level export was skipped."
+  else
+    printf -- '-\thealthcare-dataset\t(terraform output healthcare_dataset_id was empty)\tunread\n' >>"$IAM_EVIDENCE_INDEX"
   fi
 
-  if [[ "$exported" -gt 0 && -n "$bucket" ]]; then
-    # Dated path, then the timestamp, environment and the first 12 characters of the deployed
-    # commit, so one export belongs to exactly one apply.
-    local destination="gs://${bucket}/deploy-evidence/${date_path}/${stamp}-${ENVIRONMENT}-${SERVICE_VERSION:0:12}/"
-    if gcloud --quiet storage cp "${out_dir}"/*.json "$destination" >/dev/null; then
-      echo "Effective IAM export written to ${destination}"
-    else
-      echo "::warning::Could not upload the effective IAM export to ${destination}; it remains in this deploy log only."
+  # Every bucket, key, topic, image repository, Cloud Run service and service account in the
+  # project: listed, not taken from Terraform, so a resource made outside it is read too.
+  while read -r name; do
+    if [[ -n "$name" ]]; then
+      iam_evidence_read bucket "$name" iam gcloud --quiet storage buckets get-iam-policy "gs://${name}" --format=json
     fi
-  elif [[ -z "$bucket" ]]; then
-    echo "::warning::terraform output evidence_bucket was empty; the effective IAM export is in this deploy log only."
-  fi
+  done < <(iam_evidence_list bucket gcloud --quiet storage buckets list --project="$PROJECT_ID" --format='value(name)')
+  while read -r ring; do
+    [[ -z "$ring" ]] && continue
+    while read -r key; do
+      if [[ -n "$key" ]]; then
+        iam_evidence_read kms-key "${key##*/}" iam gcloud --quiet kms keys get-iam-policy "$key" --format=json
+      fi
+    done < <(iam_evidence_list kms-key gcloud --quiet kms keys list --keyring="$ring" --format='value(name)')
+  done < <(iam_evidence_list kms-key-ring gcloud --quiet kms keyrings list --location="$REGION" --project="$PROJECT_ID" --format='value(name)')
+  while read -r name; do
+    if [[ -n "$name" ]]; then
+      iam_evidence_read pubsub-topic "${name##*/}" iam gcloud --quiet pubsub topics get-iam-policy "$name" --format=json
+    fi
+  done < <(iam_evidence_list pubsub-topic gcloud --quiet pubsub topics list --project="$PROJECT_ID" --format='value(name)')
+  while read -r name; do
+    if [[ -n "$name" ]]; then
+      iam_evidence_read artifact-repository "${name##*/}" iam gcloud --quiet artifacts repositories get-iam-policy "${name##*/}" \
+        --location="$REGION" --project="$PROJECT_ID" --format=json
+    fi
+  done < <(iam_evidence_list artifact-repository gcloud --quiet artifacts repositories list --location="$REGION" --project="$PROJECT_ID" --format='value(name)')
+  while read -r name; do
+    if [[ -n "$name" ]]; then
+      iam_evidence_read cloud-run-service "$name" iam gcloud --quiet run services get-iam-policy "$name" \
+        --region="$REGION" --project="$PROJECT_ID" --format=json
+    fi
+  done < <(iam_evidence_list cloud-run-service gcloud --quiet run services list --region="$REGION" --project="$PROJECT_ID" --format='value(metadata.name)')
+  while read -r name; do
+    if [[ -n "$name" ]]; then
+      iam_evidence_read service-account "$name" iam gcloud --quiet iam service-accounts get-iam-policy "$name" \
+        --project="$PROJECT_ID" --format=json
+    fi
+  done < <(iam_evidence_list service-account gcloud --quiet iam service-accounts list --project="$PROJECT_ID" --format='value(email)')
 
+  # Every BigQuery dataset's access list, and the IAM policy of each of its tables.
+  while read -r name; do
+    [[ -z "$name" ]] && continue
+    iam_evidence_read bigquery-dataset "$name" bigquery-dataset bigquery_evidence_request GET "${bq}/datasets/${name}"
+    while read -r table; do
+      if [[ -n "$table" ]]; then
+        iam_evidence_read bigquery-table "${name}.${table}" iam \
+          bigquery_evidence_request POST "${bq}/datasets/${name}/tables/${table}:getIamPolicy"
+      fi
+    done < <(iam_evidence_list bigquery-table bigquery_evidence_request GET "${bq}/datasets/${name}/tables?maxResults=1000" |
+      python3 -c "import sys,json;[print(t['tableReference']['tableId']) for t in json.load(sys.stdin).get('tables') or []]" 2>/dev/null || true)
+  done < <(iam_evidence_list bigquery-dataset bigquery_evidence_request GET "${bq}/datasets?all=true&maxResults=1000" |
+    python3 -c "import sys,json;[print(d['datasetReference']['datasetId']) for d in json.load(sys.stdin).get('datasets') or []]" 2>/dev/null || true)
+
+  # Who each identity is: the three service accounts infra/ declares, and the deployer this runs as.
+  deployer="$(gcloud --quiet auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null | head -n 1 || true)"
+  local identities=(
+    "worker=ema-flow-worker-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com"
+    "query=ema-flow-query-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com"
+    "caller=ema-flow-caller-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com"
+  )
+  if [[ "$deployer" == *.gserviceaccount.com ]]; then
+    identities+=("deployer=${deployer}!")
+  else
+    echo "::warning title=IAM evidence incomplete::The deploy is not running as a service account, so the deployer's grants are not exported."
+  fi
+  if terraform -chdir=infra show -json >"${out_dir}/policies/state.json" 2>/dev/null &&
+    python3 scripts/ci/effective-iam.py "$IAM_EVIDENCE_INDEX" "${out_dir}/policies/state.json" \
+      "${out_dir}/reports" "${identities[@]}"; then
+    if [[ -z "$bucket" ]]; then
+      echo "::warning::terraform output evidence_bucket was empty; the effective IAM export is in this deploy log only."
+    else
+      # Dated path, then the timestamp, environment and the first 12 characters of the deployed
+      # commit, so one export belongs to exactly one apply.
+      local destination="gs://${bucket}/deploy-evidence/${date_path}/${stamp}-${ENVIRONMENT}-${SERVICE_VERSION:0:12}/"
+      if gcloud --quiet storage cp "${out_dir}/reports/"*.json "$destination" >/dev/null 2>&1; then
+        echo "Effective IAM export written to ${destination}"
+      else
+        echo "::warning::Could not upload the effective IAM export to ${destination}; its summary is in this deploy log only."
+      fi
+    fi
+  else
+    echo "::warning title=IAM evidence::The effective IAM report could not be built (the Terraform state or scripts/ci/effective-iam.py failed); no export was written."
+  fi
   rm -rf "$out_dir"
   return 0
 }
@@ -535,12 +756,13 @@ apply_permission_role() {
 # The question changes nothing, so no answer, a 429 or a 5xx is asked again, three times in all;
 # any other refusal, or an answer it cannot read, fails.
 preflight_apply_permissions() {
-  local body response status attempt missing permission account role
+  local body response status attempt missing permission account role token
   body="$(python3 -c 'import json,sys;print(json.dumps({"permissions":sys.argv[1:]}))' "${APPLY_PERMISSIONS[@]}")"
   response="$(mktemp)"
+  token="$(ema_flow_access_token)"
   for attempt in 1 2 3; do
     status="$(curl --silent --output "$response" --write-out '%{http_code}' --request POST \
-      --header "Authorization: Bearer $(ema_flow_access_token)" \
+      --header @<(ema_flow_header Authorization "Bearer ${token}") \
       --header 'Content-Type: application/json' \
       --data "$body" \
       "https://cloudresourcemanager.googleapis.com/v1/projects/${PROJECT_ID}:testIamPermissions" || true)"
@@ -602,7 +824,7 @@ ensure_fhir_stores() {
       return 1
     fi
     status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
-      --header "Authorization: Bearer ${token}" \
+      --header @<(ema_flow_header Authorization "Bearer ${token}") \
       "https://healthcare.googleapis.com/v1/projects/${PROJECT_ID}/locations/${REGION}/datasets/${dataset}/fhirStores/${store}" || true)"
     case "$status" in
       200) ;;
@@ -669,6 +891,7 @@ sync_dashboard() {
 
 phase_apply() {
   echo "=== terraform apply ==="
+  require_provenance
   echo "service_version=${SERVICE_VERSION}"
   WORKER_DIGEST="$(resolve_image_digest worker "$TAG")"
   VALIDATOR_DIGEST="$(resolve_image_digest validator "$TAG")"
@@ -699,10 +922,9 @@ phase_apply() {
   preflight_apply_permissions
   ensure_fhir_stores
 
-  if ! terraform -chdir=infra apply \
-    -input=false \
-    -auto-approve \
-    "${TF_DEPLOY_VARS[@]}"; then
+  plan_reviewed apply "${TF_DEPLOY_VARS[@]}"
+  if ! terraform -chdir=infra apply -input=false "$REVIEWED_PLAN"; then
+    rm -f "$REVIEWED_PLAN"
     echo "=== terraform apply failed; dumping recent container logs for diagnosis ===" >&2
     # Only the worker's and the query service's structured logs, whose fields are sanitised by
     # src/lib/logger.ts, and only the five fields named in --format; the validator sidecar's
@@ -720,6 +942,7 @@ phase_apply() {
     done
     return 1
   fi
+  rm -f "$REVIEWED_PLAN"
 
   # The endpoint and the audience are different hostnames; printing both here keeps a caller
   # from minting a token for the wrong one (infra/outputs.tf). The third is the account the
@@ -807,10 +1030,14 @@ plan_dashboard_drift() {
   esac
 }
 
+# bootstrap.sh reads the standards and the synthetic fixture from DEPLOY_INPUTS_DIR (made by
+# scripts/gcp/deploy-inputs.sh, in the workflow's gate job or by phase_inputs), and seeds the
+# fixture only where the environment's inputs accept synthetic content.
 phase_bootstrap() {
   echo "=== reconcile FHIR stores and import profiles ==="
   GOOGLE_CLOUD_PROJECT="$PROJECT_ID" bash scripts/gcp/reconcile-fhir-stores.sh
-  GOOGLE_CLOUD_PROJECT="$PROJECT_ID" bash scripts/gcp/bootstrap.sh
+  GOOGLE_CLOUD_PROJECT="$PROJECT_ID" ALLOW_SYNTHETIC_SOURCES="${ALLOW_SYNTHETIC_SOURCES:-false}" \
+    bash scripts/gcp/bootstrap.sh
   echo "Deployment complete."
   terraform -chdir=infra output workflow_console_url
   terraform -chdir=infra output bigquery_console_url
@@ -894,7 +1121,7 @@ phase_smoke() {
     http_code="$(curl --silent --show-error --output "$body_file" --write-out '%{http_code}' \
       --max-time 480 \
       --request POST "${worker_url}/v1/runs" \
-      --header "Authorization: Bearer ${token}" \
+      --header @<(ema_flow_header Authorization "Bearer ${token}") \
       --header 'Content-Type: application/json' \
       --data '{"source":"fixture"}' || true)"
     if [[ "$http_code" == "403" && "$attempt" -lt "$max_attempts" ]]; then
@@ -983,15 +1210,20 @@ query_smoke_request() {
   for attempt in 1 2 3; do
     local args=(--silent --output "$body_file" --write-out '%{http_code}' --max-time 30
       --request "$method")
-    if [[ -n "$edge_token" ]]; then
-      args+=(--header "X-Serverless-Authorization: Bearer ${edge_token}")
-    fi
     if [[ "$method" == "POST" ]]; then
       args+=(--header 'Content-Type: application/json'
         --header 'Accept: application/json, text/event-stream'
         --data '{"jsonrpc":"2.0","id":1,"method":"tools/list"}')
     fi
-    QS_CODE="$(curl "${args[@]}" "${QUERY_SMOKE_URL}${path}" || true)"
+    # The token is read from a pipe on the command itself, never put in curl's arguments
+    # (common.sh, ema_flow_header).
+    if [[ -n "$edge_token" ]]; then
+      QS_CODE="$(curl "${args[@]}" \
+        --header @<(ema_flow_header X-Serverless-Authorization "Bearer ${edge_token}") \
+        "${QUERY_SMOKE_URL}${path}" || true)"
+    else
+      QS_CODE="$(curl "${args[@]}" "${QUERY_SMOKE_URL}${path}" || true)"
+    fi
     case "$QS_CODE" in
       000 | 502 | 503 | 504)
         if [[ "$attempt" -lt 3 ]]; then
@@ -1050,6 +1282,7 @@ query_smoke_expect_refused() {
 
 phase_query_smoke() {
   echo "=== query-smoke: the deployed query service is up, current, and walled ==="
+  deploy_provenance
   local query_service="ema-flow-${ENVIRONMENT}-query" describe_file failed=0 expected
   QUERY_SMOKE_URL="$(terraform -chdir=infra output -raw query_service_url 2>/dev/null || true)"
   if [[ -z "$QUERY_SMOKE_URL" ]]; then
@@ -1131,6 +1364,7 @@ case "$PHASE" in
   all)
     phase_preflight
     phase_deps
+    phase_inputs
     phase_init
     phase_apis
     phase_images

@@ -24,9 +24,9 @@ set -euo pipefail
 
 # shellcheck source=scripts/gcp/common.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
-# GCP_PROJECT_ID first, as before; otherwise GOOGLE_CLOUD_PROJECT or the gcloud configuration,
-# and no project at all fails rather than falling back to a hard-coded one.
-PROJECT_ID="${GCP_PROJECT_ID:-$(ema_flow_resolve_project)}"
+# GOOGLE_CLOUD_PROJECT or GCP_PROJECT_ID (refused when the two differ), else the gcloud
+# configuration; no project at all fails rather than falling back to a hard-coded one.
+PROJECT_ID="$(ema_flow_resolve_project)"
 DEPLOYER="ema-flow-deployer@${PROJECT_ID}.iam.gserviceaccount.com"
 POLICY_ID="key-guard"
 ATTACHMENT="cloudresourcemanager.googleapis.com%2Fprojects%2F${PROJECT_ID}"

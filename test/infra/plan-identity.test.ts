@@ -107,8 +107,9 @@ describe("the plan workflow", () => {
 
   it("plans with exactly the inputs the deploy applies with", () => {
     const deploy = readFileSync("scripts/gcp/deploy.sh", "utf8");
+    // The deploy plans with them and applies exactly that plan (plan_reviewed; audit B08, D-2).
     const applyUses =
-      /terraform -chdir=infra apply \\\n\s+-input=false \\\n\s+-auto-approve \\\n\s+"\$\{TF_DEPLOY_VARS\[@\]\}"/;
+      /plan_reviewed apply "\$\{TF_DEPLOY_VARS\[@\]\}"\n\s+if ! terraform -chdir=infra apply -input=false "\$REVIEWED_PLAN"; then/;
     const planUses =
       /terraform -chdir=infra plan [^\n]*\\\n\s+-out="\$plan_file" "\$\{TF_DEPLOY_VARS\[@\]\}"/;
     expect(deploy).toMatch(applyUses);

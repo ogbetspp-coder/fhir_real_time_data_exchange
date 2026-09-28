@@ -86,7 +86,7 @@ locals {
 }
 
 resource "google_monitoring_notification_channel" "alert_email" {
-  count = var.alert_notification_email != "" ? 1 : 0
+  count = nonsensitive(var.alert_notification_email != "") ? 1 : 0
 
   display_name = "EMA Flow alerts (${var.environment})"
   type         = "email"

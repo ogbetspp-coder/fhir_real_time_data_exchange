@@ -111,6 +111,7 @@ Each variable's full description, validation and reasoning are in `variables.tf`
 | `evidence_bucket`               | IAM export in `deploy.sh`                              | Run evidence and deploy evidence                              |
 | `profile_staging_bucket`        | `bootstrap.sh`                                         | Staging for the profile import                                |
 | `submission_bucket`             | Zone A                                                 | Approved canonical submissions                                |
+| `record_readers_targets`        | `record-readers.sh`                                    | Every bucket and BigQuery dataset declared, to narrow readers |
 | `fhir_changes_topic`            | `reconcile-fhir-stores.sh`                             | Target store change notifications                             |
 | `cloud_run_service_uri`         | smoke run, deploy workflow                             | Worker URL                                                    |
 | `query_service_url`             | callers                                                | Where to send query requests                                  |

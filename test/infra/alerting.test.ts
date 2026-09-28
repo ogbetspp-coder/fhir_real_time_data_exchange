@@ -141,7 +141,7 @@ describe("the deploy's alert recipient", () => {
     expect(out).toContain("No alert recipient");
   });
 
-  it.each(["prod", "validation", ""])(
+  it.each(["prod", "validation"])(
     "cannot be made optional outside dev, wherever the setting comes from: %j",
     (environment) => {
       const { status, out } = tfDeployVars({
@@ -153,6 +153,22 @@ describe("the deploy's alert recipient", () => {
       expect(out).toContain("accepted only in dev");
     },
   );
+
+  it("is never relaxed by an unnamed environment: deploy.sh refuses to run without one", () => {
+    // Until audit B08 (L1) an unset EMA_FLOW_ENVIRONMENT read as dev, whose inputs file relaxes
+    // the recipient, on whatever project the shell named. deploy.sh itself, not tf_deploy_vars.
+    const run = spawnSync("bash", ["scripts/gcp/deploy.sh", "plan"], {
+      encoding: "utf8",
+      env: {
+        PATH: process.env.PATH ?? "",
+        GOOGLE_CLOUD_PROJECT: "any-project",
+        REQUIRE_ALERT_RECIPIENT: "false",
+      },
+    });
+    expect(run.status).not.toBe(0);
+    expect(run.stderr).toContain("EMA_FLOW_ENVIRONMENT names the environment to deploy");
+    expect(`${run.stdout}${run.stderr}`).not.toContain("require_alert_recipient=false");
+  });
 
   it.each(["False", "no", "0", " false"])(
     "accepts only true or false as the setting: %j",
@@ -195,6 +211,11 @@ describe("the deploy's alert recipient", () => {
     "ops@mail.example",
     "root@localhost",
     "root@box.LOCALHOST",
+    // A trailing dot names the same domain (a fully qualified name), and passed both patterns
+    // until audit B08.
+    "ops@operations.test.",
+    "security@example.com.",
+    "root@localhost.",
   ])("is refused when it is a placeholder, in every environment: %s", (address) => {
     for (const env of [
       { ENVIRONMENT: "prod" },

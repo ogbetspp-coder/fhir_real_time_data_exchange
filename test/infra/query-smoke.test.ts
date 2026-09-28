@@ -15,6 +15,10 @@ const workflow = readFileSync(".github/workflows/deploy.yml", "utf8");
 
 const QUERY_URL = "https://ema-flow-dev-query-123456789012.europe-west4.run.app";
 const COMMIT = "0123456789abcdef0123456789abcdef01234567";
+const DEV_PROJECT =
+  /^EXPECTED_PROJECT_ID=(\S+)$/m.exec(
+    readFileSync("scripts/gcp/environments/dev.env", "utf8"),
+  )?.[1] ?? "";
 const EDGE_TOKEN = "edge.id.token-never-printed";
 
 const TERRAFORM = `#!/bin/sh
@@ -34,23 +38,28 @@ esac
 
 // Answers each (caller, path) from a space-separated list of codes, one per call (the last
 // repeats). A request carrying X-Serverless-Authorization with the expected token is an "edge"
-// caller; anything else is anonymous. Every argument is logged so a test can see what was sent.
-const CURL = `#!/bin/sh
+// caller; anything else is anonymous. Every argument is logged so a test can see what was sent;
+// a header read from a file (--header @<file>) is logged as [@file:<the header>], so a test can
+// tell a token in the arguments from one in a file, which only the curl process reads.
+const CURL = `#!/usr/bin/env bash
 printf 'curl' >> "$STUB_DIR/calls.log"
-for argument in "$@"; do printf ' [%s]' "$argument" >> "$STUB_DIR/calls.log"; done
-echo >> "$STUB_DIR/calls.log"
 out=""; url=""; caller=anonymous
 while [ $# -gt 0 ]; do
   case "$1" in
-    --output) out="$2"; shift 2 ;;
+    --output) out="$2"; printf ' [%s] [%s]' "$1" "$2" >> "$STUB_DIR/calls.log"; shift 2 ;;
     --header)
-      [ "$2" = "X-Serverless-Authorization: Bearer $STUB_EDGE_TOKEN" ] && caller=edge
+      header="$2"
+      if [ "\${header#@}" != "$header" ]; then header="@file:$(cat "\${header#@}")"; fi
+      printf ' [%s] [%s]' "$1" "$header" >> "$STUB_DIR/calls.log"
+      [ "$header" = "@file:X-Serverless-Authorization: Bearer $STUB_EDGE_TOKEN" ] && caller=edge
       shift 2 ;;
-    --write-out|--max-time|--request|--data) shift 2 ;;
-    --*) shift ;;
-    *) url="$1"; shift ;;
+    --write-out|--max-time|--request|--data)
+      printf ' [%s] [%s]' "$1" "$2" >> "$STUB_DIR/calls.log"; shift 2 ;;
+    --*) printf ' [%s]' "$1" >> "$STUB_DIR/calls.log"; shift ;;
+    *) url="$1"; printf ' [%s]' "$1" >> "$STUB_DIR/calls.log"; shift ;;
   esac
 done
+echo >> "$STUB_DIR/calls.log"
 case "$caller:$url" in
   anonymous:*/mcp) key=mcp; codes="$STUB_MCP_CODES"; body="$STUB_MCP_BODY" ;;
   anonymous:*/readyz) key=readyz; codes="$STUB_READYZ_CODES"; body="$STUB_READYZ_BODY" ;;
@@ -119,7 +128,10 @@ async function run(answers: Answers = {}) {
       env: {
         PATH: `${stubs}:${process.env.PATH ?? ""}`,
         HOME: process.env.HOME ?? stubs,
-        GOOGLE_CLOUD_PROJECT: "synthetic-project",
+        // dev's own project (scripts/gcp/environments/dev.env): deploy.sh refuses any other.
+        GOOGLE_CLOUD_PROJECT: DEV_PROJECT,
+        // No repository here, so GITHUB_SHA names the commit (deploy.sh, deploy_provenance).
+        GIT_DIR: join(stubs, "no-repository"),
         GCP_REGION: "europe-west4",
         EMA_FLOW_ENVIRONMENT: "dev",
         GITHUB_SHA: COMMIT,
@@ -202,7 +214,9 @@ describe.concurrent("the query service smoke", { timeout: 30_000 }, () => {
       expect(call).not.toMatch(/\[authorization:/i);
     }
     for (const call of edge) {
-      expect(call).toContain(`[X-Serverless-Authorization: Bearer ${EDGE_TOKEN}]`);
+      // From a file (audit B08, D-7): an argument is readable by every process on the host.
+      expect(call).toContain(`[@file:X-Serverless-Authorization: Bearer ${EDGE_TOKEN}]`);
+      expect(call).not.toContain(`[X-Serverless-Authorization: Bearer ${EDGE_TOKEN}]`);
     }
     expect(output).not.toContain(EDGE_TOKEN);
   });

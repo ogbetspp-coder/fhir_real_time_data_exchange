@@ -33,6 +33,16 @@ on:
       - ".claude/**"
       - ".cursor/**"
   workflow_dispatch:
+    inputs:
+      # The deploy applies only a plan it has read, and refuses one that destroys or replaces
+      # anything (scripts/gcp/deploy.sh, plan_reviewed; audit B08, D-2). Once such a plan has been
+      # reviewed, run this workflow by hand with the full commit it deploys here: the
+      # acknowledgement holds for that commit's plan alone, never the next one's.
+      allow_replace_commit:
+        description: "Full commit SHA being deployed, to acknowledge that its reviewed plan destroys or replaces resources. Leave empty otherwise."
+        required: false
+        type: string
+        default: ""
 
 # Nothing at the workflow level: each job names what it needs. A job granted id-token: write
 # can ask GitHub for an OIDC token that Workload Identity Federation exchanges for the deployer,
@@ -53,6 +63,8 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
+    outputs:
+      deploy_inputs_sha256: ${{ steps.deploy_inputs.outputs.sha256 }}
     defaults:
       run:
         shell: bash --noprofile --norc -eo pipefail {0}
@@ -82,6 +94,25 @@ jobs:
 
       - name: Quality gate
         run: npm run check
+
+      # What the deploy job's bootstrap imports and seeds, made here, where no step can ask for a
+      # cloud credential (audit B08, D-1): the standards it uses and the synthetic fixture, which
+      # tsx builds with the installed packages. The deploy job installs and runs no package; it
+      # receives the directory as an artifact, and the SHA-256 of its manifest by the job output
+      # above, and bootstrap.sh refuses a directory that matches neither that nor the lock.
+      - name: Make the deploy's inputs
+        id: deploy_inputs
+        run: |
+          sha="$(bash scripts/gcp/deploy-inputs.sh "${RUNNER_TEMP}/deploy-inputs" | tail -n 1)"
+          [[ "$sha" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::deploy-inputs.sh printed no manifest hash." >&2; exit 1; }
+          echo "sha256=${sha}" >>"$GITHUB_OUTPUT"
+      - name: Hand the deploy's inputs to the deploy job
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: deploy-inputs
+          path: ${{ runner.temp }}/deploy-inputs
+          if-no-files-found: error
+          retention-days: 1
 
   # A failed gate leaves the same kind of issue a failed deploy does (foundations C11), from a
   # job that checks nothing out, installs nothing and holds only the right to open an issue.
@@ -129,6 +160,8 @@ jobs:
       CLOUDSDK_CORE_DISABLE_PROMPTS: "1"
       TF_IN_AUTOMATION: "true"
       TF_INPUT: "0"
+      # Empty on a push; on a manual run, the commit whose reviewed destroys may be applied.
+      ALLOW_REPLACE_COMMIT: ${{ inputs.allow_replace_commit || '' }}
 
     steps:
       - name: Check deployment configuration
@@ -180,22 +213,27 @@ jobs:
             fi
           done
 
+      # Without its credentials: the checkout otherwise leaves this job's GITHUB_TOKEN (issues:
+      # write here) in .git/config, where every later step could read it. The steps that open or
+      # close an issue are given the token by name.
       - name: Check out repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      # Node for the repository's own scripts, which use its built-ins only. This job installs no
+      # package and runs none (audit B08, D-1): every process in it can ask for the deployer's
+      # token, so the standards and the fixture that needed tsx are made by the gate job instead
+      # (test/ci/deploy-permissions.test.ts holds the rule).
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 22.22.0
           package-manager-cache: false
-
-      # The deploy still runs Node: bootstrap.sh fetches the pinned standards and exports the
-      # fixture with tsx. It needs the packages, not their install scripts, and in this job an
-      # install script could ask for the deployer's token. The gate job above has already run
-      # the same lock file with scripts on and proved the tree works.
-      - name: Install Node dependencies without install scripts
-        env:
-          npm_config_ignore_scripts: "true"
-        run: bash scripts/gcp/deploy.sh deps 2>&1 | tee -a deploy-run.log
+      - name: Receive the deploy's inputs from the gate job
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: deploy-inputs
+          path: ${{ runner.temp }}/deploy-inputs
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
@@ -220,6 +258,8 @@ jobs:
       - name: Terraform init
         run: bash scripts/gcp/deploy.sh init 2>&1 | tee -a deploy-run.log
 
+      # Both applies (here and "Apply infrastructure") run a plan first, and refuse one that
+      # destroys or replaces anything unless ALLOW_REPLACE_COMMIT names this commit.
       - name: Enable APIs and Artifact Registry
         run: bash scripts/gcp/deploy.sh apis 2>&1 | tee -a deploy-run.log
 
@@ -252,6 +292,9 @@ jobs:
         run: bash scripts/gcp/deploy.sh record-readers 2>&1 | tee -a deploy-run.log
 
       - name: Reconcile FHIR stores
+        env:
+          DEPLOY_INPUTS_DIR: ${{ runner.temp }}/deploy-inputs
+          DEPLOY_INPUTS_SHA256: ${{ needs.gate.outputs.deploy_inputs_sha256 }}
         run: bash scripts/gcp/deploy.sh bootstrap 2>&1 | tee -a deploy-run.log
 
       # The worker's own URL is the audience the next step mints a token for. Read from
@@ -340,19 +383,23 @@ jobs:
               gh issue close "$n" --comment "Superseded: deploy ${run_url} succeeded, smoke run included." || true
             done
 
+      # The log's last 50,000 characters, redacted first (scripts/ci/redact.py; audit B08, D-6): a
+      # plan or apply prints IAM members and addresses in resource addresses, which the job log
+      # shows to those who can read the run and an issue shows to everyone who can read the
+      # repository. A log that cannot be redacted is not published at all.
       - name: Publish failure log
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          log = Path("deploy-run.log")
-          text = log.read_text(errors="replace") if log.exists() else "deploy-run.log was not created"
-          run_url = """${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"""
-          body = f"Actions run: {run_url}\n\n```text\n{text[-50000:]}\n```\n"
-          Path("issue.md").write_text(body, encoding="utf-8")
-          PY
+          if [[ ! -f deploy-run.log ]]; then
+            printf 'Actions run: %s\n\ndeploy-run.log was not created.\n' "$RUN_URL" >issue.md
+          elif tail="$(python3 scripts/ci/redact.py deploy-run.log 50000)"; then
+            printf 'Actions run: %s\n\n```text\n%s\n```\n' "$RUN_URL" "$tail" >issue.md
+          else
+            printf 'Actions run: %s\n\nThe deploy log could not be redacted, so none of it is attached; the job log has it.\n' "$RUN_URL" >issue.md
+          fi
           gh issue create \
             --title "deploy-failure ${{ github.run_id }}" \
             --body-file issue.md
