@@ -61,7 +61,8 @@ export class XhtmlError extends Error {
 const XHTML_NAMESPACE = "http://www.w3.org/1999/xhtml";
 
 // `pre` is not here: a renderer keeps its whitespace and so draws columns the check cannot see.
-const BLOCK_ELEMENTS = new Set([
+// T's block elements are these and `br` (src/authority/t/style.ts).
+export const BLOCK_ELEMENTS: ReadonlySet<string> = new Set([
   "div",
   "p",
   "h1",

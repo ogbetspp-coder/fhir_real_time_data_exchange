@@ -16,6 +16,15 @@ export class NormalizationError extends Error {
 
 const INVISIBLE_FORMATTING = new Set([0x00ad, 0x200b, 0xfeff, 0x2060]);
 
+// Whether text holds a character step 1 removes (U+00AD, U+200B, U+FEFF, U+2060). An authority
+// import refuses such a character in a structured page (section 7), from this one list.
+export function hasInvisibleFormatting(text: string): boolean {
+  for (const character of text) {
+    if (INVISIBLE_FORMATTING.has(character.codePointAt(0) ?? 0)) return true;
+  }
+  return false;
+}
+
 const LIGATURES = new Map<number, string>([
   [0xfb00, "ff"],
   [0xfb01, "fi"],

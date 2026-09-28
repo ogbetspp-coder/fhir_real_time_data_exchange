@@ -168,7 +168,7 @@ const LOWER_NAME = /^[a-z][a-z0-9]*$/u;
 const MAX_DEPTH = 32;
 // T's bound on a section's elements, so its records of them fit the worker's memory: ten times
 // the most any pinned label's section holds (1 965, the Imatinib Teva tablets' 5.1).
-export const MAX_ELEMENTS = 20_000;
+const MAX_ELEMENTS = 20_000;
 const LOWER_ATTRIBUTE = /^[a-z_:][-a-z0-9_:.]*$/u;
 
 const END_TAG = new RegExp(XHTML_TOKENS.endTag, "y");
@@ -191,7 +191,7 @@ function decodeReference(match: RegExpExecArray): string {
 }
 
 // An attribute value with its references decoded (T1: `&` left after decoding refuses in a style).
-export function decodeAttributeValue(raw: string): string {
+function decodeAttributeValue(raw: string): string {
   let result = "";
   let index = 0;
   while (index < raw.length) {

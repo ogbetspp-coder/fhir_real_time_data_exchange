@@ -14,8 +14,10 @@ import {
 } from "../contracts/index.js";
 import {
   NORMALIZATION_VERSION,
+  NormalizationError,
   collectNarrativeSections,
-  normalizeNarrative,
+  hasDrawnText,
+  hasInvisibleFormatting,
   normalizeText,
   verifyNarrativeFidelity,
   xhtmlToText,
@@ -31,6 +33,7 @@ import {
 import { sha256, sha256Utf8, stableUuid } from "../lib/hash.js";
 import { AuthorityBytesError, readAuthorityJson } from "./json.js";
 import { transformDocument } from "./t/document.js";
+import { descendants, MarkupRefusal, readTree, type ElementNode } from "./t/tree.js";
 import {
   EMA_DOCUMENT_IDENTIFIER_SYSTEM,
   EMA_EPI_ID_SYSTEM,
@@ -47,18 +50,17 @@ import {
 } from "./shape.js";
 
 // The authority importer (docs/design/authority-import-contract.md): a pure, deterministic
-// function of the authority's document and List bytes, the pictures it references, and a
-// person's request. The producer runs it to write a submission; Zone B's gate runs it again on
-// bytes it fetched itself and requires the same submission (D1). It reads no clock, no locale
-// and no network.
+// function of the authority's document and List bytes and a person's request (pictures are no
+// input yet: D6 refuses every one). The producer runs it to write a submission; Zone B's gate
+// runs it again on bytes it fetched itself and requires the same submission (D1). It reads no
+// clock, no locale and no network.
 
 // The importer's version: part of the extractor's name in every submission it writes, and locked
 // to the hash of this directory's code and data and of its golden vectors (D10).
-export const IMPORTER_VERSION = "2.1.2";
+export const IMPORTER_VERSION = "2.2.0";
 export const IMPORTER_EXTRACTOR = `${AUTHORITY_IMPORTER_NAME}/${IMPORTER_VERSION}`;
 
-export const AUTHORITY_IMPORT_IDENTIFIER_SYSTEM =
-  "https://khs.dev/fhir/identifier/authority-import";
+const AUTHORITY_IMPORT_IDENTIFIER_SYSTEM = "https://khs.dev/fhir/identifier/authority-import";
 const GLOBAL_EPI_PROFILE_BASE =
   "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/";
 
@@ -228,34 +230,29 @@ function placeSections(document: EmaDocument, mapping: EmaMapping): Placed[] {
   return placed;
 }
 
-const IMG_START = /<img\b/giu;
-const SRC = /\bsrc\s*=\s*("([^"]*)"|'([^']*)')/iu;
+// An `img` element's start tag begins `<img` in the div (T's tree reads lower-case names only).
+const IMG_START = /<img\b/iu;
 
-// Every `<img …>` tag of a div, as /<img\b[^>]*>/giu would match them, in linear time: a tag ends
-// at the first `>` after its start, and the next search starts past it.
-function imgTags(div: string): string[] {
-  const tags: string[] = [];
-  let close = -1;
-  IMG_START.lastIndex = 0;
-  for (let match = IMG_START.exec(div); match !== null; match = IMG_START.exec(div)) {
-    if (close < match.index) close = div.indexOf(">", match.index);
-    if (close === -1) break;
-    tags.push(div.slice(match.index, close + 1));
-    IMG_START.lastIndex = close + 1;
-  }
-  return tags;
-}
-
-// D6: every picture the document names, by form. PR 2's T carries none, so the stage refuses
-// any picture; a reference the importer has neither a template nor evidence for refuses here,
-// before T, so the reason says what is missing.
+// D6: every picture the document names, by form. T accepts `img`, but this stage refuses every
+// picture until D6's templates and evidence exist; a reference the importer has neither a template
+// nor evidence for refuses here, before T, so the reason says what is missing. The source is read
+// from T's own tree of the div, its references decoded, so no other attribute (`data-src`) can pose
+// as one; a div T cannot read into a tree holds no picture this stage can name, and T refuses it
+// at `narrative`.
 function checkPictures(placed: Placed[]): void {
   for (const { section } of placed) {
     const div = section.text?.div;
-    if (div === undefined) continue;
-    for (const tag of imgTags(div)) {
-      const match = SRC.exec(tag);
-      const src = match?.[2] ?? match?.[3];
+    if (div === undefined || !IMG_START.test(div)) continue;
+    let root: ElementNode;
+    try {
+      root = readTree(div);
+    } catch (error) {
+      if (error instanceof MarkupRefusal) continue;
+      throw error;
+    }
+    for (const node of descendants(root)) {
+      if (node.kind !== "element" || node.name !== "img") continue;
+      const src = node.attributes.find(({ name }) => name === "src")?.value;
       if (src === undefined) refuse("pictures", "picture-without-a-source");
       if (src.startsWith("data:") || src.startsWith("#")) {
         refuse("pictures", "pictures-not-enabled");
@@ -268,12 +265,14 @@ function checkPictures(placed: Placed[]): void {
   }
 }
 
-// Characters §3 step 1 removes, which a structured page may not hold (fidelity §7).
-const INVISIBLE = /[\u00ad\u200b\ufeff\u2060]/u;
+// What the scanner makes of T(div) (docs/design/authority-import-t.md, T6): its text, the section's
+// page; and that text normalised (fidelity section 3), undefined where normalisation refuses it,
+// which decides whether the section draws anything and is its provenance's normalizedTextSha256.
+// A scanner refusal, then a section 3 step 1 invisible character in the text (fidelity section 7),
+// refuses the section.
+type Scanned = { text: string; normalized: string | undefined };
 
-// The scanner reads T(div) (docs/design/authority-import-t.md, T6): a scanner refusal, then a
-// section 3 step 1 invisible character in its text, refuses the section.
-function scan(div: string): string {
+function scan(div: string): Scanned {
   let text: string;
   try {
     text = xhtmlToText(div);
@@ -281,11 +280,24 @@ function scan(div: string): string {
     const code = (error as { code?: unknown }).code;
     refuse("narrative", typeof code === "string" ? `scanner-${code}` : "scanner-refused");
   }
-  if (INVISIBLE.test(text)) refuse("narrative", "invisible-character");
-  return text;
+  if (hasInvisibleFormatting(text)) refuse("narrative", "invisible-character");
+  let normalized: string | undefined;
+  try {
+    normalized = normalizeText(text);
+  } catch (error) {
+    if (!(error instanceof NormalizationError)) throw error;
+  }
+  return { text, normalized };
 }
 
-type Page = { page: number; text: string; placed: Placed; div: string | undefined };
+type Page = {
+  page: number;
+  text: string;
+  placed: Placed;
+  // The section's T(div) and its normalised text, where it draws something.
+  div: string | undefined;
+  normalized: string | undefined;
+};
 
 // T over every section (T5's two passes), then each section in pre-order: its T refusal, the
 // scanner's, and D4's record check.
@@ -295,16 +307,22 @@ function buildPages(placed: Placed[]): Page[] {
     const outcome = outcomes[index];
     if (outcome !== undefined && "refused" in outcome) refuse("narrative", outcome.refused);
     const div = outcome?.div;
-    if (div !== undefined) scan(div);
-    const drawn = div !== undefined && "text" in normalizeNarrative(div);
+    const scanned = div === undefined ? undefined : scan(div);
+    const normalized = scanned?.normalized;
+    const drawn = normalized !== undefined && hasDrawnText(normalized);
     const leaf = (entry.rule.children ?? []).length === 0;
     // A section that draws nothing refuses where the mapping needs its narrative, and a leaf
     // anywhere (FHIR cmp-1), with or without a div (D4).
     if (!drawn && (leaf || entry.rule.narrative === "required")) {
       refuse("record", "section-draws-nothing");
     }
-    if (div === undefined) return { page: index + 1, text: "", placed: entry, div: undefined };
-    return { page: index + 1, text: xhtmlToText(div), placed: entry, div: drawn ? div : undefined };
+    return {
+      page: index + 1,
+      text: scanned?.text ?? "",
+      placed: entry,
+      div: drawn ? div : undefined,
+      normalized: drawn ? normalized : undefined,
+    };
   });
 }
 
@@ -548,7 +566,7 @@ export function importPublication(
   const pageOf = new Map(pages.map((page) => [page.placed.path, page]));
   const sectionProvenance: SectionProvenance[] = narratives.map((narrative) => {
     const page = pageOf.get(narrative.path);
-    if (page === undefined) refuse("record", "narrative-without-a-page");
+    if (page?.normalized === undefined) refuse("record", "narrative-without-a-page");
     return {
       sourceKey: narrative.sourceKey,
       spans: [
@@ -560,7 +578,7 @@ export function importPublication(
         },
       ],
       narrativeDivSha256: sha256Utf8(narrative.div),
-      normalizedTextSha256: sha256Utf8(normalizeText(xhtmlToText(narrative.div))),
+      normalizedTextSha256: sha256Utf8(page.normalized),
     };
   });
   const fidelityReport = verifyNarrativeFidelity({
@@ -661,9 +679,9 @@ export function importPublication(
       approvedContentSha256: sha256(approvedContent(content)),
     },
   };
-  // The renderer gate (docs/design/authority-import-t.md, T6; PR 3c): until it exists no
-  // authority's publication is accepted on T's static rules alone. A synthetic publication is
-  // never approved content (D7), so it passes.
+  // The renderer gate (docs/design/authority-import-renderer.md; PR 3c) is not wired into the
+  // import yet: until it is, no authority's publication is accepted on T's static rules alone. A
+  // synthetic publication is never approved content (D7), so it passes.
   if (request.authority !== "synthetic") refuse("rendering", "renderer-evidence-missing");
   return { submission, fidelityReport, sourceText };
 }

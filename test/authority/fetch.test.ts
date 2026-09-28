@@ -80,10 +80,36 @@ describe("the EMA fetcher", () => {
       { status: 200 },
     );
     expect(await reason(answering(slow)("EMA", DOCUMENT))).toBe("timeout");
+    // A timeout before the headers arrive is a timeout too, not an unreachable host.
+    const beforeHeaders = emaFetcher(
+      () => Promise.reject(new DOMException("timed out", "TimeoutError")),
+      NOW,
+    );
+    expect(await reason(beforeHeaders("EMA", DOCUMENT))).toBe("timeout");
     expect(await reason(answering(new Response("x"))("synthetic", DOCUMENT))).toBe("not-the-ema");
     expect(
       await reason(answering(new Response("x"))("EMA", { kind: "document", id: "../x" })),
     ).toBe("id-not-a-guid");
+  });
+
+  it("releases the body of a response it refuses by status", async () => {
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      cancel: () => {
+        cancelled = true;
+      },
+    });
+    const fetcher = emaFetcher(() => Promise.resolve(new Response(body, { status: 503 })), NOW);
+    expect(await reason(fetcher("EMA", DOCUMENT))).toBe("http-503");
+    expect(cancelled).toBe(true);
+    // A body that cannot be cancelled changes nothing: the status is still the reason.
+    const stuck = new ReadableStream<Uint8Array>({
+      cancel: () => {
+        throw new Error("cannot cancel");
+      },
+    });
+    const refusing = emaFetcher(() => Promise.resolve(new Response(stuck, { status: 500 })), NOW);
+    expect(await reason(refusing("EMA", DOCUMENT))).toBe("http-500");
   });
 });
 

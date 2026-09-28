@@ -11,7 +11,13 @@ import {
 import type { EmaMapping } from "../fhir/mapping.js";
 import { sha256 } from "../lib/hash.js";
 import { AuthorityFetchError, type AuthorityFetcher, type Fetched } from "./fetch.js";
-import { IMPORTER_VERSION, ImportRefusedError, importPublication, sha256Bytes } from "./import.js";
+import {
+  IMPORTER_EXTRACTOR,
+  IMPORTER_VERSION,
+  ImportRefusedError,
+  importPublication,
+  sha256Bytes,
+} from "./import.js";
 
 // Zone B's gate for an authority import (docs/design/authority-import-contract.md, D1): fetch
 // the authority's files itself, require the bytes the submission pinned, run the importer on
@@ -62,6 +68,14 @@ export async function verifyAuthorityImport(
   }
   const reportUri = submission.provenance.fidelity.reportUri;
   if (reportUri === undefined) return rejected("An authority import names its report's location");
+  // The gate recomputes with the importer it runs, so a submission another version made is
+  // refused before anything is fetched (D10).
+  if (
+    submission.provenance.extraction.parser.version !== IMPORTER_VERSION ||
+    source.extractedText.extractorVersion !== IMPORTER_EXTRACTOR
+  ) {
+    return rejected("The submission was made by another importer version than the gate runs");
+  }
 
   const fetched: Fetched[] = [];
   for (const [file, pin] of [

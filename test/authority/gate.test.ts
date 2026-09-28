@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { AuthorityFetchError, type AuthorityFetcher } from "../../src/authority/fetch.js";
 import { copiesFetcher, verifyAuthorityImport } from "../../src/authority/gate.js";
 import { importPublication, sha256Bytes } from "../../src/authority/import.js";
-import { syntheticPublication } from "../../src/authority/synthetic.js";
+import { emaShapedPublication, syntheticPublication } from "../../src/authority/synthetic.js";
 import {
   SubmissionRejectedError,
   approvedContent,
@@ -81,7 +81,7 @@ describe("the authority gate", () => {
       OPTIONS,
       serving(syntheticPublication(mapping)),
     );
-    expect(result.importerVersion).toBe("2.1.2");
+    expect(result.importerVersion).toBe("2.2.0");
     expect(result.fetched.map(({ url }) => url.split("/")[3])).toEqual(["document", "index"]);
     expect(result.gate.submission.graphType).toBe("type1");
   });
@@ -146,7 +146,7 @@ describe("the authority gate", () => {
     expect(await issues(report)).toEqual(["The fidelity report is not the recomputed one"]);
   });
 
-  it("refuses an import another importer version made", async () => {
+  it("refuses an import another importer version made, and fetches nothing", async () => {
     const input = imported();
     const version = "0.9.0";
     input.submission.provenance.extraction.parser.version = version;
@@ -154,8 +154,11 @@ describe("the authority gate", () => {
     if (source.kind !== "authority-publication") throw new Error("import");
     source.extractedText.extractorVersion = `authority-import/${version}`;
     reseal(input.submission);
-    expect(await issues(input)).toEqual([
-      "The submission is not what the importer makes of the authority's files",
+    const unreachable: AuthorityFetcher = {
+      fetch: () => Promise.reject(new Error("the gate fetched")),
+    };
+    expect(await issues(input, unreachable)).toEqual([
+      "The submission was made by another importer version than the gate runs",
     ]);
   });
 
@@ -182,6 +185,39 @@ describe("the authority gate", () => {
     reseal(input.submission);
     expect(await issues(input, serving(refused))).toEqual([
       "The import refuses the authority's files at binding: title-differs-from-the-list",
+    ]);
+  });
+
+  // Every stage but the last passes the EMA-shaped publication; the gate names the missing
+  // renderer evidence as the importer's refusal (the renderer gate is not wired in yet).
+  it("refuses an authority's publication for want of the renderer's evidence", async () => {
+    const ema = emaShapedPublication(mapping);
+    // A submission pinned to those files, as a producer that skipped the importer might write.
+    const input = imported();
+    const { submission } = input;
+    const source = submission.provenance.sourceDocument;
+    const { approval } = submission;
+    if (source.kind !== "authority-publication" || approval.method !== "authority-publication") {
+      throw new Error("import");
+    }
+    source.authority = "EMA";
+    source.request = ema.request;
+    source.document = {
+      id: ema.request.documentId,
+      sha256: sha256Bytes(ema.document),
+      byteLength: ema.document.length,
+    };
+    Object.assign(source.index, {
+      id: ema.request.indexId,
+      sha256: sha256Bytes(ema.index),
+      byteLength: ema.index.length,
+    });
+    approval.authority = "EMA";
+    approval.publication.documentId = ema.request.documentId;
+    approval.publication.indexId = ema.request.indexId;
+    reseal(submission);
+    expect(await issues(input, serving(ema))).toEqual([
+      "The import refuses the authority's files at rendering: renderer-evidence-missing",
     ]);
   });
 

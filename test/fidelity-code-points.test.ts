@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { NORMALIZATION_VERSION } from "../src/fidelity/normalize.js";
+import { NORMALIZATION_VERSION, hasInvisibleFormatting } from "../src/fidelity/normalize.js";
 import { sha256 } from "../src/lib/hash.js";
 import { codePointVectors, type CodePointVectors } from "./fixtures/fidelity/code-points.js";
 
@@ -54,5 +54,21 @@ describe("the code point vectors", () => {
     expect(bitsAt(0x1d173) & ignorable).toBe(ignorable);
     expect(bitsAt(0x2060) & gap).toBe(gap);
     expect(bitsAt(0x0041) & gap).toBe(0);
+  });
+
+  it("hold the importer's invisible-character check to step 1's list", () => {
+    // src/authority/import.ts refuses a structured page that holds a character step 1 removes
+    // (fidelity section 7), through hasInvisibleFormatting: the same list, not a copy of it.
+    const removed = 1 << computed.classes.indexOf("removedByStep1");
+    const found: number[] = [];
+    let run = 0;
+    for (let codePoint = 0; codePoint <= 0x10ffff; codePoint += 1) {
+      if (codePoint >= 0xd800 && codePoint <= 0xdfff) continue;
+      while ((computed.runs[run + 1]?.[0] ?? Infinity) <= codePoint) run += 1;
+      const bits = computed.runs[run]?.[1] ?? 0;
+      const invisible = hasInvisibleFormatting(String.fromCodePoint(codePoint));
+      if (invisible !== ((bits & removed) === removed)) found.push(codePoint);
+    }
+    expect(found).toEqual([]);
   });
 });
