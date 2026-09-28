@@ -92,9 +92,9 @@ by this gate; deployments where Zone A is the only producer should disable them.
 **Versioning.** Every contract root is published under a `$id` that embeds its version
 (`contracts/generated/index.json`). Four also carry the version in the document, as a literal:
 `schemaVersion` (`CanonicalSubmission`, `RunManifest`), `reportVersion` (`FidelityReport`) and
-`version` (`QueryTools`); `IngestionProvenance`, `SourceDocumentText`, `RunRequest` and
-`AgentTurnRecord` carry none (corrected 2026-09-28: this said every root carried one;
-`AgentTurnRecord` has carried an optional `contractVersion` since agent-turn 1.2.0). Objects are
+`version` (`QueryTools`). `IngestionProvenance`, `SourceDocumentText` and `RunRequest` carry
+none, and `AgentTurnRecord` only an optional `contractVersion`, since agent-turn 1.2.0 (corrected
+2026-09-28: this said every root carried a `schemaVersion` literal). Objects are
 strict (unknown keys reject) so content cannot be smuggled in unnamed fields.
 Patch changes alter descriptions only; minor changes add optional fields and require Zone B to
 deploy before Zone A emits them; anything else is a new major `$id`. Enum additions on fields
