@@ -295,8 +295,8 @@ describe("the alert recipient's dev exception", () => {
 
 // The operator scripts that act on one environment's resources keep the same rule (audit B08,
 // L1, review round 1): plan-identity.sh now removes grants it does not want, so running it with
-// dev assumed, on another project, would strip that project's planner. Each runs with a stand-in
-// gcloud that records any call; a refusal must come before the first.
+// dev assumed, on another project, would strip that project's planner. Each runs with stand-in
+// cloud CLIs that record any call; a refusal must come before the first.
 describe("the operator scripts' environment", () => {
   const operatorScripts = [
     "scripts/gcp/plan-identity.sh",
@@ -305,8 +305,12 @@ describe("the operator scripts' environment", () => {
   ];
   const stub = mkdtempSync(path.join(tmpdir(), "operator-env-"));
   afterAll(() => rmSync(stub, { recursive: true, force: true }));
-  writeFileSync(path.join(stub, "gcloud"), `#!/bin/sh\necho "$*" >>"${stub}/calls"\nexit 3\n`);
-  chmodSync(path.join(stub, "gcloud"), 0o755);
+  // Every cloud CLI the scripts start (bq-cmek-convert.sh starts with bq), each recording its call,
+  // so a real one on the machine is never reached.
+  for (const cli of ["gcloud", "bq", "gsutil", "terraform"]) {
+    writeFileSync(path.join(stub, cli), `#!/bin/sh\necho "${cli} $*" >>"${stub}/calls"\nexit 3\n`);
+    chmodSync(path.join(stub, cli), 0o755);
+  }
   const run = (script: string, env: Record<string, string>) => {
     rmSync(path.join(stub, "calls"), { force: true });
     const result = spawnSync("bash", [script, "--check"], {
