@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { serviceAccountRoles } from "./terraform.js";
+import { serviceAccountRoles, terraformBlocks } from "./terraform.js";
 
 // The reader every least-privilege test relies on. Each evasion below would once have been
 // silently skipped, so "exactly these roles" would have passed while being false. Each must now
@@ -99,5 +99,122 @@ resource "google_project_iam_binding" "odd" {
 }
 `;
     expect(() => serviceAccountRoles(terraform, "build")).toThrow(/unrecognised line/);
+  });
+
+  it("does not count a brace inside a comment, a string or a heredoc", () => {
+    // The audit's repro: an unmatched { in a comment made the bucket grant swallow the next
+    // block, and a project-level roles/owner was reported as a bucket objectViewer grant.
+    const owner = `
+resource "google_project_iam_member" "owner" {
+  project = var.project_id
+  role    = "roles/owner"
+  member  = "serviceAccount:\${google_service_account.build.email}"
+}
+`;
+    for (const decoy of [
+      "  # see docs {section 3",
+      "  // see docs {section 3",
+      "  /* see docs {section 3 */",
+      '  description = "see docs {section 3"',
+      '  description = "${join("}", ["{"])}"',
+      "  description = <<-EOT\n    see docs {section 3\n  EOT",
+    ]) {
+      const terraform = `${account}
+resource "google_storage_bucket_iam_member" "reader" {
+  bucket = google_storage_bucket.staging.name
+${decoy}
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:\${google_service_account.build.email}"
+}
+${owner}`;
+      expect([decoy, serviceAccountRoles(terraform, "build")]).toEqual([
+        decoy,
+        [
+          { type: "google_storage_bucket_iam_member", role: "roles/storage.objectViewer" },
+          { type: "google_project_iam_member", role: "roles/owner" },
+        ],
+      ]);
+    }
+  });
+
+  it("takes the role from code, never from a comment or a heredoc", () => {
+    const terraform = `${account}
+resource "google_project_iam_member" "log" {
+  description = <<-EOT
+  role = "roles/logging.logWriter"
+  EOT
+  project = var.project_id
+  # role = "roles/logging.logWriter"
+  role    = "roles/owner"
+  member  = "serviceAccount:\${google_service_account.build.email}"
+}
+`;
+    expect(serviceAccountRoles(terraform, "build")).toEqual([
+      { type: "google_project_iam_member", role: "roles/owner" },
+    ]);
+  });
+
+  it("does not count a reference that is only mentioned in a comment", () => {
+    const terraform = `${account}
+# google_service_account.build.email is granted below
+resource "google_project_iam_member" "log" {
+  project = var.project_id
+  role    = "roles/logging.logWriter"
+  member  = "serviceAccount:\${google_service_account.build.email}"
+}
+`;
+    expect(serviceAccountRoles(terraform, "build")).toEqual([
+      { type: "google_project_iam_member", role: "roles/logging.logWriter" },
+    ]);
+  });
+
+  it("refuses unbalanced input and anything it cannot read at the top level", () => {
+    const grant = `
+resource "google_project_iam_member" "log" {
+  project = var.project_id
+  role    = "roles/logging.logWriter"
+  member  = "serviceAccount:\${google_service_account.build.email}"
+`;
+    expect(() => serviceAccountRoles(`${account}${grant}`, "build")).toThrow(/never closes/);
+    expect(() => serviceAccountRoles(`${account}${grant}}\n}\n`, "build")).toThrow(
+      /unbalanced braces|unexpected top-level text/,
+    );
+    expect(() => terraformBlocks(`${account}resource "x" "y" {\n  a = "open\n}\n`)).toThrow(
+      /unterminated string/,
+    );
+    expect(() => terraformBlocks(`${account}resource "x" "y" {\n  a = <<EOT\n  b\n}\n`)).toThrow(
+      /unterminated heredoc/,
+    );
+    expect(() => terraformBlocks(`${account}/* open\n`)).toThrow(/unterminated \/\* comment/);
+    expect(() => terraformBlocks(`${account}stray = 1\n`)).toThrow(/unexpected top-level text/);
+  });
+
+  it("refuses a grant with two role assignments", () => {
+    const terraform = `${account}
+resource "google_project_iam_member" "two" {
+  project = var.project_id
+  role    = "roles/logging.logWriter"
+  member  = "serviceAccount:\${google_service_account.build.email}"
+  condition {
+    role = "roles/owner"
+  }
+}
+`;
+    expect(() => serviceAccountRoles(terraform, "build")).toThrow(/2 role assignments/);
+  });
+});
+
+describe("terraformBlocks", () => {
+  it("returns each resource's body without its comments", () => {
+    const blocks = terraformBlocks(`
+resource "google_kms_crypto_key" "k" {
+  lifecycle {
+    # prevent_destroy = true
+    prevent_destroy = false
+  }
+}
+`);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]?.body).not.toMatch(/prevent_destroy\s*=\s*true/);
   });
 });
