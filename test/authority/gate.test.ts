@@ -2,8 +2,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { AuthorityFetchError, type AuthorityFetcher } from "../../src/authority/fetch.js";
 import { copiesFetcher, verifyAuthorityImport } from "../../src/authority/gate.js";
-import { importPublication, sha256Bytes } from "../../src/authority/import.js";
-import { syntheticPublication } from "../../src/authority/synthetic.js";
+import { IMPORTER_VERSION, importPublication, sha256Bytes } from "../../src/authority/import.js";
+import { emaShapedPublication, syntheticPublication } from "../../src/authority/synthetic.js";
 import {
   SubmissionRejectedError,
   approvedContent,
@@ -81,7 +81,7 @@ describe("the authority gate", () => {
       OPTIONS,
       serving(syntheticPublication(mapping)),
     );
-    expect(result.importerVersion).toBe("2.1.0");
+    expect(result.importerVersion).toBe("2.2.0");
     expect(result.fetched.map(({ url }) => url.split("/")[3])).toEqual(["document", "index"]);
     expect(result.gate.submission.graphType).toBe("type1");
   });
@@ -146,17 +146,32 @@ describe("the authority gate", () => {
     expect(await issues(report)).toEqual(["The fidelity report is not the recomputed one"]);
   });
 
-  it("refuses an import another importer version made", async () => {
-    const input = imported();
-    const version = "0.9.0";
-    input.submission.provenance.extraction.parser.version = version;
-    const source = input.submission.provenance.sourceDocument;
-    if (source.kind !== "authority-publication") throw new Error("import");
-    source.extractedText.extractorVersion = `authority-import/${version}`;
-    reseal(input.submission);
-    expect(await issues(input)).toEqual([
-      "The submission is not what the importer makes of the authority's files",
+  it("refuses an import another importer version made, and fetches nothing", async () => {
+    const unreachable: AuthorityFetcher = {
+      fetch: () => Promise.reject(new Error("the gate fetched")),
+    };
+    const made = (parserVersion: string, extractorVersion: string) => {
+      const input = imported();
+      input.submission.provenance.extraction.parser.version = parserVersion;
+      const source = input.submission.provenance.sourceDocument;
+      if (source.kind !== "authority-publication") throw new Error("import");
+      source.extractedText.extractorVersion = extractorVersion;
+      reseal(input.submission);
+      return input;
+    };
+    // Another version, named consistently: the gate's own check.
+    expect(await issues(made("0.9.0", "authority-import/0.9.0"), unreachable)).toEqual([
+      "The submission was made by another importer version than the gate runs",
     ]);
+    // Either field alone changed: the parse refuses the disagreement first.
+    const disagreeing =
+      "sourceDocument.extractedText.extractorVersion must be extraction.parser's name/version";
+    expect(
+      await issues(made("0.9.0", `authority-import/${IMPORTER_VERSION}`), unreachable),
+    ).toContain(disagreeing);
+    expect(await issues(made(IMPORTER_VERSION, "authority-import/0.9.0"), unreachable)).toContain(
+      disagreeing,
+    );
   });
 
   it("refuses an import requested after the gate fetched the files", async () => {
@@ -185,6 +200,39 @@ describe("the authority gate", () => {
     ]);
   });
 
+  // Every stage but the last passes the EMA-shaped publication; the gate names the missing
+  // renderer evidence as the importer's refusal (the renderer gate is not wired in yet).
+  it("refuses an authority's publication for want of the renderer's evidence", async () => {
+    const ema = emaShapedPublication(mapping);
+    // A submission pinned to those files, as a producer that skipped the importer might write.
+    const input = imported();
+    const { submission } = input;
+    const source = submission.provenance.sourceDocument;
+    const { approval } = submission;
+    if (source.kind !== "authority-publication" || approval.method !== "authority-publication") {
+      throw new Error("import");
+    }
+    source.authority = "EMA";
+    source.request = ema.request;
+    source.document = {
+      id: ema.request.documentId,
+      sha256: sha256Bytes(ema.document),
+      byteLength: ema.document.length,
+    };
+    Object.assign(source.index, {
+      id: ema.request.indexId,
+      sha256: sha256Bytes(ema.index),
+      byteLength: ema.index.length,
+    });
+    approval.authority = "EMA";
+    approval.publication.documentId = ema.request.documentId;
+    approval.publication.indexId = ema.request.indexId;
+    reseal(submission);
+    expect(await issues(input, serving(ema))).toEqual([
+      "The import refuses the authority's files at rendering: renderer-evidence-missing",
+    ]);
+  });
+
   it("refuses a drawn submission, one without a report location, and one that does not parse", async () => {
     const drawn = createSyntheticSubmission(mapping);
     expect(await issues(drawn)).toEqual(["Not an authority import"]);
@@ -194,6 +242,35 @@ describe("the authority gate", () => {
     expect(await issues(unlocated)).toEqual(["An authority import names its report's location"]);
     const found = await issues({ ...imported(), submission: { schemaVersion: "2.0.0" } });
     expect(found.length).toBeGreaterThan(0);
+  });
+
+  // The parse's refinement hashes the Bundle, so the shape bound has to come first, as in the
+  // ordinary gate: a pathological document is a classified rejection, never a RangeError.
+  it("bounds the submission's shape before it parses or hashes it, and fetches nothing", async () => {
+    const input = imported();
+    let nested: unknown = "x";
+    for (let depth = 0; depth < 20_000; depth += 1) nested = [nested];
+    (input.submission.bundle as unknown as Record<string, unknown>).extension = nested;
+    const unreachable: AuthorityFetcher = {
+      fetch: () => Promise.reject(new Error("the gate fetched")),
+    };
+
+    expect(await issues(input, unreachable)).toEqual(["submission nesting exceeds depth 48"]);
+  });
+
+  it("refuses a member the parse would drop, and fetches nothing", async () => {
+    const { submission, ...rest } = imported();
+    const text = JSON.stringify(submission).replace(
+      '"bundle":{',
+      '"bundle":{"__proto__":{"note":"Take one tablet twice daily with food."},',
+    );
+    const unreachable: AuthorityFetcher = {
+      fetch: () => Promise.reject(new Error("the gate fetched")),
+    };
+
+    expect(await issues({ ...rest, submission: JSON.parse(text) }, unreachable)).toEqual([
+      "submission carries the reserved property name __proto__",
+    ]);
   });
 });
 

@@ -36,6 +36,11 @@ export function authorityUrl(authority: "EMA" | "synthetic", file: AuthorityFile
     : `https://synthetic.invalid/${resource}/${file.id}`;
 }
 
+// The timeout's abort, before the headers or while the body is read.
+function timedOut(error: unknown): boolean {
+  return (error as { name?: unknown } | null)?.name === "TimeoutError";
+}
+
 type FetchFunction = (url: string, init: RequestInit) => Promise<Response>;
 
 // The EMA's files over HTTPS. `fetchFunction` and `now` are injectable for tests only.
@@ -58,10 +63,15 @@ export function emaFetcher(
         redirect: "error",
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
-    } catch {
-      throw new AuthorityFetchError("unreachable");
+    } catch (error) {
+      throw new AuthorityFetchError(timedOut(error) ? "timeout" : "unreachable");
     }
-    if (response.status !== 200) throw new AuthorityFetchError(`http-${String(response.status)}`);
+    if (response.status !== 200) {
+      // The body is not read, so it is released rather than left holding the connection; not
+      // awaited, so a cancel that never settles cannot hold the fetch.
+      void response.body?.cancel().catch(() => undefined);
+      throw new AuthorityFetchError(`http-${String(response.status)}`);
+    }
     const body = response.body;
     if (body === null) throw new AuthorityFetchError("empty-body");
     const chunks: Uint8Array[] = [];
@@ -73,9 +83,7 @@ export function emaFetcher(
         read = await reader.read();
       } catch (error) {
         // A body cut off or timed out mid-read is a refusal like any other, never an exception.
-        throw new AuthorityFetchError(
-          (error as { name?: unknown }).name === "TimeoutError" ? "timeout" : "unreachable",
-        );
+        throw new AuthorityFetchError(timedOut(error) ? "timeout" : "unreachable");
       }
       if (read.done) break;
       length += read.value.length;

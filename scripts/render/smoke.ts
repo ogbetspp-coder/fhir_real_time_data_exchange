@@ -1,44 +1,76 @@
+import { readFileSync, writeFileSync } from "node:fs";
+import { connect } from "node:net";
+
 import { launchChrome } from "../../src/render/cdp.js";
-import { NOT_DRAWN_RANGES } from "../../src/render/fonts.js";
+import { BINDINGS, boundFace, NOT_DRAWN_RANGES } from "../../src/render/fonts.js";
 import { openPage } from "../../src/render/page.js";
+import { EXECUTABLE, NO_SANDBOX } from "./sections.js";
 
 // The renderer image's smoke check (docs/design/authority-import-renderer.md, R6), run inside the
-// image with no network: the browser starts, both modes load, a request for anything but the page
-// fails, and every family the fontconfig binds is drawn in the pinned face it names, read back
-// through CSS.getPlatformFontsForNode.
+// image with no network: where Chrome's sandbox is off, the container's isolation that justifies
+// it holds; the browser starts, both modes load, a request for anything but the page fails, and
+// every family R6 binds (src/render/fonts.ts, BINDINGS, the fontconfig's aliases) is drawn in
+// the pinned face it names in each of its four faces, read back through
+// CSS.getPlatformFontsForNode.
 //
 // usage (inside the image): node --import tsx scripts/render/smoke.ts
 
-const EXECUTABLE =
-  process.env.RENDERER_CHROME ??
-  "/opt/renderer/chrome-headless-shell-linux64/chrome-headless-shell";
-
-const BINDINGS: readonly [string, string][] = [
-  ["Times New Roman", "LiberationSerif"],
-  ["Times", "LiberationSerif"],
-  ["serif", "LiberationSerif"],
-  ["Arial", "LiberationSans"],
-  ["Helvetica", "LiberationSans"],
-  ["sans-serif", "LiberationSans"],
-  ["Calibri", "Carlito"],
-  ["Cambria", "Caladea"],
-];
-const FACES: readonly [string, string, string][] = [
-  ["normal", "normal", "Regular"],
-  ["bold", "normal", "Bold"],
-  ["normal", "italic", "Italic"],
-  ["bold", "italic", "BoldItalic"],
+const FACES: readonly [string, string, number, string][] = [
+  ["normal", "normal", 400, "normal"],
+  ["bold", "normal", 700, "normal"],
+  ["normal", "italic", 400, "italic"],
+  ["bold", "italic", 700, "italic"],
 ];
 
-const failures: string[] = [];
+// The isolation `--no-sandbox` rests on (R1, R6; scripts/render/run.mjs): no network but the
+// loopback, a read-only root and workspace, no capabilities, and no new privileges.
+async function isolation(): Promise<string[]> {
+  const found: string[] = [];
+  const reached = await new Promise<boolean>((resolve) => {
+    const socket = connect({ host: "192.0.2.1", port: 443, timeout: 3000 });
+    socket.once("connect", () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.once("timeout", () => {
+      socket.destroy();
+      resolve(false);
+    });
+    socket.once("error", () => resolve(false));
+  });
+  const routes = readFileSync("/proc/net/route", "utf8").trim().split("\n").slice(1);
+  if (reached || routes.length > 0) {
+    found.push(`the container has a network (${routes.length} routes)`);
+  }
+  for (const where of ["/work/.renderer-probe", "/home/node/.renderer-probe"]) {
+    try {
+      writeFileSync(where, "");
+      found.push(`${where} is writable`);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== "EROFS") found.push(`${where}: ${code ?? "an error"}, not EROFS`);
+    }
+  }
+  const status = readFileSync("/proc/self/status", "utf8");
+  const field = (name: string): string | undefined =>
+    new RegExp(`^${name}:\\s*(\\S+)$`, "mu").exec(status)?.[1];
+  if (field("CapBnd") !== "0000000000000000") found.push(`capabilities ${field("CapBnd")}`);
+  if (field("NoNewPrivs") !== "1") found.push("new privileges allowed");
+  if (process.getuid?.() === 0) found.push("running as root");
+  return found;
+}
+
+const failures: string[] = NO_SANDBOX ? await isolation() : [];
+if (failures.length > 0) {
+  console.error(`Chrome's sandbox is off, but: ${failures.join("; ")}`);
+  process.exit(1);
+}
 const spans: { id: string; expected: string }[] = [];
 const parts: string[] = [];
-BINDINGS.forEach(([family, face], f) => {
-  FACES.forEach(([weight, style, suffix], s) => {
+BINDINGS.forEach(([family], f) => {
+  FACES.forEach(([weight, style, numeric, computed], s) => {
     const id = `f${f}s${s}`;
-    // The Liberation faces' regular PostScript names carry no suffix (measured in the image).
-    const regularBare = face.startsWith("Liberation") && suffix === "Regular";
-    spans.push({ id, expected: regularBare ? face : `${face}-${suffix}` });
+    spans.push({ id, expected: boundFace(family, numeric, computed) ?? "(unbound)" });
     const quoted = family.includes(" ") ? `'${family}'` : family;
     parts.push(
       `<span id="${id}" style="font-family:${quoted};font-weight:${weight};font-style:${style}">Hamburgefonstiv 0123</span>`,
@@ -47,11 +79,7 @@ BINDINGS.forEach(([family, face], f) => {
 });
 const div = `<div xmlns="http://www.w3.org/1999/xhtml"><p>${parts.join(" ")}<img src="picture.png" alt=""/></p></div>`;
 
-const browser = launchChrome({
-  executable: EXECUTABLE,
-  ratio: 1,
-  noSandbox: process.env.RENDERER_NO_SANDBOX === "1",
-});
+const browser = launchChrome({ executable: EXECUTABLE, ratio: 1, noSandbox: NO_SANDBOX });
 try {
   for (const mode of ["html", "xml"] as const) {
     const page = await openPage(browser.cdp, { div, mode, width: 813 });
@@ -175,5 +203,5 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  `renderer image: both modes load offline, requests but the page's fail, ${spans.length} family and face bindings drawn in their pinned faces, R6's substitutions drawn as their substitutes`,
+  `renderer image: ${NO_SANDBOX ? "isolated as --no-sandbox requires; " : ""}both modes load offline, requests but the page's fail, ${spans.length} family and face bindings drawn in their pinned faces, R6's substitutions drawn as their substitutes`,
 );

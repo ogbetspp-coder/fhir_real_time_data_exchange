@@ -2,9 +2,9 @@
 # Every gate .github/workflows/ci.yml runs on a pull request, in one local command: the Node gate
 # (the `check` job), then the Zone A and Agent jobs, step for step. The official HL7 validator
 # (`npm run validate:official`) is left out: it needs Java 21 and ~200 MB of downloads, and it is
-# its own CI job for the same reason. The renderer image (`npm run renderer:image`,
-# `renderer:smoke`, `renderer:check`, `renderer:fonts`, `renderer:boxes` and `renderer:drawings`)
-# is left out too: it needs Docker and ~200 MB of downloads, and it is its own CI job.
+# its own CI job for the same reason. The renderer image (`npm run renderer:image` and the
+# `renderer:*` checks run in it, with the step that decides whether they run) is left out too: it
+# needs Docker and ~200 MB of downloads, and it is its own CI job.
 # test/ci/check-all.test.ts fails if a CI step is missing here, so the two cannot drift apart
 # silently.
 #
@@ -64,6 +64,11 @@ step "Zone A: uv run --frozen python scripts/generate_models.py --check"
 (cd zone-a && "$UV" run --frozen python scripts/generate_models.py --check)
 step "Zone A: differential corpus from the TypeScript implementation"
 npx tsx scripts/fidelity/differential.ts --seed 20260920 --count 2000 > differential.jsonl
+# CI's second corpus is at its run id; here it is at the time, unless DIFFERENTIAL_RUN_SEED is set
+# (to reproduce a CI failure, set it to the seed that run printed).
+DIFFERENTIAL_RUN_SEED="${DIFFERENTIAL_RUN_SEED:-$(date +%s)}"
+step "Zone A: differential corpus at seed $DIFFERENTIAL_RUN_SEED"
+npx tsx scripts/fidelity/differential.ts --seed "$DIFFERENTIAL_RUN_SEED" --count 2000 >> differential.jsonl
 step "Zone A: uv run --frozen pytest"
 (cd zone-a && DIFFERENTIAL_CORPUS="$ROOT/differential.jsonl" "$UV" run --frozen pytest)
 

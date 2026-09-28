@@ -23,6 +23,11 @@ describe("the renderer image's pins", () => {
     const pins = readRendererPins();
     expect(pins.base).toMatch(/^node:22\.22\.0-bookworm-slim@sha256:[0-9a-f]{64}$/);
     expect(pins.debianSnapshot).toMatch(/^\d{8}T\d{6}Z$/);
+    expect(pins.debianReleases).toEqual({
+      bookworm: "2026-07-11T10:16:37Z",
+      "bookworm-updates": "2026-09-25T20:08:43Z",
+      "bookworm-security": "2026-09-25T22:03:11Z",
+    });
     expect(pins.chromeVersion).toBe("154.0.8037.57");
     expect(pins.chrome.url).toBe(
       "https://storage.googleapis.com/chrome-for-testing-public/154.0.8037.57/linux64/chrome-headless-shell-linux64.zip",
@@ -200,7 +205,48 @@ describe("the renderer image's pins", () => {
     [
       "an apt source trusted without a signature",
       (text: string) =>
-        text.replace('"Check-Valid-Until: no" \\\n      "" \\', '"Trusted: yes" \\\n      "" \\'),
+        text.replace(
+          '"Check-Valid-Until: no" \\\n        "" \\',
+          '"Trusted: yes" \\\n        "" \\',
+        ),
+    ],
+    [
+      "a malformed Release date",
+      (text: string) =>
+        text.replace(/ARG DEBIAN_BOOKWORM_DATE=\S+/, "ARG DEBIAN_BOOKWORM_DATE=2026-07-11"),
+    ],
+    [
+      "a Release date the build does not check",
+      (text: string) => text.replace('"bookworm-security ${DEBIAN_BOOKWORM_SECURITY_DATE}"', ""),
+    ],
+    [
+      "apt over HTTP alone (the HTTPS pass reverted)",
+      (text: string) => text.replace("snapshot https; \\", "snapshot http; \\"),
+    ],
+    ["the HTTPS pass dropped", (text: string) => text.replace("    snapshot https; \\\n", "")],
+    [
+      "more than the CA certificates over HTTP",
+      (text: string) =>
+        text.replace(
+          "--no-install-recommends ca-certificates; \\",
+          "--no-install-recommends ca-certificates curl; \\",
+        ),
+    ],
+    [
+      "a snapshot source written for plain HTTP",
+      (text: string) =>
+        text.replace(
+          '"URIs: $1://snapshot.debian.org/archive/debian/${DEBIAN_SNAPSHOT}"',
+          '"URIs: http://snapshot.debian.org/archive/debian/${DEBIAN_SNAPSHOT}"',
+        ),
+    ],
+    [
+      "a third apt install",
+      (text: string) =>
+        text.replace(
+          "    rm -rf /var/lib/apt/lists/*\n",
+          "    apt-get install --yes x; \\\n    rm -rf /var/lib/apt/lists/*\n",
+        ),
     ],
     [
       "a malformed snapshot",

@@ -31,6 +31,11 @@ const EnabledRunSources = z
     sources === undefined ? undefined : ([...new Set(sources)] as readonly RunSource[]),
   );
 
+// Cloud KMS signs with a crypto key VERSION; a name that stops at the crypto key is refused by
+// KMS with an opaque error, after the run's other work is done. Checked at startup instead.
+const KMS_KEY_VERSION =
+  /^projects\/[^/]+\/locations\/[^/]+\/keyRings\/[^/]+\/cryptoKeys\/[^/]+\/cryptoKeyVersions\/[^/]+$/;
+
 const ConfigSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -52,16 +57,24 @@ const ConfigSchema = z
       .enum(["true", "false"])
       .default("false")
       .transform((value) => value === "true"),
+    // The most bytes one document run reads, across all three parts together (the submission,
+    // its fidelity report and its extracted text). Sized to the worker container: parsed and
+    // hashed, a byte read costs several in memory (192 MiB read measured 646 MB RSS), and the
+    // worker runs four requests at once in 1 GiB (infra/run.tf).
     SUBMISSION_MAX_BYTES: z.coerce
       .number()
       .int()
       .min(1_024)
       .max(256 * 1_024 * 1_024)
-      .default(64 * 1_024 * 1_024),
+      .default(48 * 1_024 * 1_024),
     FHIR_ANALYTICS_DATASET: optionalNonEmpty,
     TRANSFORMATION_LEDGER_DATASET: optionalNonEmpty,
     TRANSFORMATION_LEDGER_TABLE: z.string().trim().min(1).default("transformation_runs"),
-    KMS_MANIFEST_KEY: optionalNonEmpty,
+    KMS_MANIFEST_KEY: z
+      .string()
+      .trim()
+      .regex(KMS_KEY_VERSION, "KMS_MANIFEST_KEY must name a crypto key version")
+      .optional(),
     FHIR_VALIDATOR_URL: z.url().optional(),
     DRY_RUN: z
       .enum(["true", "false"])
@@ -89,6 +102,10 @@ const ConfigSchema = z
       "EVIDENCE_BUCKET",
       "FHIR_VALIDATOR_URL",
       "FHIR_ANALYTICS_DATASET",
+      // A persisted run's manifest is signed and its ledger row written, always; there is no
+      // unsigned or unrecorded persisted run.
+      "KMS_MANIFEST_KEY",
+      "TRANSFORMATION_LEDGER_DATASET",
     ] as const;
 
     for (const key of required) {

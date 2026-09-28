@@ -46,6 +46,8 @@ export type XhtmlErrorCode =
   | "table-shape"
   | "table-size";
 
+// `offset` is in code points into the div, for every code: where the markup or text that is
+// refused begins.
 export class XhtmlError extends Error {
   public constructor(
     public readonly code: XhtmlErrorCode,
@@ -59,7 +61,8 @@ export class XhtmlError extends Error {
 const XHTML_NAMESPACE = "http://www.w3.org/1999/xhtml";
 
 // `pre` is not here: a renderer keeps its whitespace and so draws columns the check cannot see.
-const BLOCK_ELEMENTS = new Set([
+// T's block elements are these and `br` (src/authority/t/style.ts).
+export const BLOCK_ELEMENTS: ReadonlySet<string> = new Set([
   "div",
   "p",
   "h1",
@@ -164,7 +167,7 @@ export const TABLE_SLOT_LIMIT = 50_000;
 // A soft hyphen and a zero-width space are break opportunities a renderer may use at a narrow
 // width, drawing "2-" / "10 mg" or "2" / "10 mg" where the check reads "210 mg", so narrative
 // holds neither (section 2; one-sided, since page text marks a hyphenated line end with U+00AD).
-function isInvisibleBreak(codePoint: number): boolean {
+export function isInvisibleBreak(codePoint: number): boolean {
   return codePoint === 0x00ad || codePoint === 0x200b;
 }
 
@@ -294,26 +297,42 @@ function checkLoweredHalves(
   }
 }
 
-function checkComposition(text: string, boundaries: readonly number[]): void {
+// The boundaries are code point offsets in the text, each with the UTF-16 index in the div of
+// the tag that makes it, which an error reports.
+function checkComposition(
+  text: string,
+  boundaries: readonly number[],
+  tags: readonly number[],
+): void {
   const points = Array.from(text);
   // The first code point at or after each boundary that is not a Default_Ignorable code point
   // other than a mark: a word joiner or a zero-width joiner between the tag and a mark is drawn as
   // nothing, and the mark after it is still drawn apart from the letter before the tag. Boundaries
   // only increase, so one cursor reads each run of ignorables once.
   let cursor = 0;
-  for (const boundary of boundaries) {
+  for (const [position, boundary] of boundaries.entries()) {
+    const tag = tags[position] ?? 0;
     if (cursor < boundary) cursor = boundary;
     for (; cursor < points.length; cursor += 1) {
       const point = points[cursor] ?? "";
       if (MARK.test(point) || !isDefaultIgnorable(point.codePointAt(0) ?? 0)) break;
     }
     if (MARK.test(points[cursor] ?? "")) {
-      throw new XhtmlError("combining-across-markup", boundary);
+      throw new XhtmlError("combining-across-markup", tag);
     }
+    // A boundary before a code point below U+0300, U+00AD aside, is stable: every such code point
+    // is a starter that NFC never composes with what precedes it (canonical combining class 0,
+    // NFC_QC=Yes; test/fidelity-composition.test.ts checks each one), so the two sides compose the
+    // same apart as together. U+00AD breaks that on either side (step 1 removes it with a line
+    // break that follows it), so a boundary next to one takes the full comparison; it never
+    // reaches the text anyway (section 2).
+    const next = points[boundary]?.codePointAt(0);
+    const previous = points[boundary - 1]?.codePointAt(0);
+    if (next === undefined || (next < 0x0300 && next !== 0x00ad && previous !== 0x00ad)) continue;
     const before = points.slice(Math.max(0, boundary - COMPOSE_WINDOW), boundary).join("");
     const after = points.slice(boundary, boundary + COMPOSE_WINDOW).join("");
     if (composeText(before + after) !== composeText(before) + composeText(after)) {
-      throw new XhtmlError("combining-across-markup", boundary);
+      throw new XhtmlError("combining-across-markup", tag);
     }
   }
 }
@@ -426,25 +445,19 @@ function scriptRule(
   return { folding, own: new Set([...digits, ...signs, ...kept]), foreign: new Set(foreign) };
 }
 
-const SCRIPT_RULES = new Map<string, ScriptRule>([
-  [
-    "sup",
-    scriptRule(SUPERSCRIPT_DIGITS, SUPERSCRIPT_SIGNS, [
-      ...SUBSCRIPT_DIGITS,
-      ...SUBSCRIPT_SIGNS,
-      ...SUBSCRIPT_LETTERS,
-    ]),
-  ],
-  [
-    "sub",
-    scriptRule(
-      SUBSCRIPT_DIGITS,
-      SUBSCRIPT_SIGNS,
-      [...SUPERSCRIPT_DIGITS, ...SUPERSCRIPT_SIGNS, ...SUPERSCRIPT_LETTERS],
-      KEPT_IN_SUBSCRIPT,
-    ),
-  ],
-]);
+const SCRIPT_RULES: Readonly<Record<"sup" | "sub", ScriptRule>> = {
+  sup: scriptRule(SUPERSCRIPT_DIGITS, SUPERSCRIPT_SIGNS, [
+    ...SUBSCRIPT_DIGITS,
+    ...SUBSCRIPT_SIGNS,
+    ...SUBSCRIPT_LETTERS,
+  ]),
+  sub: scriptRule(
+    SUBSCRIPT_DIGITS,
+    SUBSCRIPT_SIGNS,
+    [...SUPERSCRIPT_DIGITS, ...SUPERSCRIPT_SIGNS, ...SUPERSCRIPT_LETTERS],
+    KEPT_IN_SUBSCRIPT,
+  ),
+};
 
 // The element's own script digits and signs are kept, and so is ∞ inside `sub` (and ½ there, as
 // the half-life only: checkLoweredHalves); the other script's digits, signs and letters, every
@@ -454,6 +467,24 @@ const SCRIPT_RULES = new Map<string, ScriptRule>([
 const UNMAPPABLE_SIGNS = new Set([0x00b1, 0x2213]);
 const NUMBER = /^\p{N}$/u;
 const SIGN_OR_BRACKET = /^[\p{Sm}\p{Ps}\p{Pe}\p{Pd}]$/u;
+
+// What `sup` or `sub` makes of one code point of text: the code point it is folded to, the code
+// point itself when it is kept, or undefined when it has no script form there
+// (`unmappable-script`).
+export function scriptCodePoint(element: "sup" | "sub", codePoint: number): number | undefined {
+  const rule = SCRIPT_RULES[element];
+  const folded = rule.folding.get(codePoint);
+  if (folded !== undefined) return folded;
+  const character = String.fromCodePoint(codePoint);
+  if (
+    UNMAPPABLE_SIGNS.has(codePoint) ||
+    rule.foreign.has(codePoint) ||
+    ((NUMBER.test(character) || SIGN_OR_BRACKET.test(character)) && !rule.own.has(codePoint))
+  ) {
+    return undefined;
+  }
+  return codePoint;
+}
 
 // Whitespace inside a tag is U+0009, U+000A, U+000D and U+0020 only, never `\s`: an HTML
 // parser reads any other code point (U+00A0, U+3000, U+FEFF) as part of the tag name, so
@@ -806,20 +837,11 @@ function emitText(
     output.push(emitted);
     return;
   }
-  const rule = parent === undefined ? undefined : SCRIPT_RULES.get(parent);
-  if (rule !== undefined) {
-    const folded = rule.folding.get(codePoint);
-    if (folded !== undefined) {
-      output.push(String.fromCodePoint(folded));
-      return;
-    }
-    if (
-      UNMAPPABLE_SIGNS.has(codePoint) ||
-      rule.foreign.has(codePoint) ||
-      ((NUMBER.test(character) || SIGN_OR_BRACKET.test(character)) && !rule.own.has(codePoint))
-    ) {
-      throw new XhtmlError("unmappable-script", offset);
-    }
+  if (parent === "sup" || parent === "sub") {
+    const scripted = scriptCodePoint(parent, codePoint);
+    if (scripted === undefined) throw new XhtmlError("unmappable-script", offset);
+    output.push(String.fromCodePoint(scripted));
+    return;
   }
   output.push(character);
 }
@@ -844,10 +866,33 @@ export function xhtmlToText(div: string): string {
   if (reserved !== undefined) throw new XhtmlError("reserved-character", reserved);
   const invisible = findInvisibleBreak(div);
   if (invisible !== undefined) throw new XhtmlError("invisible-character", invisible);
+  try {
+    return scan(div);
+  } catch (error) {
+    if (error instanceof XhtmlError) {
+      throw new XhtmlError(error.code, codePointOffset(div, error.offset));
+    }
+    throw error;
+  }
+}
 
+// The number of code points before a UTF-16 index of the text.
+function codePointOffset(text: string, index: number): number {
+  let offset = 0;
+  for (let unit = 0; unit < index; unit += (text.codePointAt(unit) ?? 0) > 0xffff ? 2 : 1) {
+    offset += 1;
+  }
+  return offset;
+}
+
+// The scan of a div section 2 has accepted. It reads the div by UTF-16 index, and an error it
+// throws carries that index, which `xhtmlToText` reports as a code point offset.
+function scan(div: string): string {
   const output: string[] = [];
-  // The output positions (array indexes) where an inline tag splits the text.
+  // The output positions (array indexes) where an inline tag splits the text, and the index in
+  // the div of each tag.
   const splits: number[] = [];
+  const splitTags: number[] = [];
   // Each `sub` holding ½, checked after the scan; and the one open now.
   const halves: LoweredHalf[] = [];
   let lowered: LoweredHalf | undefined;
@@ -880,7 +925,10 @@ export function xhtmlToText(div: string): string {
         const open = stack.pop();
         if (open === undefined) throw new XhtmlError("unbalanced-tag", index);
         if (open !== name) throw new XhtmlError("misnested-tag", index);
-        if (SPLITTING_INLINE.has(name)) splits.push(output.length);
+        if (SPLITTING_INLINE.has(name)) {
+          splits.push(output.length);
+          splitTags.push(index);
+        }
         if (name === "sub" && lowered !== undefined) {
           if (lowered.offset >= 0) halves.push({ ...lowered, end: output.length });
           lowered = undefined;
@@ -933,7 +981,10 @@ export function xhtmlToText(div: string): string {
       if (name === "hr" && stack.some((open) => RULE_BREAKS_FRACTION.has(open))) {
         throw new XhtmlError("table-content", index);
       }
-      if (SPLITTING_INLINE.has(name)) splits.push(output.length);
+      if (SPLITTING_INLINE.has(name)) {
+        splits.push(output.length);
+        splitTags.push(index);
+      }
       const table = tables[tables.length - 1];
       enterTableStructure(name, parent, table, index);
       let slotsBefore = "";
@@ -1028,6 +1079,6 @@ export function xhtmlToText(div: string): string {
   // A combining mark after an inline tag is drawn in its own run, apart from the letter before
   // the tag, while NFC would join them ("<" and U+0338 across `b` is drawn "</", read "≮").
   if (halves.length > 0) checkLoweredHalves(output, halves, scriptPieces);
-  checkComposition(text, splits.map(pointOffsets(output)));
+  checkComposition(text, splits.map(pointOffsets(output)), splitTags);
   return text;
 }

@@ -153,7 +153,9 @@ export class GcsSubmissionReader implements SubmissionReader {
     this.#fetch = fetcher ?? storageFetcher(projectId ?? "");
   }
 
-  async #fetchJson(uri: string, part: SubmissionPart): Promise<Fetched> {
+  // `budget` is what is left of SUBMISSION_MAX_BYTES, which caps the three parts together: a
+  // per-part cap let one run hold three times the cap.
+  async #fetchJson(uri: string, part: SubmissionPart, budget: number): Promise<Fetched> {
     const location = parseStorageUri(uri);
     // Zone A writes to exactly one bucket. Without this the worker's read permissions would be
     // available to whoever can name a URI, and a submission could cite objects from anywhere.
@@ -161,9 +163,9 @@ export class GcsSubmissionReader implements SubmissionReader {
       throw new SubmissionReadError("uri-not-allowed", part);
     }
 
-    const bytes = await this.#fetch(location.bucket, location.object, this.#maxBytes);
+    const bytes = await this.#fetch(location.bucket, location.object, budget);
     if (bytes === undefined) throw new SubmissionReadError("object-not-found", part);
-    if (bytes.length > this.#maxBytes) throw new SubmissionReadError("object-too-large", part);
+    if (bytes.length > budget) throw new SubmissionReadError("object-too-large", part);
 
     let value: unknown;
     try {
@@ -179,7 +181,7 @@ export class GcsSubmissionReader implements SubmissionReader {
   }
 
   public async read(ref: SubmissionRef, runId: string): Promise<DocumentSubmissionInput> {
-    const submission = await this.#fetchJson(ref.uri, "submission");
+    const submission = await this.#fetchJson(ref.uri, "submission", this.#maxBytes);
     // Pinned hashes cover the JSON value, not the stored bytes, exactly as every other hash in
     // this system: re-serialising an object must not invalidate it, while any change to its
     // content must.
@@ -189,14 +191,22 @@ export class GcsSubmissionReader implements SubmissionReader {
     if (!references.success) throw new SubmissionReadError("missing-reference", "submission");
     const { fidelity, sourceDocument } = references.data.provenance;
 
-    const fidelityReport = await this.#fetchJson(fidelity.reportUri, "fidelity-report");
+    const fidelityReport = await this.#fetchJson(
+      fidelity.reportUri,
+      "fidelity-report",
+      this.#maxBytes - submission.byteLength,
+    );
     // A fidelity report certifies itself: `reportHash` is a digest of its own contents, and the
     // submission pins that value. Transport only has to prove this is the report the submission
     // names; recomputing the digest from the contents is the ingress gate's job, and it does it
     // whether or not the report arrived by reference.
     requireHash(declaredReportHash(fidelityReport.value), fidelity.reportSha256, "fidelity-report");
 
-    const sourceText = await this.#fetchJson(sourceDocument.extractedText.uri, "source-text");
+    const sourceText = await this.#fetchJson(
+      sourceDocument.extractedText.uri,
+      "source-text",
+      this.#maxBytes - submission.byteLength - fidelityReport.byteLength,
+    );
     requireHash(sha256(sourceText.value), sourceDocument.extractedText.sha256, "source-text");
 
     log("info", "Canonical submission resolved by reference", {

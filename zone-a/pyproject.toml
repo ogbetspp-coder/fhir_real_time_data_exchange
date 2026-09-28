@@ -1,7 +1,7 @@
 [project]
 name = "zone-a"
 version = "0.1.0"
-description = "Zone A skeleton: contract models, cross-language canonical-hash parity, and the fidelity check re-implemented against the golden vectors"
+description = "Zone A: contract models, cross-language canonical-hash parity and the fidelity check against the golden vectors; the Word and ePI readers, the QRD template registry and the QRD conformance check"
 readme = "README.md"
 # ADR 0003 pins the Unicode Character Database, not just the language version: NFC output
 # depends on it. 3.14.x ships Unicode 16.0.0, the same version as the Zone B runtime image

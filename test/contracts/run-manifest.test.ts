@@ -1,8 +1,11 @@
+import { readFileSync } from "node:fs";
+
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { loadConfig, type AppConfig } from "../../src/config.js";
 import {
   AnyRunManifestSchema,
+  RunManifestSchema,
   RUN_MANIFEST_VERSION,
   type RunManifest,
   type RunManifestV1,
@@ -119,6 +122,70 @@ describe("run manifest contract", () => {
     delete withoutIngestion.ingestion;
 
     expect(issues(withoutIngestion)).toContain("document runs require an ingestion block");
+  });
+
+  // 2.0.0 was signed after the transaction, over its response's hash; its rows stay readable.
+  it("still reads a version 2.0.0 persisted manifest", () => {
+    const v2 = {
+      ...manifest,
+      schemaVersion: "2.0.0",
+      status: "persisted",
+      dryRun: false,
+      persistence: { targetStore: "store", transactionResponseHash: "d".repeat(64) },
+    };
+    expect(AnyRunManifestSchema.parse(v2).schemaVersion).toBe("2.0.0");
+    expect(
+      RunManifestSchema.safeParse({ ...v2, schemaVersion: RUN_MANIFEST_VERSION }).success,
+    ).toBe(false);
+  });
+
+  // Signed before its transaction, a persist-mode manifest is `authorised`, never `persisted`;
+  // the two statuses are two shapes, so the published schema enforces it too.
+  it("requires an authorised run, and only one, to name its transaction and not be a dry run", () => {
+    const authorised = {
+      ...manifest,
+      status: "authorised",
+      dryRun: false,
+      persistence: { targetStore: "store", transactionSha256: "e".repeat(64) },
+    };
+    expect(RunManifestSchema.safeParse(authorised).success).toBe(true);
+    expect(AnyRunManifestSchema.safeParse(authorised).success).toBe(true);
+    const unnamed: Record<string, unknown> = { ...authorised };
+    delete unnamed.persistence;
+    for (const wrong of [
+      unnamed,
+      { ...manifest, persistence: authorised.persistence },
+      { ...authorised, dryRun: true },
+      { ...manifest, dryRun: false },
+      { ...authorised, status: "persisted" },
+    ]) {
+      expect(RunManifestSchema.safeParse(wrong).success, JSON.stringify(wrong.status)).toBe(false);
+    }
+  });
+
+  it("publishes the rule in its JSON Schema: one shape per status", () => {
+    type Shape = { properties: Record<string, unknown>; required: string[] };
+    const published = JSON.parse(
+      readFileSync("contracts/generated/run-manifest.schema.json", "utf8"),
+    ) as { $defs: Record<string, Shape & { oneOf?: { $ref: string }[] }> };
+    const shapes = (published.$defs.RunManifest?.oneOf ?? []).map(
+      ({ $ref }) => published.$defs[$ref.replace("#/$defs/", "")] as Shape,
+    );
+    expect(shapes.map(({ properties }) => properties.status)).toEqual([
+      { type: "string", const: "validated" },
+      { type: "string", const: "authorised" },
+    ]);
+    expect(shapes.map(({ properties }) => properties.dryRun)).toEqual([
+      { type: "boolean", const: true },
+      { type: "boolean", const: false },
+    ]);
+    expect(shapes.map(({ required }) => required.includes("persistence"))).toEqual([false, true]);
+    expect(Object.keys(shapes[0]?.properties ?? {})).not.toContain("persistence");
+  });
+
+  // Never written by any version: a refused run leaves no manifest.
+  it.each(["rejected", "failed"])("no longer accepts the unused %s status", (status) => {
+    expect(AnyRunManifestSchema.safeParse({ ...manifest, status }).success).toBe(false);
   });
 
   it("rejects an ingestion block on a non-document run", () => {

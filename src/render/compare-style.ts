@@ -680,7 +680,8 @@ export function compareText(model: Model, texts: readonly ChromeText[]): Mismatc
     const entry = model.text[index];
     const expected = { element: text.parent, start: offset, end: offset + text.length };
     offset += text.length;
-    points.push(...Array.from(text.data));
+    // One at a time: a spread of a long node's code points overflows the call stack.
+    for (const point of text.data) points.push(point);
     // The judge's own reading of M1: a node directly in a table or list container is the
     // whitespace T's walk drops, and only such a node is flagged.
     // ... and holds only the ASCII whitespace T allows there.

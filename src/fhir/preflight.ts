@@ -242,14 +242,65 @@ function validateTargetSection(
     issues.push(issue("error", "value", `Expected title "${rule.title}"`, `${path}.title`));
   }
 
-  (rule.children ?? []).forEach((childRule, position) => {
+  // Each child rule finds its section by EMA code, not by position: the transform leaves out an
+  // absent optional child, so a positional match would compare every later child with its rule's
+  // neighbour. The children must still be in the manifest's order.
+  const children = section.section ?? [];
+  let previous = -1;
+  for (const childRule of rule.children ?? []) {
+    const positions = children.flatMap((child, position) =>
+      codingCode(child, mapping.targetCodeSystem) === childRule.targetCode ? [position] : [],
+    );
+    const [position, ...others] = positions;
+    if (position === undefined) {
+      if (childRule.required) {
+        validateTargetSection(undefined, childRule, mapping, `${path}.section`, issues);
+      }
+      continue;
+    }
+    if (others.length > 0) {
+      issues.push(
+        issue(
+          "error",
+          "duplicate",
+          `Duplicate EMA section ${childRule.targetCode}`,
+          `${path}.section`,
+        ),
+      );
+    }
+    if (position < previous) {
+      issues.push(
+        issue(
+          "error",
+          "structure",
+          `EMA section ${childRule.targetCode} is out of the manifest's order`,
+          `${path}.section[${position}]`,
+        ),
+      );
+    }
+    previous = Math.max(previous, position);
     validateTargetSection(
-      section.section?.[position],
+      children[position],
       childRule,
       mapping,
       `${path}.section[${position}]`,
       issues,
     );
+  }
+  // A child no rule names is refused rather than passed over unchecked.
+  const ruled = new Set((rule.children ?? []).map(({ targetCode }) => targetCode));
+  children.forEach((child, position) => {
+    const code = codingCode(child, mapping.targetCodeSystem);
+    if (code === undefined || !ruled.has(code)) {
+      issues.push(
+        issue(
+          "error",
+          "structure",
+          `Unexpected EMA section ${code ?? "without an EMA code"}`,
+          `${path}.section[${position}]`,
+        ),
+      );
+    }
   });
 }
 

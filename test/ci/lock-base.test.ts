@@ -40,6 +40,21 @@ describe("the jobs that run the checks", () => {
   }
 });
 
+describe("the Zone A job", () => {
+  // Zone A's version lock (zone-a/tests/test_versions_lock.py) reads the same base.
+  it("names the lock's base from full history before the tests", () => {
+    const text = job("ci.yml", "zone-a");
+    expect(text).toMatch(/^\s+fetch-depth: 0$/m);
+    expect(text).toMatch(/^\s+persist-credentials: false$/m);
+    const step = text.indexOf("run: bash scripts/ci/lock-base.sh");
+    expect(step).toBeGreaterThan(-1);
+    expect(text.slice(0, step)).toMatch(/BEFORE_SHA: \$\{\{ github\.event\.before \}\}/);
+    expect(step).toBeLessThan(text.indexOf("run: uv run --frozen pytest"));
+    const stepStart = text.lastIndexOf("- name:", step);
+    expect(text.slice(stepStart, step)).not.toMatch(/\bif:/);
+  });
+});
+
 describe("scripts/ci/lock-base.sh", () => {
   const repository = mkdtempSync(path.join(tmpdir(), "lock-base-"));
   const git = (...args: string[]): string =>

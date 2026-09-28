@@ -16,19 +16,24 @@ export type FontRefusal =
   | "font-coverage" // a code point the bound face lacks
   | "script"; // a code point outside Latin, Greek, Common and Inherited
 
-// R6's bindings, the fontconfig's strong aliases (src/render/image/fonts.conf), by family name
-// compared ASCII case-insensitively: the pinned family each names.
-const BINDINGS: ReadonlyMap<string, "LiberationSerif" | "LiberationSans" | "Carlito" | "Caladea"> =
-  new Map([
-    ["times new roman", "LiberationSerif"],
-    ["times", "LiberationSerif"],
-    ["serif", "LiberationSerif"],
-    ["arial", "LiberationSans"],
-    ["helvetica", "LiberationSans"],
-    ["sans-serif", "LiberationSans"],
-    ["calibri", "Carlito"],
-    ["cambria", "Caladea"],
-  ]);
+// R6's bindings: each family the fontconfig binds by a strong alias (src/render/image/fonts.conf;
+// test/render/fonts.test.ts holds the two equal), and the pinned family it names, by the prefix of
+// its faces' PostScript names. The image's smoke check draws each in every face.
+export type PinnedFamily = "LiberationSerif" | "LiberationSans" | "Carlito" | "Caladea";
+export const BINDINGS: readonly (readonly [family: string, pinned: PinnedFamily])[] = [
+  ["Times New Roman", "LiberationSerif"],
+  ["Times", "LiberationSerif"],
+  ["serif", "LiberationSerif"],
+  ["Arial", "LiberationSans"],
+  ["Helvetica", "LiberationSans"],
+  ["sans-serif", "LiberationSans"],
+  ["Calibri", "Carlito"],
+  ["Cambria", "Caladea"],
+];
+// By family name compared case-insensitively.
+const BOUND: ReadonlyMap<string, PinnedFamily> = new Map(
+  BINDINGS.map(([family, pinned]) => [family.toLowerCase(), pinned]),
+);
 
 // The first family of a computed `font-family`, unquoted: the family the node names. Chrome
 // silently draws an unbound family in the default face (measured in the image: Verdana, Segoe
@@ -45,7 +50,7 @@ export function namedFamily(computed: string): string {
 // bare `oblique` in the italic one; an oblique with an angle is expected upright, so any angle
 // Chrome draws otherwise is a `font-face` refusal, never a pass.
 export function boundFace(family: string, weight: number, style: string): string | undefined {
-  const pinned = BINDINGS.get(namedFamily(family).toLowerCase());
+  const pinned = BOUND.get(namedFamily(family).toLowerCase());
   if (pinned === undefined) return undefined;
   const bold = weight > 500;
   const italic = style === "italic" || style === "oblique";
@@ -67,7 +72,8 @@ const SCRIPT = /^[\p{Script=Latin}\p{Script=Greek}\p{Script=Common}\p{Script=Inh
 // default-ignorables HarfBuzz draws as glyphs (the Hangul fillers U+115F, U+1160, U+3164, U+FFA0
 // and U+1BCA0 to U+1BCA3, drawn as .notdef: the first code review, measured) are not on it, so
 // the character map judges them; nor are the bidirectional marks, embeddings and isolates, which
-// can reorder what is drawn (T refuses them).
+// can reorder what is drawn (the scanner refuses them: fidelity section 2's rejection list,
+// `isForbiddenCodePoint` in src/fidelity/normalize.ts).
 export const NOT_DRAWN_RANGES: readonly (readonly [number, number])[] = [
   [0x0009, 0x0009],
   [0x000a, 0x000a],

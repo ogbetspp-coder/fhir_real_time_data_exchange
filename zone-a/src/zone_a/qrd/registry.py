@@ -19,12 +19,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from zone_a.docx.reader import Paragraph, read_docx
+from zone_a.docx.reader import READER_VERSION, Paragraph, read_docx
 from zone_a.qrd.pattern import Token, UnbalancedTemplateError, children, is_balanced, parse
 from zone_a.underline import underline_changes
 
 REGISTRY_VERSION = "1.0.0"
-READER_VERSION = "docx-reader/1.1.0"
 
 TEMPLATE_FILE = "qrd-product-information-template-version-104_en.docx"
 APPENDIX_I_FILE = (
@@ -56,7 +55,8 @@ APPENDIX_III_END = "A. LABELLING"
 # Corrections the registry applies to EMA's text, each for a defect in the source itself. The key
 # is the exact source paragraph (it must occur exactly once); the value is the corrected text and
 # the reason. The registry keeps the verbatim source next to the corrected pattern, so the
-# correction is visible and reversible. See docs/design/qrd-registry.md, "Errata".
+# correction is visible and reversible. See docs/design/qrd-registry.md, "What the EMA's own
+# files got wrong".
 ERRATA: dict[str, tuple[str, str]] = {
     "<There is no relevant use of {X} <in the paediatric population> <in children aged {x to y} "
     "<years> <months> [or any other relevant subsets, e.g. weight, pubertal age, gender] "

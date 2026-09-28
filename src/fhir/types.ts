@@ -85,10 +85,6 @@ export type OperationOutcome = FhirResource & {
   issue: OperationOutcomeIssue[];
 };
 
-export function isBundle(resource: FhirResource): resource is FhirBundle {
-  return resource.resourceType === "Bundle" && Array.isArray(resource.entry);
-}
-
 export function isComposition(resource: FhirResource): resource is FhirComposition {
   return resource.resourceType === "Composition" && Array.isArray(resource.section);
 }

@@ -3,6 +3,7 @@ export {
   NormalizationError,
   countWords,
   findForbiddenCharacter,
+  hasInvisibleFormatting,
   isDefaultIgnorable,
   isGap,
   isWordCharacter,

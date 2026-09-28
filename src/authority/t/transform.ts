@@ -258,16 +258,15 @@ export function colours(style: ComputedStyle): Rgb[] {
   return [style.colour ?? [0, 0, 0]];
 }
 
-// T3a, T3c and the font-size rules at a text node or a list marker drawn in `style`.
-function checkDrawn(style: ComputedStyle, blockSize: Size): void {
+// T3a and T3c at a text node or a list marker drawn in `style`. The font-size rules are judged at
+// every element, before its text and marker (walkSection): both are drawn in the element's style.
+function checkDrawn(style: ComputedStyle): void {
   for (const text of colours(style)) {
     for (const background of [...style.backgrounds, WHITE]) {
       if (contrast(text, background) < 4.5) refuse("contrast");
     }
   }
   if (!lineHeightAtLeast(style, style.size, 1)) refuse("line-height");
-  if (style.size.lo < 5 || style.size.hi > 24) refuse("font-size");
-  if (style.size !== blockSize && style.size.lo < 0.5 * blockSize.hi) refuse("font-size");
 }
 
 function hasDrawnText(node: TextNode): boolean {
@@ -423,7 +422,7 @@ function walkSection(root: ElementNode, rightToLeft: boolean, recordSources: boo
     infos.set(element, info);
 
     // A list item's marker is drawn text, judged at its tag (T3d, T6).
-    if (name === "li") checkDrawn(style, info.blockSize);
+    if (name === "li") checkDrawn(style);
     const start = points.length;
     if (block) push("\n", name === "br" ? LINE_BREAK : BOUNDARY);
     if (name === "li" && parent?.element.name === "ol") {
@@ -439,7 +438,7 @@ function walkSection(root: ElementNode, rightToLeft: boolean, recordSources: boo
     if (name === "img") push("\ufffc", own);
     for (const child of element.children) {
       if (child.kind === "text") {
-        if (hasDrawnText(child)) checkDrawn(style, info.blockSize);
+        if (hasDrawnText(child)) checkDrawn(style);
         if (recordSources) child.points.forEach((code, index) => push(code, own, [child, index]));
         else for (const code of child.points) push(code, own);
       } else {
@@ -602,7 +601,10 @@ function decideShifts(walk: Walk): Map<ElementNode, ShiftDecision> {
     const { element } = info;
     const parent = element.parent === undefined ? undefined : walk.infos.get(element.parent);
     if (parent === undefined || element.name !== "span" || info.inScript) refuse("baseline-shift");
-    // No ancestor and no descendant carries a shift.
+    // No ancestor and no descendant carries a shift. The ancestor check is a defence: a shifted
+    // ancestor comes first in this loop and refuses for its shifted descendant, unless it was
+    // deleted; then this element was too (its text moves as it does under the ancestor), or it
+    // has no text and refuses below.
     if (info.shiftedAncestors.length > 0) refuse("baseline-shift");
     const texts = textNodesUnder(element);
     if (texts.length === 0 || containsImage(element)) refuse("baseline-shift");
@@ -892,7 +894,7 @@ function plusToken(
   return codes.slice(start, index + 1).join("");
 }
 
-function plainTokens(codes: readonly string[], points: readonly Point[]): Set<string> {
+export function plainTokens(codes: readonly string[], points: readonly Point[]): Set<string> {
   const tokens = new Set<string>();
   points.forEach((point, index) => {
     if (codes[index] !== "+" || point.underlined || point.inScript || point.boundary) return;
@@ -1086,6 +1088,8 @@ export function analyseSection(
   checkTables(walk);
   const waived = checkUnderlines(walk, evidence);
   const output = edit(div, root, shifts);
+  // A self-check of the edit, which touches no block element's tag: it cannot fail but by a
+  // fault in T.
   const after = readTree(output);
   if (blockTags(after).join(" ") !== blockTags(root).join(" ")) refuse("markup");
   return { root, walk, shifts, waived, output };

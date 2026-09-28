@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { IsoDateTime } from "../contracts/common.js";
+
 // The EMA's live shape, closed (docs/design/authority-import-contract.md, Appendix A). The EMA
 // serves FHIR codes as integers of its own enumerations and places its product identity on
 // List.subject under its own extension URLs; every other key, value type or value refuses.
@@ -15,6 +17,32 @@ const Plain = z
   .min(1)
   .max(1_024)
   .refine((value) => !/[\p{Cc}\p{Cf}\p{Cs}]/u.test(value), "a control or format character");
+
+// FHIR's `dateTime` and `instant` (R5, "Primitive Types"): a time needs seconds and a zone. Each
+// is also a day and time the calendar has, so the value the record carries (Composition.date, and
+// Bundle.timestamp as the approval's authorityTimestamp) is one its own contract accepts (which
+// has no leap second).
+const YEAR = "(?:[0-9](?:[0-9](?:[0-9][1-9]|[1-9]0)|[1-9]00)|[1-9]000)";
+const MONTH = "(?:0[1-9]|1[0-2])";
+const DAY = "(?:0[1-9]|[12][0-9]|3[01])";
+const TIME = "(?:[01][0-9]|2[0-3]):[0-5][0-9]:(?:[0-5][0-9]|60)(?:\\.[0-9]{1,9})?";
+const ZONE = "(?:Z|[+-](?:(?:0[0-9]|1[0-3]):[0-5][0-9]|14:00))";
+const DATE_TIME = new RegExp(`^${YEAR}(?:-${MONTH}(?:-${DAY}(?:T${TIME}${ZONE})?)?)?$`, "u");
+const INSTANT = new RegExp(`^${YEAR}-${MONTH}-${DAY}T${TIME}${ZONE}$`, "u");
+
+function onTheCalendar(value: string): boolean {
+  if (value.length < 10) return true;
+  return IsoDateTime.safeParse(value.length === 10 ? `${value}T00:00:00Z` : value).success;
+}
+
+const DateTime = Plain.refine(
+  (value) => DATE_TIME.test(value) && onTheCalendar(value),
+  "not a FHIR dateTime",
+);
+const Instant = Plain.refine(
+  (value) => INSTANT.test(value) && onTheCalendar(value),
+  "not a FHIR instant",
+);
 
 const Meta = z.strictObject({ versionId: Plain, lastUpdated: Plain.optional() });
 const Narrative = z.strictObject({ status: Plain, div: z.string() });
@@ -88,7 +116,7 @@ const Composition = z.strictObject({
       }),
     ]),
   }),
-  date: Plain,
+  date: DateTime,
   author: z
     .array(z.strictObject({ identifier: z.record(z.string(), z.unknown()) }))
     .max(1)
@@ -104,7 +132,7 @@ export const EmaDocumentSchema = z.strictObject({
   meta: Meta.optional(),
   identifier: z.strictObject({ system: z.literal(EMA_DOCUMENT_IDENTIFIER_SYSTEM), value: Guid }),
   type: z.literal("document"),
-  timestamp: Plain,
+  timestamp: Instant,
   entry: z.tuple([z.strictObject({ fullUrl: Plain.optional(), resource: Composition })]),
 });
 

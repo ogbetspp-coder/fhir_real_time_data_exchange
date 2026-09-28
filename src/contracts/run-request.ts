@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { FhirId, Sha256Hex, StorageUri, Uuid } from "./common.js";
+import { AddressableFhirId, Sha256Hex, StorageUri, Uuid } from "./common.js";
 
 // The wire shape of POST /v1/runs. It is a published contract because Zone A and the Workflows
 // orchestration both construct it, and because it is where the by-reference rule is expressed:
@@ -8,7 +8,9 @@ import { FhirId, Sha256Hex, StorageUri, Uuid } from "./common.js";
 // submissions are multi-megabyte, Workflows bodies are capped, and an inline body would transit
 // execution history and logs.
 
-export const RUN_REQUEST_VERSION = "1.0.0";
+// 2.0.0: `bundleId` is an `AddressableFhirId`, so never `.` or `..` (ADR 0002: a narrowed field is
+// a major version).
+export const RUN_REQUEST_VERSION = "2.0.0";
 
 export const SubmissionRefSchema = z.strictObject({ uri: StorageUri, sha256: Sha256Hex }).meta({
   id: "SubmissionRef",
@@ -23,7 +25,7 @@ export const RunRequestSchema = z
     z.strictObject({ source: z.literal("fixture"), runId: Uuid.optional() }),
     z.strictObject({
       source: z.literal("healthcare-api"),
-      bundleId: FhirId,
+      bundleId: AddressableFhirId,
       runId: Uuid.optional(),
     }),
     z.strictObject({

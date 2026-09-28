@@ -1,7 +1,10 @@
 """The QRD conformance check: pinned EMA ePIs, the matching rules, and the committed results.
 
 The rule cases build a document from the mapping's own sections, so each starts conformant and
-changes one thing; the product cases pin what the check finds in the three EMA ePIs.
+changes one thing; the product cases pin what the check finds in every EMA ePI pinned in
+``labels/ema-epi/sources.lock.json``. A committed result is compared by digest, and a difference
+named by JSON pointer only: the result quotes the label, and a failing test prints what it
+compares (``test_no_narrative_leak.py``).
 """
 
 from __future__ import annotations
@@ -65,8 +68,44 @@ def test_the_committed_results_are_what_the_sources_give() -> None:
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    stale: dict[str, list[str]] = {}
     for path, content in module.expected().items():
-        assert path.read_text(encoding="utf-8") == content, "run zone-a/scripts/check_labels.py"
+        committed = path.read_bytes()
+        if hashlib.sha256(committed).digest() != hashlib.sha256(content.encode()).digest():
+            pointers = _differing_pointers(json.loads(committed), json.loads(content))
+            stale[path.name] = pointers[:20] or ["(formatting only)"]
+    # Only the file names and JSON pointers reach the failure message, never a label's text.
+    assert not stale, f"run zone-a/scripts/check_labels.py; differing: {stale}"
+
+
+def _differing_pointers(committed: Any, expected: Any, at: str = "") -> list[str]:
+    """The JSON pointers (RFC 6901) at which two JSON values differ, deepest first found."""
+    if isinstance(committed, dict) and isinstance(expected, dict):
+        out: list[str] = []
+        for key in sorted(set(committed) | set(expected)):
+            where = f"{at}/{str(key).replace('~', '~0').replace('/', '~1')}"
+            if key not in committed or key not in expected:
+                out.append(where)
+            else:
+                out += _differing_pointers(committed[key], expected[key], where)
+        return out
+    if isinstance(committed, list) and isinstance(expected, list):
+        out = []
+        for position in range(max(len(committed), len(expected))):
+            if position >= len(committed) or position >= len(expected):
+                out.append(f"{at}/{position}")
+            else:
+                out += _differing_pointers(
+                    committed[position], expected[position], f"{at}/{position}"
+                )
+        return out
+    return [] if committed == expected else [at or "/"]
+
+
+def test_differing_pointers_name_places_not_values() -> None:
+    committed = {"a": [1, {"b": "x"}], "c/d": 1, "e": 1}
+    expected = {"a": [1, {"b": "y"}, 3], "c/d": 2, "f": 1}
+    assert _differing_pointers(committed, expected) == ["/a/1/b", "/a/2", "/c~1d", "/e", "/f"]
 
 
 # --- a conformant document to change one thing at a time ---------------------------------------
@@ -271,7 +310,7 @@ def test_an_underline_over_what_it_changes_is_a_formatting_finding(
     assert len(findings(result, "formatting")) == (1 if reported else 0)
 
 
-# --- what the check finds in the three EMA ePIs ---------------------------------------------------
+# --- what the check finds in the pinned EMA ePIs --------------------------------------------------
 
 
 def test_brukinsa() -> None:
@@ -293,6 +332,11 @@ def test_brukinsa() -> None:
     ]
     waiver = _deviation(result, "smpc.5.1#6")["differences"]
     assert waiver == [{"change": "replace", "template": "in", "label": "for"}]
+    # Section 2's standard statement, filed by the template under the optional 2.2, is checked
+    # in section 2: Brukinsa leaves off its full stop.
+    assert _deviation(result, "smpc.2.2#1")["differences"] == [
+        {"change": "delete", "template": ".", "label": ""}
+    ]
 
 
 def test_jentadueto() -> None:
@@ -321,12 +365,32 @@ def test_nuvaxovid() -> None:
     ]
 
 
-# The three labels pinned for the QRD check link to the EMA's old address; Imatinib Teva, pinned
-# later for the authority importer, links to the new one and only lacks the closing full stop.
+def test_imatinib_teva() -> None:
+    for name in ("imatinib-teva-smpc-en.json", "imatinib-teva-tablets-smpc-en.json"):
+        result = RESULTS[name]
+        # From epi-reader/1.2.0 the reader takes Word's `tab-stops` and a `position: relative`
+        # shift as the importer's T does; 5.1 is still refused, for a line height under 12pt.
+        assert [
+            (f["section"], f["code"], f["detail"]) for f in findings(result, "refused-section")
+        ] == [("5.1 Pharmacodynamic properties", "unsupported-style", "p line-height: 11.7pt")], (
+            name
+        )
+        assert status(result, "smpc.4.2#1") == "used", name
+        assert _deviation(result, "smpc.4.2#4")["differences"] == [
+            {"change": "insert", "template": "", "label": "published"},
+            {"change": "replace", "template": "described", "label": "summarised"},
+        ], name
+        assert _deviation(result, "document#1")["differences"] == [
+            {"change": "delete", "template": ".", "label": ""}
+        ], name
+
+
+# The three labels pinned first for the QRD check link to the EMA's old address; Imatinib Teva,
+# pinned later for the authority importer, links to the new one and only lacks the full stop.
 OLD_ADDRESS_LABELS = ("brukinsa-smpc-en.json", "jentadueto-smpc-en.json", "nuvaxovid-smpc-en.json")
 
 
-def test_every_label_links_to_the_old_ema_address() -> None:
+def test_the_closing_statement_names_the_ema_website() -> None:
     for name, result in RESULTS.items():
         (closing,) = [f for f in findings(result, "deviation") if f["id"] == "document#1"]
         if name in OLD_ADDRESS_LABELS:
@@ -703,8 +767,8 @@ def test_an_optional_fill_in_in_the_same_paragraph_is_matched() -> None:
         source = LABELS / "sources" / name
         assert source.exists()
         if name in ("imatinib-teva-smpc-en.json", "imatinib-teva-tablets-smpc-en.json"):
-            # Both Imatinib Teva SmPCs draw text in 5.1 with `position: relative`, which the
-            # reader refuses (roadmap 3a, PR 3), so nothing in 5.1 is checked.
+            # Both Imatinib Teva SmPCs set a line height under 12pt in 5.1, which the reader
+            # refuses (test_imatinib_teva), so nothing in 5.1 is checked.
             assert used["status"] == "not-checked", name
             continue
         assert used["status"] == "used", name
@@ -889,3 +953,245 @@ def test_a_fill_in_does_not_start_a_paragraph_the_template_does_not_break() -> N
     for finding in findings(result, "deviation"):
         for difference in finding["differences"]:
             assert "Next paragraph" not in difference["label"]
+
+
+# --- audit B12 -------------------------------------------------------------------------------
+
+
+def _registry_items() -> list[str]:
+    """Every statement and subheading of the registry, in the order a result lists them."""
+    out = [
+        f"{section['key']}#{number}"
+        for section in REGISTRY["sections"]
+        for number, item in enumerate(section["items"])
+        if item["kind"] in ("statement", "subheading")
+    ]
+    out += [f"document#{number}" for number in range(len(REGISTRY["documentStatements"]))]
+    appendices = REGISTRY["appendices"]
+    out += [f"appendix-I#{entry['id']}" for entry in appendices["I"]["entries"]]
+    out += [f"appendix-III#{number}" for number in range(len(appendices["III"]["items"]))]
+    out += [
+        f"appendix-II#{row['code']}"
+        for group in appendices["II"]["groups"].values()
+        for row in group
+    ]
+    return out
+
+
+def _root_only() -> Document:
+    root = MAPPING["root"]
+    section = Section(code=root["targetCode"], title=root["title"], paragraphs=(), refusal=None)
+    return Document(title="X", date=None, document_type=None, sections=(section,))
+
+
+def _statement(result: dict[str, Any], identifier: str) -> dict[str, Any]:
+    found: list[dict[str, Any]] = [s for s in result["statements"] if s["id"] == identifier]
+    assert len(found) == 1, identifier
+    return found[0]
+
+
+def test_every_registry_item_gets_exactly_one_status() -> None:
+    expected = _registry_items()
+    assert len(expected) == len(set(expected)) == 126
+    for result in (
+        check(document(), REGISTRY, MAPPING),
+        check(_root_only(), REGISTRY, MAPPING),
+        *RESULTS.values(),
+    ):
+        assert [s["id"] for s in result["statements"]] == expected
+        assert sum(result["summary"]["statements"].values()) == 126
+
+
+def test_an_item_with_nothing_to_check_it_against_says_why() -> None:
+    # Section 12 (radiopharmaceuticals) is optional and not in the mapping.
+    assert _statement(check(document(), REGISTRY, MAPPING), "smpc.12#0") == {
+        "id": "smpc.12#0",
+        "status": "not-checked",
+        "reason": "section-not-mapped",
+    }
+    reporting = f"smpc.4.8#{_item_index('smpc.4.8', 'Reporting suspected')}"
+    for identifier in (reporting, "document#1", "appendix-I#lactation.2", "appendix-II#001"):
+        assert _statement(check(_root_only(), REGISTRY, MAPPING), identifier) == {
+            "id": identifier,
+            "status": "not-checked",
+            "reason": "section-absent",
+        }
+
+
+def test_section_2s_standard_statements_are_checked_in_section_2() -> None:
+    statement = f"smpc.2.2#{_item_index('smpc.2.2', '<For the full list')}"
+    subheading = f"smpc.2.2#{_item_index('smpc.2.2', '<Excipient(s)')}"
+    text = "For the full list of excipients, see section 6.1."
+    result = check(
+        document(smpc_2=_paragraphs("Excipients with known effect", text)), REGISTRY, MAPPING
+    )
+    assert status(result, statement) == "used"
+    assert status(result, subheading) == "used"
+    result = check(document(smpc_2=_paragraphs(text[:-1])), REGISTRY, MAPPING)
+    assert _deviation(result, statement)["differences"] == [
+        {"change": "delete", "template": ".", "label": ""}
+    ]
+
+
+def test_a_statement_of_alternatives_is_matched_alternative_by_alternative() -> None:
+    paragraphs = _paragraphs(
+        "Zeta/metabolites are excreted in human milk to such an extent that effects on the "
+        "breastfed newborns/infants are likely.",
+        "Zeta is contraindicated during breast-feeding (see section 4.3).",
+    )
+    used = _statement(
+        check(document(smpc_4_6=paragraphs), REGISTRY, MAPPING), "appendix-I#lactation.1"
+    )
+    assert used["status"] == "used"
+    # The third alternative, and the first of the fourth's two.
+    assert used["alternatives"] == ["3", "4.1"]
+    assert paragraphs[0].text[used["start"] : used["end"]] == paragraphs[0].text
+
+
+def test_an_alternative_worded_otherwise_is_a_deviation_that_names_it() -> None:
+    text = "Breast-feeding should be stopped during treatment with Zeta."
+    result = check(document(smpc_4_6=_paragraphs(text)), REGISTRY, MAPPING)
+    deviation = _deviation(result, "appendix-I#lactation.1")
+    assert deviation["alternative"] == "5"
+    assert deviation["differences"] == [
+        {"change": "replace", "template": "discontinued", "label": "stopped"}
+    ]
+
+
+def test_short_alternatives_are_checked_and_a_short_statement_says_why_it_is_not() -> None:
+    result = check(
+        document(
+            smpc_6_4=_paragraphs("Do not refrigerate or freeze."), smpc_6_1=_paragraphs("None.")
+        ),
+        REGISTRY,
+        MAPPING,
+    )
+    assert _statement(result, "appendix-III#6")["alternatives"] == ["1", "3"]
+    assert _statement(result, "smpc.6.1#0") == {
+        "id": "smpc.6.1#0",
+        "status": "not-checkable",
+        "reason": "too-little-text",
+    }
+    assert _statement(result, "appendix-I#pregnancy.1") == {
+        "id": "appendix-I#pregnancy.1",
+        "status": "not-checkable",
+        "reason": "unbalanced-brackets",
+    }
+
+
+def test_a_subheading_with_the_templates_plural_marker_matches_either_number() -> None:
+    identifier = f"smpc.5.2#{_item_index('smpc.5.2', '<Pharmacokinetic/pharmacodynamic')}"
+    for text in (
+        "Pharmacokinetic/pharmacodynamic relationships",
+        "Pharmacokinetic/pharmacodynamic relationship",
+        "Pharmacokinetic/pharmacodynamic relationship(s)",
+    ):
+        result = check(document(smpc_5_2=_paragraphs(text)), REGISTRY, MAPPING)
+        assert status(result, identifier) == "used", text
+    result = check(
+        document(smpc_5_2=_paragraphs("Pharmacokinetic/pharmacodynamic relationshipss")),
+        REGISTRY,
+        MAPPING,
+    )
+    assert status(result, identifier) == "absent"
+
+
+def test_a_statement_used_mid_sentence_after_an_omitted_opening_segment_is_found() -> None:
+    from zone_a.qrd import check as module
+
+    pattern = parse("<Before this sentence.> Animal studies do not indicate harmful effects.")
+    pieces = module._statement(pattern)
+    for text, expected in (
+        ("Data are limited; animal studies do not indicate harmful effects.", []),
+        (
+            "Data are limited; animal studies do not indicate harmful effect.",
+            [{"change": "replace", "template": "effects", "label": "effect"}],
+        ),
+    ):
+        line = module._Line("4.6", 0, text, tuple(range(len(text))), (0, 0))
+        item = {"kind": "statement", "optional": False, "pattern": pattern}
+        job = module._Job("x", item, [line], [], "g")
+        if not expected:
+            assert module._search(pieces, [line]) is not None
+            continue
+        near = module._candidate(job, {}, module._Views())
+        assert near is not None
+        assert module._differences(near) == expected
+
+
+def test_text_hidden_on_its_own_colour_is_not_a_match() -> None:
+    from zone_a.epi.reader import read_div
+
+    text = "Zeta has no or negligible influence on the ability to drive and use machines."
+    for style, used in (
+        ("background: black", False),
+        ("background: #111111; color: #000000", False),
+        ("background: navy; color: navy", False),
+        ("background: black; color: white", True),
+        ("background: yellow", True),
+    ):
+        div = f'<div xmlns="http://www.w3.org/1999/xhtml"><p style="{style}">{text}</p></div>'
+        paragraphs, refused, _ = read_div(div)
+        assert refused is None
+        result = check(document(smpc_4_7=paragraphs), REGISTRY, MAPPING)
+        assert (status(result, "smpc.4.7#0") == "used") is used, style
+
+
+def _read_as(key: str, inner: str) -> Document:
+    """A conformant document whose section ``key`` is the div as the ePI reader reads it."""
+    from zone_a.epi.reader import read_div
+
+    paragraphs, refused, notes = read_div(
+        f'<div xmlns="http://www.w3.org/1999/xhtml">{inner}</div>'
+    )
+    code = next(t["targetCode"] for t in _mapping_nodes() if t["sourceKey"] == key)
+
+    def swap(section: Section) -> Section:
+        if section.code == code:
+            return replace(section, paragraphs=paragraphs, refusal=refused, notes=notes)
+        return replace(section, sections=tuple(swap(child) for child in section.sections))
+
+    base = document()
+    return replace(base, sections=tuple(swap(section) for section in base.sections))
+
+
+def _mapping_nodes() -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+
+    def visit(node: dict[str, Any]) -> None:
+        out.append(node)
+        for child in node.get("children", []):
+            visit(child)
+
+    visit(MAPPING["root"])
+    return out
+
+
+@pytest.mark.parametrize(
+    "inner",
+    [
+        # Review 1: a browser drops "color: none", so the span is drawn black on black; the reader
+        # read it as visible and the statement as used. It now refuses the section.
+        '<p style="background: black; color: white"><span style="color: black; color: none">'
+        "No interaction studies have been performed.</span></p>",
+        '<p><span style="background-color: black; background-color: none">No interaction studies '
+        "have been performed.</span></p>",
+        '<p style="background: black">No interaction studies have been performed.</p>',
+    ],
+)
+def test_a_statement_drawn_on_its_own_colour_is_never_used(inner: str) -> None:
+    identifier = f"smpc.4.5#{_item_index('smpc.4.5', '<No interaction')}"
+    result = check(_read_as("smpc.4.5", inner), REGISTRY, MAPPING)
+    assert status(result, identifier) != "used"
+
+
+def test_a_result_names_the_exact_inputs_it_was_computed_from() -> None:
+    registry = (ROOT / "qrd" / "registry" / "cap-smpc-en-10.4.json").read_bytes()
+    mapping = (ROOT / "fhir" / "mappings" / "cap-smpc-en.json").read_bytes()
+    for result in RESULTS.values():
+        assert result["inputs"] == {
+            "registrySha256": hashlib.sha256(registry).hexdigest(),
+            "mappingSha256": hashlib.sha256(mapping).hexdigest(),
+        }
+        assert result["mappingVersion"] == MAPPING["mappingVersion"]
+        assert result["registryVersion"] == REGISTRY["registryVersion"]
