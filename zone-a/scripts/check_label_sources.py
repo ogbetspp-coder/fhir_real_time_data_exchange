@@ -6,8 +6,9 @@ Weekly and on demand (.github/workflows/ema-drift.yml, which never gates a pull 
 
 For every label in labels/ema-epi/sources.lock.json it downloads the document and its List (a
 List two labels share once) and compares each SHA-256 with the lock. It fetches as the gate's
-fetcher does (src/authority/fetch.ts, ``emaFetcher``): one ``Accept: application/fhir+json``
-header, no redirect followed, HTTP 200 only, a 30 s timeout and a 4 MiB limit on the body, so
+fetcher does (src/authority/fetch.ts, ``emaFetcher``): only a URL of its template (the EMA's
+host, a Bundle or List by GUID), one ``Accept: application/fhir+json`` header, no redirect
+followed, HTTP 200 only, one 30 s deadline on the whole fetch and a 4 MiB limit on the body, so
 "unchanged" means the gate would read the same bytes; tests/test_label_sources.py keeps the
 values in step with fetch.ts. It writes nothing. Exit status 1 means at least one file differs
 or could not be fetched: the EMA has republished that ePI (or serves it otherwise), and pinning
@@ -19,7 +20,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -42,20 +45,45 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         raise RefusedError("a redirect")
 
 
+# The only URLs the gate fetches (fetch.ts, ``authorityUrl``): its fixed template on the EMA's
+# host, a Bundle or a List by GUID.
+URL = re.compile(
+    r"https://epi\.ema\.europa\.eu/consuming/api/fhir/(?:Bundle|List)/"
+    r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}"
+)
+_CHUNK = 64 * 1024
+
+
 def fetch(url: str) -> bytes:
-    """The body the gate's fetcher would read at the URL, or ``RefusedError``/``OSError``."""
+    """The body the gate's fetcher would read at the URL, or ``RefusedError``/``OSError``.
+
+    The URL must be one the gate would fetch, and the whole fetch, the body included, must end
+    within ``TIMEOUT_SECONDS`` (fetch.ts aborts the request on one deadline; a socket timeout
+    alone bounds each read, not their sum).
+    """
+    if not URL.fullmatch(url):
+        raise RefusedError("not a URL the gate fetches")
+    deadline = time.monotonic() + TIMEOUT_SECONDS
     opener = urllib.request.build_opener(_NoRedirect)
     request = urllib.request.Request(url, headers={"Accept": ACCEPT})
+    chunks: list[bytes] = []
+    size = 0
     try:
         with opener.open(request, timeout=TIMEOUT_SECONDS) as response:
             if response.status != 200:
                 raise RefusedError(f"HTTP {response.status}")
-            body: bytes = response.read(MAX_BYTES + 1)
+            while chunk := response.read(_CHUNK):
+                size += len(chunk)
+                if size > MAX_BYTES:
+                    raise RefusedError("over the size limit")
+                if time.monotonic() > deadline:
+                    raise RefusedError("timed out")
+                chunks.append(chunk)
     except urllib.error.HTTPError as error:
         raise RefusedError(f"HTTP {error.code}") from error
-    if len(body) > MAX_BYTES:
-        raise RefusedError("over the size limit")
-    return body
+    if time.monotonic() > deadline:
+        raise RefusedError("timed out")
+    return b"".join(chunks)
 
 
 def files(lock: dict[str, Any]) -> list[tuple[str, str, str]]:

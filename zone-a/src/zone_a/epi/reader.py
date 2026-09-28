@@ -103,11 +103,14 @@ font draws other glyphs); a border value on inline text a browser would not acce
 inherited from the parent; a shift other than ``position: relative`` with exactly one of ``top``
 and ``bottom`` on an inline element other than ``sup`` and ``sub``, without ``vertical-align``,
 by at most 6pt (``top`` or ``bottom`` alone included; a background on or inside a shifted element,
-which is painted over the text around it); a style CSS would split otherwise than the reader (a
-quote outside a font family name or inside a quoted one, a comment, an escape, a bracket outside
-``rgb()``, a character outside ASCII letters, digits, whitespace and ``# % ! . , : ; ' " ( ) -``);
-and a margin or indent with a value a browser drops (the wrong number of values, ``text-indent:
-auto``).
+which is painted over the text around it; a shift inside another, or inside a ``sup``, ``sub``
+or ``vertical-align``, and one of a point or more around one, since each is bounded only on its
+own); a colour or background keyword a browser drops (``color: none``, ``background-color:
+auto``), which leaves the declaration before it in force; a style CSS would split otherwise than
+the reader (a quote outside a font family name or inside a quoted one, a comment, an escape, a
+bracket outside ``rgb()``, a character outside ASCII letters, digits, whitespace and
+``# % ! . , : ; ' " ( ) -``); and a margin or indent with a value a browser drops (the wrong
+number of values, ``text-indent: auto``).
 
 What refuses the document (``EpiRefusedError``): not UTF-8 JSON (or JSON with an integer longer
 than Python's digit limit), a lone surrogate anywhere in it, not a document Bundle, not the shape
@@ -582,6 +585,17 @@ _TEXT_FONTS: Final = frozenset(
 )
 
 
+# Keywords ``_colour`` passes that are no value of the property: a browser drops the declaration
+# and keeps the one before it ("color: black; color: none" is black), where the reader would read
+# the last. The reader refuses them rather than follow two readings. ``background: none`` is valid
+# (no image, and the colour reset to transparent).
+_DROPPED: Final[dict[str, frozenset[str]]] = {
+    "color": frozenset({"none", "auto"}),
+    "background-color": frozenset({"none", "auto"}),
+    "background": frozenset({"auto"}),
+}
+
+
 def _style(style: str) -> set[str]:
     """The mark kinds a style attribute asks for, or a refusal."""
     kinds: set[str] = set()
@@ -603,12 +617,15 @@ def _style(style: str) -> set[str]:
                 raise _RefusedError("unsupported-style", f"visibility: {value}")
         elif name == "color":
             # Checked here; the colour is judged against what is painted under it (``_paint``).
-            _colour(value)
+            if _colour(value) in _DROPPED[name]:
+                raise _RefusedError("unsupported-style", f"{name}: {value} (a browser drops it)")
         elif name in ("position", "top", "bottom"):
             # A shift, read with the element it is on (``_shift``).
             continue
         elif name in ("background", "background-color"):
             colour = _colour(value)
+            if colour in _DROPPED[name]:
+                raise _RefusedError("unsupported-style", f"{name}: {value} (a browser drops it)")
             if colour not in _WHITE and colour not in _KEYWORDS and not _light(colour):
                 kinds.add(f"shading-{colour}")
         elif name == "font-size":
@@ -715,13 +732,29 @@ def _paint(style: str, builder: _Builder) -> bool:
 
 
 def _paint_element(style: str, builder: _Builder, name: str) -> None:
-    """``_paint`` for an element, and a refusal of a background on or inside a shifted one.
+    """``_paint`` for an element, and the refusals that depend on the elements around it.
 
-    A shifted box is painted over the text around it (T4), so a background there can hide it.
+    As T4: a shifted box is painted over the text around it, so a background on or inside one is
+    refused; and a shift is bounded only on its own, so one inside another shift or inside a
+    superscript, a subscript or a ``vertical-align`` is refused (five nested 6pt shifts move text
+    30pt), and so is one of a point or more around them (one under a point, which T drops, may
+    hold a superscript: Imatinib Teva's 5.1 writes "m" and a raised "2" so).
     """
     painted = _paint(style, builder)
-    if "position" in dict(_importance_ordered(style)):
-        builder.shifted = True
+    declared = dict(_importance_ordered(style))
+    shifted = "position" in declared
+    # Inline text raised or lowered (``vertical-align`` on a table part aligns it in its row).
+    aligned = name in ("sup", "sub") or (
+        name in _INLINE and declared.get("vertical-align", "baseline") != "baseline"
+    )
+    if shifted and (builder.shifted or builder.raised):
+        raise _RefusedError("unsupported-style", f"{name}: a shift inside a shifted or raised text")
+    if aligned and builder.moved:
+        raise _RefusedError("unsupported-style", f"{name}: a raised text inside a shifted one")
+    builder.shifted = builder.shifted or shifted
+    # A shift under a point, which T drops (under 0.1 of the font), may hold a superscript.
+    builder.moved = builder.moved or bool(shifted and _shift(name, style))
+    builder.raised = builder.raised or aligned
     if painted and builder.shifted:
         raise _RefusedError("unsupported-style", f"{name}: a background on a shifted element")
 
@@ -767,10 +800,20 @@ class _Builder:
     open_a: bool = False
     cell: Any = None
     # The text's colour and the background painted under it, in ``_colour``'s spelling (None:
-    # black text, the white page), and whether an element above is shifted (``_shift``).
+    # black text, the white page), and whether an element above is shifted (``_shift``) or
+    # raised or lowered otherwise (``sup``, ``sub``, ``vertical-align``).
     colour: str | None = None
     backdrop: str | None = None
     shifted: bool = False
+    moved: bool = False
+    raised: bool = False
+
+    def paint_state(self) -> tuple[str | None, str | None, bool, bool, bool]:
+        """What an element's colour, background and shift set, to restore after it."""
+        return self.colour, self.backdrop, self.shifted, self.moved, self.raised
+
+    def restore_paint(self, state: tuple[str | None, str | None, bool, bool, bool]) -> None:
+        self.colour, self.backdrop, self.shifted, self.moved, self.raised = state
 
     def text(self, text: str, marks: frozenset[str]) -> None:
         for character in text:
@@ -1002,14 +1045,14 @@ def _walk(element: ET.Element, builder: _Builder, marks: frozenset[str], depth: 
     builder.nesting += 1
     saved_left, saved_indent = builder.left, builder.indent
     saved_open = builder.open_p, builder.open_li, builder.open_a
-    saved_paint = builder.colour, builder.backdrop, builder.shifted
+    saved_paint = builder.paint_state()
     try:
         _walk_element(element, builder, marks, depth)
     finally:
         builder.nesting -= 1
         builder.left, builder.indent = saved_left, saved_indent
         builder.open_p, builder.open_li, builder.open_a = saved_open
-        builder.colour, builder.backdrop, builder.shifted = saved_paint
+        builder.restore_paint(saved_paint)
 
 
 def _enter_block(name: str, style: str, builder: _Builder) -> None:
@@ -1154,15 +1197,15 @@ def _table_rows(element: ET.Element, builder: _Builder, marks: frozenset[str], d
         _, own = _left_offsets(part.get("style", ""))
         part_indent = own if own is not None else builder.indent
         # A row group's and a row's colour and background reach their cells' text.
-        table_paint = builder.colour, builder.backdrop, builder.shifted
+        table_paint = builder.paint_state()
         if part_name != "tr":
             _paint_element(part.get("style", ""), builder, part_name)
-        part_paint = builder.colour, builder.backdrop, builder.shifted
+        part_paint = builder.paint_state()
         for row in rows:
             if _local(row) != "tr":
                 raise _RefusedError("unsupported-element", f"{_local(row)} in a table body")
             row_marks = frozenset(set(marks) | part_marks | _check_attributes(row, "tr"))
-            builder.colour, builder.backdrop, builder.shifted = part_paint
+            builder.restore_paint(part_paint)
             _paint_element(row.get("style", ""), builder, "tr")
             _, own = _left_offsets(row.get("style", "") if row is not part else "")
             builder.part_indent = own if own is not None else part_indent
@@ -1178,7 +1221,7 @@ def _table_rows(element: ET.Element, builder: _Builder, marks: frozenset[str], d
                 _walk(cell, builder, row_marks, depth)
                 builder.flush()
             row_index += 1
-        builder.colour, builder.backdrop, builder.shifted = table_paint
+        builder.restore_paint(table_paint)
     builder.table = outer
     builder.part_indent = saved_part
 

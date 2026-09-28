@@ -38,6 +38,22 @@ _TEMPLATES = {
     "tbody": '<table><tbody style="{style}"><tr><td>{text}</td></tr></tbody></table>',
     "tr": '<table><tr style="{style}"><td>{text}</td></tr></table>',
     "td": '<table><tr><td style="{style}">{text}</td></tr></table>',
+    # A styled element inside a shifted, a slightly shifted or a raised one.
+    "span in shifted span": (
+        '<p>Store at <span style="position: relative; top: -3pt">9<span style="{style}">9</span>'
+        "</span> C, not for clinical use.</p>"
+    ),
+    "sup in shifted span": (
+        '<p>Store at <span style="position: relative; top: -3pt">9<sup style="{style}">2</sup>'
+        "</span> C, not for clinical use.</p>"
+    ),
+    "sup in slightly shifted span": (
+        '<p>Store at <span style="position: relative; top: .5pt">m<sup style="{style}">2</sup>'
+        "</span> C, not for clinical use.</p>"
+    ),
+    "span in sup": (
+        '<p>Store at 9<sup><span style="{style}">2</span></sup> C, not for clinical use.</p>'
+    ),
 }
 # The styled element holds the "9" alone, with text on either side, as a shifted digit stands.
 _INLINE_TEMPLATE = '<p>Store at <{name} style="{style}">9</{name}> C, not for clinical use.</p>'
@@ -79,6 +95,15 @@ CASES: list[tuple[str, str]] = [
     ("span", "font-size: 7.0pt; color: #231f20; position: relative; top: -5.0pt;"),
     ("span", "color: #231f20; position: relative; top: .5pt;"),
     ("sup", "position: relative; top: -5pt"),
+    ("span in shifted span", "position: relative; top: -3pt"),
+    ("span in shifted span", "vertical-align: super"),
+    ("span in shifted span", ""),
+    ("sup in shifted span", ""),
+    ("sup in slightly shifted span", ""),
+    ("span in sup", "position: relative; top: -3pt"),
+    ("span", "color: black; color: none"),
+    ("span", "background-color: black; background-color: auto"),
+    ("span", "background: black; background: none"),
     ("span", "tab-stops: 35.4pt"),
     ("span", "mso-bidi-font-size: 11pt"),
     ("span", "layout-grid-mode: line"),
@@ -157,7 +182,8 @@ _VERTICAL_ALIGN = (
 )
 _SHIFT = (
     "T refuses a shift it can neither drop (under 0.1 of the font) nor write as sup or sub (from "
-    "0.2 of the font, T4); the reader marks any shift of a point or more, up to 6pt"
+    "0.2 of the font, T4); the reader marks any shift of a point or more, up to 6pt, none inside "
+    "another"
 )
 _WORD_ONLY = (
     "a Word property a browser ignores, on the reader's list and not on T's, which refuses any "
@@ -169,6 +195,10 @@ _NOT_ON_READERS_LIST = (
 )
 _VISIBILITY = (
     "T refuses visibility of any value (T3); the reader takes visible, which hides nothing"
+)
+_BACKGROUND_NONE = (
+    "T takes only a colour as a background (T3a); the reader takes the shorthand's none, which "
+    "a browser reads as no background (a colour keyword a browser drops refuses in both)"
 )
 
 # (element, style) -> (T's answer, why): only where T answers otherwise than the reader.
@@ -194,6 +224,7 @@ DIVERGENCES: dict[tuple[str, str], tuple[str, str]] = {
     ("p", "width: 100pt"): ("refused:css-property", _BOXES),
     ("p", "border-bottom: 1px solid"): ("refused:css-property", _BOXES),
     ("span", "visibility: visible"): ("refused:css-property", _VISIBILITY),
+    ("span", "background: black; background: none"): ("refused:css-value", _BACKGROUND_NONE),
 }
 
 

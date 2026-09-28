@@ -10,9 +10,9 @@ the version. ``versions.lock.json`` records, for every version of every componen
 the source files that decide its output, as ``src/authority/importer.lock.json`` does for the
 authority importer. A change to one of those files leaves the current version locked to other
 code, which tests/test_versions_lock.py refuses until the version is bumped and this script run.
-``--amend`` re-locks a version to changed code, for a version not yet merged to main only (a
-reviewer checks that it is not in main's lock); nothing else changes a locked hash. Versions
-released before the lock existed are not in it.
+``--amend`` re-locks a version to changed code, and refuses one any lock in main's first-parent
+history holds (``released``); the test holds every released entry unchanged too, as the
+importer's lock test does. Versions released before the lock existed are not in it.
 """
 
 from __future__ import annotations
@@ -21,6 +21,8 @@ import argparse
 import hashlib
 import importlib
 import json
+import os
+import subprocess
 import sys
 from pathlib import Path
 from typing import NamedTuple
@@ -46,7 +48,12 @@ COMPONENTS: dict[str, Component] = {
     "epi-reader": Component(
         "zone_a.epi.reader",
         "READER_VERSION",
-        ("src/zone_a/epi/reader.py", "src/zone_a/fidelity/normalize.py"),
+        (
+            "src/zone_a/epi/reader.py",
+            # Its Paragraph, Mark and Numbering model.
+            "src/zone_a/docx/reader.py",
+            "src/zone_a/fidelity/normalize.py",
+        ),
     ),
     "qrd-registry": Component(
         "zone_a.qrd.registry",
@@ -110,6 +117,58 @@ def problems(lock: dict[str, dict[str, str]]) -> list[str]:
     return out
 
 
+def _git(*arguments: str) -> str | None:
+    try:
+        return subprocess.run(
+            ["git", "-C", str(ZONE_A.parent), *arguments],
+            check=True,
+            capture_output=True,
+            text=True,
+            stdin=subprocess.DEVNULL,
+        ).stdout.strip()
+    except OSError, subprocess.CalledProcessError:
+        return None
+
+
+def released(base: str) -> list[tuple[str, dict[str, dict[str, str]]]] | None:
+    """Every lock in the first-parent history of ``base``, with its commit; None without it.
+
+    What was released, as for the importer's lock (test/authority/lock.test.ts): in CI ``base`` is
+    scripts/ci/lock-base.sh's LOCK_BASE (the commit before a push, main otherwise), locally
+    origin/main. Reading the whole history means neither a second push nor a manual run after a
+    changed released entry compares with the change itself.
+    """
+    commit = _git("rev-parse", "--verify", f"{base}^{{commit}}")
+    if commit is None:
+        return None
+    path = LOCK.relative_to(ZONE_A.parent).as_posix()
+    history = _git("log", "--first-parent", "--format=%H", commit, "--", path) or ""
+    out: list[tuple[str, dict[str, dict[str, str]]]] = []
+    for each in filter(None, history.split("\n")):
+        text = _git("show", f"{each}:{path}")
+        if text is not None:  # the commit that deleted the lock, if any
+            out.append((each, dict(json.loads(text))))
+    return out
+
+
+def released_problems(
+    lock: dict[str, dict[str, str]], history: list[tuple[str, dict[str, dict[str, str]]]]
+) -> list[str]:
+    """Every released entry the lock no longer holds unchanged."""
+    out: list[str] = []
+    for commit, old in history:
+        for name, versions in old.items():
+            for version, sha256 in versions.items():
+                if lock.get(name, {}).get(version) != sha256:
+                    out.append(f"{name} {version} was released ({commit}); bump the version")
+    return out
+
+
+def base() -> str:
+    """The commit whose history is released: LOCK_BASE in CI, else origin/main."""
+    return os.environ.get("LOCK_BASE", "origin/main")
+
+
 def main() -> int:
     """Adds the current versions to the lock, or with ``--check`` reports unlocked code.
 
@@ -123,17 +182,22 @@ def main() -> int:
     mode.add_argument("--amend", action="store_true", help="re-lock an unreleased version")
     arguments = parser.parse_args()
     lock = load()
+    history = released(base()) or []
     if arguments.check:
-        found = problems(lock)
+        found = problems(lock) + released_problems(lock, history)
         for problem in found:
             print(problem)
         return 1 if found else 0
+    shipped = {(name, version) for _, old in history for name in old for version in old[name]}
     status = 0
     for name, component in COMPONENTS.items():
         version, sha256 = current_version(component), source_sha256(component)
         versions = lock.setdefault(name, {})
-        if versions.get(version, sha256) != sha256 and not arguments.amend:
-            print(f"{name} {version} is locked to other code; bump the version (or --amend)")
+        if versions.get(version, sha256) != sha256 and (
+            not arguments.amend or (name, version) in shipped
+        ):
+            # --amend re-locks only a version no released lock holds.
+            print(f"{name} {version} is locked to other code; bump the version")
             status = 1
             continue
         versions[version] = sha256

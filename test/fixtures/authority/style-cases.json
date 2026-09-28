@@ -237,7 +237,7 @@
    "subscript"
   ],
   "t": "refused:baseline-shift",
-  "why": "T refuses a shift it can neither drop (under 0.1 of the font) nor write as sup or sub (from 0.2 of the font, T4); the reader marks any shift of a point or more, up to 6pt"
+  "why": "T refuses a shift it can neither drop (under 0.1 of the font) nor write as sup or sub (from 0.2 of the font, T4); the reader marks any shift of a point or more, up to 6pt, none inside another"
  },
  {
   "element": "span",
@@ -287,6 +287,71 @@
   "style": "position: relative; top: -5pt",
   "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <sup style=\"position: relative; top: -5pt\">9</sup> C, not for clinical use.</p></div>",
   "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "span in shifted span",
+  "style": "position: relative; top: -3pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"position: relative; top: -3pt\">9<span style=\"position: relative; top: -3pt\">9</span></span> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "span in shifted span",
+  "style": "vertical-align: super",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"position: relative; top: -3pt\">9<span style=\"vertical-align: super\">9</span></span> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "span in shifted span",
+  "style": "",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"position: relative; top: -3pt\">9<span style=\"\">9</span></span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "superscript"
+  ]
+ },
+ {
+  "element": "sup in shifted span",
+  "style": "",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"position: relative; top: -3pt\">9<sup style=\"\">2</sup></span> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "sup in slightly shifted span",
+  "style": "",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"position: relative; top: .5pt\">m<sup style=\"\">2</sup></span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "superscript"
+  ]
+ },
+ {
+  "element": "span in sup",
+  "style": "position: relative; top: -3pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at 9<sup><span style=\"position: relative; top: -3pt\">2</span></sup> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "span",
+  "style": "color: black; color: none",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"color: black; color: none\">9</span> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "span",
+  "style": "background-color: black; background-color: auto",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"background-color: black; background-color: auto\">9</span> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
+  "element": "span",
+  "style": "background: black; background: none",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"background: black; background: none\">9</span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "shading-black"
+  ],
+  "t": "refused:css-value",
+  "why": "T takes only a colour as a background (T3a); the reader takes the shorthand's none, which a browser reads as no background (a colour keyword a browser drops refuses in both)"
  },
  {
   "element": "span",

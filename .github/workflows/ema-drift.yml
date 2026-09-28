@@ -6,8 +6,8 @@ name: EMA drift
 # zone-a/scripts/check_label_sources.py, which fetches as the import gate does). The EMA
 # republishes without any commit here (QRD template 11 is in consultation), so this runs weekly
 # and on demand, never on a pull request: a slow or changed EMA website must not block a merge.
-# A weekly run that finds a change, or cannot reach a file, opens an issue; pinning the new
-# bytes is a reviewed change. Modelled on vulnerabilities.yml.
+# A weekly run that finds a change, or cannot reach a file, opens an issue, or comments on the
+# one still open; pinning the new bytes is a reviewed change. Modelled on vulnerabilities.yml.
 
 on:
   schedule:
@@ -80,7 +80,9 @@ jobs:
       run:
         shell: bash --noprofile --norc -eo pipefail {0}
     steps:
-      - name: Open an issue
+      # One open issue at a time: a drift the owner has not yet pinned is reported again every
+      # week, so a later run comments on the open issue rather than opening another.
+      - name: Open an issue, or comment on the open one
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -94,4 +96,10 @@ jobs:
             base64 -d <<<"$REPORT" || true
             echo '```'
           } >"$RUNNER_TEMP/issue.md"
-          gh issue create --title "EMA drift $(date -u +%Y-%m-%d)" --body-file "$RUNNER_TEMP/issue.md"
+          open="$(gh issue list --state open --search 'in:title "EMA drift"' --json number,title \
+            --jq '[.[] | select(.title | startswith("EMA drift "))] | .[0].number // empty')"
+          if [[ -n "$open" ]]; then
+            gh issue comment "$open" --body-file "$RUNNER_TEMP/issue.md"
+          else
+            gh issue create --title "EMA drift $(date -u +%Y-%m-%d)" --body-file "$RUNNER_TEMP/issue.md"
+          fi

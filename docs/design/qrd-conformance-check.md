@@ -72,10 +72,13 @@ renderer's, borders and widths outside tables, struck text, some shifts, a few W
 properties); `test/authority/style-cases.test.ts` holds T to the reader's answer on every other
 case, so a change to either list shows until it is recorded. From `epi-reader/1.2.0` the reader
 takes Word's `tab-stops` and a `position: relative` shift as T does (a shift of a point or more
-marked as a superscript or subscript, bounded at 6pt), judges faint text by its contrast with
-the background painted under it (text on its own colour cannot be seen; white on black can), and
-refuses a private-use, unassigned or default-ignorable code point (a Symbol font's U+F0B3 is
-drawn "≥").
+marked as a superscript or subscript, bounded at 6pt; as T4, no shift inside another or inside
+a superscript, a subscript or a `vertical-align`, and none of a point or more around one, since
+each is bounded only on its own), judges faint text by its contrast with the background painted
+under it (text on its own colour cannot be seen; white on black can), refuses a colour or
+background keyword a browser drops (`color: none`, `background-color: auto`, which leave the
+declaration before them in force: "color: black; color: none" on black is hidden), and refuses a
+private-use, unassigned or default-ignorable code point (a Symbol font's U+F0B3 is drawn "≥").
 
 One defect is read through by a stated rule rather than refused: a `<` that cannot open a tag
 is text, as the HTML tokenizer reads it, and each section where that happened is noted. The
@@ -224,6 +227,9 @@ The mapping lacks three EMA codes the labels use (Pregnancy, Breast-feeding and 
   label also carries, has a typo: the optional sentence is simply taken as absent. So is a
   statement of alternatives once one alternative matches: a second alternative the label also
   uses (one from each group of `lactation.1`) is not compared when it differs.
+- An alternative's form keeps its short sibling segments optional ("Do not refrigerate <or>
+  <freeze>."), so it also matches a combination the template does not mean ("Do not or
+  freeze."), which is reported `used`: a stated residual of the check.
 - A resemblance is a proposal. A short statement (fewer than six words) resembles text only
   when every word it requires is there, so a changed word in "No data are available." is not
   found; a heavily reworded statement is not found either.

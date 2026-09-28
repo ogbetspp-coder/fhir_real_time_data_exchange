@@ -8,6 +8,8 @@ import re
 from pathlib import Path
 from types import ModuleType
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -34,6 +36,29 @@ def test_the_drift_check_fetches_with_the_gates_header_limits_and_no_redirect() 
     timeout = re.search(r"TIMEOUT_MS = ([\d_]+);", fetcher)
     assert timeout is not None
     assert int(timeout.group(1).replace("_", "")) == script.TIMEOUT_SECONDS * 1000
+
+
+def test_only_a_url_the_gate_fetches_is_fetched() -> None:
+    script = _script()
+    fetcher = (ROOT / "src" / "authority" / "fetch.ts").read_text(encoding="utf-8")
+    assert 'const EMA_HOST = "epi.ema.europa.eu";' in fetcher
+    assert "const EMA_BASE = `https://${EMA_HOST}/consuming/api/fhir`;" in fetcher
+    assert "const GUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;" in fetcher
+    lock = json.loads((ROOT / "labels" / "ema-epi" / "sources.lock.json").read_text("utf-8"))
+    for url, _, _ in script.files(lock):
+        assert script.URL.fullmatch(url), url
+    guid = "6301d093-9501-4e2e-a500-794dd263f9a2"
+    for url in (
+        f"http://epi.ema.europa.eu/consuming/api/fhir/Bundle/{guid}",
+        f"https://epi.ema.europa.eu.example/consuming/api/fhir/Bundle/{guid}",
+        f"https://epi.ema.europa.eu/consuming/api/fhir/Binary/{guid}",
+        f"https://epi.ema.europa.eu/consuming/api/fhir/Bundle/{guid}?x=1",
+        "https://epi.ema.europa.eu/consuming/api/fhir/Bundle/not-a-guid",
+        "file:///etc/passwd",
+    ):
+        # Refused before any network access.
+        with pytest.raises(script.RefusedError, match="not a URL the gate fetches"):
+            script.fetch(url)
 
 
 def test_a_list_two_labels_share_is_fetched_once() -> None:

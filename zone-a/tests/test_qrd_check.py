@@ -1137,6 +1137,54 @@ def test_text_hidden_on_its_own_colour_is_not_a_match() -> None:
         assert (status(result, "smpc.4.7#0") == "used") is used, style
 
 
+def _read_as(key: str, inner: str) -> Document:
+    """A conformant document whose section ``key`` is the div as the ePI reader reads it."""
+    from zone_a.epi.reader import read_div
+
+    paragraphs, refused, notes = read_div(
+        f'<div xmlns="http://www.w3.org/1999/xhtml">{inner}</div>'
+    )
+    code = next(t["targetCode"] for t in _mapping_nodes() if t["sourceKey"] == key)
+
+    def swap(section: Section) -> Section:
+        if section.code == code:
+            return replace(section, paragraphs=paragraphs, refusal=refused, notes=notes)
+        return replace(section, sections=tuple(swap(child) for child in section.sections))
+
+    base = document()
+    return replace(base, sections=tuple(swap(section) for section in base.sections))
+
+
+def _mapping_nodes() -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+
+    def visit(node: dict[str, Any]) -> None:
+        out.append(node)
+        for child in node.get("children", []):
+            visit(child)
+
+    visit(MAPPING["root"])
+    return out
+
+
+@pytest.mark.parametrize(
+    "inner",
+    [
+        # Review 1: a browser drops "color: none", so the span is drawn black on black; the reader
+        # read it as visible and the statement as used. It now refuses the section.
+        '<p style="background: black; color: white"><span style="color: black; color: none">'
+        "No interaction studies have been performed.</span></p>",
+        '<p><span style="background-color: black; background-color: none">No interaction studies '
+        "have been performed.</span></p>",
+        '<p style="background: black">No interaction studies have been performed.</p>',
+    ],
+)
+def test_a_statement_drawn_on_its_own_colour_is_never_used(inner: str) -> None:
+    identifier = f"smpc.4.5#{_item_index('smpc.4.5', '<No interaction')}"
+    result = check(_read_as("smpc.4.5", inner), REGISTRY, MAPPING)
+    assert status(result, identifier) != "used"
+
+
 def test_a_result_names_the_exact_inputs_it_was_computed_from() -> None:
     registry = (ROOT / "qrd" / "registry" / "cap-smpc-en-10.4.json").read_bytes()
     mapping = (ROOT / "fhir" / "mappings" / "cap-smpc-en.json").read_bytes()
