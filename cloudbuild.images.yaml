@@ -5,36 +5,66 @@ substitutions:
   _REGION: europe-west4
   _REPOSITORY: ema-flow-images
   _IMAGE_TAG: manual
+  # The commit the images are built from, as scripts/gcp/deploy.sh names it (SERVICE_VERSION: the
+  # full commit, with -dirty-<tree> when the uploaded tree differs from it). Stamped on every
+  # image as org.opencontainers.image.revision, so an image names its source by itself.
+  _REVISION: unknown
 
 # Every builder is pinned by digest, like every base image (npm run images:check covers both):
 # the builder runs with the build identity's token and pushes the images that deploy. The digest
 # is gcr.io/cloud-builders/docker:latest (Docker 20.10.24, single-arch linux/amd64) as resolved
-# from the registry on 2026-09-22. Dependabot does not read this file; move it by hand.
+# from the registry on 2026-09-22. Dependabot does not read this file; move it by hand. The node
+# image is the one the Dockerfiles start FROM, at the same digest (images:check holds them equal).
+#
+# The three images build at once (waitFor: ["-"]): none reads another. The validator image starts
+# from the layers of its previous build (--cache-from its buildcache tag), so an unchanged
+# Dockerfile.validator does not download the ~210 MB of validator and packages again; a changed
+# line rebuilds from that line on, and a first build, with no cache to pull, builds everything.
 steps:
   - id: build-app-image
     name: gcr.io/cloud-builders/docker@sha256:001fb4a870a84485cf198c80002f7af42f6456f2dbc261d70a0b5f0111470df4
+    waitFor: ["-"]
     args:
       - build
+      - --label
+      - org.opencontainers.image.revision=${_REVISION}
       - --tag
       - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/worker:${_IMAGE_TAG}
       - .
 
+  - id: pull-validator-cache
+    name: gcr.io/cloud-builders/docker@sha256:001fb4a870a84485cf198c80002f7af42f6456f2dbc261d70a0b5f0111470df4
+    waitFor: ["-"]
+    entrypoint: bash
+    args:
+      - -c
+      - docker pull "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/validator:buildcache" || echo "No validator build cache yet; building without one."
+
   - id: build-validator-image
     name: gcr.io/cloud-builders/docker@sha256:001fb4a870a84485cf198c80002f7af42f6456f2dbc261d70a0b5f0111470df4
+    waitFor: ["pull-validator-cache"]
     args:
       - build
       - --file
       - Dockerfile.validator
+      - --cache-from
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/validator:buildcache
+      - --label
+      - org.opencontainers.image.revision=${_REVISION}
       - --tag
       - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/validator:${_IMAGE_TAG}
+      - --tag
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/validator:buildcache
       - .
 
   # The validator image must start with no network at all (docs/foundations.md, C9). Its
   # packages are installed at build time and its JVM has no route out, so this proves on every
-  # build that the deployed sidecar needs nothing from the internet to become ready. Bash
-  # variables are written $$name so Cloud Build does not read them as substitutions.
+  # build that the deployed sidecar needs nothing from the internet to become ready. This step
+  # only starts it and keeps its log; the next one judges the log. Bash variables are written
+  # $$name so Cloud Build does not read them as substitutions.
   - id: validator-starts-offline
     name: gcr.io/cloud-builders/docker@sha256:001fb4a870a84485cf198c80002f7af42f6456f2dbc261d70a0b5f0111470df4
+    waitFor: ["build-validator-image"]
     entrypoint: bash
     args:
       - -c
@@ -42,10 +72,8 @@ steps:
         set -euo pipefail
         image="${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/validator:${_IMAGE_TAG}"
         docker run --detach --name offline --network none "$$image" >/dev/null
-        started=""
         for attempt in $$(seq 1 120); do
           if docker logs offline 2>&1 | grep -q "FHIR Validator HTTP Service started"; then
-            started="yes"
             break
           fi
           if [ "$$(docker inspect --format '{{.State.Running}}' offline)" != "true" ]; then
@@ -55,38 +83,29 @@ steps:
         done
         docker logs offline > offline.log 2>&1 || true
         docker rm --force offline >/dev/null
-        # An install means a needed package is not in the image. A fetch error that the
-        # validator's own -no-http-access policy did not refuse means an attempt got as far as a
-        # socket. Refused optional lookups (the hl7.terminology version check) are allowed.
-        if grep -E "Installing [^ ]+ to the package cache" offline.log; then
-          echo "The validator needed a package that is not installed in the image." >&2
-          exit 1
-        fi
-        # Refused before any socket: the policy message, or a bare "Failed to determine latest
-        # version of package <id> from server: <server>" (the engine's hl7.terminology lookup,
-        # which falls back to the pinned package). Anything else is a real attempt.
-        if grep -E "Error fetching|Failed to determine latest version of package|Failed to connect" offline.log \
-          | grep -Ev "not allowed by local security policy|Failed to determine latest version of package [^ ]+ from server: [^ ]+[[:space:]]*$"; then
-          echo "The validator attempted a network request that its policy did not refuse." >&2
-          exit 1
-        fi
-        if [ -z "$$started" ]; then
-          tail -40 offline.log >&2
-          echo "The validator did not start with networking disabled." >&2
-          exit 1
-        fi
-        grep -q "Jurisdiction: Global (Whole world)" offline.log \
-          || { echo "The validator is not validating under universal jurisdiction." >&2; exit 1; }
-        grep -q "Locale: United States/US" offline.log \
-          || { echo "The validator is not running in the pinned locale." >&2; exit 1; }
-        grep -E "Jurisdiction:|Locale:|Package Summary|HTTP Service started" offline.log | cut -c1-200
+
+  # The verdict, by the same classifier the CI gate uses (scripts/ci/validator-pins.mjs,
+  # networkUse and offlineStartVerdict), not a second copy of it in grep: an install means a
+  # needed package is not in the image, a fetch error the validator's own -no-http-access policy
+  # did not refuse means an attempt got as far as a socket, and the validator must have started
+  # under universal jurisdiction in the pinned locale.
+  - id: validator-offline-verdict
+    name: node:22.22.0-bookworm-slim@sha256:dd9d21971ec4395903fa6143c2b9267d048ae01ca6d3ea96f16cb30df6187d94
+    waitFor: ["validator-starts-offline"]
+    entrypoint: node
+    args:
+      - scripts/ci/validator-offline.mjs
+      - offline.log
 
   - id: build-query-image
     name: gcr.io/cloud-builders/docker@sha256:001fb4a870a84485cf198c80002f7af42f6456f2dbc261d70a0b5f0111470df4
+    waitFor: ["-"]
     args:
       - build
       - --file
       - Dockerfile.query
+      - --label
+      - org.opencontainers.image.revision=${_REVISION}
       - --tag
       - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/query:${_IMAGE_TAG}
       - .
@@ -94,4 +113,5 @@ steps:
 images:
   - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/worker:${_IMAGE_TAG}
   - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/validator:${_IMAGE_TAG}
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/validator:buildcache
   - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/query:${_IMAGE_TAG}

@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -8,6 +9,7 @@ import {
   HERMETIC_PROPERTIES,
   PACKAGE_LOCK,
   networkUse,
+  offlineStartVerdict,
   packageSummary,
   readPackageLock,
   readSidecarPins,
@@ -123,6 +125,24 @@ describe("the readers refuse a Dockerfile that has drifted", () => {
     const text = dockerfile.replace(`"-jurisdiction", "uv", `, "");
     expect(() => readSidecarPins(variant(text))).toThrow(/-jurisdiction/);
   });
+
+  it("loading one package twice and another not at all, which a count alone passed", () => {
+    const text = dockerfile.replace(
+      `"-ig", "/opt/fhir/ema-epi-package.tgz"`,
+      `"-ig", "/opt/fhir/global-epi-package.tgz"`,
+    );
+    expect(text).not.toBe(dockerfile);
+    expect(() => readSidecarPins(variant(text))).toThrow(/global-epi-package\.tgz more than once/);
+  });
+
+  it("loading one package twice beside all the others", () => {
+    const text = dockerfile.replace(
+      `"-tx", "n/a"`,
+      `"-ig", "/opt/fhir/terminology-package.tgz", "-tx", "n/a"`,
+    );
+    expect(text).not.toBe(dockerfile);
+    expect(() => readSidecarPins(variant(text))).toThrow(/more than once/);
+  });
 });
 
 describe("reading how the validator used the network", () => {
@@ -171,15 +191,88 @@ describe("the local validator helper", () => {
 });
 
 describe("the image build", () => {
+  const build = readFileSync("cloudbuild.images.yaml", "utf8");
+
   it("proves the validator starts with networking disabled", () => {
-    const build = readFileSync("cloudbuild.images.yaml", "utf8");
     expect(build).toContain("- id: validator-starts-offline");
     expect(build).toMatch(/docker run --detach --name offline --network none/);
-    expect(build).toMatch(/grep -E "Installing \[\^ \]\+ to the package cache" offline\.log/);
-    expect(build).toContain(
-      'grep -Ev "not allowed by local security policy|Failed to determine latest version',
+    expect(build).toMatch(
+      /- id: validator-offline-verdict\n[\s\S]*?waitFor: \["validator-starts-offline"\]\n\s+entrypoint: node\n\s+args:\n\s+- scripts\/ci\/validator-offline\.mjs\n\s+- offline\.log/,
     );
-    expect(build).toContain('grep -q "Jurisdiction: Global (Whole world)" offline.log');
-    expect(build).toContain('grep -q "Locale: United States/US" offline.log');
+  });
+
+  it("judges the log with the gate's classifier, not a second copy of it in grep", () => {
+    // The fetch-error patterns live in networkUse alone.
+    expect(build).not.toMatch(/Error fetching|Failed to determine latest version|Installing /);
+  });
+
+  it("builds the three images at once, the validator from its previous layers", () => {
+    for (const id of ["build-app-image", "build-query-image", "pull-validator-cache"]) {
+      expect(build).toMatch(new RegExp(`- id: ${id}\\n[^\\n]*\\n\\s+waitFor: \\["-"\\]`));
+    }
+    expect(build).toMatch(/waitFor: \["pull-validator-cache"\]/);
+    expect(build).toMatch(/- --cache-from\n\s+- \S+\/validator:buildcache/);
+    expect(build).toMatch(/^ {2}- \S+\/validator:buildcache$/m);
+  });
+
+  it("stamps every image with the commit it is built from", () => {
+    const builds = build.match(/^ {6}- build$/gm) ?? [];
+    const labels = build.match(
+      /- --label\n\s+- org\.opencontainers\.image\.revision=\$\{_REVISION\}/g,
+    );
+    expect(builds).toHaveLength(3);
+    expect(labels).toHaveLength(3);
+    expect(readFileSync("scripts/gcp/deploy.sh", "utf8")).toContain("_REVISION=${SERVICE_VERSION}");
+  });
+});
+
+describe("the offline start's verdict", () => {
+  const started = [
+    "  Jurisdiction: Global (Whole world)",
+    "  Locale: United States/US",
+    "  Package Summary: [hl7.fhir.r5.core#5.0.0]",
+    "Failed to determine latest version of package hl7.terminology from server: build.fhir.org",
+    "FHIR Validator HTTP Service started on port 8090",
+  ];
+
+  it("passes a validator that started offline, pinned, refusing its one optional lookup", () => {
+    const verdict = offlineStartVerdict(started);
+    expect(verdict.failures).toEqual([]);
+    expect(verdict.ok).toBe(true);
+    expect(verdict.evidence).toHaveLength(4);
+  });
+
+  it.each([
+    [
+      "an install",
+      [...started, "Installing hl7.fhir.r5.core#5.0.0 to the package cache"],
+      "not installed",
+    ],
+    [
+      "a fetch that reached a socket",
+      [...started, "Error fetching https://x: Failed to connect to /127.0.0.1:9"],
+      "policy did not refuse",
+    ],
+    ["no start", started.slice(0, 4), "did not start"],
+    ["another jurisdiction", started.slice(1), "universal jurisdiction"],
+    ["another locale", [started[0] ?? "", ...started.slice(2)], "pinned locale"],
+  ])("fails on %s", (_label, lines, reason) => {
+    const verdict = offlineStartVerdict(lines);
+    expect(verdict.ok).toBe(false);
+    expect(verdict.failures.join("\n")).toContain(reason);
+  });
+
+  it("is what the build runs, exiting 1 on a refusal", () => {
+    const directory = mkdtempSync(path.join(tmpdir(), "validator-offline-"));
+    temporary.push(directory);
+    const log = path.join(directory, "offline.log");
+    const run = () =>
+      spawnSync(process.execPath, ["scripts/ci/validator-offline.mjs", log], { encoding: "utf8" });
+    writeFileSync(log, started.join("\n"));
+    expect(run().status).toBe(0);
+    writeFileSync(log, [...started, "Installing a#1.0.0 to the package cache"].join("\n"));
+    const refused = run();
+    expect(refused.status).toBe(1);
+    expect(refused.stderr).toContain("not installed in the image");
   });
 });

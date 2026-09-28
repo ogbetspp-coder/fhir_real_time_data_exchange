@@ -63,6 +63,7 @@ describe("the deploy's permission preflight", () => {
     run(
       `${permissionsArray}
 PREFLIGHT_RETRY_SECONDS=0
+source scripts/gcp/common.sh
 ema_flow_access_token() { printf token; }
 ${extract("apply_permission_role")}
 ${extract("preflight_apply_permissions")}

@@ -192,7 +192,9 @@ variable "query_entitlements_json" {
   EOT
   type        = string
   default     = "{}"
-  sensitive   = false
+  # Sensitive (audit B08, D-6): the map says who may read which bundle, and a plan or apply
+  # printed it whole into the deploy log that a failure issue carries.
+  sensitive = true
 
   # Checks what src/query/entitlements.ts checks at container start (a JSON object; PrincipalId
   # keys; each value an object whose only key is `bundles`; at most 10,000 FhirId members, each a
@@ -294,6 +296,10 @@ variable "alert_notification_email" {
   EOT
   type        = string
   default     = ""
+  # Sensitive (audit B08, D-6): an address is personal data, and a plan or apply printed it into
+  # the deploy log that a failure issue carries. Whether one is set is not secret: it decides
+  # whether the e-mail channel exists (nonsensitive in infra/observability.tf).
+  sensitive = true
 
   validation {
     condition     = var.alert_notification_email == "" || can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.alert_notification_email))
@@ -301,9 +307,10 @@ variable "alert_notification_email" {
   }
 
   # A placeholder pages nobody: a domain reserved by RFC 2606 (example.com/.org/.net, and the
-  # .test, .invalid, .example and .localhost top-level domains) or a template's you@.
+  # .test, .invalid, .example and .localhost top-level domains), written with or without the
+  # trailing dot of a fully qualified name, or a template's you@.
   validation {
-    condition     = !can(regex("(?i)^you@|@([^@]+\\.)?example\\.(com|org|net)$|[@.](test|invalid|example|localhost)$", var.alert_notification_email))
+    condition     = !can(regex("(?i)^you@|@([^@]+\\.)?example\\.(com|org|net)\\.?$|[@.](test|invalid|example|localhost)\\.?$", var.alert_notification_email))
     error_message = "alert_notification_email is a placeholder (a reserved example or test domain, or a you@ address); set a real, watched address."
   }
 }

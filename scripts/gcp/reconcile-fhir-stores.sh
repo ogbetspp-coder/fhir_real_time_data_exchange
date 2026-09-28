@@ -29,6 +29,9 @@ PARTITION_MS="$((PARTITION_DAYS * 86400000))"
 # BigQuery refused to create: "Too many total leaf fields". The other ten stream fine at 5 and are
 # left alone.
 SUBSTANCE_RECURSION_DEPTH="${SUBSTANCE_RECURSION_DEPTH:-2}"
+# The stores' environment label. No default: deploy.sh, which runs this, requires the variable
+# (audit B08, L1), and a label saying dev on another environment's stores would be the same mistake.
+ENVIRONMENT="${EMA_FLOW_ENVIRONMENT:?EMA_FLOW_ENVIRONMENT names the environment these stores belong to}"
 
 TOKEN="$(ema_flow_access_token)"
 PARENT="projects/${PROJECT_ID}/locations/${REGION}/datasets/${DATASET}"
@@ -52,7 +55,7 @@ cat >"$TMP/source.json" <<JSON
   },
   "labels": {
     "application": "ema-flow",
-    "environment": "${EMA_FLOW_ENVIRONMENT:-dev}",
+    "environment": "${ENVIRONMENT}",
     "managed_by": "rest-reconciler"
   }
 }
@@ -121,47 +124,14 @@ cat >"$TMP/target.json" <<JSON
   }],
   "labels": {
     "application": "ema-flow",
-    "environment": "${EMA_FLOW_ENVIRONMENT:-dev}",
+    "environment": "${ENVIRONMENT}",
     "managed_by": "rest-reconciler"
   }
 }
 JSON
 
-summarize_response() {
-  node -e '
-const fs = require("node:fs");
-const crypto = require("node:crypto");
-const raw = fs.readFileSync(process.argv[1]);
-const digest = () =>
-  `unrecognised body sha256=${crypto.createHash("sha256").update(raw).digest("hex")}`;
-const token = (value, pattern) => (typeof value === "string" && pattern.test(value) ? value : "?");
-let body;
-try {
-  body = JSON.parse(raw.toString("utf8"));
-} catch {
-  body = undefined;
-}
-if (body === null || typeof body !== "object") {
-  console.log(digest());
-} else if (body.error !== null && typeof body.error === "object") {
-  const code = Number.isInteger(body.error.code) ? String(body.error.code) : "?";
-  console.log(`code=${code} status=${token(body.error.status, /^[A-Z0-9_]{1,64}$/)}`);
-} else if (body.resourceType === "OperationOutcome") {
-  const issues = Array.isArray(body.issue) ? body.issue : [];
-  const column = (name) =>
-    issues
-      .map((issue) =>
-        issue === null || typeof issue !== "object" ? "?" : token(issue[name], /^[a-z-]{1,64}$/),
-      )
-      .join(",");
-  const summary = `issues=${issues.length} codes=${column("code")} severities=${column("severity")}`;
-  console.log(`OperationOutcome ${summary}`);
-} else {
-  console.log(digest());
-}
-' "$1" 2>/dev/null || echo "unrecognised body sha256=unavailable"
-}
-
+# The token is read from a pipe on the curl command itself, never put in its arguments
+# (common.sh, ema_flow_header). summarize_response is common.sh's too.
 request() {
   local method="$1"
   local url="$2"
@@ -169,13 +139,12 @@ request() {
   local args=(
     --fail-with-body --silent --show-error
     --request "$method"
-    --header "Authorization: Bearer ${TOKEN}"
     --header "Content-Type: application/json"
   )
   if [[ -n "$body" ]]; then
     args+=(--data-binary "@${body}")
   fi
-  curl "${args[@]}" "$url"
+  curl "${args[@]}" --header @<(ema_flow_header Authorization "Bearer ${TOKEN}") "$url"
 }
 
 reconcile() {
@@ -185,7 +154,7 @@ reconcile() {
   local current="$TMP/${store_id}-current.json"
   local status
   status="$(curl --silent --output "$current" --write-out '%{http_code}' \
-    --header "Authorization: Bearer ${TOKEN}" "$resource")"
+    --header @<(ema_flow_header Authorization "Bearer ${TOKEN}") "$resource")"
 
   if [[ "$status" == "404" ]]; then
     if ! request POST "${COLLECTION}?fhirStoreId=${store_id}" "$body" >"$current"; then
@@ -203,7 +172,7 @@ reconcile() {
   fi
 
   local version
-  version="$(node -e "console.log(require(process.argv[1]).version)" "$current")"
+  version="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("version", ""))' "$current")"
   if [[ "$version" != "R5" ]]; then
     echo "${store_id} exists with immutable version ${version}; refusing to substitute R4." >&2
     exit 1

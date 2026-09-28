@@ -1,0 +1,6 @@
+{
+  "description": "SHA-256 of each file of the deploy's inputs that the repository itself generates (scripts/gcp/deploy-inputs.sh), pinned so that a dependency of the job that makes them cannot change what the deploy seeds (audit B08, review round 1). The synthetic fixture is deterministic: scripts/fhir/export-fixture.ts from the pinned Global ePI Type 2 example and fhir/mappings. A change to either changes it; record the new hash here, in the same reviewed pull request (CI's official-validation job makes the inputs and fails on a mismatch).",
+  "files": {
+    "synthetic-type2.json": "85885af9820382080bef9acf0ad714f340ff575fc10d0e64dc1f2a222a9dc518"
+  }
+}

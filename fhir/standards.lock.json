@@ -6,7 +6,8 @@
       "package": "hl7.fhir.uv.emedicinal-product-info#1.0.0",
       "url": "https://hl7.org/fhir/uv/emedicinal-product-info/package.tgz",
       "sha256": "6cdbc95ff054ef52c16e1beaec1c81c9e04fab1c0123b31de6ff1748e30ba0b1",
-      "status": "trial-use-published"
+      "status": "trial-use-published",
+      "usedBy": ["bootstrap"]
     },
     {
       "name": "HL7 Global ePI Type 1 DrugX example",
@@ -18,28 +19,32 @@
       "name": "HL7 Global ePI Type 2 DrugX example",
       "url": "https://hl7.org/fhir/uv/emedicinal-product-info/STU1/Bundle-bundlepackageleaflet75type2.json",
       "sha256": "c07e53f4edb77b931ab474bfe650faa2443717cce5808ceaf77b30d1b0a2b457",
-      "status": "non-normative-example"
+      "status": "non-normative-example",
+      "usedBy": ["bootstrap"]
     },
     {
       "name": "EMA EUePI package",
       "package": "EUePI#1.0.0",
       "url": "https://epi.ema.europa.eu/fhirig/1.0.0/package.tgz",
       "sha256": "19fb9fbf55c6bb3819c78d427acac1e3e5b96b50c1045d80e70c94f09566bd80",
-      "status": "preview"
+      "status": "preview",
+      "usedBy": ["bootstrap"]
     },
     {
       "name": "HL7 R5 terminology dependency",
       "package": "hl7.terminology.r5#7.3.0",
       "url": "https://packages2.fhir.org/packages/hl7.terminology.r5/7.3.0",
       "sha256": "c2ee6bccc9d0130d0a90db5967e7adbf9dd175df7a3351c531642c3dce102d10",
-      "status": "dependency"
+      "status": "dependency",
+      "usedBy": ["bootstrap"]
     },
     {
       "name": "HL7 R5 extensions dependency",
       "package": "hl7.fhir.uv.extensions.r5#5.3.0",
       "url": "https://packages2.fhir.org/packages/hl7.fhir.uv.extensions.r5/5.3.0",
       "sha256": "f1039cac888d79ebd29878d7debe5e647ffe7ed962a9033da095258a03a06105",
-      "status": "dependency"
+      "status": "dependency",
+      "usedBy": ["bootstrap"]
     },
     {
       "name": "EMA EPI-23-1022 English commented sample",

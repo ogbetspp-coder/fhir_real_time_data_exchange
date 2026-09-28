@@ -332,11 +332,18 @@ resource "google_bigquery_table_iam_member" "worker_ledger_appender" {
 }
 
 # TRANSITIONAL (audit B04, phase 1 of 2). The broad grants the three above replace stay until the
-# narrow ones are applied and a deploy's smoke run has proved them; phase 2 removes these blocks.
-# Removing them in the same apply that creates the narrow ones would leave the worker without
-# ledger or FHIR access if that apply stopped part-way (a create refused for want of a permission
-# while the independent removals still ran), and for the seconds IAM takes to propagate even if
-# it did not. test/infra/worker-identity.test.ts proves what remains once they are removed.
+# narrow ones are applied; phase 2 removes these blocks. Removing them in the same apply that
+# creates the narrow ones would leave the worker without ledger or FHIR access if that apply
+# stopped part-way (a create refused for want of a permission while the independent removals still
+# ran), and for the seconds IAM takes to propagate even if it did not.
+#
+# Phase 1's smoke run cannot prove the narrow grants (audit B08, L2): while these broad ones are
+# bound, a run succeeds whether the narrow ones work or not. The proof is phase 2's own deploy: it
+# removes these, and its smoke run is then the first to exercise the narrow grants alone. If that
+# run fails, the rollback is to restore these blocks (the pull request that removes them,
+# reverted) and deploy again; nothing else changes, so it is quick.
+# test/infra/worker-identity.test.ts proves, from the configuration, what remains once they are
+# removed.
 resource "google_healthcare_dataset_iam_member" "worker_fhir_editor" {
   dataset_id = google_healthcare_dataset.record.id
   role       = "roles/healthcare.fhirResourceEditor"

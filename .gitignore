@@ -6,6 +6,10 @@ coverage/
 .env.*
 !.env.example
 gha-creds-*.json
+# The deploy workflow's own log (.github/workflows/deploy.yml). Ignored so it is not uploaded with
+# the image build's source, and so the deploy's provenance check does not read it as an
+# uncommitted change (scripts/gcp/deploy.sh, deploy_provenance).
+deploy-run.log
 .terraform/
 *.tfstate
 *.tfstate.*

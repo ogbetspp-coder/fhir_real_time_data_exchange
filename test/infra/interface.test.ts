@@ -52,12 +52,20 @@ describe("the Terraform interface", () => {
     expect(deploy).toMatch(
       /tf_common_vars=\(\n(?:[^\n]*\n)*?\s*-var="environment=\$\{ENVIRONMENT\}"/,
     );
-    const calls = [...deploy.matchAll(/terraform -chdir=infra (plan|apply|import)\b[\s\S]*?\n\n/g)];
-    // phase_apis's import and targeted apply, phase_apply's apply, sync_dashboard's replacement,
-    // phase_plan's plan.
-    expect(calls.length).toBe(5);
+    const vars = /"\$\{tf_common_vars\[@\]\}"|"\$\{TF_DEPLOY_VARS\[@\]\}"/;
+    // Since audit B08 (D-2) the two deploy applies apply a plan that plan_reviewed made, and a
+    // saved plan carries its variables: so it is each plan_reviewed call that must pass them.
+    const reviewed = [...deploy.matchAll(/^\s+plan_reviewed (\w+) [\s\S]*?\n\n/gm)];
+    expect(reviewed.map((match) => match[1])).toEqual(["apis", "apply"]);
+    for (const [call] of reviewed) expect(vars.test(call)).toBe(true);
+    const calls = [
+      ...deploy.matchAll(/terraform -chdir=infra (plan|apply|import)\b[\s\S]*?\n\n/g),
+    ].filter(([call]) => !call.includes('apply -input=false "$REVIEWED_PLAN"'));
+    // phase_apis's import, plan_reviewed's plan (its arguments checked above), sync_dashboard's
+    // replacement, phase_plan's plan.
+    expect(calls.length).toBe(4);
     for (const [call] of calls) {
-      expect(/"\$\{tf_common_vars\[@\]\}"|"\$\{TF_DEPLOY_VARS\[@\]\}"/.test(call)).toBe(true);
+      expect(vars.test(call) || call.includes('-out="$plan_file" "$@"')).toBe(true);
     }
     expect(deploy).toMatch(/TF_DEPLOY_VARS=\(\n\s+"\$\{tf_common_vars\[@\]\}"/);
   });

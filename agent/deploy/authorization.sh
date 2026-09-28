@@ -29,9 +29,9 @@ set -euo pipefail
 
 # shellcheck source=scripts/gcp/common.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../scripts/gcp" && pwd)/common.sh"
-# GCP_PROJECT_ID first, as before; otherwise GOOGLE_CLOUD_PROJECT or the gcloud configuration,
-# and no project at all fails rather than falling back to a hard-coded one.
-PROJECT_ID="${GCP_PROJECT_ID:-$(ema_flow_resolve_project)}"
+# GOOGLE_CLOUD_PROJECT or GCP_PROJECT_ID (refused when the two differ), else the gcloud
+# configuration; no project at all fails rather than falling back to a hard-coded one.
+PROJECT_ID="$(ema_flow_resolve_project)"
 AUTHORIZATION_ID="query_service_bearer_token"
 # No default: the connector's OAuth client is a per-tenant console decision. The dev client's id
 # is in deploy/README.md. Required below, once --check (which does not use it) has returned.
