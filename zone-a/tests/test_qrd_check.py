@@ -58,6 +58,51 @@ def test_every_pinned_label_matches_its_lock_entry_and_nothing_else_is_there() -
         assert entry["list"].startswith("https://epi.ema.europa.eu/consuming/api/fhir/List/")
 
 
+def _pin_script() -> Any:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "pin_label", ROOT / "zone-a" / "scripts" / "pin_label.py"
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_every_lock_entry_says_what_its_pinned_bytes_carry() -> None:
+    # The lock's EMA metadata, read back from the bytes it pins, as scripts/pin_label.py writes
+    # it: a value typed in by hand, or left behind when the bytes were re-pinned, fails here.
+    metadata = _pin_script().metadata
+    for entry in LOCK["sources"]:
+        document = (LABELS / "sources" / entry["file"]).read_bytes()
+        index = (LABELS / "lists" / entry["listFile"]).read_bytes()
+        carried = metadata(document, index)
+        assert entry["url"].rsplit("/", 1)[-1] == carried["documentId"], entry["file"]
+        assert entry["list"].rsplit("/", 1)[-1] == carried["listId"], entry["file"]
+        for key in ("epiId", "procedureNumber", "marketingAuthorisationHolder", "compositionDate"):
+            assert entry[key] == carried[key], (entry["file"], key)
+
+
+def test_every_lock_entry_carries_its_own_retrieval_dates() -> None:
+    # One lock-wide date once covered entries pinned on a later day.
+    assert "retrieved" not in LOCK
+    lists: dict[str, tuple[str, int, str]] = {}
+    for entry in LOCK["sources"]:
+        for key in ("retrieved", "listRetrieved"):
+            assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", entry[key]), (entry["file"], key)
+        # A List two labels share is one file: one hash, one size, one retrieval.
+        shared = (entry["listSha256"], entry["listBytes"], entry["listRetrieved"])
+        assert lists.setdefault(entry["listFile"], shared) == shared, entry["file"]
+
+
+def test_the_committed_results_are_exactly_one_per_pinned_label() -> None:
+    # A result whose label left the lock would stay behind, unchecked, beside the rest.
+    checks = {path.name for path in (LABELS / "checks").iterdir()}
+    assert checks == {entry["file"] for entry in LOCK["sources"]}
+
+
 def test_the_committed_results_are_what_the_sources_give() -> None:
     import importlib.util
 
