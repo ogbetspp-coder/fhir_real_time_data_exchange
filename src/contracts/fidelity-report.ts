@@ -53,7 +53,7 @@ export const DiffHintSchema = z
 export const SectionResultSchema = z
   .strictObject({
     sourceKey: SourceKey,
-    path: z.string().regex(/^Composition\.section\[\d+\](?:\.section\[\d+\])*$/),
+    path: z.string().regex(/^Composition\.section\[[0-9]+\](?:\.section\[[0-9]+\])*$/),
     status: SectionStatus,
     spanCount: Count,
     reason: z

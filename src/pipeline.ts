@@ -279,8 +279,9 @@ export async function runPipeline(
     throw new Error("Source identifier is in the reserved authority-import namespace");
   }
 
-  // The standards the manifest names, read from the lock the image ships before anything is
-  // written: a missing or malformed lock fails the run here, not after its side effects.
+  // The standards the manifest names, read from the locks the image ships before anything is
+  // written (only the document gate, whose authority fetch reads, runs before): a missing or
+  // malformed lock fails the run here, not after its writes.
   const packages = pinnedPackages();
   const standards: RunManifest["standards"] = {
     fhir: "5.0.0",

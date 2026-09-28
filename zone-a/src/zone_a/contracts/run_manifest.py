@@ -39,7 +39,7 @@ class IsoDateTime(RootModel[str]):
         str,
         Field(
             description="RFC 3339 timestamp with Z or a numeric offset.",
-            pattern="^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            pattern="^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))T(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|([+-](?:[01][0-9]|2[0-3]):[0-5][0-9])))$",
         ),
     ]
 
@@ -50,7 +50,7 @@ class PackageRef(RootModel[str]):
         Field(
             description="FHIR package id#version.",
             max_length=256,
-            pattern="^[A-Za-z][A-Za-z0-9-]*(?:\\.[A-Za-z0-9-]+)*#\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?$",
+            pattern="^[A-Za-z][A-Za-z0-9-]*(?:\\.[A-Za-z0-9-]+)*#[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$",
         ),
     ]
 
@@ -67,7 +67,7 @@ class HttpUrl(RootModel[str]):
         Field(
             description="http(s) URL without whitespace; may carry |version.",
             max_length=256,
-            pattern="^https?:\\/\\/[A-Za-z0-9.-]{1,253}(?::\\d{1,5})?(?:[/?#][A-Za-z0-9._~:/?#@!$&'()*+,;=%|-]*)?$",
+            pattern="^https?:\\/\\/[A-Za-z0-9.-]{1,253}(?::[0-9]{1,5})?(?:[/?#][A-Za-z0-9._~:/?#@!$&'()*+,;=%|-]*)?$",
         ),
     ]
 
@@ -124,7 +124,7 @@ class NormalizationVersion(RootModel[str]):
         str,
         Field(
             description="Version of docs/fidelity-normalization.md the hashes were computed under.",
-            pattern="^fidelity-norm\\/\\d+\\.\\d+\\.\\d+$",
+            pattern="^fidelity-norm\\/[0-9]+\\.[0-9]+\\.[0-9]+$",
         ),
     ]
 
