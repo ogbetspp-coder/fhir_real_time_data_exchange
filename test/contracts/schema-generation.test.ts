@@ -2,9 +2,9 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
-import { z } from "zod";
 
 import { CONTRACTS, contractId, type ContractDefinition } from "../../src/contracts/index.js";
+import { asciiDigits, contractJsonSchema } from "../../src/contracts/json-schema.js";
 import { sha256 } from "../../src/lib/hash.js";
 
 const GENERATED = path.resolve("contracts/generated");
@@ -30,15 +30,9 @@ async function readJson<T>(file: string): Promise<T> {
   return JSON.parse(text) as T;
 }
 
-// The exact call scripts/contracts/generate-schemas.ts makes; any drift here is drift there.
+// The call scripts/contracts/generate-schemas.ts makes (src/contracts/json-schema.ts).
 function generate(contract: ContractDefinition, io: "input" | "output"): JsonObject {
-  return z.toJSONSchema(contract.schema, {
-    target: "draft-2020-12",
-    io,
-    unrepresentable: "throw",
-    cycles: "ref",
-    reused: "inline",
-  });
+  return contractJsonSchema(contract.schema, io);
 }
 
 function document(contract: ContractDefinition): JsonObject {
@@ -100,6 +94,36 @@ describe("generated contract JSON Schemas", () => {
         sha256: sha256(document(contract)),
       })),
     );
+  });
+
+  // Zone A's models validate with Rust's regex crate, where \d is any Unicode decimal digit; the
+  // schema's ECMA-262 dialect and Zod mean [0-9] (audit B07 follow-up, Low-2).
+  it("publishes no shorthand character class in any pattern", async () => {
+    const patterns: string[] = [];
+    const walk = (value: unknown): void => {
+      if (Array.isArray(value)) value.forEach(walk);
+      else if (value !== null && typeof value === "object") {
+        for (const [key, inner] of Object.entries(value)) {
+          if (key === "pattern" && typeof inner === "string") patterns.push(inner);
+          else walk(inner);
+        }
+      }
+    };
+    for (const contract of CONTRACTS)
+      walk(await readJson<JsonObject>(`${contract.name}.schema.json`));
+    expect(patterns.length).toBeGreaterThan(20);
+    for (const pattern of patterns)
+      expect([pattern, /\\[dDwWsSbB]/.test(pattern)]).toEqual([pattern, false]);
+  });
+
+  it("rewrites \\d to the ASCII class, inside and outside a class, and refuses other shorthands", () => {
+    expect(asciiDigits(String.raw`^\d{4}-[12]\d:[\d.]+\\d$`)).toBe(
+      String.raw`^[0-9]{4}-[12][0-9]:[0-9.]+\\d$`,
+    );
+    expect(asciiDigits(String.raw`^a\.b\[c\]$`)).toBe(String.raw`^a\.b\[c\]$`);
+    for (const shorthand of ["w", "W", "s", "S", "b", "B", "D"]) {
+      expect(() => asciiDigits(`^a\\${shorthand}$`)).toThrow(/reads as Unicode/);
+    }
   });
 
   it("hashes the document including its $id wrapper", async () => {

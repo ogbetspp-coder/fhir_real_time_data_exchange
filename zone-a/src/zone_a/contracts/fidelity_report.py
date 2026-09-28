@@ -41,7 +41,7 @@ class NormalizationVersion(RootModel[str]):
         str,
         Field(
             description="Version of docs/fidelity-normalization.md the hashes were computed under.",
-            pattern="^fidelity-norm\\/\\d+\\.\\d+\\.\\d+$",
+            pattern="^fidelity-norm\\/[0-9]+\\.[0-9]+\\.[0-9]+$",
         ),
     ]
 
@@ -87,7 +87,7 @@ class SectionResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
     sourceKey: SourceKey
     path: Annotated[
-        str, Field(pattern="^Composition\\.section\\[\\d+\\](?:\\.section\\[\\d+\\])*$")
+        str, Field(pattern="^Composition\\.section\\[[0-9]+\\](?:\\.section\\[[0-9]+\\])*$")
     ]
     status: SectionStatus
     spanCount: Annotated[int, Field(ge=0, le=9007199254740991)]

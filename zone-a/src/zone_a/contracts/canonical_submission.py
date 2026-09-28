@@ -27,7 +27,7 @@ class IsoDateTime(RootModel[str]):
         str,
         Field(
             description="RFC 3339 timestamp with Z or a numeric offset.",
-            pattern="^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            pattern="^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))T(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|([+-](?:[01][0-9]|2[0-3]):[0-5][0-9])))$",
         ),
     ]
 
@@ -130,13 +130,13 @@ class HttpUrl(RootModel[str]):
         Field(
             description="http(s) URL without whitespace; may carry |version.",
             max_length=256,
-            pattern="^https?:\\/\\/[A-Za-z0-9.-]{1,253}(?::\\d{1,5})?(?:[/?#][A-Za-z0-9._~:/?#@!$&'()*+,;=%|-]*)?$",
+            pattern="^https?:\\/\\/[A-Za-z0-9.-]{1,253}(?::[0-9]{1,5})?(?:[/?#][A-Za-z0-9._~:/?#@!$&'()*+,;=%|-]*)?$",
         ),
     ]
 
 
 class SectionPath(RootModel[str]):
-    root: Annotated[str, Field(pattern="^Composition(?:\\.section\\[\\d{1,4}\\]){1,16}$")]
+    root: Annotated[str, Field(pattern="^Composition(?:\\.section\\[[0-9]{1,4}\\]){1,16}$")]
 
 
 class ToolVersion(BaseModel):
@@ -188,7 +188,7 @@ class TargetPath(RootModel[str]):
         str,
         Field(
             max_length=256,
-            pattern="^[A-Za-z][A-Za-z0-9]*(?:\\[\\d+\\])?(?:\\.[A-Za-z][A-Za-z0-9]*(?:\\[\\d+\\])?)*$",
+            pattern="^[A-Za-z][A-Za-z0-9]*(?:\\[[0-9]+\\])?(?:\\.[A-Za-z][A-Za-z0-9]*(?:\\[[0-9]+\\])?)*$",
         ),
     ]
 
@@ -198,7 +198,7 @@ class SourcePath(RootModel[str]):
         str,
         Field(
             max_length=256,
-            pattern="^(?:List|Bundle|Composition)(?:\\.[A-Za-z][A-Za-z0-9]*(?:\\[(?:\\d{1,4}|[A-Za-z][A-Za-z0-9]*)\\])?)*$",
+            pattern="^(?:List|Bundle|Composition)(?:\\.[A-Za-z][A-Za-z0-9]*(?:\\[(?:[0-9]{1,4}|[A-Za-z][A-Za-z0-9]*)\\])?)*$",
         ),
     ]
 
@@ -234,7 +234,7 @@ class NormalizationVersion(RootModel[str]):
         str,
         Field(
             description="Version of docs/fidelity-normalization.md the hashes were computed under.",
-            pattern="^fidelity-norm\\/\\d+\\.\\d+\\.\\d+$",
+            pattern="^fidelity-norm\\/[0-9]+\\.[0-9]+\\.[0-9]+$",
         ),
     ]
 

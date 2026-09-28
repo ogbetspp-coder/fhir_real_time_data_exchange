@@ -81,7 +81,7 @@ export const AuthorityId = z
 // A section of the authority's Composition, by its position in the section tree.
 export const SectionPath = z
   .string()
-  .regex(/^Composition(?:\.section\[\d{1,4}\]){1,16}$/)
+  .regex(/^Composition(?:\.section\[[0-9]{1,4}\]){1,16}$/)
   .meta({ id: "SectionPath" });
 
 // A reference to a picture the document names outside its own bytes, in the grammars the
@@ -239,7 +239,7 @@ export const TerminologyRefSchema = z
 export const SourcePath = z
   .string()
   .regex(
-    /^(?:List|Bundle|Composition)(?:\.[A-Za-z][A-Za-z0-9]*(?:\[(?:\d{1,4}|[A-Za-z][A-Za-z0-9]*)\])?)*$/,
+    /^(?:List|Bundle|Composition)(?:\.[A-Za-z][A-Za-z0-9]*(?:\[(?:[0-9]{1,4}|[A-Za-z][A-Za-z0-9]*)\])?)*$/,
   )
   .max(256)
   .meta({ id: "SourcePath" });
