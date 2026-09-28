@@ -118,11 +118,21 @@ const MAX_EXCLUDED_CODE_POINTS_PER_PAGE = 240;
 
 const SOFT_HYPHEN = "\u00ad";
 
+// A page with what the slice rules read of its lines precomputed, so that each read is O(1) and
+// a section of many spans on one long line costs linear time, not a walk to the line's ends per
+// span. Indexed by code point offset in the page; only offsets in [bodyStart, bodyEnd] are set.
 type PageIndex = {
   page: SourcePage;
   codePoints: string[];
   malformed: boolean;
   bodyIssue: string | undefined;
+  // Per code point in the body: 1 when its line (between two U+000A, inside the body) contains
+  // U+0009.
+  tabLine: Uint8Array;
+  // Per offset from bodyStart to bodyEnd: the U+000A `fromLineStart` reads a slice starting there
+  // from, or -1; and 1 when a U+0009 lies between that U+000A and the offset.
+  lineBreakBefore: Int32Array;
+  tabBefore: Uint8Array;
 };
 
 // True when the line break that ends just before `offset` follows U+00AD: normalisation step 1
@@ -183,10 +193,50 @@ function indexPages(source: SourceDocumentText): {
       codePoints,
       malformed: findForbiddenCharacter(page.text) !== undefined,
       bodyIssue,
+      ...indexLines(page, codePoints),
     });
   }
   if (structural.length > 0) throw new FidelityError("Source document text is invalid", structural);
   return { pages, issues };
+}
+
+// One pass over the body for the line reads of `lastLineHasTab` and `fromLineStart`.
+function indexLines(
+  page: SourcePage,
+  codePoints: string[],
+): Pick<PageIndex, "tabLine" | "lineBreakBefore" | "tabBefore"> {
+  const { bodyStart, bodyEnd } = page;
+  const tabLine = new Uint8Array(codePoints.length);
+  let lineStart = bodyStart;
+  let hasTab = false;
+  for (let position = bodyStart; position <= bodyEnd; position += 1) {
+    if (position < bodyEnd && codePoints[position] !== "\n") {
+      if (codePoints[position] === "\t") hasTab = true;
+      continue;
+    }
+    if (hasTab) tabLine.fill(1, lineStart, position);
+    lineStart = position + 1;
+    hasTab = false;
+  }
+  // At bodyStart the read stops: the code point before it, if U+000A, is the line break
+  // (section 1). After it, U+000A is the break, other whitespace is read past, and anything else
+  // stops the read at the offset itself.
+  const lineBreakBefore = new Int32Array(bodyEnd - bodyStart + 1);
+  const tabBefore = new Uint8Array(bodyEnd - bodyStart + 1);
+  lineBreakBefore[0] = codePoints[bodyStart - 1] === "\n" ? bodyStart - 1 : -1;
+  for (let position = bodyStart + 1; position <= bodyEnd; position += 1) {
+    const at = position - bodyStart;
+    const character = codePoints[position - 1] ?? "";
+    if (character === "\n") {
+      lineBreakBefore[at] = position - 1;
+    } else if (isWhitespace(character.codePointAt(0) ?? 0)) {
+      lineBreakBefore[at] = lineBreakBefore[at - 1] ?? -1;
+      tabBefore[at] = character === "\t" ? 1 : (tabBefore[at - 1] ?? 0);
+    } else {
+      lineBreakBefore[at] = -1;
+    }
+  }
+  return { tabLine, lineBreakBefore, tabBefore };
 }
 
 function slice(index: PageIndex, start: number, end: number): string {
@@ -197,35 +247,33 @@ function slice(index: PageIndex, start: number, end: number): string {
 // previous line when only whitespace other than U+000A lies between it and `start` (before
 // `bodyStart`, section 1 makes that code point U+000A), otherwise `start` itself. Normalisation
 // does not treat the start of a text as the start of a line (section 3 step 4), so a slice that
-// begins at a line start carries its line terminator with it.
+// begins at a line start carries its line terminator with it. `start` is in [bodyStart, bodyEnd].
 function fromLineStart(index: PageIndex, start: number): number {
-  let position = start;
-  while (position > index.page.bodyStart) {
-    const character = index.codePoints[position - 1] ?? "";
-    if (character === "\n") return position - 1;
-    if (!isWhitespace(character.codePointAt(0) ?? 0)) return start;
-    position -= 1;
-  }
-  return index.codePoints[position - 1] === "\n" ? position - 1 : start;
+  const lineBreak = index.lineBreakBefore[start - index.page.bodyStart] ?? -1;
+  return lineBreak < 0 ? start : lineBreak;
 }
 
 // Whether the page line that a slice ending at `end` ends on — the whole line in the body, from
 // the U+000A before it to the next U+000A, not only its part inside the slice — contains U+0009.
-// A slice that ends with U+000A ends on no partial line.
+// A slice that ends with U+000A ends on no partial line. `end` is at most bodyEnd.
 function lastLineHasTab(index: PageIndex, end: number): boolean {
-  const { bodyStart, bodyEnd } = index.page;
-  if (end <= bodyStart || index.codePoints[end - 1] === "\n") return false;
-  let lineStart = end - 1;
-  while (lineStart > bodyStart && index.codePoints[lineStart - 1] !== "\n") lineStart -= 1;
-  let lineEnd = end;
-  while (lineEnd < bodyEnd && index.codePoints[lineEnd] !== "\n") lineEnd += 1;
-  return index.codePoints.slice(lineStart, lineEnd).includes("\t");
+  if (end <= index.page.bodyStart || index.codePoints[end - 1] === "\n") return false;
+  return index.tabLine[end - 1] === 1;
 }
 
+// Whether a gap between spans normalises to nothing. The gap is read from its line start
+// (`fromLineStart`), but the whitespace between that U+000A and the gap is not copied: all it can
+// change is whether the line holds U+0009 (for step 4), so U+000A and, if one is there, U+0009
+// stand for it. Every other code point in it becomes a space that step 5 collapses, and none
+// composes with what follows (a whitespace code point is a starter no mark combines with). This
+// keeps a run of many spans across one whitespace line linear.
 function isBlankSlice(index: PageIndex, start: number, end: number): boolean {
   if (end <= start) return true;
   try {
-    const text = slice(index, fromLineStart(index, start), end);
+    const at = start - index.page.bodyStart;
+    const head =
+      (index.lineBreakBefore[at] ?? -1) < 0 ? "" : index.tabBefore[at] === 1 ? "\n\t" : "\n";
+    const text = head + slice(index, start, end);
     return normalizeText(text, { lastLineHasTab: lastLineHasTab(index, end) }) === "";
   } catch {
     return false;
@@ -311,8 +359,9 @@ function resolveSpans(
   };
 }
 
-// Whitespace for the edge rules: section 3 step 5's list without U+00A0, U+2007 and U+202F,
-// which join the groups of a number (`10 000`) and so are not a boundary between tokens.
+// Whitespace for the edge rules: section 3 step 5's list without U+00A0 and U+2007, which join
+// the groups of a number (`10 000`) and so are not a boundary between tokens. (U+202F is not
+// whitespace at all from fidelity-norm/3.0.0: it is a thin space, content.)
 const NUMBER_JOINERS = new Set([0x00a0, 0x2007]);
 
 function isEdgeWhitespace(character: string | undefined): boolean {
@@ -503,15 +552,22 @@ function coverage(
   let bodyCodePoints = 0;
   let coveredCodePoints = 0;
   let uncoveredGaps = 0;
+  // The spans of each page, grouped once rather than filtered from every span per page.
+  const spansByPage = new Map<number, SourceSpan[]>();
+  for (const span of verifiedSpans) {
+    const onPage = spansByPage.get(span.page);
+    if (onPage === undefined) spansByPage.set(span.page, [span]);
+    else onPage.push(span);
+  }
   for (const index of pages.values()) {
     const { bodyStart, bodyEnd } = index.page;
     // Page totals are reported alongside body totals so a reviewer can see how much text the
     // extractor-declared body range excludes; the body range itself is not trusted blindly.
     pageCodePoints += index.codePoints.length;
     bodyCodePoints += bodyEnd - bodyStart;
-    const spans = verifiedSpans
-      .filter((span) => span.page === index.page.page)
-      .sort((left, right) => left.startOffset - right.startOffset);
+    const spans = (spansByPage.get(index.page.page) ?? []).sort(
+      (left, right) => left.startOffset - right.startOffset,
+    );
     let cursor = bodyStart;
     for (const span of spans) {
       if (!isBlankSlice(index, cursor, span.startOffset)) uncoveredGaps += 1;
@@ -549,12 +605,32 @@ function assertUniqueKeys(keys: string[], what: string): void {
   if (duplicates.length > 0) throw new FidelityError(`Duplicate ${what}`, duplicates);
 }
 
+// Every source key, and the normalisation version, is a string. Another JSON value is refused
+// before any of them is written into a string or compared: `true`, `1` and `1.0` would otherwise
+// read as the same key in one language and as three in another, and be written differently.
+function assertStringKeys(input: FidelityInput): void {
+  const invalid: string[] = [];
+  input.sections.forEach(({ sourceKey }, position) => {
+    if (typeof sourceKey !== "string") invalid.push(`Source section ${position} has no string key`);
+  });
+  input.provenance.forEach(({ sourceKey }, position) => {
+    if (typeof sourceKey !== "string") {
+      invalid.push(`Provenance entry ${position} has no string key`);
+    }
+  });
+  if (invalid.length > 0) throw new FidelityError("Source key is invalid", invalid);
+}
+
 export function verifyNarrativeFidelity(input: FidelityInput): FidelityReport {
-  if (input.normalizationVersion !== NORMALIZATION_VERSION) {
+  const version: unknown = input.normalizationVersion;
+  if (version !== NORMALIZATION_VERSION) {
     throw new FidelityError("Normalization version mismatch", [
-      `Expected ${NORMALIZATION_VERSION}, received ${input.normalizationVersion}`,
+      typeof version === "string"
+        ? `Expected ${NORMALIZATION_VERSION}, received ${version}`
+        : `Expected ${NORMALIZATION_VERSION}, received a value that is not a string`,
     ]);
   }
+  assertStringKeys(input);
   assertUniqueKeys(
     input.sections.map(({ sourceKey }) => sourceKey),
     "source section",
@@ -574,6 +650,8 @@ export function verifyNarrativeFidelity(input: FidelityInput): FidelityReport {
 
   const results: SectionResult[] = [];
   const verifiedSpans: { sourceKey: string; span: SourceSpan }[] = [];
+  // computeNarrativeBinding's bindings, from the scan each section gets here rather than a second.
+  const bindings: NarrativeBinding[] = [];
 
   for (const section of input.sections) {
     const entry = provenance.get(section.sourceKey);
@@ -581,6 +659,10 @@ export function verifyNarrativeFidelity(input: FidelityInput): FidelityReport {
     const normalized = normalizeNarrative(section.div);
     const normalizedHash =
       "text" in normalized ? { normalizedTextSha256: sha256Utf8(normalized.text) } : {};
+    bindings.push({
+      sourceKey: section.sourceKey,
+      normalizedTextSha256: normalizedHash.normalizedTextSha256 ?? null,
+    });
 
     if (entry === undefined) {
       results.push({ ...base, status: "missing-provenance", spanCount: 0, ...normalizedHash });
@@ -657,7 +739,7 @@ export function verifyNarrativeFidelity(input: FidelityInput): FidelityReport {
     reportVersion: "1.0.0",
     normalizationVersion: NORMALIZATION_VERSION,
     extractedTextSha256: sha256(input.source),
-    narrativeBindingSha256: computeNarrativeBinding(input.sections).sha256,
+    narrativeBindingSha256: sha256(bindings),
     status,
     sections,
     issues,

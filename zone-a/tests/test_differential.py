@@ -1,15 +1,18 @@
 """Differential test: the Python implementation against a corpus of TypeScript outputs.
 
-The golden vectors are the executable specification, and 130 of them passing proves agreement on
-130 inputs the TypeScript author chose. "Language-neutral" is a claim about the inputs nobody
-chose, so this module tests it as a property: ``scripts/fidelity/differential.ts`` generates a
-seeded corpus of synthetic inputs together with what ``src/fidelity/`` produced for each one, and
-every case here is re-run through ``zone_a.fidelity`` and compared.
+The golden vectors are the executable specification, and their passing proves agreement on the
+inputs the TypeScript author chose (634 worked vectors, and the per-code-point table of every
+closed list). "Language-neutral" is a claim about the inputs nobody chose, so this module tests it
+as a property: ``scripts/fidelity/differential.ts`` generates a seeded corpus of synthetic inputs
+together with what ``src/fidelity/`` produced for each one, and every case here is re-run through
+``zone_a.fidelity`` and compared.
 
 The corpus path comes from ``DIFFERENTIAL_CORPUS``. With the variable unset the small committed
-smoke corpus is used, so ``pytest`` runs offline and without Node; CI generates a 2000-case
-corpus first and points the variable at it. The smoke corpus is a subset of the same generator
-at the same default seed, so a local failure is reproducible in CI and the reverse.
+smoke corpus is used, so ``pytest`` runs offline and without Node; CI generates 2000 cases at the
+fixed seed 20260920 and 2000 more at a seed of the run's own (its run id, which the generator
+prints), and points the variable at both. The smoke corpus is a subset of the same generator at
+the fixed seed, so a local failure is reproducible in CI and the reverse; a failure at the run's
+seed is reproduced with ``--seed <that seed> --count 2000``, the seed every case records.
 
 Three things the corpus carries that the vectors cannot:
 
@@ -21,7 +24,8 @@ Three things the corpus carries that the vectors cannot:
   cannot carry an integral float. The generator marks such a case with ``floatOffsets`` instead
   and ``_with_float_offsets`` rewrites the numbers here. In JavaScript ``1`` and ``1.0`` are one
   value, so the recorded expectation is exactly what the TypeScript would have produced.
-* **volume.** Two thousand cases at three seeds, rather than one worked example per rule.
+* **volume.** Two thousand cases at the fixed seed and two thousand at a new one every run,
+  rather than one worked example per rule.
 
 Nothing in here prints an input. A mismatch reports the family, the tag, the seed, the index, the
 input classes, and two digests — the same discipline as ``_assert_same`` in
@@ -163,7 +167,10 @@ RUNNERS = {"normalize": _run_normalize, "xhtml": _run_xhtml, "verify": _run_veri
 
 
 def _cases() -> list[Any]:
-    return [pytest.param(case, id=f"{case['family']}-{case['index']}") for case in _CORPUS]
+    return [
+        pytest.param(case, id=f"{case['family']}-{case['seed']}-{case['index']}")
+        for case in _CORPUS
+    ]
 
 
 @pytest.mark.parametrize("case", _cases())
@@ -313,5 +320,7 @@ def test_the_corpus_exercises_the_classes_the_review_named() -> None:
         "picture-violation",
         "reserved-character",
         "near-reserved",
+        # Audit 2026-09-27 (F-5): a key or a version that is not a string.
+        "non-string-keys",
     }
     assert required <= seen, sorted(required - seen)

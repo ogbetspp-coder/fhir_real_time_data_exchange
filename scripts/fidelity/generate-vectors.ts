@@ -13,6 +13,7 @@ import {
 } from "../../src/fidelity/index.js";
 import { sha256Utf8 } from "../../src/lib/hash.js";
 import { normalizationCases, verifyCases, xhtmlCases } from "../../test/fixtures/fidelity/cases.js";
+import { codePointVectors } from "../../test/fixtures/fidelity/code-points.js";
 
 // Golden vectors: the language-neutral, byte-for-byte specification of the fidelity check
 // (ADR 0003). A re-implementation must reproduce every `expected` value and `reportHash`.
@@ -57,7 +58,16 @@ const verify = verifyCases.map(({ name, input }) => {
   return { name, input: filled, expected: verifyNarrativeFidelity(filled) };
 });
 
-const vectors = { normalizationVersion: NORMALIZATION_VERSION, normalization, xhtml, verify };
+// Every code point's classes under every closed list (test/fixtures/fidelity/code-points.ts).
+const codePoints = codePointVectors();
+
+const vectors = {
+  normalizationVersion: NORMALIZATION_VERSION,
+  normalization,
+  xhtml,
+  verify,
+  codePoints,
+};
 const prettierOptions = { ...(await resolveConfig(output)), parser: "json" as const };
 await writeFile(
   path.join(output, "vectors.json"),
@@ -65,5 +75,5 @@ await writeFile(
 );
 
 console.log(
-  `Generated ${normalization.length} normalization, ${xhtml.length} xhtml, and ${verify.length} verify vectors`,
+  `Generated ${normalization.length} normalization, ${xhtml.length} xhtml, ${verify.length} verify vectors and ${codePoints.runs.length} code point runs`,
 );

@@ -60,6 +60,16 @@ const MAX_UNVERIFIED_STRINGS = 3_000;
 const MAX_UNVERIFIED_TOTAL_LENGTH = 40_000;
 const JSON_KEY = /^_?[A-Za-z][A-Za-z0-9]{0,63}$/;
 
+// Bounds on what the fidelity check re-executes at this gate (audit 2026-09-27, F-1 and F-3). The
+// check is linear in both, but every span is hashed and every narrative scanned several times, so
+// neither is left to the submission alone. An extractor writes a span per page a section is on
+// and per run of text between the headers and footers it excludes, and an authority import one
+// per section: both far below these. A narrative's bound (in UTF-16 code units) leaves room for
+// five pictures at the scanner's 1 MiB limit each.
+export const MAX_SPANS_PER_SECTION = 1_000;
+export const MAX_SPANS = 10_000;
+export const MAX_NARRATIVE_LENGTH = 8 * 1_024 * 1_024;
+
 const WORD_SEGMENTER = new Intl.Segmenter(undefined, { granularity: "word" });
 
 function countWordsAnyScript(value: string): number {
@@ -185,6 +195,14 @@ export function structuralInvariantIssues(submission: CanonicalSubmission): stri
   if (fidelity.normalizationVersion !== NORMALIZATION_VERSION) {
     issues.push(`fidelity.normalizationVersion must be ${NORMALIZATION_VERSION}`);
   }
+
+  provenance.sections.forEach(({ spans }, position) => {
+    if (spans.length > MAX_SPANS_PER_SECTION) {
+      issues.push(`provenance.sections[${position}] has more than ${MAX_SPANS_PER_SECTION} spans`);
+    }
+  });
+  const spanCount = provenance.sections.reduce((total, { spans }) => total + spans.length, 0);
+  if (spanCount > MAX_SPANS) issues.push(`provenance.sections have more than ${MAX_SPANS} spans`);
 
   const keys = provenance.sections.map(({ sourceKey }) => sourceKey);
   if (new Set(keys).size !== keys.length)
@@ -480,6 +498,16 @@ export function verifyDocumentSubmission(
     ]);
   }
   const narrativeSections = collectNarrativeSections(composition.data, sourceCodeSystem);
+  // Before any narrative is scanned.
+  const oversized = narrativeSections.filter(({ div }) => div.length > MAX_NARRATIVE_LENGTH);
+  if (oversized.length > 0) {
+    throw new SubmissionRejectedError("Canonical submission is invalid", [
+      ...issues,
+      ...oversized.map(
+        ({ path }) => `${path} narrative exceeds ${MAX_NARRATIVE_LENGTH} UTF-16 code units`,
+      ),
+    ]);
+  }
   const provenanceByKey = new Map(
     submission.provenance.sections.map((section) => [section.sourceKey, section]),
   );

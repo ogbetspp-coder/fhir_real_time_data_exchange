@@ -38,6 +38,7 @@ import {
   type SourceDocumentText,
   type SourcePage,
 } from "../../../src/fidelity/index.js";
+import { isWhitespace } from "../../../src/fidelity/normalize.js";
 import { loadEmaMapping } from "../../../src/fhir/mapping.js";
 import { isComposition } from "../../../src/fhir/types.js";
 import { createSyntheticType2Bundle } from "../../../src/fixtures/synthetic.js";
@@ -136,9 +137,9 @@ export function assertTextFree(report: unknown, location = "$"): void {
 // ---------------------------------------------------------------------------------------------
 
 // The normalisation of docs/fidelity-normalization.md section 3, applied with provenance so a
-// normalised match can be turned back into raw code-point offsets. It deliberately mirrors
-// src/fidelity/normalize.ts rather than importing its private tables (the spike does not modify
-// src/fidelity/), and it omits NFC, which cannot be tracked per code point. Both simplifications
+// normalised match can be turned back into raw code-point offsets. It mirrors
+// src/fidelity/normalize.ts's private tables (the spike does not modify src/fidelity/) and takes
+// its whitespace class from there, so the two cannot drift apart again; it omits NFC, which cannot be tracked per code point. Both simplifications
 // are safe in one direction only: a candidate span is accepted only after `normalizeText` of the
 // raw slice is compared against the target, so a divergence here can lose a section, never
 // fabricate a match.
@@ -159,14 +160,6 @@ const LIGATURES = new Map<number, string>([
 const BULLET_GLYPHS = new Set([
   0x2022, 0x2023, 0x25a0, 0x25a1, 0x25aa, 0x25ab, 0x25cb, 0x25cf, 0x25e6,
 ]);
-
-const WHITESPACE = new Set([
-  0x0009, 0x000a, 0x000d, 0x0020, 0x00a0, 0x1680, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000,
-]);
-
-function isWhitespace(codePoint: number): boolean {
-  return WHITESPACE.has(codePoint) || (codePoint >= 0x2000 && codePoint <= 0x200a);
-}
 
 type BodyIndex = {
   page: number;
@@ -466,16 +459,11 @@ function countCodePoints(characters: readonly string[]): Map<string, number> {
 
 // The separators the adapter introduces are never part of a comparison: they are the adapter's
 // own, they exist on one side only by construction, and they are reported as `separatorsAdded`.
-// Whitespace class of docs/fidelity-normalization.md section 3 step 5, replicated here because
-// the spike must not reach into src/fidelity's private tables and must not apply the rest of
-// the normaliser (ligature expansion and NFC would hide exactly the differences it measures).
-const WHITESPACE_CLASS = new Set([
-  0x0009, 0x000a, 0x000d, 0x0020, 0x00a0, 0x1680, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000,
-]);
-
+// Whitespace class of docs/fidelity-normalization.md section 3 step 5, taken from
+// src/fidelity/normalize.ts (this used to be a copy of the 2.0.0 class), and nothing else of the
+// normaliser (ligature expansion and NFC would hide exactly the differences it measures).
 function isWhitespaceClass(character: string): boolean {
-  const codePoint = character.codePointAt(0) ?? 0;
-  return WHITESPACE_CLASS.has(codePoint) || (codePoint >= 0x2000 && codePoint <= 0x200a);
+  return isWhitespace(character.codePointAt(0) ?? 0);
 }
 
 // The two sides represent separators differently — the adapter emits U+0009 between cells and
