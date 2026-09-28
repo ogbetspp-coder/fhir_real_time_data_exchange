@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
+# The two R5 FHIR stores, created or reconciled through the REST API, which Terraform cannot
+# manage for R5 (source: the Type 2 inputs; target: the validated EMA output, with its Pub/Sub
+# notifications and BigQuery stream). Run by deploy.sh; takes no argument.
+#
+#   EMA_FLOW_ENVIRONMENT=dev GCP_PROJECT_ID=sage-ship-509104-b8 bash scripts/gcp/reconcile-fhir-stores.sh
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # shellcheck source=scripts/gcp/common.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+ema_flow_option "" "$@"
 cd "$ROOT"
 
 PROJECT_ID="$(ema_flow_resolve_project)"
@@ -37,7 +43,11 @@ TOKEN="$(ema_flow_access_token)"
 PARENT="projects/${PROJECT_ID}/locations/${REGION}/datasets/${DATASET}"
 COLLECTION="https://healthcare.googleapis.com/v1/${PARENT}/fhirStores"
 TMP="$(mktemp -d)"
-trap 'unset TOKEN; rm -rf "$TMP"' EXIT
+reconcile_cleanup() {
+  unset TOKEN
+  rm -rf "$TMP"
+}
+ema_flow_on_exit reconcile_cleanup
 
 cat >"$TMP/source.json" <<JSON
 {
@@ -193,3 +203,4 @@ reconcile() {
 
 reconcile "$SOURCE_STORE" "$TMP/source.json"
 reconcile "$TARGET_STORE" "$TMP/target.json"
+ema_flow_finish

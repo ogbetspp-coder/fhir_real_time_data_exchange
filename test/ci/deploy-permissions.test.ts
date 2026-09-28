@@ -87,10 +87,12 @@ function shell(text: string): string {
 }
 
 // Text without its comment lines (shell and YAML alike) and without YAML `shell:` keys.
+// A `shell: bash …` key is the default made explicit; any other shell (node, python, pwsh) runs
+// a step's text as that language, and is a finding of its own (deployJobFindings).
 function uncommented(text: string): string {
   return text
     .split("\n")
-    .filter((line) => !/^\s*#/.test(line) && !/^\s*shell:/.test(line))
+    .filter((line) => !/^\s*#/.test(line) && !/^\s*shell:\s*bash\b/.test(line))
     .join("\n");
 }
 
@@ -100,27 +102,36 @@ function uncommented(text: string): string {
 // named. Anything else (a path built from a variable, ./scripts/...) is a finding.
 // Only at a command's position: a line's start, after a separator, a keyword or a YAML `run:`;
 // a word in a message ("No synthetic source seeded") is not a command.
+// Every argument after the interpreter's flags is read (round 3), so `node --no-warnings ./x.mjs`
+// is followed to ./x.mjs; a flag that takes inline code (-c, -e, -p, a lone -) ends the reading.
 const STARTS =
-  /(?:^[ \t]*|[;|&(`][ \t]*|\b(?:then|do|else|if|run:)[ \t]+)(node|bash|sh|source|python3?)[ \t]+("[^"]*"|'[^']*'|[^\s;|&)]+)/gm;
+  /(?:^[ \t]*|[;|&(`][ \t]*|\b(?:then|do|else|if|run:)[ \t]+)(node|bash|sh|source|python3?)((?:[ \t]+(?:"[^"]*"|'[^']*'|[^\s;|&)"']+))+)/gm;
+const ARGUMENT = /"[^"]*"|'[^']*'|[^\s;|&)"']+/g;
 // The one line every script sources common.sh with, which is followed as a file by name.
 const SOURCES_COMMON =
   /^source "\$\(cd "\$\(dirname "\$\{BASH_SOURCE\[0\]\}"\)(?:\/\.\.\/\.\.\/scripts\/gcp)?" && pwd\)\/common\.sh"$/gm;
 function invocationFindings(where: string, text: string): string[] {
   const findings: string[] = [];
-  for (const [, command, argument] of uncommented(text)
+  for (const [, command, argumentText] of uncommented(text)
     .replace(SOURCES_COMMON, "")
     .matchAll(STARTS)) {
-    const arg = argument ?? "";
-    if (arg.startsWith("-")) continue;
-    if (command === "source" && arg === '"$ENVIRONMENT_INPUTS"') continue;
-    if (/^scripts\/[\w/.-]+$/.test(arg) && existsSync(arg)) continue;
-    findings.push(`${where}: ${command ?? "?"} ${arg}`);
+    const args = (argumentText ?? "").match(ARGUMENT) ?? [];
+    const inline = args.findIndex((arg) => /^-[cep]?$/.test(arg));
+    const script = args.find(
+      (arg, index) => !arg.startsWith("-") && (inline < 0 || index < inline),
+    );
+    if (script === undefined) continue;
+    if (command === "source" && script === '"$ENVIRONMENT_INPUTS"') continue;
+    if (/^scripts\/[\w/.-]+$/.test(script) && existsSync(script)) continue;
+    findings.push(`${where}: ${command ?? "?"} ${script}`);
   }
   // Inline Node code (node -e): every require or dynamic import names a built-in, literally.
   for (const [call, specifier] of uncommented(text).matchAll(
     /\b(?:require\s*|import)\(\s*(["'][^"']*["']|[^)\s]*)/g,
   )) {
-    if (!/^["']node:[a-z/_]+["']$/.test(specifier ?? "")) findings.push(`${where}: ${call}`);
+    if (!/^["']node:[a-z/_]+["']$/.test(specifier ?? "") || !allowedBuiltin(specifier ?? "")) {
+      findings.push(`${where}: ${call}`);
+    }
   }
   const run = RUNS_A_PACKAGE.exec(uncommented(text));
   if (run !== null) findings.push(`${where}: ${run[0]}`);
@@ -152,7 +163,17 @@ const INDIRECT: [string, RegExp][] = [
   ["a dot-source", new RegExp(`${AT}\\.[ \t]+(?!\\d?>)\\S`, "m")],
   ["a script run as a command", new RegExp(`${AT}(?:\\./)?scripts/[\\w/.-]+`, "m")],
   ["perl", /\bperl\b/],
+  // Round 3: a preload through the environment reaches every node process the job starts.
+  ["NODE_OPTIONS", /\bNODE_OPTIONS\b/],
 ];
+
+// The Node built-ins a script the deploy job starts may use: not the ones that start or load
+// other code (child_process, vm, module, worker_threads), which would take it past this reader.
+const REFUSED_BUILTINS = new Set(["child_process", "vm", "module", "worker_threads"]);
+function allowedBuiltin(specifier: string): boolean {
+  const name = /node:([a-z_]+)/.exec(specifier)?.[1] ?? "";
+  return name !== "" && !REFUSED_BUILTINS.has(name);
+}
 
 // The Python the job runs: the code of each `python3 -c` string and each heredoc fed to
 // `python3 -`, and the repository's Python files it starts. Each may import the standard library
@@ -271,6 +292,11 @@ function nodeScripts(texts: Iterable<string>): Set<string> {
 // Everything wrong with what the deploy job runs: an empty list is the rule held.
 function deployJobFindings(reached: Map<string, string>): string[] {
   const findings = [...reached].flatMap(([where, text]) => invocationFindings(where, text));
+  for (const [where, text] of reached) {
+    for (const [line] of text.matchAll(/^\s*shell:\s*(?!bash\b)\S.*$/gm)) {
+      findings.push(`${where}: a step run by a shell other than bash: ${line.trim()}`);
+    }
+  }
   // Python, read from the whole of each file reached (a function's heredocs are stripped above),
   // and from each Python file started.
   const files = [...reached.keys()].filter((where) => /^scripts\/.*\.sh$/.test(where));
@@ -286,7 +312,7 @@ function deployJobFindings(reached: Map<string, string>): string[] {
   }
   for (const script of nodeScripts(reached.values())) {
     for (const imported of nodeImports(script)) {
-      if (!/: node:[a-z/_]+$/.test(imported)) findings.push(imported);
+      if (!/: node:[a-z/_]+$/.test(imported) || !allowedBuiltin(imported)) findings.push(imported);
     }
   }
   return findings;
@@ -358,6 +384,11 @@ describe("the job that can become the deployer", () => {
     expect(
       withLine(job, reached.get(job) ?? "", "        run: npm run x && npm exec --yes -- some-pkg"),
     ).not.toEqual([]);
+    // Round 3: a step whose text another language runs.
+    expect(withLine(job, reached.get(job) ?? "", "        shell: node {0}")).not.toEqual([]);
+    expect(withLine(job, reached.get(job) ?? "", "        shell: bash --noprofile {0}")).toEqual(
+      [],
+    );
     // In a script the job reaches: a package manager, a path the reader cannot follow, and the
     // fetch and fixture export that ran in bootstrap.sh until this batch.
     const boot = "scripts/gcp/bootstrap.sh";
@@ -367,6 +398,10 @@ describe("the job that can become the deployer", () => {
       'bash "$ROOT/scripts/gcp/other.sh"',
       "npm run standards:fetch",
       "node_modules/.bin/tsx scripts/fhir/export-fixture.ts out.json in.json",
+      // Round 3.
+      "node --no-warnings ./scripts/fhir/x.mjs",
+      "NODE_OPTIONS=--require=./hook.cjs node scripts/fhir/fetch-standards.mjs",
+      'node -e \'require("node:child_process").execSync("x")\'',
       // Review round 2.
       'eval "$COMMAND"',
       "curl -s https://x | sh",
@@ -397,13 +432,18 @@ describe("the job that can become the deployer", () => {
         'export * from "esbuild";',
         "import { z } from 'zod';",
         "const m = require(name);",
+        // Round 3: built-ins that start or load other code.
+        'import { execSync } from "node:child_process";',
+        'import vm from "node:vm";',
+        'import { createRequire } from "node:module";',
+        'import { Worker } from "node:worker_threads";',
       ]) {
         const file = path.join(dir, "probe.mjs");
         writeFileSync(file, `import { readFile } from "node:fs/promises";\n${line}\n`);
-        expect([line, nodeImports(file).filter((i) => !/: node:[a-z/_]+$/.test(i))]).toEqual([
+        expect([
           line,
-          [expect.any(String)],
-        ]);
+          nodeImports(file).filter((i) => !/: node:[a-z/_]+$/.test(i) || !allowedBuiltin(i)),
+        ]).toEqual([line, [expect.any(String)]]);
       }
     } finally {
       rmSync(dir, { recursive: true, force: true });

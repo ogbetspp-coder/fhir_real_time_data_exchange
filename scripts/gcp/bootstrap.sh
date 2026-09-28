@@ -13,6 +13,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # shellcheck source=scripts/gcp/common.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+ema_flow_option "" "$@"
 cd "$ROOT"
 
 PROJECT_ID="$(ema_flow_resolve_project)"
@@ -39,7 +40,11 @@ PROFILE_BUCKET="$(terraform -chdir=infra output -raw profile_staging_bucket)"
 TARGET_FHIR="https://healthcare.googleapis.com/v1/projects/${PROJECT_ID}/locations/${REGION}/datasets/${DATASET}/fhirStores/${TARGET_STORE}/fhir"
 
 TMP="$(mktemp -d)"
-trap 'unset TOKEN; rm -rf "$TMP"' EXIT
+bootstrap_cleanup() {
+  unset TOKEN
+  rm -rf "$TMP"
+}
+ema_flow_on_exit bootstrap_cleanup
 mkdir -p \
   "$TMP/global" "$TMP/ema" "$TMP/terminology" "$TMP/extensions" \
   "$TMP/import/global" "$TMP/import/ema" "$TMP/import/terminology" "$TMP/import/extensions"
@@ -130,9 +135,11 @@ with open(out, "a", encoding="utf-8") as listing:
         version = (resource.get("meta") or {}).get("versionId")
         version = version if isinstance(version, str) and re.fullmatch(r"[A-Za-z0-9.-]{1,64}", version) else "-"
         listing.write(f"{kind}/{rid} {version}\n")
-if isinstance(bundle.get("total"), int) and not isinstance(bundle.get("total"), bool):
-    with open(out + ".totals", "a", encoding="utf-8") as totals:
-        totals.write(f"{kind} {bundle['total']}\n")
+# The total of every page, "-" where it gives none, so the first line for a type is its first page.
+total = bundle.get("total")
+total = total if isinstance(total, int) and not isinstance(total, bool) else "-"
+with open(out + ".totals", "a", encoding="utf-8") as totals:
+    totals.write(f"{kind} {total}\n")
 following = [link.get("url", "") for link in bundle.get("link") or [] if link.get("relation") == "next"]
 if following and not following[0].startswith(base):
     sys.exit("a next-page link leads outside the target store")
@@ -141,22 +148,27 @@ PY
 )"
     done
   done
-  STORE_LISTING_UNSTABLE="$(python3 - "$out" <<'PY'
+  STORE_LISTING_UNSTABLE="$(python3 - "$out" "$IMPORT_TYPES" <<'PY'
 import collections, sys
-out = sys.argv[1]
+out, types = sys.argv[1], sys.argv[2].split()
 refs = collections.Counter(line.split(" ")[0] for line in open(out, encoding="utf-8").read().splitlines() if line)
 first_total = {}
 for line in open(out + ".totals", encoding="utf-8").read().splitlines():
     kind, total = line.split(" ")
-    first_total.setdefault(kind, int(total))
+    first_total.setdefault(kind, total)
 reasons = []
 repeated = sorted(ref for ref, n in refs.items() if n > 1)
 if repeated:
     reasons.append(f"{len(repeated)} resource(s) listed more than once")
-for kind in sorted(first_total):
+# Every type the import covers must have a first-page total to be judged against: a type whose
+# first page gives none cannot be shown complete, review round 3.
+for kind in types:
     listed = sum(1 for ref in refs if ref.startswith(kind + "/"))
-    if listed != first_total[kind]:
-        reasons.append(f"{listed} {kind} listed against a first-page total of {first_total[kind]}")
+    total = first_total.get(kind, "-")
+    if total == "-":
+        reasons.append(f"the {kind} search gave no total on its first page")
+    elif listed != int(total):
+        reasons.append(f"{listed} {kind} listed against a first-page total of {total}")
 print("; ".join(reasons))
 PY
 )"
@@ -364,7 +376,7 @@ fi
 # in the store.
 if [[ "${ALLOW_SYNTHETIC_SOURCES:-false}" != "true" ]]; then
   echo "Profiles imported into ${TARGET_STORE}. No synthetic source seeded: this environment does not accept synthetic content."
-  exit 0
+  ema_flow_finish
 fi
 TOKEN="$(ema_flow_access_token)"
 FHIR_BASE="https://healthcare.googleapis.com/v1/projects/${PROJECT_ID}/locations/${REGION}/datasets/${DATASET}/fhirStores/${SOURCE_STORE}/fhir"
@@ -386,3 +398,4 @@ echo "Profiles imported into ${TARGET_STORE}."
 echo "Synthetic source seeded at Bundle/synthetic-type2-smpc in ${SOURCE_STORE}."
 echo "Run:"
 echo "gcloud workflows run $(terraform -chdir=infra output -raw workflow_name) --location=${REGION} --data='{\"source\":\"healthcare-api\",\"bundleId\":\"synthetic-type2-smpc\"}'"
+ema_flow_finish

@@ -20,6 +20,7 @@ set -euo pipefail
 
 # shellcheck source=scripts/gcp/common.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../scripts/gcp" && pwd)/common.sh"
+ema_flow_option --check "$@"
 # GOOGLE_CLOUD_PROJECT or GCP_PROJECT_ID (refused when the two differ), else the gcloud
 # configuration; no project at all fails rather than falling back to a hard-coded one.
 PROJECT_ID="$(ema_flow_resolve_project)"
@@ -40,7 +41,7 @@ MEMBER="serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-discoveryengine.iam.gser
 ROLE="projects/${PROJECT_ID}/roles/${ROLE_ID}"
 API="https://${REGION}-aiplatform.googleapis.com/v1/${AGENT_RESOURCE}"
 CHECK="false"
-[[ "${1:-}" == "--check" ]] && CHECK="true"
+[[ "$EMA_FLOW_OPTION" == "--check" ]] && CHECK="true"
 TOKEN="$(gcloud --quiet auth print-access-token)"
 
 # The access token reaches curl on its standard input, as a config line, never as an argument:
@@ -65,7 +66,7 @@ print(any(b.get('role') == sys.argv[1] and sys.argv[2] in b.get('members', [])
 if [[ "$CHECK" == "true" ]]; then
   if [[ "$granted" == "True" ]]; then
     echo "Gemini Enterprise may run this agent."
-    exit 0
+    ema_flow_finish
   fi
   echo "Gemini Enterprise cannot run this agent: ${MEMBER} lacks ${ROLE} on it." >&2
   exit 1
@@ -88,7 +89,8 @@ fi
 if [[ "$granted" != "True" ]]; then
   # The binding is added to the policy read above, so nothing else in it is disturbed.
   request="$(mktemp)"
-  trap 'rm -f "$request"' EXIT
+  grant_invoker_cleanup() { rm -f "$request"; }
+  ema_flow_on_exit grant_invoker_cleanup
   printf '%s' "$policy" | python3 -c "
 import json, sys
 policy = json.load(sys.stdin)
@@ -104,3 +106,4 @@ json.dump({'policy': policy}, open(sys.argv[3], 'w'))" "$ROLE" "$MEMBER" "$reque
 fi
 
 bash "$0" --check
+ema_flow_finish

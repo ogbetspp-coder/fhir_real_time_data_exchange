@@ -131,7 +131,11 @@ link = []
 if page + 1 < len(of_kind):
     following = os.environ.get("STUB_NEXT_BASE", base) + kind + "?_page_token=" + str(page + 1)
     link = [{"relation": "next", "url": following}]
-answer(200, {"resourceType": "Bundle", "total": total, "entry": entry, "link": link})
+bundle = {"resourceType": "Bundle", "total": total, "entry": entry, "link": link}
+# STUB_NO_FIRST_TOTAL: the first page of this type's search gives no total.
+if page == 0 and os.environ.get("STUB_NO_FIRST_TOTAL") == kind:
+    del bundle["total"]
+answer(200, bundle)
 `;
 
 const GCLOUD = `#!/usr/bin/env bash
@@ -395,6 +399,19 @@ describe.concurrent("the deploy's FHIR bootstrap", { timeout: 60_000 }, () => {
     expect(result.out).toContain("listed against a first-page total of");
     expect(result.out).toContain("Profile set not confirmed");
     expect(result.calls).not.toContain("DELETE");
+    expect(readFileSync(path.join(setup.stubs, "marker"), "utf8")).toBe(marker);
+  });
+
+  it("does not trust a listing whose first page gives no total, for any type it imports", async () => {
+    // Review round 3: a type with no first-page total was not judged at all. CodeSystem has one
+    // resource here, so its first page is its only page.
+    const setup = await setUp();
+    await bootstrap(setup);
+    const marker = readFileSync(path.join(setup.stubs, "marker"), "utf8");
+    const result = await bootstrap(setup, { STUB_NO_FIRST_TOTAL: "CodeSystem" });
+    expect(result.status).toBe(0);
+    expect(result.out).toContain("the CodeSystem search gave no total on its first page");
+    expect(result.out).toContain("Profile set not confirmed");
     expect(readFileSync(path.join(setup.stubs, "marker"), "utf8")).toBe(marker);
   });
 

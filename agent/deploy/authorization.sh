@@ -29,6 +29,16 @@ set -euo pipefail
 
 # shellcheck source=scripts/gcp/common.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../scripts/gcp" && pwd)/common.sh"
+# The command lines above, and nothing else, checked before anything is read (review round 3):
+# a secret file must exist, and --help prints this header.
+case "$#:${1:-}" in
+  0: | "1:--check" | "1:--clipboard") ;;
+  1:--help | 1:-h) ema_flow_help "${BASH_SOURCE[0]}" ;;
+  2:--secret-file) ;;
+  1:-*) ema_flow_refuse "${BASH_SOURCE[0]}" "[--check|--clipboard|--secret-file PATH|PATH]" "$@" ;;
+  1:*) [[ -f "$1" ]] || ema_flow_refuse "${BASH_SOURCE[0]}" "[--check|--clipboard|--secret-file PATH|PATH]" "$@" ;;
+  *) ema_flow_refuse "${BASH_SOURCE[0]}" "[--check|--clipboard|--secret-file PATH|PATH]" "$@" ;;
+esac
 # GOOGLE_CLOUD_PROJECT or GCP_PROJECT_ID (refused when the two differ), else the gcloud
 # configuration; no project at all fails rather than falling back to a hard-coded one.
 PROJECT_ID="$(ema_flow_resolve_project)"
@@ -51,7 +61,7 @@ google_curl() {
 status="$(google_curl --output /dev/null --write-out '%{http_code}' \
   --header "X-Goog-User-Project: ${PROJECT_ID}" "${BASE}/${NAME}")" || status="curl-failed"
 if [[ "${1:-}" == "--check" ]]; then
-  if [[ "$status" == "200" ]]; then echo "authorization ${AUTHORIZATION_ID}: present"; exit 0; fi
+  if [[ "$status" == "200" ]]; then echo "authorization ${AUTHORIZATION_ID}: present"; ema_flow_finish; fi
   echo "authorization ${AUTHORIZATION_ID}: missing (HTTP ${status})" >&2
   exit 1
 fi
@@ -147,7 +157,8 @@ fi
 # heredoc inside a command substitution, which bash mis-parsed on the first run (2026-09-22).
 body_file="$(mktemp)"
 chmod 600 "$body_file"
-trap 'rm -f "$body_file"' EXIT
+authorization_cleanup() { rm -f "$body_file" "${response_file:-}"; }
+ema_flow_on_exit authorization_cleanup
 NAME="$NAME" CLIENT_ID="$CLIENT_ID" CLIENT_SECRET="$CLIENT_SECRET" python3 -c '
 import json, os
 client_id = os.environ["CLIENT_ID"]
@@ -183,7 +194,6 @@ else
 fi
 echo "sending ${verb} to the Discovery Engine API…"
 response_file="$(mktemp)"
-trap 'rm -f "$body_file" "$response_file"' EXIT
 # --fail-with-body: an error status fails the call, and the body still lands in the file to be
 # reported below (the code is kept too; the script stops on anything but 200).
 code="$(google_curl --fail-with-body --output "$response_file" --write-out '%{http_code}' \
@@ -219,3 +229,4 @@ redirect = (query.get('redirect_uri') or [''])[0]
 if redirect != 'https://vertexaisearch.cloud.google.com/static/oauth/oauth.html':
     sys.exit('stored authorizationUri has no usable redirect_uri; the update did not apply')
 print('stored: redirect_uri correct for client', (d.get('serverSideOauth2') or {}).get('clientId','')[:24] + '…')" "$stored"
+ema_flow_finish

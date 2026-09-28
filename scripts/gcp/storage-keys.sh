@@ -97,7 +97,8 @@ done
 # key existed. Noncurrent generations are deleted once 20 newer ones exist or after 30 days,
 # whichever comes first; the live state is never touched by the rule.
 lifecycle="$(mktemp)"
-trap 'rm -f "$lifecycle"' EXIT
+storage_keys_cleanup() { rm -f "$lifecycle"; }
+ema_flow_on_exit storage_keys_cleanup
 cat > "$lifecycle" <<'JSON'
 {"rule": [
   {"action": {"type": "Delete"}, "condition": {"isLive": false, "numNewerVersions": 20}},
@@ -150,3 +151,4 @@ if [[ "$CHECK" == "true" ]]; then
 else
   bash "$0" --check
 fi
+ema_flow_finish

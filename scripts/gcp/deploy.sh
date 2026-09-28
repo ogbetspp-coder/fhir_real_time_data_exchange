@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# The deploy, one phase at a time (.github/workflows/deploy.yml runs them in order), or all of them
+# for a local run:
+#
+#   EMA_FLOW_ENVIRONMENT=dev GCP_PROJECT_ID=sage-ship-509104-b8 bash scripts/gcp/deploy.sh [phase]
+#
+# Phases: preflight, deps, init, apis, images, apply, plan, record-readers, bootstrap, smoke,
+# query-smoke, all (the default).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -6,14 +13,23 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 cd "$ROOT"
 
-PHASE="${1:-all}"
+# One phase, known before anything else is done; --help prints the header above (review round
+# 3: an unknown argument used to reach the project and environment checks first).
+case "$#:${1:-}" in
+  0:) PHASE=all ;;
+  1:--help | 1:-h) ema_flow_help "${BASH_SOURCE[0]}" ;;
+  1:preflight | 1:deps | 1:init | 1:apis | 1:images | 1:apply | 1:plan | 1:record-readers | \
+    1:bootstrap | 1:smoke | 1:query-smoke | 1:all) PHASE="$1" ;;
+  *) ema_flow_refuse "${BASH_SOURCE[0]}" "[phase]" "$@" ;;
+esac
 trap 'echo "::error title=Phase ${PHASE} failed::${BASH_COMMAND} exited $?"' ERR
 # Temporary files that must not outlive the script however it ends (a saved plan holds sensitive
-# values); plan_reviewed adds to it.
+# values); plan_reviewed adds to it. The EXIT trap is common.sh's (ema_flow_on_exit): under bash
+# 3.2 any EXIT trap turns an expansion or unset-variable error into exit 0, whatever the trap does
+# with $?, so it fails a run that ended without reaching ema_flow_finish at the bottom.
 DEPLOY_TEMP_FILES=()
-# The script's own status is kept: an exit caused by an expansion error (an unset
-# EMA_FLOW_ENVIRONMENT) would otherwise end with the status of this cleanup, 0.
-trap 'deploy_status=$?; rm -f ${DEPLOY_TEMP_FILES[@]+"${DEPLOY_TEMP_FILES[@]}"}; exit "$deploy_status"' EXIT
+deploy_cleanup() { rm -f ${DEPLOY_TEMP_FILES[@]+"${DEPLOY_TEMP_FILES[@]}"}; }
+ema_flow_on_exit deploy_cleanup
 PROJECT_ID="$(ema_flow_resolve_project)"
 # Exported unconditionally, both names, so every script this one runs (record-readers.sh,
 # bootstrap.sh, reconcile-fhir-stores.sh) acts on the project this one resolved.
@@ -1412,8 +1428,5 @@ case "$PHASE" in
     phase_smoke
     phase_query_smoke
     ;;
-  *)
-    echo "Unknown deploy phase: ${PHASE}" >&2
-    exit 1
-    ;;
 esac
+ema_flow_finish

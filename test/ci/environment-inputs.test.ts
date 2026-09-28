@@ -117,7 +117,7 @@ describe("each environment's own inputs", () => {
 
   it("are read by deploy.sh for the environment it runs, and a missing file is refused", () => {
     const run = (environment: string) =>
-      spawnSync("bash", ["scripts/gcp/deploy.sh", "no-such-phase"], {
+      spawnSync("bash", ["scripts/gcp/deploy.sh", "plan"], {
         encoding: "utf8",
         env: {
           PATH: process.env.PATH ?? "",
@@ -126,20 +126,21 @@ describe("each environment's own inputs", () => {
         },
       });
     const dev = run("dev");
-    expect(dev.stderr).toContain("Unknown deploy phase: no-such-phase");
+    expect(dev.stderr).toContain("DEPLOY_SERVICE_ACCOUNT names the account");
     const unknown = run("staging");
     expect(unknown.status).toBe(1);
     expect(unknown.stderr).toContain("No inputs file for environment staging");
-    expect(unknown.stderr).not.toContain("Unknown deploy phase");
+    expect(unknown.stderr).not.toContain("DEPLOY_SERVICE_ACCOUNT names the account");
   });
 });
 
 // The environment names its project, and nothing defaults to dev (audit B08, L1). Until then an
 // unset or empty EMA_FLOW_ENVIRONMENT read as dev, and dev's inputs (alerts that page no one,
 // synthetic sources) applied to whatever project the shell named. Each case runs deploy.sh itself,
-// with a phase that does not exist, so it stops at the first refusal or at "Unknown deploy phase".
+// with the plan phase and no DEPLOY_SERVICE_ACCOUNT, so it stops at the first refusal or, past
+// every environment check, at the plan's own refusal of a missing account.
 function deployWith(env: Record<string, string>) {
-  return spawnSync("bash", ["scripts/gcp/deploy.sh", "no-such-phase"], {
+  return spawnSync("bash", ["scripts/gcp/deploy.sh", "plan"], {
     encoding: "utf8",
     env: { PATH: process.env.PATH ?? "", ...env },
   });
@@ -160,7 +161,7 @@ describe("the environment deploy.sh deploys", () => {
     const run = deployWith({ GOOGLE_CLOUD_PROJECT: DEV_PROJECT, ...env });
     expect(run.status).not.toBe(0);
     expect(run.stderr).toContain("EMA_FLOW_ENVIRONMENT names the environment to deploy");
-    expect(run.stderr).not.toContain("Unknown deploy phase");
+    expect(run.stderr).not.toContain("DEPLOY_SERVICE_ACCOUNT names the account");
   });
 
   it("is deployed only to the project its inputs file names", () => {
@@ -170,7 +171,7 @@ describe("the environment deploy.sh deploys", () => {
     });
     expect(run.status).toBe(1);
     expect(run.stderr).toContain(`dev is deployed to ${DEV_PROJECT} only`);
-    expect(run.stderr).not.toContain("Unknown deploy phase");
+    expect(run.stderr).not.toContain("DEPLOY_SERVICE_ACCOUNT names the account");
   });
 
   it.each(["prod", "validation"])("is refused as %s, which names no project yet", (environment) => {

@@ -45,12 +45,13 @@ set -euo pipefail
 ORG_ID="${GCP_ORG_ID:-1048405016186}"
 # shellcheck source=scripts/gcp/common.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+ema_flow_option --check "$@"
 # GOOGLE_CLOUD_PROJECT or GCP_PROJECT_ID (refused when the two differ), else the gcloud
 # configuration; no project at all fails rather than falling back to a hard-coded one.
 DEV_PROJECT="$(ema_flow_resolve_project)"
 PROD_PROJECT="${PROD_PROJECT_ID:-khs-ema-flow-prod}"
 CHECK="false"
-[[ "${1:-}" == "--check" ]] && CHECK="true"
+[[ "$EMA_FLOW_OPTION" == "--check" ]] && CHECK="true"
 drift=0
 
 note() { drift=1; echo "$*"; }
@@ -110,7 +111,8 @@ ensure_folder prod "production" "folders/${product}"
 
 # 2. The production folder's policies, before anything lives in it.
 policy_dir="$(mktemp -d)"
-trap 'rm -rf "$policy_dir"' EXIT
+landing_zone_cleanup() { rm -rf "$policy_dir"; }
+ema_flow_on_exit landing_zone_cleanup
 policy() { # <constraint> <values json>
   printf '{"name":"folders/%s/policies/%s","spec":{"rules":[{"values":%s}]}}\n' "$prod" "$1" "$2" \
     >"$policy_dir/$1.json"
@@ -193,3 +195,4 @@ if [[ "$CHECK" == "true" ]]; then
 else
   bash "$0" --check
 fi
+ema_flow_finish
