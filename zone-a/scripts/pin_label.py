@@ -10,9 +10,13 @@ document and its List with scripts/check_label_sources.py's ``fetch`` (the gate'
 header, limits and no redirect), writes them to labels/ema-epi/sources/FILE and lists/, and
 writes the entry with each file's SHA-256, size and the date it was retrieved, and with the EMA
 ePI identifier, procedure number, marketing authorisation holder and composition date read from
-those bytes (``metadata``), never typed in. A List two labels share is written once and every
-entry naming it takes its new hash and date. tests/test_qrd_check.py derives the same metadata
-from the committed bytes and fails on any entry that disagrees.
+those bytes (``metadata``), never typed in. Every date is the fetch's UTC date, and pinning a
+file removes the entry's ``retrievedReconstructed`` or ``listRetrievedReconstructed`` flag, which
+marks a date reconstructed from the commit that added a file pinned before this script existed.
+A List two labels share is written once and every entry naming it takes its new hash and date,
+only if the new List still lists each of those labels' documents with the metadata its entry
+records; a new List URL for a shared List file needs --list-file. tests/test_qrd_check.py
+derives the same metadata from the committed bytes and fails on any entry that disagrees.
 
 Pinning new bytes is a reviewed change: afterwards run scripts/check_labels.py to regenerate the
 QRD check results, and ``npm run contracts:check`` for the importer's vectors.
@@ -25,6 +29,7 @@ import datetime
 import hashlib
 import importlib.util
 import json
+import re
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -126,11 +131,13 @@ _KEYS = (
     "sha256",
     "bytes",
     "retrieved",
+    "retrievedReconstructed",
     "list",
     "listFile",
     "listSha256",
     "listBytes",
     "listRetrieved",
+    "listRetrievedReconstructed",
     "epiId",
     "procedureNumber",
     "marketingAuthorisationHolder",
@@ -138,12 +145,51 @@ _KEYS = (
     "epar",
 )
 
+# File names as src/render/sections.ts accepts them: a plain name, never a path.
+FILE = re.compile(r"[a-z0-9-]+\.json")
+LIST_FILE = re.compile(r"[a-z0-9-]+\.list\.json")
+
+# The values metadata() reads from the bytes that a lock entry records.
+_CARRIED = ("epiId", "procedureNumber", "marketingAuthorisationHolder", "compositionDate")
+
+
+def _guid(url: str) -> str:
+    return url.rsplit("/", 1)[-1]
+
+
+def _sibling_issues(
+    entry: dict[str, Any], siblings: list[dict[str, Any]], index: bytes
+) -> list[str]:
+    """Why the new List cannot be written under the labels that share its file, if it cannot.
+
+    Each sibling keeps its own pinned document, so the new List must still list that document
+    and carry the metadata its entry records.
+    """
+    issues: list[str] = []
+    for sibling in siblings:
+        try:
+            carried = metadata((LABELS / "sources" / sibling["file"]).read_bytes(), index)
+        except (OSError, MetadataError, ValueError) as error:
+            issues.append(f"{sibling['file']}: {error}")
+            continue
+        if carried["documentId"] != _guid(sibling["url"]) or carried["listId"] != _guid(
+            entry["list"]
+        ):
+            issues.append(f"{sibling['file']}: the new List does not name its document")
+        issues += [
+            f"{sibling['file']}: the new List's {key} is not the one its entry records"
+            for key in _CARRIED
+            if carried[key] != sibling[key]
+        ]
+    return issues
+
 
 def main() -> int:
     """Fetches one label and its List, writes both, and writes its lock entry.
 
     Returns:
-        The exit status: 0 when the label was pinned, 1 when it could not be.
+        The exit status: 0 when the label was pinned, 1 when it could not be. Nothing is
+        written unless every check passed.
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("file", help="the label's file name in labels/ema-epi/sources/")
@@ -151,6 +197,12 @@ def main() -> int:
         parser.add_argument(f"--{flag}", help="for a label the lock does not hold yet")
     parser.add_argument("--list-file", help="the List's file name in lists/, if not FILE's own")
     arguments = parser.parse_args()
+    if not FILE.fullmatch(arguments.file):
+        print(f"{arguments.file!r} is not a label file name ({FILE.pattern})")
+        return 1
+    if arguments.list_file is not None and not LIST_FILE.fullmatch(arguments.list_file):
+        print(f"{arguments.list_file!r} is not a List file name ({LIST_FILE.pattern})")
+        return 1
     lock = json.loads(LOCK.read_text(encoding="utf-8"))
     entry = next((each for each in lock["sources"] if each["file"] == arguments.file), None)
     given = {
@@ -170,10 +222,35 @@ def main() -> int:
         entry = {"file": arguments.file, **given}
         lock["sources"].append(entry)
     else:
+        # A new List URL for a List file other labels share would move them to another List
+        # unasked: the moved label needs a List file of its own.
+        shares = any(
+            each is not entry and each.get("listFile") == entry.get("listFile")
+            for each in lock["sources"]
+        )
+        if (
+            arguments.list is not None
+            and arguments.list != entry["list"]
+            and arguments.list_file is None
+            and shares
+        ):
+            print(
+                f"could not pin {arguments.file}: {entry['listFile']} is shared; a new List "
+                "URL needs --list-file"
+            )
+            return 1
         entry.update({name: value for name, value in given.items() if value is not None})
     if arguments.list_file is not None:
         entry["listFile"] = arguments.list_file
     entry.setdefault("listFile", arguments.file.removesuffix(".json") + ".list.json")
+    siblings = [
+        each
+        for each in lock["sources"]
+        if each is not entry and each.get("listFile") == entry["listFile"]
+    ]
+    if any(sibling["list"] != entry["list"] for sibling in siblings):
+        print(f"could not pin {arguments.file}: {entry['listFile']} holds another List")
+        return 1
 
     fetcher = _fetcher()
     try:
@@ -183,11 +260,15 @@ def main() -> int:
     except (OSError, fetcher.RefusedError, MetadataError, ValueError) as error:
         print(f"could not pin {arguments.file}: {error}")
         return 1
-    if entry["url"].rsplit("/", 1)[-1] != values["documentId"]:
+    if _guid(entry["url"]) != values["documentId"]:
         print(f"could not pin {arguments.file}: the document's id is not its URL's")
         return 1
-    if entry["list"].rsplit("/", 1)[-1] != values["listId"]:
+    if _guid(entry["list"]) != values["listId"]:
         print(f"could not pin {arguments.file}: the List's id is not its URL's")
+        return 1
+    issues = _sibling_issues(entry, siblings, index)
+    if issues:
+        print(f"could not pin {arguments.file}: the List is shared, and {'; '.join(issues)}")
         return 1
 
     today = datetime.datetime.now(datetime.UTC).date().isoformat()
@@ -197,18 +278,15 @@ def main() -> int:
         sha256=hashlib.sha256(document).hexdigest(),
         bytes=len(document),
         retrieved=today,
-        epiId=values["epiId"],
-        procedureNumber=values["procedureNumber"],
-        marketingAuthorisationHolder=values["marketingAuthorisationHolder"],
-        compositionDate=values["compositionDate"],
+        **{key: values[key] for key in _CARRIED},
     )
-    for each in lock["sources"]:
-        if each.get("listFile") == entry["listFile"]:
-            each.update(
-                listSha256=hashlib.sha256(index).hexdigest(),
-                listBytes=len(index),
-                listRetrieved=today,
-            )
+    # A date written here is the fetch's own, never reconstructed.
+    entry.pop("retrievedReconstructed", None)
+    for each in [entry, *siblings]:
+        each.update(
+            listSha256=hashlib.sha256(index).hexdigest(), listBytes=len(index), listRetrieved=today
+        )
+        each.pop("listRetrievedReconstructed", None)
     lock["sources"] = [
         {key: each[key] for key in _KEYS if key in each}
         | {key: value for key, value in each.items() if key not in _KEYS}

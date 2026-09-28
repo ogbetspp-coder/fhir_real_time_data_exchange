@@ -21,7 +21,17 @@ and the renderer checks (`scripts/render/`).
 The lock is written only by `zone-a/scripts/pin_label.py` (in `zone-a/`,
 `uv run --frozen python scripts/pin_label.py FILE` re-pins a label; its docstring shows how to
 add one). It fetches as the import gate does, writes the bytes, and records each file's own
-retrieval date and the metadata read from the bytes, never typed in.
+retrieval date (UTC) and the metadata read from the bytes, never typed in. A List two labels
+share is re-pinned only if it still lists each of their documents with the metadata their
+entries record.
+
+**Reconstructed dates.** The five labels and four Lists pinned today were fetched before the
+script existed, and their retrieval was not recorded. Their dates are reconstructed: the UTC
+author date of the commit that added each file (25829f7, 42554cf, 8312d37), not a recorded
+fetch. Each such date is marked in the lock by `retrievedReconstructed` or
+`listRetrievedReconstructed` (`true`); the script removes the flag when it fetches the file, and
+`zone-a/tests/test_qrd_check.py` fails on a flag beside bytes other than those it was
+reconstructed for.
 `zone-a/tests/test_qrd_check.py` reads the metadata back from the pinned bytes and fails on an
 entry that disagrees, and `checks/` must hold exactly one result per pinned label. The pinned
 files are marked `-text` in `.gitattributes`, so no line-ending conversion touches the bytes the
