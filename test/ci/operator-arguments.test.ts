@@ -32,9 +32,10 @@ for (const cli of ["gcloud", "bq", "gsutil", "terraform", "curl"]) {
   chmodSync(path.join(stub, cli), 0o755);
 }
 
-function run(script: string, args: string[]) {
+function run(script: string, args: string[], cwd = process.cwd()) {
   rmSync(path.join(stub, "calls"), { force: true });
-  const result = spawnSync("bash", [script, ...args], {
+  const result = spawnSync("bash", [path.relative(cwd, script), ...args], {
+    cwd,
     encoding: "utf8",
     env: { PATH: `${stub}:${process.env.PATH ?? ""}`, HOME: stub },
   });
@@ -98,6 +99,34 @@ describe("every operator script's command line", () => {
         expect([script, /^\s*exit 0\b/m.test(text)]).toEqual([script, false]);
       }
     }
+  });
+
+  it.each(scripts)("%s answers --help run from its own directory", (script) => {
+    // Review of the follow-up: `cd scripts/gcp && bash deploy.sh --help` named itself relative to
+    // a directory the script had already left, and failed.
+    const result = run(script, ["--help"], path.dirname(path.resolve(script)));
+    expect([result.status, result.called, result.stderr]).toEqual([0, false, ""]);
+    expect(result.stdout.trim()).not.toBe("");
+  });
+
+  it.each(scripts)("%s never echoes an argument it refuses, which may be a secret", (script) => {
+    // An OAuth client secret was exposed on a command line on 2026-09-22.
+    const secrets = [
+      "GOCSPX-abcdefghijklmnopqrstuvwxyz12",
+      "ya29.a0AfH6SMBx-secret",
+      "1//0gSecretRefreshToken",
+      "--token=QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo=",
+    ];
+    const result = run(script, secrets);
+    expect([result.status, result.called]).toEqual([2, false]);
+    for (const secret of secrets) expect(result.stderr).not.toContain(secret);
+    expect(result.stderr).toContain("argument 1 (");
+  });
+
+  it("refuses a --secret-file that does not exist, before any call", () => {
+    const result = run("agent/deploy/authorization.sh", ["--secret-file", "/no/such/secret.txt"]);
+    expect([result.status, result.called]).toEqual([2, false]);
+    expect(result.stderr).not.toContain("/no/such/secret.txt");
   });
 
   it("names the Python deployer's own parser, which exits 0 on --help and 2 on anything else", () => {

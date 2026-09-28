@@ -30,14 +30,15 @@ set -euo pipefail
 # shellcheck source=scripts/gcp/common.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../scripts/gcp" && pwd)/common.sh"
 # The command lines above, and nothing else, checked before anything is read (review round 3):
-# a secret file must exist, and --help prints this header.
+# a secret file, however named, must exist, and --help prints this header.
+takes="[--check|--clipboard|--secret-file PATH|PATH]"
 case "$#:${1:-}" in
   0: | "1:--check" | "1:--clipboard") ;;
-  1:--help | 1:-h) ema_flow_help "${BASH_SOURCE[0]}" ;;
-  2:--secret-file) ;;
-  1:-*) ema_flow_refuse "${BASH_SOURCE[0]}" "[--check|--clipboard|--secret-file PATH|PATH]" "$@" ;;
-  1:*) [[ -f "$1" ]] || ema_flow_refuse "${BASH_SOURCE[0]}" "[--check|--clipboard|--secret-file PATH|PATH]" "$@" ;;
-  *) ema_flow_refuse "${BASH_SOURCE[0]}" "[--check|--clipboard|--secret-file PATH|PATH]" "$@" ;;
+  1:--help | 1:-h) ema_flow_help ;;
+  2:--secret-file) [[ -f "$2" ]] || ema_flow_refuse "$takes" "$@" ;;
+  1:-*) ema_flow_refuse "$takes" "$@" ;;
+  1:*) [[ -f "$1" ]] || ema_flow_refuse "$takes" "$@" ;;
+  *) ema_flow_refuse "$takes" "$@" ;;
 esac
 # GOOGLE_CLOUD_PROJECT or GCP_PROJECT_ID (refused when the two differ), else the gcloud
 # configuration; no project at all fails rather than falling back to a hard-coded one.

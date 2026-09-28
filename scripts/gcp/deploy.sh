@@ -17,10 +17,10 @@ cd "$ROOT"
 # 3: an unknown argument used to reach the project and environment checks first).
 case "$#:${1:-}" in
   0:) PHASE=all ;;
-  1:--help | 1:-h) ema_flow_help "${BASH_SOURCE[0]}" ;;
+  1:--help | 1:-h) ema_flow_help ;;
   1:preflight | 1:deps | 1:init | 1:apis | 1:images | 1:apply | 1:plan | 1:record-readers | \
     1:bootstrap | 1:smoke | 1:query-smoke | 1:all) PHASE="$1" ;;
-  *) ema_flow_refuse "${BASH_SOURCE[0]}" "[phase]" "$@" ;;
+  *) ema_flow_refuse "[phase]" "$@" ;;
 esac
 trap 'echo "::error title=Phase ${PHASE} failed::${BASH_COMMAND} exited $?"' ERR
 # Temporary files that must not outlive the script however it ends (a saved plan holds sensitive

@@ -247,6 +247,9 @@ missing="$(missing_from "$TMP/store.txt" | wc -l | tr -d ' ')"
 prune_candidates "$TMP/store.txt" >"$TMP/extra.txt"
 extra="$(wc -l <"$TMP/extra.txt" | tr -d ' ')"
 echo "profile set ${FINGERPRINT:0:16}… (recorded ${recorded_set:0:16}…): $(wc -l <"$EXPECTED" | tr -d ' ') resources, ${missing} not in ${TARGET_STORE}, ${extra} in it beside them; store ${in_store:0:16}… (recorded ${recorded_store:0:16}…)"
+# Each type's first-page total, as the listing is judged by it ("-" for none), so a deploy's log
+# shows what the store reported.
+echo "first-page totals: $(awk '!seen[$1]++ { printf "%s%s=%s", sep, $1, $2; sep=" " }' "$TMP/store.txt.totals")"
 if grep -q ' -$' "$TMP/store.txt"; then
   echo "::notice title=Store versions::${TARGET_STORE} did not report every resource's version, so an edit made in the store is noticed only when it adds or removes a resource."
 fi

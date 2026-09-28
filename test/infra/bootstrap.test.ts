@@ -297,6 +297,8 @@ describe.concurrent("the deploy's FHIR bootstrap", { timeout: 60_000 }, () => {
     expect(first.marker.split("\n").filter(Boolean)).toHaveLength(2);
     expect(first.seeded).toBe("");
     expect(first.out).toContain("No synthetic source seeded");
+    // The store's first-page totals, as the listing is judged by them; empty types report 0.
+    expect(first.out).toMatch(/first-page totals: CodeSystem=0 .*StructureDefinition=0 /);
 
     const seeding = await bootstrap(setup, { ALLOW_SYNTHETIC_SOURCES: "true" });
     expect(seeding.status).toBe(0);
