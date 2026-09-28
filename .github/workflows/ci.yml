@@ -229,6 +229,15 @@ jobs:
         working-directory: .
         run: npx tsx scripts/fidelity/differential.ts --seed 20260920 --count 2000 > differential.jsonl
 
+      # And 2000 cases more at a seed of this run's own, so every run reaches inputs the fixed seed
+      # never does. The generator prints the seed and every case records it: a failure here is
+      # reproduced anywhere with `--seed <that seed> --count 2000`.
+      - name: Add a differential corpus at this run's seed
+        working-directory: .
+        env:
+          DIFFERENTIAL_RUN_SEED: ${{ github.run_id }}
+        run: npx tsx scripts/fidelity/differential.ts --seed "$DIFFERENTIAL_RUN_SEED" --count 2000 >> differential.jsonl
+
       - name: Test
         env:
           DIFFERENTIAL_CORPUS: ${{ github.workspace }}/differential.jsonl

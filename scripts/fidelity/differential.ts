@@ -2179,6 +2179,36 @@ function verifyCase(random: Random, seed: number, index: number): CorpusCase {
     provenance,
   };
 
+  // A source key or a normalisation version that is not a string is structural (audit 2026-09-27,
+  // F-5): Python writes `True` where JavaScript writes `true`, and reads the keys `1` and `true`
+  // as one. Drawn from a stream of its own, so every other case at a seed stays as it was.
+  const keyRandom = mulberry32((seed ^ Math.imul(index + 1, 0x9e3779b1)) >>> 0);
+  if (chance(keyRandom, 0.04)) {
+    classes.add("non-string-keys");
+    const value = (): string =>
+      pick(keyRandom, [true, false, 1, 0, 1.5, null]) as unknown as string;
+    const variant = between(keyRandom, 0, 3);
+    const [firstSection] = input.sections;
+    const [firstProvenance] = input.provenance;
+    if (variant === 0 || firstSection === undefined || firstProvenance === undefined) {
+      input.normalizationVersion = value();
+    } else if (variant === 1) {
+      input.sections = [{ ...firstSection, sourceKey: value() }, ...input.sections.slice(1)];
+    } else if (variant === 2) {
+      input.provenance = [{ ...firstProvenance, sourceKey: value() }, ...input.provenance.slice(1)];
+    } else {
+      // The two keys Python's dictionaries merge.
+      input.sections = [
+        { ...firstSection, sourceKey: 1 as unknown as string },
+        ...input.sections.slice(1),
+      ];
+      input.provenance = [
+        { ...firstProvenance, sourceKey: true as unknown as string },
+        ...input.provenance.slice(1),
+      ];
+    }
+  }
+
   let expected: VerifyExpectation;
   try {
     const report = verifyNarrativeFidelity(input);

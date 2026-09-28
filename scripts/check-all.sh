@@ -64,6 +64,11 @@ step "Zone A: uv run --frozen python scripts/generate_models.py --check"
 (cd zone-a && "$UV" run --frozen python scripts/generate_models.py --check)
 step "Zone A: differential corpus from the TypeScript implementation"
 npx tsx scripts/fidelity/differential.ts --seed 20260920 --count 2000 > differential.jsonl
+# CI's second corpus is at its run id; here it is at the time, unless DIFFERENTIAL_RUN_SEED is set
+# (to reproduce a CI failure, set it to the seed that run printed).
+DIFFERENTIAL_RUN_SEED="${DIFFERENTIAL_RUN_SEED:-$(date +%s)}"
+step "Zone A: differential corpus at seed $DIFFERENTIAL_RUN_SEED"
+npx tsx scripts/fidelity/differential.ts --seed "$DIFFERENTIAL_RUN_SEED" --count 2000 >> differential.jsonl
 step "Zone A: uv run --frozen pytest"
 (cd zone-a && DIFFERENTIAL_CORPUS="$ROOT/differential.jsonl" "$UV" run --frozen pytest)
 
