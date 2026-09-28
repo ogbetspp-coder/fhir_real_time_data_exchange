@@ -22,7 +22,7 @@ function compare(configured: unknown, live: unknown): { status: number | null; o
   dirs.push(dir);
   const want = path.join(dir, "configured.json");
   const have = path.join(dir, "live.json");
-  writeFileSync(want, JSON.stringify(configured));
+  writeFileSync(want, typeof configured === "string" ? configured : JSON.stringify(configured));
   writeFileSync(have, typeof live === "string" ? live : JSON.stringify(live));
   const run = spawnSync("python3", [script, want, have], { encoding: "utf8" });
   return { status: run.status, out: run.stdout };
@@ -109,8 +109,12 @@ describe("the dashboard drift check", () => {
   it("exits 2, an error, never 1, drift, on a failure it did not foresee", () => {
     // Nesting deep enough to exhaust Python's recursion limit raises RecursionError, which no
     // handler names; uncaught it exited 1, and the deploy would have replaced the dashboard.
+    // The same document on both sides, so whichever step fails, it is a failure and never
+    // drift: before Python 3.14 json.load raises RecursionError on it; 3.14's parser reads it,
+    // and the recursive comparison raises instead. (Beside `configured` it is no failure on 3.14
+    // at all but real drift at $.a, which is why it is compared with itself.)
     const deep = `{"a":${"[".repeat(100_000)}${"]".repeat(100_000)}}`;
-    expect(compare(configured, deep).status).toBe(2);
+    expect(compare(deep, deep).status).toBe(2);
     const nested: unknown = JSON.parse(`{"a":${"[".repeat(2000)}${"]".repeat(2000)}}`);
     expect(compare(nested, nested).status).toBe(2);
   });
