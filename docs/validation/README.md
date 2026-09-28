@@ -414,3 +414,4 @@ order.
 - [The importer's hardening, importer 2.2.0, 2026-09-28](changes/2026-09-28-importer-hardening-2-2-0.md)
 - [Run manifest 4.0.0, the Global ePI package at its versioned URL, and the image runtimes, 2026-09-28](changes/2026-09-28-run-manifest-4-0-0-global-epi-stu1.md)
 - [The published contract patterns name ASCII digits (no version change), 2026-09-28](changes/2026-09-28-contract-patterns-ascii-digits.md)
+- [Contract versions held to their schemas, Python readers held to Zod, and numbers: `ingestion-provenance` 2.0.0, run manifest 5.0.0, `query-tools` 4.1.0, `agent-turn` 1.2.0, 2026-09-28](changes/2026-09-28-contract-versions-lock-and-parity.md)

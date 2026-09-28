@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { FhirId, PrincipalId } from "../contracts/common.js";
+import { AddressableFhirId, PrincipalId } from "../contracts/common.js";
 
 // Who may read what. Phase 1 backs this with a Terraform-managed map parsed once at startup;
 // Firestore replaces the backing in phase 2 without changing this interface. A principal with
@@ -19,9 +19,13 @@ export type EntitlementDirectory = {
 };
 
 // Strict: a key this schema does not know (an `organisation` from an older map, say) is a
-// configuration error and fails startup rather than being silently ignored.
+// configuration error and fails startup rather than being silently ignored. An entitled id is an
+// `AddressableFhirId`, never `.` or `..`: every tool checks the entitlement before it reads, so
+// no id that is not one URL path segment ever reaches the store URL. The published tool inputs
+// still take a `FhirId` (query-tools 4.x), and a `..` asked for is answered as any id outside
+// the entitlement is, `document-not-found`.
 const EntitlementSchema = z.strictObject({
-  bundles: z.array(FhirId).max(10_000),
+  bundles: z.array(AddressableFhirId).max(10_000),
 });
 
 const DirectorySchema = z.record(PrincipalId, EntitlementSchema);

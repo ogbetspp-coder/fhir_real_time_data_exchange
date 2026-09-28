@@ -1,6 +1,14 @@
 import { z } from "zod";
 
-import { Count, IsoDateTime, PrincipalId, Sha256Hex, Token, Uuid } from "./common.js";
+import {
+  ContractVersion,
+  Count,
+  IsoDateTime,
+  PrincipalId,
+  Sha256Hex,
+  Token,
+  Uuid,
+} from "./common.js";
 import { QueryToolName } from "./query-tools.js";
 
 // The record the verifiable-answer agent (docs/design/verifiable-answers.md, `agent/`) writes
@@ -18,8 +26,15 @@ import { QueryToolName } from "./query-tools.js";
 // a record saying why; `principalDigest`, for the session user id `principal` may not carry
 // (Gemini Enterprise's is an e-mail address); `assistantFlags`, what was removed from or noticed
 // in the assistant's own words; and three verification flags.
+//
+// 1.2.0 (minor: two optional fields; audit C-9): `contractVersion`, the version of this contract
+// the record was written under, and `queryToolsVersion`, the version of the agent's vendored copy
+// of the query-tools contract, which it validated the tools' answers against. That is not the
+// version the service answered under, which is what decides a `match` (it meant a different thing
+// under query-tools 2.0.0 and 2.0.1): the service's own audit records carry that, as their
+// `contractVersion` (query-tools 4.1.0), joined to this record on `turnId`.
 
-export const AGENT_TURN_VERSION = "1.1.0";
+export const AGENT_TURN_VERSION = "1.2.0";
 
 // How one tool call went, as the agent saw it: the transport failed, the tool answered with the
 // contract's error shape, the result was not an object, the result did not validate against the
@@ -92,6 +107,13 @@ export const AgentTurnRecordSchema = z
   .strictObject({
     service: z.literal("ema-flow-agent"),
     serviceVersion: Token,
+    // The versions of the agent's vendored copies: of this contract, which the record was written
+    // under, and of query-tools, which the turn's tool answers were validated against. Not the
+    // version the service answered under, which decides `match`: the service's own audit records
+    // of the same `turnId` name that. Optional in the contract, which gained them at 1.2.0; the
+    // agent always writes both.
+    contractVersion: ContractVersion.optional(),
+    queryToolsVersion: ContractVersion.optional(),
     at: IsoDateTime,
     // The session's user id when it is an opaque identifier; otherwise (an e-mail address, which
     // is what Gemini Enterprise supplies) the fixed value `session-user-withheld`. Either way it

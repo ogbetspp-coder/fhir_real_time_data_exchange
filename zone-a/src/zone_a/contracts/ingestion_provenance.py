@@ -10,12 +10,14 @@ committed module is out of date with ``contracts/generated/``.
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel
+from pydantic import ConfigDict, Field, RootModel, StrictInt, StrictStr
+from zone_a.contract_model import ContractModel
 
 
-class Sha256Hex(RootModel[str]):
+class Sha256Hex(RootModel[StrictStr]):
     root: Annotated[
-        str, Field(description="Lower-case hexadecimal SHA-256 digest.", pattern="^[0-9a-f]{64}$")
+        StrictStr,
+        Field(description="Lower-case hexadecimal SHA-256 digest.", pattern="^[0-9a-f]{64}$"),
     ]
 
 
@@ -26,9 +28,9 @@ class MediaType(StrEnum):
     )
 
 
-class Token(RootModel[str]):
+class Token(RootModel[StrictStr]):
     root: Annotated[
-        str,
+        StrictStr,
         Field(
             description="Identifier: letters, digits, and . _ : / @ + - only.",
             pattern="^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$",
@@ -36,9 +38,9 @@ class Token(RootModel[str]):
     ]
 
 
-class StorageUri(RootModel[str]):
+class StorageUri(RootModel[StrictStr]):
     root: Annotated[
-        str,
+        StrictStr,
         Field(
             description="Cloud Storage object URI (gs://bucket/object).",
             max_length=512,
@@ -47,7 +49,7 @@ class StorageUri(RootModel[str]):
     ]
 
 
-class ExtractedTextRef(BaseModel):
+class ExtractedTextRef(ContractModel):
     model_config = ConfigDict(extra="forbid")
     uri: StorageUri
     sha256: Sha256Hex
@@ -59,9 +61,9 @@ class Authority(StrEnum):
     synthetic = "synthetic"
 
 
-class AuthorityId(RootModel[str]):
+class AuthorityId(RootModel[StrictStr]):
     root: Annotated[
-        str,
+        StrictStr,
         Field(
             description="A lower-case GUID.",
             pattern="^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$",
@@ -69,23 +71,23 @@ class AuthorityId(RootModel[str]):
     ]
 
 
-class PinnedFile(BaseModel):
+class PinnedFile(ContractModel):
     model_config = ConfigDict(extra="forbid")
     id: AuthorityId
     sha256: Sha256Hex
-    byteLength: Annotated[int, Field(gt=0, le=9007199254740991)]
+    byteLength: Annotated[StrictInt, Field(gt=0, le=9007199254740991)]
 
 
-class PictureReference(RootModel[str]):
+class PictureReference(RootModel[StrictStr]):
     root: Annotated[
-        str,
+        StrictStr,
         Field(pattern="^~\\/_entity\\/annotation\\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$"),
     ]
 
 
-class HttpUrl(RootModel[str]):
+class HttpUrl(RootModel[StrictStr]):
     root: Annotated[
-        str,
+        StrictStr,
         Field(
             description="http(s) URL without whitespace; may carry |version.",
             max_length=256,
@@ -94,48 +96,48 @@ class HttpUrl(RootModel[str]):
     ]
 
 
-class SectionPath(RootModel[str]):
-    root: Annotated[str, Field(pattern="^Composition(?:\\.section\\[[0-9]{1,4}\\]){1,16}$")]
+class SectionPath(RootModel[StrictStr]):
+    root: Annotated[StrictStr, Field(pattern="^Composition(?:\\.section\\[[0-9]{1,4}\\]){1,16}$")]
 
 
-class Uuid(RootModel[str]):
+class Uuid(RootModel[StrictStr]):
     root: Annotated[
-        str,
+        StrictStr,
         Field(
             pattern="^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         ),
     ]
 
 
-class ToolVersion(BaseModel):
+class ToolVersion(ContractModel):
     model_config = ConfigDict(extra="forbid")
     name: Token
     version: Token
 
 
-class ModelRef(BaseModel):
+class ModelRef(ContractModel):
     model_config = ConfigDict(extra="forbid")
     provider: Token
     id: Token
 
 
-class PromptTemplateRef(BaseModel):
+class PromptTemplateRef(ContractModel):
     model_config = ConfigDict(extra="forbid")
     id: Token
     version: Token
     sha256: Sha256Hex
 
 
-class TerminologyServiceRef(BaseModel):
+class TerminologyServiceRef(ContractModel):
     model_config = ConfigDict(extra="forbid")
     name: Token
     version: Token
     snapshotSha256: Sha256Hex
 
 
-class SourceKey(RootModel[str]):
+class SourceKey(RootModel[StrictStr]):
     root: Annotated[
-        str,
+        StrictStr,
         Field(
             description="Canonical SmPC section identifier from the mapping manifest, e.g. smpc.4.2.posology.",
             pattern="^[a-z0-9]+(?:\\.[a-z0-9]+)*$",
@@ -143,17 +145,17 @@ class SourceKey(RootModel[str]):
     ]
 
 
-class SourceSpan(BaseModel):
+class SourceSpan(ContractModel):
     model_config = ConfigDict(extra="forbid")
-    page: Annotated[int, Field(gt=0, le=9007199254740991)]
-    startOffset: Annotated[int, Field(ge=0, le=9007199254740991)]
-    endOffset: Annotated[int, Field(gt=0, le=9007199254740991)]
+    page: Annotated[StrictInt, Field(gt=0, le=9007199254740991)]
+    startOffset: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
+    endOffset: Annotated[StrictInt, Field(gt=0, le=9007199254740991)]
     textSha256: Sha256Hex
 
 
-class TargetPath(RootModel[str]):
+class TargetPath(RootModel[StrictStr]):
     root: Annotated[
-        str,
+        StrictStr,
         Field(
             max_length=256,
             pattern="^[A-Za-z][A-Za-z0-9]*(?:\\[[0-9]+\\])?(?:\\.[A-Za-z][A-Za-z0-9]*(?:\\[[0-9]+\\])?)*$",
@@ -161,9 +163,9 @@ class TargetPath(RootModel[str]):
     ]
 
 
-class SourcePath(RootModel[str]):
+class SourcePath(RootModel[StrictStr]):
     root: Annotated[
-        str,
+        StrictStr,
         Field(
             max_length=256,
             pattern="^(?:List|Bundle|Composition)(?:\\.[A-Za-z][A-Za-z0-9]*(?:\\[(?:[0-9]{1,4}|[A-Za-z][A-Za-z0-9]*)\\])?)*$",
@@ -179,7 +181,7 @@ class DecisionAction(StrEnum):
     rejected = "rejected"
 
 
-class TerminologyRef(BaseModel):
+class TerminologyRef(ContractModel):
     model_config = ConfigDict(extra="forbid")
     system: HttpUrl
     code: Token
@@ -197,9 +199,9 @@ class DecisionReason(StrEnum):
     duplicate = "duplicate"
 
 
-class NormalizationVersion(RootModel[str]):
+class NormalizationVersion(RootModel[StrictStr]):
     root: Annotated[
-        str,
+        StrictStr,
         Field(
             description="Version of docs/fidelity-normalization.md the hashes were computed under.",
             pattern="^fidelity-norm\\/[0-9]+\\.[0-9]+\\.[0-9]+$",
@@ -212,32 +214,32 @@ class FidelityStatus(StrEnum):
     failed = "failed"
 
 
-class SourceSystemRef(BaseModel):
+class SourceSystemRef(ContractModel):
     model_config = ConfigDict(extra="forbid")
     name: Token
     documentId: Token
     versionId: Token | None = None
 
 
-class Index(BaseModel):
+class Index(ContractModel):
     model_config = ConfigDict(extra="forbid")
     id: AuthorityId
     sha256: Sha256Hex
-    byteLength: Annotated[int, Field(gt=0, le=9007199254740991)]
+    byteLength: Annotated[StrictInt, Field(gt=0, le=9007199254740991)]
     epiId: Token
     versionNumber: Token
     metaVersionId: Token
     status: Literal["current"]
 
 
-class SectionPage(BaseModel):
+class SectionPage(ContractModel):
     model_config = ConfigDict(extra="forbid")
-    page: Annotated[int, Field(gt=0, le=9007199254740991)]
+    page: Annotated[StrictInt, Field(gt=0, le=9007199254740991)]
     path: SectionPath
     code: Token
 
 
-class ImportRequest(BaseModel):
+class ImportRequest(ContractModel):
     model_config = ConfigDict(extra="forbid")
     authority: Authority
     documentId: AuthorityId
@@ -245,16 +247,16 @@ class ImportRequest(BaseModel):
     language: Literal["en"]
 
 
-class Picture1(BaseModel):
+class Picture1(ContractModel):
     model_config = ConfigDict(extra="forbid")
     kind: Literal["fetched"]
     reference: PictureReference
     url: HttpUrl
     sha256: Sha256Hex
-    byteLength: Annotated[int, Field(gt=0, le=9007199254740991)]
+    byteLength: Annotated[StrictInt, Field(gt=0, le=9007199254740991)]
 
 
-class Picture2(BaseModel):
+class Picture2(ContractModel):
     model_config = ConfigDict(extra="forbid")
     kind: Literal["not-drawn"]
     reference: PictureReference
@@ -265,7 +267,7 @@ class Picture(RootModel[Picture1 | Picture2]):
     root: Picture1 | Picture2
 
 
-class ExtractionTooling(BaseModel):
+class ExtractionTooling(ContractModel):
     model_config = ConfigDict(extra="forbid")
     extractionRunId: Uuid
     serviceVersion: Token
@@ -275,7 +277,7 @@ class ExtractionTooling(BaseModel):
     terminologyService: TerminologyServiceRef | None = None
 
 
-class SectionProvenance(BaseModel):
+class SectionProvenance(ContractModel):
     model_config = ConfigDict(extra="forbid")
     sourceKey: SourceKey
     spans: Annotated[list[SourceSpan], Field(min_length=1)]
@@ -283,7 +285,7 @@ class SectionProvenance(BaseModel):
     normalizedTextSha256: Sha256Hex
 
 
-class StructuringDecision(BaseModel):
+class StructuringDecision(ContractModel):
     model_config = ConfigDict(extra="forbid")
     target: TargetPath
     sourceKey: SourceKey | None = None
@@ -295,31 +297,31 @@ class StructuringDecision(BaseModel):
     reason: DecisionReason | None = None
 
 
-class FidelitySummary(BaseModel):
+class FidelitySummary(ContractModel):
     model_config = ConfigDict(extra="forbid")
     normalizationVersion: NormalizationVersion
     status: FidelityStatus
-    sectionsChecked: Annotated[int, Field(ge=0, le=9007199254740991)]
-    sectionsMatched: Annotated[int, Field(ge=0, le=9007199254740991)]
+    sectionsChecked: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
+    sectionsMatched: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
     narrativeBindingSha256: Sha256Hex
     reportSha256: Sha256Hex
     reportUri: StorageUri | None = None
 
 
-class DrawnSourceDocument(BaseModel):
+class DrawnSourceDocument(ContractModel):
     model_config = ConfigDict(extra="forbid")
     kind: Literal["drawn"]
     sha256: Sha256Hex
-    byteLength: Annotated[int, Field(gt=0, le=9007199254740991)]
+    byteLength: Annotated[StrictInt, Field(gt=0, le=9007199254740991)]
     mediaType: MediaType
-    filename: Annotated[str, Field(pattern="^[A-Za-z0-9][A-Za-z0-9._ -]{0,254}$")]
-    pageCount: Annotated[int | None, Field(gt=0, le=9007199254740991)] = None
+    filename: Annotated[StrictStr, Field(pattern="^[A-Za-z0-9][A-Za-z0-9._ -]{0,254}$")]
+    pageCount: Annotated[StrictInt | None, Field(gt=0, le=9007199254740991)] = None
     sourceSystem: SourceSystemRef | None = None
     storageUri: StorageUri | None = None
     extractedText: ExtractedTextRef
 
 
-class AuthoritySourceDocument(BaseModel):
+class AuthoritySourceDocument(ContractModel):
     model_config = ConfigDict(extra="forbid")
     kind: Literal["authority-publication"]
     mediaType: Literal["application/fhir+json"]
@@ -336,7 +338,7 @@ class SourceDocument(RootModel[DrawnSourceDocument | AuthoritySourceDocument]):
     root: DrawnSourceDocument | AuthoritySourceDocument
 
 
-class IngestionProvenance(BaseModel):
+class IngestionProvenance(ContractModel):
     model_config = ConfigDict(extra="forbid")
     sourceDocument: SourceDocument
     extraction: ExtractionTooling

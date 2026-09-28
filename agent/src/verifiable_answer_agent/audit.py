@@ -3,9 +3,11 @@
 ``TurnAuditRecord`` is the ``AgentTurnRecord`` of the published ``agent-turn`` contract
 (``contracts/generated/agent-turn.schema.json``, vendored next to the query-tools schema): the
 same field names, the same closed enumerations for tool names, outcomes and flags, and the same
-patterns for ``serviceVersion``, ``principal``, ``principalDigest``, ``turnId`` and
-``errorClass``, so that a record this module builds serialises to an instance the contract
-accepts. ``tests/test_audit.py`` validates an emitted record against the vendored schema.
+patterns for ``serviceVersion``, ``contractVersion``, ``queryToolsVersion``, ``principal``,
+``principalDigest``, ``turnId`` and ``errorClass``, so that a record this module builds
+serialises to an instance the contract accepts. ``tests/test_audit.py`` validates an emitted
+record against the vendored schema. Each record names the versions of the agent's vendored
+copies of agent-turn and query-tools (agent-turn 1.2.0).
 
 What is absent is the point. No narrative. No argument values — a ``verify_quote`` argument
 *is* narrative, so not even a digest of one is carried, because a digest of a quote is a way of
@@ -31,7 +33,7 @@ from typing import Any, Final, Literal, TextIO
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .contract import QueryToolName
+from .contract import QueryToolName, contract_version, load_agent_turn_schema, load_schema
 from .postcheck import CheckedAnswer, VerificationFlag
 from .render import AssistantFlag
 
@@ -51,6 +53,14 @@ __all__ = [
 
 AGENT_SERVICE: Final = "ema-flow-agent"
 
+AGENT_TURN_VERSION: Final = contract_version(load_agent_turn_schema())
+"""The agent-turn version every record is written under: the vendored copy's."""
+
+QUERY_TOOLS_VERSION: Final = contract_version(load_schema())
+"""The query-tools version of the vendored copy every tool answer of the turn was validated against
+(audit C-9). Not the version the service answered under, which decides a ``match``: the service's
+own audit records of the same ``turnId`` carry that, as their ``contractVersion``."""
+
 ToolOutcome = Literal["ok", "schema-invalid", "tool-error", "transport-error", "not-an-object"]
 """``AgentToolOutcome`` in the agent-turn contract."""
 
@@ -65,6 +75,7 @@ TOKEN_PATTERN: Final = r"^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$"
 PRINCIPAL_PATTERN: Final = r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
 SHA256_PATTERN: Final = r"^[0-9a-f]{64}$"
 ERROR_CLASS_PATTERN: Final = r"^[A-Za-z_][A-Za-z0-9_]{0,127}$"
+CONTRACT_VERSION_PATTERN: Final = r"^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}$"
 UUID_PATTERN: Final = (
     r"^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}"
     r"|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
@@ -144,6 +155,16 @@ class TurnAuditRecord(BaseModel):
 
     service: Literal["ema-flow-agent"] = AGENT_SERVICE
     service_version: str = Field(pattern=TOKEN_PATTERN, serialization_alias="serviceVersion")
+    contract_version: str = Field(
+        default=AGENT_TURN_VERSION,
+        pattern=CONTRACT_VERSION_PATTERN,
+        serialization_alias="contractVersion",
+    )
+    query_tools_version: str = Field(
+        default=QUERY_TOOLS_VERSION,
+        pattern=CONTRACT_VERSION_PATTERN,
+        serialization_alias="queryToolsVersion",
+    )
     at: str
     principal: str = Field(pattern=PRINCIPAL_PATTERN)
     principal_digest: str | None = Field(

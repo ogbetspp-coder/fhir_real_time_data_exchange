@@ -174,15 +174,15 @@ function only(): Sent {
 const DOCUMENT = { resourceType: "Bundle", id: "bundle-1", type: "document", entry: [] };
 
 describe("reading a document Bundle", () => {
-  it("GETs the Bundle from the validated store with read-only headers, the id encoded", async () => {
+  it("GETs the Bundle from the validated store with read-only headers", async () => {
     answer = respond(200, DOCUMENT);
     const reader = new HealthcareFhirReader({ ...OPTIONS, HEALTHCARE_DATASET_ID: "d/x" });
 
-    expect(await reader.readBundle("bundle/1")).toEqual(DOCUMENT);
+    expect(await reader.readBundle("bundle-1")).toEqual(DOCUMENT);
 
     const request = only();
     expect(request.url).toBe(
-      "https://healthcare.googleapis.com/v1/projects/p/locations/europe-west4/datasets/d%2Fx/fhirStores/s/fhir/Bundle/bundle%2F1",
+      "https://healthcare.googleapis.com/v1/projects/p/locations/europe-west4/datasets/d%2Fx/fhirStores/s/fhir/Bundle/bundle-1",
     );
     expect(request.init.method).toBe("GET");
     expect(request.init.body).toBeUndefined();
@@ -195,6 +195,21 @@ describe("reading a document Bundle", () => {
     expect(headers.get("x-goog-healthcare-audit-appname")).toBe("ema-flow-query");
     expect(headers.get("x-goog-healthcare-audit-reason")).toBe("ePI read-only query service");
   });
+
+  // Encoding leaves . and .. as they are and the URL parser resolves them: Bundle/.. would read
+  // the store itself. An entitled id is always an AddressableFhirId; any other is refused before a
+  // request is made.
+  it.each([".", "..", "bundle/1", "-bundle", ""])(
+    "refuses %j as a Bundle id, reading nothing",
+    async (id) => {
+      answer = respond(200, DOCUMENT);
+      const reader = new HealthcareFhirReader(OPTIONS);
+
+      await expect(reader.readBundle(id)).rejects.toThrow(/single URL path segment/);
+      await expect(reader.readBundleVersion(id, "1")).rejects.toThrow(/single URL path segment/);
+      expect(sent).toEqual([]);
+    },
+  );
 
   it("GETs one version through _history", async () => {
     answer = respond(200, DOCUMENT);

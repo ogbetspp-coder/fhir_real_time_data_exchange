@@ -1,0 +1,1569 @@
+{
+  "schemaVersion": "2.0.0",
+  "submissionId": "5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b",
+  "createdAt": "2026-09-19T00:00:00Z",
+  "graphType": "type2",
+  "bundle": {
+    "resourceType": "Bundle",
+    "id": "synthetic-smoketest-type2-smpc",
+    "meta": {
+      "profile": [
+        "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/Bundle-uv-epi"
+      ]
+    },
+    "language": "en",
+    "identifier": {
+      "system": "https://khs.dev/fhir/identifier/type2-document",
+      "value": "synthetic-smoketest-type2-smpc-v1"
+    },
+    "type": "document",
+    "timestamp": "2026-09-19T00:00:00Z",
+    "entry": [
+      {
+        "fullUrl": "https://khs.dev/fhir/Composition/synthetic-smoketest-smpc",
+        "resource": {
+          "resourceType": "Composition",
+          "id": "synthetic-smoketest-smpc",
+          "meta": {
+            "profile": [
+              "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/Composition-uv-epi"
+            ]
+          },
+          "language": "en",
+          "identifier": [
+            {
+              "system": "https://khs.dev/fhir/identifier/composition",
+              "value": "synthetic-smoketest-smpc-v1"
+            }
+          ],
+          "status": "final",
+          "type": {
+            "coding": [
+              {
+                "system": "https://khs.dev/fhir/CodeSystem/document-type",
+                "code": "smpc",
+                "display": "Summary of Product Characteristics"
+              }
+            ]
+          },
+          "subject": [
+            {
+              "reference": "https://khs.dev/fhir/MedicinalProductDefinition/synthetic-smoketest"
+            }
+          ],
+          "date": "2026-09-19T00:00:00Z",
+          "author": [
+            {
+              "reference": "https://khs.dev/fhir/Organization/synthetic-pharma"
+            }
+          ],
+          "title": "Synthetic Smoketest 2.5 mg tablets SmPC",
+          "section": [
+            {
+              "id": "smpc",
+              "title": "SUMMARY OF PRODUCT CHARACTERISTICS",
+              "code": {
+                "coding": [
+                  {
+                    "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                    "code": "smpc",
+                    "display": "SUMMARY OF PRODUCT CHARACTERISTICS"
+                  }
+                ]
+              },
+              "text": {
+                "status": "generated",
+                "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+              },
+              "section": [
+                {
+                  "id": "smpc-1",
+                  "title": "1. NAME OF THE MEDICINAL PRODUCT",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.1",
+                        "display": "1. NAME OF THE MEDICINAL PRODUCT"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "generated",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.1 of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                  }
+                },
+                {
+                  "id": "smpc-2",
+                  "title": "2. QUALITATIVE AND QUANTITATIVE COMPOSITION",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.2",
+                        "display": "2. QUALITATIVE AND QUANTITATIVE COMPOSITION"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "generated",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.2 of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                  }
+                },
+                {
+                  "id": "smpc-3",
+                  "title": "3. PHARMACEUTICAL FORM",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.3",
+                        "display": "3. PHARMACEUTICAL FORM"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "generated",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.3 of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                  }
+                },
+                {
+                  "id": "smpc-4",
+                  "title": "4. CLINICAL PARTICULARS",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.4",
+                        "display": "4. CLINICAL PARTICULARS"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "generated",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4 of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                  },
+                  "section": [
+                    {
+                      "id": "smpc-4-1",
+                      "title": "4.1 Therapeutic indications",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.4.1",
+                            "display": "4.1 Therapeutic indications"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.1 of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "smpc-4-2",
+                      "title": "4.2 Posology and method of administration",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.4.2",
+                            "display": "4.2 Posology and method of administration"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.2 of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                      },
+                      "section": [
+                        {
+                          "id": "smpc-4-2-posology",
+                          "title": "Posology",
+                          "code": {
+                            "coding": [
+                              {
+                                "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                                "code": "smpc.4.2.posology",
+                                "display": "Posology"
+                              }
+                            ]
+                          },
+                          "text": {
+                            "status": "generated",
+                            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.2.posology of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                          }
+                        },
+                        {
+                          "id": "smpc-4-2-administration",
+                          "title": "Method of administration",
+                          "code": {
+                            "coding": [
+                              {
+                                "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                                "code": "smpc.4.2.administration",
+                                "display": "Method of administration"
+                              }
+                            ]
+                          },
+                          "text": {
+                            "status": "generated",
+                            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.2.administration of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "id": "smpc-4-3",
+                      "title": "4.3 Contraindications",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.4.3",
+                            "display": "4.3 Contraindications"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.3 of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "smpc-4-4",
+                      "title": "4.4 Special warnings and precautions for use",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.4.4",
+                            "display": "4.4 Special warnings and precautions for use"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.4 of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "smpc-4-5",
+                      "title": "4.5 Interaction with other medicinal products and other forms of interaction",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.4.5",
+                            "display": "4.5 Interaction with other medicinal products and other forms of interaction"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.5 of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "smpc-4-6",
+                      "title": "4.6 Fertility, pregnancy and lactation",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.4.6",
+                            "display": "4.6 Fertility, pregnancy and lactation"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.6 of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "smpc-4-7",
+                      "title": "4.7 Effects on ability to drive and use machines",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.4.7",
+                            "display": "4.7 Effects on ability to drive and use machines"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.7 of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "smpc-4-8",
+                      "title": "4.8 Undesirable effects",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.4.8",
+                            "display": "4.8 Undesirable effects"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.8 of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                      },
+                      "section": [
+                        {
+                          "id": "smpc-4-8-reporting",
+                          "title": "Reporting of suspected adverse reactions",
+                          "code": {
+                            "coding": [
+                              {
+                                "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                                "code": "smpc.4.8.reporting",
+                                "display": "Reporting of suspected adverse reactions"
+                              }
+                            ]
+                          },
+                          "text": {
+                            "status": "generated",
+                            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.8.reporting of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "id": "smpc-4-9",
+                      "title": "4.9 Overdose",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.4.9",
+                            "display": "4.9 Overdose"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.9 of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "smpc-5",
+                  "title": "5. PHARMACOLOGICAL PROPERTIES",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.5",
+                        "display": "5. PHARMACOLOGICAL PROPERTIES"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "generated",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.5 of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                  },
+                  "section": [
+                    {
+                      "id": "smpc-5-1",
+                      "title": "5.1 Pharmacodynamic properties",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.5.1",
+                            "display": "5.1 Pharmacodynamic properties"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.5.1 of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "smpc-5-2",
+                      "title": "5.2 Pharmacokinetic properties",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.5.2",
+                            "display": "5.2 Pharmacokinetic properties"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.5.2 of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "smpc-5-3",
+                      "title": "5.3 Preclinical safety data",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.5.3",
+                            "display": "5.3 Preclinical safety data"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.5.3 of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "smpc-6",
+                  "title": "6. PHARMACEUTICAL PARTICULARS",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.6",
+                        "display": "6. PHARMACEUTICAL PARTICULARS"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "generated",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.6 of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                  },
+                  "section": [
+                    {
+                      "id": "smpc-6-1",
+                      "title": "6.1 List of excipients",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.6.1",
+                            "display": "6.1 List of excipients"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.6.1 of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "smpc-6-2",
+                      "title": "6.2 Incompatibilities",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.6.2",
+                            "display": "6.2 Incompatibilities"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.6.2 of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "smpc-6-3",
+                      "title": "6.3 Shelf life",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.6.3",
+                            "display": "6.3 Shelf life"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.6.3 of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "smpc-6-4",
+                      "title": "6.4 Special precautions for storage",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.6.4",
+                            "display": "6.4 Special precautions for storage"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.6.4 of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "smpc-6-5",
+                      "title": "6.5 Nature and contents of container and special equipment for use, administration or implantation",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.6.5",
+                            "display": "6.5 Nature and contents of container and special equipment for use, administration or implantation"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.6.5 of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "smpc-6-6",
+                      "title": "6.6 Special precautions for disposal and other handling",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.6.6",
+                            "display": "6.6 Special precautions for disposal and other handling"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "generated",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.6.6 of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "smpc-7",
+                  "title": "7. MARKETING AUTHORISATION HOLDER",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.7",
+                        "display": "7. MARKETING AUTHORISATION HOLDER"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "generated",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.7 of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                  }
+                },
+                {
+                  "id": "smpc-8",
+                  "title": "8. MARKETING AUTHORISATION NUMBER(S)",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.8",
+                        "display": "8. MARKETING AUTHORISATION NUMBER(S)"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "generated",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.8 of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                  }
+                },
+                {
+                  "id": "smpc-9",
+                  "title": "9. DATE OF FIRST AUTHORISATION/RENEWAL OF THE AUTHORISATION",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.9",
+                        "display": "9. DATE OF FIRST AUTHORISATION/RENEWAL OF THE AUTHORISATION"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "generated",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.9 of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                  }
+                },
+                {
+                  "id": "smpc-10",
+                  "title": "10. DATE OF REVISION OF THE TEXT",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.10",
+                        "display": "10. DATE OF REVISION OF THE TEXT"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "generated",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.10 of Synthetic Smoketest 2.5 mg tablets; not for clinical use.</p></div>"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "fullUrl": "https://khs.dev/fhir/Organization/synthetic-pharma",
+        "resource": {
+          "resourceType": "Organization",
+          "id": "synthetic-pharma",
+          "meta": {
+            "profile": [
+              "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/Organization-uv-epi"
+            ]
+          },
+          "identifier": [
+            {
+              "system": "https://khs.dev/fhir/identifier/organization",
+              "value": "SYN-ORG-0001"
+            }
+          ],
+          "name": "Synthetic Pharma Ltd"
+        }
+      },
+      {
+        "fullUrl": "https://khs.dev/fhir/MedicinalProductDefinition/synthetic-smoketest",
+        "resource": {
+          "resourceType": "MedicinalProductDefinition",
+          "id": "synthetic-smoketest",
+          "meta": {
+            "profile": [
+              "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/MedicinalProductDefinition-uv-epi"
+            ]
+          },
+          "identifier": [
+            {
+              "system": "https://khs.dev/fhir/identifier/product",
+              "value": "SYN-SMOK-001"
+            }
+          ],
+          "type": {
+            "coding": [
+              {
+                "code": "MedicinalProduct"
+              }
+            ]
+          },
+          "domain": {
+            "coding": [
+              {
+                "code": "Human"
+              }
+            ]
+          },
+          "status": {
+            "coding": [
+              {
+                "code": "active"
+              }
+            ]
+          },
+          "name": [
+            {
+              "productName": "Synthetic Smoketest 2.5 mg tablets"
+            }
+          ]
+        }
+      },
+      {
+        "fullUrl": "https://khs.dev/fhir/RegulatedAuthorization/synthetic-smoketest-authorization",
+        "resource": {
+          "resourceType": "RegulatedAuthorization",
+          "id": "synthetic-smoketest-authorization",
+          "meta": {
+            "profile": [
+              "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/RegulatedAuthorization-uv-epi"
+            ]
+          },
+          "identifier": [
+            {
+              "system": "https://khs.dev/fhir/identifier/authorization",
+              "value": "EU/SYN/0004"
+            }
+          ],
+          "subject": [
+            {
+              "reference": "https://khs.dev/fhir/MedicinalProductDefinition/synthetic-smoketest"
+            }
+          ],
+          "holder": {
+            "reference": "https://khs.dev/fhir/Organization/synthetic-pharma"
+          },
+          "status": {
+            "coding": [
+              {
+                "code": "active"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "fullUrl": "https://khs.dev/fhir/PackagedProductDefinition/synthetic-smoketest-package",
+        "resource": {
+          "resourceType": "PackagedProductDefinition",
+          "id": "synthetic-smoketest-package",
+          "meta": {
+            "profile": [
+              "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/PackagedProductDefinition-uv-epi"
+            ]
+          },
+          "identifier": [
+            {
+              "system": "https://khs.dev/fhir/identifier/package",
+              "value": "SYN-SMOK-001-PKG"
+            }
+          ],
+          "name": "Synthetic Smoketest 2.5 mg tablets carton",
+          "packageFor": [
+            {
+              "reference": "https://khs.dev/fhir/MedicinalProductDefinition/synthetic-smoketest"
+            }
+          ],
+          "packaging": {
+            "identifier": [
+              {
+                "system": "https://khs.dev/fhir/identifier/packaging",
+                "value": "SYN-SMOK-001-PKG-1"
+              }
+            ],
+            "type": {
+              "coding": [
+                {
+                  "display": "Carton"
+                }
+              ]
+            },
+            "quantity": 1,
+            "containedItem": [
+              {
+                "item": {
+                  "reference": {
+                    "reference": "https://khs.dev/fhir/ManufacturedItemDefinition/synthetic-smoketest-tablet"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "fullUrl": "https://khs.dev/fhir/ManufacturedItemDefinition/synthetic-smoketest-tablet",
+        "resource": {
+          "resourceType": "ManufacturedItemDefinition",
+          "id": "synthetic-smoketest-tablet",
+          "meta": {
+            "profile": [
+              "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/ManufacturedItemDefinition-uv-epi"
+            ]
+          },
+          "identifier": [
+            {
+              "system": "https://khs.dev/fhir/identifier/manufactured-item",
+              "value": "SYN-SMOK-001-ITEM"
+            }
+          ],
+          "status": "active",
+          "manufacturedDoseForm": {
+            "coding": [
+              {
+                "display": "Tablet"
+              }
+            ]
+          },
+          "unitOfPresentation": {
+            "coding": [
+              {
+                "display": "Tablet"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "fullUrl": "https://khs.dev/fhir/AdministrableProductDefinition/synthetic-smoketest-administrable",
+        "resource": {
+          "resourceType": "AdministrableProductDefinition",
+          "id": "synthetic-smoketest-administrable",
+          "meta": {
+            "profile": [
+              "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/AdministrableProductDefinition-uv-epi"
+            ]
+          },
+          "identifier": [
+            {
+              "system": "https://khs.dev/fhir/identifier/administrable-product",
+              "value": "SYN-SMOK-001-ADM"
+            }
+          ],
+          "status": "active",
+          "formOf": [
+            {
+              "reference": "https://khs.dev/fhir/MedicinalProductDefinition/synthetic-smoketest"
+            }
+          ],
+          "administrableDoseForm": {
+            "coding": [
+              {
+                "display": "Tablet"
+              }
+            ]
+          },
+          "producedFrom": [
+            {
+              "reference": "https://khs.dev/fhir/ManufacturedItemDefinition/synthetic-smoketest-tablet"
+            }
+          ],
+          "routeOfAdministration": [
+            {
+              "code": {
+                "coding": [
+                  {
+                    "display": "Oral use"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "fullUrl": "https://khs.dev/fhir/Ingredient/synthetic-smoketest-active-ingredient",
+        "resource": {
+          "resourceType": "Ingredient",
+          "id": "synthetic-smoketest-active-ingredient",
+          "meta": {
+            "profile": [
+              "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/Ingredient-uv-epi"
+            ]
+          },
+          "status": "active",
+          "for": [
+            {
+              "reference": "https://khs.dev/fhir/ManufacturedItemDefinition/synthetic-smoketest-tablet"
+            }
+          ],
+          "role": {
+            "coding": [
+              {
+                "display": "Active"
+              }
+            ]
+          },
+          "substance": {
+            "code": {
+              "reference": {
+                "reference": "https://khs.dev/fhir/SubstanceDefinition/synthetic-smoketest-substance"
+              }
+            },
+            "strength": [
+              {
+                "presentationRatio": {
+                  "numerator": {
+                    "value": 2.5,
+                    "unit": "mg",
+                    "system": "http://unitsofmeasure.org",
+                    "code": "mg"
+                  },
+                  "denominator": {
+                    "value": 1,
+                    "unit": "tablet"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "fullUrl": "https://khs.dev/fhir/SubstanceDefinition/synthetic-smoketest-substance",
+        "resource": {
+          "resourceType": "SubstanceDefinition",
+          "id": "synthetic-smoketest-substance",
+          "meta": {
+            "profile": [
+              "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/SubstanceDefinition-uv-epi"
+            ]
+          },
+          "identifier": [
+            {
+              "system": "https://khs.dev/fhir/identifier/substance",
+              "value": "SYN-SMOKETESTIUM"
+            }
+          ],
+          "version": "1",
+          "status": {
+            "coding": [
+              {
+                "code": "active"
+              }
+            ]
+          },
+          "name": [
+            {
+              "name": "Smoketestium",
+              "status": {
+                "coding": [
+                  {
+                    "code": "current"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "bundleSha256": "c2a682feaca2b1506040d0239c11ac7997701d1c65ca9ec1ea6246dc20aee4ed",
+  "provenance": {
+    "sourceDocument": {
+      "kind": "drawn",
+      "sha256": "ac60116975b9a8acf4696f68354f724ee018541f91915c83617218e9d74d7f4e",
+      "byteLength": 1024,
+      "mediaType": "application/pdf",
+      "filename": "synthetic-smoketest-smpc.pdf",
+      "pageCount": 3,
+      "extractedText": {
+        "uri": "gs://synthetic-bucket/synthetic-smoketest-smpc.pages.json",
+        "sha256": "347d33f4b2109d7f894900dab682d7ccf3234009b29818274f721939dd48dc77",
+        "extractorVersion": "synthetic-extractor/1.0.0"
+      }
+    },
+    "extraction": {
+      "extractionRunId": "6f7a8b9c-0d1e-4f2a-9b3c-4d5e6f7a8b9c",
+      "serviceVersion": "synthetic",
+      "parser": {
+        "name": "synthetic-extractor",
+        "version": "1.0.0"
+      },
+      "terminologyService": {
+        "name": "synthetic-terminology",
+        "version": "1.0.0",
+        "snapshotSha256": "a9b4ebe65101ef198490a271c7f4f398ea156135edd981dd48af1381435a41c6"
+      }
+    },
+    "sections": [
+      {
+        "sourceKey": "smpc",
+        "spans": [
+          {
+            "page": 1,
+            "startOffset": 69,
+            "endOffset": 170,
+            "textSha256": "06ba63f32f26558cc2f72f45212c4d7bf6db7ca975a7395b18da993fba966780"
+          }
+        ],
+        "narrativeDivSha256": "3173b0a18e952c5d6097d9d025ec114a0071b20354701fc8cb7d1fb13cc1bc0c",
+        "normalizedTextSha256": "06ba63f32f26558cc2f72f45212c4d7bf6db7ca975a7395b18da993fba966780"
+      },
+      {
+        "sourceKey": "smpc.1",
+        "spans": [
+          {
+            "page": 1,
+            "startOffset": 171,
+            "endOffset": 274,
+            "textSha256": "c7e2fe4cc48326c64017483f6a67c9242d3e98da550f15d1125b29453fa15ad6"
+          }
+        ],
+        "narrativeDivSha256": "e12b4fd004538a027cbdba8da930c9ccacbbb46a8a405ccf9d8654f0517d3479",
+        "normalizedTextSha256": "c7e2fe4cc48326c64017483f6a67c9242d3e98da550f15d1125b29453fa15ad6"
+      },
+      {
+        "sourceKey": "smpc.2",
+        "spans": [
+          {
+            "page": 1,
+            "startOffset": 275,
+            "endOffset": 378,
+            "textSha256": "6abdc551a8f83ec5df3eb43ee7e198155b7b57c603039bb7ed1ccde6b5f2342b"
+          }
+        ],
+        "narrativeDivSha256": "f70a282614b6cfe1138d0841a84c1121bf53e10f02325537543cab8b00638899",
+        "normalizedTextSha256": "6abdc551a8f83ec5df3eb43ee7e198155b7b57c603039bb7ed1ccde6b5f2342b"
+      },
+      {
+        "sourceKey": "smpc.3",
+        "spans": [
+          {
+            "page": 1,
+            "startOffset": 379,
+            "endOffset": 482,
+            "textSha256": "666e01d6f7ff39ea48484c5172cdcdd7be3337d20b8b916e68d72b79069289ea"
+          }
+        ],
+        "narrativeDivSha256": "88023baf669c88a09c86b91a7ef1661a843ce59c6b5b9c69c10982a52c9376c1",
+        "normalizedTextSha256": "666e01d6f7ff39ea48484c5172cdcdd7be3337d20b8b916e68d72b79069289ea"
+      },
+      {
+        "sourceKey": "smpc.4",
+        "spans": [
+          {
+            "page": 1,
+            "startOffset": 483,
+            "endOffset": 586,
+            "textSha256": "ede3146feff9bab4bdd236f7c2209209f26d2d267b96f7ac1b4257e284476c19"
+          }
+        ],
+        "narrativeDivSha256": "5af4d91b98b4a972427f72d537e3df89abb36331f465e3c6834313f4952dcec5",
+        "normalizedTextSha256": "ede3146feff9bab4bdd236f7c2209209f26d2d267b96f7ac1b4257e284476c19"
+      },
+      {
+        "sourceKey": "smpc.4.1",
+        "spans": [
+          {
+            "page": 1,
+            "startOffset": 587,
+            "endOffset": 692,
+            "textSha256": "80167dcae430670a40bf13c2f233fcc64777e253ab129fb4b652153e91c6ea21"
+          }
+        ],
+        "narrativeDivSha256": "1601c1b38a10e6413693479970ab166228c88f19c2f962f0402a49990c273a59",
+        "normalizedTextSha256": "80167dcae430670a40bf13c2f233fcc64777e253ab129fb4b652153e91c6ea21"
+      },
+      {
+        "sourceKey": "smpc.4.2",
+        "spans": [
+          {
+            "page": 1,
+            "startOffset": 693,
+            "endOffset": 798,
+            "textSha256": "16cc98173ee14ef25eb36e84087da9cffcfb30b9359a0d73becc17f69724e110"
+          }
+        ],
+        "narrativeDivSha256": "0135babc71ec4329c878d4b46f2d7d9ceeffbd33116a2ea3a71d7ab6dfe71204",
+        "normalizedTextSha256": "16cc98173ee14ef25eb36e84087da9cffcfb30b9359a0d73becc17f69724e110"
+      },
+      {
+        "sourceKey": "smpc.4.2.posology",
+        "spans": [
+          {
+            "page": 1,
+            "startOffset": 799,
+            "endOffset": 913,
+            "textSha256": "0cc58983eaef23043d48267513bd45496ff225be503a504abdfd11c63c609c8a"
+          }
+        ],
+        "narrativeDivSha256": "75c846fbbc923ce2af6cf60d357052d7eb378529390b525e22f76b4b6ff94efe",
+        "normalizedTextSha256": "0cc58983eaef23043d48267513bd45496ff225be503a504abdfd11c63c609c8a"
+      },
+      {
+        "sourceKey": "smpc.4.2.administration",
+        "spans": [
+          {
+            "page": 1,
+            "startOffset": 914,
+            "endOffset": 1034,
+            "textSha256": "bb5dd3787b02e8e0c6e0dca064a863449e092c2c8f0554ab9ada7bae3aab16bb"
+          }
+        ],
+        "narrativeDivSha256": "2740f57f61be951e879c62bdedd21999dc2f1e89fc4b1d6fdc6852a5971d18ba",
+        "normalizedTextSha256": "bb5dd3787b02e8e0c6e0dca064a863449e092c2c8f0554ab9ada7bae3aab16bb"
+      },
+      {
+        "sourceKey": "smpc.4.3",
+        "spans": [
+          {
+            "page": 1,
+            "startOffset": 1035,
+            "endOffset": 1140,
+            "textSha256": "4675de2a9c1eda54f51927008662d318ab1f62c7302ddcbe063ecfd1041bd440"
+          }
+        ],
+        "narrativeDivSha256": "8816d27778b1e82bee08d4bacd11d7d68725a2cf3bf89ebefabcc37fdc18f820",
+        "normalizedTextSha256": "4675de2a9c1eda54f51927008662d318ab1f62c7302ddcbe063ecfd1041bd440"
+      },
+      {
+        "sourceKey": "smpc.4.4",
+        "spans": [
+          {
+            "page": 1,
+            "startOffset": 1141,
+            "endOffset": 1246,
+            "textSha256": "bf6513178080733655edccdb4fe184d54db4d198785c538d3d08122350da912c"
+          }
+        ],
+        "narrativeDivSha256": "9317a01da014036d06cd3c3f147a5011c47414331e6b570312a650095f2d7aef",
+        "normalizedTextSha256": "bf6513178080733655edccdb4fe184d54db4d198785c538d3d08122350da912c"
+      },
+      {
+        "sourceKey": "smpc.4.5",
+        "spans": [
+          {
+            "page": 2,
+            "startOffset": 69,
+            "endOffset": 174,
+            "textSha256": "696be860f17d30e5bd2151a2097ce8472f44e710340827526ce7d540b3c2c400"
+          }
+        ],
+        "narrativeDivSha256": "bfa605e88ce05559141a0d6a1a196faa388b9ac644c3dd0c7a71c14412f482fd",
+        "normalizedTextSha256": "696be860f17d30e5bd2151a2097ce8472f44e710340827526ce7d540b3c2c400"
+      },
+      {
+        "sourceKey": "smpc.4.6",
+        "spans": [
+          {
+            "page": 2,
+            "startOffset": 175,
+            "endOffset": 280,
+            "textSha256": "907073986d8f57bc4daca289a2356465aaae2955fa85783d48baaf433c4ef995"
+          }
+        ],
+        "narrativeDivSha256": "776df63254052f2a54dfac15a35c57860224205d54df5eef8b8e42f9beb63a6d",
+        "normalizedTextSha256": "907073986d8f57bc4daca289a2356465aaae2955fa85783d48baaf433c4ef995"
+      },
+      {
+        "sourceKey": "smpc.4.7",
+        "spans": [
+          {
+            "page": 2,
+            "startOffset": 281,
+            "endOffset": 386,
+            "textSha256": "4cf6d4a2e245afec900f1b859c46a8ef912bd65ac070ca6eb9e2fd3b2bb57248"
+          }
+        ],
+        "narrativeDivSha256": "6d12a18c36c59ef6ee1a5e0989540b3e633a45fef54ebca0c043af2a29efdc72",
+        "normalizedTextSha256": "4cf6d4a2e245afec900f1b859c46a8ef912bd65ac070ca6eb9e2fd3b2bb57248"
+      },
+      {
+        "sourceKey": "smpc.4.8",
+        "spans": [
+          {
+            "page": 2,
+            "startOffset": 387,
+            "endOffset": 492,
+            "textSha256": "cf1f4897a1a5dda3627d67b678146b6a942cf79d396bf5dcbd5aa7aabd7d8e58"
+          }
+        ],
+        "narrativeDivSha256": "fb9a16e0abbf5dbf7b3422a0e5f618b30e328be73074e3be1fea278f89935b1b",
+        "normalizedTextSha256": "cf1f4897a1a5dda3627d67b678146b6a942cf79d396bf5dcbd5aa7aabd7d8e58"
+      },
+      {
+        "sourceKey": "smpc.4.8.reporting",
+        "spans": [
+          {
+            "page": 2,
+            "startOffset": 493,
+            "endOffset": 608,
+            "textSha256": "df9d31ccb3f106c3a2ada5d2b5ffead343ca2b636ad43b3d2f4f1f5b6e016102"
+          }
+        ],
+        "narrativeDivSha256": "b1fc34b4612daeefd394af773cf769d7ffbd8fcd2ef4c344468a92e6b68fb9ff",
+        "normalizedTextSha256": "df9d31ccb3f106c3a2ada5d2b5ffead343ca2b636ad43b3d2f4f1f5b6e016102"
+      },
+      {
+        "sourceKey": "smpc.4.9",
+        "spans": [
+          {
+            "page": 2,
+            "startOffset": 609,
+            "endOffset": 714,
+            "textSha256": "d73dcfce2e6283eb956bf1e330d3cf97b034624ae936ab0f8d0abba8395c48c0"
+          }
+        ],
+        "narrativeDivSha256": "88d87687e10e6663387befb187b43a907d8b9b20b38596dd68d528653f158acd",
+        "normalizedTextSha256": "d73dcfce2e6283eb956bf1e330d3cf97b034624ae936ab0f8d0abba8395c48c0"
+      },
+      {
+        "sourceKey": "smpc.5",
+        "spans": [
+          {
+            "page": 2,
+            "startOffset": 715,
+            "endOffset": 818,
+            "textSha256": "7e77ecb88f794627655733db44367d3c3cc7ac6b86159153eb7b3e9dc03b5651"
+          }
+        ],
+        "narrativeDivSha256": "23314921438543232420b0fbe50f940763c8ab0b719212617df2c19229fc0692",
+        "normalizedTextSha256": "7e77ecb88f794627655733db44367d3c3cc7ac6b86159153eb7b3e9dc03b5651"
+      },
+      {
+        "sourceKey": "smpc.5.1",
+        "spans": [
+          {
+            "page": 2,
+            "startOffset": 819,
+            "endOffset": 924,
+            "textSha256": "291600626a393edb09efc3343f673db69ae74b31028ac3520a83597f84a63196"
+          }
+        ],
+        "narrativeDivSha256": "cb61e7c8967eb279846519c92c419efc5391846c5eb436877a2886c342d2dcaf",
+        "normalizedTextSha256": "291600626a393edb09efc3343f673db69ae74b31028ac3520a83597f84a63196"
+      },
+      {
+        "sourceKey": "smpc.5.2",
+        "spans": [
+          {
+            "page": 2,
+            "startOffset": 925,
+            "endOffset": 1030,
+            "textSha256": "1d2e88d6341b1e5fccbb81578129866c589ed8e7d6391f17c391ea25fe29ae89"
+          }
+        ],
+        "narrativeDivSha256": "a2e023e390ff97afaf29c6031c5910fdbacc4d426f95689647d5b1050f030155",
+        "normalizedTextSha256": "1d2e88d6341b1e5fccbb81578129866c589ed8e7d6391f17c391ea25fe29ae89"
+      },
+      {
+        "sourceKey": "smpc.5.3",
+        "spans": [
+          {
+            "page": 2,
+            "startOffset": 1031,
+            "endOffset": 1136,
+            "textSha256": "29ef7bc3807c2cd5d260d2e7044da4102caa6fb11da8c9c46d66ed530f4a127b"
+          }
+        ],
+        "narrativeDivSha256": "0d7a327b827a183dffc5fb2ec20afe8c9867e0e2fa7a17a1c7f03911070a7792",
+        "normalizedTextSha256": "29ef7bc3807c2cd5d260d2e7044da4102caa6fb11da8c9c46d66ed530f4a127b"
+      },
+      {
+        "sourceKey": "smpc.6",
+        "spans": [
+          {
+            "page": 2,
+            "startOffset": 1137,
+            "endOffset": 1240,
+            "textSha256": "27df04dc41f7aa5143f83c6d52923d08886cbe0a04df502dbab277a9b1e7abaf"
+          }
+        ],
+        "narrativeDivSha256": "bbe882b75185e06f7dcfa418eb454f6af230d2b19809d3fb5b83bf564e0886ee",
+        "normalizedTextSha256": "27df04dc41f7aa5143f83c6d52923d08886cbe0a04df502dbab277a9b1e7abaf"
+      },
+      {
+        "sourceKey": "smpc.6.1",
+        "spans": [
+          {
+            "page": 3,
+            "startOffset": 69,
+            "endOffset": 174,
+            "textSha256": "b29c523e9605ca4c367fd3d6e04f34abe73135a7b5a6be3a3b9de4b0d3d7622d"
+          }
+        ],
+        "narrativeDivSha256": "4aa7004344492cb464d7253e85f387c1516c50c522ac35db5e439b3f2b054b91",
+        "normalizedTextSha256": "b29c523e9605ca4c367fd3d6e04f34abe73135a7b5a6be3a3b9de4b0d3d7622d"
+      },
+      {
+        "sourceKey": "smpc.6.2",
+        "spans": [
+          {
+            "page": 3,
+            "startOffset": 175,
+            "endOffset": 280,
+            "textSha256": "4437dfaecf7e33c82e890373ea8f37081393aec1ce68d66e71a108febd30a9bc"
+          }
+        ],
+        "narrativeDivSha256": "4cfe4b5f75c585cdbd35f88a47ce9b0a8f5ff1bb924f95e69e2d50407000f04d",
+        "normalizedTextSha256": "4437dfaecf7e33c82e890373ea8f37081393aec1ce68d66e71a108febd30a9bc"
+      },
+      {
+        "sourceKey": "smpc.6.3",
+        "spans": [
+          {
+            "page": 3,
+            "startOffset": 281,
+            "endOffset": 386,
+            "textSha256": "1cd48cee9731466fb37a7e92dee1d21aaecb0cec2ce50c07bd34397a2ca1cc46"
+          }
+        ],
+        "narrativeDivSha256": "fa5aa240548b517bb8333ac280ad1d0ac05baee98cb8c65d0ff7546431fa2e63",
+        "normalizedTextSha256": "1cd48cee9731466fb37a7e92dee1d21aaecb0cec2ce50c07bd34397a2ca1cc46"
+      },
+      {
+        "sourceKey": "smpc.6.4",
+        "spans": [
+          {
+            "page": 3,
+            "startOffset": 387,
+            "endOffset": 492,
+            "textSha256": "b0832f7b1e0754bc1ce3816308bb7512513b405871dcc00b25d1e299d7ed4cea"
+          }
+        ],
+        "narrativeDivSha256": "f6b48ab214c6e2ac630bfca50490b4669a99a75d21d031d1d90853012f0d2790",
+        "normalizedTextSha256": "b0832f7b1e0754bc1ce3816308bb7512513b405871dcc00b25d1e299d7ed4cea"
+      },
+      {
+        "sourceKey": "smpc.6.5",
+        "spans": [
+          {
+            "page": 3,
+            "startOffset": 493,
+            "endOffset": 598,
+            "textSha256": "b5821e6b581a81ec8bc7f32a42cc7e9523b715689bc4f934bf14487005c94dab"
+          }
+        ],
+        "narrativeDivSha256": "843b2d496405fb49767ec1498e2d8b95d26f00351be4aa621e7650df2484c15e",
+        "normalizedTextSha256": "b5821e6b581a81ec8bc7f32a42cc7e9523b715689bc4f934bf14487005c94dab"
+      },
+      {
+        "sourceKey": "smpc.6.6",
+        "spans": [
+          {
+            "page": 3,
+            "startOffset": 599,
+            "endOffset": 704,
+            "textSha256": "989967361e41de17ccf4997dcfb2b19be632bad5c9a8601efccbec48754c25ad"
+          }
+        ],
+        "narrativeDivSha256": "bf3ebb5aa74403dc77c23ca2abbd0a30610549d5b9c735aca59a1616b1f33504",
+        "normalizedTextSha256": "989967361e41de17ccf4997dcfb2b19be632bad5c9a8601efccbec48754c25ad"
+      },
+      {
+        "sourceKey": "smpc.7",
+        "spans": [
+          {
+            "page": 3,
+            "startOffset": 705,
+            "endOffset": 808,
+            "textSha256": "d359e28fa5fab154d83d3839724422bd1a161a44a4d7f62cf67eb6fc9dd8b26a"
+          }
+        ],
+        "narrativeDivSha256": "f43eba8a7695b4e7a59b9daaae7e22a18f9c6c94a3ae1931c37742997e25a018",
+        "normalizedTextSha256": "d359e28fa5fab154d83d3839724422bd1a161a44a4d7f62cf67eb6fc9dd8b26a"
+      },
+      {
+        "sourceKey": "smpc.8",
+        "spans": [
+          {
+            "page": 3,
+            "startOffset": 809,
+            "endOffset": 912,
+            "textSha256": "796023f921b04cf8f1c732163406c0585faf46870849ed85619147b4a1eeafed"
+          }
+        ],
+        "narrativeDivSha256": "8c18955ec8b777821eec6e56dc2beb41ac764eeec6f0957cee9de0bbef9001bf",
+        "normalizedTextSha256": "796023f921b04cf8f1c732163406c0585faf46870849ed85619147b4a1eeafed"
+      },
+      {
+        "sourceKey": "smpc.9",
+        "spans": [
+          {
+            "page": 3,
+            "startOffset": 913,
+            "endOffset": 1016,
+            "textSha256": "949ba5ce0d6b2c535bfb43ad4cf0e4f507092b2aac0ae3fd97a584905b9c3356"
+          }
+        ],
+        "narrativeDivSha256": "c1e1ad789440346480c7089c2a9217c363c043d13416204d8dc6c7111b76456e",
+        "normalizedTextSha256": "949ba5ce0d6b2c535bfb43ad4cf0e4f507092b2aac0ae3fd97a584905b9c3356"
+      },
+      {
+        "sourceKey": "smpc.10",
+        "spans": [
+          {
+            "page": 3,
+            "startOffset": 1017,
+            "endOffset": 1121,
+            "textSha256": "4805dd36111da6bb2948db97025f386e04555d3c5faccb89108f0d08617590cc"
+          }
+        ],
+        "narrativeDivSha256": "a877387e7b3dfdabe21bdc94733a4c519037a8343d2d503552f3981b7d063ece",
+        "normalizedTextSha256": "4805dd36111da6bb2948db97025f386e04555d3c5faccb89108f0d08617590cc"
+      }
+    ],
+    "decisions": [
+      {
+        "target": "Composition.section[0]",
+        "sourceKey": "smpc",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[0]",
+        "sourceKey": "smpc.1",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[1]",
+        "sourceKey": "smpc.2",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[2]",
+        "sourceKey": "smpc.3",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[3]",
+        "sourceKey": "smpc.4",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[0]",
+        "sourceKey": "smpc.4.1",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[1]",
+        "sourceKey": "smpc.4.2",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[1].section[0]",
+        "sourceKey": "smpc.4.2.posology",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[1].section[1]",
+        "sourceKey": "smpc.4.2.administration",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[2]",
+        "sourceKey": "smpc.4.3",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[3]",
+        "sourceKey": "smpc.4.4",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[4]",
+        "sourceKey": "smpc.4.5",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[5]",
+        "sourceKey": "smpc.4.6",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[6]",
+        "sourceKey": "smpc.4.7",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[7]",
+        "sourceKey": "smpc.4.8",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[7].section[0]",
+        "sourceKey": "smpc.4.8.reporting",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[8]",
+        "sourceKey": "smpc.4.9",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[4]",
+        "sourceKey": "smpc.5",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[4].section[0]",
+        "sourceKey": "smpc.5.1",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[4].section[1]",
+        "sourceKey": "smpc.5.2",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[4].section[2]",
+        "sourceKey": "smpc.5.3",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[5]",
+        "sourceKey": "smpc.6",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[0]",
+        "sourceKey": "smpc.6.1",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[1]",
+        "sourceKey": "smpc.6.2",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[2]",
+        "sourceKey": "smpc.6.3",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[3]",
+        "sourceKey": "smpc.6.4",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[4]",
+        "sourceKey": "smpc.6.5",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[5]",
+        "sourceKey": "smpc.6.6",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[6]",
+        "sourceKey": "smpc.7",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[7]",
+        "sourceKey": "smpc.8",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[8]",
+        "sourceKey": "smpc.9",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.section[0].section[9]",
+        "sourceKey": "smpc.10",
+        "action": "extracted-verbatim"
+      },
+      {
+        "target": "Composition.type",
+        "action": "code-mapped",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/document-type",
+          "code": "smpc",
+          "lookupId": "synthetic-lookup-1"
+        }
+      }
+    ],
+    "fidelity": {
+      "normalizationVersion": "fidelity-norm/3.1.0",
+      "status": "passed",
+      "sectionsChecked": 32,
+      "sectionsMatched": 32,
+      "narrativeBindingSha256": "ff84541ac9562bc2600567b55e7c5cf4f5343a4b2f691ee7e8fc9d77c3f2ba44",
+      "reportSha256": "4af62739c48b0b5c224603d8ba8939e91da38679e13cedb796862f3ef3f52626",
+      "reportUri": "gs://synthetic-bucket/synthetic-smoketest-smpc.fidelity-report.json"
+    }
+  },
+  "approval": {
+    "approverId": "urn:reviewer:synthetic-01",
+    "approverRole": "content-reviewer",
+    "approvedAt": "2026-09-19T00:00:00Z",
+    "method": "api-attestation",
+    "meaning": "reviewed-fidelity-and-structure",
+    "approvedContentSha256": "90c1fe3872496fe773961785f4967bd0ca5e8e8f17dfbf111bd7ed54283efbe4"
+  }
+}

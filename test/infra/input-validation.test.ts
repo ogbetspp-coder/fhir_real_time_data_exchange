@@ -34,8 +34,14 @@ describe("query_entitlements_json", () => {
   it("caps each entitlement at the service's 10,000 bundles", () => {
     expect(body).toContain("try(length(entitlement.bundles), 10001) <= 10000");
     expect(readFileSync("src/query/entitlements.ts", "utf8")).toContain(
-      "bundles: z.array(FhirId).max(10_000)",
+      "bundles: z.array(AddressableFhirId).max(10_000)",
     );
+  });
+
+  // Each id is a single URL path segment, as the service requires at startup: never . or ..
+  // (src/query/entitlements.ts).
+  it("takes only ids that begin with a letter or a digit", () => {
+    expect(body).toContain('can(regex("^[A-Za-z0-9][A-Za-z0-9.-]{0,63}$", bundle))');
   });
 });
 

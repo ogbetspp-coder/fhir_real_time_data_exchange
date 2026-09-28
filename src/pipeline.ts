@@ -4,6 +4,7 @@ import type { AppConfig } from "./config.js";
 import {
   AUTHORITY_IMPORT_PREFIX,
   CANONICAL_SUBMISSION_VERSION,
+  DEVELOPMENT_RUNTIME,
   RUN_MANIFEST_VERSION,
   RunManifestSchema,
   SubmissionRejectedError,
@@ -13,6 +14,7 @@ import {
   type DocumentSubmissionInput,
   type IngestionEvidence,
   type ManifestPersistence,
+  type ManifestRuntime,
 } from "./contracts/index.js";
 import { OfficialFhirValidatorClient } from "./fhir/official-validator.js";
 import {
@@ -224,6 +226,19 @@ async function documentGate(
 // What a run may be given instead of its production default; tests use it.
 export type PipelineDependencies = { authorityFetcher?: AuthorityFetcher };
 
+// The code and images the manifest names, read through the configuration, which has already
+// refused a value outside its grammar (src/config.ts); `development` where none is set, as off
+// Cloud Run. Cloud Run sets K_REVISION on the container; WORKFLOW_REVISION is never set by the
+// deploy (infra/run.tf).
+export function manifestRuntime(config: AppConfig): ManifestRuntime {
+  return {
+    sourceCommit: config.GIT_COMMIT ?? DEVELOPMENT_RUNTIME,
+    imageDigest: config.IMAGE_DIGEST ?? DEVELOPMENT_RUNTIME,
+    validatorImageDigest: config.VALIDATOR_IMAGE_DIGEST ?? DEVELOPMENT_RUNTIME,
+    workflowRevision: config.WORKFLOW_REVISION ?? config.K_REVISION ?? DEVELOPMENT_RUNTIME,
+  };
+}
+
 export async function runPipeline(
   input: PipelineInput,
   mapping: EmaMapping,
@@ -361,12 +376,7 @@ export async function runPipeline(
       outputHash: transformed.outputHash,
       decisions: transformed.mappingDecisions.length,
     },
-    runtime: {
-      sourceCommit: process.env.GIT_COMMIT ?? "development",
-      imageDigest: process.env.IMAGE_DIGEST ?? "development",
-      validatorImageDigest: process.env.VALIDATOR_IMAGE_DIGEST ?? "development",
-      workflowRevision: process.env.WORKFLOW_REVISION ?? process.env.K_REVISION ?? "development",
-    },
+    runtime: manifestRuntime(config),
     ...(ingestion === undefined ? {} : { ingestion }),
   });
 

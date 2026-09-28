@@ -1,0 +1,197 @@
+{
+  "extractorVersion": "authority-import/2.2.0",
+  "pages": [
+    {
+      "page": 1,
+      "text": "\n\nSynthetic demonstration content for smpc; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 67
+    },
+    {
+      "page": 2,
+      "text": "\n\nSynthetic demonstration content for smpc.1; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 69
+    },
+    {
+      "page": 3,
+      "text": "\n\nSynthetic demonstration content for smpc.2; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 69
+    },
+    {
+      "page": 4,
+      "text": "\n\nSynthetic demonstration content for smpc.3; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 69
+    },
+    {
+      "page": 5,
+      "text": "\n\nSynthetic demonstration content for smpc.4; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 69
+    },
+    {
+      "page": 6,
+      "text": "\n\nSynthetic demonstration content for smpc.4.1; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 71
+    },
+    {
+      "page": 7,
+      "text": "\n\nSynthetic demonstration content for smpc.4.2; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 71
+    },
+    {
+      "page": 8,
+      "text": "\n\nSynthetic demonstration content for smpc.4.2.posology; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 80
+    },
+    {
+      "page": 9,
+      "text": "\n\nSynthetic demonstration content for smpc.4.2.administration; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 86
+    },
+    {
+      "page": 10,
+      "text": "\n\nSynthetic demonstration content for smpc.4.3; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 71
+    },
+    {
+      "page": 11,
+      "text": "\n\nSynthetic demonstration content for smpc.4.4; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 71
+    },
+    {
+      "page": 12,
+      "text": "\n\nSynthetic demonstration content for smpc.4.5; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 71
+    },
+    {
+      "page": 13,
+      "text": "\n\nSynthetic demonstration content for smpc.4.6; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 71
+    },
+    {
+      "page": 14,
+      "text": "\n\nSynthetic demonstration content for smpc.4.7; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 71
+    },
+    {
+      "page": 15,
+      "text": "\n\nSynthetic demonstration content for smpc.4.8; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 71
+    },
+    {
+      "page": 16,
+      "text": "\n\nSynthetic demonstration content for smpc.4.8.reporting; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 81
+    },
+    {
+      "page": 17,
+      "text": "\n\nSynthetic demonstration content for smpc.4.9; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 71
+    },
+    {
+      "page": 18,
+      "text": "\n\nSynthetic demonstration content for smpc.5; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 69
+    },
+    {
+      "page": 19,
+      "text": "\n\nSynthetic demonstration content for smpc.5.1; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 71
+    },
+    {
+      "page": 20,
+      "text": "\n\nSynthetic demonstration content for smpc.5.2; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 71
+    },
+    {
+      "page": 21,
+      "text": "\n\nSynthetic demonstration content for smpc.5.3; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 71
+    },
+    {
+      "page": 22,
+      "text": "\n\nSynthetic demonstration content for smpc.6; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 69
+    },
+    {
+      "page": 23,
+      "text": "\n\nSynthetic demonstration content for smpc.6.1; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 71
+    },
+    {
+      "page": 24,
+      "text": "\n\nSynthetic demonstration content for smpc.6.2; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 71
+    },
+    {
+      "page": 25,
+      "text": "\n\nSynthetic demonstration content for smpc.6.3; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 71
+    },
+    {
+      "page": 26,
+      "text": "\n\nSynthetic demonstration content for smpc.6.4; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 71
+    },
+    {
+      "page": 27,
+      "text": "\n\nSynthetic demonstration content for smpc.6.5; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 71
+    },
+    {
+      "page": 28,
+      "text": "\n\nSynthetic demonstration content for smpc.6.6; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 71
+    },
+    {
+      "page": 29,
+      "text": "\n\nSynthetic demonstration content for smpc.7; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 69
+    },
+    {
+      "page": 30,
+      "text": "\n\nSynthetic demonstration content for smpc.8; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 69
+    },
+    {
+      "page": 31,
+      "text": "\n\nSynthetic demonstration content for smpc.9; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 69
+    },
+    {
+      "page": 32,
+      "text": "\n\nSynthetic demonstration content for smpc.10; not for clinical use.\n\n",
+      "bodyStart": 0,
+      "bodyEnd": 70
+    }
+  ]
+}

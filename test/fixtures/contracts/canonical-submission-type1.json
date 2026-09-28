@@ -1,0 +1,2670 @@
+{
+  "schemaVersion": "2.0.0",
+  "submissionId": "00000000-0000-4000-8000-0000000000aa",
+  "createdAt": "2026-09-24T12:00:00Z",
+  "graphType": "type1",
+  "bundle": {
+    "resourceType": "Bundle",
+    "id": "eaa4726f-52f7-582c-a1b6-bcea36489da7",
+    "meta": {
+      "profile": [
+        "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/Bundle-uv-epi"
+      ]
+    },
+    "language": "en",
+    "identifier": {
+      "system": "https://khs.dev/fhir/identifier/authority-import",
+      "value": "authority-import:synthetic:00000000-5979-4e74-8000-000000000001"
+    },
+    "type": "document",
+    "timestamp": "2026-09-24T12:00:00.000000+00:00",
+    "entry": [
+      {
+        "fullUrl": "urn:uuid:15c21790-073c-51c6-a661-0d81603382f2",
+        "resource": {
+          "resourceType": "Composition",
+          "id": "15c21790-073c-51c6-a661-0d81603382f2",
+          "meta": {
+            "profile": [
+              "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/Composition-uv-epi"
+            ]
+          },
+          "language": "en",
+          "identifier": [
+            {
+              "system": "https://khs.dev/fhir/identifier/authority-import",
+              "value": "authority-import:synthetic:00000000-5979-4e74-8000-000000000001:composition"
+            }
+          ],
+          "status": "final",
+          "type": {
+            "coding": [
+              {
+                "system": "https://spor.ema.europa.eu/v1/lists/100000155531/terms/",
+                "code": "100000155532",
+                "display": "Summary of Product Characteristics (English)"
+              }
+            ]
+          },
+          "subject": [
+            {
+              "reference": "urn:uuid:740682b7-befb-5347-a72b-c36223c105ba"
+            }
+          ],
+          "date": "2026-09-24",
+          "author": [
+            {
+              "reference": "urn:uuid:186ae94e-312a-5b04-ab9f-f6a4d8f09d27"
+            }
+          ],
+          "title": "Synthetic Paracetamol 500 mg tablets",
+          "relatesTo": [
+            {
+              "type": "derived-from",
+              "resourceReference": {
+                "identifier": {
+                  "system": "http://ema.europa.eu/fhir/epiDocument",
+                  "value": "00000000-5979-4e74-8000-000000000003"
+                }
+              }
+            }
+          ],
+          "section": [
+            {
+              "id": "8da7b13c-6db0-50f5-ac44-38ee536b0f2c",
+              "title": "SUMMARY OF PRODUCT CHARACTERISTICS",
+              "code": {
+                "coding": [
+                  {
+                    "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                    "code": "smpc"
+                  }
+                ]
+              },
+              "text": {
+                "status": "additional",
+                "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc; not for clinical use.</p></div>"
+              },
+              "section": [
+                {
+                  "id": "0d4c916a-3f35-52f0-a695-6c3da7939069",
+                  "title": "1. NAME OF THE MEDICINAL PRODUCT",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.1"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "additional",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.1; not for clinical use.</p></div>"
+                  }
+                },
+                {
+                  "id": "051057c3-e465-5f7e-a6ba-f52cd6d4aa42",
+                  "title": "2. QUALITATIVE AND QUANTITATIVE COMPOSITION",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.2"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "additional",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.2; not for clinical use.</p></div>"
+                  }
+                },
+                {
+                  "id": "ec8d43c5-fc8f-5d10-a70b-2df7aa3b1434",
+                  "title": "3. PHARMACEUTICAL FORM",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.3"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "additional",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.3; not for clinical use.</p></div>"
+                  }
+                },
+                {
+                  "id": "095bffde-82f9-5d3c-af1c-fcfb19f134aa",
+                  "title": "4. CLINICAL PARTICULARS",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.4"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "additional",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4; not for clinical use.</p></div>"
+                  },
+                  "section": [
+                    {
+                      "id": "9982cd56-f3bc-58ad-a393-07dcfc8de669",
+                      "title": "4.1 Therapeutic indications",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.4.1"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "additional",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.1; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "9db67b1f-589b-5aea-a800-034238453cf8",
+                      "title": "4.2 Posology and method of administration",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.4.2"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "additional",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.2; not for clinical use.</p></div>"
+                      },
+                      "section": [
+                        {
+                          "id": "ec137140-72fa-501f-a982-3c74b905ceea",
+                          "title": "Posology",
+                          "code": {
+                            "coding": [
+                              {
+                                "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                                "code": "smpc.4.2.posology"
+                              }
+                            ]
+                          },
+                          "text": {
+                            "status": "additional",
+                            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.2.posology; not for clinical use.</p></div>"
+                          }
+                        },
+                        {
+                          "id": "90245ebd-b931-5250-ad21-f122f0ad6157",
+                          "title": "Method of administration",
+                          "code": {
+                            "coding": [
+                              {
+                                "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                                "code": "smpc.4.2.administration"
+                              }
+                            ]
+                          },
+                          "text": {
+                            "status": "additional",
+                            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.2.administration; not for clinical use.</p></div>"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "id": "ffcfef6d-5977-597c-ae3b-3505e9d1756d",
+                      "title": "4.3 Contraindications",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.4.3"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "additional",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.3; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "1ca99c78-b768-5135-a3ab-2387481591ab",
+                      "title": "4.4 Special warnings and precautions for use",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.4.4"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "additional",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.4; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "e4b4d1b3-2d72-5aac-aa53-71c98271f83d",
+                      "title": "4.5 Interaction with other medicinal products and other forms of interaction",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.4.5"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "additional",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.5; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "9d2519c5-cd63-5e93-a8ea-7e9b1b5af375",
+                      "title": "4.6 Fertility, pregnancy and lactation",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.4.6"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "additional",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.6; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "f0d0d48c-ac8a-5f96-a54d-93bd602ed49a",
+                      "title": "4.7 Effects on ability to drive and use machines",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.4.7"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "additional",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.7; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "565907cd-c1b1-5d53-a0fc-3d48b49b8ecb",
+                      "title": "4.8 Undesirable effects",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.4.8"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "additional",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.8; not for clinical use.</p></div>"
+                      },
+                      "section": [
+                        {
+                          "id": "1abb5040-8240-5790-ad6a-f1fe44344aee",
+                          "title": "Reporting of suspected adverse reactions",
+                          "code": {
+                            "coding": [
+                              {
+                                "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                                "code": "smpc.4.8.reporting"
+                              }
+                            ]
+                          },
+                          "text": {
+                            "status": "additional",
+                            "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.8.reporting; not for clinical use.</p></div>"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "id": "ba35634d-b7b5-5169-ad2f-0225bec7972c",
+                      "title": "4.9 Overdose",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.4.9"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "additional",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.4.9; not for clinical use.</p></div>"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "f27a0ce1-c1a1-56ce-acbe-054fe0fa175e",
+                  "title": "5. PHARMACOLOGICAL PROPERTIES",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.5"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "additional",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.5; not for clinical use.</p></div>"
+                  },
+                  "section": [
+                    {
+                      "id": "26d18e11-fddb-5cf2-a83e-adabd0b0432c",
+                      "title": "5.1 Pharmacodynamic properties",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.5.1"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "additional",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.5.1; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "1e3a6a76-eaab-5be8-aa29-9e879f58e90b",
+                      "title": "5.2 Pharmacokinetic properties",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.5.2"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "additional",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.5.2; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "b5bd3d9d-22de-5cd5-a03f-6a2417628bde",
+                      "title": "5.3 Preclinical safety data",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.5.3"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "additional",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.5.3; not for clinical use.</p></div>"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "5574c7f7-2941-531b-ae21-27966a1a89f7",
+                  "title": "6. PHARMACEUTICAL PARTICULARS",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.6"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "additional",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.6; not for clinical use.</p></div>"
+                  },
+                  "section": [
+                    {
+                      "id": "d182c733-e3a8-5c74-a1a9-216d845c5bed",
+                      "title": "6.1 List of excipients",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.6.1"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "additional",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.6.1; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "dc885c25-cfcb-58fd-a4ff-3291c43f06a5",
+                      "title": "6.2 Incompatibilities",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.6.2"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "additional",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.6.2; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "18f4573d-0cc5-587d-a41e-d610998c022a",
+                      "title": "6.3 Shelf life",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.6.3"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "additional",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.6.3; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "659dd01e-fb3b-5823-acf7-61db53fff0df",
+                      "title": "6.4 Special precautions for storage",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.6.4"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "additional",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.6.4; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "5eab0b51-0b31-5a7c-a38c-93c72f5ffd70",
+                      "title": "6.5 Nature and contents of container and special equipment for use, administration or implantation",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.6.5"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "additional",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.6.5; not for clinical use.</p></div>"
+                      }
+                    },
+                    {
+                      "id": "af462d1e-1e73-5bfb-a538-47a0ace828bd",
+                      "title": "6.6 Special precautions for disposal and other handling",
+                      "code": {
+                        "coding": [
+                          {
+                            "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                            "code": "smpc.6.6"
+                          }
+                        ]
+                      },
+                      "text": {
+                        "status": "additional",
+                        "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.6.6; not for clinical use.</p></div>"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "9c97e412-bf12-5852-a151-ec5576b2bea4",
+                  "title": "7. MARKETING AUTHORISATION HOLDER",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.7"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "additional",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.7; not for clinical use.</p></div>"
+                  }
+                },
+                {
+                  "id": "3471cf5f-762d-5e4a-a81b-d574a4821756",
+                  "title": "8. MARKETING AUTHORISATION NUMBER(S)",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.8"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "additional",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.8; not for clinical use.</p></div>"
+                  }
+                },
+                {
+                  "id": "29a11f38-0fdd-5bc5-aa19-a62406cbe7e9",
+                  "title": "9. DATE OF FIRST AUTHORISATION/RENEWAL OF THE AUTHORISATION",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.9"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "additional",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.9; not for clinical use.</p></div>"
+                  }
+                },
+                {
+                  "id": "607b0dbb-c1f6-5523-a3b9-9d9f9b0d3e35",
+                  "title": "10. DATE OF REVISION OF THE TEXT",
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+                        "code": "smpc.10"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "status": "additional",
+                    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Synthetic demonstration content for smpc.10; not for clinical use.</p></div>"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:740682b7-befb-5347-a72b-c36223c105ba",
+        "resource": {
+          "resourceType": "MedicinalProductDefinition",
+          "id": "740682b7-befb-5347-a72b-c36223c105ba",
+          "meta": {
+            "profile": [
+              "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/MedicinalProductDefinition-uv-epi"
+            ]
+          },
+          "identifier": [
+            {
+              "system": "http://ema.europa.eu/fhir/epiId",
+              "value": "SYNTHETIC-EPI-1"
+            }
+          ],
+          "name": [
+            {
+              "productName": "Synthetic Paracetamol 500 mg tablets"
+            }
+          ]
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:186ae94e-312a-5b04-ab9f-f6a4d8f09d27",
+        "resource": {
+          "resourceType": "Organization",
+          "id": "186ae94e-312a-5b04-ab9f-f6a4d8f09d27",
+          "meta": {
+            "profile": [
+              "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/Organization-uv-epi"
+            ]
+          },
+          "identifier": [
+            {
+              "system": "https://spor.ema.europa.eu/v1/organisations/",
+              "value": "SYNTHETIC-ORG-1"
+            }
+          ],
+          "name": "Synthetic Pharma B.V."
+        }
+      },
+      {
+        "fullUrl": "urn:uuid:d7d0c87c-91e7-5edf-ac7d-368e3ca37770",
+        "resource": {
+          "resourceType": "RegulatedAuthorization",
+          "id": "d7d0c87c-91e7-5edf-ac7d-368e3ca37770",
+          "meta": {
+            "profile": [
+              "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/RegulatedAuthorization-uv-epi"
+            ]
+          },
+          "identifier": [
+            {
+              "system": "http://ema.europa.eu/fhir/procedureIdentifierNumber",
+              "value": "SYNTHETIC-PROCEDURE-1"
+            }
+          ],
+          "subject": [
+            {
+              "reference": "urn:uuid:740682b7-befb-5347-a72b-c36223c105ba"
+            }
+          ],
+          "holder": {
+            "reference": "urn:uuid:186ae94e-312a-5b04-ab9f-f6a4d8f09d27"
+          },
+          "regulator": {
+            "identifier": {
+              "system": "https://spor.ema.europa.eu/v1/organisations/",
+              "value": "SYNTHETIC-AUTHORITY"
+            },
+            "display": "Synthetic Medicines Agency"
+          },
+          "case": {
+            "identifier": {
+              "system": "http://ema.europa.eu/fhir/procedureIdentifierNumber",
+              "value": "SYNTHETIC-PROCEDURE-1"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "bundleSha256": "978c3ea664a8cd2b3f068223402743524d7a1d64ef7a3811f5c4f911cc9da21c",
+  "provenance": {
+    "sourceDocument": {
+      "kind": "authority-publication",
+      "mediaType": "application/fhir+json",
+      "authority": "synthetic",
+      "request": {
+        "authority": "synthetic",
+        "documentId": "00000000-5979-4e74-8000-000000000001",
+        "indexId": "00000000-5979-4e74-8000-000000000002",
+        "language": "en"
+      },
+      "document": {
+        "id": "00000000-5979-4e74-8000-000000000001",
+        "sha256": "d41e0389e8df4658a8f658ce00fe10791fa9c5ea8b1441cc3101a7ae7ce7226c",
+        "byteLength": 25585
+      },
+      "index": {
+        "id": "00000000-5979-4e74-8000-000000000002",
+        "sha256": "7b30f4e26bbfe85554dd9a88104efc00219886f17e34b35c9b1d1bb9e0ddbda4",
+        "byteLength": 1644,
+        "epiId": "SYNTHETIC-EPI-1",
+        "versionNumber": "1",
+        "metaVersionId": "1",
+        "status": "current"
+      },
+      "pictures": [],
+      "sectionPages": [
+        {
+          "page": 1,
+          "path": "Composition.section[0]",
+          "code": "200000029791"
+        },
+        {
+          "page": 2,
+          "path": "Composition.section[0].section[0]",
+          "code": "200000029792"
+        },
+        {
+          "page": 3,
+          "path": "Composition.section[0].section[1]",
+          "code": "200000029793"
+        },
+        {
+          "page": 4,
+          "path": "Composition.section[0].section[2]",
+          "code": "200000029797"
+        },
+        {
+          "page": 5,
+          "path": "Composition.section[0].section[3]",
+          "code": "200000029798"
+        },
+        {
+          "page": 6,
+          "path": "Composition.section[0].section[3].section[0]",
+          "code": "200000029799"
+        },
+        {
+          "page": 7,
+          "path": "Composition.section[0].section[3].section[1]",
+          "code": "200000029800"
+        },
+        {
+          "page": 8,
+          "path": "Composition.section[0].section[3].section[1].section[0]",
+          "code": "200000029801"
+        },
+        {
+          "page": 9,
+          "path": "Composition.section[0].section[3].section[1].section[1]",
+          "code": "200000029803"
+        },
+        {
+          "page": 10,
+          "path": "Composition.section[0].section[3].section[2]",
+          "code": "200000029805"
+        },
+        {
+          "page": 11,
+          "path": "Composition.section[0].section[3].section[3]",
+          "code": "200000029806"
+        },
+        {
+          "page": 12,
+          "path": "Composition.section[0].section[3].section[4]",
+          "code": "200000029809"
+        },
+        {
+          "page": 13,
+          "path": "Composition.section[0].section[3].section[5]",
+          "code": "200000029811"
+        },
+        {
+          "page": 14,
+          "path": "Composition.section[0].section[3].section[6]",
+          "code": "200000029815"
+        },
+        {
+          "page": 15,
+          "path": "Composition.section[0].section[3].section[7]",
+          "code": "200000029816"
+        },
+        {
+          "page": 16,
+          "path": "Composition.section[0].section[3].section[7].section[0]",
+          "code": "200000029818"
+        },
+        {
+          "page": 17,
+          "path": "Composition.section[0].section[3].section[8]",
+          "code": "200000029819"
+        },
+        {
+          "page": 18,
+          "path": "Composition.section[0].section[4]",
+          "code": "200000029821"
+        },
+        {
+          "page": 19,
+          "path": "Composition.section[0].section[4].section[0]",
+          "code": "200000029822"
+        },
+        {
+          "page": 20,
+          "path": "Composition.section[0].section[4].section[1]",
+          "code": "200000029827"
+        },
+        {
+          "page": 21,
+          "path": "Composition.section[0].section[4].section[2]",
+          "code": "200000029834"
+        },
+        {
+          "page": 22,
+          "path": "Composition.section[0].section[5]",
+          "code": "200000029836"
+        },
+        {
+          "page": 23,
+          "path": "Composition.section[0].section[5].section[0]",
+          "code": "200000029837"
+        },
+        {
+          "page": 24,
+          "path": "Composition.section[0].section[5].section[1]",
+          "code": "200000029838"
+        },
+        {
+          "page": 25,
+          "path": "Composition.section[0].section[5].section[2]",
+          "code": "200000029839"
+        },
+        {
+          "page": 26,
+          "path": "Composition.section[0].section[5].section[3]",
+          "code": "200000029840"
+        },
+        {
+          "page": 27,
+          "path": "Composition.section[0].section[5].section[4]",
+          "code": "200000029841"
+        },
+        {
+          "page": 28,
+          "path": "Composition.section[0].section[5].section[5]",
+          "code": "200000029842"
+        },
+        {
+          "page": 29,
+          "path": "Composition.section[0].section[6]",
+          "code": "200000029844"
+        },
+        {
+          "page": 30,
+          "path": "Composition.section[0].section[7]",
+          "code": "200000029845"
+        },
+        {
+          "page": 31,
+          "path": "Composition.section[0].section[8]",
+          "code": "200000029846"
+        },
+        {
+          "page": 32,
+          "path": "Composition.section[0].section[9]",
+          "code": "200000029847"
+        }
+      ],
+      "extractedText": {
+        "uri": "gs://synthetic-bucket/import.pages.json",
+        "sha256": "15a5732528c7e1dee29f3eb43b92627724b98ce16f7094b2514b7c081dcdfabf",
+        "extractorVersion": "authority-import/2.2.0"
+      }
+    },
+    "extraction": {
+      "extractionRunId": "00000000-0000-4000-8000-0000000000bb",
+      "serviceVersion": "test",
+      "parser": {
+        "name": "authority-import",
+        "version": "2.2.0"
+      },
+      "terminologyService": {
+        "name": "cap-smpc-en",
+        "version": "1.3.0",
+        "snapshotSha256": "d5eb76d1b8039f0396c5294e925ebfcfa53665e5aa7c9a16963a41d40092836e"
+      }
+    },
+    "sections": [
+      {
+        "sourceKey": "smpc",
+        "spans": [
+          {
+            "page": 1,
+            "startOffset": 0,
+            "endOffset": 67,
+            "textSha256": "4d1dafb6154df7b357d5cfcf94f4c6808ad221a9ff7879fae0542cc122ed3258"
+          }
+        ],
+        "narrativeDivSha256": "edd8b9c0b3cdf7083d52e7bac61be2714e96940bad2730318a2e24ea0cfdbb18",
+        "normalizedTextSha256": "ab3372db125a0b0e87b81686c5dd74e2f7e8aa18795b6989ec6026e5799d2cb7"
+      },
+      {
+        "sourceKey": "smpc.1",
+        "spans": [
+          {
+            "page": 2,
+            "startOffset": 0,
+            "endOffset": 69,
+            "textSha256": "812345248446dbd946152a21d11b058e31fd224b8924634dfebb412c938e809a"
+          }
+        ],
+        "narrativeDivSha256": "e22d4db966d04634d7db22295baefa6d9409c7a4773f201d761d9bd28270ba0a",
+        "normalizedTextSha256": "b1275dd181c1f5a0ffcc619a2a6c8e08728ca1a99ccb4800f42d805eb7df9c04"
+      },
+      {
+        "sourceKey": "smpc.2",
+        "spans": [
+          {
+            "page": 3,
+            "startOffset": 0,
+            "endOffset": 69,
+            "textSha256": "fefb623786bf9fd4642c43f4d32f9ad23c64c4d40763356e89843e6f8cfb43c1"
+          }
+        ],
+        "narrativeDivSha256": "d29bd80d03050b80d7a4b7cbf0d84bddf6041dae9298993407c98dcef0c980c6",
+        "normalizedTextSha256": "270a4b4efbbca89a2a0d41bf14452a0bbb5b35c043b636b4b5b4a7472522adfa"
+      },
+      {
+        "sourceKey": "smpc.3",
+        "spans": [
+          {
+            "page": 4,
+            "startOffset": 0,
+            "endOffset": 69,
+            "textSha256": "1df38b1d80b68ed9cc0e426def7a3061ed0c44cd10ca7951827046b7f5927a07"
+          }
+        ],
+        "narrativeDivSha256": "efa61010619b92f9071416734bf106d36cfae4b5b8b81be5238923967aa9b860",
+        "normalizedTextSha256": "0a17203a009cfa4cbbb9497809700b515d916ced6893accbe81022a6193c827f"
+      },
+      {
+        "sourceKey": "smpc.4",
+        "spans": [
+          {
+            "page": 5,
+            "startOffset": 0,
+            "endOffset": 69,
+            "textSha256": "09346a53ea7e245e43842f4e1ac3c06be6a8e71d31b2e45a7ef8b9fa1a9bad14"
+          }
+        ],
+        "narrativeDivSha256": "db54406069f8157698bde83850acef50280d11ed5007bc4fe4019f7ac8f9903f",
+        "normalizedTextSha256": "6b7b02ab00118a100b4d8eca9dfb58087615a596aaa811cb1c41cc0c4d31506c"
+      },
+      {
+        "sourceKey": "smpc.4.1",
+        "spans": [
+          {
+            "page": 6,
+            "startOffset": 0,
+            "endOffset": 71,
+            "textSha256": "11f36a4739de2e023e96865dfa7d66d3c580f3bc5fc98e5aead22391141b1d73"
+          }
+        ],
+        "narrativeDivSha256": "5ec5f34e8c82439cd8c1358a6eae7b1c82147e911d4e4138413105ec5b6e76f0",
+        "normalizedTextSha256": "fd809f6517ece48bc064771d4e75eaf027ebaf06e9f398c1f9163afd3eb71184"
+      },
+      {
+        "sourceKey": "smpc.4.2",
+        "spans": [
+          {
+            "page": 7,
+            "startOffset": 0,
+            "endOffset": 71,
+            "textSha256": "919a8cc5c57756b662659c29fee2e36c6c0eedc4550f6eaba7aa04e3a102060e"
+          }
+        ],
+        "narrativeDivSha256": "81a519da911516693715dd0a3cd788b75e1438e2f2838e5541d6c75dccac4ff1",
+        "normalizedTextSha256": "b064949dfbb6402bb80a02627384b20a8470324e7680936a790bbc22f0eb923a"
+      },
+      {
+        "sourceKey": "smpc.4.2.posology",
+        "spans": [
+          {
+            "page": 8,
+            "startOffset": 0,
+            "endOffset": 80,
+            "textSha256": "c5c868a40b7a288d9ea70f869723d54b8d6e19c39c7694412af78ad596c4a4b9"
+          }
+        ],
+        "narrativeDivSha256": "ff056b8b29a02e3362bab81cf7cbc3822b3b4e6a0748cae16852fe8b0eb23c5d",
+        "normalizedTextSha256": "96c7bd940e0919d7c77ae27032b122ff9198fa7fe39bc9a1a41c82e20577989d"
+      },
+      {
+        "sourceKey": "smpc.4.2.administration",
+        "spans": [
+          {
+            "page": 9,
+            "startOffset": 0,
+            "endOffset": 86,
+            "textSha256": "a6bca11deff6cfd873fc01af8961a78a9eda78b04583e80b52ce588538267881"
+          }
+        ],
+        "narrativeDivSha256": "128f118e16f320b47e05810567adb3977b580f1f24323ab20f120d3a60b481d5",
+        "normalizedTextSha256": "f299d828692cf5bca437c7fc6f15fed4285d3e6bc3681d224ea5cffc887ef4dd"
+      },
+      {
+        "sourceKey": "smpc.4.3",
+        "spans": [
+          {
+            "page": 10,
+            "startOffset": 0,
+            "endOffset": 71,
+            "textSha256": "b4bf607abb5cd15eb0a51385c1d8883b45f2adda9da17736cca4e6def4a41074"
+          }
+        ],
+        "narrativeDivSha256": "ff6dbb7da9c2c902aa5a554df75ecbbec87146ab8752fbb2a168f4edc06ad617",
+        "normalizedTextSha256": "6adf8c3f72e6673d252151f6e418fcce882739861720b7a0e11d82f49c50e657"
+      },
+      {
+        "sourceKey": "smpc.4.4",
+        "spans": [
+          {
+            "page": 11,
+            "startOffset": 0,
+            "endOffset": 71,
+            "textSha256": "3be9fd08c7638b3258e8ecc64fd27e55701b0de93d0bb8f8ed94f09ab2a63ed2"
+          }
+        ],
+        "narrativeDivSha256": "005f4ecfdae8a9079ecc9042c18b4681f9709007dbbc7be47c931cfd30282f69",
+        "normalizedTextSha256": "4f3ad9259211cfe5455ae65bc60f44ab1fe50e9873a0ae93da9fc6f017ec7bff"
+      },
+      {
+        "sourceKey": "smpc.4.5",
+        "spans": [
+          {
+            "page": 12,
+            "startOffset": 0,
+            "endOffset": 71,
+            "textSha256": "04a283d086c0d969c5d76d7bff74020590ba247153309c03f86f09147521ea07"
+          }
+        ],
+        "narrativeDivSha256": "ae7811a4b74c581fc14cf72e30e9e97fb65014d0be70af24d6e8a77e92d2b6fe",
+        "normalizedTextSha256": "c3f159b97702ad72854fb8d04ce5ba580868c859cc21991927c6c630ea90302f"
+      },
+      {
+        "sourceKey": "smpc.4.6",
+        "spans": [
+          {
+            "page": 13,
+            "startOffset": 0,
+            "endOffset": 71,
+            "textSha256": "09d6855d9a430a51756589840de57846a52bb8640ff5c12fa5167c7bec85e228"
+          }
+        ],
+        "narrativeDivSha256": "fea5256e2adbcaf2205e70a401bcedde2797e7d4a60fffcc8620c205cc55c8cf",
+        "normalizedTextSha256": "4acd4cce23b1a1d5974de69b9e99b39c0e5f5e8a32d1645d89a65c056a663f0c"
+      },
+      {
+        "sourceKey": "smpc.4.7",
+        "spans": [
+          {
+            "page": 14,
+            "startOffset": 0,
+            "endOffset": 71,
+            "textSha256": "eb70f63d838b40f1a335284512fead995adbb1b4c5fb1444623c9751a742d7e8"
+          }
+        ],
+        "narrativeDivSha256": "38943be7977d58ce7e7b3c524d1f47bbd2073d24290338b8fee81af4d4f6a5ba",
+        "normalizedTextSha256": "34f7c6b552077d690eee8f16b8de5dc8de22cd535f6b34d606eb004132bc099d"
+      },
+      {
+        "sourceKey": "smpc.4.8",
+        "spans": [
+          {
+            "page": 15,
+            "startOffset": 0,
+            "endOffset": 71,
+            "textSha256": "c3d28de491d1548395a7f90304cb787632c3a70245622b4eee7d5c691c0b8d67"
+          }
+        ],
+        "narrativeDivSha256": "0ad8754943110f6ef5dcfd47da4741eaf1dcc7e0cc96c1a4ceab8f434a169e2c",
+        "normalizedTextSha256": "acc535a38784ac5e346abbb9ad97c4197c7af6590c9ce99124bee2c48f4b16b8"
+      },
+      {
+        "sourceKey": "smpc.4.8.reporting",
+        "spans": [
+          {
+            "page": 16,
+            "startOffset": 0,
+            "endOffset": 81,
+            "textSha256": "1eebdc98316a747ecf174e328448c5f0026f0b6db26489bd4a2eaa57e3906b0b"
+          }
+        ],
+        "narrativeDivSha256": "d6cac16544a7838dd43478b2f3a6a470b179d6240aae318d8f8f45125d67bf30",
+        "normalizedTextSha256": "cea6f3c01eced1a63362a8301523fbf780ae470f3a501ae7e4c5195b9d0f9eac"
+      },
+      {
+        "sourceKey": "smpc.4.9",
+        "spans": [
+          {
+            "page": 17,
+            "startOffset": 0,
+            "endOffset": 71,
+            "textSha256": "aa37383bdf69ca9e49df7a57c29687be077b1d43bfb5310c6e706189f5576bd2"
+          }
+        ],
+        "narrativeDivSha256": "aad453ab7106fcdea4faabd08fac5c0778d6e4eecc89691d54da04a696b33388",
+        "normalizedTextSha256": "adbf9b81eb2086eb40fd07fc95f55ea8461c6594537d84b2c793d41c0359b89e"
+      },
+      {
+        "sourceKey": "smpc.5",
+        "spans": [
+          {
+            "page": 18,
+            "startOffset": 0,
+            "endOffset": 69,
+            "textSha256": "ca7f0fde473bdde768361531f27893f320cc4f88964668a21bd524f3a186f8c8"
+          }
+        ],
+        "narrativeDivSha256": "71525df04ce0924ce6447fc2b463a484811138338730546d4cb2313632bfa24f",
+        "normalizedTextSha256": "63f67d62b6ad3f4bf9b04fca6b1128ef8ae606265e0d432671ab405c943296d7"
+      },
+      {
+        "sourceKey": "smpc.5.1",
+        "spans": [
+          {
+            "page": 19,
+            "startOffset": 0,
+            "endOffset": 71,
+            "textSha256": "0a0e5a970a85c5e7364c83748b68a31b566925b4eca5cef352bdb966a5771cb1"
+          }
+        ],
+        "narrativeDivSha256": "eb719bd354348075e22f0def9db90b8578595243d0963c4425feb5c53ab05a36",
+        "normalizedTextSha256": "724becae096cdce2c3b2593e52dbcf044fdd0de840767aefbca6e8a142f15eeb"
+      },
+      {
+        "sourceKey": "smpc.5.2",
+        "spans": [
+          {
+            "page": 20,
+            "startOffset": 0,
+            "endOffset": 71,
+            "textSha256": "0d982d36429463df40899f5abaafdd6e7c9b4ec7080d389819d97a58f20ebc0f"
+          }
+        ],
+        "narrativeDivSha256": "4d14e45298b6829d90b6c7f24047de2c87ca1b3e3c3bbb06371c0988b4fced00",
+        "normalizedTextSha256": "dc0e3102e014e42e56c73e7a12ba7a8f8489fb4f2199c87d558efd70ecf2b727"
+      },
+      {
+        "sourceKey": "smpc.5.3",
+        "spans": [
+          {
+            "page": 21,
+            "startOffset": 0,
+            "endOffset": 71,
+            "textSha256": "89ae62b3ef4947b2094434f8a3c7251f1d2d8bc46bd6f619e02b06600ff25bcd"
+          }
+        ],
+        "narrativeDivSha256": "d324a58d3d8e356473cd25f10542e63c1110cc45eaf57c2f5c5c0ba2d9884740",
+        "normalizedTextSha256": "367d1feedbf4d0496d9ff2a83049d7337b7e38a45266a25f9628af97e33dcb49"
+      },
+      {
+        "sourceKey": "smpc.6",
+        "spans": [
+          {
+            "page": 22,
+            "startOffset": 0,
+            "endOffset": 69,
+            "textSha256": "8e113bbbb02eb04b9607654467fdb74d9e24e8f905195d28eef2cc24f369d3c7"
+          }
+        ],
+        "narrativeDivSha256": "0a5479951bb8ff8c0d7f0480c14147aec9c99ef350c2b267c4f734a127e74413",
+        "normalizedTextSha256": "377325f7217dfb025dfa57fba44c7a42d13e5a84e91be461088d11da5853d52b"
+      },
+      {
+        "sourceKey": "smpc.6.1",
+        "spans": [
+          {
+            "page": 23,
+            "startOffset": 0,
+            "endOffset": 71,
+            "textSha256": "dca78d77bfdf0b47854366e52ffee65025ea853d078ce6f9624d689a72a47804"
+          }
+        ],
+        "narrativeDivSha256": "a4117f1c2a031fa8f470c2680a4bc94cf1cf68482de08b99457b9645558b7f39",
+        "normalizedTextSha256": "e4b392e1066aeef3156b0e637962529b362cdbb9f7a7a42aa7fc7883ea312677"
+      },
+      {
+        "sourceKey": "smpc.6.2",
+        "spans": [
+          {
+            "page": 24,
+            "startOffset": 0,
+            "endOffset": 71,
+            "textSha256": "6bd61dec4c385650bdaca521830b4b61f3044e17546e0a932d126fac0474af41"
+          }
+        ],
+        "narrativeDivSha256": "6b8939c3053d5111916bb1a5e425eb4d14c93db7eafe7bc1cb120967d72df656",
+        "normalizedTextSha256": "d67546696948994973bfbc1a133f9598ac722b623dab6029bd774c13217fcf7f"
+      },
+      {
+        "sourceKey": "smpc.6.3",
+        "spans": [
+          {
+            "page": 25,
+            "startOffset": 0,
+            "endOffset": 71,
+            "textSha256": "678ad1a53ba071f19d1412e8bd298c587126c809695f7dd08e514871312729aa"
+          }
+        ],
+        "narrativeDivSha256": "c43318cc85b424f3231035e3655ed8b8d33161f1871dcb8f8aad402504165e9e",
+        "normalizedTextSha256": "8bec7fe8e052e710407261ca36ed743ff5a0454800bfb6a7ce7a0a5c4c14a496"
+      },
+      {
+        "sourceKey": "smpc.6.4",
+        "spans": [
+          {
+            "page": 26,
+            "startOffset": 0,
+            "endOffset": 71,
+            "textSha256": "2b97901f860a309f653b7dafc8447d1e0b43c08dce22ef475f3aa26683e92008"
+          }
+        ],
+        "narrativeDivSha256": "27637b55c147c09dd32e8fce386333f0d0fda3bc7dba160089db77f47e769f2e",
+        "normalizedTextSha256": "ac2a3a4aa9fde81b08de48af7d0fbc72b526057f6c78a667e69c162204739c73"
+      },
+      {
+        "sourceKey": "smpc.6.5",
+        "spans": [
+          {
+            "page": 27,
+            "startOffset": 0,
+            "endOffset": 71,
+            "textSha256": "ea29f00f7441ec9787e524bbfe8e66925f3189e4024488a700f8fdf1f714cdcf"
+          }
+        ],
+        "narrativeDivSha256": "965c7fd56c08439643156e3306f61ae515e0a76efda81eb8c66b73912dd461ff",
+        "normalizedTextSha256": "9edc425d74a3ae16fb90e4609264b6e06dc7710e699fd37f1194472714fbab2d"
+      },
+      {
+        "sourceKey": "smpc.6.6",
+        "spans": [
+          {
+            "page": 28,
+            "startOffset": 0,
+            "endOffset": 71,
+            "textSha256": "6f649a3984f6b2b2efd6a2d9c6c96f3db4c48e1611226660a128b9b8ce5a4800"
+          }
+        ],
+        "narrativeDivSha256": "f7138efd4cca6ccf4a2583816dbe10b7fbb87053c113280f6ca0663fec999f4c",
+        "normalizedTextSha256": "5bf570ffb249ddca3a7b3f2bbc55700e953852971b392abfe064f5183ce41dec"
+      },
+      {
+        "sourceKey": "smpc.7",
+        "spans": [
+          {
+            "page": 29,
+            "startOffset": 0,
+            "endOffset": 69,
+            "textSha256": "566dd676d6dc000390e5858e92e4d9ee60b283ad3d3b4f17769c788f02d526af"
+          }
+        ],
+        "narrativeDivSha256": "663f02416e8e3b6c672cf83574b70e8f59e894398f79b2577f9fc0eae07fe679",
+        "normalizedTextSha256": "8f8ca0eb7981312a8d5ddc20153072c09aaffc8023f51cb5ce160b3559010df6"
+      },
+      {
+        "sourceKey": "smpc.8",
+        "spans": [
+          {
+            "page": 30,
+            "startOffset": 0,
+            "endOffset": 69,
+            "textSha256": "eeb8047f459108b32964d1714af18bdb512d475f0b48bff6c955e9390111ecc0"
+          }
+        ],
+        "narrativeDivSha256": "94d8d787a4042467b906594fdc242ef32e2ae23cfefa35881f05e0c8d6566391",
+        "normalizedTextSha256": "276e3f829bf1044e0bc8c232442204a0dd9a8ca9abbc8d9fb222f9879fdfc6be"
+      },
+      {
+        "sourceKey": "smpc.9",
+        "spans": [
+          {
+            "page": 31,
+            "startOffset": 0,
+            "endOffset": 69,
+            "textSha256": "d6d049f9d6c8c6b3cc26f0564099113c4a2908beb4d590ef8dfbc52d8d2cd180"
+          }
+        ],
+        "narrativeDivSha256": "79ed2a736425a847cbfffe391e1a39ae1c82e30d3e2131278f34cb9ccb0d5c25",
+        "normalizedTextSha256": "f54d075e269e6b840c35cbbed0546468d1f55ea9710b371871a621be604b784a"
+      },
+      {
+        "sourceKey": "smpc.10",
+        "spans": [
+          {
+            "page": 32,
+            "startOffset": 0,
+            "endOffset": 70,
+            "textSha256": "07ba81fc36d3471d9e04296d665c056033d8340d1c9266984fd7fe0db30c7111"
+          }
+        ],
+        "narrativeDivSha256": "c35cf855b68f5cfe163d1750bc94869fe17577a42afbaf2b2cc7dd39e456638a",
+        "normalizedTextSha256": "b839b07d0b9f0df32a3f4b472669e9bc586d8140edeced98d1cf72a999edc98c"
+      }
+    ],
+    "decisions": [
+      {
+        "target": "Bundle.identifier",
+        "action": "defaulted-by-rule",
+        "ruleId": "authority-import:identifier"
+      },
+      {
+        "target": "Bundle.language",
+        "action": "defaulted-by-rule",
+        "ruleId": "authority-import:language"
+      },
+      {
+        "target": "Bundle.timestamp",
+        "action": "extracted-verbatim",
+        "sourceField": "Bundle.timestamp"
+      },
+      {
+        "target": "Bundle.type",
+        "action": "defaulted-by-rule",
+        "ruleId": "authority-import:document-bundle"
+      },
+      {
+        "target": "Composition.identifier",
+        "action": "defaulted-by-rule",
+        "ruleId": "authority-import:identifier"
+      },
+      {
+        "target": "Composition.relatesTo",
+        "action": "extracted-verbatim",
+        "sourceField": "Bundle.identifier"
+      },
+      {
+        "target": "Composition.language",
+        "action": "defaulted-by-rule",
+        "ruleId": "authority-import:language"
+      },
+      {
+        "target": "Composition.status",
+        "action": "defaulted-by-rule",
+        "ruleId": "authority-import:status-from-publication"
+      },
+      {
+        "target": "Composition.type",
+        "action": "extracted-verbatim",
+        "sourceField": "Composition.type"
+      },
+      {
+        "target": "Composition.title",
+        "action": "extracted-verbatim",
+        "sourceField": "Composition.title"
+      },
+      {
+        "target": "Composition.date",
+        "action": "extracted-verbatim",
+        "sourceField": "Composition.date"
+      },
+      {
+        "target": "Composition.subject",
+        "action": "defaulted-by-rule",
+        "ruleId": "authority-import:subject-is-the-product"
+      },
+      {
+        "target": "Composition.author",
+        "action": "defaulted-by-rule",
+        "ruleId": "authority-import:author-is-the-holder"
+      },
+      {
+        "target": "MedicinalProductDefinition.identifier",
+        "action": "extracted-verbatim",
+        "sourceField": "List.identifier"
+      },
+      {
+        "target": "MedicinalProductDefinition.name",
+        "action": "extracted-verbatim",
+        "sourceField": "List.title"
+      },
+      {
+        "target": "Organization.identifier",
+        "action": "extracted-verbatim",
+        "sourceField": "List.subject.extension[marketingAuthorisationHolder]"
+      },
+      {
+        "target": "Organization.name",
+        "action": "extracted-verbatim",
+        "sourceField": "List.subject.extension[marketingAuthorisationHolder]"
+      },
+      {
+        "target": "RegulatedAuthorization.identifier",
+        "action": "extracted-verbatim",
+        "sourceField": "List.subject.extension[procedureNumber]"
+      },
+      {
+        "target": "RegulatedAuthorization.case",
+        "action": "extracted-verbatim",
+        "sourceField": "List.subject.extension[procedureNumber]"
+      },
+      {
+        "target": "RegulatedAuthorization.regulator",
+        "action": "extracted-verbatim",
+        "sourceField": "List.subject.extension[regulatoryAgency]"
+      },
+      {
+        "target": "RegulatedAuthorization.subject",
+        "action": "defaulted-by-rule",
+        "ruleId": "authority-import:subject-is-the-product"
+      },
+      {
+        "target": "RegulatedAuthorization.holder",
+        "action": "defaulted-by-rule",
+        "ruleId": "authority-import:holder-is-the-holder"
+      },
+      {
+        "target": "Composition.section[0].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc",
+        "sourceField": "Composition.section[0].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029791"
+        }
+      },
+      {
+        "target": "Composition.section[0].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc",
+        "sourceField": "Composition.section[0].title"
+      },
+      {
+        "target": "Composition.section[0].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc",
+        "sourceField": "Composition.section[0].text"
+      },
+      {
+        "target": "Composition.section[0].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[0].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.1",
+        "sourceField": "Composition.section[0].section[0].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.1",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029792"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[0].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.1",
+        "sourceField": "Composition.section[0].section[0].title"
+      },
+      {
+        "target": "Composition.section[0].section[0].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.1",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[0].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.1",
+        "sourceField": "Composition.section[0].section[0].text"
+      },
+      {
+        "target": "Composition.section[0].section[0].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.1",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[1].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.2",
+        "sourceField": "Composition.section[0].section[1].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.2",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029793"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[1].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.2",
+        "sourceField": "Composition.section[0].section[1].title"
+      },
+      {
+        "target": "Composition.section[0].section[1].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.2",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[1].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.2",
+        "sourceField": "Composition.section[0].section[1].text"
+      },
+      {
+        "target": "Composition.section[0].section[1].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.2",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[2].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.3",
+        "sourceField": "Composition.section[0].section[2].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.3",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029797"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[2].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.3",
+        "sourceField": "Composition.section[0].section[2].title"
+      },
+      {
+        "target": "Composition.section[0].section[2].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.3",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[2].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.3",
+        "sourceField": "Composition.section[0].section[2].text"
+      },
+      {
+        "target": "Composition.section[0].section[2].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.3",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[3].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.4",
+        "sourceField": "Composition.section[0].section[3].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.4",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029798"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[3].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.4",
+        "sourceField": "Composition.section[0].section[3].title"
+      },
+      {
+        "target": "Composition.section[0].section[3].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.4",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[3].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.4",
+        "sourceField": "Composition.section[0].section[3].text"
+      },
+      {
+        "target": "Composition.section[0].section[3].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.4",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[0].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.4.1",
+        "sourceField": "Composition.section[0].section[3].section[0].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.4.1",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029799"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[3].section[0].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.4.1",
+        "sourceField": "Composition.section[0].section[3].section[0].title"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[0].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.4.1",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[0].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.4.1",
+        "sourceField": "Composition.section[0].section[3].section[0].text"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[0].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.4.1",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[1].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.4.2",
+        "sourceField": "Composition.section[0].section[3].section[1].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.4.2",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029800"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[3].section[1].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.4.2",
+        "sourceField": "Composition.section[0].section[3].section[1].title"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[1].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.4.2",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[1].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.4.2",
+        "sourceField": "Composition.section[0].section[3].section[1].text"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[1].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.4.2",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[1].section[0].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.4.2.posology",
+        "sourceField": "Composition.section[0].section[3].section[1].section[0].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.4.2.posology",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029801"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[3].section[1].section[0].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.4.2.posology",
+        "sourceField": "Composition.section[0].section[3].section[1].section[0].title"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[1].section[0].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.4.2.posology",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[1].section[0].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.4.2.posology",
+        "sourceField": "Composition.section[0].section[3].section[1].section[0].text"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[1].section[0].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.4.2.posology",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[1].section[1].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.4.2.administration",
+        "sourceField": "Composition.section[0].section[3].section[1].section[1].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.4.2.administration",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029803"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[3].section[1].section[1].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.4.2.administration",
+        "sourceField": "Composition.section[0].section[3].section[1].section[1].title"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[1].section[1].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.4.2.administration",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[1].section[1].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.4.2.administration",
+        "sourceField": "Composition.section[0].section[3].section[1].section[1].text"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[1].section[1].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.4.2.administration",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[2].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.4.3",
+        "sourceField": "Composition.section[0].section[3].section[2].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.4.3",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029805"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[3].section[2].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.4.3",
+        "sourceField": "Composition.section[0].section[3].section[2].title"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[2].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.4.3",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[2].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.4.3",
+        "sourceField": "Composition.section[0].section[3].section[2].text"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[2].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.4.3",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[3].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.4.4",
+        "sourceField": "Composition.section[0].section[3].section[3].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.4.4",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029806"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[3].section[3].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.4.4",
+        "sourceField": "Composition.section[0].section[3].section[3].title"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[3].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.4.4",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[3].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.4.4",
+        "sourceField": "Composition.section[0].section[3].section[3].text"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[3].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.4.4",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[4].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.4.5",
+        "sourceField": "Composition.section[0].section[3].section[4].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.4.5",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029809"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[3].section[4].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.4.5",
+        "sourceField": "Composition.section[0].section[3].section[4].title"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[4].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.4.5",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[4].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.4.5",
+        "sourceField": "Composition.section[0].section[3].section[4].text"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[4].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.4.5",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[5].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.4.6",
+        "sourceField": "Composition.section[0].section[3].section[5].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.4.6",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029811"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[3].section[5].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.4.6",
+        "sourceField": "Composition.section[0].section[3].section[5].title"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[5].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.4.6",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[5].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.4.6",
+        "sourceField": "Composition.section[0].section[3].section[5].text"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[5].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.4.6",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[6].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.4.7",
+        "sourceField": "Composition.section[0].section[3].section[6].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.4.7",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029815"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[3].section[6].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.4.7",
+        "sourceField": "Composition.section[0].section[3].section[6].title"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[6].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.4.7",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[6].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.4.7",
+        "sourceField": "Composition.section[0].section[3].section[6].text"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[6].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.4.7",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[7].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.4.8",
+        "sourceField": "Composition.section[0].section[3].section[7].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.4.8",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029816"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[3].section[7].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.4.8",
+        "sourceField": "Composition.section[0].section[3].section[7].title"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[7].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.4.8",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[7].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.4.8",
+        "sourceField": "Composition.section[0].section[3].section[7].text"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[7].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.4.8",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[7].section[0].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.4.8.reporting",
+        "sourceField": "Composition.section[0].section[3].section[7].section[0].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.4.8.reporting",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029818"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[3].section[7].section[0].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.4.8.reporting",
+        "sourceField": "Composition.section[0].section[3].section[7].section[0].title"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[7].section[0].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.4.8.reporting",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[7].section[0].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.4.8.reporting",
+        "sourceField": "Composition.section[0].section[3].section[7].section[0].text"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[7].section[0].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.4.8.reporting",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[8].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.4.9",
+        "sourceField": "Composition.section[0].section[3].section[8].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.4.9",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029819"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[3].section[8].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.4.9",
+        "sourceField": "Composition.section[0].section[3].section[8].title"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[8].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.4.9",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[8].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.4.9",
+        "sourceField": "Composition.section[0].section[3].section[8].text"
+      },
+      {
+        "target": "Composition.section[0].section[3].section[8].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.4.9",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[4].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.5",
+        "sourceField": "Composition.section[0].section[4].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.5",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029821"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[4].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.5",
+        "sourceField": "Composition.section[0].section[4].title"
+      },
+      {
+        "target": "Composition.section[0].section[4].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.5",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[4].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.5",
+        "sourceField": "Composition.section[0].section[4].text"
+      },
+      {
+        "target": "Composition.section[0].section[4].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.5",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[4].section[0].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.5.1",
+        "sourceField": "Composition.section[0].section[4].section[0].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.5.1",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029822"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[4].section[0].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.5.1",
+        "sourceField": "Composition.section[0].section[4].section[0].title"
+      },
+      {
+        "target": "Composition.section[0].section[4].section[0].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.5.1",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[4].section[0].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.5.1",
+        "sourceField": "Composition.section[0].section[4].section[0].text"
+      },
+      {
+        "target": "Composition.section[0].section[4].section[0].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.5.1",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[4].section[1].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.5.2",
+        "sourceField": "Composition.section[0].section[4].section[1].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.5.2",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029827"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[4].section[1].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.5.2",
+        "sourceField": "Composition.section[0].section[4].section[1].title"
+      },
+      {
+        "target": "Composition.section[0].section[4].section[1].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.5.2",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[4].section[1].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.5.2",
+        "sourceField": "Composition.section[0].section[4].section[1].text"
+      },
+      {
+        "target": "Composition.section[0].section[4].section[1].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.5.2",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[4].section[2].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.5.3",
+        "sourceField": "Composition.section[0].section[4].section[2].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.5.3",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029834"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[4].section[2].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.5.3",
+        "sourceField": "Composition.section[0].section[4].section[2].title"
+      },
+      {
+        "target": "Composition.section[0].section[4].section[2].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.5.3",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[4].section[2].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.5.3",
+        "sourceField": "Composition.section[0].section[4].section[2].text"
+      },
+      {
+        "target": "Composition.section[0].section[4].section[2].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.5.3",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[5].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.6",
+        "sourceField": "Composition.section[0].section[5].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.6",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029836"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[5].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.6",
+        "sourceField": "Composition.section[0].section[5].title"
+      },
+      {
+        "target": "Composition.section[0].section[5].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.6",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[5].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.6",
+        "sourceField": "Composition.section[0].section[5].text"
+      },
+      {
+        "target": "Composition.section[0].section[5].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.6",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[0].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.6.1",
+        "sourceField": "Composition.section[0].section[5].section[0].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.6.1",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029837"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[5].section[0].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.6.1",
+        "sourceField": "Composition.section[0].section[5].section[0].title"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[0].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.6.1",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[0].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.6.1",
+        "sourceField": "Composition.section[0].section[5].section[0].text"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[0].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.6.1",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[1].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.6.2",
+        "sourceField": "Composition.section[0].section[5].section[1].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.6.2",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029838"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[5].section[1].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.6.2",
+        "sourceField": "Composition.section[0].section[5].section[1].title"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[1].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.6.2",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[1].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.6.2",
+        "sourceField": "Composition.section[0].section[5].section[1].text"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[1].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.6.2",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[2].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.6.3",
+        "sourceField": "Composition.section[0].section[5].section[2].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.6.3",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029839"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[5].section[2].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.6.3",
+        "sourceField": "Composition.section[0].section[5].section[2].title"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[2].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.6.3",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[2].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.6.3",
+        "sourceField": "Composition.section[0].section[5].section[2].text"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[2].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.6.3",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[3].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.6.4",
+        "sourceField": "Composition.section[0].section[5].section[3].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.6.4",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029840"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[5].section[3].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.6.4",
+        "sourceField": "Composition.section[0].section[5].section[3].title"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[3].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.6.4",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[3].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.6.4",
+        "sourceField": "Composition.section[0].section[5].section[3].text"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[3].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.6.4",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[4].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.6.5",
+        "sourceField": "Composition.section[0].section[5].section[4].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.6.5",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029841"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[5].section[4].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.6.5",
+        "sourceField": "Composition.section[0].section[5].section[4].title"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[4].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.6.5",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[4].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.6.5",
+        "sourceField": "Composition.section[0].section[5].section[4].text"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[4].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.6.5",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[5].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.6.6",
+        "sourceField": "Composition.section[0].section[5].section[5].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.6.6",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029842"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[5].section[5].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.6.6",
+        "sourceField": "Composition.section[0].section[5].section[5].title"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[5].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.6.6",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[5].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.6.6",
+        "sourceField": "Composition.section[0].section[5].section[5].text"
+      },
+      {
+        "target": "Composition.section[0].section[5].section[5].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.6.6",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[6].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.7",
+        "sourceField": "Composition.section[0].section[6].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.7",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029844"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[6].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.7",
+        "sourceField": "Composition.section[0].section[6].title"
+      },
+      {
+        "target": "Composition.section[0].section[6].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.7",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[6].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.7",
+        "sourceField": "Composition.section[0].section[6].text"
+      },
+      {
+        "target": "Composition.section[0].section[6].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.7",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[7].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.8",
+        "sourceField": "Composition.section[0].section[7].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.8",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029845"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[7].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.8",
+        "sourceField": "Composition.section[0].section[7].title"
+      },
+      {
+        "target": "Composition.section[0].section[7].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.8",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[7].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.8",
+        "sourceField": "Composition.section[0].section[7].text"
+      },
+      {
+        "target": "Composition.section[0].section[7].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.8",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[8].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.9",
+        "sourceField": "Composition.section[0].section[8].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.9",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029846"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[8].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.9",
+        "sourceField": "Composition.section[0].section[8].title"
+      },
+      {
+        "target": "Composition.section[0].section[8].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.9",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[8].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.9",
+        "sourceField": "Composition.section[0].section[8].text"
+      },
+      {
+        "target": "Composition.section[0].section[8].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.9",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Composition.section[0].section[9].code",
+        "action": "code-mapped",
+        "sourceKey": "smpc.10",
+        "sourceField": "Composition.section[0].section[9].code",
+        "terminologyRef": {
+          "system": "https://khs.dev/fhir/CodeSystem/canonical-smpc-sections",
+          "code": "smpc.10",
+          "version": "1.3.0",
+          "lookupId": "mapping:200000029847"
+        }
+      },
+      {
+        "target": "Composition.section[0].section[9].title",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.10",
+        "sourceField": "Composition.section[0].section[9].title"
+      },
+      {
+        "target": "Composition.section[0].section[9].id",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.10",
+        "ruleId": "authority-import:section-id-from-identifier"
+      },
+      {
+        "target": "Composition.section[0].section[9].text",
+        "action": "extracted-verbatim",
+        "sourceKey": "smpc.10",
+        "sourceField": "Composition.section[0].section[9].text"
+      },
+      {
+        "target": "Composition.section[0].section[9].text.status",
+        "action": "defaulted-by-rule",
+        "sourceKey": "smpc.10",
+        "ruleId": "authority-import:narrative-status-additional"
+      },
+      {
+        "target": "Bundle.entry[0].fullUrl",
+        "action": "defaulted-by-rule",
+        "ruleId": "authority-import:id-from-identifier"
+      },
+      {
+        "target": "Composition.id",
+        "action": "defaulted-by-rule",
+        "ruleId": "authority-import:id-from-identifier"
+      },
+      {
+        "target": "Composition.meta.profile",
+        "action": "defaulted-by-rule",
+        "ruleId": "authority-import:epi-profile"
+      },
+      {
+        "target": "Bundle.entry[1].fullUrl",
+        "action": "defaulted-by-rule",
+        "ruleId": "authority-import:id-from-identifier"
+      },
+      {
+        "target": "MedicinalProductDefinition.id",
+        "action": "defaulted-by-rule",
+        "ruleId": "authority-import:id-from-identifier"
+      },
+      {
+        "target": "MedicinalProductDefinition.meta.profile",
+        "action": "defaulted-by-rule",
+        "ruleId": "authority-import:epi-profile"
+      },
+      {
+        "target": "Bundle.entry[2].fullUrl",
+        "action": "defaulted-by-rule",
+        "ruleId": "authority-import:id-from-identifier"
+      },
+      {
+        "target": "Organization.id",
+        "action": "defaulted-by-rule",
+        "ruleId": "authority-import:id-from-identifier"
+      },
+      {
+        "target": "Organization.meta.profile",
+        "action": "defaulted-by-rule",
+        "ruleId": "authority-import:epi-profile"
+      },
+      {
+        "target": "Bundle.entry[3].fullUrl",
+        "action": "defaulted-by-rule",
+        "ruleId": "authority-import:id-from-identifier"
+      },
+      {
+        "target": "RegulatedAuthorization.id",
+        "action": "defaulted-by-rule",
+        "ruleId": "authority-import:id-from-identifier"
+      },
+      {
+        "target": "RegulatedAuthorization.meta.profile",
+        "action": "defaulted-by-rule",
+        "ruleId": "authority-import:epi-profile"
+      },
+      {
+        "target": "Bundle.id",
+        "action": "defaulted-by-rule",
+        "ruleId": "authority-import:id-from-identifier"
+      },
+      {
+        "target": "Bundle.meta.profile",
+        "action": "defaulted-by-rule",
+        "ruleId": "authority-import:epi-profile"
+      }
+    ],
+    "fidelity": {
+      "normalizationVersion": "fidelity-norm/3.1.0",
+      "status": "passed",
+      "sectionsChecked": 32,
+      "sectionsMatched": 32,
+      "narrativeBindingSha256": "dbc8cf153c23e248a34c79d2bb6176030b2b206646e92060ac9c7ce6e7b786dd",
+      "reportSha256": "32aa154decea0edc15f38e46e1279dec03252478537bd5436b01e7de5cd5e84e",
+      "reportUri": "gs://synthetic-bucket/import.fidelity-report.json"
+    }
+  },
+  "approval": {
+    "method": "authority-publication",
+    "meaning": "authority-publication-imported",
+    "authority": "synthetic",
+    "authorityStatus": "pilot",
+    "publication": {
+      "epiId": "SYNTHETIC-EPI-1",
+      "documentId": "00000000-5979-4e74-8000-000000000001",
+      "indexId": "00000000-5979-4e74-8000-000000000002",
+      "versionNumber": "1",
+      "procedureNumber": "SYNTHETIC-PROCEDURE-1",
+      "authorityTimestamp": "2026-09-24T12:00:00.000000+00:00"
+    },
+    "requestedBy": "urn:requester:synthetic-01",
+    "requestedAt": "2026-09-24T11:59:00Z",
+    "approvedContentSha256": "0ea21de86338a4a341e646d79378958ab18bb442e4d9d6d7d77f183235b439c3"
+  }
+}

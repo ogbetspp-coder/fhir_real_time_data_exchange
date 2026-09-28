@@ -2,8 +2,10 @@ import { z } from "zod";
 
 import {
   CanonicalUri,
+  ContractVersion,
   Count,
   FhirId,
+  ImageDigest,
   IsoDateTime,
   NormalizationVersion,
   PositiveInt,
@@ -42,8 +44,10 @@ import { ApproverRole } from "./ingestion-provenance.js";
 // meant any contiguous slice, including one cut inside a word or a number; and an approval —
 // get_provenance's answer, get_section's `provenanceResourceId` — is given for a document's
 // current version only. Patch, not minor, because no field, enum member or bound changed
-// (ADR 0002, "Versioning"); a `match` recorded under 2.0.0 was decided by the looser rule, and
-// the version on the record is what tells the two apart.
+// (ADR 0002, "Versioning"); a `match` recorded under 2.0.0 was decided by the looser rule. No
+// record carried the contract version until 4.1.0 (audit C-9): a record written before it is
+// told apart by its `serviceVersion`, the commit that answered, whose QUERY_TOOLS_VERSION git
+// holds.
 //
 // 3.0.0: a product identifier's value may carry "/" — every EMA ePI id does ("EPI/23/1047"),
 // and so does every EU marketing authorisation number — where 2.0.x refused the whole product
@@ -62,20 +66,17 @@ import { ApproverRole } from "./ingestion-provenance.js";
 // `match` with no location validated, and a client reading `result` alone would have stamped it
 // verified (audit AG-4). Major because instances earlier versions accepted are now refused
 // (ADR 0002, "Versioning"); the service never produced one, so nothing it answers changes.
+//
+// 4.1.0: the audit record gains an optional `contractVersion`, the version of this contract the
+// service answered under, so a record says which `match` rule decided a quote (audit C-9). Minor:
+// one optional field on a record no tool answer carries; no answer changes.
 
-export const QUERY_TOOLS_VERSION = "4.0.0";
+export const QUERY_TOOLS_VERSION = "4.1.0";
 
 // A product identifier's value: letters, digits and ". _ : / -". The slash is what an EMA ePI
 // id ("EPI/23/1047") and an EU marketing authorisation number ("EU/1/12/780/003") are built
 // with.
 const ProductIdentifierValue = z.string().regex(/^[A-Za-z0-9._:/-]{1,128}$/);
-
-// The digest of the container image that answered, as Cloud Run reports it (ADR 0004: a
-// service's evidence names its image).
-export const ImageDigest = z
-  .string()
-  .regex(/^sha256:[0-9a-f]{64}$/)
-  .meta({ id: "ImageDigest" });
 
 // How the caller proved who they are. An OpenID Connect ID token (a client calling the service
 // directly, or the Google service agent on the assistant path) or a Google OAuth 2.0 access
@@ -345,6 +346,9 @@ export const QueryAuditRecordSchema = z
   .strictObject({
     service: z.literal("ema-flow-query"),
     serviceVersion: Token,
+    // The version of this contract the service answered under (QUERY_TOOLS_VERSION). Optional in
+    // the contract, which gained it at 4.1.0; the service always writes it.
+    contractVersion: ContractVersion.optional(),
     // Absent only where the service runs outside a container (tests, a local process).
     imageDigest: ImageDigest.optional(),
     at: IsoDateTime,

@@ -10,16 +10,24 @@ Determinism: ``--disable-timestamp`` removes the only clock-dependent line datam
 emits; everything else is a pure function of the input schema, the generator version, and the
 flags below, all of which are exact-pinned in ``pyproject.toml`` / ``uv.lock``.
 
-Strictness is not configured here and is not assumed: datamodel-code-generator maps
-``additionalProperties: false`` to ``ConfigDict(extra="forbid")`` and an open object to
-``ConfigDict(extra="allow")`` by itself. ``tests/test_contracts_strictness.py`` proves that for
-every object in every schema rather than trusting it.
+Strictness. datamodel-code-generator maps ``additionalProperties: false`` to
+``ConfigDict(extra="forbid")`` and an open object to ``ConfigDict(extra="allow")`` by itself;
+``tests/test_contracts_strictness.py`` proves that for every object in every schema rather than
+trusting it. Two things it does not do by itself are configured below (audit C-7), because
+pydantic's lax mode accepted what Zod refuses and dumped it back as another document:
+``--strict-types`` (a string ``"1"`` or ``true`` is not an integer, ``1`` is not a string or a
+boolean) and ``--base-class zone_a.contract_model.ContractModel``, which refuses ``null`` for an
+optional field. ``tests/test_contract_verdicts.py`` holds the models to Zod's verdicts.
+
+Which contracts: every one ``contracts/generated/index.json`` lists except those Zone A does not
+read (``NOT_ZONE_A``), so a new contract is generated unless it is named there.
 """
 
 from __future__ import annotations
 
 import argparse
 import filecmp
+import json
 import shutil
 import subprocess
 import sys
@@ -30,15 +38,23 @@ ROOT = Path(__file__).resolve().parent.parent
 SCHEMAS = ROOT.parent / "contracts" / "generated"
 OUTPUT = ROOT / "src" / "zone_a" / "contracts"
 
+# The contracts Zone A neither writes nor reads: the query service's tool surface and the agent's
+# turn record, whose readers are the agent (its vendored copies) and people.
+NOT_ZONE_A = frozenset({"agent-turn", "query-tools"})
+
+
+def zone_a_contracts() -> list[str]:
+    """The contracts to generate, one module each: every one the index lists but ``NOT_ZONE_A``.
+
+    Returns:
+        The contract names, sorted.
+    """
+    index = json.loads((SCHEMAS / "index.json").read_text(encoding="utf-8"))
+    return sorted(entry["name"] for entry in index["contracts"] if entry["name"] not in NOT_ZONE_A)
+
+
 # One module per contract root, named after the schema file.
-CONTRACTS = [
-    "canonical-submission",
-    "fidelity-report",
-    "ingestion-provenance",
-    "run-manifest",
-    "run-request",
-    "source-document-text",
-]
+CONTRACTS = zone_a_contracts()
 
 HEADER = '''"""Generated pydantic models. Do not edit.
 
@@ -93,6 +109,14 @@ def generate_into(destination: Path) -> None:
                 "string+uuid=string",
                 "string+date-time=string",
                 "--disable-timestamp",
+                # Zod's types, never pydantic's lax coercions (audit C-7).
+                "--strict-types",
+                "str",
+                "int",
+                "float",
+                "bool",
+                "--base-class",
+                "zone_a.contract_model.ContractModel",
                 "--use-annotated",
                 "--use-standard-collections",
                 "--use-union-operator",

@@ -22,7 +22,6 @@ from google.adk.agents.invocation_context import InvocationContext
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from google.genai import types
-from jsonschema import Draft202012Validator
 
 from verifiable_answer_agent import finish
 from verifiable_answer_agent.audit import (
@@ -34,6 +33,7 @@ from verifiable_answer_agent.audit import (
 from verifiable_answer_agent.config import AgentConfig
 from verifiable_answer_agent.contract import (
     VERIFY_QUOTE_MAX_UTF16,
+    EcmaDraft202012Validator,
     load_agent_turn_schema,
     utf16_length,
 )
@@ -149,7 +149,7 @@ def _records(capsys: Any) -> list[dict[str, Any]]:
 
 
 def _validates(record: dict[str, Any]) -> bool:
-    return not list(Draft202012Validator(load_agent_turn_schema()).iter_errors(record))
+    return not list(EcmaDraft202012Validator(load_agent_turn_schema()).iter_errors(record))
 
 
 async def _finish(

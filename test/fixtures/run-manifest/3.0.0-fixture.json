@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "3.0.0",
+  "runId": "00000000-0000-4000-8000-00000000f001",
+  "startedAt": "2026-09-28T21:34:33.818Z",
+  "completedAt": "2026-09-28T21:34:33.826Z",
+  "status": "validated",
+  "dryRun": true,
+  "source": {
+    "kind": "fixture",
+    "resource": "fixture:synthetic-type2-smpc",
+    "hash": "e95421e1d5de87f5e637edb5900487ab0bd5cc6942e0861c629d129f03836490"
+  },
+  "standards": {
+    "fhir": "5.0.0",
+    "globalEpiPackage": "hl7.fhir.uv.emedicinal-product-info#1.0.0",
+    "emaPackage": "EUePI#1.0.0",
+    "qrdTemplate": "10.4",
+    "mappingVersion": "1.3.0"
+  },
+  "validation": {
+    "preflightErrors": 0,
+    "officialValidationExecuted": false,
+    "officialProfileErrors": 0,
+    "cloudValidationExecuted": false,
+    "cloudProfileErrors": 0,
+    "profiles": [
+      "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/Bundle-uv-epi",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUEpiList",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUEpiBundle",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUEpiComposition",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUEpiCompositionSmPC",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUEpiCompositionCAP",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUQRD-CAP-template-new-SmPC-en"
+    ]
+  },
+  "transformation": {
+    "inputHash": "e95421e1d5de87f5e637edb5900487ab0bd5cc6942e0861c629d129f03836490",
+    "outputHash": "2bbcea5b1f88692ac92fb6fc634f91f256bfe90915df0f18c2649ee4a8865fb4",
+    "decisions": 32
+  },
+  "runtime": {
+    "sourceCommit": "development",
+    "imageDigest": "development",
+    "workflowRevision": "development"
+  }
+}

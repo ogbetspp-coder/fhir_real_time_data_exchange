@@ -193,6 +193,12 @@ resource "google_cloud_run_v2_service" "worker" {
       condition     = local.worker_image_digest != null
       error_message = "worker_image must be an image reference by digest (…@sha256:<64 hex>) so IMAGE_DIGEST can name the exact image in every signed run manifest."
     }
+    # The worker refuses to start with a GIT_COMMIT that is not a full commit id (src/config.ts,
+    # run manifest 5.0.0's runtime.sourceCommit), so a plan that would set one is refused first.
+    precondition {
+      condition     = can(regex("^[0-9a-f]{40}$", var.service_version))
+      error_message = "service_version must be the full 40-hex git commit id (scripts/gcp/deploy.sh passes it) so GIT_COMMIT can name the code in every signed run manifest."
+    }
     precondition {
       condition     = local.validator_image_digest != null
       error_message = "validator_image must be an image reference by digest (…@sha256:<64 hex>) so VALIDATOR_IMAGE_DIGEST can name the validator in every signed run manifest."

@@ -1,0 +1,76 @@
+{
+  "schemaVersion": "1.1.0",
+  "runId": "00000000-0000-4000-8000-00000000d001",
+  "startedAt": "2026-09-28T21:34:34.927Z",
+  "completedAt": "2026-09-28T21:34:34.935Z",
+  "status": "validated",
+  "dryRun": true,
+  "source": {
+    "kind": "document",
+    "resource": "gs://synthetic-submissions/synthetic-submission.json",
+    "hash": "8891a69b297b5bf2f054684102273866ef91215b743ca2a82d8630a15ef9aa6a"
+  },
+  "standards": {
+    "fhir": "5.0.0",
+    "globalEpiPackage": "hl7.fhir.uv.emedicinal-product-info#1.0.0",
+    "emaPackage": "EUePI#1.0.0",
+    "qrdTemplate": "10.4",
+    "mappingVersion": "1.0.0"
+  },
+  "validation": {
+    "preflightErrors": 0,
+    "officialValidationExecuted": false,
+    "officialProfileErrors": 0,
+    "cloudValidationExecuted": false,
+    "cloudProfileErrors": 0,
+    "profiles": [
+      "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/Bundle-uv-epi",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUEpiList",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUEpiBundle",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUEpiComposition",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUEpiCompositionSmPC",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUEpiCompositionCAP",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUQRD-CAP-template-new-SmPC-en"
+    ]
+  },
+  "transformation": {
+    "inputHash": "8891a69b297b5bf2f054684102273866ef91215b743ca2a82d8630a15ef9aa6a",
+    "outputHash": "6b84ef9a4194286dc1f314052eb16dd39775d11e1ae35da9eb6348737e290cf3",
+    "decisions": 32
+  },
+  "runtime": {
+    "sourceCommit": "development",
+    "imageDigest": "development",
+    "workflowRevision": "development"
+  },
+  "ingestion": {
+    "submissionId": "4b1d2c3e-5f60-4a71-8b92-0c1d2e3f4a5b",
+    "contractVersion": "1.0.0",
+    "sourceDocumentSha256": "c226c77c373a69ba2a0e131298356e48916601fabdf85cb58d87a516c14674b4",
+    "extractionRunId": "7c8d9e0f-1a2b-4c3d-9e4f-5a6b7c8d9e0f",
+    "parser": "synthetic-extractor@1.0.0",
+    "fidelity": {
+      "status": "passed",
+      "normalizationVersion": "fidelity-norm/1.0.0",
+      "sectionsChecked": 32,
+      "sectionsMatched": 32,
+      "reportSha256": "9d09a923e2359401f339cb16fe4de4570879c1efe40d2b9a2d76b26e4bf76f12",
+      "narrativeBindingSha256": "dbc8cf153c23e248a34c79d2bb6176030b2b206646e92060ac9c7ce6e7b786dd",
+      "coverage": {
+        "pageCodePoints": 2433,
+        "bodyCodePoints": 2184,
+        "coveredCodePoints": 2155,
+        "uncoveredGaps": 0
+      }
+    },
+    "approval": {
+      "approverId": "urn:reviewer:synthetic-01",
+      "approverRole": "content-reviewer",
+      "approvedAt": "2026-09-19T00:00:00Z",
+      "method": "api-attestation",
+      "meaning": "reviewed-fidelity-and-structure",
+      "approvedContentSha256": "b02a44c9325d4656bd93f70825400a872756a9e92372ddcc3bc35c0f31d095ca"
+    },
+    "provenanceResourceId": "13c749d3-ff2b-597f-a388-c39e01676f90"
+  }
+}

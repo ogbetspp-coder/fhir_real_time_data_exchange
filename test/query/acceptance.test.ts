@@ -8,6 +8,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
   FindProductOutputSchema,
   ProvenanceDetailSchema,
+  QUERY_TOOLS_VERSION,
   QueryAuditRecordSchema,
   QuoteVerificationSchema,
   SectionContentSchema,
@@ -121,6 +122,8 @@ describe("ePI query service, phase 1", () => {
       expect(record).toMatchObject({
         service: "ema-flow-query",
         serviceVersion: SERVICE_VERSION,
+        // The contract the service answered under, so a verdict can be read by its own rule.
+        contractVersion: QUERY_TOOLS_VERSION,
         principal: PRINCIPAL_A,
         credentialType: "id-token",
         tool: "get_section",

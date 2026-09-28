@@ -7,7 +7,7 @@ The agent shares nothing with the worker or with Zone A except two published sch
 schema). Both are vendored into the package by ``scripts/sync_contract.py`` so the deployable
 is self-contained on Agent Engine, and CI fails if either copy has drifted.
 
-query-tools 4.0.0. Since 2.0.0, ``FindProductOutput`` carries ``truncated``, and
+query-tools 4.1.0. Since 2.0.0, ``FindProductOutput`` carries ``truncated``, and
 ``not-entitled`` is no longer an error code a caller can see — outside the caller's entitlement
 the service answers ``document-not-found``. Nothing here ever matched on an error code (an
 ``isError`` result is unavailable whatever its code), so that change alters no behaviour at this
@@ -18,7 +18,13 @@ no longer carries ``structuredContent``, which nothing here read; this agent mus
 with 3.0.0 or later no later than the service. 4.0.0 makes ``QuoteVerification`` a union on
 ``result``: a ``match`` without its location, or over no section, no longer validates, so it is
 unavailable here rather than a match. The schema cannot say that ``startOffset`` comes before
-``endOffset``; ``postcheck`` holds every offset to the chunk's own, which is stricter.
+``endOffset``; ``postcheck`` holds every offset to the chunk's own, which is stricter. 4.1.0 adds an
+optional ``contractVersion`` to the service's audit record, which the agent never reads; no tool
+answer changes.
+
+Patterns are read as the schema's dialect reads them (``ecma_pattern``): Python's ``re``, which
+``jsonschema`` uses unchanged, let ``$`` match before a final newline and a digit class match any
+Unicode digit.
 
 Every tool result is validated against the schema before anything reads it. A result that does
 not validate is *unavailable*: it is never composed, never rendered, and never quoted. That is
@@ -29,13 +35,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import unicodedata
+from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import cache
 from importlib import resources
 from typing import Any, Final, Literal, NotRequired, TypedDict, final
 
-from jsonschema import Draft202012Validator
+from jsonschema import Draft202012Validator, validators
 from jsonschema.exceptions import ValidationError
 
 from .quote_edge import SignIndex, edge_after, edge_before, is_gap, number_from
@@ -45,6 +53,7 @@ __all__ = [
     "CONTRACT_RESOURCE",
     "VERIFY_QUOTE_MAX_UTF16",
     "DocumentRef",
+    "EcmaDraft202012Validator",
     "FindProductOutput",
     "ProvenanceDetail",
     "QueryToolName",
@@ -54,6 +63,8 @@ __all__ = [
     "ToolResult",
     "UnavailableReason",
     "chunk_spans",
+    "contract_version",
+    "ecma_pattern",
     "load_agent_turn_schema",
     "load_schema",
     "sha256_hex",
@@ -203,16 +214,77 @@ def load_agent_turn_schema() -> dict[str, Any]:
     return _vendored(AGENT_TURN_RESOURCE)
 
 
+def contract_version(schema: dict[str, Any]) -> str:
+    """A vendored contract's version, as its ``$id`` names it (``<name>/<version>/schema.json``)."""
+    return str(schema["$id"]).rsplit("/", 2)[-2]
+
+
+@cache
+def ecma_pattern(pattern: str) -> re.Pattern[str]:
+    r"""A contract pattern compiled to mean what it means in the schema's own dialect.
+
+    JSON Schema 2020-12 reads ``pattern`` as an ECMA-262 regular expression, and Zod (the
+    service) agrees. Python's ``re``, which ``jsonschema`` uses as it is, differs in three places,
+    each of which let this agent accept an answer the service's own contract refuses (audit C-7;
+    the #145 review, L2-d): ``$`` also matches before a final ``\n`` (a hash followed by a newline
+    passed ``Sha256Hex``), ``.`` also matches ``\r``, U+2028 and U+2029, and ``\d`` is any Unicode
+    digit. Outside a character class, an unescaped ``$`` is compiled as ``\Z`` and an unescaped
+    ``.`` as ``[^\n\r\u2028\u2029]``; and the pattern is compiled with ``re.ASCII``, so a shorthand
+    class, which the generator refuses to publish, would still mean ASCII.
+    """
+    out: list[str] = []
+    in_class = False
+    index = 0
+    while index < len(pattern):
+        character = pattern[index]
+        if character == "\\":
+            out.append(pattern[index : index + 2])
+            index += 2
+            continue
+        if in_class:
+            in_class = character != "]"
+        elif character == "[":
+            in_class = True
+        elif character == "$":
+            character = r"\Z"
+        elif character == ".":
+            character = "[^\n\r\u2028\u2029]"
+        out.append(character)
+        index += 1
+    return re.compile("".join(out), re.ASCII)
+
+
+def _pattern(
+    validator: Any, pattern: str, instance: object, schema: dict[str, Any]
+) -> Iterator[ValidationError]:
+    """The ``pattern`` keyword, by ``ecma_pattern``. The error never quotes the instance."""
+    del schema
+    if validator.is_type(instance, "string") and not ecma_pattern(pattern).search(str(instance)):
+        yield ValidationError("does not match the contract's pattern")
+
+
+# jsonschema types `extend` loosely; what it returns is a Draft 2020-12 validator class.
+EcmaDraft202012Validator: Final[type[Draft202012Validator]] = validators.extend(  # type: ignore[no-untyped-call]
+    Draft202012Validator, {"pattern": _pattern}
+)
+"""Draft 2020-12 with the ``pattern`` keyword read as ECMA-262 reads it (``ecma_pattern``).
+
+Every schema the agent validates against, its own turn record's in the tests included, is read
+with this class, so a value passes here exactly when it passes the service's Zod contract:
+``tests/test_contract_verdicts.py`` holds it to every verdict of the contract verdict corpus.
+"""
+
+
 @cache
 def _validator(tool: QueryToolName) -> Draft202012Validator:
     schema = load_schema()
     # A ``$ref`` into the contract's own ``$defs``, so every nested reference still resolves and
     # the agent validates against exactly the published definitions, not a paraphrase of them.
     subschema = {"$ref": f"#/$defs/{_OUTPUT_DEF[tool]}", "$defs": schema["$defs"]}
-    Draft202012Validator.check_schema(subschema)
+    EcmaDraft202012Validator.check_schema(subschema)
     # No format checker: every ``format`` in this contract is accompanied by a ``pattern`` that
     # says the same thing, so format assertion would add a dependency and no strictness.
-    return Draft202012Validator(subschema)
+    return EcmaDraft202012Validator(subschema)
 
 
 def validate_tool_output(tool: QueryToolName, payload: object) -> ToolResult:

@@ -2,7 +2,7 @@
 
 ADR 0002: "Objects are strict (unknown keys reject) so content cannot be smuggled in unnamed
 fields." The Type 2 Bundle and the FHIR resources inside it are the deliberate exception — FHIR
-resources are open by nature, and ``src/contracts/type2-bundle.ts`` models them with
+resources are open by nature, and ``src/contracts/canonical-bundle.ts`` models them with
 ``z.looseObject`` — and those must accept and *preserve* an unknown field, or Zone A would
 silently drop content that the Bundle hash was taken over.
 
@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import importlib
 import inspect
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -22,16 +23,22 @@ from pydantic import BaseModel, RootModel, ValidationError
 
 from .conftest import CONTRACT_SCHEMAS, load_json
 
+# Every contract the index publishes that Zone A reads (scripts/generate_models.py), derived rather
+# than listed, so a contract added to the index is checked here without an edit (audit C-8).
+NOT_ZONE_A = frozenset({"agent-turn", "query-tools"})
 CONTRACTS = [
-    ("canonical-submission", "canonical_submission"),
-    ("fidelity-report", "fidelity_report"),
-    ("ingestion-provenance", "ingestion_provenance"),
-    ("run-manifest", "run_manifest"),
-    ("run-request", "run_request"),
-    ("source-document-text", "source_document_text"),
+    (entry["name"], entry["name"].replace("-", "_"))
+    for entry in load_json(CONTRACT_SCHEMAS / "index.json")["contracts"]
+    if entry["name"] not in NOT_ZONE_A
 ]
 
 UNKNOWN_FIELD = "zoneAUnknownField"
+
+
+def test_every_contract_zone_a_reads_has_its_generated_module() -> None:
+    generated = Path(__file__).resolve().parents[1] / "src" / "zone_a" / "contracts"
+    modules = sorted(path.stem for path in generated.glob("*.py") if path.stem != "__init__")
+    assert modules == sorted(module for _, module in CONTRACTS)
 
 
 def _count_objects(node: Any) -> tuple[int, int]:

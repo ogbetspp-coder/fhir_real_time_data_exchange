@@ -9,21 +9,22 @@ committed module is out of date with ``contracts/generated/``.
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel
+from pydantic import ConfigDict, Field, RootModel, StrictStr
+from zone_a.contract_model import ContractModel
 
 
-class Uuid(RootModel[str]):
+class Uuid(RootModel[StrictStr]):
     root: Annotated[
-        str,
+        StrictStr,
         Field(
             pattern="^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         ),
     ]
 
 
-class AddressableFhirId(RootModel[str]):
+class AddressableFhirId(RootModel[StrictStr]):
     root: Annotated[
-        str,
+        StrictStr,
         Field(
             description="FHIR id that begins with a letter or digit, so a single URL path segment.",
             pattern="^[A-Za-z0-9][A-Za-z0-9\\-.]{0,63}$",
@@ -31,9 +32,9 @@ class AddressableFhirId(RootModel[str]):
     ]
 
 
-class StorageUri(RootModel[str]):
+class StorageUri(RootModel[StrictStr]):
     root: Annotated[
-        str,
+        StrictStr,
         Field(
             description="Cloud Storage object URI (gs://bucket/object).",
             max_length=512,
@@ -42,32 +43,33 @@ class StorageUri(RootModel[str]):
     ]
 
 
-class Sha256Hex(RootModel[str]):
+class Sha256Hex(RootModel[StrictStr]):
     root: Annotated[
-        str, Field(description="Lower-case hexadecimal SHA-256 digest.", pattern="^[0-9a-f]{64}$")
+        StrictStr,
+        Field(description="Lower-case hexadecimal SHA-256 digest.", pattern="^[0-9a-f]{64}$"),
     ]
 
 
-class RunRequest1(BaseModel):
+class RunRequest1(ContractModel):
     model_config = ConfigDict(extra="forbid")
     source: Literal["fixture"]
     runId: Uuid | None = None
 
 
-class RunRequest2(BaseModel):
+class RunRequest2(ContractModel):
     model_config = ConfigDict(extra="forbid")
     source: Literal["healthcare-api"]
     bundleId: AddressableFhirId
     runId: Uuid | None = None
 
 
-class SubmissionRef(BaseModel):
+class SubmissionRef(ContractModel):
     model_config = ConfigDict(extra="forbid")
     uri: StorageUri
     sha256: Sha256Hex
 
 
-class RunRequest3(BaseModel):
+class RunRequest3(ContractModel):
     model_config = ConfigDict(extra="forbid")
     source: Literal["document"]
     submissionRef: SubmissionRef
