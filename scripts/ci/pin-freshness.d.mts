@@ -12,11 +12,18 @@ export type Upstream =
 
 export type Pin = { name: string; where: string; read: () => string; upstream: Upstream };
 
-export type Verdict = { status: "current" | "behind" | "unchecked"; detail: string };
+export type Verdict = { status: "current" | "held" | "behind" | "unchecked"; detail: string };
 
 export type Row = Verdict & { pin: Pin; pinned: string };
 
 export const SNAPSHOT_MAX_AGE_DAYS: number;
+export const HELD: Record<string, { value: string; reason: string }>;
+export function workflowInputs(
+  action: string,
+  key: string,
+  directory?: string,
+): { where: string; value: string }[];
+export function workflowPin(action: string, key: string, directory?: string): string;
 export function pins(): Pin[];
 export function latest(
   upstream: Upstream,

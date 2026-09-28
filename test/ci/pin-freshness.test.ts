@@ -1,13 +1,18 @@
-import { readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import {
+  HELD,
   SNAPSHOT_MAX_AGE_DAYS,
   check,
   pins,
   report,
   verdict,
+  workflowInputs,
+  workflowPin,
   type Pin,
 } from "../../scripts/ci/pin-freshness.mjs";
 
@@ -88,6 +93,72 @@ describe("pin freshness", () => {
     expect(new Set(versions.map(([, version]) => version)).size).toBe(1);
   });
 
+  // A tool installed in several places was read from one of them (audit B07, review round 1,
+  // L-3): uv is pinned in four steps across three workflows.
+  it("holds every tool the workflows install to one version, wherever it is installed", () => {
+    const actions = new Set<string>();
+    for (const file of readdirSync(".github/workflows")) {
+      const text = readFileSync(path.join(".github/workflows", file), "utf8");
+      for (const [, action] of text.matchAll(/uses: ([\w.-]+\/[\w./-]+)@/g))
+        actions.add(action ?? "");
+    }
+    let repeated = 0;
+    for (const action of actions) {
+      for (const key of [
+        "version",
+        "node-version",
+        "python-version",
+        "java-version",
+        "terraform_version",
+      ]) {
+        const found = workflowInputs(action, key);
+        if (found.length > 1) repeated += 1;
+        expect([action, key, new Set(found.map(({ value }) => value)).size <= 1]).toEqual([
+          action,
+          key,
+          true,
+        ]);
+      }
+    }
+    expect(repeated).toBeGreaterThanOrEqual(5);
+    expect(workflowInputs("astral-sh/setup-uv", "version")).toHaveLength(4);
+  });
+
+  it("refuses a pin that differs between the places it is installed", () => {
+    const directory = mkdtempSync(path.join(tmpdir(), "pin-freshness-"));
+    try {
+      mkdirSync(directory, { recursive: true });
+      const step = (version: string) =>
+        `jobs:\n  a:\n    steps:\n      - name: Set up uv\n        uses: astral-sh/setup-uv@${"0".repeat(40)} # v7\n        with:\n          version: "${version}"\n`;
+      writeFileSync(path.join(directory, "a.yml"), step("0.12.17"));
+      writeFileSync(path.join(directory, "b.yml"), step("0.12.17"));
+      expect(workflowPin("astral-sh/setup-uv", "version", directory)).toBe("0.12.17");
+      writeFileSync(path.join(directory, "b.yml"), step("0.12.19"));
+      expect(() => workflowPin("astral-sh/setup-uv", "version", directory)).toThrow(
+        /differs: a\.yml:7=0\.12\.17, b\.yml:7=0\.12\.19/,
+      );
+      expect(() =>
+        workflowPin("hashicorp/setup-terraform", "terraform_version", directory),
+      ).toThrow(/not set anywhere/);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  // Held on the legacy builder until docker:29 is rehearsed (audit B07, review round 1, M-1).
+  it("reports the held builder as held, with its reason, not as behind; a moved one is judged", () => {
+    const builder = pins().find(({ name }) => name === "Cloud Build docker builder");
+    if (builder === undefined) throw new Error("no builder pin");
+    const held = HELD["Cloud Build docker builder"];
+    expect(builder.read()).toBe(held?.value);
+    const upstream = `sha256:${"b".repeat(64)}`;
+    const row = verdict(builder, builder.read(), upstream);
+    expect(row.status).toBe("held");
+    expect(row.detail).toContain("B13");
+    expect(report([{ pin: builder, pinned: builder.read(), ...row }]).behind).toBe(0);
+    expect(verdict(builder, `sha256:${"c".repeat(64)}`, upstream).status).toBe("behind");
+  });
+
   it("is reported weekly and opens an issue from a job that checks nothing out", () => {
     const workflow = readFileSync(".github/workflows/pin-freshness.yml", "utf8");
     expect(workflow).toContain("run: node scripts/ci/pin-freshness.mjs --report");
@@ -95,5 +166,8 @@ describe("pin freshness", () => {
     const reporter = workflow.slice(workflow.indexOf("\n  report:"));
     expect(reporter).toContain("issues: write");
     expect(reporter).not.toContain("actions/checkout");
+    // One open issue at a time: a later week's report is a comment on it.
+    expect(reporter).toMatch(/gh issue list --state open[\s\S]*gh issue comment "\$open"/);
+    expect(reporter).toContain('gh issue create --title "pins behind upstream" ');
   });
 });

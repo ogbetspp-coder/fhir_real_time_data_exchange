@@ -52,7 +52,8 @@ jobs:
           [[ -f "$RUNNER_TEMP/pins.md" ]] && cat "$RUNNER_TEMP/pins.md" >>"$GITHUB_STEP_SUMMARY" || true
           echo "report=$(base64 -w0 "$RUNNER_TEMP/pins.md" 2>/dev/null || true)" >>"$GITHUB_OUTPUT"
 
-  # The one job that may write issues, with no checkout, as in vulnerabilities.yml.
+  # The one job that may write issues, with no checkout, as in vulnerabilities.yml. One open issue
+  # at a time: a week's report is added to the open one, if any, rather than opening another.
   report:
     name: Report pins behind upstream
     needs: check
@@ -65,7 +66,7 @@ jobs:
       run:
         shell: bash --noprofile --norc -eo pipefail {0}
     steps:
-      - name: Open an issue
+      - name: Open or update the issue
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -77,4 +78,10 @@ jobs:
             echo
             base64 -d <<<"$REPORT" || true
           } >"$RUNNER_TEMP/issue.md"
-          gh issue create --title "pins behind upstream $(date -u +%Y-%m-%d)" --body-file "$RUNNER_TEMP/issue.md"
+          open="$(gh issue list --state open --author "app/github-actions" --search "pins behind upstream in:title" \
+            --limit 100 --json number,title --jq '[.[] | select(.title == "pins behind upstream")][0].number // empty')"
+          if [[ -n "$open" ]]; then
+            gh issue comment "$open" --body-file "$RUNNER_TEMP/issue.md"
+          else
+            gh issue create --title "pins behind upstream" --body-file "$RUNNER_TEMP/issue.md"
+          fi

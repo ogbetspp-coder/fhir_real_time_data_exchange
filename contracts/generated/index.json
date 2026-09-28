@@ -55,7 +55,7 @@
       "version": "4.0.0",
       "$id": "https://khs.dev/contracts/run-manifest/4.0.0/schema.json",
       "file": "run-manifest.schema.json",
-      "sha256": "18d7018c861fa93e86a721677593092cd36e390880deca08f69ebb81aa5c68bf"
+      "sha256": "ef73dded7bfee4d348ecdb3cc7c52ac66c8090a4cd8bb352d688b1278e7c52f3"
     }
   ]
 }

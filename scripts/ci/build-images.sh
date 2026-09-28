@@ -18,6 +18,11 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 
+# The legacy builder, as Cloud Build's held docker:20.10.24 builder uses (cloudbuild.images.yaml;
+# audit B07, review round 1, M-1): a Dockerfile that only BuildKit could build fails here, before
+# the deploy, rather than there. Docker 28 on the runner still has it, with a deprecation notice.
+export DOCKER_BUILDKIT=0
+
 docker build --target worker --tag ema-flow/worker:ci .
 docker build --target query --tag ema-flow/query:ci .
 docker build --file Dockerfile.validator --tag ema-flow/validator:ci .
@@ -40,7 +45,7 @@ docker run --rm --network none ema-flow/worker:ci node --input-type=module -e '
   const { pinnedPackages } = await import("/app/dist/fhir/standards-lock.js");
   const packages = pinnedPackages();
   if (packages.length === 0) process.exit(1);
-  console.log(`worker image: ${packages.length} pinned packages in fhir/standards.lock.json`);
+  console.log(`worker image: ${packages.length} pinned packages in its two locks`);
 '
 
 if docker run --rm --network none --entrypoint sh ema-flow/validator:ci -c 'command -v curl || command -v wget'; then

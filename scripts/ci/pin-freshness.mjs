@@ -16,7 +16,7 @@
 // pinned by checksum and move only with the renderer gate's own review (the snapshot's age is
 // reported), and every pin Dependabot already moves.
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 
 import { readRendererPins } from "./renderer-pins.mjs";
 import { readSidecarPins } from "./validator-pins.mjs";
@@ -33,6 +33,59 @@ function capture(file, pattern) {
   }
   return values[0];
 }
+
+// A tool's version wherever the workflows install it: the `with:` input `key` of every step that
+// uses `action`, in every workflow. One value, or an error naming each place (audit B07, review
+// round 1, L-3): a pin repeated in four places and moved in three is not a pin.
+export function workflowInputs(action, key, directory = ".github/workflows") {
+  const found = [];
+  for (const file of readdirSync(directory)
+    .filter((name) => /\.ya?ml$/.test(name))
+    .sort()) {
+    const lines = readFileSync(`${directory}/${file}`, "utf8").split(/\r?\n/);
+    lines.forEach((line, index) => {
+      if (
+        !new RegExp(`^\\s*(?:- )?uses: ${action.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")}@`).test(
+          line,
+        )
+      )
+        return;
+      // The step runs from its `- ` line back up to the next line indented as little.
+      let start = index;
+      while (start > 0 && !/^\s*- /.test(lines[start])) start -= 1;
+      const indent = /^(\s*)- /.exec(lines[start])?.[1].length ?? 0;
+      for (let at = start + 1; at < lines.length; at += 1) {
+        const text = lines[at];
+        if (text.trim() !== "" && text.search(/\S/) <= indent) break;
+        const input = new RegExp(`^\\s+${key}:\\s*"?([^"\\s#]+)"?`).exec(text);
+        if (input !== null) found.push({ where: `${file}:${at + 1}`, value: input[1] });
+      }
+    });
+  }
+  return found;
+}
+
+// The one value of `workflowInputs`, or a thrown error.
+export function workflowPin(action, key, directory) {
+  const found = workflowInputs(action, key, directory);
+  const values = [...new Set(found.map(({ value }) => value))];
+  if (values.length !== 1) {
+    throw new Error(
+      `${action} ${key}: ${values.length === 0 ? "not set anywhere" : `differs: ${found.map(({ where, value }) => `${where}=${value}`).join(", ")}`}`,
+    );
+  }
+  return values[0];
+}
+
+// A pin kept behind upstream on purpose: reported as `held`, with its reason, while it stays at
+// `value`; any other value is judged against upstream as usual.
+export const HELD = {
+  "Cloud Build docker builder": {
+    value: "sha256:001fb4a870a84485cf198c80002f7af42f6456f2dbc261d70a0b5f0111470df4",
+    reason:
+      "docker:20.10.24, the legacy builder, held until the move to docker:29 and BuildKit is rehearsed on Cloud Build (audit B07 review round 1, M-1; batch B13)",
+  },
+};
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 // How old the renderer's Debian snapshot may be before it is reported: its security suite is
@@ -82,20 +135,20 @@ export function pins() {
     },
     {
       name: "uv",
-      where: ".github/workflows/ci.yml",
-      read: () => capture(".github/workflows/ci.yml", /^\s+version: "(\d+\.\d+\.\d+)"$/m),
+      where: ".github/workflows/* (setup-uv)",
+      read: () => workflowPin("astral-sh/setup-uv", "version"),
       upstream: { github: "astral-sh/uv" },
     },
     {
       name: "Terraform",
-      where: ".github/workflows/deploy.yml",
-      read: () => capture(".github/workflows/deploy.yml", /terraform_version: (\S+)/),
+      where: ".github/workflows/* (setup-terraform)",
+      read: () => workflowPin("hashicorp/setup-terraform", "terraform_version"),
       upstream: { terraform: true },
     },
     {
       name: "Google Cloud SDK (setup-gcloud version)",
-      where: ".github/workflows/deploy.yml",
-      read: () => capture(".github/workflows/deploy.yml", /^\s+version: "(\d+\.\d+\.\d+)"$/m),
+      where: ".github/workflows/* (setup-gcloud)",
+      read: () => workflowPin("google-github-actions/setup-gcloud", "version"),
       upstream: { cloudSdk: true },
     },
     {
@@ -176,8 +229,16 @@ export async function latest(upstream, env = process.env) {
   throw new Error("a pin with no upstream");
 }
 
-// `current`, `behind` (with what upstream has) or `unchecked` (with why), for one pin.
+// `current`, `held` (kept behind on purpose, with why), `behind` (with what upstream has) or
+// `unchecked` (with why), for one pin.
 export function verdict(pin, pinned, upstreamValue) {
+  const held = HELD[pin.name];
+  if (held !== undefined && held.value === pinned) {
+    return {
+      status: pinned === upstreamValue ? "current" : "held",
+      detail: `${upstreamValue}; held: ${held.reason}`,
+    };
+  }
   if (pin.upstream.age !== undefined) {
     const stamp = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(pinned);
     if (stamp === null) return { status: "unchecked", detail: `${pinned} is not a snapshot time` };
@@ -213,7 +274,7 @@ export async function check(list = pins(), lookup = latest) {
 }
 
 export function report(rows) {
-  const behind = rows.filter(({ status }) => status !== "current").length;
+  const behind = rows.filter(({ status }) => status !== "current" && status !== "held").length;
   const lines = [
     `#### Pin freshness: ${behind === 0 ? "every pin is current" : `${behind} of ${rows.length} pins behind or unchecked`}`,
     "",

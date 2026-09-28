@@ -640,9 +640,10 @@ record does not change them.
 
 `Dockerfile.renderer`, pinned as `Dockerfile.validator` is, its pins read by one reader
 (`scripts/ci/renderer-pins.mjs`), to be used by the lock (3c-C4). The reader refuses the shapes
-`test/ci/renderer-pins.test.ts` names (a denylist of the usual ways a download or an apt source could
-escape its pin, not a proof that none can); the control is the review of `Dockerfile.renderer` and of
-the reader, each of which `.github/CODEOWNERS` gives a named owner (audit B07).
+`test/ci/renderer-pins.test.ts` names: a denylist of the usual ways a download or an apt source could
+escape its pin, not a proof that none can. Nothing else holds `Dockerfile.renderer` or the reader
+today: `.github/CODEOWNERS` names an owner for both (audit B07), but branch protection requires no
+review, so it enforces nothing (the residuals below).
 Its Debian packages come over HTTPS (the CA certificates alone over HTTP), each suite's signed
 Release held to its pinned date. The renderer image build
 (`cloudbuild.renderer-image.yaml`, R1) builds it when its pins change and pushes it to

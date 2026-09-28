@@ -46,8 +46,10 @@ COPY --chown=node:node --from=build /app/node_modules ./node_modules
 COPY --chown=node:node --from=build /app/dist ./dist
 COPY --chown=node:node package.json ./
 COPY --chown=node:node fhir/mappings ./fhir/mappings
-# The pinned standards the run manifest names (src/fhir/standards-lock.ts, run manifest 4.0.0).
+# The pinned packages the run manifest names, both locks: every package the validator loads
+# (src/fhir/standards-lock.ts, run manifest 4.0.0).
 COPY --chown=node:node fhir/standards.lock.json ./fhir/standards.lock.json
+COPY --chown=node:node fhir/validator-packages.lock ./fhir/validator-packages.lock
 EXPOSE 8080
 
 FROM runtime AS query

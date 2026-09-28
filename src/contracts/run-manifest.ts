@@ -75,8 +75,14 @@ const ManifestPackageSchema = z
   .strictObject({ package: PackageRef, sha256: Sha256Hex })
   .meta({ id: "ManifestPackage" });
 
-// 4.0.0: the same fields, the two named packages among `packages`, which carries every package of
-// the lock with the SHA-256 of its tarball.
+// 4.0.0: the same fields, the two named packages among `packages`, which carries every package the
+// validator loads (both locks the worker ships, src/fhir/standards-lock.ts) with the SHA-256 its
+// lock records. The two rules below are not expressible in JSON Schema, so the published schema
+// states them in its description and Zone A's verifier enforces them
+// (zone-a/src/zone_a/run_manifest_rules.py): an outside verifier refuses what the worker refuses.
+export const STANDARDS_RULES =
+  "globalEpiPackage and emaPackage are each the package of an entry of packages; no two entries of packages name the same package (id#version); one id may appear at several versions.";
+
 const StandardsSchema = z
   .strictObject({
     ...legacyStandards,
@@ -90,12 +96,11 @@ const StandardsSchema = z
         context.addIssue({ code: "custom", message: `${field} is not among the pinned packages` });
       }
     }
-    const ids = named.map((ref) => ref.slice(0, ref.indexOf("#")));
-    if (new Set(ids).size !== ids.length) {
+    if (new Set(named).size !== named.length) {
       context.addIssue({ code: "custom", message: "a package is pinned more than once" });
     }
   })
-  .meta({ id: "ManifestStandards" });
+  .meta({ id: "ManifestStandards", description: STANDARDS_RULES });
 
 const ValidationSchema = z
   .strictObject({

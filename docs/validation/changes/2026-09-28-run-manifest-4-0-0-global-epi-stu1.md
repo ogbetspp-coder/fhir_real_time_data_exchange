@@ -4,11 +4,23 @@
 
 1. **Run manifest 4.0.0**, a major under ADR 0002. `RUN_MANIFEST_VERSION` moved from `3.0.0` to
    `4.0.0`, and the manifest now names the standards that validated the run instead of literals:
-   - `standards.packages`: every FHIR package of `fhir/standards.lock.json`, each as
-     `{ package: "<id>#<version>", sha256 }`, the SHA-256 of the tarball. The worker image ships the
-     lock, and the pipeline reads it before any side effect (`src/fhir/standards-lock.ts`).
-   - `standards.globalEpiPackage` and `standards.emaPackage` are taken from that list; the schema
-     refuses a manifest whose named packages are not among those it pins, or which pins an id twice.
+   - `standards.packages`: every package the official validator loads, each as
+     `{ package: "<id>#<version>", sha256 }` with the SHA-256 its lock records. That is the four
+     packages of `fhir/standards.lock.json` (the `-ig` packages) and the nine of
+     `fhir/validator-packages.lock` (the packages the validator resolves itself). One package is in
+     both, with the same SHA-256 (`hl7.fhir.uv.extensions.r5#5.3.0`), so the list has twelve
+     entries: the count the validator's own Package Summary reports. Every SHA-256 is the one its
+     lock records; none is computed or assumed here. The worker image ships both locks, and the
+     pipeline reads them before any side effect (`src/fhir/standards-lock.ts`). A package the two
+     locks record with different SHA-256s fails the run.
+   - `standards.globalEpiPackage` and `standards.emaPackage` are taken from that list. The schema
+     refuses a manifest whose named packages are not among `packages`, and one that lists a package
+     (an `id#version`) twice; one id at several versions is allowed, and `hl7.terminology.r5` is at
+     four. JSON Schema cannot state either rule. The published schema states them in the
+     `ManifestStandards` description, and Zone A's verifier (`zone_a.run_manifest_rules`,
+     `VerifiedRunManifest`) enforces them, so an outside verifier refuses what the worker refuses.
+     (Review round 1 of #142: the first draft named four of the twelve packages, and keyed
+     uniqueness on the id.)
    - `runtime.validatorImageDigest`: the validator sidecar's image digest
      (`VALIDATOR_IMAGE_DIGEST`, set by `infra/run.tf` from the validator image reference, which must
      now carry a digest; `development` off Cloud Run, as for the others).
@@ -71,23 +83,27 @@ frozen since February 2026, with 34 fixed advisories it could never receive.
    `zone-a/src/zone_a/contracts/run_manifest.py` are regenerated.
 3. No fidelity vector changed.
 4. Adversarial tests:
-   - `test/standards-lock.test.ts`: the manifest names the lock's packages with their hashes and the
-     validator's digest; it ignores `GLOBAL_EPI_PACKAGE`; the schema refuses a named package that is
-     not pinned, an empty list and a repeated id; 3.0.0 stays readable and is not accepted as 4.0.0;
-     the lock reader refuses a repeated id, no package, a versionless package, plain HTTP and a
-     missing SHA-256.
+   - `test/standards-lock.test.ts`: the manifest names both locks' twelve packages with their hashes
+     and the validator's digest; it ignores `GLOBAL_EPI_PACKAGE`; the schema refuses a named package
+     that is not pinned, an empty list and a repeated package; 3.0.0 stays readable and is not
+     accepted as 4.0.0; the readers accept one id at several versions and refuse a package listed
+     twice, two SHA-256s for one package, a malformed validator-lock line, no package, a versionless
+     package, plain HTTP and a missing SHA-256.
    - `test/ci/validator-pins.test.ts`: the sidecar and the lock pin the same URLs and hashes.
    - `test/infra/worker-provenance.test.ts`: `VALIDATOR_IMAGE_DIGEST` from a digest-only validator
      reference; no `GLOBAL_EPI_PACKAGE`.
    - `zone-a/tests/test_run_manifest_status.py`: the generated model requires the packages, their
      hashes and the validator's digest.
+   - `zone-a/tests/test_run_manifest_rules.py`: `VerifiedRunManifest` refuses the named packages not
+     pinned and a package listed twice, which the generated model alone accepts; the published
+     description states both rules.
    - `test/ci/images.test.ts` and CI's Images job (`scripts/ci/build-images.sh`): the runtime
      assertion, the targets, the standards lock in the worker image.
 5. ADR 0002's versioning rule is unchanged. ADR 0003's runtime is unchanged.
 6. None.
 
-**Blast radius.** A worker without `fhir/standards.lock.json` refuses every run before any side
-effect. A deploy whose validator image reference has no digest is refused at plan time (the deploy
+**Blast radius.** A worker without `fhir/standards.lock.json` or `fhir/validator-packages.lock`
+refuses every run before any side effect. A deploy whose validator image reference has no digest is refused at plan time (the deploy
 passes one by digest already).
 
 **Step 7.** Not applicable: no approved content changes.
