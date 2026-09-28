@@ -152,16 +152,19 @@ export function logAuditRecord(record: QueryAuditRecord): void {
 // tool ran and there is no reader, budget or entitlement to give it.
 type AuditDeps = Pick<McpServerDeps, "serviceVersion" | "identity" | "audit" | "now">;
 
-// What a fallback record carries as `argumentsSha256` when the arguments could not be hashed:
-// the hash of JSON `null`, marked by `degraded` as not describing the arguments.
-const UNHASHABLE_ARGUMENTS_SHA256 = sha256(null);
+// What a record carries as `argumentsSha256` when the arguments could not be hashed: 64 zeros,
+// a digest no input is known to have, so it can never be read as the hash of real arguments
+// (the hash of JSON `null` would be, for a call whose arguments were `null`). `degraded` says
+// the same thing in words.
+export const UNHASHABLE_ARGUMENTS_SHA256 = "0".repeat(64);
 
 // Writes the one record of a call, and reports whether one was written. It never throws: the
 // record is written on the paths that must not fail (after a tool, and in the HTTP layer's
-// `finally`), and a record lost to an exception is a call with no trace. When the full record
-// cannot be written — its arguments cannot be hashed, or it fails its own contract — a fallback
-// record carrying only the fields that always can be is written instead, with `degraded` saying
-// why.
+// `finally`), and a record lost to an exception is a call with no trace. When the arguments
+// cannot be hashed the record says so in `degraded`; when the record fails its own contract,
+// the optional fields the contract refused are dropped and `degraded` says so, and when even
+// that fails, only the required fields are kept. A record is never refused whole while one it
+// can still write exists.
 function auditRecord(
   deps: AuditDeps,
   tool: QueryToolName,
@@ -194,22 +197,34 @@ function auditRecord(
       durationMs: Math.max(0, (deps.now ?? Date.now)() - startedAt),
     };
 
-    let record = QueryAuditRecordSchema.safeParse(
-      degraded === undefined
-        ? {
-            ...required,
-            ...(identity.imageDigest === undefined ? {} : { imageDigest: identity.imageDigest }),
-            ...(outcome.status === "ok" && outcome.truncated !== undefined
-              ? { truncated: outcome.truncated }
-              : {}),
-            ...(outcome.bundleId === undefined ? {} : { bundleId: outcome.bundleId }),
-            ...(outcome.versionId === undefined ? {} : { versionId: outcome.versionId }),
-            ...(identity.turnId === undefined ? {} : { turnId: identity.turnId }),
-          }
-        : { ...required, degraded },
-    );
-    if (!record.success && degraded === undefined) {
-      record = QueryAuditRecordSchema.safeParse({ ...required, degraded: "record-rejected" });
+    const optional: Record<string, unknown> = {
+      ...(identity.imageDigest === undefined ? {} : { imageDigest: identity.imageDigest }),
+      ...(outcome.status === "ok" && outcome.truncated !== undefined
+        ? { truncated: outcome.truncated }
+        : {}),
+      ...(outcome.bundleId === undefined ? {} : { bundleId: outcome.bundleId }),
+      ...(outcome.versionId === undefined ? {} : { versionId: outcome.versionId }),
+      ...(identity.turnId === undefined ? {} : { turnId: identity.turnId }),
+    };
+
+    let record = QueryAuditRecordSchema.safeParse({
+      ...required,
+      ...optional,
+      ...(degraded === undefined ? {} : { degraded }),
+    });
+    if (!record.success) {
+      // Drop exactly the optional fields the contract refused and keep the rest. Unhashable
+      // arguments stay the reason given when both apply: an `argumentsSha256` that does not
+      // describe the arguments is the graver fact about the record.
+      const refused = new Set(record.error.issues.map(({ path }) => path[0]));
+      const kept = Object.fromEntries(
+        Object.entries(optional).filter(([key]) => !refused.has(key)),
+      );
+      const reason = degraded ?? "record-rejected";
+      record = QueryAuditRecordSchema.safeParse({ ...required, ...kept, degraded: reason });
+      if (!record.success) {
+        record = QueryAuditRecordSchema.safeParse({ ...required, degraded: reason });
+      }
     }
     if (!record.success) {
       log("error", "Query audit record rejected by its own contract", {
@@ -297,14 +312,20 @@ async function runTool<Input, Output extends Record<string, unknown>>(
   }
 
   // Exactly one record per call: this one, unless the HTTP layer already gave up waiting for
-  // this request and wrote the record for it. The id is marked audited only once its record
-  // has been written, so a record that could not be is still written by the HTTP layer.
+  // this request and wrote the record for it. No answer leaves without a record that says what
+  // it was: when this call's own record could not be written — or the HTTP layer already wrote
+  // `unavailable` for it — the caller is answered `unavailable` too, never the content. The id
+  // is marked audited only once its record has been written, so the HTTP layer writes the
+  // `unavailable` record for a call whose own record failed, and that record matches the answer.
   const journal = deps.journal;
+  let recorded = false;
   if (journal === undefined || requestId === undefined) {
-    auditRecord(deps, tool, args, outcome, startedAt);
-  } else if (!journal.sealed && auditRecord(deps, tool, args, outcome, startedAt)) {
-    journal.audited.add(requestId);
+    recorded = auditRecord(deps, tool, args, outcome, startedAt);
+  } else if (!journal.sealed) {
+    recorded = auditRecord(deps, tool, args, outcome, startedAt);
+    if (recorded) journal.audited.add(requestId);
   }
+  if (!recorded) return errorResult({ tool, error: "unavailable" });
   if (outcome.status === "error") return errorResult(outcome.error);
   return {
     content: [{ type: "text", text: JSON.stringify(outcome.value) }],

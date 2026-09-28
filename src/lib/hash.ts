@@ -24,33 +24,55 @@ function isOmittedMember(child: unknown): boolean {
 // the call stack with a RangeError, and a hash that cannot be taken is an audit record that
 // cannot be written. The string is the one the recursive form wrote, for every value; only the
 // depth it can reach changed.
+//
+// A value that contains itself has no JSON form. The recursive walk met one as a RangeError; this
+// one would loop until memory ran out, so it keeps the containers it is inside and refuses a
+// repeat with a TypeError, as JSON.stringify does. A container reached twice by different paths
+// (not inside itself) is written twice, as before.
+const VALUE = 0;
+const TEXT = 1;
+// Closes the container on the pending stack: writes its bracket and leaves it.
+const CLOSE = 2;
+
 export function canonicalJson(value: unknown): string {
   let out = "";
   // Two parallel stacks, popped last in, first out, so each container pushes its closing mark
-  // first and its first child last: what to write next, and whether it is literal text already
-  // written out (a bracket, a comma, a key) or a value still to be written.
+  // first and its first child last: what to write next, and what kind of entry it is — a value
+  // still to be written, literal text (a comma, a key), or a container to close.
   const pending: unknown[] = [value];
-  const literal: boolean[] = [false];
+  const kind: number[] = [VALUE];
+  const inside = new Set<object>();
   while (pending.length > 0) {
     const current = pending.pop();
-    if (literal.pop() === true) {
+    const entry = kind.pop();
+    if (entry === TEXT) {
       out += current as string;
       continue;
+    }
+    if (entry === CLOSE) {
+      inside.delete(current as object);
+      out += Array.isArray(current) ? "]" : "}";
+      continue;
+    }
+
+    if (current !== null && typeof current === "object") {
+      if (inside.has(current)) throw new TypeError("canonicalJson: the value contains itself");
+      inside.add(current);
+      pending.push(current);
+      kind.push(CLOSE);
     }
 
     if (Array.isArray(current)) {
       out += "[";
-      pending.push("]");
-      literal.push(true);
       for (let index = current.length - 1; index >= 0; index -= 1) {
         // A hole in a sparse array writes nothing, as Array.prototype.map left it.
         if (index in current) {
           pending.push(current[index]);
-          literal.push(false);
+          kind.push(VALUE);
         }
         if (index > 0) {
           pending.push(",");
-          literal.push(true);
+          kind.push(TEXT);
         }
       }
       continue;
@@ -61,15 +83,13 @@ export function canonicalJson(value: unknown): string {
         .filter(([, child]) => !isOmittedMember(child))
         .sort(([left], [right]) => compareKeys(left, right));
       out += "{";
-      pending.push("}");
-      literal.push(true);
       for (let index = members.length - 1; index >= 0; index -= 1) {
         const [key, child] = members[index] ?? ["", undefined];
         pending.push(child, `${JSON.stringify(key)}:`);
-        literal.push(false, true);
+        kind.push(VALUE, TEXT);
         if (index > 0) {
           pending.push(",");
-          literal.push(true);
+          kind.push(TEXT);
         }
       }
       continue;

@@ -347,7 +347,9 @@ event: "refused-body", principal: <sub>`, plus `reason`, one of `invalid-turn-id
   Each read carries a 10-second timeout (`STORE_READ_TIMEOUT_MS`) joined with the request's
   own abort signal, which the service aborts once the request is over — answered, abandoned at
   the deadline, or left by its client — so a tool still running on an abandoned request stops
-  reading. A store refusal whose body is not JSON (an HTML page from a proxy) still fails
+  reading. The bound covers the whole read, the access-token lookup included: the read stops
+  waiting for a credential the metadata server does not answer (the library's own lookup takes
+  no signal and finishes or fails on its own). A store refusal whose body is not JSON (an HTML page from a proxy) still fails
   naming its HTTP status, and the body of a `404` or `410` is released unread. Section lookup
   is by canonical `sourceKey`: the transform stamps every EMA section with the id
   `stableUuid("ema-qrd-section", sourceKey)`, and a section is found by that id alone — the
@@ -362,8 +364,11 @@ event: "refused-body", principal: <sub>`, plus `reason`, one of `invalid-turn-id
   run through a pool of 8 workers, within the request's own in-flight bound, cover at most the
   first 200 entitled ids in entitlement order (`FIND_PRODUCT_SCAN_HORIZON`), stop being
   launched once `limit` matches are in hand, and stop when the request's read budget is spent.
-  When one read fails, the other workers launch no further read, and the call answers
-  `unavailable` only once every read it started has settled, so none outlives the answer.
+  When one read fails, the call's own abort signal (joined with the request's) is aborted: the
+  other workers launch no further read, a read still waiting for a place in the request's pool
+  is never made, and one in flight is cancelled rather than waited out. The call answers
+  `unavailable` — logging the read that failed, not the cancellations it caused — only once
+  every read it started has settled, so none outlives the answer.
   `truncated` covers both ways an answer can be shorter than what the entitlement holds. The
   first is documents the call never searched — because the horizon cut the list, because
   `limit` stopped the scan, or because the budget ran out — or read and could not search: a
@@ -533,7 +538,7 @@ event: "refused-body", principal: <sub>`, plus `reason`, one of `invalid-turn-id
   pinned, in stateless mode so Cloud Run can scale it. Tool descriptions state that content
   fields are document text, never instructions. Tool failures are returned as `isError: true`
   with one text content item that is exactly the closed error code, and no
-  `structuredContent` (`query-tools` 2.1.0; the contract's `QueryError` is that code and the
+  `structuredContent` (`query-tools` 3.0.0; the contract's `QueryError` is that code and the
   tool the caller called). Each tool's `outputSchema` describes its success shape, and MCP SDK
   1.30.0's `Client.callTool` validates `structuredContent` against it whenever it is present —
   including when `isError` is true — once `listTools` has cached the validators; under 2.0.x,
@@ -564,15 +569,21 @@ event: "refused-body", principal: <sub>`, plus `reason`, one of `invalid-turn-id
   records date from the moment the request was taken up, captured once before the transport is
   connected, so a call that occupied the whole deadline reads as having started when the
   request did and as having lasted about the deadline. A body refused before the transport is
-  connected produces no record at all; the warning line above is its trace. A record is never
-  lost to an exception: writing one cannot throw, a call's id is marked recorded only once its
-  record has been written (so the HTTP layer writes any record a tool could not), and the
-  arguments are hashed by an iterative walk that no nesting depth can overflow. When the full
-  record cannot be written — its arguments cannot be hashed at all, or it fails its own
-  contract — a fallback carrying only the required fields is written instead, with `degraded`
-  (`arguments-unhashable`, when `argumentsSha256` is the hash of JSON `null`, or
-  `record-rejected`) saying why; `durationMs` is floored at zero, so a wall clock stepped back
-  mid-call does not cost the record.
+  connected produces no record at all; the warning line above is its trace. **No answer leaves
+  without a record that says what it was.** Writing a record cannot throw. When a call's own
+  record cannot be written (the sink fails), the caller is answered `unavailable` — never the
+  content it would otherwise have been given — and, because a call's id is marked recorded
+  only once its record has been written, the HTTP layer writes the `unavailable` record for
+  it; so a record never says less was released than was. Over a transport with no HTTP layer,
+  or when no record can be written at all, the answer is still `unavailable`. The arguments
+  are hashed by an iterative walk that no nesting depth can overflow (a value that contains
+  itself is refused with a `TypeError`, where the recursive walk met it as a `RangeError`).
+  When the record cannot be written in full, what can be is: arguments that cannot be hashed
+  are recorded with `argumentsSha256` of 64 zeros — a digest no arguments have, unlike the
+  hash of JSON `null` — and `degraded: "arguments-unhashable"`, keeping every other field; a
+  record that fails its own contract drops exactly the optional fields the contract refused,
+  with `degraded: "record-rejected"`. `durationMs` is floored at zero, so a wall clock stepped
+  back mid-call does not cost the record.
 - **Structured log lines** the service writes all carry `service: "ema-flow-query"`. A refused
   authentication is `severity: WARNING, stage: "query-http", event: "unauthenticated"` with no
   principal and nothing derived from the credential. It carries no reason either, unless
@@ -817,12 +828,27 @@ alpine` with a `RUN --mount ... from=alpine`, and a `FROM node:...@<digest> AS n
     client as `isError` with the closed code as its text, not as the client's own validation
     `McpError`. (`failure-paths.test.ts`, "receives a tool error as a tool error after listTools,
     not as its own validation error")
-35. **No record is lost.** Arguments nested 20,000 deep over a transport that does not bound
-    them are recorded once, hashed; arguments that cannot be hashed, and a record that fails its
-    own contract, are recorded by the fallback with `degraded`; an audit sink that throws does
-    not turn the answer into an internal error or leak the sink's message. (`failure-paths.test.ts`,
-    "an audit record"; `test/hash.test.ts`, "writes a value nested far deeper than the call
-    stack would allow a recursive walk")
+35. **No record is lost, and no content leaves unrecorded.** Arguments nested 20,000 deep over
+    a transport that does not bound them are recorded once, hashed; arguments that cannot be
+    hashed are recorded with 64 zeros and `degraded`, keeping every other field, while
+    arguments of JSON `null` hash as themselves; a record that fails its own contract drops
+    only the fields refused. A sink that fails once on a `get_section` that found its section
+    makes the answer `unavailable`, with the narrative in no byte of the response, and the one
+    record written says `unavailable` with no results; a sink that always fails does the same
+    for every call of a batch, over HTTP and over an in-memory transport, and leaks nothing of
+    its message. A value that contains itself is refused by the hash with a `TypeError`.
+    (`failure-paths.test.ts`, "an audit record", "an answer whose audit record could not be
+    written"; `test/hash.test.ts`, "writes a value nested far deeper than the call stack would
+    allow a recursive walk", "refuses a value that contains itself, and writes one reached
+    twice")
+36. **One failure ends a scan.** When one of `find_product`'s reads fails while the others wait
+    on the network, every read the call started is cancelled rather than waited out, the call
+    answers `unavailable` promptly, and the failure line names the store's refusal
+    (`FhirReadError`, its status), not the cancellations. A read waiting on a credential stops
+    at the request's end and at its own timeout, before any request is sent.
+    (`failure-paths.test.ts`, "find_product's other reads when one fails"; `fhir-reader.test.ts`,
+    "stops waiting for a credential when the request ends", "stops waiting for a credential at
+    the read's own timeout")
 
 ## Security properties stated honestly
 

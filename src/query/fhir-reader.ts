@@ -44,6 +44,30 @@ export class FhirReadError extends Error {
 // request is over.
 export const STORE_READ_TIMEOUT_MS = 10_000;
 
+// Settles with `work`, or rejects with the signal's reason once it is aborted, whichever comes
+// first. For a call that takes no signal of its own (google-auth-library's getAccessToken): the
+// read stops waiting, and the library finishes or abandons its own request, which it caches
+// for the next read either way.
+function untilAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(signal.reason as Error);
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = (): void => {
+      reject(signal.reason as Error);
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    work.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error instanceof Error ? error : new Error("credential lookup failed"));
+      },
+    );
+  });
+}
+
 type ReaderOptions = Pick<
   QueryConfig,
   "GOOGLE_CLOUD_PROJECT" | "GCP_LOCATION" | "HEALTHCARE_DATASET_ID" | "TARGET_FHIR_STORE_ID"
@@ -128,11 +152,15 @@ export class HealthcareFhirReader implements FhirReader {
   // A missing resource is `undefined`, not an error: the tools turn it into the closed
   // `document-not-found` code without learning anything else about the store.
   async #read<T>(url: string, signal?: AbortSignal): Promise<T | undefined> {
-    const token = await this.#auth.getAccessToken();
+    // One bound for the whole read, the credential included: minting a token is a network call
+    // too, and a metadata server that never answers must not hold the read past its timeout or
+    // past the end of the request.
+    const timeout = AbortSignal.timeout(STORE_READ_TIMEOUT_MS);
+    const bound = signal === undefined ? timeout : AbortSignal.any([signal, timeout]);
+    const token = await untilAborted(this.#auth.getAccessToken(), bound);
     if (token === null)
       throw new FhirReadError("Application Default Credentials returned no token");
 
-    const timeout = AbortSignal.timeout(STORE_READ_TIMEOUT_MS);
     const response = await fetch(url, {
       method: "GET",
       headers: {
@@ -142,7 +170,7 @@ export class HealthcareFhirReader implements FhirReader {
         "x-goog-healthcare-audit-appname": "ema-flow-query",
         "x-goog-healthcare-audit-reason": "ePI read-only query service",
       },
-      signal: signal === undefined ? timeout : AbortSignal.any([signal, timeout]),
+      signal: bound,
     });
 
     if (response.status === 404 || response.status === 410) {

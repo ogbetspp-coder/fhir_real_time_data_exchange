@@ -10,6 +10,7 @@ import { sha256, stableUuid } from "../../src/lib/hash.js";
 import { MAX_JSON_DEPTH } from "../../src/lib/json-shape.js";
 import {
   MAX_BODY_BYTES,
+  UNHASHABLE_ARGUMENTS_SHA256,
   buildQueryServer,
   createQueryServer,
   type QueryAppDeps,
@@ -27,6 +28,7 @@ import {
   connectHarness,
   createFakeReader,
   entitlementDirectory,
+  narrativeDivOf,
   testIdentity,
   type QueryStore,
   type SeededDocument,
@@ -244,6 +246,61 @@ describe("find_product when one read fails", () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
       expect(started).toBe(atAnswer);
       expect(harness.audits.map(({ outcome }) => outcome)).toEqual(["unavailable"]);
+    } finally {
+      await harness.close();
+    }
+  });
+});
+
+describe("find_product's other reads when one fails", () => {
+  it("are cancelled, not waited out, and the failure reported is the first one", async () => {
+    // Every read but the third waits until its signal is aborted, as a real store read waits
+    // on the network; the third fails. Without cancellation the call would wait out the reads
+    // in flight (up to the reader's own timeout) before answering.
+    const signals: (AbortSignal | undefined)[] = [];
+    let started = 0;
+    const reader: FhirReader = {
+      readBundle: (_, signal) => {
+        started += 1;
+        signals.push(signal);
+        if (started === 3) return Promise.reject(new FhirReadError(CANARY, 503));
+        return new Promise((_, reject) => {
+          signal?.addEventListener("abort", () => {
+            reject(signal.reason as Error);
+          });
+        });
+      },
+      readBundleVersion: () => Promise.reject(new Error("unused")),
+      findProvenanceForBundle: () => Promise.reject(new Error("unused")),
+    };
+    const ids = Array.from({ length: 50 }, (_, position) =>
+      stableUuid("ema-bundle", `cancel-${String(position)}`),
+    );
+    const harness = await connectHarness({
+      store,
+      principal: PRINCIPAL_A,
+      entitlements: { bundles: ids },
+      documents: new Map<string, SeededDocument>(),
+      wrapReader: () => reader,
+    });
+    try {
+      const startedAt = Date.now();
+      const { value: answer, lines } = await captured(() =>
+        callTool(harness, "find_product", { query: "no-such-product" }),
+      );
+      expect(answer).toMatchObject({ isError: true, text: "unavailable" });
+      expect(Date.now() - startedAt).toBeLessThan(1_000);
+      // Every read the call started was cancelled, and none started after the failure but
+      // those already claimed.
+      expect(started).toBeLessThanOrEqual(FIND_PRODUCT_CONCURRENCY);
+      for (const [position, signal] of signals.entries()) {
+        expect([position, signal?.aborted]).toEqual([position, true]);
+      }
+      // The log names the store's refusal, not the cancellations it caused.
+      const failed = parsedLines(lines).filter((line) => line.message === "Query tool failed");
+      expect(failed.map(({ errorType, httpStatus }) => [errorType, httpStatus])).toEqual([
+        ["FhirReadError", 503],
+      ]);
     } finally {
       await harness.close();
     }
@@ -504,50 +561,125 @@ describe("an audit record", () => {
     }
   });
 
-  it("falls back to its required fields, saying why, rather than being lost", async () => {
-    // A turn id the contract refuses makes the full record invalid: the fallback is written.
+  it("drops only the fields its contract refused, saying why, rather than being lost", async () => {
+    // A turn id the contract refuses makes the full record invalid: the record is written
+    // without it, and keeps every field the contract accepts.
+    const imageDigest = `sha256:${"ab".repeat(32)}`;
     const rejected = await connectHarness({
       store,
       principal: PRINCIPAL_A,
       entitlements: { bundles: [store.bundleIdA] },
-      identity: testIdentity(PRINCIPAL_A, { turnId: "not-a-uuid" }),
+      identity: testIdentity(PRINCIPAL_A, { turnId: "not-a-uuid", imageDigest }),
     });
     try {
-      await callTool(rejected, "get_section", {
+      const answer = await callTool(rejected, "get_section", {
         bundleId: store.bundleIdA,
         sourceKey: SECTION_KEY,
       });
+      expect(answer.isError).toBe(false);
       expect(rejected.audits).toHaveLength(1);
       const record = QueryAuditRecordSchema.parse(rejected.audits[0]);
-      expect(record).toMatchObject({ outcome: "ok", degraded: "record-rejected" });
+      expect(record).toMatchObject({
+        outcome: "ok",
+        resultCount: 1,
+        degraded: "record-rejected",
+        imageDigest,
+        bundleId: store.bundleIdA,
+        versionId: "1",
+      });
       expect(record.turnId).toBeUndefined();
-      expect(record.bundleId).toBeUndefined();
     } finally {
       await rejected.close();
     }
+  });
 
-    // Arguments that cannot be hashed at all (a BigInt has no JSON form) are recorded with the
-    // hash of JSON null, marked as not describing them.
-    const unhashable = await connectHarness({
+  it("says when the arguments could not be hashed, with a digest no arguments have", async () => {
+    // A BigInt has no JSON form. The record keeps every other field it can, and its
+    // argumentsSha256 is 64 zeros — never the hash of some real arguments.
+    const turnId = "0f6d1a2e-3b4c-4d5e-8f60-718293a4b5c6";
+    const imageDigest = `sha256:${"ab".repeat(32)}`;
+    const harness = await connectHarness({
       store,
       principal: PRINCIPAL_A,
       entitlements: { bundles: [store.bundleIdA] },
+      identity: testIdentity(PRINCIPAL_A, { turnId, imageDigest }),
     });
     try {
-      const answer = await callTool(unhashable, "find_product", { query: 10n });
-      expect(answer).toMatchObject({ isError: true, text: "invalid-request" });
-      expect(unhashable.audits).toHaveLength(1);
-      expect(QueryAuditRecordSchema.parse(unhashable.audits[0])).toMatchObject({
-        outcome: "invalid-request",
-        argumentsSha256: sha256(null),
-        degraded: "arguments-unhashable",
+      const answer = await callTool(harness, "verify_quote", {
+        bundleId: store.bundleIdA,
+        quote: "tablets",
+        extra: 10n,
       });
+      expect(answer).toMatchObject({ isError: true, text: "invalid-request" });
+      // Arguments of JSON null hash as themselves, and never as the marker.
+      await harness.client.callTool({ name: "find_product", arguments: undefined });
+      expect(harness.audits).toHaveLength(2);
+      const [unhashable, absent] = harness.audits.map((record) =>
+        QueryAuditRecordSchema.parse(record),
+      );
+      expect(unhashable).toMatchObject({
+        outcome: "invalid-request",
+        argumentsSha256: UNHASHABLE_ARGUMENTS_SHA256,
+        degraded: "arguments-unhashable",
+        turnId,
+        imageDigest,
+      });
+      expect(UNHASHABLE_ARGUMENTS_SHA256).toBe("0".repeat(64));
+      expect(absent?.argumentsSha256).not.toBe(UNHASHABLE_ARGUMENTS_SHA256);
+      expect(absent?.degraded).toBeUndefined();
+      expect(sha256(null)).not.toBe(UNHASHABLE_ARGUMENTS_SHA256);
     } finally {
-      await unhashable.close();
+      await harness.close();
     }
   });
+});
 
-  it("that cannot be written does not turn the answer into an internal error", async () => {
+// No answer leaves without a record that says what it was. When a call's own record cannot be
+// written, the caller is told `unavailable` rather than given the content, and the HTTP layer
+// writes the `unavailable` record for it.
+describe("an answer whose audit record could not be written", () => {
+  const narrative = (): string => narrativeDivOf(store, store.bundleIdA, SECTION_KEY);
+
+  it("is unavailable, and the record the HTTP layer writes says so", async () => {
+    const audits: QueryAuditRecord[] = [];
+    let failures = 1;
+    const origin = await serve({
+      audit: (record) => {
+        if (failures > 0) {
+          failures -= 1;
+          throw new Error(CANARY);
+        }
+        audits.push(record);
+      },
+    });
+    const { value: text, lines } = await captured(async () => {
+      const response = await post(
+        origin,
+        JSON.stringify(
+          callBody("get_section", { bundleId: store.bundleIdA, sourceKey: SECTION_KEY }),
+        ),
+      );
+      expect(response.status).toBe(200);
+      return response.text();
+    });
+
+    // The narrative was ready and was not released.
+    expect(text).not.toContain(narrative());
+    expect((JSON.parse(text) as RpcAnswer).result).toEqual({
+      isError: true,
+      content: [{ type: "text", text: "unavailable" }],
+    });
+    // One record, and it says what the caller got: nothing.
+    expect(audits.map(({ outcome, resultCount }) => ({ outcome, resultCount }))).toEqual([
+      { outcome: "unavailable", resultCount: 0 },
+    ]);
+    expect(lines.join("\n")).not.toContain("CANARY");
+    expect(
+      parsedLines(lines).some((line) => line.message === "Query audit record could not be written"),
+    ).toBe(true);
+  });
+
+  it("is unavailable when no record can be written at all, and nothing is released", async () => {
     const origin = await serve({
       audit: () => {
         throw new Error(CANARY);
@@ -556,20 +688,57 @@ describe("an audit record", () => {
     const { value: text, lines } = await captured(async () => {
       const response = await post(
         origin,
-        JSON.stringify(callBody("get_section", { bundleId: 7, sourceKey: SECTION_KEY })),
+        JSON.stringify([
+          callBody("get_section", { bundleId: store.bundleIdA, sourceKey: SECTION_KEY }, 1),
+          callBody("get_section", { bundleId: 7, sourceKey: SECTION_KEY }, 2),
+        ]),
       );
       expect(response.status).toBe(200);
       return response.text();
     });
+
     expect(text).not.toContain("CANARY");
-    expect((JSON.parse(text) as RpcAnswer).result).toEqual({
-      isError: true,
-      content: [{ type: "text", text: "invalid-request" }],
-    });
+    expect(text).not.toContain(narrative());
+    const answers = JSON.parse(text) as RpcAnswer[];
+    expect(answers.map(({ result }) => result)).toEqual([
+      { isError: true, content: [{ type: "text", text: "unavailable" }] },
+      { isError: true, content: [{ type: "text", text: "unavailable" }] },
+    ]);
     expect(lines.join("\n")).not.toContain("CANARY");
-    expect(
-      parsedLines(lines).some((line) => line.message === "Query audit record could not be written"),
-    ).toBe(true);
+  });
+
+  it("is unavailable over a transport with no HTTP layer to write the record", async () => {
+    let failures = 1;
+    const audits: QueryAuditRecord[] = [];
+    // A sink that fails once, then records.
+    const failing = await connectHarness({
+      store,
+      principal: PRINCIPAL_A,
+      entitlements: { bundles: [store.bundleIdA] },
+      audit: (record) => {
+        if (failures > 0) {
+          failures -= 1;
+          throw new Error(CANARY);
+        }
+        audits.push(record);
+      },
+    });
+    try {
+      const { value: answer } = await captured(() =>
+        callTool(failing, "get_section", { bundleId: store.bundleIdA, sourceKey: SECTION_KEY }),
+      );
+      expect(answer).toMatchObject({ isError: true, text: "unavailable" });
+      // Nothing was released, so the record that was lost described nothing the caller has.
+      expect(audits).toEqual([]);
+      const again = await callTool(failing, "get_section", {
+        bundleId: store.bundleIdA,
+        sourceKey: SECTION_KEY,
+      });
+      expect(again.isError).toBe(false);
+      expect(audits.map(({ outcome, resultCount }) => [outcome, resultCount])).toEqual([["ok", 1]]);
+    } finally {
+      await failing.close();
+    }
   });
 });
 

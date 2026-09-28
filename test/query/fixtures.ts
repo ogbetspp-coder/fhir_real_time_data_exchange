@@ -14,7 +14,12 @@ import {
 } from "../../src/fhir/types.js";
 import { APPROVER_ROLE_SYSTEM } from "../../src/fhir/provenance.js";
 import { createSyntheticSubmission } from "../../src/fixtures/synthetic-submission.js";
-import { createMcpServer, logAuditRecord, type RequestIdentity } from "../../src/query/app.js";
+import {
+  createMcpServer,
+  logAuditRecord,
+  type AuditSink,
+  type RequestIdentity,
+} from "../../src/query/app.js";
 import {
   parseEntitlements,
   type EntitlementDirectory,
@@ -360,6 +365,9 @@ export async function connectHarness(options: {
   // Lets a test change what one kind of read answers — a store whose plain read of a document
   // disagrees with its history, say — while the read log still records every read.
   wrapReader?: (reader: FhirReader) => FhirReader;
+  // Replaces the harness's own sink, so a test can make writing a record fail; `audits` then
+  // stays empty.
+  audit?: AuditSink;
 }): Promise<Harness> {
   const audits: QueryAuditRecord[] = [];
   const { reader, log } = createFakeReader(options.documents ?? options.store.documents);
@@ -370,10 +378,12 @@ export async function connectHarness(options: {
     identity: options.identity ?? testIdentity(options.principal),
     entitlements: options.entitlements,
     readBudget: createReadBudget(options.readBudget ?? 10_000),
-    audit: (record) => {
-      audits.push(record);
-      if (options.logAudit === true) logAuditRecord(record);
-    },
+    audit:
+      options.audit ??
+      ((record) => {
+        audits.push(record);
+        if (options.logAudit === true) logAuditRecord(record);
+      }),
   });
 
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();

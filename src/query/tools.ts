@@ -1285,12 +1285,21 @@ export async function findProduct(
   // the contract. A document the store does not hold is not one of them: there is nothing in
   // it to find.
   let unsearched = 0;
-  // Set when any worker's read fails, so the others launch no further reads for a call whose
-  // answer is already `unavailable`.
-  let stopped = false;
+  // Aborted when any worker's read fails: the others launch no further read, a read still
+  // waiting for a place in the request's pool is never made, and one in flight is cancelled —
+  // for a call whose answer is already `unavailable`. Its signal joins the request's own.
+  const stop = new AbortController();
+  const scan: ToolContext = {
+    ...context,
+    signal:
+      context.signal === undefined ? stop.signal : AbortSignal.any([context.signal, stop.signal]),
+  };
+  // The first read failure, which is what the call reports: the cancellations it causes in the
+  // other workers are not.
+  let failure: unknown;
   const worker = async (): Promise<void> => {
     try {
-      while (!stopped && next < scanned.length && matched < limit) {
+      while (!stop.signal.aborted && next < scanned.length && matched < limit) {
         // Checked before the position is claimed, so a document the budget will not pay for is
         // left unattempted and counts as unsearched rather than as a read that failed.
         if (context.readBudget.remaining() === 0) return;
@@ -1299,7 +1308,7 @@ export async function findProduct(
         const bundleId = scanned[position];
         if (bundleId === undefined) return;
         attempted += 1;
-        const loaded = await loadDocument<FindProductOutput>(context, "find_product", {
+        const loaded = await loadDocument<FindProductOutput>(scan, "find_product", {
           bundleId,
         });
         if (isOutcome(loaded)) {
@@ -1319,18 +1328,19 @@ export async function findProduct(
         }
       }
     } catch (error) {
-      stopped = true;
-      throw error;
+      if (!stop.signal.aborted) {
+        failure = error;
+        stop.abort();
+      }
     }
   };
   // Every worker is waited for, not only the first to fail: the call answers once no read of
   // its own is still in flight, so none outlives the answer and drains the request's budget.
-  const settled = await Promise.allSettled(
+  await Promise.all(
     Array.from({ length: Math.min(FIND_PRODUCT_CONCURRENCY, scanned.length) }, () => worker()),
   );
-  const failure = settled.find((result) => result.status === "rejected");
   if (failure !== undefined) {
-    throw failure.reason instanceof Error ? failure.reason : new Error("find_product read failed");
+    throw failure instanceof Error ? failure : new Error("find_product read failed");
   }
 
   // Matches are reported in entitlement order regardless of the order the reads completed in.

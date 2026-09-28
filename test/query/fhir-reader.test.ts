@@ -6,6 +6,7 @@ import {
   FhirReadError,
   HealthcareFhirReader,
   PROVENANCE_PAGE_SIZE,
+  STORE_READ_TIMEOUT_MS,
   latestProvenance,
 } from "../../src/query/fhir-reader.js";
 
@@ -13,13 +14,15 @@ import {
 // it is replaced here at that boundary, and `fetch` is stubbed, so nothing below touches a
 // credential or the network.
 const auth = vi.hoisted(() => {
-  const state: { token: string | null } = { token: "test-token" };
+  // `hang`: the credential lookup never answers, as a metadata server that has stopped would.
+  const state: { token: string | null; hang: boolean } = { token: "test-token", hang: false };
   return state;
 });
 
 vi.mock("google-auth-library", () => ({
   GoogleAuth: class {
     getAccessToken(): Promise<string | null> {
+      if (auth.hang) return new Promise<never>(() => undefined);
       return Promise.resolve(auth.token);
     }
   },
@@ -145,6 +148,7 @@ function respond(status: number, body: unknown, statusText = ""): () => Response
 
 beforeEach(() => {
   auth.token = "test-token";
+  auth.hang = false;
   sent = [];
   answer = respond(200, {});
   vi.stubGlobal(
@@ -292,6 +296,39 @@ describe("reading a document Bundle", () => {
     expect(joined?.aborted).toBe(false);
     request.abort();
     expect(joined?.aborted).toBe(true);
+  });
+
+  it("stops waiting for a credential when the request ends", async () => {
+    auth.hang = true;
+    const reader = new HealthcareFhirReader(OPTIONS);
+    const request = new AbortController();
+
+    const pending = reader.readBundle("bundle-1", request.signal).catch((e: unknown) => e);
+    request.abort();
+    const error = await pending;
+
+    expect((error as Error).name).toBe("AbortError");
+    expect(sent).toEqual([]);
+  });
+
+  it("stops waiting for a credential at the read's own timeout", async () => {
+    auth.hang = true;
+    // AbortSignal.timeout runs on the runtime's own timer, which fake timers do not drive; the
+    // read's timeout is replaced by one that has already fired, and the read is asked for it.
+    const timeout = vi
+      .spyOn(AbortSignal, "timeout")
+      .mockImplementation(() =>
+        AbortSignal.abort(new DOMException("The operation timed out.", "TimeoutError")),
+      );
+    try {
+      const reader = new HealthcareFhirReader(OPTIONS);
+      const error = await reader.readBundle("bundle-1").catch((e: unknown) => e);
+      expect(timeout).toHaveBeenCalledWith(STORE_READ_TIMEOUT_MS);
+      expect((error as Error).name).toBe("TimeoutError");
+      expect(sent).toEqual([]);
+    } finally {
+      timeout.mockRestore();
+    }
   });
 
   it("refuses when Application Default Credentials yield no token, before any request", async () => {
