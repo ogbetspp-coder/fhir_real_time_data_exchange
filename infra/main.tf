@@ -246,6 +246,14 @@ resource "google_healthcare_dataset" "record" {
   }
 }
 
+# The two stores in the form a store-level IAM grant names them. The stores themselves are created
+# by scripts/gcp/reconcile-fhir-stores.sh, which scripts/gcp/deploy.sh runs before an apply when
+# either is missing, so a grant on a store never precedes the store.
+locals {
+  source_fhir_store_path = "${var.project_id}/${var.region}/${google_healthcare_dataset.record.name}/${local.source_fhir_store_id}"
+  target_fhir_store_path = "${var.project_id}/${var.region}/${google_healthcare_dataset.record.name}/${local.target_fhir_store_id}"
+}
+
 resource "google_bigquery_dataset_iam_member" "healthcare_stream_writer" {
   dataset_id = google_bigquery_dataset.fhir_analytics.dataset_id
   role       = "roles/bigquery.dataEditor"

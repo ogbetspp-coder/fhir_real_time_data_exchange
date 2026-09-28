@@ -1,7 +1,8 @@
 # The read-only ePI query service (docs/design/epi-mcp-query-service.md). ADR 0004: a
 # component with a different trust level than the worker is its own deployable, with its own
 # service account holding least-privilege IAM, its own configuration, and its own image. This
-# service never writes: it holds a dataset-scoped reader role and nothing else.
+# service never writes: it holds a reader role on the validated FHIR store, a log writer role,
+# and nothing else.
 
 locals {
   query_service_name = "${local.name_prefix}-query"
@@ -27,12 +28,13 @@ resource "google_service_account" "query" {
   display_name = "EMA Flow query service (${var.environment})"
 }
 
-# Dataset-level, not project-level: the query service can read FHIR resources in this dataset
-# and nothing outside it, unlike the worker's project-level editor role.
-resource "google_healthcare_dataset_iam_member" "query_fhir_reader" {
-  dataset_id = google_healthcare_dataset.record.id
-  role       = "roles/healthcare.fhirResourceReader"
-  member     = "serviceAccount:${google_service_account.query.email}"
+# The validated store only: the query service reads what passed validation and nothing else. Until
+# 2026-09-27 this was bound on the dataset, which also holds the source store, so the one
+# internet-facing identity could read unvalidated source bundles.
+resource "google_healthcare_fhir_store_iam_member" "query_fhir_reader" {
+  fhir_store_id = local.target_fhir_store_path
+  role          = "roles/healthcare.fhirResourceReader"
+  member        = "serviceAccount:${google_service_account.query.email}"
 }
 
 resource "google_project_iam_member" "query_log_writer" {
@@ -159,7 +161,7 @@ resource "google_cloud_run_v2_service" "query" {
   }
 
   depends_on = [
-    google_healthcare_dataset_iam_member.query_fhir_reader,
+    google_healthcare_fhir_store_iam_member.query_fhir_reader,
     google_project_iam_member.query_log_writer,
   ]
 }

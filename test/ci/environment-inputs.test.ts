@@ -1,0 +1,110 @@
+import { spawnSync } from "node:child_process";
+import { readFileSync, readdirSync } from "node:fs";
+
+import { describe, expect, it } from "vitest";
+
+// The plan is what applies (audit I-6). A pull request's plan (.github/workflows/plan.yml) is the
+// last point a person sees an infrastructure change before the deploy applies it unattended. Until
+// 2026-09-27 the deploy set QUERY_LOG_REJECTION_REASON and the plan did not, so every plan showed
+// an update to the query service that no pull request had made, and reviewers learned to skip a
+// "1 to change" line. These pin: the environment's own inputs live in one file deploy.sh reads for
+// both, and every other input the deploy hands deploy.sh, the plan hands it too.
+
+const deployWorkflow = readFileSync(".github/workflows/deploy.yml", "utf8");
+const planWorkflow = readFileSync(".github/workflows/plan.yml", "utf8");
+const deployScript = readFileSync("scripts/gcp/deploy.sh", "utf8");
+const environments = readdirSync("scripts/gcp/environments").filter((name) =>
+  name.endsWith(".env"),
+);
+
+// The keys of the `env:` mapping that starts right after `anchor`, at `indent` spaces.
+function envKeys(text: string, anchor: string, indent: number): string[] {
+  const from = text.indexOf(anchor);
+  if (from === -1) throw new Error(`${anchor} not found`);
+  const pad = " ".repeat(indent);
+  const header = text.indexOf(`\n${pad}env:\n`, from);
+  if (header === -1) throw new Error(`no env: after ${anchor}`);
+  const keys: string[] = [];
+  const pattern = new RegExp(`^${pad}  ([A-Za-z_][A-Za-z0-9_]*):`);
+  for (const line of text.slice(header + indent + 6).split("\n")) {
+    if (line.trim() === "" || line.trimStart().startsWith("#")) continue;
+    const key = pattern.exec(line)?.[1];
+    if (key === undefined) break;
+    keys.push(key);
+  }
+  return keys;
+}
+
+const deployInputs = [
+  ...envKeys(deployWorkflow, "\n  deploy:\n", 4),
+  ...envKeys(deployWorkflow, "- name: Apply infrastructure", 8),
+];
+const planInputs = [
+  ...envKeys(planWorkflow, "\n  plan:\n", 4),
+  ...envKeys(planWorkflow, "- name: Plan against live state", 8),
+];
+
+function inputsIn(file: string): string[] {
+  return readFileSync(`scripts/gcp/environments/${file}`, "utf8")
+    .split("\n")
+    .filter((line) => line.trim() !== "" && !line.startsWith("#"))
+    .map((line) => /^([A-Z][A-Z0-9_]*)=/.exec(line)?.[1] ?? `unreadable line: ${line}`);
+}
+
+describe("the plan's inputs", () => {
+  it("include every input the deploy passes to deploy.sh", () => {
+    expect(deployInputs).toContain("EMA_FLOW_ENVIRONMENT");
+    expect(deployInputs).toContain("ALERT_NOTIFICATION_EMAIL");
+    const missing = deployInputs.filter((name) => !planInputs.includes(name));
+    expect(missing).toEqual([]);
+  });
+
+  it("name the same environment", () => {
+    const environment = (text: string) => /^ {6}EMA_FLOW_ENVIRONMENT: (\S+)$/m.exec(text)?.[1];
+    expect(environment(planWorkflow)).toBe(environment(deployWorkflow));
+  });
+});
+
+describe("each environment's own inputs", () => {
+  it("exist for every environment Terraform accepts", () => {
+    expect(environments.sort()).toEqual(["dev.env", "prod.env", "validation.env"]);
+  });
+
+  it.each(environments)("%s holds NAME=value lines that deploy.sh reads", (file) => {
+    for (const name of inputsIn(file)) {
+      expect([name, deployScript.includes(`\${${name}:-`)]).toEqual([name, true]);
+    }
+  });
+
+  it("are set nowhere else", () => {
+    const names = environments.flatMap(inputsIn);
+    expect(names).toEqual(
+      expect.arrayContaining(["QUERY_LOG_REJECTION_REASON", "ALLOW_SYNTHETIC_SOURCES"]),
+    );
+    for (const name of names) {
+      expect([
+        name,
+        deployWorkflow.includes(`${name}:`),
+        planWorkflow.includes(`${name}:`),
+      ]).toEqual([name, false, false]);
+    }
+  });
+
+  it("are read by deploy.sh for the environment it runs, and a missing file is refused", () => {
+    const run = (environment: string) =>
+      spawnSync("bash", ["scripts/gcp/deploy.sh", "no-such-phase"], {
+        encoding: "utf8",
+        env: {
+          PATH: process.env.PATH ?? "",
+          GOOGLE_CLOUD_PROJECT: "test-project",
+          EMA_FLOW_ENVIRONMENT: environment,
+        },
+      });
+    const dev = run("dev");
+    expect(dev.stderr).toContain("Unknown deploy phase: no-such-phase");
+    const unknown = run("staging");
+    expect(unknown.status).toBe(1);
+    expect(unknown.stderr).toContain("No inputs file for environment staging");
+    expect(unknown.stderr).not.toContain("Unknown deploy phase");
+  });
+});

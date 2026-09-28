@@ -1143,8 +1143,12 @@ describe("ePI query service, phase 1", () => {
 
     const reader = roles.find(({ role }) => role === "roles/healthcare.fhirResourceReader");
     const writer = roles.find(({ role }) => role === "roles/logging.logWriter");
-    // The FHIR reader role is bound on the dataset, never on the project.
-    expect(reader?.type).toBe("google_healthcare_dataset_iam_member");
+    // The FHIR reader role is bound on the validated store, never on the dataset (which also
+    // holds the unvalidated source store) or the project.
+    expect(reader?.type).toBe("google_healthcare_fhir_store_iam_member");
+    expect(
+      blocks.find(({ type, name }) => type === reader?.type && name === "query_fhir_reader")?.body,
+    ).toMatch(/fhir_store_id\s*=\s*local\.target_fhir_store_path\n/);
     expect(writer?.type).toBe("google_project_iam_member");
 
     // The impersonation-only caller identity may invoke the query service and do nothing else.

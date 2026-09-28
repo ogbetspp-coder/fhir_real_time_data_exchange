@@ -42,3 +42,51 @@ describe("resources that hold a record", () => {
     expect(ledger?.body).toMatch(/deletion_protection\s*=\s*var\.deletion_protection/);
   });
 });
+
+// No bucket can be made public (audit I-8). Until 2026-09-27 only the build staging bucket
+// enforced it; a single allUsers grant on the evidence or submission bucket would have published
+// it.
+describe("every bucket", () => {
+  const buckets = blocks.filter(({ type }) => type === "google_storage_bucket");
+
+  it.each(buckets.map(({ name, body }) => [name, body]))(
+    "%s enforces public access prevention",
+    (_name, body) => {
+      expect(body).toMatch(/^\s*public_access_prevention\s*=\s*"enforced"\s*$/m);
+    },
+  );
+
+  it("includes the four Terraform creates, and the ones it does not are enforced by script", () => {
+    expect(buckets.map(({ name }) => name).sort()).toEqual([
+      "build_staging",
+      "evidence",
+      "profiles",
+      "submissions",
+    ]);
+    // The state bucket, created by deploy.sh before Terraform exists, and the agent staging
+    // bucket, created by hand.
+    const deploy = readFileSync("scripts/gcp/deploy.sh", "utf8");
+    expect(deploy).toMatch(
+      /gcloud --quiet storage buckets create "gs:\/\/\$\{state_bucket\}"[^;]*--public-access-prevention/,
+    );
+    const keys = readFileSync("scripts/gcp/storage-keys.sh", "utf8");
+    expect(keys).toContain("--public-access-prevention >/dev/null");
+    expect(keys).toMatch(/BUCKETS=\("\$STATE_BUCKET" "\$\{PROJECT_ID\}-ema-flow-agent-staging"\)/);
+  });
+});
+
+describe("the profiles bucket", () => {
+  it("expires old generations only, never the live profile set or the import marker", () => {
+    // An unscoped `age = 30` rule deleted the import-fingerprint marker every month, and the next
+    // deploy re-staged and re-imported every profile for nothing (audit I-9).
+    const profiles = blocks.find(
+      ({ type, name }) => type === "google_storage_bucket" && name === "profiles",
+    );
+    const rules = [...(profiles?.body ?? "").matchAll(/lifecycle_rule \{([\s\S]*?)\n {2}\}/g)].map(
+      (match) => match[1] ?? "",
+    );
+    expect(rules).toHaveLength(1);
+    expect(rules[0]).toMatch(/condition \{\s*days_since_noncurrent_time = 30\s*\}/);
+    expect(rules[0]).not.toMatch(/\bage\s*=/);
+  });
+});

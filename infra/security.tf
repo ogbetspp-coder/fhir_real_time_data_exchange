@@ -18,6 +18,12 @@ resource "google_project_iam_audit_config" "regulated_data_access" {
     # service's own audit record captures the call; this captures who asked Gemini, and what
     # Gemini sent to the connector.
     "discoveryengine.googleapis.com",
+    # Who minted a token as whom. The IAM Service Account Credentials API (generateIdToken,
+    # generateAccessToken, signJwt) writes Data Access logs under iamcredentials.googleapis.com
+    # only when they are enabled here, for iam.googleapis.com. A query audit record names the
+    # shared caller service account; without these entries nothing names the person who
+    # impersonated it.
+    "iam.googleapis.com",
   ])
 
   project = var.project_id
@@ -81,6 +87,7 @@ resource "google_storage_bucket" "evidence" {
   name                        = "${var.project_id}-${local.name_prefix}-evidence"
   location                    = var.region
   uniform_bucket_level_access = true
+  public_access_prevention    = "enforced"
   force_destroy               = false
   labels                      = local.labels
 
@@ -114,6 +121,7 @@ resource "google_storage_bucket" "submissions" {
   name                        = "${var.project_id}-${local.name_prefix}-submissions"
   location                    = var.region
   uniform_bucket_level_access = true
+  public_access_prevention    = "enforced"
   force_destroy               = false
   labels                      = local.labels
 
@@ -152,6 +160,7 @@ resource "google_storage_bucket" "profiles" {
   name                        = "${var.project_id}-${local.name_prefix}-profiles"
   location                    = var.region
   uniform_bucket_level_access = true
+  public_access_prevention    = "enforced"
   force_destroy               = var.environment != "prod"
   labels                      = local.labels
 
@@ -159,9 +168,14 @@ resource "google_storage_bucket" "profiles" {
     enabled = true
   }
 
+  # Old generations only. The live objects are the staged profile set and the import-fingerprint
+  # marker (scripts/gcp/bootstrap.sh), which the deploy keeps current itself: rsync removes what is
+  # no longer in the set. Until 2026-09-27 this rule deleted every object 30 days after upload, live
+  # ones included, so about once a month the marker vanished and the next deploy re-staged and
+  # re-imported every profile (some twenty minutes) for nothing.
   lifecycle_rule {
     condition {
-      age = 30
+      days_since_noncurrent_time = 30
     }
     action {
       type = "Delete"
@@ -232,13 +246,18 @@ resource "google_logging_project_bucket_config" "regulated_audit_cmek" {
   }
 }
 
+# What is retained for as long as the evidence. Beside the services that touch the record: IAM
+# (grants, deny policies, service accounts), IAM credentials (every token minted as a service
+# account), Resource Manager (project policy changes) and Logging (a sink, bucket or exclusion
+# changed — tampering with this trail). _Required keeps some of these for 400 days only; the
+# evidence they explain is kept for evidence_retention_days.
 resource "google_logging_project_sink" "regulated_audit" {
   name                   = "${local.name_prefix}-regulated-audit"
   destination            = "logging.googleapis.com/${google_logging_project_bucket_config.regulated_audit_cmek.id}"
   unique_writer_identity = true
   filter                 = <<-EOT
     resource.type=("cloud_run_revision" OR "workflows.googleapis.com/Workflow" OR "healthcare_fhir_store")
-    OR protoPayload.serviceName=("healthcare.googleapis.com" OR "run.googleapis.com" OR "workflows.googleapis.com" OR "storage.googleapis.com" OR "bigquery.googleapis.com" OR "cloudkms.googleapis.com" OR "discoveryengine.googleapis.com")
+    OR protoPayload.serviceName=("healthcare.googleapis.com" OR "run.googleapis.com" OR "workflows.googleapis.com" OR "storage.googleapis.com" OR "bigquery.googleapis.com" OR "cloudkms.googleapis.com" OR "discoveryengine.googleapis.com" OR "iam.googleapis.com" OR "iamcredentials.googleapis.com" OR "cloudresourcemanager.googleapis.com" OR "logging.googleapis.com")
   EOT
 }
 
@@ -276,18 +295,38 @@ resource "google_storage_bucket_iam_member" "worker_submission_reader" {
 # software key stays enabled, and protected, so that every manifest it signed stays verifiable
 # against its public key; nothing may sign with it any more, so the worker holds no grant on it.
 
-# Bound on the one dataset the worker works in, never on the project (foundations C4). Until CMEK
-# step 5c this was a project-level grant, so the worker could edit FHIR resources in any dataset in
-# the project; the query service's reader was always dataset-scoped.
-resource "google_healthcare_dataset_iam_member" "worker_fhir_editor" {
-  dataset_id = google_healthcare_dataset.record.id
-  role       = "roles/healthcare.fhirResourceEditor"
-  member     = "serviceAccount:${google_service_account.worker.email}"
+# Bound on each store, for what the worker does there (foundations C4): it reads a source bundle
+# from the source store, and validates and writes the EMA package in the validated store. Until
+# CMEK step 5c the editor role was project-level; until 2026-09-27 it was bound on the dataset,
+# which let the worker, a service that parses untrusted XHTML, rewrite the source store too.
+resource "google_healthcare_fhir_store_iam_member" "worker_source_reader" {
+  fhir_store_id = local.source_fhir_store_path
+  role          = "roles/healthcare.fhirResourceReader"
+  member        = "serviceAccount:${google_service_account.worker.email}"
 }
 
-resource "google_bigquery_dataset_iam_member" "worker_ledger_writer" {
-  dataset_id = google_bigquery_dataset.ledger.dataset_id
-  role       = "roles/bigquery.dataEditor"
+resource "google_healthcare_fhir_store_iam_member" "worker_validated_editor" {
+  fhir_store_id = local.target_fhir_store_path
+  role          = "roles/healthcare.fhirResourceEditor"
+  member        = "serviceAccount:${google_service_account.worker.email}"
+}
+
+# Append rows to the ledger table, and nothing else. The worker streams one row per run
+# (src/gcp/evidence.ts, tabledata.insertAll: bigquery.tables.updateData, with tables.get to find
+# the table). Until 2026-09-27 it held bigquery.dataEditor on the ledger dataset, which also
+# deletes a table or sets its expiration — the ledger's, from a service that parses untrusted
+# XHTML. The evidence bucket had already been cut down to create-only for the same reason.
+resource "google_project_iam_custom_role" "ledger_appender" {
+  role_id     = "emaFlowLedgerAppender_${var.environment}"
+  title       = "EMA Flow ledger appender (${var.environment})"
+  description = "Stream rows into one BigQuery table; no read, update or delete of the table itself."
+  permissions = ["bigquery.tables.get", "bigquery.tables.updateData"]
+}
+
+resource "google_bigquery_table_iam_member" "worker_ledger_appender" {
+  dataset_id = google_bigquery_table.transformation_runs.dataset_id
+  table_id   = google_bigquery_table.transformation_runs.table_id
+  role       = google_project_iam_custom_role.ledger_appender.name
   member     = "serviceAccount:${google_service_account.worker.email}"
 }
 
@@ -301,7 +340,9 @@ resource "google_project_iam_member" "worker_lineage_editor" {
 # bundle into the source store. Until CMEK step 5c that permission was a grant made by hand on the
 # old dataset, outside Terraform, and nothing recorded it but a note; the switch to the new
 # dataset left the deployer without it and the first deploy's seeding step was refused (403).
-# Declared here so it follows the dataset. Scoped to the one dataset, like the worker's.
+# Declared here so it follows the dataset. Scoped to the one dataset, never the project; it is
+# dataset-wide, unlike the services' store-level grants, because the deploy seeds the source store
+# and is the identity that creates both.
 resource "google_healthcare_dataset_iam_member" "deployer_fhir_editor" {
   count      = var.deployer_account == "" ? 0 : 1
   dataset_id = google_healthcare_dataset.record.id

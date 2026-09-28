@@ -16,7 +16,8 @@ export type TerraformBinding = { type: string; role: string };
 // throws and the test fails:
 //
 //   1. a `member`/`members` line of an `*_iam_member|binding|policy` resource — a role the
-//      account holds, whose `role` must be a quoted literal;
+//      account holds, whose `role` must be a quoted literal or a custom role declared here with a
+//      literal permission list;
 //   2. a `service_account_id` line of such a resource — someone else holding a role over the
 //      account (the token-creator grant), which is not a permission of the account;
 //   3. a line of a non-IAM resource, such as a Cloud Run service's runtime `service_account`;
@@ -52,7 +53,7 @@ export function serviceAccountRoles(terraform: string, account: string): Terrafo
     if (!/^\s*members?\s*=/.test(line)) {
       throw new Error(`${where}: ${block.type}.${block.name} uses it on an unrecognised line`);
     }
-    bindings.push({ type: block.type, role: literalRole(block, account) });
+    bindings.push({ type: block.type, role: literalRole(block, account, blocks) });
   }
 
   // A literal e-mail for the account in any IAM member line bypasses the reference scan above.
@@ -79,10 +80,13 @@ export function serviceAccountRoles(terraform: string, account: string): Terrafo
   return bindings;
 }
 
-// The one `role` a grant assigns, as a quoted literal. The assignment is found in the lexed body,
-// so a `role =` line in a comment or a heredoc is not mistaken for it, and two assignments (one
-// in a nested block) are refused rather than guessed between.
-function literalRole(block: TopLevelBlock, account: string): string {
+// The one `role` a grant assigns: a quoted literal, or a reference to a custom role declared in
+// the same configuration, reported as `custom:` and its permissions, sorted — so a least-privilege
+// test sees what the role allows, and a permission added to it changes what the test reads. The
+// assignment is found in the lexed body, so a `role =` line in a comment or a heredoc is not
+// mistaken for it, and two assignments (one in a nested block) are refused rather than guessed
+// between.
+function literalRole(block: TopLevelBlock, account: string, blocks: TopLevelBlock[]): string {
   const assignments = [...block.code.matchAll(/^[ \t]*role\s*=/gm)];
   if (assignments.length !== 1) {
     throw new Error(
@@ -91,10 +95,39 @@ function literalRole(block: TopLevelBlock, account: string): string {
   }
   const line = lineAt(block.body, assignments[0]?.index ?? 0);
   const role = /^\s*role\s*=\s*"([^"$%\\]+)"\s*$/.exec(line)?.[1];
-  if (role === undefined) {
-    throw new Error(`${block.type}.${block.name} grants to ${account} with a non-literal role`);
+  if (role !== undefined) return role;
+  const custom = /^\s*role\s*=\s*google_project_iam_custom_role\.(\w+)\.(?:name|id)\s*$/.exec(
+    line,
+  )?.[1];
+  if (custom !== undefined) return `custom:${customRolePermissions(blocks, custom).join(",")}`;
+  throw new Error(`${block.type}.${block.name} grants to ${account} with a non-literal role`);
+}
+
+// A custom role's permissions, when they are one literal list of quoted strings on a role that is
+// declared once (no count or for_each); anything else is refused.
+function customRolePermissions(blocks: TopLevelBlock[], name: string): string[] {
+  const role = blocks.find(
+    ({ kind, type, name: candidate }) =>
+      kind === "resource" && type === "google_project_iam_custom_role" && candidate === name,
+  );
+  const where = `google_project_iam_custom_role.${name}`;
+  if (role === undefined) throw new Error(`${where} is referenced but not declared`);
+  if (/^[ \t]*(count|for_each)\s*=/m.test(role.code)) {
+    throw new Error(`${where} uses count or for_each, which this reader cannot follow`);
   }
-  return role;
+  const assignments = [...role.code.matchAll(/^[ \t]*permissions\s*=/gm)];
+  const list =
+    assignments.length === 1
+      ? /^\s*permissions\s*=\s*\[([^\]]*)\]/m.exec(role.body.slice(assignments[0]?.index ?? 0))?.[1]
+      : undefined;
+  const items = list
+    ?.split(",")
+    .map((item) => item.trim())
+    .filter((item) => item !== "");
+  if (items === undefined || items.length === 0 || items.some((item) => !/^"[\w.]+"$/.test(item))) {
+    throw new Error(`${where} does not list its permissions as quoted literals`);
+  }
+  return items.map((item) => item.slice(1, -1)).sort();
 }
 
 type TopLevelBlock = {

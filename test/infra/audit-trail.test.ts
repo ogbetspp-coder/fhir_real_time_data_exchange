@@ -12,6 +12,19 @@ const services = [
   "bigquery.googleapis.com",
   "cloudkms.googleapis.com",
   "discoveryengine.googleapis.com",
+  // Enables the Data Access logs of the IAM Service Account Credentials API too: which person
+  // minted a token as the shared caller account that query audit records name (audit I-5).
+  "iam.googleapis.com",
+];
+
+// Retained beside the services above, though they hold no record: who was granted what, who
+// minted a token as whom, what changed on the project, and any change to this trail itself. Their
+// Admin Activity logs otherwise live 400 days in _Required, against years for the evidence.
+const governance = [
+  "iam.googleapis.com",
+  "iamcredentials.googleapis.com",
+  "cloudresourcemanager.googleapis.com",
+  "logging.googleapis.com",
 ];
 
 describe("the audit trail", () => {
@@ -29,7 +42,10 @@ describe("the audit trail", () => {
     expect(auditConfig).toContain(`"${service}"`);
   });
 
-  it.each(services)("copies %s into the retained audit log", (service) => {
-    expect(sink).toContain(`"${service}"`);
-  });
+  it.each([...new Set([...services, ...governance])])(
+    "copies %s into the retained audit log",
+    (service) => {
+      expect(sink).toContain(`"${service}"`);
+    },
+  );
 });

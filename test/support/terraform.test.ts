@@ -204,6 +204,50 @@ resource "google_project_iam_member" "two" {
   });
 });
 
+describe("a custom role", () => {
+  const grant = `
+resource "google_bigquery_table_iam_member" "append" {
+  table_id = google_bigquery_table.t.table_id
+  role     = google_project_iam_custom_role.appender.name
+  member   = "serviceAccount:\${google_service_account.build.email}"
+}
+`;
+
+  it("is read as its permissions, sorted", () => {
+    const terraform = `${account}${grant}
+resource "google_project_iam_custom_role" "appender" {
+  role_id     = "appender_\${var.environment}"
+  permissions = ["bigquery.tables.updateData", "bigquery.tables.get"]
+}
+`;
+    expect(serviceAccountRoles(terraform, "build")).toEqual([
+      {
+        type: "google_bigquery_table_iam_member",
+        role: "custom:bigquery.tables.get,bigquery.tables.updateData",
+      },
+    ]);
+  });
+
+  it("is refused when its permissions are not literal, or it is not declared", () => {
+    const computed = `${account}${grant}
+resource "google_project_iam_custom_role" "appender" {
+  role_id     = "appender"
+  permissions = local.permissions
+}
+`;
+    expect(() => serviceAccountRoles(computed, "build")).toThrow(/quoted literals/);
+    expect(() => serviceAccountRoles(`${account}${grant}`, "build")).toThrow(/not declared/);
+    const many = `${account}${grant}
+resource "google_project_iam_custom_role" "appender" {
+  for_each    = toset(["a"])
+  role_id     = "appender"
+  permissions = ["bigquery.tables.get"]
+}
+`;
+    expect(() => serviceAccountRoles(many, "build")).toThrow(/count or for_each/);
+  });
+});
+
 describe("terraformBlocks", () => {
   it("returns each resource's body without its comments", () => {
     const blocks = terraformBlocks(`
