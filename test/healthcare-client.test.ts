@@ -106,6 +106,19 @@ describe("reading a source resource", () => {
     expectStandardHeaders(request.headers);
   });
 
+  // Encoding leaves `.` and `..` alone and the URL parser resolves them: `Bundle/..` is the store.
+  it.each([".", ".."])(
+    "refuses the id %s, which names no resource, before any request",
+    async (id) => {
+      const client = new HealthcareApiClient(OPTIONS);
+
+      await expect(client.readSourceResource("Bundle", id, RUN_ID)).rejects.toThrow(
+        "A source resource id must be a single path segment",
+      );
+      expect(sent).toEqual([]);
+    },
+  );
+
   it("refuses without a source store, before any request", async () => {
     const client = new HealthcareApiClient({ ...OPTIONS, SOURCE_FHIR_STORE_ID: undefined });
     await expect(client.readSourceResource("Bundle", "b", RUN_ID)).rejects.toThrow(

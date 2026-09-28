@@ -121,11 +121,16 @@ describe("run API", () => {
       submissionRef: { uri: "https://example.org/submission.json", sha256: "a".repeat(64) },
     });
     const badBundleId = await post(app, { source: "healthcare-api", bundleId: "../../secrets" });
+    // Both are FHIR ids, and both resolve out of the store's Bundle path (run-request 2.0.0).
+    const dotBundleIds = await Promise.all(
+      [".", ".."].map((bundleId) => post(app, { source: "healthcare-api", bundleId })),
+    );
 
     expect(notJson.status).toBe(400);
     expect(await notJson.json()).toEqual({ error: "invalid-json" });
     expect(badUri.status).toBe(400);
     expect(badBundleId.status).toBe(400);
+    expect(dotBundleIds.map(({ status }) => status)).toEqual([400, 400]);
   });
 
   // A caller learns why the reference failed without learning anything about the document.

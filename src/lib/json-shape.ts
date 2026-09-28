@@ -5,6 +5,12 @@
 export const MAX_JSON_DEPTH = 48;
 export const MAX_JSON_NODES = 200_000;
 
+// Property names JavaScript gives a meaning of its own. `JSON.parse` makes an own `__proto__`
+// member an ordinary property, but a parser that rebuilds the object (zod does) drops it, so what
+// is checked and hashed is no longer the value that is stored; the other two are what a prototype
+// pollution reaches for. No FHIR element and no contract field has any of these names.
+const RESERVED_KEYS: ReadonlySet<string> = new Set(["__proto__", "constructor", "prototype"]);
+
 export function jsonShapeIssues(name: string, value: unknown): string[] {
   const stack: { value: unknown; depth: number }[] = [{ value, depth: 0 }];
   let nodes = 1;
@@ -19,7 +25,10 @@ export function jsonShapeIssues(name: string, value: unknown): string[] {
     if (Array.isArray(current)) {
       children = current;
     } else if (current !== null && typeof current === "object") {
-      children = Object.values(current as Record<string, unknown>);
+      const keys = Object.keys(current);
+      const reserved = keys.find((key) => RESERVED_KEYS.has(key));
+      if (reserved !== undefined) return [`${name} carries the reserved property name ${reserved}`];
+      children = keys.map((key) => (current as Record<string, unknown>)[key]);
     } else {
       continue;
     }

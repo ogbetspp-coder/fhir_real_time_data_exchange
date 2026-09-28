@@ -57,7 +57,7 @@ describe("an authority import in the pipeline", () => {
     expect(ingestion?.graphType).toBe("type1");
     expect(ingestion?.allowSyntheticSources).toBe(true);
     expect(ingestion?.approval.method).toBe("authority-publication");
-    expect(ingestion?.authority?.importerVersion).toBe("2.1.0");
+    expect(ingestion?.authority?.importerVersion).toBe("2.1.1");
     expect(ingestion?.authority?.fetched.map(({ fetchedAt: at }) => at)).toEqual([
       "2026-09-24T12:00:00.000Z",
       "2026-09-24T12:00:00.000Z",
