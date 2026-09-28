@@ -9,4 +9,10 @@
 /contracts/         @ogbetspp-coder
 /fhir/              @ogbetspp-coder
 /LICENSE            @ogbetspp-coder
+
+# What builds and checks the images and the pins (audit B07): the gates' readers and scanners, the
+# Dockerfiles and the Cloud Build configuration. Their rules are denylists; review is the control.
+/scripts/ci/        @ogbetspp-coder
+/Dockerfile*        @ogbetspp-coder
+/cloudbuild*.yaml   @ogbetspp-coder
 /SECURITY.md        @ogbetspp-coder

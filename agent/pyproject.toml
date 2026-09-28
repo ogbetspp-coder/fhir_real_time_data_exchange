@@ -34,6 +34,23 @@ dev = [
 requires = ["hatchling==1.32.4"]
 build-backend = "hatchling.build"
 
+[tool.uv]
+# The build backend and its whole closure, pinned (audit B07, S-5). `uv sync` builds this project
+# with hatchling, and hatchling's own dependencies were resolved afresh on every sync, unpinned:
+# a new release of any of them reached CI and every developer's machine with no review. uv takes
+# no hashes for build dependencies in project mode, so these are exact versions, checked against
+# the index's hashes as they download; test/ci/python-build-pins.test.ts holds the hatchling pin
+# equal to [build-system] and the list to hatchling's dependencies. A Dependabot move of
+# [build-system] fails `uv sync` until this list moves with it (then `uv lock`).
+build-constraint-dependencies = [
+  "hatchling==1.32.4",
+  "packaging==26.3",
+  "pathspec==1.1.1",
+  "pluggy==1.6.0",
+  "tomlkit==0.15.1",
+  "trove-classifiers==2026.9.21.13",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/verifiable_answer_agent"]
 

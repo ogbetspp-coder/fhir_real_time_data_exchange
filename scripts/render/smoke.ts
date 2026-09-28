@@ -26,21 +26,39 @@ const FACES: readonly [string, string, number, string][] = [
 // loopback, a read-only root and workspace, no capabilities, and no new privileges.
 async function isolation(): Promise<string[]> {
   const found: string[] = [];
-  const reached = await new Promise<boolean>((resolve) => {
-    const socket = connect({ host: "192.0.2.1", port: 443, timeout: 3000 });
-    socket.once("connect", () => {
-      socket.destroy();
-      resolve(true);
+  const reaches = (host: string) =>
+    new Promise<boolean>((resolve) => {
+      const socket = connect({ host, port: 443, timeout: 3000 });
+      socket.once("connect", () => {
+        socket.destroy();
+        resolve(true);
+      });
+      socket.once("timeout", () => {
+        socket.destroy();
+        resolve(false);
+      });
+      socket.once("error", () => resolve(false));
     });
-    socket.once("timeout", () => {
-      socket.destroy();
-      resolve(false);
-    });
-    socket.once("error", () => resolve(false));
-  });
+  // Documentation addresses (RFC 5737, RFC 3849): nothing answers there, but a route would let
+  // the attempt leave the container.
+  const reached = (await reaches("192.0.2.1")) || (await reaches("2001:db8::1"));
   const routes = readFileSync("/proc/net/route", "utf8").trim().split("\n").slice(1);
-  if (reached || routes.length > 0) {
-    found.push(`the container has a network (${routes.length} routes)`);
+  // IPv6 too (audit B07, carried from B11's review): every route but the loopback's, whose device
+  // is the last field. No file means the kernel has no IPv6, so no IPv6 route.
+  let routes6: string[] = [];
+  try {
+    routes6 = readFileSync("/proc/net/ipv6_route", "utf8")
+      .trim()
+      .split("\n")
+      .filter((line) => line.trim() !== "" && line.trim().split(/\s+/u).at(-1) !== "lo");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT")
+      found.push("/proc/net/ipv6_route unreadable");
+  }
+  if (reached || routes.length > 0 || routes6.length > 0) {
+    found.push(
+      `the container has a network (${routes.length} IPv4 routes, ${routes6.length} IPv6 routes)`,
+    );
   }
   for (const where of ["/work/.renderer-probe", "/home/node/.renderer-probe"]) {
     try {

@@ -8,19 +8,24 @@ substitutions:
 
 # Every builder is pinned by digest, like every base image (npm run images:check covers both):
 # the builder runs with the build identity's token and pushes the images that deploy. The digest
-# is gcr.io/cloud-builders/docker:latest (Docker 20.10.24, single-arch linux/amd64) as resolved
-# from the registry on 2026-09-22. Dependabot does not read this file; move it by hand.
+# is gcr.io/cloud-builders/docker:29 (Docker 29 on Ubuntu 24.04, the multi-arch index) as resolved
+# from the registry on 2026-09-28. Until then it was :latest, Docker 20.10.24 on Ubuntu 20.04,
+# both past their end of life; Google now tags that image and 24.0.9 (also Ubuntu 20.04)
+# "no-new-use" (audit B07, S-2). Dependabot does not read this file: the weekly pin-freshness
+# workflow (scripts/ci/pin-freshness.mjs) reports when the tag has moved; move it by hand.
 steps:
   - id: build-app-image
-    name: gcr.io/cloud-builders/docker@sha256:001fb4a870a84485cf198c80002f7af42f6456f2dbc261d70a0b5f0111470df4
+    name: gcr.io/cloud-builders/docker@sha256:b7e5a7271b51a9fe4ee29ebaa98a06ecef86a5f0c51fd7a4bfab8e6a57294d94
     args:
       - build
+      - --target
+      - worker
       - --tag
       - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/worker:${_IMAGE_TAG}
       - .
 
   - id: build-validator-image
-    name: gcr.io/cloud-builders/docker@sha256:001fb4a870a84485cf198c80002f7af42f6456f2dbc261d70a0b5f0111470df4
+    name: gcr.io/cloud-builders/docker@sha256:b7e5a7271b51a9fe4ee29ebaa98a06ecef86a5f0c51fd7a4bfab8e6a57294d94
     args:
       - build
       - --file
@@ -34,7 +39,7 @@ steps:
   # build that the deployed sidecar needs nothing from the internet to become ready. Bash
   # variables are written $$name so Cloud Build does not read them as substitutions.
   - id: validator-starts-offline
-    name: gcr.io/cloud-builders/docker@sha256:001fb4a870a84485cf198c80002f7af42f6456f2dbc261d70a0b5f0111470df4
+    name: gcr.io/cloud-builders/docker@sha256:b7e5a7271b51a9fe4ee29ebaa98a06ecef86a5f0c51fd7a4bfab8e6a57294d94
     entrypoint: bash
     args:
       - -c
@@ -82,11 +87,11 @@ steps:
         grep -E "Jurisdiction:|Locale:|Package Summary|HTTP Service started" offline.log | cut -c1-200
 
   - id: build-query-image
-    name: gcr.io/cloud-builders/docker@sha256:001fb4a870a84485cf198c80002f7af42f6456f2dbc261d70a0b5f0111470df4
+    name: gcr.io/cloud-builders/docker@sha256:b7e5a7271b51a9fe4ee29ebaa98a06ecef86a5f0c51fd7a4bfab8e6a57294d94
     args:
       - build
-      - --file
-      - Dockerfile.query
+      - --target
+      - query
       - --tag
       - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/query:${_IMAGE_TAG}
       - .

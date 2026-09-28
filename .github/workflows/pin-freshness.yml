@@ -1,0 +1,80 @@
+name: Pin freshness
+
+# Every pin Dependabot does not move (scripts/ci/pin-freshness.mjs: the validator jar, Chrome,
+# the fonts, the renderer's Debian snapshot, OSV-Scanner, gitleaks, uv, Terraform, the Cloud SDK,
+# the Cloud Build builder and the Agent Engine SDK), compared weekly with what upstream publishes.
+# A pin that is behind, or that could not be checked, opens an issue; moving it is a reviewed pull
+# request with its checksum re-measured (audit B07, S-2). Not on pull requests: upstream moves
+# without any commit here, so a pull request's verdict would depend on the day it ran.
+
+on:
+  schedule:
+    - cron: "41 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Pin freshness
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash --noprofile --norc -eo pipefail {0}
+    outputs:
+      report: ${{ steps.report.outputs.report }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 22.22.0
+          package-manager-cache: false
+
+      # Node built-ins only, so nothing is installed. The read-only token lifts api.github.com's
+      # anonymous rate limit and is sent nowhere else.
+      - name: Compare every pin with upstream
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/ci/pin-freshness.mjs --report "$RUNNER_TEMP/pins.md"
+
+      - name: Publish the report
+        id: report
+        if: always()
+        run: |
+          [[ -f "$RUNNER_TEMP/pins.md" ]] && cat "$RUNNER_TEMP/pins.md" >>"$GITHUB_STEP_SUMMARY" || true
+          echo "report=$(base64 -w0 "$RUNNER_TEMP/pins.md" 2>/dev/null || true)" >>"$GITHUB_OUTPUT"
+
+  # The one job that may write issues, with no checkout, as in vulnerabilities.yml.
+  report:
+    name: Report pins behind upstream
+    needs: check
+    if: failure()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    defaults:
+      run:
+        shell: bash --noprofile --norc -eo pipefail {0}
+    steps:
+      - name: Open an issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REPORT: ${{ needs.check.outputs.report }}
+        run: |
+          {
+            echo "A pin that Dependabot does not move is behind upstream, or could not be checked: ${RUN_URL}"
+            echo
+            base64 -d <<<"$REPORT" || true
+          } >"$RUNNER_TEMP/issue.md"
+          gh issue create --title "pins behind upstream $(date -u +%Y-%m-%d)" --body-file "$RUNNER_TEMP/issue.md"

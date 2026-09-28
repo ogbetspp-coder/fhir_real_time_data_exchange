@@ -84,6 +84,7 @@ export function readRendererPins(dockerfile = RENDERER_DOCKERFILE) {
   ) {
     throw new Error(`${name}: the Debian packages are not installed over HTTPS as pinned`);
   }
+  aptStaysPinned(name, lines, apt[0]);
   const chromeVersion = required("CHROME_VERSION", /^\d+\.\d+\.\d+\.\d+$/);
   const googleFontsCommit = required("GOOGLE_FONTS_COMMIT", /^[0-9a-f]{40}$/);
 
@@ -221,4 +222,72 @@ export function readRendererPins(dockerfile = RENDERER_DOCKERFILE) {
     fonts,
     artefacts,
   };
+}
+
+// The HTTPS rule above constrains the RUN that writes the snapshot's sources. These close the ways
+// around it (audit B07, carried from B11's review): apt run anywhere else, or in that RUN before its
+// sources are written; another apt source or configuration written (sources.list, apt.conf*); TLS
+// verification or the https transport configured by option; and the scheme argument of snapshot()
+// reassigned inside it. A denylist like the rest of this reader, not a proof.
+function aptStaysPinned(name, lines, pinned) {
+  const APT = /\bapt(?:-get)?\s+(?:-\S+\s+)*(?:install|update|upgrade|dist-upgrade|full-upgrade)\b/;
+  for (const line of lines) {
+    if (line !== pinned && APT.test(line)) {
+      throw new Error(`${name}: apt installs or updates outside the snapshot's RUN`);
+    }
+    if (/Verify-Peer|Verify-Host|Acquire::https/i.test(line)) {
+      throw new Error(`${name}: apt's TLS verification or https transport is configured`);
+    }
+  }
+
+  // snapshot()'s body, by its braces (${...} and { ...; } groups inside it balance).
+  const start = pinned.indexOf("snapshot() {");
+  if (start === -1) throw new Error(`${name}: the snapshot's RUN defines no snapshot()`);
+  let depth = 0;
+  let end = -1;
+  for (let index = pinned.indexOf("{", start); index < pinned.length; index += 1) {
+    if (pinned[index] === "{") depth += 1;
+    else if (pinned[index] === "}" && (depth -= 1) === 0) {
+      end = index + 1;
+      break;
+    }
+  }
+  if (end === -1) throw new Error(`${name}: snapshot() is not closed`);
+  const body = pinned.slice(start, end);
+  // The scheme is the function's first argument, read in the two URIs and nowhere else.
+  if (
+    (body.match(/\$1\b/g) ?? []).length !== 2 ||
+    /\$\{1|\bset\s+(?:-\S+\s+)*--|\bshift\b/.test(body)
+  ) {
+    throw new Error(`${name}: snapshot() reads or reassigns its scheme argument`);
+  }
+  const outside = pinned.slice(0, start) + pinned.slice(end);
+  const first = outside.indexOf("snapshot http;");
+  const before = outside.slice(0, first === -1 ? outside.length : first);
+  if (APT.test(before)) {
+    throw new Error(`${name}: apt runs before the snapshot's sources are written`);
+  }
+
+  // Every mention of apt's own configuration, less the two the pinned RUN makes: clearing the
+  // sources, and writing the snapshot's.
+  const allowed = [
+    "rm -rf /etc/apt/sources.list /etc/apt/sources.list.d/* /var/lib/apt/lists/*;",
+    "> /etc/apt/sources.list.d/snapshot.sources;",
+  ];
+  for (const line of lines) {
+    let rest = line;
+    if (line === pinned) {
+      for (const text of allowed) {
+        if (rest.split(text).length !== 2) {
+          throw new Error(`${name}: the snapshot's RUN does not write its sources as pinned`);
+        }
+        rest = rest.replace(text, "");
+      }
+    }
+    if (
+      /\/etc\/apt\/(?:sources\.list|apt\.conf|preferences|trusted\.gpg)|\bAPT_CONFIG\b/.test(rest)
+    ) {
+      throw new Error(`${name}: an apt source or configuration is written`);
+    }
+  }
 }

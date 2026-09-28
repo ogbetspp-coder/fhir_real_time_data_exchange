@@ -4,7 +4,8 @@
 # (`npm run validate:official`) is left out: it needs Java 21 and ~200 MB of downloads, and it is
 # its own CI job for the same reason. The renderer image (`npm run renderer:image` and the
 # `renderer:*` checks run in it, with the step that decides whether they run) is left out too: it
-# needs Docker and ~200 MB of downloads, and it is its own CI job.
+# needs Docker and ~200 MB of downloads, and it is its own CI job. So is the build of the worker,
+# query and validator images (`bash scripts/ci/build-images.sh`, CI's Images job).
 # test/ci/check-all.test.ts fails if a CI step is missing here, so the two cannot drift apart
 # silently.
 #
