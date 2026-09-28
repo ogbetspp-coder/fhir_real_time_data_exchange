@@ -33,13 +33,17 @@ resource "google_logging_metric" "failed_runs" {
   EOT
 }
 
+# Matched by stage, not by message: a message is prose and was renamed once ("Canonical Type 2
+# preflight rejected" became "Canonical preflight rejected"), which left this metric counting
+# nothing. The three stages are the fail-closed rejections src/pipeline.ts logs, and no other line
+# carries them (test/infra/alerting.test.ts).
 resource "google_logging_metric" "validation_rejections" {
   name        = "ema_flow/validation_rejections"
   description = "Count of fail-closed source or EMA validation rejections"
   filter      = <<-EOT
     resource.type="cloud_run_revision"
     resource.labels.service_name="${google_cloud_run_v2_service.worker.name}"
-    (jsonPayload.message="Canonical Type 2 preflight rejected" OR jsonPayload.message="EMA preflight rejected")
+    jsonPayload.stage=("document-gate" OR "source-preflight" OR "ema-preflight")
   EOT
 }
 
@@ -69,10 +73,45 @@ resource "google_logging_metric" "run_duration" {
   }
 }
 
+# Who is paged: the e-mail channel below and any channels passed by name, one list for every alert
+# policy in infra/. An alert with no channel opens an incident nobody hears about, so each policy
+# refuses an apply with an empty list (its precondition) rather than quietly notifying no one.
+# The one exception is dev, by the owner's decision of 2026-09-28 (require_alert_recipient): its
+# policies exist with an empty list and page no one until it is given a real address.
+locals {
+  alert_notification_channels = concat(
+    google_monitoring_notification_channel.alert_email[*].id,
+    var.alert_notification_channels,
+  )
+}
+
+resource "google_monitoring_notification_channel" "alert_email" {
+  count = var.alert_notification_email != "" ? 1 : 0
+
+  display_name = "EMA Flow alerts (${var.environment})"
+  type         = "email"
+  labels = {
+    email_address = var.alert_notification_email
+  }
+}
+
+# Until 2026-09-27 the one e-mail channel was named for the first alert that used it.
+moved {
+  from = google_monitoring_notification_channel.query_entitlement_denials_email
+  to   = google_monitoring_notification_channel.alert_email
+}
+
 resource "google_monitoring_alert_policy" "pipeline_failures" {
   display_name          = "EMA Flow pipeline failures (${var.environment})"
   combiner              = "OR"
-  notification_channels = var.alert_notification_channels
+  notification_channels = local.alert_notification_channels
+
+  lifecycle {
+    precondition {
+      condition     = !var.require_alert_recipient || length(local.alert_notification_channels) > 0
+      error_message = "No alert notification channel: set alert_notification_email (ALERT_NOTIFICATION_EMAIL) or alert_notification_channels. A failed run must page someone."
+    }
+  }
 
   conditions {
     display_name = "At least one failed run in five minutes"
@@ -129,16 +168,6 @@ resource "google_logging_metric" "query_entitlement_denials" {
   }
 }
 
-resource "google_monitoring_notification_channel" "query_entitlement_denials_email" {
-  count = var.alert_notification_email != "" ? 1 : 0
-
-  display_name = "EMA Flow query entitlement denials (${var.environment})"
-  type         = "email"
-  labels = {
-    email_address = var.alert_notification_email
-  }
-}
-
 # Threshold: more than 5 denials in any rolling hour. A phase-1 tenant is a handful of
 # principals with a hand-written entitlement map, so a denial is either a caller naming a
 # document it was never given (one or two an hour from a mistyped id is plausible) or a
@@ -146,11 +175,16 @@ resource "google_monitoring_notification_channel" "query_entitlement_denials_ema
 # documents it is not entitled to, which the design note names as the existence oracle to
 # watch, or a broken entitlement map that is refusing everyone. Either deserves a person.
 resource "google_monitoring_alert_policy" "query_entitlement_denials" {
-  count = var.alert_notification_email != "" ? 1 : 0
-
   display_name          = "EMA Flow query entitlement denials (${var.environment})"
   combiner              = "OR"
-  notification_channels = [google_monitoring_notification_channel.query_entitlement_denials_email[0].id]
+  notification_channels = local.alert_notification_channels
+
+  lifecycle {
+    precondition {
+      condition     = !var.require_alert_recipient || length(local.alert_notification_channels) > 0
+      error_message = "No alert notification channel: set alert_notification_email (ALERT_NOTIFICATION_EMAIL) or alert_notification_channels. Entitlement probing must page someone."
+    }
+  }
 
   conditions {
     display_name = "More than five entitlement denials in one hour"
@@ -176,8 +210,21 @@ resource "google_monitoring_alert_policy" "query_entitlement_denials" {
   }
 }
 
-resource "google_monitoring_dashboard" "operations" {
-  dashboard_json = jsonencode({
+# Created only when an e-mail was given, until 2026-09-27; now always.
+moved {
+  from = google_monitoring_alert_policy.query_entitlement_denials[0]
+  to   = google_monitoring_alert_policy.query_entitlement_denials
+}
+
+# The dashboard as configured. The Monitoring API rewrites a dashboard's JSON into its own form
+# (defaults filled in, zero values dropped), so comparing the two texts showed a change on every
+# plan, and a reviewer learned to skip a "1 to change" line (docs/design/cmek-rollout.md, step 0).
+# Terraform therefore ignores the text, and scripts/ci/dashboard-drift.py compares meaning
+# instead: every value configured here must be present in the live dashboard. When one is not,
+# the pull request's plan summary says so and the deploy replaces the dashboard
+# (scripts/gcp/deploy.sh, sync_dashboard).
+locals {
+  operations_dashboard = {
     displayName = "EMA Flow — Interoperability and GxP Evidence (${var.environment})"
     mosaicLayout = {
       columns = 12
@@ -299,5 +346,13 @@ resource "google_monitoring_dashboard" "operations" {
         }
       ]
     }
-  })
+  }
+}
+
+resource "google_monitoring_dashboard" "operations" {
+  dashboard_json = jsonencode(local.operations_dashboard)
+
+  lifecycle {
+    ignore_changes = [dashboard_json]
+  }
 }

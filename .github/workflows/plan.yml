@@ -47,7 +47,11 @@ jobs:
     defaults:
       run:
         shell: bash --noprofile --norc -eo pipefail {0}
+    # Every input the deploy passes to deploy.sh is passed here too, job and step alike, so the
+    # plan is what applies (test/ci/environment-inputs.test.ts). The environment's own inputs
+    # are in scripts/gcp/environments/dev.env, which deploy.sh reads for both.
     env:
+      GOOGLE_CLOUD_PROJECT: ${{ vars.GCP_PROJECT_ID }}
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
       GCP_REGION: ${{ vars.GCP_REGION }}
       EMA_FLOW_ENVIRONMENT: dev
@@ -130,9 +134,9 @@ jobs:
           QUERY_TOKEN_CREATORS: ${{ vars.QUERY_TOKEN_CREATORS }}
           QUERY_ENTITLEMENTS_JSON: ${{ vars.QUERY_ENTITLEMENTS_JSON }}
           QUERY_OAUTH_CLIENT_IDS: ${{ vars.QUERY_OAUTH_CLIENT_IDS }}
-          ALERT_NOTIFICATION_EMAIL: ${{ vars.ALERT_NOTIFICATION_EMAIL }}
-          # As the dev deploy sets it (.github/workflows/deploy.yml), so the plan is what applies.
-          ALLOW_SYNTHETIC_SOURCES: "true"
+          # As the deploy passes them: not to dev, whose alerts page no one (deploy.yml).
+          ALERT_NOTIFICATION_EMAIL: ${{ env.EMA_FLOW_ENVIRONMENT != 'dev' && vars.ALERT_NOTIFICATION_EMAIL || '' }}
+          ALERT_NOTIFICATION_CHANNELS: ${{ env.EMA_FLOW_ENVIRONMENT != 'dev' && vars.ALERT_NOTIFICATION_CHANNELS || '' }}
           ALLOW_REPLACE: ${{ contains(github.event.pull_request.labels.*.name, 'allow-replace') }}
           PLAN_OUT: ${{ runner.temp }}/plan.txt
           PLAN_SUMMARY: ${{ runner.temp }}/plan-summary.md

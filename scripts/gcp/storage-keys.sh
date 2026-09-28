@@ -4,8 +4,9 @@
 # create anything, and the agent staging bucket was created by hand for the Agent Engine deploy;
 # neither can take a key Terraform manages at creation, so this script sets it afterwards.
 #
-# For each bucket: the default key set, then every existing object rewritten under it — a
-# bucket's default key applies only to objects written after it is set. For the state bucket also:
+# For each bucket: the default key set, public access prevention enforced, then every existing
+# object rewritten under the key — a bucket's default key applies only to objects written after it
+# is set. For the state bucket also:
 # the legacy convenience bindings removed (projectViewer read, projectEditor/projectOwner write),
 # so that the state, which holds the entitlement map and every resource's configuration, is
 # readable only by identities granted storage access on purpose — the deployer (project
@@ -55,6 +56,17 @@ for bucket in "${BUCKETS[@]}"; do
     if [[ "$CHECK" == "false" ]]; then
       gcloud --quiet storage buckets update "gs://${bucket}" --default-encryption-key="$KEY" >/dev/null
       echo "${bucket}: default key set"
+    fi
+  fi
+
+  # Never public, whatever a later grant says, like every bucket Terraform creates (audit I-8).
+  prevention="$(gcloud storage buckets describe "gs://${bucket}" --format='value(public_access_prevention)')"
+  if [[ "$prevention" != "enforced" ]]; then
+    drift=1
+    echo "${bucket}: public access prevention is '${prevention:-inherited}'"
+    if [[ "$CHECK" == "false" ]]; then
+      gcloud --quiet storage buckets update "gs://${bucket}" --public-access-prevention >/dev/null
+      echo "${bucket}: public access prevention enforced"
     fi
   fi
 

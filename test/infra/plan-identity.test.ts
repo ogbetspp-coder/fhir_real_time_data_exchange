@@ -45,7 +45,10 @@ describe("the pull-request planner", () => {
     const forbidden = [
       /^storage\.objects\./, // evidence, submissions; state is read through one bucket grant
       /^bigquery\.tables\.getData$/, // the ledger and the analytical projection
-      /^healthcare\.fhir(Resources|Stores)\./, // the FHIR stores themselves
+      // The FHIR stores' content. A store's IAM policy is the one store permission a plan needs
+      // (the services' grants are bound on each store); it says who may read, never what is there.
+      /^healthcare\.fhirResources\./,
+      /^healthcare\.fhirStores\.(?!getIamPolicy$)/,
       /^logging\.(logEntries|privateLogEntries)\./, // log content, including audit logs
       /^cloudkms\.cryptoKeyVersions\.use/, // decrypt or sign
       /^secretmanager\.versions\.access$/,
@@ -55,6 +58,22 @@ describe("the pull-request planner", () => {
         permission,
         false,
       ]);
+    }
+  });
+
+  it("can read the policy of every kind of IAM grant infra/ declares", () => {
+    // A plan refreshes each grant by reading the policy it is part of; a kind the planner cannot
+    // read fails every plan after the first apply that creates one.
+    const infra =
+      readFileSync("infra/security.tf", "utf8") + readFileSync("infra/query.tf", "utf8");
+    const kinds: [RegExp, string][] = [
+      [/resource "google_healthcare_fhir_store_iam_member"/, "healthcare.fhirStores.getIamPolicy"],
+      [/resource "google_bigquery_table_iam_member"/, "bigquery.tables.getIamPolicy"],
+      [/resource "google_project_iam_custom_role"/, "iam.roles.get"],
+    ];
+    for (const [kind, permission] of kinds) {
+      expect(kind.test(infra)).toBe(true);
+      expect(permissions).toContain(permission);
     }
   });
 

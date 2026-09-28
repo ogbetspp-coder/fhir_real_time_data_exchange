@@ -118,15 +118,22 @@ resource "google_kms_crypto_key_iam_member" "worker_manifest_signer_hsm" {
 #     rare and deliberate, and an alert on one is a confirmation, not noise.
 # If the audit-logs key itself is the one disabled, log entries buffer for about three hours and
 # are then discarded — one more reason this must fire in minutes.
+#
+# Always declared, and never without a channel. Until 2026-09-27 it existed only when an e-mail
+# or channel was supplied, so a deploy without one removed the one-hour guard silently; now such an
+# apply is refused (the precondition below; observability.tf holds the channel list), except in
+# dev, whose policies exist but page no one (require_alert_recipient).
 resource "google_monitoring_alert_policy" "key_availability" {
-  count = var.alert_notification_email != "" || length(var.alert_notification_channels) > 0 ? 1 : 0
+  display_name          = "EMA Flow encryption key made unavailable (${var.environment})"
+  combiner              = "OR"
+  notification_channels = local.alert_notification_channels
 
-  display_name = "EMA Flow encryption key made unavailable (${var.environment})"
-  combiner     = "OR"
-  notification_channels = concat(
-    google_monitoring_notification_channel.query_entitlement_denials_email[*].id,
-    var.alert_notification_channels,
-  )
+  lifecycle {
+    precondition {
+      condition     = !var.require_alert_recipient || length(local.alert_notification_channels) > 0
+      error_message = "No alert notification channel: set alert_notification_email (ALERT_NOTIFICATION_EMAIL) or alert_notification_channels. A key made unavailable gives one hour before the FHIR dataset is disabled; it must page someone."
+    }
+  }
 
   conditions {
     display_name = "A key version was disabled, scheduled for destruction, or a key's grants changed"
@@ -160,4 +167,9 @@ resource "google_monitoring_alert_policy" "key_availability" {
       dataset answers. Runbook: docs/design/cmek-rollout.md, "Protection against losing a key".
     EOT
   }
+}
+
+moved {
+  from = google_monitoring_alert_policy.key_availability[0]
+  to   = google_monitoring_alert_policy.key_availability
 }

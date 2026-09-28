@@ -290,8 +290,14 @@ that skips one is not a production deploy.
   production, leave `ALLOW_SYNTHETIC_SOURCES` unset, which does it by default.
 - ~~**The worker's Healthcare role scoped to the dataset**~~ done 2026-09-21 with the CMEK
   rollout: the worker holds `fhirResourceEditor` on the record dataset only.
-- **Real addresses for alerts and security reports.** The alert channel and `SECURITY.md` carry
-  placeholders (`you@khsadvisory.com`, `security@khsadvisory.com`); production needs monitored ones.
+- **Before production or any real data: set a real, monitored alert address; prod refuses to
+  deploy without one.** `dev` has none, by the owner's decision of 2026-09-28 (early development):
+  its alert policies exist but page no one, and its deploy ignores the `ALERT_NOTIFICATION_EMAIL`
+  repository variable, still the placeholder `you@khsadvisory.com`. Only `dev` may go without
+  (`require_alert_recipient`, `scripts/gcp/environments/dev.env`); every other environment refuses
+  an apply with no recipient or a placeholder one.
+- **A real address for security reports.** `SECURITY.md` carries a placeholder,
+  `security@khsadvisory.com`; production needs a monitored one.
 - **Registry vulnerability scanning and Binary Authorization in production.** `dev` scans with
   OSV-Scanner in CI (foundations C1); production turns on Artifact Analysis, where it is charged
   per image and deploys are rare.

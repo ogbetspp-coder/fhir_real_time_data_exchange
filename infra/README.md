@@ -10,7 +10,12 @@ Two things an environment needs are deliberately not here:
 
 - **The R5 FHIR stores.** The Google provider rejects `version = "R5"`, so
   `scripts/gcp/reconcile-fhir-stores.sh` creates and patches them over REST inside the dataset
-  Terraform owns, refuses any R4 substitution, and never deletes a store.
+  Terraform owns, refuses any R4 substitution, and never deletes a store. The services' FHIR
+  grants are bound on each store in Terraform, so `deploy.sh` creates a missing store before it
+  applies; a project's first deploy creates the dataset and fails at those grants, and the next
+  one completes. Until phase 2 of audit B04, the worker's and query service's older dataset-wide
+  grants stay beside the narrow ones (marked TRANSITIONAL); the least-privilege tests prove the set
+  that remains once they are removed (`test/infra/transitional-grants.ts`).
 - **The identities that run Terraform.** The deployer and the read-only planner are bootstrapped
   outside this configuration (`scripts/gcp/deploy-identity.sh`, `scripts/gcp/plan-identity.sh`).
 
@@ -21,6 +26,10 @@ Only by the deploy workflow. A merge to `main` that touches a deployable path ru
 Identity Federation (admitted only for `main` and that workflow) and runs `scripts/gcp/deploy.sh`.
 That script is the only place the inputs below are assembled (`tf_deploy_vars`): it builds the
 images, resolves their digests, and applies with the deployed commit as `service_version`.
+Before applying it refuses a placeholder alert recipient, and a missing one outside `dev` (whose
+alerts page no one until it is given a real address; owner decision, 2026-09-28), and asks Resource Manager
+(`testIamPermissions`) whether the deployer holds every permission the apply needs
+(`APPLY_PERMISSIONS`): an apply missing one fails part-way, after its independent changes.
 
 Every pull request is planned first, by `.github/workflows/plan.yml`, as the read-only planner,
 with the same inputs and against the live state. The check fails on any destroy or replace until
@@ -46,7 +55,14 @@ Resources that hold the record (keys, the dataset, the ledger) carry `prevent_de
 
 `environment` has no default: every plan, apply and import in `deploy.sh` passes it
 (`EMA_FLOW_ENVIRONMENT`, `dev` in both workflows). `prod` also sets a minimum of one instance on
-each Cloud Run service.
+each Cloud Run service. An environment's own inputs (`QUERY_LOG_REJECTION_REASON`,
+`ALLOW_SYNTHETIC_SOURCES`) are in `scripts/gcp/environments/<environment>.env`, which `deploy.sh`
+reads for the plan and the deploy alike; a missing file is refused.
+
+The operations dashboard's JSON is ignored by Terraform, because the Monitoring API rewrites it
+and every plan showed a change. `scripts/ci/dashboard-drift.py` compares its meaning instead: the
+pull request's plan summary says whether the dashboard differs from its configuration, and the
+deploy replaces it when it does.
 
 ## Inputs
 
@@ -66,16 +82,17 @@ Set by `deploy.sh` on every plan and apply unless marked "default".
 | `query_token_creators`            | `QUERY_TOKEN_CREATORS`                                                                    | Members who may impersonate the caller service account                                                                     |
 | `query_entitlements_json`         | `QUERY_ENTITLEMENTS_JSON`                                                                 | Entitlement map: principal to the bundles it may read                                                                      |
 | `query_oauth_client_ids`          | `QUERY_OAUTH_CLIENT_IDS`                                                                  | OAuth client ids whose access tokens the query service accepts                                                             |
-| `alert_notification_email`        | `ALERT_NOTIFICATION_EMAIL`                                                                | Recipient of the entitlement-denial alert; empty creates no alert                                                          |
-| `query_log_rejection_reason`      | `QUERY_LOG_REJECTION_REASON`                                                              | Log the category of a refused credential (dev only)                                                                        |
+| `alert_notification_email`        | `ALERT_NOTIFICATION_EMAIL` (not passed to dev)                                            | Paged by every alert (key made unavailable, failed run, entitlement denials); this or a channel is required outside dev    |
+| `alert_notification_channels`     | `ALERT_NOTIFICATION_CHANNELS` (optional; not passed to dev)                               | Existing notification channels paged by every alert, beside or instead of the e-mail                                       |
+| `require_alert_recipient`         | `REQUIRE_ALERT_RECIPIENT`, from `scripts/gcp/environments/` (`false` in dev only)         | Whether an apply must name a recipient; refused as `false` outside dev, whose alerts then page no one                      |
+| `query_log_rejection_reason`      | `QUERY_LOG_REJECTION_REASON`, from `scripts/gcp/environments/`                            | Log the category of a refused credential (dev only)                                                                        |
 | `query_audience`                  | default (empty)                                                                           | Override for the query service's OIDC audience                                                                             |
-| `allow_synthetic_sources`         | default `false`; the dev deploy sets `true`                                               | Whether the worker accepts synthetic content and the gate-bypassing sources (docs/design/authority-import-contract.md, D7) |
+| `allow_synthetic_sources`         | `ALLOW_SYNTHETIC_SOURCES`, from `scripts/gcp/environments/` (`true` in dev only)          | Whether the worker accepts synthetic content and the gate-bypassing sources (docs/design/authority-import-contract.md, D7) |
 | `enabled_run_sources`             | default (null): every source where synthetic content is allowed, otherwise `["document"]` | Run sources the worker accepts; fixture and healthcare-api need `allow_synthetic_sources`                                  |
 | `evidence_retention_days`         | default (2555)                                                                            | Retention policy on the evidence bucket                                                                                    |
 | `submission_retention_days`       | default (0, none)                                                                         | Retention policy on the submission bucket                                                                                  |
 | `deletion_protection`             | default (`true`)                                                                          | Deletion protection on the ledger table, the services and the workflow                                                     |
 | `enforce_binary_authorization`    | default (`false`)                                                                         | Binary Authorization on the worker service (the query service has none yet)                                                |
-| `alert_notification_channels`     | default (empty)                                                                           | Existing notification channels for the operational and key alerts                                                          |
 | `lock_regulated_audit_log_bucket` | default (`false`)                                                                         | Bucket Lock on the regulated audit log bucket; irreversible                                                                |
 | `kms_manifest_key_version`        | default (`1`)                                                                             | Version of `manifest-signing-hsm` the worker signs with                                                                    |
 
@@ -103,3 +120,5 @@ Each variable's full description, validation and reasoning are in `variables.tf`
 | `workflow_name`                 | `bootstrap.sh`                                         | Pipeline workflow name                                        |
 | `workflow_console_url`          | operators                                              | Console link to workflow executions                           |
 | `bigquery_console_url`          | operators                                              | Console link to the analytics dataset                         |
+| `operations_dashboard_json`     | dashboard drift check in `deploy.sh`                   | The operations dashboard as configured                        |
+| `operations_dashboard_id`       | dashboard drift check in `deploy.sh`                   | Resource name of the operations dashboard                     |
