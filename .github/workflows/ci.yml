@@ -72,6 +72,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
@@ -87,12 +89,14 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      # Keyed by the Dockerfile and the package list: the script verifies every cached tarball
-      # against its pinned checksum before use, so a stale or tampered entry is re-downloaded,
-      # never trusted. The seeded package cache lives inside this directory too. There is no
-      # separate cache of ~/.fhir/packages any more: that one was restored from any earlier key,
-      # so on a warm runner it hid every download the validator made and could supply packages
-      # nobody had pinned.
+      # Keyed by the Dockerfile and the package list. On a miss the cache is saved after this job's
+      # own steps have run (npm ci with its install scripts, tsx), so nothing in it is trusted as
+      # restored: the script re-hashes the jar and every tarball against its pinned checksum on
+      # every run, re-downloading a stale or tampered one, and deletes the unpacked package cache
+      # (home/, also inside this directory) and unpacks it afresh from the verified tarballs
+      # (test/ci/official-validate.test.ts). There is no separate cache of ~/.fhir/packages any
+      # more: that one was restored from any earlier key, so on a warm runner it hid every
+      # download the validator made and could supply packages nobody had pinned.
       - name: Cache the validator and its packages
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -172,6 +176,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
       # The differential corpus is produced by the TypeScript implementation, so this job needs
       # the Node toolchain as well: the whole point is that the two languages are compared, and
       # a corpus committed to the repository would only prove agreement with a past revision.
@@ -240,6 +246,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:

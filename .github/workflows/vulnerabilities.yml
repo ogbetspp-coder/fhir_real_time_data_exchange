@@ -7,7 +7,8 @@ name: Vulnerabilities
 #
 # Secret scan (docs/foundations.md, D4; scripts/ci/secret-scan.sh), in the same required check:
 # fails on any possible credential in the working tree or in the commits a pull request or a push
-# adds; the weekly and manual runs scan the whole history.
+# adds; the weekly and manual runs scan the whole history. Its verdict is first proved on planted
+# secrets (scripts/ci/secret-scan-selftest.sh), so a scan that would miss them cannot pass.
 
 on:
   pull_request:
@@ -18,18 +19,25 @@ on:
     - cron: "17 6 * * 1"
   workflow_dispatch:
 
+# Read only at the workflow level. Only the weekly report job below may write an issue, and it
+# checks nothing out: the scan job runs two downloaded scanners over every pull request's content.
 permissions:
   contents: read
-  issues: write
 
 jobs:
   scan:
     name: Vulnerabilities
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    permissions:
+      contents: read
     defaults:
       run:
         shell: bash --noprofile --norc -eo pipefail {0}
+    # The two reports, base64 encoded so each is one line whatever it holds, for the weekly issue.
+    outputs:
+      vulnerabilities: ${{ steps.reports.outputs.vulnerabilities }}
+      secrets: ${{ steps.reports.outputs.secrets }}
     steps:
       - name: Check out repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -44,6 +52,10 @@ jobs:
         run: bash scripts/ci/vuln-scan.sh
 
       # Runs even when the vulnerability scan failed, so one finding never hides the other.
+      - name: Prove the secret scan on planted secrets
+        if: success() || failure()
+        run: bash scripts/ci/secret-scan-selftest.sh
+
       - name: Scan for secrets
         if: success() || failure()
         env:
@@ -68,6 +80,7 @@ jobs:
           SECRET_SCAN_RANGE="$range" bash scripts/ci/secret-scan.sh
 
       - name: Publish the report
+        id: reports
         if: always()
         env:
           REPORT: ${{ runner.temp }}/vulnerabilities.md
@@ -75,14 +88,37 @@ jobs:
         run: |
           [[ -f "$REPORT" ]] && cat "$REPORT" >>"$GITHUB_STEP_SUMMARY" || true
           [[ -f "$SECRETS" ]] && cat "$SECRETS" >>"$GITHUB_STEP_SUMMARY" || true
+          {
+            echo "vulnerabilities=$(base64 -w0 "$REPORT" 2>/dev/null || true)"
+            echo "secrets=$(base64 -w0 "$SECRETS" 2>/dev/null || true)"
+          } >>"$GITHUB_OUTPUT"
 
-      - name: Open an issue when the weekly scan fails
-        if: failure() && github.event_name == 'schedule'
+  # The one job that may write issues: on the weekly run only, after a failed scan, and with no
+  # checkout, so no repository code or downloaded tool runs beside the token.
+  report:
+    name: Report a failed weekly scan
+    needs: scan
+    if: failure() && github.event_name == 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    defaults:
+      run:
+        shell: bash --noprofile --norc -eo pipefail {0}
+    steps:
+      - name: Open an issue
         env:
           GH_TOKEN: ${{ github.token }}
-          REPORT: ${{ runner.temp }}/vulnerabilities.md
-          SECRETS: ${{ runner.temp }}/secrets.md
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          VULNERABILITIES: ${{ needs.scan.outputs.vulnerabilities }}
+          SECRETS: ${{ needs.scan.outputs.secrets }}
         run: |
-          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          { echo "The weekly scan found known vulnerabilities in a lockfile or a possible secret: ${run_url}"; echo; cat "$REPORT" "$SECRETS" 2>/dev/null || true; } >issue.md
-          gh issue create --title "vulnerabilities $(date -u +%Y-%m-%d)" --body-file issue.md
+          {
+            echo "The weekly scan found known vulnerabilities in a lockfile or a possible secret: ${RUN_URL}"
+            echo
+            base64 -d <<<"$VULNERABILITIES" || true
+            base64 -d <<<"$SECRETS" || true
+          } >"$RUNNER_TEMP/issue.md"
+          gh issue create --title "vulnerabilities $(date -u +%Y-%m-%d)" --body-file "$RUNNER_TEMP/issue.md"
