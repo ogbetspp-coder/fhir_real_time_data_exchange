@@ -12,12 +12,19 @@ import { readInfra, terraformBlocks } from "../support/terraform.js";
 // the validation-rejection metric matched a log message that had been renamed. These pin: every
 // alert policy always exists, always pages the deploy's recipient, and cannot be applied without
 // one; and every log line a metric counts is one the code writes.
+//
+// The one exception, by the owner's decision of 2026-09-28, is dev while it is early development:
+// it may have no recipient, and its policies then exist but page no one. These also pin that the
+// exception is dev's alone, and that a placeholder is refused in dev as everywhere else.
 
 const terraform = readInfra();
 const blocks = terraformBlocks(terraform);
 const block = (type: string, name: string) =>
   blocks.find((candidate) => candidate.type === type && candidate.name === name)?.body ?? "";
 const deploy = readFileSync("scripts/gcp/deploy.sh", "utf8");
+const variables = readFileSync("infra/variables.tf", "utf8");
+const variable = (name: string) =>
+  new RegExp(`^variable "${name}" \\{\\n([\\s\\S]*?)^\\}`, "m").exec(variables)?.[1] ?? "";
 
 describe("every alert policy", () => {
   const policies = blocks.filter(({ type }) => type === "google_monitoring_alert_policy");
@@ -31,7 +38,7 @@ describe("every alert policy", () => {
   });
 
   it.each(policies.map(({ name, body }) => [name, body]))(
-    "%s always exists, pages the deploy's recipients, and refuses an apply with none",
+    "%s always exists, pages the deploy's recipients, and refuses an apply with none outside dev",
     (_name, body) => {
       // At the top of the block (terraform fmt indents it by two); a trigger's count is nested.
       expect(body).not.toMatch(/^ {2}(count|for_each)\s*=/m);
@@ -39,7 +46,7 @@ describe("every alert policy", () => {
         /^\s*notification_channels\s*=\s*local\.alert_notification_channels\s*$/m,
       );
       expect(body).toMatch(
-        /precondition \{\s*condition\s*=\s*length\(local\.alert_notification_channels\) > 0/,
+        /precondition \{\s*condition\s*=\s*!var\.require_alert_recipient \|\| length\(local\.alert_notification_channels\) > 0\n/,
       );
     },
   );
@@ -57,12 +64,41 @@ describe("every alert policy", () => {
     expect(deploy).toContain(
       '-var="alert_notification_channels=${alert_notification_channels_json}"',
     );
+    expect(deploy).toContain('-var="require_alert_recipient=${require_alert_recipient}"');
+  });
+});
+
+describe("require_alert_recipient", () => {
+  const body = variable("require_alert_recipient");
+
+  it("is a boolean that defaults to requiring a recipient", () => {
+    expect(body).toMatch(/^\s*type\s*=\s*bool$/m);
+    expect(body).toMatch(/^\s*default\s*=\s*true$/m);
+    expect(body).toMatch(/^\s*nullable\s*=\s*false$/m);
+  });
+
+  it("is refused as false in any environment but dev, by Terraform itself", () => {
+    expect(body).toMatch(
+      /validation \{\s*condition\s*=\s*var\.require_alert_recipient \|\| var\.environment == "dev"\n/,
+    );
+  });
+
+  it("does not relax the placeholder refusal, which reads the address alone", () => {
+    const placeholder = /validation \{\s*condition\s*=\s*(!can\(regex\([^\n]*)\n/g;
+    const conditions = [...variable("alert_notification_email").matchAll(placeholder)].map(
+      (match) => match[1] ?? "",
+    );
+    expect(conditions).toHaveLength(1);
+    expect(conditions[0]).not.toContain("require_alert_recipient");
+    expect(conditions[0]).not.toContain("environment");
   });
 });
 
 // The deploy's inputs are assembled by tf_deploy_vars; this runs it, outside the rest of the
 // script, to see what it does with and without a recipient.
 function tfDeployVars(env: Record<string, string>): { status: number | null; out: string } {
+  // ENVIRONMENT is deploy.sh's own, from EMA_FLOW_ENVIRONMENT; prod when a case names none, so a
+  // case proves the strict rules rather than inheriting dev's exception.
   const functions = ["ema_flow_json_array", "tf_deploy_vars"].map((name) => {
     const body = new RegExp(`^${name}\\(\\) \\{\\n[\\s\\S]*?^\\}$`, "m").exec(deploy)?.[0];
     if (body === undefined) throw new Error(`${name} not found in deploy.sh`);
@@ -75,17 +111,57 @@ printf '%s\\n' "\${TF_DEPLOY_VARS[@]}"
 `;
   const run = spawnSync("bash", ["-c", script], {
     encoding: "utf8",
-    env: { PATH: process.env.PATH ?? "", ...env },
+    env: { PATH: process.env.PATH ?? "", ENVIRONMENT: "prod", ...env },
   });
   return { status: run.status, out: `${run.stdout}${run.stderr}` };
 }
 
 describe("the deploy's alert recipient", () => {
-  it("is required: with no e-mail and no channel, the deploy refuses before Terraform", () => {
-    const { status, out } = tfDeployVars({});
+  it.each(["prod", "validation"])(
+    "is required in %s: with no e-mail and no channel, the deploy refuses before Terraform",
+    (environment) => {
+      const { status, out } = tfDeployVars({ ENVIRONMENT: environment });
+      expect(status).not.toBe(0);
+      expect(out).toContain("No alert recipient");
+    },
+  );
+
+  it("is optional in dev, whose inputs file says so: the policies are planned with no channel", () => {
+    const { status, out } = tfDeployVars({ ENVIRONMENT: "dev", REQUIRE_ALERT_RECIPIENT: "false" });
+    expect(status).toBe(0);
+    expect(out).toContain("-var=alert_notification_email=\n");
+    expect(out).toContain("-var=alert_notification_channels=[]");
+    expect(out).toContain("-var=require_alert_recipient=false");
+    expect(out).toContain("Alerts page no one");
+  });
+
+  it("is still required in dev when its inputs file does not relax it", () => {
+    const { status, out } = tfDeployVars({ ENVIRONMENT: "dev" });
     expect(status).not.toBe(0);
     expect(out).toContain("No alert recipient");
   });
+
+  it.each(["prod", "validation", ""])(
+    "cannot be made optional outside dev, wherever the setting comes from: %j",
+    (environment) => {
+      const { status, out } = tfDeployVars({
+        ENVIRONMENT: environment,
+        REQUIRE_ALERT_RECIPIENT: "false",
+        ALERT_NOTIFICATION_EMAIL: "oncall@ema-flow-alerts.eu",
+      });
+      expect(status).not.toBe(0);
+      expect(out).toContain("accepted only in dev");
+    },
+  );
+
+  it.each(["False", "no", "0", " false"])(
+    "accepts only true or false as the setting: %j",
+    (value) => {
+      const { status, out } = tfDeployVars({ ENVIRONMENT: "dev", REQUIRE_ALERT_RECIPIENT: value });
+      expect(status).not.toBe(0);
+      expect(out).toContain("REQUIRE_ALERT_RECIPIENT must be true or false");
+    },
+  );
 
   it("is passed to Terraform as an e-mail, a channel list, or both", () => {
     const email = tfDeployVars({ ALERT_NOTIFICATION_EMAIL: "oncall@ema-flow-alerts.eu" });
@@ -94,8 +170,10 @@ describe("the deploy's alert recipient", () => {
     expect(email.out).toContain("-var=alert_notification_channels=[]");
     // The address itself never reaches the log line tf_deploy_vars prints.
     expect(email.out.split("\n").filter((line) => line.includes("alert configuration"))).toEqual([
-      "alert configuration: alert_notification_email is set, alert_notification_channels=2 bytes",
+      "alert configuration: alert_notification_email is set, alert_notification_channels=2 bytes, require_alert_recipient=true",
     ]);
+    expect(email.out).toContain("-var=require_alert_recipient=true");
+    expect(email.out).not.toContain("Alerts page no one");
 
     const channel = tfDeployVars({
       ALERT_NOTIFICATION_CHANNELS: "projects/p/notificationChannels/1",
@@ -117,11 +195,28 @@ describe("the deploy's alert recipient", () => {
     "ops@mail.example",
     "root@localhost",
     "root@box.LOCALHOST",
-  ])("is refused when it is a placeholder: %s", (address) => {
-    const { status, out } = tfDeployVars({ ALERT_NOTIFICATION_EMAIL: address });
-    expect(status).not.toBe(0);
-    expect(out).toContain("Placeholder alert recipient");
-    expect(out).not.toContain(address);
+  ])("is refused when it is a placeholder, in every environment: %s", (address) => {
+    for (const env of [
+      { ENVIRONMENT: "prod" },
+      { ENVIRONMENT: "validation" },
+      { ENVIRONMENT: "dev", REQUIRE_ALERT_RECIPIENT: "false" },
+    ]) {
+      const { status, out } = tfDeployVars({ ...env, ALERT_NOTIFICATION_EMAIL: address });
+      expect([env.ENVIRONMENT, status]).not.toEqual([env.ENVIRONMENT, 0]);
+      expect(out).toContain("Placeholder alert recipient");
+      expect(out).not.toContain(address);
+    }
+  });
+
+  it("is used in dev when one is given: optional there, not ignored by deploy.sh", () => {
+    const { status, out } = tfDeployVars({
+      ENVIRONMENT: "dev",
+      REQUIRE_ALERT_RECIPIENT: "false",
+      ALERT_NOTIFICATION_EMAIL: "oncall@ema-flow-alerts.eu",
+    });
+    expect(status).toBe(0);
+    expect(out).toContain("-var=alert_notification_email=oncall@ema-flow-alerts.eu");
+    expect(out).not.toContain("Alerts page no one");
   });
 
   it.each([
@@ -135,7 +230,6 @@ describe("the deploy's alert recipient", () => {
   });
 
   it("is refused as a placeholder by Terraform too, by the same pattern", () => {
-    const variables = readFileSync("infra/variables.tf", "utf8");
     const terraformPattern = /!can\(regex\("\(\?i\)(.+?)", var\.alert_notification_email\)\)/
       .exec(variables)?.[1]
       ?.replaceAll("\\\\", "\\");

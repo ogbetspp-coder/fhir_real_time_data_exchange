@@ -108,3 +108,86 @@ describe("each environment's own inputs", () => {
     expect(unknown.stderr).not.toContain("Unknown deploy phase");
   });
 });
+
+// Dev's alerts may page no one (owner decision, 2026-09-28): dev.env relaxes the recipient, and
+// the workflows give dev none, so a placeholder left in the repository variable is ignored rather
+// than refused. Every other environment keeps the strict rules; these pin that the exception
+// cannot reach one.
+describe("the alert recipient's dev exception", () => {
+  const valueIn = (file: string, name: string) =>
+    readFileSync(`scripts/gcp/environments/${file}`, "utf8")
+      .split("\n")
+      .find((line) => line.startsWith(`${name}=`))
+      ?.slice(name.length + 1);
+
+  it("is set by dev.env alone", () => {
+    expect(valueIn("dev.env", "REQUIRE_ALERT_RECIPIENT")).toBe("false");
+    for (const file of environments.filter((name) => name !== "dev.env")) {
+      expect([file, inputsIn(file).includes("REQUIRE_ALERT_RECIPIENT")]).toEqual([file, false]);
+    }
+  });
+
+  it("withholds the alert variables from dev alone, in the plan as in the deploy", () => {
+    for (const name of ["ALERT_NOTIFICATION_EMAIL", "ALERT_NOTIFICATION_CHANNELS"]) {
+      const passed = `${name}: \${{ env.EMA_FLOW_ENVIRONMENT != 'dev' && vars.${name} || '' }}`;
+      const occurrences = (text: string) =>
+        text.split("\n").filter((line) => line.trim().startsWith(`${name}:`));
+      // The deploy's configuration check reads the variables as they are, to say they are ignored.
+      expect(occurrences(deployWorkflow).map((line) => line.trim())).toEqual([
+        `${name}: \${{ vars.${name} }}`,
+        passed,
+      ]);
+      expect(occurrences(planWorkflow).map((line) => line.trim())).toEqual([passed]);
+    }
+  });
+
+  function stepScript(text: string, name: string): string {
+    const start = text.indexOf(`- name: ${name}\n`);
+    if (start === -1) throw new Error(`no step ${name}`);
+    const run = text.indexOf("        run: |\n", start);
+    const lines: string[] = [];
+    for (const line of text.slice(run + "        run: |\n".length).split("\n")) {
+      if (line !== "" && !line.startsWith("          ")) break;
+      lines.push(line.slice(10));
+    }
+    return lines.join("\n");
+  }
+
+  const check = (env: Record<string, string>) =>
+    spawnSync("bash", ["-c", stepScript(deployWorkflow, "Check deployment configuration")], {
+      encoding: "utf8",
+      env: {
+        PATH: process.env.PATH ?? "",
+        GCP_PROJECT_ID: "p",
+        GCP_REGION: "europe-west4",
+        GCP_DEPLOY_SERVICE_ACCOUNT: "sa",
+        GCP_WORKLOAD_IDENTITY_PROVIDER: "wip",
+        ...env,
+      },
+    });
+
+  it("lets the deploy's configuration check pass dev with no recipient, and says one is ignored", () => {
+    const none = check({ EMA_FLOW_ENVIRONMENT: "dev" });
+    expect(none.status).toBe(0);
+    expect(none.stdout).not.toContain("ignored");
+    const placeholder = check({
+      EMA_FLOW_ENVIRONMENT: "dev",
+      ALERT_NOTIFICATION_EMAIL: "you@khsadvisory.com",
+    });
+    expect(placeholder.status).toBe(0);
+    expect(placeholder.stdout).toContain("Alert variables ignored");
+    expect(placeholder.stdout).not.toContain("you@khsadvisory.com");
+  });
+
+  it.each(["prod", "validation"])(
+    "keeps the deploy's configuration check strict in %s",
+    (environment) => {
+      const none = check({ EMA_FLOW_ENVIRONMENT: environment });
+      expect(none.status).toBe(1);
+      expect(none.stderr).toContain("ALERT_NOTIFICATION_EMAIL (or ALERT_NOTIFICATION_CHANNELS)");
+      expect(
+        check({ EMA_FLOW_ENVIRONMENT: environment, ALERT_NOTIFICATION_CHANNELS: "c" }).status,
+      ).toBe(0);
+    },
+  );
+});

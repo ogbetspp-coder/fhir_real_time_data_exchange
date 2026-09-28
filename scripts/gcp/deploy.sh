@@ -15,8 +15,8 @@ export CLOUDSDK_CORE_PROJECT="$PROJECT_ID"
 REGION="${GCP_REGION:-europe-west4}"
 ENVIRONMENT="${EMA_FLOW_ENVIRONMENT:-dev}"
 
-# The environment's own inputs (QUERY_LOG_REJECTION_REASON, ALLOW_SYNTHETIC_SOURCES), set in one
-# file that the pull-request plan and the deploy both read through this script, so the plan is
+# The environment's own inputs (QUERY_LOG_REJECTION_REASON, ALLOW_SYNTHETIC_SOURCES,
+# REQUIRE_ALERT_RECIPIENT), set in one file that the pull-request plan and the deploy both read through this script, so the plan is
 # what applies. A missing file is refused rather than read as "all defaults".
 ENVIRONMENT_INPUTS="${ROOT}/scripts/gcp/environments/${ENVIRONMENT}.env"
 if [[ ! -f "$ENVIRONMENT_INPUTS" ]]; then
@@ -111,11 +111,23 @@ tf_deploy_vars() {
   # dataset is disabled), a failed pipeline run, and entitlement probing. Required: with neither,
   # this refuses here, before Terraform, and Terraform's preconditions refuse too. Until
   # 2026-09-27 both were optional and a deploy without them silently dropped the key alert.
+  # The one exception is dev (owner decision, 2026-09-28): its inputs file sets
+  # REQUIRE_ALERT_RECIPIENT=false, and its alert policies are created but page no one. Any other
+  # environment is refused that setting, here and by infra/variables.tf, wherever it came from.
   # Presence and counts only are logged: an address is personal data and this log can be
   # attached to a failure issue.
   local alert_notification_email="${ALERT_NOTIFICATION_EMAIL:-}" alert_notification_channels_json
+  local require_alert_recipient="${REQUIRE_ALERT_RECIPIENT:-true}"
   alert_notification_channels_json="$(ema_flow_json_array "${ALERT_NOTIFICATION_CHANNELS:-}")"
-  if [[ -z "$alert_notification_email" && "$alert_notification_channels_json" == "[]" ]]; then
+  if [[ "$require_alert_recipient" != "true" && "$require_alert_recipient" != "false" ]]; then
+    echo "::error title=Invalid alert setting::REQUIRE_ALERT_RECIPIENT must be true or false." >&2
+    return 1
+  fi
+  if [[ "$require_alert_recipient" == "false" && "${ENVIRONMENT:-}" != "dev" ]]; then
+    echo "::error title=Alert recipient required::REQUIRE_ALERT_RECIPIENT=false is accepted only in dev; ${ENVIRONMENT:-this environment}'s alerts must page someone." >&2
+    return 1
+  fi
+  if [[ "$require_alert_recipient" == "true" && -z "$alert_notification_email" && "$alert_notification_channels_json" == "[]" ]]; then
     echo "::error title=No alert recipient::Set ALERT_NOTIFICATION_EMAIL (a repository variable in GitHub Actions) or ALERT_NOTIFICATION_CHANNELS. Every alert policy must page someone; none is deployed without." >&2
     return 1
   fi
@@ -128,7 +140,10 @@ tf_deploy_vars() {
     echo "::error title=Placeholder alert recipient::ALERT_NOTIFICATION_EMAIL is a placeholder (a reserved example or test domain, or a you@ address). Set it to a real, watched address." >&2
     return 1
   fi
-  echo "alert configuration: alert_notification_email is $([[ -n "$alert_notification_email" ]] && echo set || echo 'not set'), alert_notification_channels=${#alert_notification_channels_json} bytes"
+  echo "alert configuration: alert_notification_email is $([[ -n "$alert_notification_email" ]] && echo set || echo 'not set'), alert_notification_channels=${#alert_notification_channels_json} bytes, require_alert_recipient=${require_alert_recipient}"
+  if [[ -z "$alert_notification_email" && "$alert_notification_channels_json" == "[]" ]]; then
+    echo "::notice title=Alerts page no one::${ENVIRONMENT:-This environment} has no alert recipient: its alert policies are created but notify nobody. Before production or any real data, set a real, monitored address."
+  fi
 
   TF_DEPLOY_VARS=(
     "${tf_common_vars[@]}"
@@ -143,6 +158,7 @@ tf_deploy_vars() {
     -var="query_entitlements_json=${query_entitlements_json}"
     -var="alert_notification_email=${alert_notification_email}"
     -var="alert_notification_channels=${alert_notification_channels_json}"
+    -var="require_alert_recipient=${require_alert_recipient}"
     # Dev logs why a credential was refused (a category, never the token); production does not.
     # Set by the environment's inputs file (scripts/gcp/environments/).
     -var="query_log_rejection_reason=${QUERY_LOG_REJECTION_REASON:-false}"

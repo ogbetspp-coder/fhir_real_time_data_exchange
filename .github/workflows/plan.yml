@@ -134,8 +134,9 @@ jobs:
           QUERY_TOKEN_CREATORS: ${{ vars.QUERY_TOKEN_CREATORS }}
           QUERY_ENTITLEMENTS_JSON: ${{ vars.QUERY_ENTITLEMENTS_JSON }}
           QUERY_OAUTH_CLIENT_IDS: ${{ vars.QUERY_OAUTH_CLIENT_IDS }}
-          ALERT_NOTIFICATION_EMAIL: ${{ vars.ALERT_NOTIFICATION_EMAIL }}
-          ALERT_NOTIFICATION_CHANNELS: ${{ vars.ALERT_NOTIFICATION_CHANNELS }}
+          # As the deploy passes them: not to dev, whose alerts page no one (deploy.yml).
+          ALERT_NOTIFICATION_EMAIL: ${{ env.EMA_FLOW_ENVIRONMENT != 'dev' && vars.ALERT_NOTIFICATION_EMAIL || '' }}
+          ALERT_NOTIFICATION_CHANNELS: ${{ env.EMA_FLOW_ENVIRONMENT != 'dev' && vars.ALERT_NOTIFICATION_CHANNELS || '' }}
           ALLOW_REPLACE: ${{ contains(github.event.pull_request.labels.*.name, 'allow-replace') }}
           PLAN_OUT: ${{ runner.temp }}/plan.txt
           PLAN_SUMMARY: ${{ runner.temp }}/plan-summary.md

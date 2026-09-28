@@ -55,8 +55,8 @@ variable "alert_notification_channels" {
   description = <<-EOT
     Existing Cloud Monitoring notification channel resource names
     (projects/<project>/notificationChannels/<id>), paged by every alert policy beside the
-    alert_notification_email channel. At least one of the two must be given: an apply with
-    neither is refused.
+    alert_notification_email channel. At least one of the two must be given, unless
+    require_alert_recipient is false (dev only): an apply with neither is refused.
   EOT
   type        = list(string)
   default     = []
@@ -288,8 +288,9 @@ variable "alert_notification_email" {
   description = <<-EOT
     E-mail address paged by every alert policy: an encryption key made unavailable, a failed
     pipeline run, and query entitlement denials. Empty (the default) creates no e-mail channel,
-    and an apply with no alert_notification_channels either is refused: every alert policy is
-    always declared and must reach someone.
+    and an apply with no alert_notification_channels either is refused, unless
+    require_alert_recipient is false (dev only): every alert policy is always declared and must
+    reach someone. A placeholder is refused in every environment, dev included.
   EOT
   type        = string
   default     = ""
@@ -304,6 +305,27 @@ variable "alert_notification_email" {
   validation {
     condition     = !can(regex("(?i)^you@|@([^@]+\\.)?example\\.(com|org|net)$|[@.](test|invalid|example|localhost)$", var.alert_notification_email))
     error_message = "alert_notification_email is a placeholder (a reserved example or test domain, or a you@ address); set a real, watched address."
+  }
+}
+
+variable "require_alert_recipient" {
+  description = <<-EOT
+    Whether an apply must name an alert recipient (alert_notification_email or
+    alert_notification_channels). True, the default, everywhere but dev. The owner decided on
+    2026-09-28 that dev, while it is early development, need not have a real address: dev sets
+    this false (scripts/gcp/environments/dev.env), and its alert policies are still created, so
+    they show in the console, but page no one. No channel is created for a stand-in address, since
+    Google would mail a verification to it and it would look real in the console. False is
+    refused in any other environment; before production or any real data, a real, monitored
+    address is required.
+  EOT
+  type        = bool
+  default     = true
+  nullable    = false
+
+  validation {
+    condition     = var.require_alert_recipient || var.environment == "dev"
+    error_message = "require_alert_recipient may be false only in dev: every other environment's alerts must page someone."
   }
 }
 

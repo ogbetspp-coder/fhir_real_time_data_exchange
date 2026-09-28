@@ -121,7 +121,8 @@ resource "google_kms_crypto_key_iam_member" "worker_manifest_signer_hsm" {
 #
 # Always declared, and never without a channel. Until 2026-09-27 it existed only when an e-mail
 # or channel was supplied, so a deploy without one removed the one-hour guard silently; now such an
-# apply is refused (the precondition below; observability.tf holds the channel list).
+# apply is refused (the precondition below; observability.tf holds the channel list), except in
+# dev, whose policies exist but page no one (require_alert_recipient).
 resource "google_monitoring_alert_policy" "key_availability" {
   display_name          = "EMA Flow encryption key made unavailable (${var.environment})"
   combiner              = "OR"
@@ -129,7 +130,7 @@ resource "google_monitoring_alert_policy" "key_availability" {
 
   lifecycle {
     precondition {
-      condition     = length(local.alert_notification_channels) > 0
+      condition     = !var.require_alert_recipient || length(local.alert_notification_channels) > 0
       error_message = "No alert notification channel: set alert_notification_email (ALERT_NOTIFICATION_EMAIL) or alert_notification_channels. A key made unavailable gives one hour before the FHIR dataset is disabled; it must page someone."
     }
   }

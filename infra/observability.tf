@@ -76,6 +76,8 @@ resource "google_logging_metric" "run_duration" {
 # Who is paged: the e-mail channel below and any channels passed by name, one list for every alert
 # policy in infra/. An alert with no channel opens an incident nobody hears about, so each policy
 # refuses an apply with an empty list (its precondition) rather than quietly notifying no one.
+# The one exception is dev, by the owner's decision of 2026-09-28 (require_alert_recipient): its
+# policies exist with an empty list and page no one until it is given a real address.
 locals {
   alert_notification_channels = concat(
     google_monitoring_notification_channel.alert_email[*].id,
@@ -106,7 +108,7 @@ resource "google_monitoring_alert_policy" "pipeline_failures" {
 
   lifecycle {
     precondition {
-      condition     = length(local.alert_notification_channels) > 0
+      condition     = !var.require_alert_recipient || length(local.alert_notification_channels) > 0
       error_message = "No alert notification channel: set alert_notification_email (ALERT_NOTIFICATION_EMAIL) or alert_notification_channels. A failed run must page someone."
     }
   }
@@ -179,7 +181,7 @@ resource "google_monitoring_alert_policy" "query_entitlement_denials" {
 
   lifecycle {
     precondition {
-      condition     = length(local.alert_notification_channels) > 0
+      condition     = !var.require_alert_recipient || length(local.alert_notification_channels) > 0
       error_message = "No alert notification channel: set alert_notification_email (ALERT_NOTIFICATION_EMAIL) or alert_notification_channels. Entitlement probing must page someone."
     }
   }

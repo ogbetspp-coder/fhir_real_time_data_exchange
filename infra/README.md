@@ -26,7 +26,8 @@ Only by the deploy workflow. A merge to `main` that touches a deployable path ru
 Identity Federation (admitted only for `main` and that workflow) and runs `scripts/gcp/deploy.sh`.
 That script is the only place the inputs below are assembled (`tf_deploy_vars`): it builds the
 images, resolves their digests, and applies with the deployed commit as `service_version`.
-Before applying it refuses a missing or placeholder alert recipient, and asks Resource Manager
+Before applying it refuses a placeholder alert recipient, and a missing one outside `dev` (whose
+alerts page no one until it is given a real address; owner decision, 2026-09-28), and asks Resource Manager
 (`testIamPermissions`) whether the deployer holds every permission the apply needs
 (`APPLY_PERMISSIONS`): an apply missing one fails part-way, after its independent changes.
 
@@ -81,8 +82,9 @@ Set by `deploy.sh` on every plan and apply unless marked "default".
 | `query_token_creators`            | `QUERY_TOKEN_CREATORS`                                                                    | Members who may impersonate the caller service account                                                                     |
 | `query_entitlements_json`         | `QUERY_ENTITLEMENTS_JSON`                                                                 | Entitlement map: principal to the bundles it may read                                                                      |
 | `query_oauth_client_ids`          | `QUERY_OAUTH_CLIENT_IDS`                                                                  | OAuth client ids whose access tokens the query service accepts                                                             |
-| `alert_notification_email`        | `ALERT_NOTIFICATION_EMAIL`                                                                | Paged by every alert (key made unavailable, failed run, entitlement denials); this or a channel is required                |
-| `alert_notification_channels`     | `ALERT_NOTIFICATION_CHANNELS` (optional)                                                  | Existing notification channels paged by every alert, beside or instead of the e-mail                                       |
+| `alert_notification_email`        | `ALERT_NOTIFICATION_EMAIL` (not passed to dev)                                            | Paged by every alert (key made unavailable, failed run, entitlement denials); this or a channel is required outside dev    |
+| `alert_notification_channels`     | `ALERT_NOTIFICATION_CHANNELS` (optional; not passed to dev)                               | Existing notification channels paged by every alert, beside or instead of the e-mail                                       |
+| `require_alert_recipient`         | `REQUIRE_ALERT_RECIPIENT`, from `scripts/gcp/environments/` (`false` in dev only)         | Whether an apply must name a recipient; refused as `false` outside dev, whose alerts then page no one                      |
 | `query_log_rejection_reason`      | `QUERY_LOG_REJECTION_REASON`, from `scripts/gcp/environments/`                            | Log the category of a refused credential (dev only)                                                                        |
 | `query_audience`                  | default (empty)                                                                           | Override for the query service's OIDC audience                                                                             |
 | `allow_synthetic_sources`         | `ALLOW_SYNTHETIC_SOURCES`, from `scripts/gcp/environments/` (`true` in dev only)          | Whether the worker accepts synthetic content and the gate-bypassing sources (docs/design/authority-import-contract.md, D7) |
