@@ -79,13 +79,9 @@ export function workflowPin(action, key, directory) {
 
 // A pin kept behind upstream on purpose: reported as `held`, with its reason, while it stays at
 // `value`; any other value is judged against upstream as usual.
-export const HELD = {
-  "Cloud Build docker builder": {
-    value: "sha256:001fb4a870a84485cf198c80002f7af42f6456f2dbc261d70a0b5f0111470df4",
-    reason:
-      "docker:20.10.24, the legacy builder, held until the move to docker:29 and BuildKit is rehearsed on Cloud Build (audit B07 review round 1, M-1; batch B13)",
-  },
-};
+// None today: the Cloud Build docker builder, held on docker:20.10.24 until the move to docker:29
+// was rehearsed (audit B07 review round 1, M-1), moved in audit B13.
+export const HELD = {};
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 // How old the renderer's Debian snapshot may be before it is reported: its security suite is

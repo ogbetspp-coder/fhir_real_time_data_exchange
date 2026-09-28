@@ -687,9 +687,14 @@ resolve_image_digest() {
   # The header is read from a pipe, not given as --user, which would put the token in curl's
   # argument list (common.sh, ema_flow_header).
   token="$(ema_flow_access_token)"
+  # Every manifest type a tag can name, an index included (audit B13): a registry asked for a type
+  # the tag does not hold answers 404, not the digest. cloudbuild.images.yaml builds each tag as a
+  # single image (--provenance=false --sbom=false), so the digest is that image's. Should a tag ever
+  # be an index, its digest is pinned as it is: an index names each platform's image by digest, so
+  # it fixes the linux/amd64 image Cloud Run runs as surely, and Cloud Run accepts one.
   digest="$(curl --fail --silent --show-error --head \
     --header @<(ema_flow_header Authorization "Basic $(printf 'oauth2accesstoken:%s' "$token" | base64 | tr -d '\n')") \
-    --header "Accept: application/vnd.docker.distribution.manifest.v2+json,application/vnd.oci.image.manifest.v1+json" \
+    --header "Accept: application/vnd.docker.distribution.manifest.v2+json,application/vnd.oci.image.manifest.v1+json,application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.list.v2+json" \
     "https://${REGION}-docker.pkg.dev/v2/${PROJECT_ID}/${REPOSITORY_ID}/${image_name}/manifests/${tag}" \
     | tr -d '\r' | grep -i '^docker-content-digest:' | awk '{print $2}')"
   if [[ -z "$digest" ]]; then
