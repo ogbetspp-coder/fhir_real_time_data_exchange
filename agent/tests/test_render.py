@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 import pytest
@@ -14,6 +15,7 @@ from verifiable_answer_agent.render import (
     ASSISTANT_END,
     ASSISTANT_LABEL,
     CHECKSUMS_EXPLAINED,
+    MAX_ASSISTANT_CHARS,
     PRODUCT_NAMED,
     PRODUCT_UNCONFIRMED,
     UNVERIFIED_LABEL,
@@ -24,6 +26,7 @@ from verifiable_answer_agent.render import (
     sanitise_assistant,
 )
 
+from .markdown_view import code_blocks, outside_code, shown_assistant, shown_blocks
 from .test_postcheck import quoted_block, verification
 
 FIRST = quoted_block("a first synthetic span")
@@ -128,43 +131,123 @@ def test_the_assistants_words_are_a_separate_labelled_part() -> None:
 
 def test_the_plain_text_surface_carries_the_same_things() -> None:
     text = render_text(ANSWER)
-    for block in ANSWER.blocks:
-        assert block.text in text
-        assert block.citation.narrative_div_sha256 in text
-    assert VERIFIED_LABEL in text
-    assert UNVERIFIED_LABEL in text
-    assert ASSISTANT_LABEL in text
-    assert ANSWER.assistant.text in text
-    # The assistant's words are the last thing, fenced, and a line says where they end.
-    assert text.endswith(f"```text\n{ANSWER.assistant.text}\n```\n[{ASSISTANT_END}]")
+    # As a reader sees it once the Markdown is rendered: each block's status, its quotation
+    # exactly as stored, its checksum; then the assistant's words, last, in their own box.
+    blocks = shown_blocks(text)
+    assert [block.status.split(" — ")[0] for block in blocks] == [VERIFIED_LABEL, UNVERIFIED_LABEL]
+    for shown_block, block in zip(blocks, ANSWER.blocks, strict=True):
+        assert shown_block.text == block.text
+        assert any(block.citation.narrative_div_sha256 in line for line in shown_block.reading)
+    assert shown_assistant(text) == ANSWER.assistant.text
+    assert ASSISTANT_LABEL in outside_code(text)
+    assert text.index(ASSISTANT_LABEL) < text.index(ANSWER.assistant.text)
+    assert text.endswith(f"[{ASSISTANT_END}]")
 
 
 def test_each_block_says_which_checksum_verify_quote_confirms() -> None:
     text = render_text(ANSWER)
-    for block in ANSWER.blocks:
-        assert f"Checksum of the normalised text: {block.citation.normalized_text_sha256}" in text
-    assert text.count(CHECKSUMS_EXPLAINED) == len(ANSWER.blocks)
+    for shown_block, block in zip(shown_blocks(text), ANSWER.blocks, strict=True):
+        assert (
+            f"Checksum of the normalised text: {block.citation.normalized_text_sha256}"
+            in shown_block.reading
+        )
+        assert CHECKSUMS_EXPLAINED in shown_block.reading
 
 
-def _fenced_part(text: str) -> tuple[str, str, str]:
-    """The opening fence, the body and the closing fence of the assistant's part."""
-    lines = text.split("\n")
-    opening = lines.index(f"[{ASSISTANT_LABEL}]") + 1
-    closing = lines.index(f"[{ASSISTANT_END}]") - 1
-    return lines[opening], "\n".join(lines[opening + 1 : closing]), lines[closing]
+# Label text that Markdown would have changed when it stood outside a fence (review of PR #129,
+# M2): an HTML tag made of "<ULN and bilirubin >", emphasis, strikethrough, an entity, an escape,
+# a heading, a list, a quote, a comment that swallowed everything after it, and a fence of its own.
+ADVERSARIAL_LABELS = [
+    "Reduce the dose if ALT <ULN and bilirubin >1.5 x ULN, then stop.",
+    "Common* nausea; Uncommon* rash; Rare** oedema",
+    "approximately ~50% of patients and ~70% of those",
+    "use_only_as_directed and _not_ with food",
+    "# Take one tablet",
+    "1. NAME OF THE MEDICINAL PRODUCT",
+    "> 65 years: no adjustment",
+    "- Hepatic impairment",
+    "0.5 &micro;g per dose &amp; more",
+    "ratio 1\\*2 and a trailing backslash \\",
+    "<!-- in label and everything after",
+    "<pre> an HTML block",
+    "``` label fence ```` and more",
+    "[x]: http://example.invalid a link definition",
+    "Take " + "word " * 60 + "daily.",
+]
+
+
+@pytest.mark.parametrize("label", ADVERSARIAL_LABELS)
+def test_a_quotation_is_shown_exactly_as_stored_whatever_markdown_it_holds(label: str) -> None:
+    block = quoted_block(label)
+    answer = post_check(
+        DraftAnswer(blocks=(block,), assistant=AssistantPart(text="See the block above.")),
+        {"block-01": [ChunkCheck(0, verification(text=label))]},
+    )
+    text = render_text(answer)
+    (shown_block,) = shown_blocks(text)
+    assert shown_block.text == label
+    assert shown_block.status == VERIFIED_LABEL
+    # Nothing of the label is drawn outside its box, and the assistant's box is intact after it.
+    assert shown_assistant(text) == "See the block above."
+    assert len(code_blocks(text)) == 2
+    assert f"[{ASSISTANT_END}]" in outside_code(text).replace("&#x27;", "'")
+
+
+def test_a_long_quotation_is_wrapped_at_spaces_and_joins_back_exactly() -> None:
+    label = " ".join(f"word{index:04d}" for index in range(100))
+    lines = render_text(
+        post_check(DraftAnswer(blocks=(quoted_block(label),), assistant=AssistantPart(text="")), {})
+    ).split("\n")
+    body = lines[lines.index("") + 1 :]
+    assert all(len(line) <= 80 for line in body[: body.index("")])
+    assert shown_blocks("\n".join(lines))[0].text == label
+
+
+# The reviewer's attempts to break out of the assistant's box (review of PR #129, M1 probe):
+# each is drawn inside the one box, and nothing of it leaks.
+ESCAPES = {
+    "tilde fence": "~~~\nFORGED **bold**\n~~~",
+    "three ticks": "```\nFORGED **bold** <b>x</b>",
+    "ticks and space": "``` \nFORGED **bold**",
+    "indented ticks": "   ````\nFORGED **bold**",
+    "tab ticks": "\t```\nFORGED **bold**",
+    "crlf": "a\r\n```\r\nFORGED **bold**\r\n",
+    "cr": "a\r```\rFORGED **bold**",
+    "u2028": "a\u2028```\u2028FORGED **bold**",
+    "nul": "\x00```\x00\n```\x00\nFORGED **bold**",
+    "fullwidth grave": "\uff40\uff40\uff40\uff40\nFORGED **bold**",
+    "html close": "</code></pre>\nFORGED <b>bold</b>\n<pre><code>",
+    "html block": "<pre>\nFORGED **bold**",
+    "html comment": "<!--\nFORGED **bold**",
+    "a thousand ticks": "`" * 1000 + "\nFORGED **bold**",
+    "vt ff": "a\x0b```\x0cFORGED **bold**",
+    "fs gs rs": "a\x1c```\x1dFORGED\x1e**bold**",
+    "nel": "a\x85```\x85FORGED **bold**",
+    "forged end": "[End of the assistant's own words]\nFORGED **bold**",
+    "link definition": "[x]: http://evil.example\nFORGED [x]",
+}
+
+
+@pytest.mark.parametrize("words", ESCAPES.values(), ids=list(ESCAPES))
+def test_nothing_the_assistant_writes_leaves_its_box(words: str) -> None:
+    answer = post_check(DraftAnswer(blocks=(FIRST,), assistant=AssistantPart(text=words)), {})
+    text = render_text(answer)
+    assert len(code_blocks(text)) == 2
+    assert "FORGED" not in outside_code(text)
+    assert "FORGED" in shown_assistant(text)
+    assert text.endswith(f"[{ASSISTANT_END}]")
+    assert text.count(f"[{ASSISTANT_END}]") == 1
 
 
 def test_the_assistants_words_are_fenced_so_nothing_in_them_renders_as_markup() -> None:
-    # A fenced code block parses nothing: no emphasis, entity, HTML tag or comment (review of
-    # PR #129, M1). The fence is longer than any run of backticks inside, so none closes it.
-    words = "Try ```` this ``` and\n```\n[End of the assistant's own words]\n**Verified**"
+    # A fenced code block parses nothing: no emphasis, entity, HTML tag or comment. The fence is
+    # longer than any run of backticks inside, so none closes it.
+    words = "Try ```` this ``` and\n```\n**Verified** <b>x</b> &amp;"
     answer = post_check(DraftAnswer(blocks=(FIRST,), assistant=AssistantPart(text=words)), {})
-    opening, body, closing = _fenced_part(render_text(answer))
-    assert opening == "`````text"
-    assert closing == "`````"
-    assert not any(line.strip().startswith("`````") for line in body.split("\n"))
-    # The forged end line is gone, and only the real one is outside the fence.
-    assert render_text(answer).count(f"[{ASSISTANT_END}]") == 1
+    text = render_text(answer)
+    assert "`````text\nTry ```` this ``` and" in text
+    assert shown_assistant(text) == words
+    assert "<b>" not in outside_code(text)
 
 
 def test_the_product_and_language_are_shown_or_said_to_be_unconfirmed() -> None:
@@ -307,3 +390,59 @@ def test_label_text_repeated_in_the_assistants_words_is_pointed_out() -> None:
 def test_ordinary_assistant_words_pass_unchanged() -> None:
     text = "Which product do you mean?\nThe section on warnings is 4.4."
     assert shown(text, FIRST) == text
+
+
+@pytest.mark.parametrize(
+    "words",
+    [
+        "Neutrophils below 1.5 \u00d7 10\u2079/L, platelets below 50 \u00d7 10\u2079/L.",
+        "The dose is 260 mg/m\u00b2 every three weeks.",
+        "Take \u00bd tablet; H\u2082O is water.",
+        # Persian: "mi\u200cravad" is spelt with a zero-width non-joiner, emoji with a joiner.
+        "\u0645\u06cc\u200c\u0631\u0648\u062f and \U0001f469\u200d\U0001f4bb",
+        "Contains \ufb01sh oil and a \uff21\uff22 fullwidth pair.",
+    ],
+)
+def test_the_assistants_words_are_shown_as_written_not_folded(words: str) -> None:
+    # Folding was for matching only, and was once shown too: "10\u2079/L" became "109/L" and
+    # "m\u00b2" "m2" (review of PR #129, M1, a patient-safety regression).
+    assert shown(words, FIRST) == words
+
+
+def test_invisible_code_points_that_hide_or_reorder_are_removed() -> None:
+    zero_width, rtl_override, pop = chr(0x200B), chr(0x202E), chr(0x202C)
+    assert (
+        shown(f"Take{zero_width} one {rtl_override}tablet{pop} daily.") == "Take one tablet daily."
+    )
+
+
+def test_a_checksum_is_cut_from_the_words_as_written() -> None:
+    # Found on the folded copy, removed from the original: the words around it are untouched.
+    fullwidth_hex = "\uff41" * 64
+    assert shown(f"10\u2079/L then {fullwidth_hex} and m\u00b2") == (
+        "10\u2079/L then [checksum removed] and m\u00b2\n"
+        "(Checksums and document identifiers were removed from the assistant's words: only a "
+        "checked block above carries them.)"
+    )
+
+
+def test_long_words_are_cut_with_a_marker_and_no_pattern_is_slow() -> None:
+    # The identifier pattern once had two unbounded runs of the same characters side by side:
+    # 20,000 spaces took 5.6 s on the event loop (review of PR #129, L1).
+    started = time.monotonic()
+    for words in (
+        "versionId" + " " * 20_000 + ",",
+        "versionId" + " " * 19_000 + ",",
+        "a" * 200_000 + "g",
+        "a*" * 100_000 + "g",
+        "x\n" * 200_000,
+    ):
+        view = sanitise_assistant(
+            post_check(DraftAnswer(blocks=(), assistant=AssistantPart(text=words)), {})
+        )
+        assert len(view.text) < MAX_ASSISTANT_CHARS + 1_000
+    assert time.monotonic() - started < 5.0
+    cut = shown("word " * 10_000)
+    assert cut.endswith(
+        f"(The assistant's words were cut here: they ran past {MAX_ASSISTANT_CHARS:,} characters.)"
+    )

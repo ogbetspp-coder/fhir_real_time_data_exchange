@@ -57,6 +57,7 @@ from .fake_query_service import (
     FakeQueryService,
     long_section,
 )
+from .markdown_view import shown_blocks
 
 SECTION_KEY = "smpc.4.4"
 TURN_ID = "0f6d1a2e-3b4c-4d5e-8f60-718293a4b5c6"
@@ -205,7 +206,7 @@ async def test_an_e_mail_user_id_still_gets_its_checked_answer_and_a_record(
         "Here is what it says.",
         user_id="alice@example.com",
     )
-    assert shown.startswith(VERIFIED_LABEL)
+    assert [block.status for block in shown_blocks(shown)] == [VERIFIED_LABEL]
     assert shown != UNVERIFIABLE_NOTICE
     (record,) = _records(capsys)
     assert _validates(record)
@@ -242,7 +243,7 @@ async def test_a_record_that_cannot_be_built_never_hides_the_checked_answer(
     shown = await _run(
         query_service, _events(query_service, "synthetic-invocation"), "Here is what it says."
     )
-    assert shown.startswith(VERIFIED_LABEL)
+    assert [block.status for block in shown_blocks(shown)] == [VERIFIED_LABEL]
     (record,) = _records(capsys)
     assert _validates(record)
     assert record["outcome"] == "answered"
@@ -437,7 +438,8 @@ async def test_a_verbatim_block_over_the_quote_bound_is_verified_end_to_end(
     # Every chunk was within the bound, and together they are the whole block.
     assert all(utf16_length(quote) <= VERIFY_QUOTE_MAX_UTF16 for quote in quotes)
     assert " ".join(quotes) == text
-    assert shown.startswith(VERIFIED_LABEL + "\n" + text[:40])
+    (block,) = shown_blocks(shown)
+    assert (block.status, block.text) == (VERIFIED_LABEL, text)
     assert "not verified" not in shown.lower()
     assert "no-match" not in shown
 

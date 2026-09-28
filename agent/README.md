@@ -95,12 +95,34 @@ backticks in them, so no Markdown or HTML they contain is rendered and no line o
 the fence. A fence rather than escaping, because CommonMark parses nothing inside one, it
 closes only on a line of as many backticks, and on a surface that renders no Markdown it still
 shows two marker lines around the words; escaping would rely on every escape being honoured,
-show backslashes where one is not, and draw no boundary. (The A2UI renderer gives them their own
-Text component instead.)
+show backslashes where one is not, and draw no boundary.
 
-As defence in depth (`render.sanitise_assistant`), the words are split on every kind of line
-break (`str.splitlines`: carriage return, U+0085, U+2028 as well as line feed), shown
-compatibility-folded with zero-width and format characters removed, and filtered: a line that
+**The same fence carries every checked block** (review of PR #129, M2). Gemini Enterprise
+renders the answer as Markdown, and a label's own text is not Markdown: "ALT <ULN and bilirubin
+
+> 1.5 x ULN" lost "<ULN and bilirubin >" as an HTML tag, "_not_" became emphasis, "&micro;" an
+> entity, a label opening "# " or "1. " a heading or a list, and a "<!--" in a label swallowed the
+> rest of the answer. Each block — its status line, its quotation, its citation and checksums — is
+> now one fenced code block, the quotation wrapped at spaces to 80 characters (a normalised section
+> is a single line, and a code block does not wrap), so the lines joined by single spaces are the
+> stored text exactly. Only this module's own fixed sentences stand between the fences, each its
+> own paragraph. The verbatim display of a quotation therefore depends on the fence:
+> `tests/test_render.py` renders adversarial label text and the reviewer's escape attempts through
+> a CommonMark parser (markdown-it-py, a test-only dependency) and checks that each quotation comes
+> back out of its fence exactly and nothing leaks outside one. (The A2UI renderer gives each part
+> its own `Text` component and does not fence it; A2UI is not sent, and before it is the same
+> question has to be settled for that surface.)
+
+As defence in depth (`render.sanitise_assistant`), the words are cut at 20,000 characters (with a
+marker saying so), split on every kind of line break (`str.splitlines`: carriage return,
+U+0085, U+2028 as well as line feed), and **shown as written**, less only the code points that
+draw nothing and can hide or reorder what is drawn (zero-width space, word joiner, bidirectional
+controls, byte order mark, control characters); the joiners U+200C and U+200D are kept, since
+Persian words and emoji are spelt with them. The patterns read a folded copy — compatibility-folded
+per code point, format characters dropped — mapped back to the line as written, so a checksum or
+identifier found there is cut from the original where it stands and a folded line is never
+shown: round 1 of the review showed the folded line, which turned "10⁹/L" into "109/L" and
+"m²" into "m2" (round 2, M1). The filters: a line that
 opens with a label reserved for checked text, or has the citation line's whole shape ("From
 section … of document version"), is removed — compared as letters and digits only, after HTML
 entities are decoded, HTML comments and tags dropped and Cyrillic and Greek look-alikes folded,
@@ -344,8 +366,10 @@ one, so the change is defence in depth: an answer the union refuses is unavailab
 match. The schema cannot say that `startOffset` comes before `endOffset` (zod checks it at the
 service); the post-check's own rule is stricter anyway, since every match must sit at its
 chunk's exact offsets. A `verify_quote` answer from a service on an earlier version validates
-here unchanged, because the service never produced an instance 4.0.0 refuses. (4.0.0 follows
-3.0.0, the query service's own batch of the same audit; this agent was adapted to both.)
+here unchanged, because the service never produced an instance 4.0.0 refuses. (4.0.0 is numbered
+to follow 3.0.0, the query service's own batch of the same audit, which has not merged at the
+time of writing: this branch is to be rebased onto it and the schemas regenerated, after which
+the agent is adapted to both. Until then it is adapted to 4.0.0 over 2.0.1.)
 
 ## The turn id
 
@@ -482,6 +506,9 @@ default destination.
   to compare with the hashes it returned beside them.
 - **No A2UI in the deployed path.** `render_a2ui` is built and tested; the deployed agent renders
   for the `text` surface, because nothing it is served through advertises the A2UI extension.
+  Its `Text` components carry quotations and the assistant's words unfenced; whether that is
+  safe depends on whether the surface parses Markdown in a `Text`, to be settled before it is
+  sent.
 - **No selection of blocks by the model.** Every section the model fetched in the turn is shown
   (at most eight, `compose.MAX_BLOCKS`; the answer says how many more were read), labelled as
   the sections read, not as the answer; the model's own words say which of them answer the

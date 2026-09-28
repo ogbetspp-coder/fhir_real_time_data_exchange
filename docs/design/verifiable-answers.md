@@ -36,18 +36,28 @@ can put an intended-use statement around. What keeps it honest, as built (2026-0
   citation; the model cannot write into one. So an unverified string cannot be presented as a
   quotation. The blocks are what was read, not a selection the model vouches for, and the answer
   says so; at most eight are shown, and the answer says how many more were read.
+- **Verbatim display depends on the fence.** Gemini Enterprise renders the answer as Markdown,
+  and label text read as Markdown changes: "<ULN and bilirubin >" is taken for an HTML tag,
+  "_not_" for emphasis, "&micro;" for an entity, a line opening "# " or "1. " for a heading or a
+  list, and a "<!--" swallows the rest of the answer. So each block — status, quotation,
+  citation, checksums — is a fenced code block, in which nothing is parsed, the quotation
+  wrapped at spaces so that its lines joined by single spaces are the stored text exactly. A
+  test renders adversarial label text through a CommonMark parser and requires each quotation
+  back out of its fence exactly. The A2UI renderer does not fence; it is not sent.
 - **The model's own words cannot render as anything but its own words.** On the text surface
   they are shown inside a fenced code block, between a label line and an end line; Markdown
   and HTML are not parsed inside a fence, and the fence is longer than any run of backticks in
   them, so nothing the model writes — emphasis, an entity, a tag, a comment, a forged end line
   — renders as markup or closes the box. That is the structural guarantee. As defence in depth
-  the words are also filtered: split on every kind of line break, compatibility-folded and
-  stripped of zero-width and format characters, a line that opens with (or has the shape of)
-  a label reserved for checked text is removed — read with Markdown, HTML and look-alike Cyrillic
-  and Greek letters set aside — and checksum-like runs of hexadecimal digits and document
-  identifiers named with an identifier-like value are removed. Each removal is said in the
-  answer and recorded (`assistantFlags`). The filters are patterns and can be missed; the fence
-  does not depend on them.
+  the words are also filtered. They are shown as written — "10⁹/L" stays "10⁹/L" — less only the
+  invisible code points that can hide or reorder text (the joiners some scripts need are kept);
+  the patterns read a compatibility-folded copy mapped back to the original: a line that opens
+  with (or has the shape of) a label reserved for checked text is removed — read with Markdown,
+  HTML and look-alike Cyrillic and Greek letters set aside — and checksum-like runs of
+  hexadecimal digits and document identifiers named with an identifier-like value are cut out
+  where they stand. Words past 20,000 characters are cut, with a note. Each removal is said in
+  the answer and recorded (`assistantFlags`). The filters are patterns and can be missed; the
+  fence does not depend on them.
 - **Label text in the model's own words is pointed out, not checked.** Where they share eight or
   more consecutive words with a block, the answer says they repeat label text and are not
   checked, and the record carries `label-text-repeated`. This is a runtime flag, not the

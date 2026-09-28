@@ -6,13 +6,19 @@ of a user. That is the invariant, stated in the signatures.
 
 Two surfaces:
 
-- **Plain structured text**, which is what the deployed agent returns (``finish`` asks for
-  ``text``): Gemini Enterprise receives the answer as the text of the turn's final event. No
-  Markdown emphasis, because the quoted text must not be decorated.
+- **Structured text**, which is what the deployed agent returns (``finish`` asks for ``text``):
+  Gemini Enterprise receives the answer as the text of the turn's final event and renders it as
+  Markdown. Every block and the assistant's words are fenced code blocks, so the verbatim
+  display of a quotation depends on the fence, not on what the label happens to contain
+  (``render_text``).
 - **A2UI** (v0.9.1), built and tested but not yet sent anywhere: one ``createSurface``
   envelope followed by one ``updateComponents`` envelope carrying a flat adjacency list,
   exactly as the specification describes them. Sending it needs an A2A surface that
-  advertises the extension; nothing in the deployed path does yet.
+  advertises the extension; nothing in the deployed path does yet. Its ``Text`` components carry
+  each quotation and the assistant's words as plain strings, unfenced: if a surface renders a
+  ``Text`` as Markdown, a label's own "<", "*" or "_" would be read as markup there. Before A2UI
+  is sent, that has to be settled for the surface in question — a component that does not parse
+  Markdown, or the same fencing — and tested as ``render_text`` is.
 
 Both put the citation next to the quotation and the verification status on the block itself,
 and both label the assistant's own words as the assistant's own words. The assistant's words are
@@ -188,33 +194,60 @@ def render_a2ui(
 
 
 def render_text(answer: CheckedAnswer) -> str:
-    """The same answer where no structured surface exists. Labels, not decoration.
+    """The same answer where no structured surface exists: Markdown that shows only literal text.
 
-    What a reader needs first is the quotation and whether it was verified; what an auditor
-    needs is the product, the version and the checksums, which follow it on their own lines. The
-    block id is an internal handle and belongs in the audit record, not in a person's reading.
-    The checksums are written in full: this is the surface Gemini Enterprise shows, and a
-    checksum a reader cannot copy is not evidence.
+    Gemini Enterprise renders this text as Markdown, so nothing in it is left for Markdown to
+    read (review of PR #129, M2). Each block — its status, its quotation and its reading lines —
+    is one fenced code block (``_fenced``), in which nothing is parsed: a label's own "<", "*",
+    "_", "~", "&micro;", a backslash, or a line opening "#", "1." or ">", is shown as the store
+    holds it, and a "<!--" in a label cannot swallow what follows. So is the assistant's part,
+    last, between
+    a label and an end line. Between the fences are only this module's own fixed sentences. Every
+    element is its own paragraph, a blank line apart, so none runs into the next.
 
-    The assistant's words come last, between a label and an end line, and inside a fenced code
-    block (``_fenced``): Gemini Enterprise renders this text as Markdown, and inside a fence
-    nothing is Markdown or HTML, so no emphasis, entity, comment or tag the model writes can make
-    its words render as anything but its own words in a box.
+    What a reader needs first is whether the block was verified and the quotation; what an
+    auditor needs is the product, the version and the checksums, which follow it. The quotation is
+    wrapped at spaces to ``_WRAP`` characters a line — a normalised section is one line, and a
+    code block does not wrap it — so joining its lines with single spaces gives back the stored
+    text exactly. The block id is an internal handle and belongs in the audit record, not in a
+    person's reading. The checksums are written in full: a checksum a reader cannot copy is not
+    evidence.
+    """
+    parts: list[str] = []
+    for block in answer.blocks:
+        body = [_status_line(block), "", *_wrapped(block.text), "", *_reading_lines(block)]
+        parts.append("\n".join(_fenced("\n".join(body))))
+    parts.extend(_after_blocks(answer))
+    parts.append(f"[{ASSISTANT_LABEL}]")
+    parts.append("\n".join(_fenced(sanitise_assistant(answer).text)))
+    parts.append(f"[{ASSISTANT_END}]")
+    return "\n\n".join(parts)
+
+
+# The widest line a quotation is wrapped to inside its fence.
+_WRAP: Final = 80
+
+
+def _wrapped(text: str) -> list[str]:
+    """``text`` broken at single spaces into lines of at most ``_WRAP`` characters.
+
+    A word longer than the width is a line of its own. Each break replaces exactly one space, so
+    ``" ".join`` of the lines is ``text`` again; the text's own line breaks, if any, are kept.
     """
     lines: list[str] = []
-    for block in answer.blocks:
-        lines.append(_status_line(block))
-        lines.append(block.text)
-        lines.extend(_reading_lines(block))
-        lines.append("")
-    after = _after_blocks(answer)
-    if after:
-        lines.extend(after)
-        lines.append("")
-    lines.append(f"[{ASSISTANT_LABEL}]")
-    lines.extend(_fenced(sanitise_assistant(answer).text))
-    lines.append(f"[{ASSISTANT_END}]")
-    return "\n".join(lines)
+    for line in text.split("\n"):
+        current: list[str] = []
+        width = 0
+        for word in line.split(" "):
+            added = len(word) + (1 if current else 0)
+            if current and width + added > _WRAP:
+                lines.append(" ".join(current))
+                current, width = [word], len(word)
+            else:
+                current.append(word)
+                width += added
+        lines.append(" ".join(current))
+    return lines
 
 
 def _fenced(text: str) -> list[str]:
@@ -228,12 +261,14 @@ def _fenced(text: str) -> list[str]:
     closes a backtick one). Escaping depends on the renderer honouring backslash escapes for
     every character that could matter, shows the backslashes wherever it does not, and draws no
     boundary; a fence is a visible box where Markdown is rendered and two plain marker lines
-    where it is not. ``text`` has no line breaks but line feeds (``sanitise_assistant`` splits on
-    every kind), so a carriage return cannot end a line early.
+    where it is not. The text's line breaks of every kind are made line feeds first, so a
+    carriage return cannot end a line where it was not counted. A render through a CommonMark
+    parser is in ``tests/test_render.py``.
     """
-    longest = max((len(run) for run in re.findall(r"`+", text)), default=0)
+    body = "\n".join(text.splitlines())
+    longest = max((len(run) for run in re.findall(r"`+", body)), default=0)
     fence = "`" * max(3, longest + 1)
-    return [f"{fence}text", text, fence]
+    return [f"{fence}text", body, fence]
 
 
 def _after_blocks(answer: CheckedAnswer) -> list[str]:
@@ -282,17 +317,19 @@ _CITATION_SHAPE: Final = re.compile(r"fromsection.{1,200}?ofdocumentversion")
 
 # A checksum-like run: 32 or more hexadecimal digits standing alone, however Markdown emphasis or
 # code marks are threaded through it. Only a checked block may carry one; the model has been seen
-# inventing them (deploy/README.md, 2026-09-22). Read after compatibility folding and with
-# zero-width characters gone, so neither fullwidth digits nor a zero-width space hides one.
+# inventing them (deploy/README.md, 2026-09-22). Matched on the folded copy (``_folded``), so
+# neither fullwidth digits nor a zero-width space hides one; removed from the line as written.
 _HEX_RUN: Final = re.compile(
     r"(?<![0-9A-Za-z])[0-9A-Fa-f](?:[*_~`\\]*[0-9A-Fa-f]){31,}(?![0-9A-Za-z])"
 )
 # A document identifier named by its field, with the value after it. The value is removed only
 # when it looks like an identifier (a digit or one of . _ : / + - in it); "the version ID shown
-# with each block" is prose, and keeps its next word.
+# with each block" is prose, and keeps its next word. The separators are bounded, and the colon
+# group optional as a whole: two unbounded runs of the same characters side by side made the
+# match quadratic (20,000 spaces took 5.6 s, review of PR #129).
 _IDENTIFIER: Final = re.compile(
     r"\b(?:bundle|version|source|narrativeDiv|normalizedText|quote)[ _-]?(?:id|key|sha256)\b"
-    r"[\s`'\"*]*[:=]?[\s`'\"*]*(?P<value>[A-Za-z0-9._:/+-]+)",
+    r"[\s`'\"*]{0,16}(?:[:=][\s`'\"*]{0,16})?(?P<value>[A-Za-z0-9._:/+-]+)",
     re.IGNORECASE,
 )
 _ID_LIKE: Final = re.compile(r"[0-9._:/+-]")
@@ -306,30 +343,50 @@ _CONFUSABLES: Final = str.maketrans(
 )
 # How many words in a row the assistant may share with a block before it is pointed out.
 _REPEATED_WORDS: Final = 8
+# The longest the assistant's words are shown: more is cut, and the answer says so. The model has
+# no reason to write more, and the filters below are linear but not free.
+MAX_ASSISTANT_CHARS: Final = 20_000
+
+# What is taken out of the assistant's words as shown: code points that draw nothing and can hide
+# or reorder what is drawn — zero-width space, word joiner and the invisible operators, the byte
+# order mark, the Mongolian vowel separator, the bidirectional marks, embeddings, overrides and
+# isolates — and the C0 and C1 controls but tab. The joiners (U+200C, U+200D) are kept: Persian
+# and other scripts spell words with them, and emoji sequences are built with them. Nothing else
+# is changed: "10⁹/L", "m²" and "½" are shown as written (review of PR #129, M1).
+_HIDDEN: Final = (
+    frozenset(chr(point) for point in (0x200B, 0x200E, 0x200F, 0x061C, 0x180E, 0xFEFF))
+    | frozenset(chr(point) for point in (*range(0x202A, 0x202F), *range(0x2060, 0x2070)))
+    | frozenset(chr(point) for point in (*range(0x09), *range(0x0A, 0x20), 0x7F))
+    | frozenset(chr(point) for point in range(0x80, 0xA0))
+)
 
 
-def _shown(line: str) -> str:
-    """A line of the assistant's words as it is shown: compatibility-folded, invisibles gone.
+def _visible(line: str) -> str:
+    """The line as it is shown: only the code points in ``_HIDDEN`` removed."""
+    return "".join(character for character in line if character not in _HIDDEN)
 
-    NFKC folds fullwidth and other compatibility forms to their plain letters and digits;
-    format characters and every other zero-width or default-ignorable code point are removed;
-    any remaining gap (a no-break or thin space) becomes a plain space.
+
+def _folded(line: str) -> tuple[str, list[int]]:
+    """The copy of a shown line the patterns read, and where each of its code points came from.
+
+    Each code point is compatibility-folded on its own (fullwidth to plain, superscript to
+    digit), format characters and the other zero-width and default-ignorable code points are
+    dropped, and any remaining gap becomes a space. ``origin[i]`` is the index in ``line`` of the
+    code point that gave the folded copy's ``i``th, so a match found here is removed from the
+    line as written, and a folded line is never shown.
     """
-    folded = unicodedata.normalize("NFKC", line)
-    kept: list[str] = []
-    for character in folded:
-        if unicodedata.category(character) == "Cf":
+    folded: list[str] = []
+    origin: list[int] = []
+    for index, character in enumerate(line):
+        if unicodedata.category(character) == "Cf" or character in _INVISIBLE_GAPS:
             continue
-        if is_gap(character):
-            if character in _INVISIBLE_GAPS:
-                continue
-            kept.append(" ")
-            continue
-        kept.append(character)
-    return "".join(kept)
+        for piece in unicodedata.normalize("NFKC", character):
+            folded.append(" " if is_gap(piece) else piece)
+            origin.append(index)
+    return "".join(folded), origin
 
 
-# The gaps that draw nothing (zero-width and default-ignorable): removed, not turned to spaces.
+# The gaps that draw nothing (zero-width and default-ignorable): dropped from the folded copy.
 _INVISIBLE_GAPS: Final = frozenset(
     chr(point)
     for point in (0x034F, 0x115F, 0x1160, 0x17B4, 0x17B5, 0x3164, 0xFFA0, *range(0x180B, 0x1810))
@@ -337,12 +394,13 @@ _INVISIBLE_GAPS: Final = frozenset(
 
 
 def _probe(line: str, *, keep_case: bool = False) -> str:
-    """A shown line as a reader would take it in, letters and digits only.
+    """A line as a reader would take it in, letters and digits only.
 
     HTML entities are decoded and HTML comments and tags dropped (a Markdown surface renders them
-    away); Cyrillic and Greek look-alikes are folded to Latin; then everything but letters and
-    digits goes — spaces, Markdown emphasis, table bars, list markers, emoji — and any leading
-    digits (a list number). Casefolded unless ``keep_case``.
+    away); the line is compatibility-folded and Cyrillic and Greek look-alikes are folded to
+    Latin; then everything but letters and digits goes — spaces, zero-width characters, Markdown
+    emphasis, table bars, list markers, emoji — and any leading digits (a list number).
+    Casefolded unless ``keep_case``. Used only to decide; never shown.
     """
     text = _HTML_TAG.sub("", _HTML_COMMENT.sub("", html.unescape(line)))
     text = unicodedata.normalize("NFKC", text).translate(_CONFUSABLES)
@@ -355,7 +413,7 @@ _RESERVED_PROBES: Final = tuple(_probe(opening) for opening in _RESERVED_OPENING
 
 
 def _reserved(line: str) -> bool:
-    """Whether a shown line opens with, or has the shape of, a label reserved for checked text."""
+    """Whether a line opens with, or has the shape of, a label reserved for checked text."""
     probe = _probe(line)
     return (
         probe.startswith(_RESERVED_PROBES)
@@ -364,17 +422,39 @@ def _reserved(line: str) -> bool:
     )
 
 
-def _without_identifiers(line: str) -> tuple[str, int]:
-    removed = 0
+def _removals(line: str) -> tuple[str, bool, bool]:
+    """``line`` with every checksum and identifier the folded copy shows cut out of it as written.
 
-    def replace(match: re.Match[str]) -> str:
-        nonlocal removed
-        if _ID_LIKE.search(match.group("value")) is None:
-            return match.group(0)
-        removed += 1
-        return "[identifier removed]"
-
-    return _IDENTIFIER.sub(replace, line), removed
+    Returns the line and whether a checksum and whether an identifier was removed. Overlapping
+    finds are removed as one span, marked as an identifier if either was one.
+    """
+    folded, origin = _folded(line)
+    spans: list[tuple[int, int, bool]] = [
+        (match.start(), match.end(), False) for match in _HEX_RUN.finditer(folded)
+    ]
+    spans.extend(
+        (match.start(), match.end(), True)
+        for match in _IDENTIFIER.finditer(folded)
+        if _ID_LIKE.search(match.group("value")) is not None
+    )
+    if not spans:
+        return line, False, False
+    merged: list[list[int]] = []
+    for start, end, identifier in sorted(spans):
+        if merged and start < merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], end)
+            merged[-1][2] |= identifier
+        else:
+            merged.append([start, end, int(identifier)])
+    shown = line
+    for start, end, named in reversed(merged):
+        marker = "[identifier removed]" if named else "[checksum removed]"
+        shown = shown[: origin[start]] + marker + shown[origin[end - 1] + 1 :]
+    return (
+        shown,
+        any(not identifier for _, _, identifier in spans),
+        any(identifier for _, _, identifier in spans),
+    )
 
 
 def _words(text: str) -> list[str]:
@@ -392,27 +472,36 @@ def sanitise_assistant(answer: CheckedAnswer) -> AssistantView:
     """The assistant's words as shown, and the ``AssistantFlag`` values for the audit record.
 
     Pure, and a function of the answer alone, so every renderer and the audit record agree. The
-    words are split on every kind of line break (``str.splitlines``: carriage returns, U+0085,
-    U+2028 and the rest, not only line feeds), each line is shown folded and without invisibles
-    (``_shown``), and the filters run on what is shown. On the text surface the result is then
-    fenced (``render_text``), which is the structural guarantee; the filters are defence in depth.
+    words are cut at ``MAX_ASSISTANT_CHARS``, split on every kind of line break
+    (``str.splitlines``: carriage returns, U+0085, U+2028 and the rest, not only line feeds), and
+    each line is shown as written less the code points that draw nothing (``_visible``). The
+    patterns read a folded copy (``_probe``, ``_folded``) and act on the line as written: a line
+    with a reserved label is dropped whole, a checksum or identifier is cut out where it stands.
+    On the text surface the result is then fenced (``render_text``), which is the structural
+    guarantee; the filters are defence in depth.
     """
     flags: set[AssistantFlag] = set()
     kept: list[str] = []
     removed_lines = 0
-    for raw in answer.assistant.text.splitlines():
-        line = _shown(raw)
+    words = answer.assistant.text
+    cut = len(words) > MAX_ASSISTANT_CHARS
+    for raw in words[:MAX_ASSISTANT_CHARS].splitlines():
+        line = _visible(raw)
         if _reserved(line):
             removed_lines += 1
             continue
-        without_checksums, checksums = _HEX_RUN.subn("[checksum removed]", line)
-        shown, identifiers = _without_identifiers(without_checksums)
-        if checksums:
+        shown, checksum, identifier = _removals(line)
+        if checksum:
             flags.add("checksum-removed")
-        if identifiers:
+        if identifier:
             flags.add("identifier-removed")
         kept.append(shown)
     notes: list[str] = []
+    if cut:
+        notes.append(
+            f"(The assistant's words were cut here: they ran past {MAX_ASSISTANT_CHARS:,} "
+            "characters.)"
+        )
     if removed_lines:
         flags.add("reserved-label-removed")
         notes.append(
@@ -427,7 +516,7 @@ def sanitise_assistant(answer: CheckedAnswer) -> AssistantView:
     block_shingles: set[tuple[str, ...]] = set()
     for block in answer.blocks:
         block_shingles |= _shingles(_words(block.text))
-    if block_shingles & _shingles(_words(answer.assistant.text)):
+    if block_shingles & _shingles(_words(words[:MAX_ASSISTANT_CHARS])):
         flags.add("label-text-repeated")
         notes.append(
             "(The assistant's words repeat label text. They are not checked: read the checked "
