@@ -8,7 +8,7 @@ import {
   importPublication,
   sha256Bytes,
 } from "../../src/authority/import.js";
-import { syntheticPublication } from "../../src/authority/synthetic.js";
+import { emaShapedPublication, syntheticPublication } from "../../src/authority/synthetic.js";
 import { verifyDocumentSubmission, type ImportRequest } from "../../src/contracts/index.js";
 import { loadEmaMapping, type EmaMapping } from "../../src/fhir/mapping.js";
 import {
@@ -202,11 +202,21 @@ describe("the first check a publication fails", () => {
       "pictures: picture-reference-in-no-known-grammar",
     );
     expect(refusal(withDiv(div("<p><img/></p>")))).toBe("pictures: picture-without-a-source");
-    // Every `<img` up to the first `>` is one tag; finding them is linear (the third code review).
-    const started = performance.now();
-    expect(refusal(withDiv(div(`<p>${"<img ".repeat(80000)}</p>`)))).toBe(
+    // The source is the `src` attribute of T's tree, its references decoded: another attribute
+    // that ends in `src`, or holds one in its value, is none.
+    expect(refusal(withDiv(div('<p><img data-src="#picture"/></p>')))).toBe(
       "pictures: picture-without-a-source",
     );
+    expect(refusal(withDiv(div("<p><img alt=\"x src='#picture'\"/></p>")))).toBe(
+      "pictures: picture-without-a-source",
+    );
+    expect(refusal(withDiv(div('<p><img src="&#35;picture"/></p>')))).toBe(
+      "pictures: pictures-not-enabled",
+    );
+    // A div T cannot read into a tree names no picture; T refuses it at the narrative. Reading
+    // one is linear (the third code review).
+    const started = performance.now();
+    expect(refusal(withDiv(div(`<p>${"<img ".repeat(80000)}</p>`)))).toBe("narrative: markup");
     expect(performance.now() - started).toBeLessThan(10_000);
     // T reads the style (red on white is 4.0:1, under T3a's 4.5:1), then the scanner reads T(div).
     expect(refusal(withDiv(div('<p style="color:red">x; not for clinical use</p>')))).toBe(
@@ -233,15 +243,16 @@ describe("the pinned EMA labels", () => {
   };
   const id = (url: string): string => url.split("/").at(-1) ?? "";
 
-  // Each refuses at the first check it fails, as recorded here when the importer was built:
-  // Imatinib Teva passes the shape, binding, tree and headings and stops at its two picture
-  // references, which PR 3 resolves; Nuvaxovid stops at its pictures; Brukinsa keeps the
-  // template's brackets in two headings; Jentadueto has uncoded subheadings.
+  // Each refuses at the first check it fails: Imatinib Teva passes the shape, binding, tree and
+  // headings and stops at its two picture references, which wait for D6's templates and
+  // evidence; Nuvaxovid's one picture tag is broken markup (an extra quote), so it names no
+  // picture and T refuses the section; Brukinsa keeps the template's brackets in two headings;
+  // Jentadueto has uncoded subheadings.
   const expected: Record<string, string> = {
     "imatinib-teva-smpc-en.json": "pictures: picture-reference-without-template-or-evidence",
     "imatinib-teva-tablets-smpc-en.json":
       "pictures: picture-reference-without-template-or-evidence",
-    "nuvaxovid-smpc-en.json": "pictures: pictures-not-enabled",
+    "nuvaxovid-smpc-en.json": "narrative: markup",
     "brukinsa-smpc-en.json": "titles: heading-not-permitted",
     "jentadueto-smpc-en.json": "shape: document-shape",
   };
@@ -319,6 +330,39 @@ describe("each stated rule, on its own", () => {
         }),
       ),
     ).toBe("shape: list-version-missing");
+  });
+
+  it("refuses a date or a timestamp outside FHIR's grammar or the calendar", () => {
+    const dated = (date: unknown, timestamp?: unknown) =>
+      mutated(mapping, (document) => {
+        (only(document.entry).resource as Json).date = date;
+        if (timestamp !== undefined) document.timestamp = timestamp;
+      });
+    for (const date of [
+      "next tuesday",
+      "not-a-date",
+      "2026-02-30",
+      "2026-09-24T12:00",
+      "24/09/2026",
+    ]) {
+      expect(refusal(dated(date)), date).toBe("shape: document-shape");
+    }
+    for (const date of ["2026", "2026-09", "2024-02-29", "2026-09-24T12:00:00.5+02:00"]) {
+      expect(refusal(dated(date)), date).toBe("imported");
+    }
+    for (const timestamp of [
+      "2026-09-24",
+      "2026-09-24T12:00:00",
+      "2026-09-24T12:00:60Z",
+      "next tuesday",
+    ]) {
+      expect(refusal(dated("2026-09-24", timestamp)), timestamp).toBe("shape: document-shape");
+    }
+    expect(refusal(dated("2026-09-24", "2024-04-08T08:38:15.0152435+00:00"))).toBe("imported");
+  });
+
+  it("refuses a publication in the EMA's form at the last stage, for want of the renderer's evidence", () => {
+    expect(refusal(emaShapedPublication(mapping))).toBe("rendering: renderer-evidence-missing");
   });
 
   it("refuses a List other than the requested one, and synthetic values mixed with real ones", () => {
