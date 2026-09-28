@@ -211,6 +211,39 @@ phase_init() {
   terraform -chdir=infra validate
 }
 
+# Every `moved` block in infra/, one "from to" pair per line. A block missing either end is refused
+# rather than skipped, so a pending move can never be passed over silently.
+moved_pairs() {
+  awk '
+    /^moved \{/ { inside = 1; from = ""; to = ""; next }
+    inside && /^[[:space:]]*from[[:space:]]*=/ { sub(/^[^=]*=[[:space:]]*/, ""); sub(/[[:space:]]+$/, ""); from = $0 }
+    inside && /^[[:space:]]*to[[:space:]]*=/ { sub(/^[^=]*=[[:space:]]*/, ""); sub(/[[:space:]]+$/, ""); to = $0 }
+    inside && /^\}/ {
+      if (from == "" || to == "") { print "A moved block in " FILENAME " has no from or no to." > "/dev/stderr"; exit 1 }
+      print from, to; inside = 0
+    }
+  ' infra/*.tf
+}
+
+# Terraform refuses a -target apply that leaves out either end of a pending `moved` block ("Moved
+# resource instances excluded by targeting"), and phase_apis and sync_dashboard apply with -target.
+# So a pending move is completed in the state first, as the full apply would complete it:
+# `terraform state mv` changes no resource, only the address the state keeps it under. A move is
+# pending while its old address, or an instance of it, is in the state; once done, its block is
+# inert and this does nothing.
+complete_pending_moves() {
+  local state pairs from to
+  state="$(terraform -chdir=infra state list)"
+  pairs="$(moved_pairs)"
+  while read -r from to; do
+    [[ -n "$from" ]] || continue
+    if awk -v address="$from" '$0 == address || index($0, address "[") == 1 { found = 1 } END { exit !found }' <<<"$state"; then
+      echo "Completing the pending move ${from} -> ${to} in the Terraform state."
+      terraform -chdir=infra state mv "$from" "$to"
+    fi
+  done <<<"$pairs"
+}
+
 phase_apis() {
   echo "=== enable APIs and artifact registry ==="
   gcloud --quiet services enable \
@@ -244,6 +277,8 @@ phase_apis() {
         "projects/${PROJECT_ID}/locations/${REGION}/repositories/${REPOSITORY_ID}"
     fi
   fi
+
+  complete_pending_moves
 
   # The three placeholder images below carry no digest. The precondition on
   # google_cloud_run_v2_service.query rejects a digest-less query_image, and that resource is

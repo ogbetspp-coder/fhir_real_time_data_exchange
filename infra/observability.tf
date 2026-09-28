@@ -95,10 +95,18 @@ resource "google_monitoring_notification_channel" "alert_email" {
   }
 }
 
-# Until 2026-09-27 the one e-mail channel was named for the first alert that used it.
-moved {
+# Until 2026-09-27 the one e-mail channel was named for the first alert that used it. It is
+# forgotten rather than moved: dev now has no address, so a moved channel would be deleted, and
+# Terraform deletes it before updating the policies that still name it, which the Monitoring API
+# refuses for a channel in use. Forgotten, it stays in the project, unused once the policies are
+# updated, and is deleted by hand (docs/roadmap.md). An environment given an address gets a new
+# alert_email channel.
+removed {
   from = google_monitoring_notification_channel.query_entitlement_denials_email
-  to   = google_monitoring_notification_channel.alert_email
+
+  lifecycle {
+    destroy = false
+  }
 }
 
 resource "google_monitoring_alert_policy" "pipeline_failures" {
