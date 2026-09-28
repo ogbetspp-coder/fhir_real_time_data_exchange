@@ -18,6 +18,7 @@ import {
   type ProvenanceDetail,
   type QueryAuditOutcome,
   type QueryError,
+  type QuoteMatch,
   type QuoteVerification,
   type SectionContent,
   type VerifyQuoteInput,
@@ -1070,7 +1071,7 @@ export async function verifyQuote(
 
   // The search normalises each section's text and stops at the first occurrence the
   // quote-edge rule accepts; only the matched section's text is hashed.
-  let match: QuoteVerification["match"];
+  let match: QuoteMatch | undefined;
   for (const candidate of candidates) {
     const text = normalizeText(xhtmlToText(candidate.div));
     // Offsets are code points in the section's normalised text, as every offset in this
