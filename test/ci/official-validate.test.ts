@@ -145,6 +145,19 @@ describe("the official-validation package cache", () => {
     expect(existsSync(path.join(f.dir, "seeded"))).toBe(false);
   });
 
+  it("refuses a validator directory it may not own, before deleting anything", () => {
+    const f = fixture();
+    for (const outside of [path.parse(process.cwd()).root, process.cwd(), tmpdir()]) {
+      const run = spawnSync(
+        process.execPath,
+        [SCRIPT, "--offline", "--seed-only", "--validator-dir", outside, "--package-lock", f.lock],
+        { encoding: "utf8" },
+      );
+      expect([outside, run.status]).toEqual([outside, 2]);
+      expect(run.stderr).toContain("is outside the repository and the temporary directory");
+    }
+  });
+
   it("refuses a tarball that no longer matches its pin, offline", () => {
     const f = fixture();
     const tarball = path.join(f.dir, "packages", "example.fhir.terms#2.0.0.tgz");

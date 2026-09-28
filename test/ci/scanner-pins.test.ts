@@ -62,6 +62,53 @@ describe.each(scanners)("$script", ({ script, version, url, binary, download, sh
   });
 });
 
+// What .gitleaks.toml may hold, statement by statement: `[extend]` once with `useDefault = true`
+// and nothing else, then `[[allowlists]]` tables of the keys the narrow-exception rule uses. Any
+// other table or key (disabledRules, [[rules]], a per-rule or global allowlist, commits,
+// stopwords, another base config) is a problem. Returns the problems found.
+const ALLOWLIST_KEYS = new Set([
+  "description",
+  "condition",
+  "targetRules",
+  "paths",
+  "regexTarget",
+  "regexes",
+]);
+
+function configProblems(text: string): string[] {
+  const problems: string[] = [];
+  let table: string | undefined;
+  let extendSeen = 0;
+  let keys = new Set<string>();
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (line === "" || line.startsWith("#")) continue;
+    if (line.startsWith("[")) {
+      table = line;
+      keys = new Set();
+      if (line === "[extend]") extendSeen += 1;
+      else if (line !== "[[allowlists]]") problems.push(`table ${line}`);
+      continue;
+    }
+    const key = /^([A-Za-z]+)\s*=/.exec(line)?.[1];
+    if (key === undefined) {
+      problems.push(`not a single-line key: ${line}`);
+      continue;
+    }
+    if (keys.has(key)) problems.push(`${key} twice in ${table ?? "the top level"}`);
+    keys.add(key);
+    if (table === "[extend]") {
+      if (line !== "useDefault = true") problems.push(`[extend] ${line}`);
+    } else if (table === "[[allowlists]]") {
+      if (!ALLOWLIST_KEYS.has(key)) problems.push(`[[allowlists]] ${key}`);
+    } else if (table === undefined) {
+      problems.push(`top-level ${key}`);
+    }
+  }
+  if (extendSeen !== 1) problems.push(`[extend] ${extendSeen} times`);
+  return problems;
+}
+
 describe("the secret scan in CI", () => {
   const workflow = readFileSync(".github/workflows/vulnerabilities.yml", "utf8");
   const config = readFileSync(".gitleaks.toml", "utf8");
@@ -87,6 +134,8 @@ describe("the secret scan in CI", () => {
       'expect clean "a clean repository with a merge" "$clean" --all',
       'expect found "a secret introduced by a merge, in the range" "$merge" "${base}..HEAD"',
       'expect found "a secret introduced by a merge, in the whole history" "$merge" --all',
+      'expect found "a secret in a -diff file, in the range" "$attribute" HEAD~2..HEAD',
+      'expect found "a secret in a file with a NUL byte, in the range" "$nul" HEAD~2..HEAD',
       'expect found "a secret marked gitleaks:allow, in the tree" "$inline"',
       'expect refused "a secret listed in .gitleaksignore, in the tree" "$ignored"',
     ]) {
@@ -105,7 +154,7 @@ describe("the secret scan in CI", () => {
     expect(script).toContain('mkdir "$WORK/no-ignore-file"');
     // gitleaks reads the scanned root's .gitleaksignore whatever the flag says: refused outright.
     expect(script).toMatch(/if \[\[ -e "\$ROOT\/\.gitleaksignore" \]\]; then\n.*\n\s+exit 1\n/);
-    expect(script).toContain('git --log-opts="-m ${SECRET_SCAN_RANGE}" "$ROOT"');
+    expect(script).toContain('git --log-opts="-m --text ${SECRET_SCAN_RANGE}" "$ROOT"');
     expect(script.match(/--log-opts=/g)).toHaveLength(1);
     const tracked = execFileSync(
       "git",
@@ -142,6 +191,34 @@ describe("the secret scan in CI", () => {
     }
     // No global allowlist, which would exempt its paths or patterns from every rule.
     expect(config).not.toMatch(/^\[allowlist\]$/m);
+  });
+
+  it("holds nothing else that could weaken a rule: the config's whole shape is fixed", () => {
+    expect(configProblems(config)).toEqual([]);
+    // Each way a gitleaks config can switch off or narrow a default rule is refused.
+    for (const [weakening, text] of [
+      ["a disabled rule", "[extend]\nuseDefault = true\ndisabledRules = ['github-pat']\n"],
+      ["a default rule redefined", '[extend]\nuseDefault = true\n[[rules]]\nid = "github-pat"\n'],
+      [
+        "a per-rule allowlist",
+        "[extend]\nuseDefault = true\n[[rules.allowlists]]\npaths = ['''.*''']\n",
+      ],
+      [
+        "the older per-rule form",
+        "[extend]\nuseDefault = true\n[rules.allowlist]\npaths = ['''.*''']\n",
+      ],
+      ["a global allowlist", "[extend]\nuseDefault = true\n[allowlist]\npaths = ['''.*''']\n"],
+      [
+        "an allowlist by commit",
+        "[extend]\nuseDefault = true\n[[allowlists]]\ncommits = ['abc']\n",
+      ],
+      ["a stopword", "[extend]\nuseDefault = true\n[[allowlists]]\nstopwords = ['ghp']\n"],
+      ["another base config", "[extend]\nuseDefault = true\npath = 'other.toml'\n"],
+      ["no defaults", "[extend]\nuseDefault = false\n"],
+      ["a top-level key", 'title = "x"\n[extend]\nuseDefault = true\n'],
+    ] as const) {
+      expect([weakening, configProblems(text).length > 0]).toEqual([weakening, true]);
+    }
   });
 });
 

@@ -34,7 +34,12 @@ afterEach(() => {
 });
 
 // A repository whose HEAD is a pull request's merge commit: main, plus a branch changing <files>.
-function pullRequest(files: string[], merge = true): string {
+// With `rename`, main carries the first path and the branch moves it to the second, changed a
+// little, which git's rename detection pairs up.
+function pullRequest(
+  files: string[],
+  { merge = true, rename }: { merge?: boolean; rename?: [string, string] } = {},
+): string {
   const repository = mkdtempSync(path.join(tmpdir(), "plan-scope-"));
   directories.push(repository);
   const git = (...args: string[]): string =>
@@ -46,8 +51,21 @@ function pullRequest(files: string[], merge = true): string {
   git("init", "-q", "-b", "main");
   writeFileSync(path.join(repository, "README"), "base\n");
   git("add", "README");
+  if (rename !== undefined) {
+    mkdirSync(path.dirname(path.join(repository, rename[0])), { recursive: true });
+    const lines = Array.from({ length: 200 }, (_, index) => `resource "x" "r${index}" {}`);
+    writeFileSync(path.join(repository, rename[0]), `${lines.join("\n")}\n`);
+    git("add", rename[0]);
+  }
   git("commit", "-q", "-m", "base");
   git("checkout", "-q", "-b", "update");
+  if (rename !== undefined) {
+    mkdirSync(path.dirname(path.join(repository, rename[1])), { recursive: true });
+    git("mv", rename[0], rename[1]);
+    const moved = path.join(repository, rename[1]);
+    writeFileSync(moved, `${readFileSync(moved, "utf8")}# tweak\n`);
+    git("add", rename[1]);
+  }
   for (const file of files) {
     mkdirSync(path.dirname(path.join(repository, file)), { recursive: true });
     writeFileSync(path.join(repository, file), "changed\n");
@@ -64,13 +82,27 @@ function pullRequest(files: string[], merge = true): string {
   return repository;
 }
 
-function scope(repository: string, actor: string): { status: number; plan: string; log: string } {
+const REPOSITORY = "owner/repository";
+const DEPENDABOT = { author: "dependabot[bot]", head: REPOSITORY };
+
+function scope(
+  repository: string,
+  actor: string,
+  pull = DEPENDABOT,
+): { status: number; plan: string; log: string } {
   const output = path.join(repository, "..", `${path.basename(repository)}.output`);
   writeFileSync(output, "");
   directories.push(output);
   const run = spawnSync("bash", ["--noprofile", "--norc", "-eo", "pipefail", "-c", SCRIPT], {
     cwd: repository,
-    env: { PATH: process.env.PATH, ACTOR: actor, GITHUB_OUTPUT: output },
+    env: {
+      PATH: process.env.PATH,
+      ACTOR: actor,
+      AUTHOR: pull.author,
+      HEAD_REPOSITORY: pull.head,
+      REPOSITORY,
+      GITHUB_OUTPUT: output,
+    },
     encoding: "utf8",
   });
   const plan = /^plan=(.*)$/m.exec(readFileSync(output, "utf8"))?.[1] ?? "";
@@ -109,8 +141,27 @@ describe("the plan workflow's Dependabot scope", () => {
   });
 
   it("fails closed when HEAD is not a merge commit", () => {
-    const repository = pullRequest(["package-lock.json"], false);
+    const repository = pullRequest(["package-lock.json"], { merge: false });
     expect(scope(repository, "dependabot[bot]")).toMatchObject({ status: 1, plan: "" });
+  });
+
+  it("counts both sides of a rename, so moving a file the plan reads is still seen", () => {
+    const repository = pullRequest(["package-lock.json"], {
+      rename: ["infra/main.tf", "Dockerfile.evil"],
+    });
+    const result = scope(repository, "dependabot[bot]");
+    expect(result).toMatchObject({ status: 1, plan: "" });
+    expect(result.log).toContain("infra/main.tf");
+  });
+
+  it.each([
+    ["a person's pull request Dependabot pushed to", { author: "someone", head: REPOSITORY }],
+    ["a pull request from a fork", { author: "dependabot[bot]", head: "fork/repository" }],
+  ])("fails a Dependabot run on %s, whatever it changes", (_, pull) => {
+    const repository = pullRequest(["package-lock.json"]);
+    const result = scope(repository, "dependabot[bot]", pull);
+    expect(result).toMatchObject({ status: 1, plan: "" });
+    expect(result.log).toContain("not Dependabot's own pull request from this repository");
   });
 
   it("gates every step that authenticates or plans on the decision", () => {

@@ -8,6 +8,8 @@
 #
 #   - a secret a merge commit introduces and the next commit removes, in the range and in --all:
 #     git log prints no patch for a merge unless asked (-m);
+#   - a secret in a file git takes as binary, by a `-diff` attribute or a NUL byte, committed and
+#     removed: git log prints no patch for one unless asked (--text);
 #   - a secret on a line marked `gitleaks:allow`: gitleaks honours the comment unless told not to;
 #   - a secret whose fingerprint a committed .gitleaksignore lists: gitleaks reads the one at the
 #     scanned root whatever it is told, so the scan refuses to run while one is there (this case
@@ -93,6 +95,25 @@ git -C "$merge" rm -q config.env
 git -C "$merge" commit -q -m "remove it"
 expect found "a secret introduced by a merge, in the range" "$merge" "${base}..HEAD"
 expect found "a secret introduced by a merge, in the whole history" "$merge" --all
+
+# A secret in a file .gitattributes marks -diff, committed and then removed.
+attribute="$(planted attribute)"
+printf '*.env -diff\n' >"$attribute/.gitattributes"
+printf 'TOKEN=%s\n' "$token" >"$attribute/config.env"
+git -C "$attribute" add .gitattributes config.env
+git -C "$attribute" commit -q -m secret
+git -C "$attribute" rm -q config.env
+git -C "$attribute" commit -q -m "remove it"
+expect found "a secret in a -diff file, in the range" "$attribute" HEAD~2..HEAD
+
+# A secret in a file holding a NUL byte, committed and then removed.
+nul="$(planted nul)"
+printf 'TOKEN=%s\n\0\n' "$token" >"$nul/config.env"
+git -C "$nul" add config.env
+git -C "$nul" commit -q -m secret
+git -C "$nul" rm -q config.env
+git -C "$nul" commit -q -m "remove it"
+expect found "a secret in a file with a NUL byte, in the range" "$nul" HEAD~2..HEAD
 
 # A secret its own line marks as allowed.
 inline="$(planted inline)"

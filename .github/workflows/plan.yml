@@ -63,22 +63,33 @@ jobs:
           fetch-depth: 2
           persist-credentials: false
 
-      # A person's run always plans. A Dependabot run plans nothing, and passes only when every
-      # file the pull request changes is one the plan never reads: the npm and uv lockfiles and
-      # manifests, the Dockerfiles (the plan uses the images running now), and the other
-      # workflows. Anything else, known or not, fails closed with the instruction above.
+      # A person's run always plans. A Dependabot run plans nothing, and passes only for
+      # Dependabot's own pull request from a branch of this repository (not a fork, not a person's
+      # pull request Dependabot pushed to) when every path it changes, each side of a rename
+      # counted, is one the plan never reads: the npm and uv lockfiles and manifests, the
+      # Dockerfiles (the plan uses the images running now), and the other workflows. Anything
+      # else, known or not, fails closed with the instruction above.
       - name: Decide whether this run can and must plan
         id: scope
         env:
           ACTOR: ${{ github.actor }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           if [[ "$ACTOR" != "dependabot[bot]" ]]; then
             echo "plan=true" >>"$GITHUB_OUTPUT"
             exit 0
           fi
+          if [[ "$AUTHOR" != "dependabot[bot]" || "$HEAD_REPOSITORY" != "$REPOSITORY" ]]; then
+            echo "::error::Dependabot's run cannot plan, and this is not Dependabot's own pull request from this repository. Push any commit to its branch as a person; the check re-runs under that person." >&2
+            exit 1
+          fi
           git rev-parse -q --verify HEAD^2 >/dev/null || { echo "::error::Expected the pull request's merge commit." >&2; exit 1; }
           unread='^(package\.json|package-lock\.json|(agent|zone-a)/(pyproject\.toml|uv\.lock)|Dockerfile(\.[a-z]+)?|\.github/workflows/(ci|deploy|vulnerabilities)\.yml)$'
-          read="$(git diff --name-only HEAD^1 HEAD | grep -Ev "$unread" || true)"
+          # --no-renames: a rename is listed as its deletion and its addition, so moving a file the
+          # plan reads to an allowed name still names the path it left.
+          read="$(git diff --no-renames --name-only HEAD^1 HEAD | grep -Ev "$unread" || true)"
           if [[ -n "$read" ]]; then
             echo "::error::Dependabot's run cannot plan, and this pull request changes what the plan may read: ${read//$'\n'/, }. Push any commit to its branch as a person; the check re-runs under that person." >&2
             exit 1

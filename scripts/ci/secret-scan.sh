@@ -12,8 +12,10 @@
 #   - the pushed commits: every commit in SECRET_SCAN_RANGE (a git revision range such as
 #     base..head, or --all), so a secret added in one commit and removed in the next is still
 #     found. Merge commits are read against each parent (git log -m): without it git prints no
-#     patch for a merge, and a secret the merge itself introduced was never read. Unset, only the
-#     working tree is scanned.
+#     patch for a merge, and a secret the merge itself introduced was never read. Every file is
+#     read as text (git log --text): git prints no patch for one it takes as binary, a NUL byte
+#     or a `-diff` attribute in .gitattributes being enough. Unset, only the working tree is
+#     scanned.
 #
 # The scanner is downloaded at a pinned version and verified against a pinned SHA-256 before it
 # runs, like OSV-Scanner in vuln-scan.sh. Findings are redacted: the report names the rule, the
@@ -109,7 +111,7 @@ tree_findings="$(cd "$tree" && scan "Working tree" "$WORK/tree.json" dir . 3>&1 
 # 2. The commits being pushed or merged.
 range_findings=0
 if [[ -n "${SECRET_SCAN_RANGE:-}" ]]; then
-  range_findings="$(scan "Commits ${SECRET_SCAN_RANGE}" "$WORK/range.json" git --log-opts="-m ${SECRET_SCAN_RANGE}" "$ROOT" 3>&1 1>>"$REPORT")"
+  range_findings="$(scan "Commits ${SECRET_SCAN_RANGE}" "$WORK/range.json" git --log-opts="-m --text ${SECRET_SCAN_RANGE}" "$ROOT" 3>&1 1>>"$REPORT")"
 else
   printf '_No commit range given (SECRET_SCAN_RANGE); the working tree only._\n\n' >>"$REPORT"
 fi

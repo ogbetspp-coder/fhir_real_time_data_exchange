@@ -52,7 +52,8 @@ import {
 // regulated narrative; this script is not for validating real product content.
 //
 // usage: node scripts/ci/official-validate.mjs [options]
-//   --validator-dir DIR   where the jar and packages are cached (default .cache/official-validator)
+//   --validator-dir DIR   where the jar and packages are cached (default .cache/official-validator);
+//                         below the repository or the temporary directory, since home/ is rebuilt
 //   --set-dir DIR         where the resources are emitted (default: a temporary directory)
 //   --no-emit             validate what --set-dir already holds instead of emitting it
 //   --offline             never download: a missing or checksum-mismatched artefact fails
@@ -92,6 +93,17 @@ function parseArgs(argv) {
   }
   if (!options.emit && options.setDir === null) {
     throw new Error("--no-emit requires --set-dir");
+  }
+  // Each run deletes <validator-dir>/home, so the directory must be one this gate may own: below
+  // the repository or the temporary directory, never either itself or anywhere else.
+  const below = (parent) => {
+    const relative = path.relative(parent, options.validatorDir);
+    return relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
+  };
+  if (!below(root) && !below(path.resolve(tmpdir()))) {
+    throw new Error(
+      `--validator-dir ${options.validatorDir} is outside the repository and the temporary directory`,
+    );
   }
   return options;
 }
