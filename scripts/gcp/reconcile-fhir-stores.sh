@@ -172,7 +172,7 @@ reconcile() {
   fi
 
   local version
-  version="$(node -e "console.log(require(process.argv[1]).version)" "$current")"
+  version="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("version", ""))' "$current")"
   if [[ "$version" != "R5" ]]; then
     echo "${store_id} exists with immutable version ${version}; refusing to substitute R4." >&2
     exit 1

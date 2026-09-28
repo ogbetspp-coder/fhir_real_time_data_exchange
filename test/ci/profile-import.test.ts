@@ -13,7 +13,7 @@ const bootstrap = readFileSync("scripts/gcp/bootstrap.sh", "utf8");
 describe("the profile import", () => {
   it("is skipped only when the set and the store are both as recorded, and nothing is missing", () => {
     expect(bootstrap).toContain(
-      'if [[ "${FORCE_PROFILE_IMPORT:-false}" != "true" && "$recorded_set" == "$FINGERPRINT" &&\n  "$recorded_store" == "$in_store" && "$missing" == "0" ]]; then',
+      'if [[ "${FORCE_PROFILE_IMPORT:-false}" != "true" && -z "$STORE_LISTING_UNSTABLE" &&\n  "$recorded_set" == "$FINGERPRINT" && "$recorded_store" == "$in_store" && "$missing" == "0" ]]; then',
     );
   });
 

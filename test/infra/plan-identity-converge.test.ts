@@ -15,7 +15,11 @@ afterEach(() => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-const PROJECT = "p-one";
+// dev's own project: the script refuses dev on any other (scripts/gcp/environments/dev.env).
+const PROJECT =
+  /^EXPECTED_PROJECT_ID=(\S+)$/m.exec(
+    readFileSync("scripts/gcp/environments/dev.env", "utf8"),
+  )?.[1] ?? "";
 const SA = `ema-flow-planner-dev@${PROJECT}.iam.gserviceaccount.com`;
 const ROLE = `projects/${PROJECT}/roles/emaFlowPlanner`;
 const POOL_MEMBER = `principalSet://iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/github-plan-pool/attribute.repository/ogbetspp-coder/fhir_real_time_data_exchange`;

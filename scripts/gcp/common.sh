@@ -27,6 +27,49 @@ ema_flow_resolve_project() {
   printf '%s' "$project"
 }
 
+# The environment a script acts in, and the one project it may act on (audit B08, L1): no default
+# environment, and the project must be the one scripts/gcp/environments/<environment>.env names in
+# EXPECTED_PROJECT_ID. Until then deploy.sh, plan-identity.sh, storage-keys.sh and
+# bq-cmek-convert.sh took an unset EMA_FLOW_ENVIRONMENT as dev, on whatever project the shell
+# named. Prints the environment; exits on a refusal, so it is used as a plain assignment:
+#   ENVIRONMENT="$(ema_flow_require_environment "$PROJECT_ID")"
+ema_flow_require_environment() {
+  local project="$1" environment="${EMA_FLOW_ENVIRONMENT:-}" file expected
+  if [[ -z "$environment" ]]; then
+    echo "EMA_FLOW_ENVIRONMENT names the environment to deploy (dev, validation or prod); it has no default." >&2
+    exit 1
+  fi
+  file="scripts/gcp/environments/${environment}.env"
+  if [[ ! -f "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/${file}" ]]; then
+    echo "No inputs file for environment ${environment}: ${file} does not exist." >&2
+    exit 1
+  fi
+  expected="$(sed -n 's/^EXPECTED_PROJECT_ID=//p' "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/${file}" | tail -n 1)"
+  if [[ -z "$expected" ]]; then
+    echo "::error title=No project for ${environment}::${file} names no EXPECTED_PROJECT_ID, so ${environment} cannot be deployed to any project." >&2
+    exit 1
+  fi
+  if [[ "$project" != "$expected" ]]; then
+    echo "::error title=Wrong project for ${environment}::${environment} is deployed to ${expected} only (${file}), not to ${project}." >&2
+    exit 1
+  fi
+  printf '%s' "$environment"
+}
+
+# An acknowledgement that a destructive change may go ahead (audit B08, D-2; review round 1): the
+# commit being deployed and a digest of exactly what would be destroyed, "<commit>:<digest>",
+# which the run that refuses the change prints. A value given for one commit, or for one set of
+# destroys, never lets through another: re-running an old manual run that acknowledged commit X
+# re-plans X against today's state, and a different destroy there has a different digest.
+#   ema_flow_destroy_digest <file of lines>     prints the digest of its sorted, unique lines
+#   ema_flow_acknowledged <commit> <digest>     succeeds when ALLOW_REPLACE_ACK names both
+ema_flow_destroy_digest() {
+  LC_ALL=C sort -u "$1" | python3 -c "import hashlib,sys;print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest()[:16])"
+}
+ema_flow_acknowledged() {
+  [[ -n "$1" && -n "$2" && "${ALLOW_REPLACE_ACK:-}" == "$1:$2" ]]
+}
+
 ema_flow_access_token() {
   local token=""
   # Workload Identity Federation in GitHub Actions authenticates gcloud itself.

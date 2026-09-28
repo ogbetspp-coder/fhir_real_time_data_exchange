@@ -27,4 +27,8 @@ mkdir -p "$OUT/standards"
 node scripts/fhir/fetch-standards.mjs --used-by bootstrap --dest "$OUT/standards" >&2
 type2="$OUT/standards/$(node scripts/fhir/fetch-standards.mjs --path "HL7 Global ePI Type 2 DrugX example")"
 node_modules/.bin/tsx scripts/fhir/export-fixture.ts "$OUT/synthetic-type2.json" "$type2" >&2
-node scripts/fhir/deploy-inputs.mjs seal "$OUT"
+sealed="$(node scripts/fhir/deploy-inputs.mjs seal "$OUT")"
+# Checked here as the deploy checks them, so a fixture that no longer matches its pin
+# (fhir/deploy-inputs.lock.json) fails where it was made, and in CI before a merge.
+node scripts/fhir/deploy-inputs.mjs verify "$OUT" "$sealed" >&2
+echo "$sealed"

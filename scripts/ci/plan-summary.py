@@ -63,7 +63,7 @@ for change in changes:
 headline = next((l for l in text.splitlines() if l.startswith("Plan:") or l.startswith("No changes.")), "")
 lines = header + [f"**{headline or 'Plan summary line not found.'}**", ""] + (rows or ["No resource changes."])
 if destroys:
-    lines += ["", f"**{destroys} destroy or replace.** On a pull request the check fails unless it carries the `allow-replace` label; the deploy applies it only when ALLOW_REPLACE_COMMIT names the commit being deployed."]
+    lines += ["", f"**{destroys} destroy or replace.** On a pull request the check fails unless it carries the `allow-replace` label; the deploy applies it only when ALLOW_REPLACE_ACK names the commit being deployed and exactly these destroys."]
 # No change is expected here: the dashboard's text is ignored by Terraform and drift-checked
 # separately (the line after this summary), and the environment's inputs come from one file.
 lines += ["", "_Inputs are the deployed images and version, so a change listed is this pull request's, or drift in the live project; none is expected otherwise._"]

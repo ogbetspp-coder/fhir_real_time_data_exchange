@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -24,6 +25,17 @@ function extract(name: string): string {
 }
 
 const COMMIT = "0123456789abcdef0123456789abcdef01234567";
+// common.sh's ema_flow_destroy_digest: the first 16 hex of SHA-256 over the sorted, unique lines.
+const digest = (...addresses: string[]) =>
+  createHash("sha256")
+    .update(
+      [...new Set(addresses)]
+        .sort()
+        .map((a) => `${a}\n`)
+        .join(""),
+    )
+    .digest("hex")
+    .slice(0, 16);
 const change = (address: string, ...actions: string[]) => ({ address, change: { actions } });
 
 // Runs plan_reviewed, then applies REVIEWED_PLAN as the phases do, and reports what terraform
@@ -60,6 +72,8 @@ esac
     [
       "-c",
       `set -euo pipefail
+source scripts/gcp/common.sh
+DEPLOY_TEMP_FILES=()
 deploy_provenance() { PROVENANCE_ERROR=""; SERVICE_VERSION="${COMMIT}"; }
 ${extract("plan_reviewed")}
 plan_reviewed apply -var=x=1
@@ -97,26 +111,48 @@ describe("the deploy's applies", { timeout: 30_000 }, () => {
     const result = review({ exit: 2, changes });
     expect(result.status).toBe(3);
     expect(result.applied).toEqual([]);
-    expect(result.out).toContain(`ALLOW_REPLACE_COMMIT=${COMMIT}`);
+    // The refusal prints the exact acknowledgement: this commit and a digest of what it destroys.
+    expect(result.out).toContain(`ALLOW_REPLACE_ACK=${COMMIT}:${digest("google_x.a")}`);
   });
 
   it("refuse a destroy acknowledged for another commit", () => {
     const result = review(
       { exit: 2, changes: [change("google_x.a", "delete")] },
-      { ALLOW_REPLACE_COMMIT: "f".repeat(40) },
+      { ALLOW_REPLACE_ACK: `${"f".repeat(40)}:${digest("google_x.a")}` },
     );
     expect(result.status).toBe(3);
     expect(result.applied).toEqual([]);
   });
 
-  it("apply a destroy acknowledged for this commit, saying so", () => {
+  it("refuse a destroy of anything but what was acknowledged, as an old run re-run would plan", () => {
+    // Review round 1: re-running a manual run that acknowledged this commit re-plans it against
+    // the state of that day. A plan that now also destroys google_x.b is not what was reviewed.
+    const result = review(
+      { exit: 2, changes: [change("google_x.a", "delete"), change("google_x.b", "delete")] },
+      { ALLOW_REPLACE_ACK: `${COMMIT}:${digest("google_x.a")}` },
+    );
+    expect(result.status).toBe(3);
+    expect(result.applied).toEqual([]);
+  });
+
+  it("apply a destroy acknowledged for this commit and exactly these, saying so", () => {
     const result = review(
       { exit: 2, changes: [change("google_x.a", "delete")] },
-      { ALLOW_REPLACE_COMMIT: COMMIT },
+      { ALLOW_REPLACE_ACK: `${COMMIT}:${digest("google_x.a")}` },
     );
     expect(result.status).toBe(0);
     expect(result.applied).toHaveLength(1);
     expect(result.out).toContain("Destroy acknowledged");
+  });
+
+  it("leave no saved plan behind, however the run ends", () => {
+    // A saved plan holds sensitive values; deploy.sh removes every one on exit.
+    expect(deploy).toContain(
+      `trap 'deploy_status=$?; rm -f \${DEPLOY_TEMP_FILES[@]+"\${DEPLOY_TEMP_FILES[@]}"}; exit "$deploy_status"' EXIT`,
+    );
+    expect(extract("plan_reviewed")).toContain(
+      'DEPLOY_TEMP_FILES+=("$plan_file" "$plan_text" "$plan_json" "$summary")',
+    );
   });
 
   it.each([
@@ -126,6 +162,34 @@ describe("the deploy's applies", { timeout: 30_000 }, () => {
     const result = review(plan);
     expect(result.status).toBe(1);
     expect(result.applied).toEqual([]);
+  });
+
+  it("are never unreviewed: no destructive command anywhere but the dashboard's replace", () => {
+    // Review round 1: the guard read only "-auto-approve \\" on a line of its own. Now any
+    // auto-approved apply, -destroy, -replace, state rm or terraform destroy anywhere in deploy.sh
+    // (comments aside) must be sync_dashboard's deliberate replacement of the dashboard.
+    const code = deploy
+      .split("\n")
+      .map((line, index) => ({ line, index }))
+      .filter(({ line }) => !/^\s*#/.test(line));
+    const dashboard = extract("sync_dashboard");
+    const start = deploy.split("\n").findIndex((line) => line === "sync_dashboard() {");
+    const end = start + dashboard.split("\n").length;
+    const destructive =
+      /-auto-approve|-destroy\b|-replace=|\bstate (rm|replace-provider)\b|terraform\b[^\n]*\bdestroy\b/;
+    const found = code.filter(({ line }) => destructive.test(line));
+    expect(found.length).toBeGreaterThan(0);
+    for (const { line, index } of found) {
+      expect([line.trim(), index > start && index < end]).toEqual([line.trim(), true]);
+    }
+    for (const bad of [
+      "terraform -chdir=infra apply -auto-approve",
+      "terraform -chdir=infra apply -destroy",
+      "terraform -chdir=infra state rm x",
+      "terraform -chdir=infra destroy",
+    ]) {
+      expect([bad, destructive.test(bad)]).toEqual([bad, true]);
+    }
   });
 
   it("are never unreviewed: no -auto-approve apply in phase_apis or phase_apply", () => {
@@ -147,8 +211,9 @@ describe("the deploy's applies", { timeout: 30_000 }, () => {
   it("can be acknowledged from the deploy workflow, per run", () => {
     const workflow = readFileSync(".github/workflows/deploy.yml", "utf8");
     expect(workflow).toMatch(
-      /workflow_dispatch:\n {4}inputs:\n(?: {6}#.*\n)* {6}allow_replace_commit:/,
+      /workflow_dispatch:\n {4}inputs:\n(?: {6}#.*\n)* {6}allow_replace_ack:/,
     );
-    expect(workflow).toContain("ALLOW_REPLACE_COMMIT: ${{ inputs.allow_replace_commit || '' }}");
+    expect(workflow).toContain("ALLOW_REPLACE_ACK: ${{ inputs.allow_replace_ack || '' }}");
+    expect(workflow).not.toMatch(/allow_replace_commit|ALLOW_REPLACE_COMMIT/);
   });
 });

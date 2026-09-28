@@ -35,11 +35,14 @@ on:
   workflow_dispatch:
     inputs:
       # The deploy applies only a plan it has read, and refuses one that destroys or replaces
-      # anything (scripts/gcp/deploy.sh, plan_reviewed; audit B08, D-2). Once such a plan has been
-      # reviewed, run this workflow by hand with the full commit it deploys here: the
-      # acknowledgement holds for that commit's plan alone, never the next one's.
-      allow_replace_commit:
-        description: "Full commit SHA being deployed, to acknowledge that its reviewed plan destroys or replaces resources. Leave empty otherwise."
+      # anything (scripts/gcp/deploy.sh, plan_reviewed; audit B08, D-2), printing the value that
+      # acknowledges it: "<commit>:<digest>", the full commit deployed and a digest of exactly the
+      # addresses destroyed or replaced. Once they are reviewed, run this workflow by hand with that
+      # value here. It holds for that commit and those destroys alone: a later commit, or a re-run
+      # whose plan against the state of that day destroys anything else, is refused again. The
+      # profile prune's bound (scripts/gcp/bootstrap.sh) is acknowledged the same way.
+      allow_replace_ack:
+        description: "<full commit SHA>:<digest>, as the refusing run printed it, to acknowledge the destroys it listed. Leave empty otherwise."
         required: false
         type: string
         default: ""
@@ -160,8 +163,8 @@ jobs:
       CLOUDSDK_CORE_DISABLE_PROMPTS: "1"
       TF_IN_AUTOMATION: "true"
       TF_INPUT: "0"
-      # Empty on a push; on a manual run, the commit whose reviewed destroys may be applied.
-      ALLOW_REPLACE_COMMIT: ${{ inputs.allow_replace_commit || '' }}
+      # Empty on a push; on a manual run, the reviewed destroys that may be applied.
+      ALLOW_REPLACE_ACK: ${{ inputs.allow_replace_ack || '' }}
 
     steps:
       - name: Check deployment configuration
@@ -234,6 +237,12 @@ jobs:
         with:
           name: deploy-inputs
           path: ${{ runner.temp }}/deploy-inputs
+      # Checked here, before any credential is taken or anything changed, so a broken hand-off
+      # stops the deploy at once; bootstrap.sh checks them again where it uses them.
+      - name: Verify the deploy's inputs
+        env:
+          DEPLOY_INPUTS_SHA256: ${{ needs.gate.outputs.deploy_inputs_sha256 }}
+        run: node scripts/fhir/deploy-inputs.mjs verify "${RUNNER_TEMP}/deploy-inputs" "$DEPLOY_INPUTS_SHA256"
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
@@ -259,7 +268,8 @@ jobs:
         run: bash scripts/gcp/deploy.sh init 2>&1 | tee -a deploy-run.log
 
       # Both applies (here and "Apply infrastructure") run a plan first, and refuse one that
-      # destroys or replaces anything unless ALLOW_REPLACE_COMMIT names this commit.
+      # destroys or replaces anything unless ALLOW_REPLACE_ACK names this commit and exactly those
+      # destroys.
       - name: Enable APIs and Artifact Registry
         run: bash scripts/gcp/deploy.sh apis 2>&1 | tee -a deploy-run.log
 

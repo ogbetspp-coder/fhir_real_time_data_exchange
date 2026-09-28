@@ -88,15 +88,21 @@ print("\n".join(sorted(found)))
 PY
 LC_ALL=C sort -u -o "$EXPECTED" "$EXPECTED"
 
-# What the target store holds of the import's types: "Type/id versionId" per line, sorted, paged
-# through FHIR search. Only ids and versions are asked for (_elements=id; the store answers with
-# each resource's meta). A version the store does not report is "-". Any page that cannot be read
-# fails, and a next-page link is followed only within this store.
+# What the target store holds of the import's types: "Type/id versionId" per line, sorted and
+# unique, paged through FHIR search. Only ids and versions are asked for (_elements=id; the store
+# answers with each resource's meta), with accurate totals. A version the store does not report is
+# "-". Any page that cannot be read fails, and a next-page link is followed only within this store.
+#
+# Paging is not a snapshot: the store's ValueSet total has been seen to change between pages
+# (2622, 2623, 2622), and a page can repeat an entry. So the listing says when it cannot be
+# trusted: STORE_LISTING_UNSTABLE names why (an entry listed twice, a type whose total changed
+# between pages or differs from what was listed), and is empty when it can.
 store_listing() {
   local out="$1" type url page status
   : >"$out"
+  : >"${out}.totals"
   for type in $IMPORT_TYPES; do
-    url="${TARGET_FHIR}/${type}?_count=1000&_elements=id"
+    url="${TARGET_FHIR}/${type}?_count=1000&_elements=id&_total=accurate"
     while [[ -n "$url" ]]; do
       page="$TMP/page.json"
       status="$(curl --silent --show-error --output "$page" --write-out '%{http_code}' \
@@ -121,6 +127,9 @@ with open(out, "a", encoding="utf-8") as listing:
         version = (resource.get("meta") or {}).get("versionId")
         version = version if isinstance(version, str) and re.fullmatch(r"[A-Za-z0-9.-]{1,64}", version) else "-"
         listing.write(f"{kind}/{rid} {version}\n")
+if isinstance(bundle.get("total"), int) and not isinstance(bundle.get("total"), bool):
+    with open(out + ".totals", "a", encoding="utf-8") as totals:
+        totals.write(f"{kind} {bundle['total']}\n")
 following = [link.get("url", "") for link in bundle.get("link") or [] if link.get("relation") == "next"]
 if following and not following[0].startswith(base):
     sys.exit("a next-page link leads outside the target store")
@@ -129,7 +138,39 @@ PY
 )"
     done
   done
-  LC_ALL=C sort -o "$out" "$out"
+  STORE_LISTING_UNSTABLE="$(python3 - "$out" <<'PY'
+import collections, sys
+out = sys.argv[1]
+refs = collections.Counter(line.split(" ")[0] for line in open(out, encoding="utf-8").read().splitlines() if line)
+totals = collections.defaultdict(set)
+for line in open(out + ".totals", encoding="utf-8").read().splitlines():
+    kind, total = line.split(" ")
+    totals[kind].add(int(total))
+reasons = []
+repeated = sorted(ref for ref, n in refs.items() if n > 1)
+if repeated:
+    reasons.append(f"{len(repeated)} resource(s) listed more than once")
+for kind in sorted(totals):
+    listed = sum(1 for ref in refs if ref.startswith(kind + "/"))
+    if len(totals[kind]) > 1:
+        reasons.append(f"the {kind} total changed between pages")
+    elif listed != next(iter(totals[kind])):
+        reasons.append(f"{listed} {kind} listed against a total of {next(iter(totals[kind]))}")
+print("; ".join(reasons))
+PY
+)"
+  LC_ALL=C sort -u -o "$out" "$out"
+}
+
+# A listing that can be trusted, if three tries give one; otherwise the last, with
+# STORE_LISTING_UNSTABLE saying why.
+stable_store_listing() {
+  local attempt
+  for attempt in 1 2 3; do
+    store_listing "$1"
+    [[ -z "$STORE_LISTING_UNSTABLE" ]] && return 0
+    echo "The listing of ${TARGET_STORE} moved while it was read (${STORE_LISTING_UNSTABLE}); attempt ${attempt}/3."
+  done
 }
 
 # The store's own fingerprint: its listing, ids and versions. Any edit to a resource gives it a new
@@ -138,30 +179,72 @@ store_fingerprint() {
   python3 -c "import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],'rb').read()).hexdigest())" "$1"
 }
 
+# The pinned resources the store listing lacks, one "Type/id" per line.
+missing_from() {
+  cut -d' ' -f1 "$1" | LC_ALL=C sort -u | LC_ALL=C comm -23 "$EXPECTED" -
+}
+
+# The resources the store listing holds that the pinned set does not: the prune's candidates. The
+# set difference, then every line of the pinned set removed again by a second, independent filter,
+# so no pinned resource can be a candidate whatever the listing held.
+prune_candidates() {
+  cut -d' ' -f1 "$1" | LC_ALL=C sort -u | LC_ALL=C comm -13 "$EXPECTED" - |
+    { grep -vxFf "$EXPECTED" || true; }
+}
+
+# More than 50 candidates, or more than 5% of the set, is a listing gone wrong or a pin moved far,
+# and is refused before anything is imported or deleted, unless ALLOW_REPLACE_ACK names the commit
+# being deployed (DEPLOY_COMMIT, from deploy.sh) and the digest of exactly these candidates -- the
+# same acknowledgement, printed by the refusing run, that lets a reviewed plan destroy (common.sh,
+# ema_flow_acknowledged).
+#   check_prune_bound <candidates file>
+check_prune_bound() {
+  local count size digest
+  count="$(wc -l <"$1" | tr -d ' ')"
+  size="$(wc -l <"$EXPECTED" | tr -d ' ')"
+  if [[ "$count" -le 50 && "$((count * 100))" -le "$((size * 5))" ]]; then
+    return 0
+  fi
+  digest="$(ema_flow_destroy_digest "$1")"
+  if ema_flow_acknowledged "${DEPLOY_COMMIT:-}" "$digest"; then
+    echo "::warning title=Profile prune acknowledged::${count} resource(s) outside the pinned set will be deleted from ${TARGET_STORE}; ALLOW_REPLACE_ACK names this commit and exactly these."
+    return 0
+  fi
+  echo "::error title=Profile prune refused::${TARGET_STORE} holds ${count} resources of the import's types that the pinned set does not, more than 50 or 5% of the set's ${size}. Nothing was imported or deleted. Check them, then deploy again with ALLOW_REPLACE_ACK=${DEPLOY_COMMIT:-<the commit being deployed>}:${digest} if they are to go." >&2
+  exit 1
+}
+
 # Skip the sync and the import when nothing would change (foundations E2). The profile bucket is
 # on a customer-managed key, and Cloud Storage omits checksums from listings of such objects, so
 # any sync compares by fetching each of the ~5,000 objects one at a time: measured at 13 minutes
 # a deploy, for a set that changes only when a vendored package does. So after a successful
 # import the marker in the bucket records two fingerprints: the set's, and the store's own (every
 # resource of the import's types, with its version). The next deploy skips only if both still
-# match. Until audit B08 (D-7) the store was checked by its StructureDefinition count alone, so a
-# deleted ValueSet, or any resource edited in the store, was never put right. FORCE_PROFILE_IMPORT
-# =true imports regardless.
+# match, and the listing is one it can trust. Until audit B08 (D-7) the store was checked by its
+# StructureDefinition count alone, so a deleted ValueSet, or any resource edited in the store, was
+# never put right. FORCE_PROFILE_IMPORT=true imports regardless.
 MARKER="gs://${PROFILE_BUCKET}/import-fingerprint/${TARGET_STORE}.sha256"
 recorded="$(gcloud --quiet storage cat "$MARKER" 2>/dev/null || true)"
 recorded_set="$(printf '%s\n' "$recorded" | sed -n 1p)"
 recorded_store="$(printf '%s\n' "$recorded" | sed -n 2p)"
 TOKEN="$(ema_flow_access_token)"
-store_listing "$TMP/store.txt"
+stable_store_listing "$TMP/store.txt"
 in_store="$(store_fingerprint "$TMP/store.txt")"
-missing="$(cut -d' ' -f1 "$TMP/store.txt" | LC_ALL=C sort | LC_ALL=C comm -23 "$EXPECTED" - | wc -l | tr -d ' ')"
-echo "profile set ${FINGERPRINT:0:16}… (recorded ${recorded_set:0:16}…): $(wc -l <"$EXPECTED" | tr -d ' ') resources, ${missing} not in ${TARGET_STORE}; store ${in_store:0:16}… (recorded ${recorded_store:0:16}…)"
+missing="$(missing_from "$TMP/store.txt" | wc -l | tr -d ' ')"
+prune_candidates "$TMP/store.txt" >"$TMP/extra.txt"
+extra="$(wc -l <"$TMP/extra.txt" | tr -d ' ')"
+echo "profile set ${FINGERPRINT:0:16}… (recorded ${recorded_set:0:16}…): $(wc -l <"$EXPECTED" | tr -d ' ') resources, ${missing} not in ${TARGET_STORE}, ${extra} in it beside them; store ${in_store:0:16}… (recorded ${recorded_store:0:16}…)"
 if grep -q ' -$' "$TMP/store.txt"; then
   echo "::notice title=Store versions::${TARGET_STORE} did not report every resource's version, so an edit made in the store is noticed only when it adds or removes a resource."
 fi
+# Refused now, in seconds, rather than after a 13-minute import.
+if [[ -z "$STORE_LISTING_UNSTABLE" ]]; then
+  check_prune_bound "$TMP/extra.txt"
+fi
 
-if [[ "${FORCE_PROFILE_IMPORT:-false}" != "true" && "$recorded_set" == "$FINGERPRINT" &&
-  "$recorded_store" == "$in_store" && "$missing" == "0" ]]; then
+imported=false
+if [[ "${FORCE_PROFILE_IMPORT:-false}" != "true" && -z "$STORE_LISTING_UNSTABLE" &&
+  "$recorded_set" == "$FINGERPRINT" && "$recorded_store" == "$in_store" && "$missing" == "0" ]]; then
   echo "Profiles unchanged in ${TARGET_STORE} since they were imported; sync and import skipped."
 else
   # --delete-unmatched-destination-objects: without it, rsync only adds/updates
@@ -216,45 +299,61 @@ else
       exit 1
     fi
   done
-
-  # The import adds and overwrites; it never removes. A resource of the import's types that the
-  # set no longer has (a pin moved, an exclusion added) or that was added to the store by hand is
-  # deleted, so the store validates against exactly the pinned set. Only those types are touched;
-  # the pipeline's own resources are of other types. More than half the set's size is refused as a
-  # listing gone wrong rather than deleted, unless FORCE_PROFILE_PRUNE=true.
+  imported=true
   TOKEN="$(ema_flow_access_token)"
-  store_listing "$TMP/store.txt"
-  cut -d' ' -f1 "$TMP/store.txt" | LC_ALL=C sort | LC_ALL=C comm -13 "$EXPECTED" - >"$TMP/extra.txt"
+  stable_store_listing "$TMP/store.txt"
+  missing="$(missing_from "$TMP/store.txt" | wc -l | tr -d ' ')"
+fi
+
+# The prune (audit B08, D-7). The import adds and overwrites; it never removes. A resource of the
+# import's types that the set no longer has (a pin moved, an exclusion added) or that was added to
+# the store by hand is deleted, so the store validates against the pinned set. Only those types
+# are touched; the pipeline's own resources are of other types. It runs only on a listing that can
+# be trusted and that holds every pinned resource: otherwise the set is "not confirmed", nothing is
+# deleted, nothing is recorded, and the next deploy imports again. A search that lags an import
+# is why that is a warning, not a failure.
+#
+# A delete the store refuses (a 409: another resource refers to it) leaves the resource in place
+# and the deploy green, with a warning naming it; every later deploy tries it again, without
+# importing again. Runbook: find what refers to it in the target store, remove or re-point that,
+# and the next deploy deletes it.
+if [[ -n "$STORE_LISTING_UNSTABLE" || "$missing" != "0" ]]; then
+  echo "::warning title=Profile set not confirmed::${TARGET_STORE} could not be confirmed to hold the pinned set (${STORE_LISTING_UNSTABLE:-${missing} pinned resource(s) not listed}); nothing was deleted or recorded, so the next deploy imports again."
+else
+  prune_candidates "$TMP/store.txt" >"$TMP/extra.txt"
   extra="$(wc -l <"$TMP/extra.txt" | tr -d ' ')"
-  limit="$(($(wc -l <"$EXPECTED") / 2))"
-  if [[ "$extra" -gt "$limit" && "${FORCE_PROFILE_PRUNE:-false}" != "true" ]]; then
-    echo "::error title=Profile prune refused::${TARGET_STORE} holds ${extra} resources of the import's types that the pinned set does not, more than half the set. Nothing was deleted; check the listing, then deploy with FORCE_PROFILE_PRUNE=true if they are to go." >&2
-    exit 1
-  fi
+  check_prune_bound "$TMP/extra.txt"
+  deleted=0
+  refused=()
   while read -r reference; do
     [[ -z "$reference" ]] && continue
     status="$(curl --silent --show-error --output "$TMP/delete.json" --write-out '%{http_code}' \
       --request DELETE --header @<(ema_flow_header Authorization "Bearer ${TOKEN}") \
       "${TARGET_FHIR}/${reference}" || true)"
-    if [[ "$status" != 2?? ]]; then
+    if [[ "$status" == 2?? ]]; then
+      deleted=$((deleted + 1))
+    else
       echo "Response summary: $(summarize_response "$TMP/delete.json")" >&2
-      echo "Could not delete ${reference} from ${TARGET_STORE}: HTTP ${status}." >&2
-      exit 1
+      refused+=("${reference} (HTTP ${status})")
     fi
   done <"$TMP/extra.txt"
-  echo "${extra} resource(s) the pinned set does not have deleted from ${TARGET_STORE}."
   if [[ "$extra" != "0" ]]; then
-    store_listing "$TMP/store.txt"
+    echo "${deleted} resource(s) the pinned set does not have deleted from ${TARGET_STORE}."
   fi
-  # The import reported success, so a store that still differs from the set is not failed here
-  # (a search that lags an import would fail a good deploy); it is left unrecorded, and the next
-  # deploy sees the difference and imports again.
-  if cut -d' ' -f1 "$TMP/store.txt" | LC_ALL=C sort | LC_ALL=C comm -3 "$EXPECTED" - | grep -q .; then
-    echo "::warning title=Profile set not confirmed::${TARGET_STORE} did not list exactly the pinned set after the import; not recorded, so the next deploy imports again."
-  else
-    printf '%s\n%s\n' "$FINGERPRINT" "$(store_fingerprint "$TMP/store.txt")" |
-      gcloud --quiet storage cp - "$MARKER" >/dev/null
-    echo "Profile set ${FINGERPRINT:0:16}… recorded as imported into ${TARGET_STORE}."
+  if [[ "${#refused[@]}" -gt 0 ]]; then
+    echo "::warning title=Profile prune incomplete::${TARGET_STORE} refused to delete ${#refused[@]} resource(s) outside the pinned set: ${refused[*]}. They stay, and every deploy tries again. A 409 means another resource refers to it: remove or re-point that, and the next deploy deletes it."
+  fi
+  if [[ "$deleted" != "0" ]]; then
+    stable_store_listing "$TMP/store.txt"
+  fi
+  if [[ "$imported" == "true" || "$deleted" != "0" ]]; then
+    if [[ -n "$STORE_LISTING_UNSTABLE" || -n "$(missing_from "$TMP/store.txt")" ]]; then
+      echo "::warning title=Profile set not confirmed::${TARGET_STORE} could not be confirmed to hold the pinned set after the prune; not recorded, so the next deploy imports again."
+    else
+      printf '%s\n%s\n' "$FINGERPRINT" "$(store_fingerprint "$TMP/store.txt")" |
+        gcloud --quiet storage cp - "$MARKER" >/dev/null
+      echo "Profile set ${FINGERPRINT:0:16}… recorded as imported into ${TARGET_STORE}."
+    fi
   fi
 fi
 

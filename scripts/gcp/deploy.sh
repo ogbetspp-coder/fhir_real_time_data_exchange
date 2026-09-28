@@ -8,6 +8,12 @@ cd "$ROOT"
 
 PHASE="${1:-all}"
 trap 'echo "::error title=Phase ${PHASE} failed::${BASH_COMMAND} exited $?"' ERR
+# Temporary files that must not outlive the script however it ends (a saved plan holds sensitive
+# values); plan_reviewed adds to it.
+DEPLOY_TEMP_FILES=()
+# The script's own status is kept: an exit caused by an expansion error (an unset
+# EMA_FLOW_ENVIRONMENT) would otherwise end with the status of this cleanup, 0.
+trap 'deploy_status=$?; rm -f ${DEPLOY_TEMP_FILES[@]+"${DEPLOY_TEMP_FILES[@]}"}; exit "$deploy_status"' EXIT
 PROJECT_ID="$(ema_flow_resolve_project)"
 # Exported unconditionally, both names, so every script this one runs (record-readers.sh,
 # bootstrap.sh, reconcile-fhir-stores.sh) acts on the project this one resolved.
@@ -18,7 +24,11 @@ REGION="${GCP_REGION:-europe-west4}"
 # No default (audit B08, L1): until then an unset or empty EMA_FLOW_ENVIRONMENT read as dev, and
 # dev's inputs (alerts that page no one, synthetic sources accepted) applied to whatever project
 # the shell named.
-ENVIRONMENT="${EMA_FLOW_ENVIRONMENT:?EMA_FLOW_ENVIRONMENT names the environment to deploy (dev, validation or prod); it has no default}"
+if [[ -z "${EMA_FLOW_ENVIRONMENT:-}" ]]; then
+  echo "EMA_FLOW_ENVIRONMENT names the environment to deploy (dev, validation or prod); it has no default." >&2
+  exit 1
+fi
+ENVIRONMENT="$EMA_FLOW_ENVIRONMENT"
 export EMA_FLOW_ENVIRONMENT="$ENVIRONMENT"
 
 # The environment's own inputs (QUERY_LOG_REJECTION_REASON, ALLOW_SYNTHETIC_SOURCES,
@@ -36,18 +46,12 @@ unset QUERY_LOG_REJECTION_REASON ALLOW_SYNTHETIC_SOURCES REQUIRE_ALERT_RECIPIENT
 # shellcheck source=/dev/null
 source "$ENVIRONMENT_INPUTS"
 
-# Each environment names the one project it may be deployed to, and any other is refused: the
-# environment and the project come from different places (a workflow's env, a repository
-# variable, an operator's shell), and nothing else ties them together. An environment that names
-# no project yet cannot be deployed anywhere.
-if [[ -z "${EXPECTED_PROJECT_ID:-}" ]]; then
-  echo "::error title=No project for ${ENVIRONMENT}::${ENVIRONMENT_INPUTS#"${ROOT}/"} names no EXPECTED_PROJECT_ID, so ${ENVIRONMENT} cannot be deployed to any project." >&2
-  exit 1
-fi
-if [[ "$PROJECT_ID" != "$EXPECTED_PROJECT_ID" ]]; then
-  echo "::error title=Wrong project for ${ENVIRONMENT}::${ENVIRONMENT} is deployed to ${EXPECTED_PROJECT_ID} only (${ENVIRONMENT_INPUTS#"${ROOT}/"}), not to ${PROJECT_ID}." >&2
-  exit 1
-fi
+# Each environment names the one project it may be deployed to (EXPECTED_PROJECT_ID), and any
+# other is refused: the environment and the project come from different places (a workflow's env,
+# a repository variable, an operator's shell), and nothing else ties them together. An environment
+# that names no project yet cannot be deployed anywhere. common.sh does the check, for the
+# operator scripts too.
+ema_flow_require_environment "$PROJECT_ID" >/dev/null
 
 # Which commit is being deployed, named the same way in the image tag (TAG), in every audit record
 # and run manifest (SERVICE_VERSION: QUERY_SERVICE_VERSION and GIT_COMMIT), and in each image's
@@ -102,6 +106,12 @@ require_provenance() {
   deploy_provenance
   if [[ -n "$PROVENANCE_ERROR" ]]; then
     echo "::error title=Deploy provenance::Not building or applying: ${PROVENANCE_ERROR}." >&2
+    exit 1
+  fi
+  # In Actions the checkout is the commit, so a tree that differs from it is something this job
+  # changed: refused rather than built and named -dirty.
+  if [[ "$SERVICE_VERSION" == *-dirty-* && "${GITHUB_ACTIONS:-}" == "true" ]]; then
+    echo "::error title=Deploy provenance::The checkout differs from ${SERVICE_VERSION%%-dirty-*}: a step of this job changed it. Not building or applying." >&2
     exit 1
   fi
   if [[ "$SERVICE_VERSION" == *-dirty-* ]]; then
@@ -282,7 +292,9 @@ phase_init() {
       --public-access-prevention
     gcloud --quiet storage buckets update "gs://${state_bucket}" --versioning
   fi
-  terraform -chdir=infra init -input=false \
+  # -lockfile=readonly: the provider versions and checksums are the committed lock's, and an
+  # init that would change the lock fails instead of rewriting it in the checkout it deploys.
+  terraform -chdir=infra init -input=false -lockfile=readonly \
     -backend-config="bucket=${state_bucket}" \
     -backend-config="prefix=terraform/state"
   terraform -chdir=infra fmt -check -recursive
@@ -330,10 +342,14 @@ complete_pending_moves() {
 # (scripts/ci/plan-summary.py: 0 no destroy, 4 a destroy or replace, anything else an error), and
 # then an apply of exactly that file (REVIEWED_PLAN), never a fresh one.
 #
-# A plan that destroys or replaces anything is applied only when ALLOW_REPLACE_COMMIT names the
-# commit being deployed (SERVICE_VERSION, in full): an acknowledgement is for one commit's plan and
-# is never carried to the next. In Actions it is the deploy workflow's allow_replace_commit input,
-# given on a manual run once the destroy has been reviewed. Anything the verdict cannot read fails.
+# A plan that destroys or replaces anything is applied only when ALLOW_REPLACE_ACK names the
+# commit being deployed (SERVICE_VERSION, in full) and the digest of the addresses it destroys or
+# replaces, as "<commit>:<digest>" (common.sh, ema_flow_acknowledged): the refusing run prints the
+# value. An acknowledgement is for one commit's one set of destroys, and is never carried to the
+# next commit, nor to a re-run whose plan destroys something else. In Actions it is the deploy
+# workflow's allow_replace_ack input, given on a manual run once the destroy has been reviewed.
+# Anything the verdict cannot read fails. Every temporary file here, the saved plan included
+# (it holds sensitive values), is removed when the script exits, however it exits.
 #   plan_reviewed <label> <terraform plan arguments...>
 plan_reviewed() {
   local label="$1" plan_file plan_text plan_json summary code=0 verdict=0
@@ -342,6 +358,7 @@ plan_reviewed() {
   plan_text="$(mktemp)"
   plan_json="$(mktemp)"
   summary="$(mktemp)"
+  DEPLOY_TEMP_FILES+=("$plan_file" "$plan_text" "$plan_json" "$summary")
   echo "--- ${label}: plan ---"
   terraform -chdir=infra plan -input=false -no-color -detailed-exitcode -out="$plan_file" "$@" \
     >"$plan_text" 2>&1 || code=$?
@@ -355,17 +372,27 @@ plan_reviewed() {
     return 1
   fi
   python3 scripts/ci/plan-summary.py "$plan_json" "$plan_text" "$summary" "$code" || verdict=$?
+  local destroyed digest=""
+  if [[ "$verdict" == "4" ]]; then
+    destroyed="$(mktemp)"
+    DEPLOY_TEMP_FILES+=("$destroyed")
+    python3 -c "
+import json, sys
+for change in json.load(open(sys.argv[1])).get('resource_changes', []):
+    if 'delete' in change.get('change', {}).get('actions', []):
+        print(change.get('address', '?') + (' deposed ' + change['deposed'] if change.get('deposed') else ''))
+" "$plan_json" >"$destroyed" && digest="$(ema_flow_destroy_digest "$destroyed")" || digest=""
+  fi
   rm -f "$plan_text" "$plan_json" "$summary"
   case "$verdict" in
     0) ;;
     4)
       deploy_provenance
-      if [[ -z "$PROVENANCE_ERROR" && -n "${ALLOW_REPLACE_COMMIT:-}" &&
-        "$ALLOW_REPLACE_COMMIT" == "$SERVICE_VERSION" ]]; then
-        echo "::warning title=Destroy acknowledged::${label}: the plan destroys or replaces the resources listed above, and ALLOW_REPLACE_COMMIT names this commit, so it is applied."
+      if [[ -z "$PROVENANCE_ERROR" ]] && ema_flow_acknowledged "$SERVICE_VERSION" "$digest"; then
+        echo "::warning title=Destroy acknowledged::${label}: the plan destroys or replaces the resources listed above, and ALLOW_REPLACE_ACK names this commit and exactly these, so it is applied."
       else
         rm -f "$plan_file"
-        echo "::error title=Destroy not acknowledged::${label}: the plan destroys or replaces the resources listed above, and nothing was applied. Once they are reviewed, deploy again with ALLOW_REPLACE_COMMIT=${SERVICE_VERSION} (in Actions, run the deploy workflow with allow_replace_commit set to it)." >&2
+        echo "::error title=Destroy not acknowledged::${label}: the plan destroys or replaces the resources listed above, and nothing was applied. Once they are reviewed, deploy again with ALLOW_REPLACE_ACK=${SERVICE_VERSION}:${digest:-<digest unavailable>} (in Actions, run the deploy workflow with allow_replace_ack set to it)." >&2
         return 3
       fi
       ;;
@@ -703,9 +730,11 @@ export_effective_iam() {
     if [[ -z "$bucket" ]]; then
       echo "::warning::terraform output evidence_bucket was empty; the effective IAM export is in this deploy log only."
     else
-      # Dated path, then the timestamp, environment and the first 12 characters of the deployed
-      # commit, so one export belongs to exactly one apply.
-      local destination="gs://${bucket}/deploy-evidence/${date_path}/${stamp}-${ENVIRONMENT}-${SERVICE_VERSION:0:12}/"
+      # Dated path, then the timestamp, environment and the deployed version, so one export
+      # belongs to exactly one apply.
+      # The full SERVICE_VERSION, -dirty-<tree> included, so a report is never filed under a
+      # commit its code was not.
+      local destination="gs://${bucket}/deploy-evidence/${date_path}/${stamp}-${ENVIRONMENT}-${SERVICE_VERSION}/"
       if gcloud --quiet storage cp "${out_dir}/reports/"*.json "$destination" >/dev/null 2>&1; then
         echo "Effective IAM export written to ${destination}"
       else
@@ -1036,8 +1065,11 @@ plan_dashboard_drift() {
 phase_bootstrap() {
   echo "=== reconcile FHIR stores and import profiles ==="
   GOOGLE_CLOUD_PROJECT="$PROJECT_ID" bash scripts/gcp/reconcile-fhir-stores.sh
+  # DEPLOY_COMMIT is what ALLOW_REPLACE_ACK must name for bootstrap to prune more than its bound
+  # allows (bootstrap.sh, check_prune_bound).
+  deploy_provenance
   GOOGLE_CLOUD_PROJECT="$PROJECT_ID" ALLOW_SYNTHETIC_SOURCES="${ALLOW_SYNTHETIC_SOURCES:-false}" \
-    bash scripts/gcp/bootstrap.sh
+    DEPLOY_COMMIT="$SERVICE_VERSION" bash scripts/gcp/bootstrap.sh
   echo "Deployment complete."
   terraform -chdir=infra output workflow_console_url
   terraform -chdir=infra output bigquery_console_url

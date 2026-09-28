@@ -172,6 +172,10 @@ function inputs() {
   writeFileSync(path.join(dir, "standards", "S1-p_1.tgz"), "S1");
   writeFileSync(path.join(dir, "standards", "S2.json"), "S2");
   writeFileSync(path.join(dir, "synthetic-type2.json"), "{}");
+  writeFileSync(
+    path.join(root, "fhir", "deploy-inputs.lock.json"),
+    JSON.stringify({ files: { "synthetic-type2.json": sha256("{}") } }),
+  );
   return { root, dir };
 }
 
@@ -213,6 +217,34 @@ describe("the deploy's inputs", { timeout: 30_000 }, () => {
     const verify = deployInputs(root, "verify", dir, hash ?? sealed);
     expect(verify.status).toBe(1);
     expect(verify.stderr).toContain(reason);
+  });
+
+  it("are refused when the fixture is not the pinned one, however consistently sealed", () => {
+    // A dependency of the job that makes the fixture could otherwise seed any Bundle it liked.
+    const { root, dir } = inputs();
+    writeFileSync(path.join(dir, "synthetic-type2.json"), '{"resourceType":"Bundle"}');
+    const sealed = deployInputs(root, "seal", dir).stdout.trim();
+    const verify = deployInputs(root, "verify", dir, sealed);
+    expect(verify.status).toBe(1);
+    expect(verify.stderr).toContain(
+      "synthetic-type2.json is not the one fhir/deploy-inputs.lock.json pins",
+    );
+  });
+
+  it("pin the fixture the repository generates today", () => {
+    const pinned = JSON.parse(readFileSync("fhir/deploy-inputs.lock.json", "utf8")) as {
+      files: Record<string, string>;
+    };
+    expect(Object.keys(pinned.files)).toEqual(["synthetic-type2.json"]);
+    expect(pinned.files["synthetic-type2.json"]).toMatch(/^[0-9a-f]{64}$/);
+    // Checked against the fixture itself where the pinned Type 2 example can be downloaded: CI's
+    // official-validation job, which makes the inputs (.github/workflows/ci.yml).
+    expect(readFileSync(".github/workflows/ci.yml", "utf8")).toContain(
+      'bash scripts/gcp/deploy-inputs.sh "${RUNNER_TEMP}/deploy-inputs"',
+    );
+    expect(readFileSync("scripts/gcp/deploy-inputs.sh", "utf8")).toContain(
+      'node scripts/fhir/deploy-inputs.mjs verify "$OUT" "$sealed"',
+    );
   });
 
   it("are refused when a standard is not the pinned one, however consistently sealed", () => {

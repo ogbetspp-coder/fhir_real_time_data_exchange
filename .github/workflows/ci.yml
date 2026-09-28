@@ -106,6 +106,13 @@ jobs:
       - name: Validate the fixture against the official HL7 validator
         run: npm run validate:official
 
+      # The deploy's inputs, made as the deploy's gate job makes them (scripts/gcp/deploy-inputs.sh):
+      # the standards bootstrap imports, checked against fhir/standards.lock.json, and the synthetic
+      # fixture, checked against its pin in fhir/deploy-inputs.lock.json. A change to the fixture's
+      # code that does not update the pin fails here, before merge, rather than in the deploy.
+      - name: Make the deploy's inputs and check them against their pins
+        run: bash scripts/gcp/deploy-inputs.sh "${RUNNER_TEMP}/deploy-inputs" >/dev/null
+
   # The renderer gate's image (docs/design/authority-import-renderer.md, R1's pre-check and R6):
   # built from Dockerfile.renderer, every download checked against its pin and every library
   # Chrome links resolved, then run with no network, a read-only workspace and no credentials

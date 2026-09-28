@@ -11,8 +11,10 @@
 //   node scripts/fhir/deploy-inputs.mjs verify <dir> <manifest sha256>
 //     Refuses the directory unless the manifest has that hash; every file it names is present
 //     with its hash and no other file is; every standard the bootstrap uses is present under its
-//     exact name with the SHA-256 fhir/standards.lock.json pins (a check that does not depend on
-//     the job that made the directory); and the synthetic fixture is there.
+//     exact name with the SHA-256 fhir/standards.lock.json pins, and every file the repository
+//     generates (the synthetic fixture) has the SHA-256 fhir/deploy-inputs.lock.json pins: checks
+//     that do not depend on the job that made the directory, so a compromised dependency there
+//     cannot change what the deploy imports or seeds.
 
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
@@ -21,6 +23,7 @@ import path from "node:path";
 import { outputName, readLock, sha256File } from "./standards.mjs";
 
 const MANIFEST = "manifest.json";
+const GENERATED_LOCK = "fhir/deploy-inputs.lock.json";
 const FIXTURE = "synthetic-type2.json";
 const CONSUMER = "bootstrap";
 
@@ -69,7 +72,16 @@ async function verify(dir, expected) {
       problems.push(`${file} is not ${artifact.name} as fhir/standards.lock.json pins it`);
     }
   }
-  if (!(FIXTURE in manifest)) problems.push(`${FIXTURE} is missing`);
+  const generated = JSON.parse(await readFile(GENERATED_LOCK, "utf8")).files ?? {};
+  if (!(FIXTURE in generated)) problems.push(`${GENERATED_LOCK} pins no ${FIXTURE}`);
+  for (const [file, sha256] of Object.entries(generated)) {
+    if (!(file in manifest)) problems.push(`${file} is missing`);
+    else if (manifest[file] !== sha256) {
+      problems.push(
+        `${file} is not the one ${GENERATED_LOCK} pins (${manifest[file].slice(0, 16)}…, not ${sha256.slice(0, 16)}…); if the fixture's code or inputs changed, record its new hash there`,
+      );
+    }
+  }
   return problems;
 }
 

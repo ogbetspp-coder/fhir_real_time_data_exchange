@@ -39,6 +39,15 @@ const EXPECTED = [
 ];
 
 const sha256 = (data: string | Buffer) => createHash("sha256").update(data).digest("hex");
+// The acknowledgement of a prune over its bound (common.sh, ema_flow_acknowledged): the commit
+// being deployed and the first 16 hex of SHA-256 over the sorted candidates.
+const ack = (commit: string, ...candidates: string[]) =>
+  `${commit}:${sha256(
+    [...candidates]
+      .sort()
+      .map((c) => `${c}\n`)
+      .join(""),
+  ).slice(0, 16)}`;
 
 // The four packages bootstrap imports, each a package/ directory of resources, as tarballs.
 const PACKAGES: [name: string, pkg: string, resources: [string, string][]][] = [
@@ -90,6 +99,8 @@ def answer(code, body):
     else: sys.stdout.write(text)
     if "--write-out" in args: sys.stdout.write(str(code))
 base = "${TARGET}/"
+if method == "DELETE" and os.environ.get("STUB_REFUSE_DELETE"):
+    answer(409, {"resourceType": "OperationOutcome", "issue": [{"code": "conflict", "severity": "error"}]}); sys.exit(0)
 if method == "DELETE":
     ref = url[len(base):]
     open(store, "w").write("".join(l + "\\n" for l in lines if l.split(" ")[0] != ref))
@@ -102,15 +113,20 @@ path, _, query = url[len(base):].partition("?")
 kind = path.split("/")[0]
 page = int(query.split("_page_token=")[1]) if "_page_token=" in query else 0
 of_kind = [l for l in lines if l.startswith(kind + "/")]
-entry = []
-if page < len(of_kind):
-    ref, version = of_kind[page].split(" ")
-    entry = [{"resource": {"resourceType": kind, "id": ref.split("/")[1], "meta": {"versionId": version}}}]
+def resource(line):
+    ref, version = line.split(" ")
+    return {"resource": {"resourceType": kind, "id": ref.split("/")[1], "meta": {"versionId": version}}}
+entry = [resource(of_kind[page])] if page < len(of_kind) else []
+# STUB_REPEAT: page 0 also answers page 1's entry, as a search that is not a snapshot can.
+if os.environ.get("STUB_REPEAT") and page == 0 and len(of_kind) > 1:
+    entry.append(resource(of_kind[1]))
+# STUB_TOTAL_SKEW: the total grows by one on every page after the first.
+total = len(of_kind) + (page if os.environ.get("STUB_TOTAL_SKEW") else 0)
 link = []
 if page + 1 < len(of_kind):
     following = os.environ.get("STUB_NEXT_BASE", base) + kind + "?_page_token=" + str(page + 1)
     link = [{"relation": "next", "url": following}]
-answer(200, {"resourceType": "Bundle", "entry": entry, "link": link})
+answer(200, {"resourceType": "Bundle", "total": total, "entry": entry, "link": link})
 `;
 
 const GCLOUD = `#!/usr/bin/env bash
@@ -198,6 +214,10 @@ async function setUp() {
     JSON.stringify({ schemaVersion: "1.0.0", artifacts }),
   );
   writeFileSync(path.join(inputs, "synthetic-type2.json"), '{"resourceType":"Bundle"}');
+  writeFileSync(
+    path.join(root, "fhir", "deploy-inputs.lock.json"),
+    JSON.stringify({ files: { "synthetic-type2.json": sha256('{"resourceType":"Bundle"}') } }),
+  );
   const sealed = await run(process.execPath, ["scripts/fhir/deploy-inputs.mjs", "seal", inputs], {
     cwd: root,
   });
@@ -293,7 +313,11 @@ describe.concurrent("the deploy's FHIR bootstrap", { timeout: 60_000 }, () => {
       readFileSync(store, "utf8").replace("ValueSet/e2 1", "ValueSet/e2 7") +
         "StructureDefinition/foreign 1\n",
     );
-    const again = await bootstrap(setup);
+    // One of a set of five is over the prune's 5% bound, so this commit acknowledges it.
+    const again = await bootstrap(setup, {
+      ALLOW_REPLACE_ACK: ack("c1", "StructureDefinition/foreign"),
+      DEPLOY_COMMIT: "c1",
+    });
     expect(again.status).toBe(0);
     expect(imports(again.calls)).toBe(8);
     expect(again.calls).toMatch(/--request DELETE .*\/fhir\/StructureDefinition\/foreign/);
@@ -312,16 +336,63 @@ describe.concurrent("the deploy's FHIR bootstrap", { timeout: 60_000 }, () => {
     expect(imports(again.calls)).toBe(8);
   });
 
-  it("refuses to delete more than half the set's size", async () => {
+  it("refuses a prune over its bound before importing, unless this commit acknowledges it", async () => {
     const setup = await setUp();
-    writeFileSync(
-      path.join(setup.stubs, "store.txt"),
-      ["a", "b", "c"].map((id) => `StructureDefinition/foreign-${id} 1\n`).join(""),
-    );
-    const result = await bootstrap(setup);
-    expect(result.status).not.toBe(0);
-    expect(result.out).toContain("Profile prune refused");
+    writeFileSync(path.join(setup.stubs, "store.txt"), "StructureDefinition/foreign 1\n");
+    const refused = await bootstrap(setup, {
+      ALLOW_REPLACE_ACK: ack("old", "StructureDefinition/foreign"),
+      DEPLOY_COMMIT: "c1",
+    });
+    expect(refused.status).not.toBe(0);
+    expect(refused.out).toContain("Profile prune refused");
+    expect(refused.out).toContain(`ALLOW_REPLACE_ACK=${ack("c1", "StructureDefinition/foreign")}`);
+    expect(imports(refused.calls)).toBe(0);
+    expect(refused.calls).not.toContain("DELETE");
+  });
+
+  it("never deletes a pinned resource, even when a search page repeats one", async () => {
+    // The review's reproduction: page 0 also answers page 1's entry. Until the listing was made
+    // unique, the repeat was a prune candidate, and a pinned StructureDefinition was deleted.
+    const setup = await setUp();
+    await bootstrap(setup);
+    const again = await bootstrap(setup, { STUB_REPEAT: "1", FORCE_PROFILE_IMPORT: "true" });
+    expect(again.status).toBe(0);
+    expect(again.calls).not.toContain("DELETE");
+    expect(again.store.map((line) => line.split(" ")[0])).toEqual(EXPECTED);
+  });
+
+  it("skips the prune, and records nothing, on a listing that moved while it was read", async () => {
+    const setup = await setUp();
+    await bootstrap(setup);
+    const store = path.join(setup.stubs, "store.txt");
+    writeFileSync(store, `${readFileSync(store, "utf8")}StructureDefinition/foreign 1\n`);
+    const marker = readFileSync(path.join(setup.stubs, "marker"), "utf8");
+    const result = await bootstrap(setup, {
+      STUB_TOTAL_SKEW: "1",
+      ALLOW_REPLACE_ACK: ack("c1", "StructureDefinition/foreign"),
+      DEPLOY_COMMIT: "c1",
+    });
+    expect(result.status).toBe(0);
+    expect(result.out).toContain("total changed between pages");
+    expect(result.out).toContain("Profile set not confirmed");
     expect(result.calls).not.toContain("DELETE");
+    expect(readFileSync(path.join(setup.stubs, "marker"), "utf8")).toBe(marker);
+  });
+
+  it("keeps the deploy green when the store refuses a delete, and says what to do", async () => {
+    const setup = await setUp();
+    await bootstrap(setup);
+    const store = path.join(setup.stubs, "store.txt");
+    writeFileSync(store, `${readFileSync(store, "utf8")}StructureDefinition/referenced 1\n`);
+    const result = await bootstrap(setup, {
+      STUB_REFUSE_DELETE: "1",
+      ALLOW_REPLACE_ACK: ack("c1", "StructureDefinition/referenced"),
+      DEPLOY_COMMIT: "c1",
+    });
+    expect(result.status).toBe(0);
+    expect(result.out).toContain("Profile prune incomplete");
+    expect(result.out).toContain("StructureDefinition/referenced (HTTP 409)");
+    expect(result.out).toContain("remove or re-point that");
   });
 
   it("refuses inputs that are not what the gate job sealed, before touching the store", async () => {

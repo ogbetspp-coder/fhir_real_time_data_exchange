@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -69,15 +70,62 @@ describe("deploy workflow permissions", () => {
 // phases, and those call functions and scripts; every one of them runs with the deployer's
 // credentials file and its OIDC token request in the environment. Until then bootstrap.sh ran
 // `npm run standards:fetch` and `node_modules/.bin/tsx`, which load tsx, esbuild and zod at import
-// time. So nothing reachable from a phase the deploy job runs may start an installed package, and
-// every Node script it starts must import Node's built-ins and the repository's own files only.
-const RUNS_A_PACKAGE = /\btsx\b|node_modules\/\.bin|\bnpm (run|ci|install|i|exec|test)\b|\bnpx\b/;
+// time. So nothing the deploy job runs -- its own steps, and everything reachable from the phases
+// they call -- may start an installed package or a package manager; every interpreter it starts
+// must be given a script this reader can find in the repository (or inline code); and every Node
+// script it starts must import Node's built-ins and the repository's own files only. The first
+// version of these tests read only some of that, and a review showed three ways past them (review
+// round 1): the last test below holds each of them.
+const RUNS_A_PACKAGE =
+  /\btsx\b|node_modules\/\.bin|\bnpm (run|ci|install|i|exec|x|test)\b|\bnpx\b|\bpip[x3]?\b|-m pip\b|\buvx?\b|\byarn\b|\bpnpm\b|\bbunx?\b/;
 
 // A script's shell, without the Python its heredocs feed to python3: that text is never run by
 // the shell, and a `}` alone on a line inside it would end a function early for the reader below.
 function shell(text: string): string {
   return text.replace(/<<'(\w+)'[^\n]*\n[\s\S]*?^\1$/gm, "<<'$1'");
 }
+
+// Text without its comment lines (shell and YAML alike) and without YAML `shell:` keys.
+function uncommented(text: string): string {
+  return text
+    .split("\n")
+    .filter((line) => !/^\s*#/.test(line) && !/^\s*shell:/.test(line))
+    .join("\n");
+}
+
+// Every interpreter started with an argument: node, bash, sh, source, python and python3. Inline
+// code (-c, -e) and a heredoc (-) are read as part of the text itself; a script must be a literal
+// repository path that exists, so the reader can follow it; the two files deploy.sh sources are
+// named. Anything else (a path built from a variable, ./scripts/...) is a finding.
+// Only at a command's position: a line's start, after a separator, a keyword or a YAML `run:`;
+// a word in a message ("No synthetic source seeded") is not a command.
+const STARTS =
+  /(?:^[ \t]*|[;|&(`][ \t]*|\b(?:then|do|else|if|run:)[ \t]+)(node|bash|sh|source|python3?)[ \t]+("[^"]*"|'[^']*'|[^\s;|&)]+)/gm;
+// The one line every script sources common.sh with, which is followed as a file by name.
+const SOURCES_COMMON =
+  /^source "\$\(cd "\$\(dirname "\$\{BASH_SOURCE\[0\]\}"\)(?:\/\.\.\/\.\.\/scripts\/gcp)?" && pwd\)\/common\.sh"$/gm;
+function invocationFindings(where: string, text: string): string[] {
+  const findings: string[] = [];
+  for (const [, command, argument] of uncommented(text)
+    .replace(SOURCES_COMMON, "")
+    .matchAll(STARTS)) {
+    const arg = argument ?? "";
+    if (arg.startsWith("-")) continue;
+    if (command === "source" && arg === '"$ENVIRONMENT_INPUTS"') continue;
+    if (/^scripts\/[\w/.-]+$/.test(arg) && existsSync(arg)) continue;
+    findings.push(`${where}: ${command ?? "?"} ${arg}`);
+  }
+  // Inline Node code (node -e): every require or dynamic import names a built-in, literally.
+  for (const [call, specifier] of uncommented(text).matchAll(
+    /\b(?:require\s*|import)\(\s*(["'][^"']*["']|[^)\s]*)/g,
+  )) {
+    if (!/^["']node:[a-z/_]+["']$/.test(specifier ?? "")) findings.push(`${where}: ${call}`);
+  }
+  const run = RUNS_A_PACKAGE.exec(uncommented(text));
+  if (run !== null) findings.push(`${where}: ${run[0]}`);
+  return findings;
+}
+
 const deployScript = shell(readFileSync("scripts/gcp/deploy.sh", "utf8"));
 
 function reachableFromDeployJob(): Map<string, string> {
@@ -91,11 +139,15 @@ function reachableFromDeployJob(): Map<string, string> {
   const dispatch = new Map(
     [...deployScript.matchAll(/^ {2}([a-z-]+)\) (.+) ;;$/gm)].map((m) => [m[1] ?? "", m[2] ?? ""]),
   );
-  const phases = [
-    ...(byName.get("deploy") ?? "").matchAll(/scripts\/gcp\/deploy\.sh ([a-z-]+)/g),
-  ].map((m) => m[1] ?? "");
+  const deployJob = byName.get("deploy") ?? "";
+  const phases = [...deployJob.matchAll(/scripts\/gcp\/deploy\.sh ([a-z-]+)/g)].map(
+    (m) => m[1] ?? "",
+  );
   expect(phases).toEqual(expect.arrayContaining(["apply", "bootstrap", "record-readers"]));
-  const reached = new Map<string, string>([["deploy.sh (top level)", top]]);
+  const reached = new Map<string, string>([
+    ["deploy.yml (the deploy job's own steps)", deployJob],
+    ["deploy.sh (top level)", top],
+  ]);
   const queue = phases.map((phase) => {
     const call = dispatch.get(phase);
     expect([phase, call]).toEqual([phase, expect.any(String)]);
@@ -109,9 +161,9 @@ function reachableFromDeployJob(): Map<string, string> {
         queue.push(body);
       }
     }
-    for (const match of text.matchAll(/\bbash (scripts\/gcp\/[\w.-]+\.sh)/g)) {
+    for (const match of uncommented(text).matchAll(/\b(?:bash|sh) (scripts\/[\w/.-]+\.sh)/g)) {
       const file = match[1] ?? "";
-      if (!reached.has(file)) {
+      if (!reached.has(file) && file !== "scripts/gcp/deploy.sh") {
         const body = shell(readFileSync(file, "utf8"));
         reached.set(file, body);
         queue.push(body);
@@ -124,22 +176,47 @@ function reachableFromDeployJob(): Map<string, string> {
   return reached;
 }
 
-// The modules a Node script imports, followed through the repository's own files.
+// The modules a Node script imports, followed through the repository's own files: static imports
+// with or without bindings (a side-effect `import "x"` too), re-exports, require and dynamic
+// import, in either quote. A require or import of anything but a literal is a finding itself.
+const IMPORTS =
+  /(?:^|[;\s}])import\s*(?:[^'";]*?\s*from\s*)?["']([^"']+)["']|\bexport\s+[^'";]*?\s*from\s*["']([^"']+)["']|\b(?:require|import)\s*\(\s*["']([^"']+)["']\s*\)/g;
 function nodeImports(file: string, seen = new Set<string>()): string[] {
   if (seen.has(file)) return [];
   seen.add(file);
   const text = readFileSync(file, "utf8");
-  const specifiers = [
-    ...text.matchAll(/^import [^;]*?from "([^"]+)";$/gm),
-    ...text.matchAll(/\brequire\("([^"]+)"\)/g),
-    ...text.matchAll(/\bimport\("([^"]+)"\)/g),
-  ].map((match) => match[1] ?? "");
-  return specifiers.flatMap((specifier) => {
-    if (!specifier.startsWith(".")) return [`${file}: ${specifier}`];
-    // TypeScript sources import each other by their compiled .js names.
-    const target = path.join(path.dirname(file), specifier);
-    return nodeImports(existsSync(target) ? target : target.replace(/\.js$/, ".ts"), seen);
-  });
+  const dynamic = [...text.matchAll(/\b(?:require|import)\s*\(\s*(?!["'])/g)].map(
+    () => `${file}: a require or import of something other than a literal`,
+  );
+  const specifiers = [...text.matchAll(IMPORTS)].map((m) => m[1] ?? m[2] ?? m[3] ?? "");
+  return [
+    ...dynamic,
+    ...specifiers.flatMap((specifier) => {
+      if (!specifier.startsWith(".")) return [`${file}: ${specifier}`];
+      // TypeScript sources import each other by their compiled .js names.
+      const target = path.join(path.dirname(file), specifier);
+      return nodeImports(existsSync(target) ? target : target.replace(/\.js$/, ".ts"), seen);
+    }),
+  ];
+}
+
+function nodeScripts(texts: Iterable<string>): Set<string> {
+  return new Set(
+    [...texts].flatMap((text) =>
+      [...uncommented(text).matchAll(/\bnode (scripts\/[\w/.-]+\.m?js)\b/g)].map((m) => m[1] ?? ""),
+    ),
+  );
+}
+
+// Everything wrong with what the deploy job runs: an empty list is the rule held.
+function deployJobFindings(reached: Map<string, string>): string[] {
+  const findings = [...reached].flatMap(([where, text]) => invocationFindings(where, text));
+  for (const script of nodeScripts(reached.values())) {
+    for (const imported of nodeImports(script)) {
+      if (!/: node:[a-z/_]+$/.test(imported)) findings.push(imported);
+    }
+  }
+  return findings;
 }
 
 describe("the job that can become the deployer", () => {
@@ -159,39 +236,85 @@ describe("the job that can become the deployer", () => {
     // Made by the gate job, and by `deploy.sh all` locally; never by a phase of this job.
     expect(reached.has("phase_inputs")).toBe(false);
     expect(reached.has("phase_deps")).toBe(false);
-  });
-
-  it("starts no installed package: no tsx, nothing from node_modules/.bin, no npm run", () => {
-    for (const [where, text] of reached) {
-      expect([where, RUNS_A_PACKAGE.exec(text)?.[0]]).toEqual([where, undefined]);
-    }
-  });
-
-  it("starts Node scripts that import Node's built-ins and the repository's own files only", () => {
-    const scripts = new Set(
-      [...reached.values()].flatMap((text) =>
-        [...text.matchAll(/\bnode (scripts\/[\w/.-]+\.m?js)\b/g)].map((m) => m[1] ?? ""),
-      ),
-    );
-    expect([...scripts]).toEqual(
+    expect([...nodeScripts(reached.values())]).toEqual(
       expect.arrayContaining([
         "scripts/fhir/deploy-inputs.mjs",
         "scripts/fhir/fetch-standards.mjs",
         "scripts/fhir/select-import-resources.mjs",
       ]),
     );
-    for (const script of scripts) {
-      for (const imported of nodeImports(script)) {
-        expect(imported).toMatch(/: node:[a-z/_]+$/);
-      }
-    }
   });
 
-  it("would have caught the fetch and the fixture export this batch moved to the gate job", () => {
-    expect(RUNS_A_PACKAGE.test("npm run standards:fetch")).toBe(true);
+  it("starts no package, no package manager, no script it cannot follow, and no import but Node's", () => {
+    expect(deployJobFindings(reached)).toEqual([]);
+  });
+
+  it("uses only the actions it names, pinned, and checks its inputs before any credential", () => {
+    const deployJob = byName.get("deploy") ?? "";
+    const uses = [...deployJob.matchAll(/^\s+uses: (\S+)/gm)].map((m) => m[1] ?? "");
+    const pinned = uses.map((use) => /^([\w./-]+)@[0-9a-f]{40}$/.exec(use)?.[1] ?? use);
+    expect(pinned).toEqual([
+      "actions/checkout",
+      "actions/setup-node",
+      "actions/download-artifact",
+      "google-github-actions/auth",
+      "google-github-actions/setup-gcloud",
+      "hashicorp/setup-terraform",
+      "google-github-actions/auth",
+      "google-github-actions/auth",
+    ]);
+    const at = (text: string) => deployJob.indexOf(text);
+    expect(at("node scripts/fhir/deploy-inputs.mjs verify")).toBeGreaterThan(
+      at("uses: actions/download-artifact@"),
+    );
+    expect(at("node scripts/fhir/deploy-inputs.mjs verify")).toBeLessThan(
+      at("uses: google-github-actions/auth@"),
+    );
+  });
+
+  it("would catch each way past it that the review found, and the two this batch removed", () => {
+    const withLine = (where: string, text: string, line: string) =>
+      deployJobFindings(new Map([...reached, [where, `${text}\n${line}\n`]]));
+    // In the deploy job's own steps.
+    const job = "deploy.yml (the deploy job's own steps)";
     expect(
-      RUNS_A_PACKAGE.test("node_modules/.bin/tsx scripts/fhir/export-fixture.ts out.json in.json"),
-    ).toBe(true);
+      withLine(job, reached.get(job) ?? "", "        run: npm run x && npm exec --yes -- some-pkg"),
+    ).not.toEqual([]);
+    // In a script the job reaches: a package manager, a path the reader cannot follow, and the
+    // fetch and fixture export that ran in bootstrap.sh until this batch.
+    const boot = "scripts/gcp/bootstrap.sh";
+    for (const line of [
+      "python3 -m pip install requests",
+      "node ./scripts/fhir/x.mjs",
+      'bash "$ROOT/scripts/gcp/other.sh"',
+      "npm run standards:fetch",
+      "node_modules/.bin/tsx scripts/fhir/export-fixture.ts out.json in.json",
+    ]) {
+      expect([line, withLine(boot, reached.get(boot) ?? "", line)]).toEqual([
+        line,
+        expect.arrayContaining([expect.any(String)]),
+      ]);
+    }
+    // In a Node script it starts: a side-effect import, a re-export, single quotes, a dynamic
+    // require.
+    const dir = mkdtempSync(path.join(tmpdir(), "deploy-permissions-"));
+    try {
+      for (const line of [
+        'import "zod";',
+        'export * from "esbuild";',
+        "import { z } from 'zod';",
+        "const m = require(name);",
+      ]) {
+        const file = path.join(dir, "probe.mjs");
+        writeFileSync(file, `import { readFile } from "node:fs/promises";\n${line}\n`);
+        expect([line, nodeImports(file).filter((i) => !/: node:[a-z/_]+$/.test(i))]).toEqual([
+          line,
+          [expect.any(String)],
+        ]);
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
     expect(nodeImports("scripts/fhir/export-fixture.ts").some((i) => !i.includes(": node:"))).toBe(
       true,
     );

@@ -25,8 +25,8 @@
 # added, and an apply ends by running the check itself, so it cannot report success over drift it
 # left (audit B08, D-7). `--check` reports drift without changing anything.
 #
-#   bash scripts/gcp/plan-identity.sh
-#   bash scripts/gcp/plan-identity.sh --check
+#   EMA_FLOW_ENVIRONMENT=dev GCP_PROJECT_ID=sage-ship-509104-b8 bash scripts/gcp/plan-identity.sh
+#   EMA_FLOW_ENVIRONMENT=dev GCP_PROJECT_ID=sage-ship-509104-b8 bash scripts/gcp/plan-identity.sh --check
 set -euo pipefail
 
 # shellcheck source=scripts/gcp/common.sh
@@ -34,7 +34,8 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 # GOOGLE_CLOUD_PROJECT or GCP_PROJECT_ID (refused when the two differ), else the gcloud
 # configuration; no project at all fails rather than falling back to a hard-coded one.
 PROJECT_ID="$(ema_flow_resolve_project)"
-ENVIRONMENT="${EMA_FLOW_ENVIRONMENT:-dev}"
+# No default environment, and only the project its inputs file names (audit B08, L1).
+ENVIRONMENT="$(ema_flow_require_environment "$PROJECT_ID")"
 REPOSITORY="ogbetspp-coder/fhir_real_time_data_exchange"
 REPOSITORY_ID="1376667427"
 POOL="github-plan-pool"

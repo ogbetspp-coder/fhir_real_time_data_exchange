@@ -1,7 +1,17 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync, readdirSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
 // The plan is what applies (audit I-6). A pull request's plan (.github/workflows/plan.yml) is the
 // last point a person sees an infrastructure change before the deploy applies it unattended. Until
@@ -62,10 +72,10 @@ describe("the plan's inputs", () => {
     // The one exception is the deploy's acknowledgement of a destroy (audit B08, D-2): it names
     // the commit being deployed, which a pull request's plan has not got; the plan's own
     // acknowledgement is the allow-replace label (ALLOW_REPLACE).
-    expect(deployInputs).toContain("ALLOW_REPLACE_COMMIT");
+    expect(deployInputs).toContain("ALLOW_REPLACE_ACK");
     expect(planInputs).toContain("ALLOW_REPLACE");
     const missing = deployInputs.filter(
-      (name) => !planInputs.includes(name) && name !== "ALLOW_REPLACE_COMMIT",
+      (name) => !planInputs.includes(name) && name !== "ALLOW_REPLACE_ACK",
     );
     expect(missing).toEqual([]);
   });
@@ -82,8 +92,12 @@ describe("each environment's own inputs", () => {
   });
 
   it.each(environments)("%s holds NAME=value lines that deploy.sh reads", (file) => {
+    // EXPECTED_PROJECT_ID is read by common.sh (ema_flow_require_environment), for deploy.sh and
+    // the operator scripts alike.
+    const common = readFileSync("scripts/gcp/common.sh", "utf8");
     for (const name of inputsIn(file)) {
-      expect([name, deployScript.includes(`\${${name}:-`)]).toEqual([name, true]);
+      const read = deployScript.includes(`\${${name}:-`) || common.includes(`s/^${name}=//p`);
+      expect([name, read]).toEqual([name, true]);
     }
   });
 
@@ -275,6 +289,53 @@ describe("the alert recipient's dev exception", () => {
       expect(
         check({ EMA_FLOW_ENVIRONMENT: environment, ALERT_NOTIFICATION_CHANNELS: "c" }).status,
       ).toBe(0);
+    },
+  );
+});
+
+// The operator scripts that act on one environment's resources keep the same rule (audit B08,
+// L1, review round 1): plan-identity.sh now removes grants it does not want, so running it with
+// dev assumed, on another project, would strip that project's planner. Each runs with a stand-in
+// gcloud that records any call; a refusal must come before the first.
+describe("the operator scripts' environment", () => {
+  const operatorScripts = [
+    "scripts/gcp/plan-identity.sh",
+    "scripts/gcp/storage-keys.sh",
+    "scripts/gcp/bq-cmek-convert.sh",
+  ];
+  const stub = mkdtempSync(path.join(tmpdir(), "operator-env-"));
+  afterAll(() => rmSync(stub, { recursive: true, force: true }));
+  writeFileSync(path.join(stub, "gcloud"), `#!/bin/sh\necho "$*" >>"${stub}/calls"\nexit 3\n`);
+  chmodSync(path.join(stub, "gcloud"), 0o755);
+  const run = (script: string, env: Record<string, string>) => {
+    rmSync(path.join(stub, "calls"), { force: true });
+    const result = spawnSync("bash", [script, "--check"], {
+      encoding: "utf8",
+      env: { PATH: `${stub}:${process.env.PATH ?? ""}`, ...env },
+    });
+    return { ...result, called: existsSync(path.join(stub, "calls")) };
+  };
+
+  it.each(operatorScripts)("%s refuses to run with no environment named", (script) => {
+    const result = run(script, { GCP_PROJECT_ID: DEV_PROJECT });
+    expect([result.status, result.called]).toEqual([1, false]);
+    expect(result.stderr).toContain("EMA_FLOW_ENVIRONMENT names the environment");
+  });
+
+  it.each(operatorScripts)("%s refuses dev on a project other than dev's", (script) => {
+    const result = run(script, { GCP_PROJECT_ID: "another-project", EMA_FLOW_ENVIRONMENT: "dev" });
+    expect([result.status, result.called]).toEqual([1, false]);
+    expect(result.stderr).toContain(`dev is deployed to ${DEV_PROJECT} only`);
+  });
+
+  it.each(operatorScripts)(
+    "%s runs as the owner runs it: dev named, on dev's project",
+    (script) => {
+      // Past the refusal: the stand-in gcloud is reached (and fails the script, which is fine).
+      const result = run(script, { GCP_PROJECT_ID: DEV_PROJECT, EMA_FLOW_ENVIRONMENT: "dev" });
+      expect(result.stderr).not.toContain("EMA_FLOW_ENVIRONMENT names");
+      expect(result.stderr).not.toContain("is deployed to");
+      expect(result.called).toBe(true);
     },
   );
 });

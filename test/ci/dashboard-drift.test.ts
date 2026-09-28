@@ -115,6 +115,30 @@ describe("the dashboard drift check", () => {
     // at all but real drift at $.a, which is why it is compared with itself.)
     const deep = `{"a":${"[".repeat(100_000)}${"]".repeat(100_000)}}`;
     expect(compare(deep, deep).status).toBe(2);
+    // The script's last handler, for anything no other names, reached the same way on every
+    // Python: json.load patched to raise an error the input handler does not catch, before the
+    // script runs as __main__.
+    const dir = mkdtempSync(path.join(tmpdir(), "dashboard-drift-"));
+    dirs.push(dir);
+    writeFileSync(path.join(dir, "input.json"), "{}");
+    const run = spawnSync(
+      "python3",
+      [
+        "-c",
+        [
+          "import json, runpy, sys",
+          "def refuse(*args, **kwargs):",
+          "    raise LookupError('unforeseen')",
+          "json.load = refuse",
+          "sys.argv = [sys.argv[1], sys.argv[2], sys.argv[2]]",
+          "runpy.run_path(sys.argv[0], run_name='__main__')",
+        ].join("\n"),
+        script,
+        path.join(dir, "input.json"),
+      ],
+      { encoding: "utf8" },
+    );
+    expect([run.status, run.stdout.trim()]).toEqual([2, "dashboard drift: failed (LookupError)"]);
     const nested: unknown = JSON.parse(`{"a":${"[".repeat(2000)}${"]".repeat(2000)}}`);
     expect(compare(nested, nested).status).toBe(2);
   });
