@@ -1,0 +1,97 @@
+name: EMA drift
+
+# Whether the EMA still serves the files this repository pins: the QRD template and its
+# appendices (qrd/sources.lock.json; zone-a/scripts/check_qrd_sources.py) and the authority-
+# published ePI labels and Lists (labels/ema-epi/sources.lock.json;
+# zone-a/scripts/check_label_sources.py, which fetches as the import gate does). The EMA
+# republishes without any commit here (QRD template 11 is in consultation), so this runs weekly
+# and on demand, never on a pull request: a slow or changed EMA website must not block a merge.
+# A weekly run that finds a change, or cannot reach a file, opens an issue; pinning the new
+# bytes is a reviewed change. Modelled on vulnerabilities.yml.
+
+on:
+  schedule:
+    - cron: "41 6 * * 1"
+  workflow_dispatch:
+
+# Read only at the workflow level. Only the weekly report job below may write an issue, and it
+# checks nothing out.
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    name: EMA drift
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash --noprofile --norc -eo pipefail {0}
+    # The report, base64 encoded so it is one line whatever it holds, for the weekly issue. It
+    # names files and hashes only.
+    outputs:
+      report: ${{ steps.report.outputs.report }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      # Both scripts use the standard library only; no dependency is installed.
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      - name: Compare the QRD template and appendices
+        env:
+          REPORT: ${{ runner.temp }}/drift.md
+        run: python3 zone-a/scripts/check_qrd_sources.py | tee -a "$REPORT"
+
+      # Runs even when the first failed, so one change never hides the other.
+      - name: Compare the pinned ePI labels and Lists
+        if: success() || failure()
+        env:
+          REPORT: ${{ runner.temp }}/drift.md
+        run: python3 zone-a/scripts/check_label_sources.py | tee -a "$REPORT"
+
+      - name: Publish the report
+        id: report
+        if: always()
+        env:
+          REPORT: ${{ runner.temp }}/drift.md
+        run: |
+          [[ -f "$REPORT" ]] && { echo '```'; cat "$REPORT"; echo '```'; } >>"$GITHUB_STEP_SUMMARY" || true
+          echo "report=$(base64 -w0 "$REPORT" 2>/dev/null || true)" >>"$GITHUB_OUTPUT"
+
+  # The one job that may write issues: on the weekly run only, after a failed comparison, and
+  # with no checkout, so no repository code runs beside the token.
+  report:
+    name: Report EMA drift
+    needs: drift
+    if: failure() && github.event_name == 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    defaults:
+      run:
+        shell: bash --noprofile --norc -eo pipefail {0}
+    steps:
+      - name: Open an issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REPORT: ${{ needs.drift.outputs.report }}
+        run: |
+          {
+            echo "The weekly EMA drift check found a pinned file the EMA now serves otherwise, or could not reach one: ${RUN_URL}"
+            echo
+            echo '```'
+            base64 -d <<<"$REPORT" || true
+            echo '```'
+          } >"$RUNNER_TEMP/issue.md"
+          gh issue create --title "EMA drift $(date -u +%Y-%m-%d)" --body-file "$RUNNER_TEMP/issue.md"
