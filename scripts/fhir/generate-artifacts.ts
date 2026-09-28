@@ -2,6 +2,14 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { loadEmaMapping, type SectionRule } from "../../src/fhir/mapping.js";
+import {
+  EMA_DOCUMENT_ID_NAMESPACE,
+  EMA_DOCUMENT_IDENTIFIER_SYSTEM,
+} from "../../src/fhir/transform.js";
+
+// Both artifacts are descriptive, not executed: src/fhir/transform.ts is the crosswalk. Each is
+// checked by the official HL7 validator in CI (scripts/ci/emit-validation-set.ts), and
+// test/fhir-artifacts.test.ts holds the StructureMap's rules to what the transform does.
 
 const output = path.resolve("fhir/generated");
 await mkdir(output, { recursive: true });
@@ -10,6 +18,8 @@ const mapping = await loadEmaMapping();
 function flatten(rule: SectionRule): SectionRule[] {
   return [rule, ...(rule.children ?? []).flatMap(flatten)];
 }
+
+const EMA_SMPC_SECTION_CODES = "http://ema.europa.eu/fhir/ValueSet/EUepismpcqrdcodesVs";
 
 const conceptMap = {
   resourceType: "ConceptMap",
@@ -22,8 +32,12 @@ const conceptMap = {
   experimental: true,
   description:
     "Deterministic terminology map. It maps section identifiers only and does not generate or alter regulated narrative.",
-  sourceScopeCanonical: mapping.sourceCodeSystem,
-  targetScopeCanonical: mapping.targetCodeSystem,
+  // A scope is a value set: R5 types it canonical(ValueSet), and the validator resolves a uri
+  // scope as well and refuses a code system there. The target's is the EMA IG's SmPC section-code
+  // value set, the one EUEpiCompositionSmPC binds Composition.section.code to, which holds every
+  // target code. No value set of the canonical section keys is published, so the source has no
+  // scope; group.source names its code system.
+  targetScopeCanonical: EMA_SMPC_SECTION_CODES,
   group: [
     {
       source: mapping.sourceCodeSystem,
@@ -53,7 +67,7 @@ const structureMap = {
   status: "active",
   experimental: true,
   description:
-    "High-level structural contract. The reviewed TypeScript implementation executes the complete fail-closed mapping and records field-level evidence.",
+    "Non-normative summary of two Bundle-level rules; it is not executed. The reviewed TypeScript implementation (src/fhir/transform.ts) executes the complete fail-closed mapping and records field-level evidence.",
   structure: [
     {
       url: "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/Bundle-uv-epi",
@@ -69,21 +83,28 @@ const structureMap = {
   group: [
     {
       name: "Type2BundleToEmaBundle",
-      typeMode: "none",
       input: [
         { name: "src", mode: "source", type: "Type2Bundle" },
         { name: "tgt", mode: "target", type: "EmaBundle" },
       ],
       rule: [
         {
-          name: "copyDocumentIdentifier",
+          name: "deriveDocumentIdentifier",
+          documentation: `The target identifier is not the source's: its system is ${EMA_DOCUMENT_IDENTIFIER_SYSTEM} and its value is derived from the source Bundle.identifier.value (src/lib/hash.ts stableUuid, namespace "${EMA_DOCUMENT_ID_NAMESPACE}": the first 32 hex digits of the SHA-256 of the namespace, a colon and the value, written as a UUID with its version digit set to 5 and its variant digit to a) and is also the target Bundle's id. The FHIR mapping language has no transform for that derivation, so this rule sets the system and leaves the value to the implementation.`,
           source: [{ context: "src", element: "identifier", variable: "identifier" }],
           target: [
             {
               context: "tgt",
               element: "identifier",
+              variable: "targetIdentifier",
+              transform: "create",
+              parameter: [{ valueString: "Identifier" }],
+            },
+            {
+              context: "targetIdentifier",
+              element: "system",
               transform: "copy",
-              parameter: [{ valueId: "identifier" }],
+              parameter: [{ valueString: EMA_DOCUMENT_IDENTIFIER_SYSTEM }],
             },
           ],
         },

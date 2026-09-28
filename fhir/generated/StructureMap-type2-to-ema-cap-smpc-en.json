@@ -7,7 +7,7 @@
   "title": "HL7 Global ePI Type 2 to EMA CAP SmPC English",
   "status": "active",
   "experimental": true,
-  "description": "High-level structural contract. The reviewed TypeScript implementation executes the complete fail-closed mapping and records field-level evidence.",
+  "description": "Non-normative summary of two Bundle-level rules; it is not executed. The reviewed TypeScript implementation (src/fhir/transform.ts) executes the complete fail-closed mapping and records field-level evidence.",
   "structure": [
     {
       "url": "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/Bundle-uv-epi",
@@ -23,7 +23,6 @@
   "group": [
     {
       "name": "Type2BundleToEmaBundle",
-      "typeMode": "none",
       "input": [
         {
           "name": "src",
@@ -38,7 +37,8 @@
       ],
       "rule": [
         {
-          "name": "copyDocumentIdentifier",
+          "name": "deriveDocumentIdentifier",
+          "documentation": "The target identifier is not the source's: its system is https://khs.dev/fhir/identifier/ema-document and its value is derived from the source Bundle.identifier.value (src/lib/hash.ts stableUuid, namespace \"ema-bundle\": the first 32 hex digits of the SHA-256 of the namespace, a colon and the value, written as a UUID with its version digit set to 5 and its variant digit to a) and is also the target Bundle's id. The FHIR mapping language has no transform for that derivation, so this rule sets the system and leaves the value to the implementation.",
           "source": [
             {
               "context": "src",
@@ -50,10 +50,21 @@
             {
               "context": "tgt",
               "element": "identifier",
+              "variable": "targetIdentifier",
+              "transform": "create",
+              "parameter": [
+                {
+                  "valueString": "Identifier"
+                }
+              ]
+            },
+            {
+              "context": "targetIdentifier",
+              "element": "system",
               "transform": "copy",
               "parameter": [
                 {
-                  "valueId": "identifier"
+                  "valueString": "https://khs.dev/fhir/identifier/ema-document"
                 }
               ]
             }
