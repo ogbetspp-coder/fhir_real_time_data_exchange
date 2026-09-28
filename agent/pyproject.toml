@@ -22,13 +22,13 @@ dev = [
   "pytest==9.1.1",
   "pytest-asyncio==1.4.0",
   "pytest-cov==7.1.0",
-  "ruff==0.16.8",
+  "ruff==0.16.9",
   "types-jsonschema==4.26.0.20260518",
   "uvicorn==0.53.0",
 ]
 
 [build-system]
-requires = ["hatchling==1.32.3"]
+requires = ["hatchling==1.32.4"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
