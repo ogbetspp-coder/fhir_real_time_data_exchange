@@ -81,14 +81,34 @@ export type ToolOutcome<T> =
 // 400 reads instead of 1,600. It is not a per-principal limit — a caller may send many requests.
 export const REQUEST_READ_BUDGET = 400;
 
+// At most this many store reads of one HTTP request are in flight at once, across every tool
+// call of its batch. The SDK dispatches a batch's entries concurrently, so a bound per call
+// would allow the batch cap (8) times the per-call pool (8) — 64 whole-Bundle reads at once for
+// one request.
+export const REQUEST_READ_CONCURRENCY = 8;
+
 export type ReadBudget = {
   // Reserves one store read, or reports false when the request has none left.
   take(): boolean;
   remaining(): number;
+  // Runs one store read once fewer than REQUEST_READ_CONCURRENCY of the request's reads are in
+  // flight, and frees its place when the read settles, whichever way.
+  inFlight<T>(read: () => Promise<T>): Promise<T>;
 };
 
-export function createReadBudget(limit: number = REQUEST_READ_BUDGET): ReadBudget {
+export function createReadBudget(
+  limit: number = REQUEST_READ_BUDGET,
+  concurrency: number = REQUEST_READ_CONCURRENCY,
+): ReadBudget {
   let left = limit;
+  let running = 0;
+  const waiting: (() => void)[] = [];
+  const release = (): void => {
+    const next = waiting.shift();
+    // The freed place passes straight to the next waiter, so `running` is unchanged.
+    if (next === undefined) running -= 1;
+    else next();
+  };
   return {
     take(): boolean {
       if (left <= 0) return false;
@@ -97,6 +117,18 @@ export function createReadBudget(limit: number = REQUEST_READ_BUDGET): ReadBudge
     },
     remaining(): number {
       return left;
+    },
+    async inFlight<T>(read: () => Promise<T>): Promise<T> {
+      if (running < concurrency) running += 1;
+      else
+        await new Promise<void>((resolve) => {
+          waiting.push(resolve);
+        });
+      try {
+        return await read();
+      } finally {
+        release();
+      }
     },
   };
 }
@@ -107,7 +139,22 @@ export type ToolContext = {
   mapping: EmaMapping;
   // Shared by every tool call of one HTTP request; every read below takes from it.
   readBudget: ReadBudget;
+  // Aborted when the HTTP request is over — answered, abandoned at the deadline, or left by
+  // its client — so a tool still running stops reading the store for an answer nobody gets.
+  signal?: AbortSignal | undefined;
 };
+
+// Every store read goes through here: it waits for one of the request's in-flight places, and
+// it is not made at all once the request is over.
+function storeRead<T>(
+  context: ToolContext,
+  read: (signal: AbortSignal | undefined) => Promise<T>,
+): Promise<T> {
+  return context.readBudget.inFlight(() => {
+    context.signal?.throwIfAborted();
+    return read(context.signal);
+  });
+}
 
 function fail<T>(
   tool: QueryToolNameValue,
@@ -667,8 +714,12 @@ function edgeAfter(text: string, end: number, quote: string, context: SearchCont
 // UTF-16 index, or -1. An occurrence that is cut does not end the search: a later occurrence
 // whose edges hold still matches.
 function findQuoteOccurrence(text: string, quote: string): number {
+  const first = text.indexOf(quote);
+  // Most sections do not hold the quote at all; the indices below are built only for one that
+  // does.
+  if (first < 0) return -1;
   const context: SearchContext = { tables: indexTables(text), signs: signsBefore(text) };
-  for (let found = text.indexOf(quote); found >= 0; found = text.indexOf(quote, found + 1)) {
+  for (let found = first; found >= 0; found = text.indexOf(quote, found + 1)) {
     if (
       edgeBefore(text, found, quote, context) &&
       edgeAfter(text, found + quote.length, quote, context)
@@ -722,10 +773,12 @@ async function loadDocument<T>(
     return fail<T>(tool, "unavailable", { bundleId: selector.bundleId });
   }
 
-  const bundle =
-    selector.versionId === undefined
-      ? await context.reader.readBundle(selector.bundleId)
-      : await context.reader.readBundleVersion(selector.bundleId, selector.versionId);
+  const { bundleId, versionId } = selector;
+  const bundle = await storeRead(context, (signal) =>
+    versionId === undefined
+      ? context.reader.readBundle(bundleId, signal)
+      : context.reader.readBundleVersion(bundleId, versionId, signal),
+  );
 
   if (bundle === undefined) {
     return fail<T>(
@@ -801,7 +854,9 @@ async function versionStanding(
   if (selector.versionId === undefined) return "current";
   // The current version is one more store read, so it takes from the budget like any other.
   if (!context.readBudget.take()) return "out-of-budget";
-  const current = await context.reader.readBundle(selector.bundleId);
+  const current = await storeRead(context, (signal) =>
+    context.reader.readBundle(selector.bundleId, signal),
+  );
   return current?.meta?.versionId === loaded.document.versionId ? "current" : "superseded";
 }
 
@@ -839,7 +894,9 @@ export async function getSection(
   let provenanceResourceId: string | undefined;
   if (standing === "current") {
     if (!context.readBudget.take()) return fail("get_section", "unavailable", at);
-    const provenance = await context.reader.findProvenanceForBundle(input.bundleId);
+    const provenance = await storeRead(context, (signal) =>
+      context.reader.findProvenanceForBundle(input.bundleId, signal),
+    );
     const provenanceId = Uuid.safeParse(provenance?.id);
     if (provenanceId.success) provenanceResourceId = provenanceId.data;
   }
@@ -945,7 +1002,9 @@ export async function getProvenance(
 
   // The provenance lookup is one more store read and takes from the request's budget.
   if (!context.readBudget.take()) return fail("get_provenance", "unavailable", at);
-  const resource = await context.reader.findProvenanceForBundle(input.bundleId);
+  const resource = await storeRead(context, (signal) =>
+    context.reader.findProvenanceForBundle(input.bundleId, signal),
+  );
   if (resource === undefined) return fail("get_provenance", "unavailable", at);
   const parsed = PersistedProvenanceSchema.safeParse(resource);
   if (!parsed.success) return fail("get_provenance", "unavailable", at);
@@ -1110,8 +1169,12 @@ export async function verifyQuote(
 // One find_product call reads at most this many of the caller's entitled documents, in
 // entitlement order; an entitlement longer than this is reported as `truncated`.
 export const FIND_PRODUCT_SCAN_HORIZON = 200;
-// At most this many store reads are in flight at once.
+// At most this many of one call's documents are being read at once. The request's own bound
+// (REQUEST_READ_CONCURRENCY, in the read budget) holds across every call of its batch, so a
+// batch of find_product calls still has at most that many reads in flight between them.
 export const FIND_PRODUCT_CONCURRENCY = 8;
+
+const ProductIdentifierSchema = ProductSummarySchema.shape.identifiers.element;
 
 function productSummary(loaded: LoadedDocument, index: MappingIndex): ProductSummary | undefined {
   const product = loaded.entries.find(
@@ -1123,9 +1186,16 @@ function productSummary(loaded: LoadedDocument, index: MappingIndex): ProductSum
   const productName = names.success ? names.data[0]?.productName : undefined;
   if (productName === undefined) return undefined;
 
+  // Each identifier is held to the contract on its own: one the contract cannot carry is left
+  // out of the summary, and the product — still found by its name and its other identifiers —
+  // is not.
   const identifiers = z
     .array(z.object({ system: z.string().optional(), value: z.string().optional() }))
     .safeParse(product.identifier);
+  const carried = (identifiers.success ? identifiers.data : []).flatMap(({ system, value }) => {
+    const identifier = ProductIdentifierSchema.safeParse({ system, value });
+    return identifier.success ? [identifier.data] : [];
+  });
 
   const holderReference = z
     .array(z.object({ holder: z.object({ reference: z.string() }).optional() }))
@@ -1152,12 +1222,7 @@ function productSummary(loaded: LoadedDocument, index: MappingIndex): ProductSum
   const summary = ProductSummarySchema.safeParse({
     document: loaded.document,
     productName,
-    identifiers: (identifiers.success ? identifiers.data : [])
-      .filter(
-        (identifier): identifier is { system: string; value: string } =>
-          identifier.system !== undefined && identifier.value !== undefined,
-      )
-      .slice(0, 20),
+    identifiers: carried.slice(0, 20),
     ...(typeof holderName === "string" ? { marketingAuthorisationHolder: holderName } : {}),
     language: loaded.composition.language,
     sections: index.sourceKeys.filter((sourceKey) => present.has(sourceKey)),
@@ -1201,7 +1266,9 @@ export async function findProduct(
   // Phase 1 has no search against the store, so each entitled document is read and inspected;
   // the reads run through a bounded pool, cover at most the first FIND_PRODUCT_SCAN_HORIZON
   // entitled ids, stop being launched once `limit` matches are in hand, and stop when the
-  // request's read budget is spent.
+  // request's read budget is spent. Each read is a whole document Bundle, read for a few
+  // fields, and the budget bounds reads, not bytes; phase 2 replaces the scan with a product
+  // index the worker writes (design note, "`find_product`").
   const entitled = context.entitlements?.bundles ?? [];
   const scanned = entitled.slice(0, FIND_PRODUCT_SCAN_HORIZON);
 
@@ -1213,28 +1280,68 @@ export async function findProduct(
   // Entitled documents this call attempted to read. Everything the call did not attempt was not
   // searched, whatever stopped it.
   let attempted = 0;
+  // Attempted documents the call still could not search: a stored document that could not be
+  // cited (no version, no Composition first) or whose product could not be summarised under
+  // the contract. A document the store does not hold is not one of them: there is nothing in
+  // it to find.
+  let unsearched = 0;
+  // Aborted when any worker's read fails: the others launch no further read, a read still
+  // waiting for a place in the request's pool is never made, and one in flight is cancelled —
+  // for a call whose answer is already `unavailable`. Its signal joins the request's own.
+  const stop = new AbortController();
+  const scan: ToolContext = {
+    ...context,
+    signal:
+      context.signal === undefined ? stop.signal : AbortSignal.any([context.signal, stop.signal]),
+  };
+  // The first read failure, which is what the call reports: the cancellations it causes in the
+  // other workers are not.
+  let failure: unknown;
   const worker = async (): Promise<void> => {
-    while (next < scanned.length && matched < limit) {
-      // Checked before the position is claimed, so a document the budget will not pay for is
-      // left unattempted and counts as unsearched rather than as a read that failed.
-      if (context.readBudget.remaining() === 0) return;
-      const position = next;
-      next += 1;
-      const bundleId = scanned[position];
-      if (bundleId === undefined) return;
-      attempted += 1;
-      const loaded = await loadDocument<FindProductOutput>(context, "find_product", { bundleId });
-      if (isOutcome(loaded)) continue;
-      const summary = productSummary(loaded, index);
-      if (summary !== undefined && matches(needle, summary)) {
-        found[position] = summary;
-        matched += 1;
+    try {
+      while (!stop.signal.aborted && next < scanned.length && matched < limit) {
+        // Checked before the position is claimed, so a document the budget will not pay for is
+        // left unattempted and counts as unsearched rather than as a read that failed.
+        if (context.readBudget.remaining() === 0) return;
+        const position = next;
+        next += 1;
+        const bundleId = scanned[position];
+        if (bundleId === undefined) return;
+        attempted += 1;
+        const loaded = await loadDocument<FindProductOutput>(scan, "find_product", {
+          bundleId,
+        });
+        if (isOutcome(loaded)) {
+          if (loaded.status !== "error" || loaded.auditOutcome !== "document-not-found") {
+            unsearched += 1;
+          }
+          continue;
+        }
+        const summary = productSummary(loaded, index);
+        if (summary === undefined) {
+          unsearched += 1;
+          continue;
+        }
+        if (matches(needle, summary)) {
+          found[position] = summary;
+          matched += 1;
+        }
+      }
+    } catch (error) {
+      if (!stop.signal.aborted) {
+        failure = error;
+        stop.abort();
       }
     }
   };
+  // Every worker is waited for, not only the first to fail: the call answers once no read of
+  // its own is still in flight, so none outlives the answer and drains the request's budget.
   await Promise.all(
     Array.from({ length: Math.min(FIND_PRODUCT_CONCURRENCY, scanned.length) }, () => worker()),
   );
+  if (failure !== undefined) {
+    throw failure instanceof Error ? failure : new Error("find_product read failed");
+  }
 
   // Matches are reported in entitlement order regardless of the order the reads completed in.
   // The pool can finish more matches than `limit` — up to FIND_PRODUCT_CONCURRENCY - 1 reads
@@ -1246,9 +1353,10 @@ export async function findProduct(
 
   // `truncated` covers both ways this answer can be shorter than what the entitlement holds:
   // entitled documents the call never attempted — because the scan horizon cut the list,
-  // because `limit` stopped the scan, or because the request's read budget ran out — and
-  // matches the call found and the slice did not return.
-  const truncated = entitled.length > attempted || matchedSummaries.length > products.length;
+  // because `limit` stopped the scan, or because the request's read budget ran out — or
+  // attempted and could not search, and matches the call found and the slice did not return.
+  const truncated =
+    entitled.length > attempted || unsearched > 0 || matchedSummaries.length > products.length;
 
   const output = FindProductOutputSchema.safeParse({ products, truncated });
   if (!output.success) return fail("find_product", "unavailable");

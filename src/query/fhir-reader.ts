@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { GoogleAuth } from "google-auth-library";
 
 import type { FhirBundle, FhirResource } from "../fhir/types.js";
-import { sha256 } from "../lib/hash.js";
+import { sha256, sha256Utf8 } from "../lib/hash.js";
 import type { QueryConfig } from "./config.js";
 
 // Reads of the validated store, and nothing else. The request pattern follows
@@ -12,17 +12,60 @@ import type { QueryConfig } from "./config.js";
 // worker's store configuration or its credential scope, and it needs three reads, no writes
 // (ADR 0004, points 1 and 3).
 
+// `signal`, when given, is the HTTP request's: aborted once the request is over, so a read for
+// an answer nobody will receive is cancelled rather than finished.
 export type FhirReader = {
-  readBundle(bundleId: string): Promise<FhirBundle | undefined>;
-  readBundleVersion(bundleId: string, versionId: string): Promise<FhirBundle | undefined>;
-  findProvenanceForBundle(bundleId: string): Promise<FhirResource | undefined>;
+  readBundle(bundleId: string, signal?: AbortSignal): Promise<FhirBundle | undefined>;
+  readBundleVersion(
+    bundleId: string,
+    versionId: string,
+    signal?: AbortSignal,
+  ): Promise<FhirBundle | undefined>;
+  findProvenanceForBundle(
+    bundleId: string,
+    signal?: AbortSignal,
+  ): Promise<FhirResource | undefined>;
 };
 
+// `httpStatus` is the store's answer when there was one, so the operator's log can say which
+// refusal it was without the message, which quotes nothing but is not logged either.
 export class FhirReadError extends Error {
-  public constructor(message: string) {
+  public constructor(
+    message: string,
+    public readonly httpStatus?: number,
+  ) {
     super(message);
     this.name = "FhirReadError";
   }
+}
+
+// How long one store read may take, whatever the request's own deadline: a read the store never
+// answers is abandoned here rather than holding a place in the request's read pool until the
+// request is over.
+export const STORE_READ_TIMEOUT_MS = 10_000;
+
+// Settles with `work`, or rejects with the signal's reason once it is aborted, whichever comes
+// first. For a call that takes no signal of its own (google-auth-library's getAccessToken): the
+// read stops waiting, and the library finishes or abandons its own request, which it caches
+// for the next read either way.
+function untilAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(signal.reason as Error);
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = (): void => {
+      reject(signal.reason as Error);
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    work.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error instanceof Error ? error : new Error("credential lookup failed"));
+      },
+    );
+  });
 }
 
 type ReaderOptions = Pick<
@@ -108,8 +151,13 @@ export class HealthcareFhirReader implements FhirReader {
 
   // A missing resource is `undefined`, not an error: the tools turn it into the closed
   // `document-not-found` code without learning anything else about the store.
-  async #read<T>(url: string): Promise<T | undefined> {
-    const token = await this.#auth.getAccessToken();
+  async #read<T>(url: string, signal?: AbortSignal): Promise<T | undefined> {
+    // One bound for the whole read, the credential included: minting a token is a network call
+    // too, and a metadata server that never answers must not hold the read past its timeout or
+    // past the end of the request.
+    const timeout = AbortSignal.timeout(STORE_READ_TIMEOUT_MS);
+    const bound = signal === undefined ? timeout : AbortSignal.any([signal, timeout]);
+    const token = await untilAborted(this.#auth.getAccessToken(), bound);
     if (token === null)
       throw new FhirReadError("Application Default Credentials returned no token");
 
@@ -122,32 +170,61 @@ export class HealthcareFhirReader implements FhirReader {
         "x-goog-healthcare-audit-appname": "ema-flow-query",
         "x-goog-healthcare-audit-reason": "ePI read-only query service",
       },
+      signal: bound,
     });
 
-    if (response.status === 404 || response.status === 410) return undefined;
+    if (response.status === 404 || response.status === 410) {
+      // Nothing is read from a missing resource's body, so it is released rather than left for
+      // the connection to drain.
+      await response.body?.cancel();
+      return undefined;
+    }
 
-    const body: unknown = await response.json();
+    // Read as text and parsed here, so a body that is not JSON — an HTML error page from a
+    // proxy in front of the store — still fails naming the status rather than as a bare
+    // SyntaxError. The body may quote FHIR content; it is referenced by hash and issue count
+    // only: the hash of its canonical JSON when it is JSON, of its bytes when it is not.
+    const raw = await response.text();
+    let body: unknown;
+    let parsed = true;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      parsed = false;
+    }
+    const status = `Healthcare API ${String(response.status)} ${response.statusText}`;
+    if (!parsed) {
+      throw new FhirReadError(
+        `${status} (non-JSON response sha256 ${sha256Utf8(raw)})`,
+        response.status,
+      );
+    }
     if (!response.ok) {
-      // The body may quote FHIR content; reference it by hash and issue count only.
-      const issues = (body as { issue?: unknown }).issue;
+      const issues =
+        body !== null && typeof body === "object" ? (body as { issue?: unknown }).issue : undefined;
       const issueCount = Array.isArray(issues) ? issues.length : 0;
       throw new FhirReadError(
-        `Healthcare API ${String(response.status)} ${response.statusText} (response sha256 ${sha256(body)}, ${String(issueCount)} issues)`,
+        `${status} (response sha256 ${sha256(body)}, ${String(issueCount)} issues)`,
+        response.status,
       );
     }
     return body as T;
   }
 
-  public async readBundle(bundleId: string): Promise<FhirBundle | undefined> {
-    return this.#read<FhirBundle>(`${this.#storeBase()}/Bundle/${encodeURIComponent(bundleId)}`);
+  public async readBundle(bundleId: string, signal?: AbortSignal): Promise<FhirBundle | undefined> {
+    return this.#read<FhirBundle>(
+      `${this.#storeBase()}/Bundle/${encodeURIComponent(bundleId)}`,
+      signal,
+    );
   }
 
   public async readBundleVersion(
     bundleId: string,
     versionId: string,
+    signal?: AbortSignal,
   ): Promise<FhirBundle | undefined> {
     const url = `${this.#storeBase()}/Bundle/${encodeURIComponent(bundleId)}/_history/${encodeURIComponent(versionId)}`;
-    return this.#read<FhirBundle>(url);
+    return this.#read<FhirBundle>(url, signal);
   }
 
   // One document can carry more than one Provenance: publishing a second approved version
@@ -163,7 +240,10 @@ export class HealthcareFhirReader implements FhirReader {
   // not been checked against the Healthcare API the way `-recorded` was, and a sort the store
   // refused would make every lookup fail. Until it is, the write order is exact for a document
   // with at most PROVENANCE_PAGE_SIZE approvals.
-  public async findProvenanceForBundle(bundleId: string): Promise<FhirResource | undefined> {
+  public async findProvenanceForBundle(
+    bundleId: string,
+    signal?: AbortSignal,
+  ): Promise<FhirResource | undefined> {
     const query = new URLSearchParams({
       target: `Bundle/${bundleId}`,
       _sort: "-recorded",
@@ -171,6 +251,7 @@ export class HealthcareFhirReader implements FhirReader {
     });
     const searchSet = await this.#read<FhirBundle>(
       `${this.#storeBase()}/Provenance?${query.toString()}`,
+      signal,
     );
     if (searchSet === undefined || !isBundle(searchSet)) return undefined;
     return latestProvenance(

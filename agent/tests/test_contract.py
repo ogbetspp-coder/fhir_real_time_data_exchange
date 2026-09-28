@@ -39,7 +39,7 @@ def test_each_vendored_contract_is_the_published_one(name: str) -> None:
 
 
 def test_the_two_schemas_are_the_versions_the_agent_was_adapted_to() -> None:
-    assert load_schema()["$id"].endswith("/query-tools/2.0.1/schema.json")
+    assert load_schema()["$id"].endswith("/query-tools/3.0.0/schema.json")
     assert load_agent_turn_schema()["$id"].endswith("/agent-turn/1.0.0/schema.json")
 
 

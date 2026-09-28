@@ -21,9 +21,6 @@ export const QueryConfigSchema = z.object({
   TARGET_FHIR_STORE_ID: Required,
   // The audience every caller's OIDC ID token must carry (normally the service URL).
   QUERY_AUDIENCE: z.string().trim().min(1).max(512),
-  // Comma-separated OAuth 2.0 client ids whose access tokens are accepted on `Authorization`
-  // (the Gemini Enterprise path: the end user's Google access token). Absent or empty: access
-  // tokens are rejected and only ID tokens for QUERY_AUDIENCE authenticate.
   // Log the category of an authentication refusal (never the token, never the reason to the
   // caller). Off unless set: in production a refusal reason in a log is a hint about a
   // credential. On in dev, where a credential refused for an unknown reason is undiagnosable.
@@ -31,6 +28,9 @@ export const QueryConfigSchema = z.object({
     .enum(["true", "false"])
     .default("false")
     .transform((value) => value === "true"),
+  // Comma-separated OAuth 2.0 client ids whose access tokens are accepted on `Authorization`
+  // (the Gemini Enterprise path: the end user's Google access token). Absent or empty: access
+  // tokens are rejected and only ID tokens for QUERY_AUDIENCE authenticate.
   QUERY_OAUTH_CLIENT_IDS: z
     .string()
     .max(8_192)

@@ -30,7 +30,7 @@ export default defineConfig({
         branches: 82,
         "src/fidelity/**": { lines: 99, statements: 98, functions: 100, branches: 92 },
         "src/contracts/**": { lines: 94, statements: 93, functions: 95, branches: 82 },
-        "src/query/**": { lines: 94, statements: 89, functions: 94, branches: 81 },
+        "src/query/**": { lines: 96, statements: 93, functions: 97, branches: 86 },
         "src/fhir/**": { lines: 99, statements: 98, functions: 100, branches: 92 },
         "src/gcp/**": { lines: 93, statements: 90, functions: 92, branches: 85 },
         // The run's entry points, each on its own: a gate the pipeline stops at, or a failure

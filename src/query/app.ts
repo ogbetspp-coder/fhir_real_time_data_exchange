@@ -9,6 +9,7 @@ import {
   type CallToolResult,
   type RequestId,
 } from "@modelcontextprotocol/sdk/types.js";
+import { OAuth2Client } from "google-auth-library";
 import type { z } from "zod";
 
 import { Uuid } from "../contracts/common.js";
@@ -29,10 +30,17 @@ import {
 } from "../contracts/query-tools.js";
 import type { EmaMapping } from "../fhir/mapping.js";
 import { sha256 } from "../lib/hash.js";
+import { jsonShapeIssues } from "../lib/json-shape.js";
 import { log } from "../lib/logger.js";
-import { bearerToken, isRejected, type CredentialVerifier } from "./auth.js";
-import type { EntitlementDirectory, Entitlements } from "./entitlements.js";
-import type { FhirReader } from "./fhir-reader.js";
+import {
+  bearerToken,
+  googleCredentialVerifier,
+  isRejected,
+  type CredentialVerifier,
+} from "./auth.js";
+import type { QueryConfig } from "./config.js";
+import { parseEntitlements, type EntitlementDirectory, type Entitlements } from "./entitlements.js";
+import { FhirReadError, HealthcareFhirReader, type FhirReader } from "./fhir-reader.js";
 import {
   REQUEST_READ_BUDGET,
   createReadBudget,
@@ -52,7 +60,7 @@ import {
 
 export const QUERY_SERVICE_NAME = "ema-flow-query";
 
-const MAX_BODY_BYTES = 4 * 1024 * 1024;
+export const MAX_BODY_BYTES = 4 * 1024 * 1024;
 
 // A JSON-RPC batch carries at most this many messages; a larger one is refused before the
 // transport is connected, so its entries are never dispatched.
@@ -91,6 +99,8 @@ export type McpServerDeps = {
   readBudget: ReadBudget;
   // When present, what the HTTP layer needs to write exactly one record per tools/call request.
   journal?: RequestJournal | undefined;
+  // When present, aborted once the HTTP request is over; every store read carries it.
+  signal?: AbortSignal | undefined;
   // The clock audit records are dated and timed by, in epoch milliseconds. Defaults to
   // Date.now; a test injects one to assert which reading a record carries.
   now?: (() => number) | undefined;
@@ -138,60 +148,114 @@ export function logAuditRecord(record: QueryAuditRecord): void {
   log("info", "Query tool call", { ...record, stage: "query-tool" });
 }
 
+// What writing an audit record reads, and nothing else: the record is written on paths where no
+// tool ran and there is no reader, budget or entitlement to give it.
+type AuditDeps = Pick<McpServerDeps, "serviceVersion" | "identity" | "audit" | "now">;
+
+// What a record carries as `argumentsSha256` when the arguments could not be hashed: 64 zeros,
+// a digest no input is known to have, so it can never be read as the hash of real arguments
+// (the hash of JSON `null` would be, for a call whose arguments were `null`). `degraded` says
+// the same thing in words.
+export const UNHASHABLE_ARGUMENTS_SHA256 = "0".repeat(64);
+
+// Writes the one record of a call, and reports whether one was written. It never throws: the
+// record is written on the paths that must not fail (after a tool, and in the HTTP layer's
+// `finally`), and a record lost to an exception is a call with no trace. When the arguments
+// cannot be hashed the record says so in `degraded`; when the record fails its own contract,
+// the optional fields the contract refused are dropped and `degraded` says so, and when even
+// that fails, only the required fields are kept. A record is never refused whole while one it
+// can still write exists.
 function auditRecord(
-  deps: McpServerDeps,
+  deps: AuditDeps,
   tool: QueryToolName,
   args: unknown,
   outcome: ToolOutcome<unknown>,
   startedAt: number,
-): void {
-  const { identity } = deps;
-  const candidate = {
-    service: QUERY_SERVICE_NAME,
-    serviceVersion: deps.serviceVersion,
-    ...(identity.imageDigest === undefined ? {} : { imageDigest: identity.imageDigest }),
-    at: new Date(startedAt).toISOString(),
-    principal: identity.principal,
-    credentialType: identity.credentialType,
-    tool,
-    // The arguments are hashed, never recorded: a verify_quote argument is text a caller typed.
-    argumentsSha256: sha256(args),
-    outcome: outcome.status === "ok" ? "ok" : outcome.auditOutcome,
-    resultCount: outcome.status === "ok" ? outcome.resultCount : 0,
-    ...(outcome.status === "ok" && outcome.truncated !== undefined
-      ? { truncated: outcome.truncated }
-      : {}),
-    durationMs: (deps.now ?? Date.now)() - startedAt,
-    ...(outcome.bundleId === undefined ? {} : { bundleId: outcome.bundleId }),
-    ...(outcome.versionId === undefined ? {} : { versionId: outcome.versionId }),
-    ...(identity.turnId === undefined ? {} : { turnId: identity.turnId }),
-  };
+): boolean {
+  try {
+    const { identity } = deps;
+    let argumentsSha256 = UNHASHABLE_ARGUMENTS_SHA256;
+    let degraded: QueryAuditRecord["degraded"];
+    try {
+      // The arguments are hashed, never recorded: a verify_quote argument is text a caller typed.
+      argumentsSha256 = sha256(args);
+    } catch {
+      degraded = "arguments-unhashable";
+    }
+    const required = {
+      service: QUERY_SERVICE_NAME,
+      serviceVersion: deps.serviceVersion,
+      at: new Date(startedAt).toISOString(),
+      principal: identity.principal,
+      credentialType: identity.credentialType,
+      tool,
+      argumentsSha256,
+      outcome: outcome.status === "ok" ? "ok" : outcome.auditOutcome,
+      resultCount: outcome.status === "ok" ? outcome.resultCount : 0,
+      // A wall clock stepped back during the call would make this negative, which the contract
+      // refuses; the call took no time rather than no record.
+      durationMs: Math.max(0, (deps.now ?? Date.now)() - startedAt),
+    };
 
-  const record = QueryAuditRecordSchema.safeParse(candidate);
-  if (!record.success) {
-    log("error", "Query audit record rejected by its own contract", {
+    const optional: Record<string, unknown> = {
+      ...(identity.imageDigest === undefined ? {} : { imageDigest: identity.imageDigest }),
+      ...(outcome.status === "ok" && outcome.truncated !== undefined
+        ? { truncated: outcome.truncated }
+        : {}),
+      ...(outcome.bundleId === undefined ? {} : { bundleId: outcome.bundleId }),
+      ...(outcome.versionId === undefined ? {} : { versionId: outcome.versionId }),
+      ...(identity.turnId === undefined ? {} : { turnId: identity.turnId }),
+    };
+
+    let record = QueryAuditRecordSchema.safeParse({
+      ...required,
+      ...optional,
+      ...(degraded === undefined ? {} : { degraded }),
+    });
+    if (!record.success) {
+      // Drop exactly the optional fields the contract refused and keep the rest. Unhashable
+      // arguments stay the reason given when both apply: an `argumentsSha256` that does not
+      // describe the arguments is the graver fact about the record.
+      const refused = new Set(record.error.issues.map(({ path }) => path[0]));
+      const kept = Object.fromEntries(
+        Object.entries(optional).filter(([key]) => !refused.has(key)),
+      );
+      const reason = degraded ?? "record-rejected";
+      record = QueryAuditRecordSchema.safeParse({ ...required, ...kept, degraded: reason });
+      if (!record.success) {
+        record = QueryAuditRecordSchema.safeParse({ ...required, degraded: reason });
+      }
+    }
+    if (!record.success) {
+      log("error", "Query audit record rejected by its own contract", {
+        service: QUERY_SERVICE_NAME,
+        stage: "query-tool",
+        tool,
+      });
+      return false;
+    }
+    deps.audit(record.data);
+    return true;
+  } catch (error) {
+    log("error", "Query audit record could not be written", {
       service: QUERY_SERVICE_NAME,
       stage: "query-tool",
       tool,
+      errorType: error instanceof Error ? error.name : "unknown",
     });
-    return;
+    return false;
   }
-  deps.audit(record.data);
 }
 
 function errorResult(error: QueryError): CallToolResult {
-  // One line of text, and it is the closed error code: no message, no detail, no content.
-  //
-  // Known client-side quirk, not fixable here: MCP SDK 1.30.0's Client.callTool validates
-  // `structuredContent` against the tool's outputSchema whenever it is present — including when
-  // `isError` is true — once listTools has cached the validators. A client that has called
-  // listTools therefore sees this error result rejected by its own validation as an McpError
-  // rather than as a tool error. The contract's error shape is kept as structured content
-  // regardless, because the `content` text alone would not be machine-readable.
+  // One line of text, and it is the closed error code: no message, no detail. No structured
+  // content: each tool's outputSchema describes its success shape, and an MCP client validates
+  // any `structuredContent` it is given against that schema — the SDK's Client.callTool does,
+  // error or not, once listTools has cached the validators — so an error shape there would
+  // reach the client as the client's own validation error instead of this code.
   return {
     isError: true,
     content: [{ type: "text", text: error.error }],
-    structuredContent: { ...error },
   };
 }
 
@@ -212,6 +276,7 @@ async function runTool<Input, Output extends Record<string, unknown>>(
     reader: deps.reader,
     mapping: deps.mapping,
     readBudget: deps.readBudget,
+    signal: deps.signal,
   };
 
   let outcome: ToolOutcome<Output>;
@@ -221,12 +286,16 @@ async function runTool<Input, Output extends Record<string, unknown>>(
       outcome = await run(context, parsed.data);
     } catch (error) {
       // An upstream failure or a stored narrative that no longer parses is `unavailable`, and
-      // the reason stays in the log: an error message can quote a FHIR response body.
+      // the reason stays in the log as a type and, for a store refusal, its HTTP status —
+      // never the message: an error message can quote a FHIR response body.
       log("error", "Query tool failed", {
         service: QUERY_SERVICE_NAME,
         stage: "query-tool",
         tool,
         errorType: error instanceof Error ? error.name : "unknown",
+        ...(error instanceof FhirReadError && error.httpStatus !== undefined
+          ? { httpStatus: error.httpStatus }
+          : {}),
       });
       outcome = {
         status: "error",
@@ -243,14 +312,20 @@ async function runTool<Input, Output extends Record<string, unknown>>(
   }
 
   // Exactly one record per call: this one, unless the HTTP layer already gave up waiting for
-  // this request and wrote the record for it.
+  // this request and wrote the record for it. No answer leaves without a record that says what
+  // it was: when this call's own record could not be written — or the HTTP layer already wrote
+  // `unavailable` for it — the caller is answered `unavailable` too, never the content. The id
+  // is marked audited only once its record has been written, so the HTTP layer writes the
+  // `unavailable` record for a call whose own record failed, and that record matches the answer.
   const journal = deps.journal;
+  let recorded = false;
   if (journal === undefined || requestId === undefined) {
-    auditRecord(deps, tool, args, outcome, startedAt);
+    recorded = auditRecord(deps, tool, args, outcome, startedAt);
   } else if (!journal.sealed) {
-    journal.audited.add(requestId);
-    auditRecord(deps, tool, args, outcome, startedAt);
+    recorded = auditRecord(deps, tool, args, outcome, startedAt);
+    if (recorded) journal.audited.add(requestId);
   }
+  if (!recorded) return errorResult({ tool, error: "unavailable" });
   if (outcome.status === "error") return errorResult(outcome.error);
   return {
     content: [{ type: "text", text: JSON.stringify(outcome.value) }],
@@ -276,6 +351,14 @@ function call(
   }
 }
 
+// The per-tool callback registerTool requires. It is never called: `tools/call` is answered by
+// the handler createMcpServer sets last, which replaces the SDK's own dispatcher. It throws
+// rather than answering, so a change that routed a call here would fail loudly instead of
+// answering without the contract's error codes and without an audit record.
+function answeredBelow(): never {
+  throw new Error("tools/call is answered by the query service's own handler");
+}
+
 export function createMcpServer(deps: McpServerDeps): McpServer {
   const server = new McpServer(
     { name: QUERY_SERVICE_NAME, version: deps.serviceVersion },
@@ -291,7 +374,7 @@ export function createMcpServer(deps: McpServerDeps): McpServer {
       outputSchema: FindProductOutputSchema.shape,
       annotations: READ_ONLY,
     },
-    (args: unknown) => call(deps, "find_product", args, undefined),
+    answeredBelow,
   );
 
   server.registerTool(
@@ -303,7 +386,7 @@ export function createMcpServer(deps: McpServerDeps): McpServer {
       outputSchema: SectionContentSchema.shape,
       annotations: READ_ONLY,
     },
-    (args: unknown) => call(deps, "get_section", args, undefined),
+    answeredBelow,
   );
 
   server.registerTool(
@@ -315,7 +398,7 @@ export function createMcpServer(deps: McpServerDeps): McpServer {
       outputSchema: ProvenanceDetailSchema.shape,
       annotations: READ_ONLY,
     },
-    (args: unknown) => call(deps, "get_provenance", args, undefined),
+    answeredBelow,
   );
 
   server.registerTool(
@@ -327,7 +410,7 @@ export function createMcpServer(deps: McpServerDeps): McpServer {
       outputSchema: QuoteVerificationSchema.shape,
       annotations: READ_ONLY,
     },
-    (args: unknown) => call(deps, "verify_quote", args, undefined),
+    answeredBelow,
   );
 
   // The schemas registered above are what a client generates its types from and what `tools/list`
@@ -371,12 +454,8 @@ export type QueryAppDeps = {
   now?: (() => number) | undefined;
 };
 
-const TOOL_NAMES = new Set<string>([
-  "find_product",
-  "get_section",
-  "get_provenance",
-  "verify_quote",
-]);
+// The contract's own list, so a tool added there is audited on the deadline path too.
+const TOOL_NAMES = new Set<string>(QueryToolNameSchema.options);
 
 // A tools/call-shaped JSON-RPC *request* in the body: it carries an id. A notification (no id)
 // is not a call the protocol answers, is dropped by the transport, and is not audited.
@@ -411,7 +490,7 @@ function pendingToolRequests(body: unknown): PendingRequest[] {
 //   request's handler and suppresses its response, so one id never gets a response and the
 //   JSON response promise never resolves — the request would run to the deadline below with
 //   the tool already run and audited.
-function refusedBodyShape(body: unknown): boolean {
+function refusedBodyShape(body: unknown): "repeated-id" | "cancels-own-request" | undefined {
   const messages = Array.isArray(body) ? body : [body];
   const ids = new Set<RequestId>();
   const cancelled: RequestId[] = [];
@@ -430,7 +509,8 @@ function refusedBodyShape(body: unknown): boolean {
     }
   }
 
-  return duplicated || cancelled.some((id) => ids.has(id));
+  if (duplicated) return "repeated-id";
+  return cancelled.some((id) => ids.has(id)) ? "cancels-own-request" : undefined;
 }
 
 // The SDK declares a transport's optional callbacks without `| undefined`, which this
@@ -504,17 +584,41 @@ function sendJson(response: ServerResponse, status: number, body: unknown): void
   response.end(payload);
 }
 
-async function readBody(request: IncomingMessage): Promise<unknown> {
+// Why a body was refused before the transport is connected: a closed category, logged on the
+// refusal's warning line, never anything from the body itself.
+type BodyRefusal =
+  | "invalid-turn-id"
+  | "upload-failed"
+  | "too-large"
+  | "not-json"
+  | "too-complex"
+  | "too-many-messages"
+  | "repeated-id"
+  | "cancels-own-request";
+
+async function readBody(
+  request: IncomingMessage,
+): Promise<{ body: unknown } | { refused: BodyRefusal }> {
   const chunks: Buffer[] = [];
   let bytes = 0;
   for await (const chunk of request) {
     const buffer = chunk as Buffer;
     bytes += buffer.byteLength;
-    if (bytes > MAX_BODY_BYTES) throw new Error("request body too large");
+    if (bytes > MAX_BODY_BYTES) return { refused: "too-large" };
     chunks.push(buffer);
   }
-  if (chunks.length === 0) return undefined;
-  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  if (chunks.length === 0) return { body: undefined };
+  let body: unknown;
+  try {
+    body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  } catch {
+    return { refused: "not-json" };
+  }
+  // The ingress gate's own structural bounds (src/lib/json-shape.ts: at most 48 deep and
+  // 200,000 values), checked iteratively. A tools/call in a batch is five deep at its
+  // arguments' values, and no tool's arguments nest at all; a body nested thousands deep is six
+  // kilobytes of brackets and has no use but to reach code whose depth is the call stack's.
+  return jsonShapeIssues("body", body).length > 0 ? { refused: "too-complex" } : { body };
 }
 
 // The declared assistant turn: absent, or exactly one header value that is a UUID. Anything
@@ -614,14 +718,16 @@ export function createQueryApp(
     // Every refusal that happens before the transport is connected answers 400 and writes no
     // audit record, because nothing was dispatched. This is the one application-level trace
     // such a request leaves, so a caller probing the refusal surface is visible. Nothing
-    // derived from the body's content is written: `messageCount` is how many JSON-RPC messages
-    // the parsed body carried, and it is absent when the body was not parsed.
-    const refuseBody = (messageCount?: number): void => {
+    // derived from the body's content is written: `reason` is one of a closed set of categories,
+    // and `messageCount` is how many JSON-RPC messages the parsed body carried, absent when the
+    // body was not parsed.
+    const refuseBody = (reason: BodyRefusal, messageCount?: number): void => {
       log("warning", "Query request body refused", {
         service: QUERY_SERVICE_NAME,
         stage: "query-http",
         event: "refused-body",
         principal,
+        reason,
         ...(messageCount === undefined ? {} : { messageCount }),
       });
       sendJson(response, 400, { error: "invalid-request" });
@@ -629,27 +735,34 @@ export function createQueryApp(
 
     const turn = turnIdOf(request.headers[TURN_ID_HEADER]);
     if (turn === "invalid") {
-      refuseBody();
+      refuseBody("invalid-turn-id");
       return;
     }
 
-    let body: unknown;
+    let read: Awaited<ReturnType<typeof readBody>>;
     try {
-      body = await readBody(request);
+      read = await readBody(request);
     } catch {
-      refuseBody();
+      // The client's upload failed part way: there is no body to answer.
+      refuseBody("upload-failed");
       return;
     }
+    if ("refused" in read) {
+      refuseBody(read.refused);
+      return;
+    }
+    const { body } = read;
 
     const messageCount = Array.isArray(body) ? body.length : 1;
 
     if (Array.isArray(body) && body.length > MAX_BATCH_MESSAGES) {
-      refuseBody(messageCount);
+      refuseBody("too-many-messages", messageCount);
       return;
     }
 
-    if (refusedBodyShape(body)) {
-      refuseBody(messageCount);
+    const shape = refusedBodyShape(body);
+    if (shape !== undefined) {
+      refuseBody(shape, messageCount);
       return;
     }
 
@@ -661,6 +774,9 @@ export function createQueryApp(
     };
     const pending = pendingToolRequests(body);
     const journal = createRequestJournal();
+    // Aborted once this request is over, however it ended, so a tool still running on an
+    // abandoned request stops reading the store.
+    const requestOver = new AbortController();
     const server = createMcpServer({
       reader: deps.reader,
       mapping: deps.mapping,
@@ -668,9 +784,11 @@ export function createQueryApp(
       identity,
       entitlements,
       audit,
-      // One budget for the whole request: every tool call of the batch draws on it.
+      // One budget for the whole request: every tool call of the batch draws on it, and at most
+      // REQUEST_READ_CONCURRENCY of its reads are in flight at once.
       readBudget: createReadBudget(readBudget),
       journal,
+      signal: requestOver.signal,
       now,
     });
     // Stateless mode is `sessionIdGenerator` absent (the SDK reads it as undefined), which is
@@ -694,23 +812,14 @@ export function createQueryApp(
       // still running on an abandoned request writes no second record when it finishes.
       // A request the protocol layer rejected before the handler ran is `invalid-request`; one
       // that reached a handler and has not finished is `unavailable`, which is what its caller
-      // was told. Notifications are never recorded.
+      // was told. Notifications are never recorded. auditRecord never throws, so one record
+      // that cannot be written does not cost the others theirs.
       journal.sealed = true;
       for (const unanswered of pending) {
         if (journal.audited.has(unanswered.id)) continue;
         const code = journal.dispatched.has(unanswered.id) ? "unavailable" : "invalid-request";
         auditRecord(
-          {
-            reader: deps.reader,
-            mapping: deps.mapping,
-            serviceVersion: deps.serviceVersion,
-            identity,
-            entitlements: undefined,
-            audit,
-            // Nothing is read on this path; the budget is here because the type requires one.
-            readBudget: createReadBudget(0),
-            now,
-          },
+          { serviceVersion: deps.serviceVersion, identity, audit, now },
           unanswered.tool,
           unanswered.args,
           {
@@ -721,6 +830,7 @@ export function createQueryApp(
           requestStartedAt,
         );
       }
+      requestOver.abort();
       await transport.close();
       await server.close();
     }
@@ -744,6 +854,25 @@ export function createQueryApp(
     if (response.headersSent) response.end();
     else sendJson(response, 503, { error: "unavailable" });
   };
+}
+
+// The service as src/query/server.ts runs it, built from its configuration and nothing else,
+// so a test can hold the wiring itself — which setting reaches which dependency — to what the
+// configuration says. Nothing here reads the network until a request needs it.
+export function buildQueryServer(config: QueryConfig, mapping: EmaMapping): Server {
+  return createQueryServer({
+    reader: new HealthcareFhirReader(config),
+    mapping,
+    serviceVersion: config.QUERY_SERVICE_VERSION,
+    imageDigest: config.IMAGE_DIGEST,
+    verifier: googleCredentialVerifier({
+      audience: config.QUERY_AUDIENCE,
+      oauthClientIds: config.QUERY_OAUTH_CLIENT_IDS,
+      client: new OAuth2Client(),
+    }),
+    logRejectionReason: config.QUERY_LOG_REJECTION_REASON,
+    entitlements: parseEntitlements(config.QUERY_ENTITLEMENTS_JSON),
+  });
 }
 
 export function createQueryServer(deps: QueryAppDeps): Server {
