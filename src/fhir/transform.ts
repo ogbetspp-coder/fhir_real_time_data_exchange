@@ -28,6 +28,11 @@ const EMA_LIST_CODE = "100000155539";
 const EMA_LIST_DISPLAY = "Combined File of all Documents";
 const QRD_TEMPLATE_EXTENSION =
   "http://ema.europa.eu/fhir/StructureDefinition/ext-epi-qrdtemplate-version";
+// The system of the EMA document Bundle's identifier, whose value is minted from the source's
+// (EMA_DOCUMENT_ID_NAMESPACE), never copied; the generated StructureMap describes the same rule
+// (scripts/fhir/generate-artifacts.ts).
+export const EMA_DOCUMENT_IDENTIFIER_SYSTEM = "https://khs.dev/fhir/identifier/ema-document";
+export const EMA_DOCUMENT_ID_NAMESPACE = "ema-bundle";
 
 export type MappingDecision = {
   sourceKey: string;
@@ -632,7 +637,7 @@ export function transformType2ToEma(
   const sourceIdentifier = sourceIdentifierValue(sourceBundle);
   const packageId = `ema-${sourceIdentifier}`;
   const compositionId = stableUuid("ema-composition", sourceIdentifier);
-  const bundleId = stableUuid("ema-bundle", sourceIdentifier);
+  const bundleId = stableUuid(EMA_DOCUMENT_ID_NAMESPACE, sourceIdentifier);
   const compositionFullUrl = `urn:uuid:${compositionId}`;
   const bundleFullUrl = documentBundleFullUrl(bundleId);
   const copied = reidentifiedEntries(sourceBundle, sourceIdentifier, compositionFullUrl);
@@ -750,7 +755,7 @@ export function transformType2ToEma(
     // as the Composition does.
     language: "en",
     identifier: {
-      system: "https://khs.dev/fhir/identifier/ema-document",
+      system: EMA_DOCUMENT_IDENTIFIER_SYSTEM,
       value: bundleId,
     },
     type: "document",

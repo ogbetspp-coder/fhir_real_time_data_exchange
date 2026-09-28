@@ -31,12 +31,19 @@ import {
 //   bash scripts/dev/validator-server.sh            # in another terminal, leave it running
 //   npx tsx scripts/dev/run-pipeline.ts             # dry run, writes nothing
 //   npx tsx scripts/dev/run-pipeline.ts --persist   # writes to the real store, bucket and ledger
-//   npx tsx scripts/dev/run-pipeline.ts --source document --product demoxetine --version 2
+//   npx tsx scripts/dev/run-pipeline.ts --source document --product synthetic-demoxetine --version 2
 //
 // --persist is deliberately not the default. A run that persists writes a document to the
-// validated store, artefacts to the evidence bucket and a row to the ledger, all under the
-// deployed environment's identity. That is exactly what makes this useful and exactly why it
-// should be asked for.
+// validated store, artefacts to the evidence bucket, a KMS-signed manifest and a row to the
+// ledger, into the deployed environment's resources but under the operator's own Application
+// Default Credentials, not the worker's service account: the writes are the operator's in the
+// audit logs, and they succeed only where the operator's own roles allow them. To act as the
+// worker, log in with `gcloud auth application-default login
+// --impersonate-service-account=<the worker's service account>` first. That is exactly what
+// makes this useful and exactly why it should be asked for.
+//
+// The deployed ENABLED_RUN_SOURCES applies here as it does in the worker (runPipeline enforces
+// it): a deployment that enables only `document` refuses a fixture run from this script too.
 //
 // Be clear about what a dry run is worth: DRY_RUN gates the validators as well as the writes, so
 // without --persist this exercises the transform and the two structural preflights and nothing
@@ -171,7 +178,9 @@ if (args.source === "fixture") {
     runId,
     sourceKind: "fixture",
     source: createSyntheticType2Bundle(mapping, { product: args.product, version: args.version }),
-    sourceResource: "fixture:synthetic-type2-smpc",
+    // Named as the worker names its own fixture run (src/app.ts), by the product actually sent,
+    // so the signed manifest and lineage name the right input.
+    sourceResource: `fixture:${args.product}`,
   };
 } else {
   const { submission, fidelityReport, sourceText } = createSyntheticSubmission(mapping, {
@@ -207,6 +216,8 @@ try {
         manifestHash: result.evidence.manifestHash,
         signed: result.evidence.signature !== undefined,
         targetBundleId: result.emaBundle.id,
+        // The input the signed manifest and lineage name: kind, resource name and hash only.
+        source: result.evidence.manifest.source,
         mappingDecisions: result.mappingDecisions.length,
         validation: result.evidence.manifest.validation,
         artifacts: result.artifactUris.length,

@@ -197,6 +197,12 @@ export async function runPipeline(
   if (input.runId !== undefined && !Uuid.safeParse(input.runId).success) {
     throw new Error("runId must be a UUID");
   }
+  // The run-source allowlist (ADR 0002 consequences), here as well as at the HTTP surface, so no
+  // caller of the pipeline (scripts/dev/run-pipeline.ts, a test, a later entry point) can run a
+  // source the deployment disabled: a no-synthetic deployment never signs fixture content.
+  if (!config.ENABLED_RUN_SOURCES.includes(input.sourceKind)) {
+    throw new Error("Run source is disabled");
+  }
   const runId = input.runId ?? randomUUID();
   const startedAt = new Date().toISOString();
   const stageStarted = Date.now();
