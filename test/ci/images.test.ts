@@ -133,6 +133,24 @@ describe("the Cloud Build configuration", () => {
     );
   });
 
+  // One judgement of the validator's offline start, in CI and in the image build (audit B08's
+  // offlineStartVerdict), not a copy of it.
+  it("judges the validator's offline start with the script Cloud Build runs", () => {
+    const script = readFileSync("scripts/ci/build-images.sh", "utf8");
+    expect(script).toMatch(/^node scripts\/ci\/validator-offline\.mjs "\$log"$/m);
+    expect(cloudbuild).toMatch(/- scripts\/ci\/validator-offline\.mjs\n\s+- offline\.log\n/);
+  });
+
+  it("builds each service's target with B08's revision label", () => {
+    for (const target of ["worker", "query"]) {
+      expect(cloudbuild).toMatch(
+        new RegExp(
+          `- build\\n\\s+- --target\\n\\s+- ${target}\\n\\s+- --label\\n\\s+- org\\.opencontainers\\.image\\.revision=\\$\\{_REVISION\\}\\n`,
+        ),
+      );
+    }
+  });
+
   it.each([
     ["a syntax directive", "# syntax=docker/dockerfile:1\nFROM x\n"],
     ["a cache mount", "FROM x\nRUN --mount=type=cache,target=/root/.npm npm ci\n"],

@@ -17,22 +17,24 @@
 # no run in flight, and CMEK step 1 applied so the key exists and the BigQuery encryption service
 # account holds its grant.
 #
-#   bash scripts/gcp/bq-cmek-convert.sh --dry-run   # checks and fingerprints only
-#   bash scripts/gcp/bq-cmek-convert.sh             # converts
+#   EMA_FLOW_ENVIRONMENT=dev GCP_PROJECT_ID=sage-ship-509104-b8 bash scripts/gcp/bq-cmek-convert.sh --dry-run   # checks only
+#   EMA_FLOW_ENVIRONMENT=dev GCP_PROJECT_ID=sage-ship-509104-b8 bash scripts/gcp/bq-cmek-convert.sh             # converts
 set -euo pipefail
 
 # shellcheck source=scripts/gcp/common.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
-# GCP_PROJECT_ID first, as before; otherwise GOOGLE_CLOUD_PROJECT or the gcloud configuration,
-# and no project at all fails rather than falling back to a hard-coded one.
-PROJECT_ID="${GCP_PROJECT_ID:-$(ema_flow_resolve_project)}"
+ema_flow_option --dry-run "$@"
+# GOOGLE_CLOUD_PROJECT or GCP_PROJECT_ID (refused when the two differ), else the gcloud
+# configuration; no project at all fails rather than falling back to a hard-coded one.
+PROJECT_ID="$(ema_flow_resolve_project)"
 REGION="${GCP_REGION:-europe-west4}"
-ENVIRONMENT="${EMA_FLOW_ENVIRONMENT:-dev}"
+# No default environment, and only the project its inputs file names (audit B08, L1).
+ENVIRONMENT="$(ema_flow_require_environment "$PROJECT_ID")"
 KEY="projects/${PROJECT_ID}/locations/${REGION}/keyRings/ema-flow-${ENVIRONMENT}-record/cryptoKeys/ledger-analytics"
 DATASETS=("ema_flow_ledger_${ENVIRONMENT}" "ema_flow_fhir_${ENVIRONMENT}")
 STAMP="$(date -u +%Y%m%d%H%M)"
 DRY_RUN="false"
-[[ "${1:-}" == "--dry-run" ]] && DRY_RUN="true"
+[[ "$EMA_FLOW_OPTION" == "--dry-run" ]] && DRY_RUN="true"
 
 tables() {
   bq ls --format=json --max_results=1000 "${PROJECT_ID}:$1" |

@@ -16,19 +16,14 @@ Exit codes: 0 no destroy; 4 the plan destroys or replaces something (the caller 
 that is acknowledged); 1 the plan failed or could not be read — never 0, so a crash here fails
 the check rather than passing it.
 """
-import hashlib
 import json
-import re
 import sys
+
+# The deploy's failure issue is redacted by the same function (scripts/ci/redact.py).
+from redact import redact
 
 plan_json, plan_text, summary_out, code = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4])
 text = open(plan_text, encoding="utf-8", errors="replace").read()
-
-MEMBER = re.compile(r"(?:(?:user|group|domain|serviceAccount|principal|principalSet|deleted:[a-z]+):[^\"\]\s,]+|[\w.+-]+@[\w.-]+)")
-
-
-def redact(value: str) -> str:
-    return MEMBER.sub(lambda m: "sha256:" + hashlib.sha256(m.group(0).encode()).hexdigest()[:12], value)
 
 
 def write(lines: list[str]) -> None:
@@ -68,7 +63,7 @@ for change in changes:
 headline = next((l for l in text.splitlines() if l.startswith("Plan:") or l.startswith("No changes.")), "")
 lines = header + [f"**{headline or 'Plan summary line not found.'}**", ""] + (rows or ["No resource changes."])
 if destroys:
-    lines += ["", f"**{destroys} destroy or replace.** Applied unattended on merge; the check fails unless the pull request carries the `allow-replace` label."]
+    lines += ["", f"**{destroys} destroy or replace.** On a pull request the check fails unless it carries the `allow-replace` label; the deploy applies it only when ALLOW_REPLACE_ACK names the commit being deployed and exactly these destroys."]
 # No change is expected here: the dashboard's text is ignored by Terraform and drift-checked
 # separately (the line after this summary), and the environment's inputs come from one file.
 lines += ["", "_Inputs are the deployed images and version, so a change listed is this pull request's, or drift in the live project; none is expected otherwise._"]

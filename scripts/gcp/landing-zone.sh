@@ -45,9 +45,9 @@ set -euo pipefail
 ORG_ID="${GCP_ORG_ID:-1048405016186}"
 # shellcheck source=scripts/gcp/common.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
-# GCP_PROJECT_ID first, as before; otherwise GOOGLE_CLOUD_PROJECT or the gcloud configuration,
-# and no project at all fails rather than falling back to a hard-coded one.
-DEV_PROJECT="${GCP_PROJECT_ID:-$(ema_flow_resolve_project)}"
+# GOOGLE_CLOUD_PROJECT or GCP_PROJECT_ID (refused when the two differ), else the gcloud
+# configuration; no project at all fails rather than falling back to a hard-coded one.
+DEV_PROJECT="$(ema_flow_resolve_project)"
 PROD_PROJECT="${PROD_PROJECT_ID:-khs-ema-flow-prod}"
 CHECK="false"
 [[ "${1:-}" == "--check" ]] && CHECK="true"
@@ -90,7 +90,9 @@ ensure_folder() { # <result variable> <display name> <parent resource>
 
 # Preflight: the permission to create folders and move projects, before anything changes.
 if [[ "$CHECK" == "false" ]]; then
-  granted="$(curl -fsS -X POST -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  token="$(gcloud auth print-access-token)"
+  # The token is read from a pipe, never put in curl's arguments (common.sh, ema_flow_header).
+  granted="$(curl -fsS -X POST -H @<(ema_flow_header Authorization "Bearer ${token}") \
     -H "Content-Type: application/json" \
     -d '{"permissions":["resourcemanager.folders.create","resourcemanager.projects.move","orgpolicy.policies.create"]}' \
     "https://cloudresourcemanager.googleapis.com/v3/organizations/${ORG_ID}:testIamPermissions" |
@@ -167,13 +169,13 @@ if [[ "$parent" != "folder/${nonprod}" ]]; then
   note "${DEV_PROJECT}: parent is ${parent}, want folder/${nonprod}"
   if [[ "$CHECK" == "false" ]]; then
     token="$(gcloud auth print-access-token)"
-    op="$(curl -fsS -X POST -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" \
+    op="$(curl -fsS -X POST -H @<(ema_flow_header Authorization "Bearer ${token}") -H "Content-Type: application/json" \
       -d "{\"destinationParent\":\"folders/${nonprod}\"}" \
       "https://cloudresourcemanager.googleapis.com/v3/projects/${DEV_PROJECT}:move" |
       python3 -c "import sys,json;print(json.load(sys.stdin)['name'])")"
     result=""
     for _ in $(seq 1 60); do
-      result="$(curl -fsS -H "Authorization: Bearer ${token}" \
+      result="$(curl -fsS -H @<(ema_flow_header Authorization "Bearer ${token}") \
         "https://cloudresourcemanager.googleapis.com/v3/${op}" |
         python3 -c "import sys,json;d=json.load(sys.stdin);print('error: '+json.dumps(d['error']) if 'error' in d else ('done' if d.get('done') else ''))")"
       [[ -n "$result" ]] && break

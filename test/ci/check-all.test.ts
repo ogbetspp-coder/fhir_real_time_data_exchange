@@ -19,6 +19,8 @@ const NOT_RUN_LOCALLY = new Set([
   "npm ci --no-audit --no-fund --engine-strict",
   "bash scripts/ci/build-images.sh",
   "npm run validate:official",
+  // Downloads the standards the deploy imports, like the validator's job it runs in.
+  'bash scripts/gcp/deploy-inputs.sh "${RUNNER_TEMP}/deploy-inputs" >/dev/null',
   "bash scripts/ci/lock-base.sh",
   'node scripts/ci/renderer-inputs.mjs >> "$GITHUB_OUTPUT"',
   "npm run renderer:image",

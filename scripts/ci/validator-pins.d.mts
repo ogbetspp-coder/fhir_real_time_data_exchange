@@ -29,3 +29,11 @@ export function readPackageLock(file: string): LockedPackage[];
 export type NetworkUse = { installs: string[]; refused: string[]; other: string[] };
 export function networkUse(lines: readonly string[]): NetworkUse;
 export function packageSummary(lines: readonly string[]): string[] | undefined;
+export type OfflineStartVerdict = {
+  ok: boolean;
+  failures: string[];
+  installs: string[];
+  other: string[];
+  evidence: string[];
+};
+export function offlineStartVerdict(lines: readonly string[]): OfflineStartVerdict;

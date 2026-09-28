@@ -22,37 +22,71 @@
 # second environment — is brought into line on its first deploy. Idempotent; `--check` reports
 # without changing anything.
 #
+# Which buckets and datasets: every one infra/ declares, as the Terraform output
+# record_readers_targets lists them (test/infra/record-readers.test.ts keeps that output equal to
+# infra/'s resources), plus the agent's staging bucket, made by hand outside Terraform. Each one
+# Terraform declares must exist: the apply that runs before this created it, so a missing one
+# means this is looking at another project or a stale state, and that fails rather than passing
+# with nothing enforced (audit B08, D-5). Only the hand-made bucket may be absent.
+#
 #   bash scripts/gcp/record-readers.sh
 #   bash scripts/gcp/record-readers.sh --check
 set -euo pipefail
 
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # shellcheck source=scripts/gcp/common.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
-# GCP_PROJECT_ID first, as before; otherwise GOOGLE_CLOUD_PROJECT or the gcloud configuration,
-# and no project at all fails rather than falling back to a hard-coded one.
-PROJECT_ID="${GCP_PROJECT_ID:-$(ema_flow_resolve_project)}"
-ENVIRONMENT="${EMA_FLOW_ENVIRONMENT:-dev}"
-BUCKETS=(evidence submissions profiles build-staging)
+ema_flow_option --check "$@"
+cd "$ROOT"
+# GOOGLE_CLOUD_PROJECT or GCP_PROJECT_ID (refused when the two differ), else the gcloud
+# configuration; no project at all fails rather than falling back to a hard-coded one.
+PROJECT_ID="$(ema_flow_resolve_project)"
 # Created by hand for the agent's deploy, outside Terraform and without the environment in its name.
 EXTRA_BUCKETS=("${PROJECT_ID}-ema-flow-agent-staging")
-DATASETS=("ema_flow_ledger_${ENVIRONMENT}" "ema_flow_fhir_${ENVIRONMENT}")
 CHECK="false"
-[[ "${1:-}" == "--check" ]] && CHECK="true"
+[[ "$EMA_FLOW_OPTION" == "--check" ]] && CHECK="true"
 drift=0
+
+if ! targets="$(terraform -chdir=infra output -json record_readers_targets 2>/dev/null)"; then
+  echo "Terraform names no record_readers_targets: run after an apply of this configuration, so the state lists the buckets and datasets it declares." >&2
+  exit 1
+fi
+declared_buckets=()
+while read -r name; do if [[ -n "$name" ]]; then declared_buckets+=("$name"); fi; done < <(
+  printf '%s' "$targets" | python3 -c "import sys,json;print('\n'.join(json.load(sys.stdin)['buckets']))"
+)
+DATASETS=()
+while read -r name; do if [[ -n "$name" ]]; then DATASETS+=("$name"); fi; done < <(
+  printf '%s' "$targets" | python3 -c "import sys,json;print('\n'.join(json.load(sys.stdin)['datasets']))"
+)
+if [[ "${#declared_buckets[@]}" == "0" || "${#DATASETS[@]}" == "0" ]]; then
+  echo "record_readers_targets lists no bucket or no dataset; refusing to report that nothing needs changing." >&2
+  exit 1
+fi
+# Every name Terraform gives is in the project this resolved: a state read from another project
+# names its buckets and datasets, and they are not narrowed here.
+for name in "${declared_buckets[@]}"; do
+  if [[ "$name" != "${PROJECT_ID}-"* ]]; then
+    echo "Terraform's bucket ${name} is not one of ${PROJECT_ID}'s: the state and the project disagree." >&2
+    exit 1
+  fi
+done
 
 # Buckets: every binding held through projectViewer or projectEditor goes; projectOwner stays.
 # A read that fails for any reason but "not found" stops the script: a network or permission error
-# must fail the deploy, not pass it with nothing enforced.
-bucket_names=()
-for suffix in "${BUCKETS[@]}"; do bucket_names+=("${PROJECT_ID}-ema-flow-${ENVIRONMENT}-${suffix}"); done
-bucket_names+=("${EXTRA_BUCKETS[@]}")
-for bucket in "${bucket_names[@]}"; do
+# must fail the deploy, not pass it with nothing enforced. "Not found" passes only for the
+# hand-made bucket.
+for bucket in "${declared_buckets[@]}" "${EXTRA_BUCKETS[@]}"; do
   err="$(mktemp)"
   if ! policy="$(gcloud --quiet storage buckets get-iam-policy "gs://${bucket}" --format=json 2>"$err")"; then
     if grep -qiE "not found|404" "$err"; then
-      echo "${bucket}: does not exist; skipped"
       rm -f "$err"
-      continue
+      if [[ " ${EXTRA_BUCKETS[*]} " == *" ${bucket} "* ]]; then
+        echo "${bucket}: does not exist; skipped (made by hand, outside Terraform)"
+        continue
+      fi
+      echo "${bucket}: declared in infra/ but does not exist in ${PROJECT_ID}." >&2
+      exit 1
     fi
     echo "${bucket}: cannot read its IAM policy: $(head -c 300 "$err")" >&2
     rm -f "$err"
@@ -81,16 +115,16 @@ done
 # the REST API rather than the bq tool: on a fresh CI runner bq printed something other than JSON
 # before its output (deploy of 2026-09-22), and the API's answer is always JSON. The PATCH carries
 # If-Match with the etag read, so it applies only to the access list this script saw.
-token="$(gcloud --quiet auth print-access-token)"
+token="$(ema_flow_access_token)"
 for dataset in "${DATASETS[@]}"; do
   url="https://bigquery.googleapis.com/bigquery/v2/projects/${PROJECT_ID}/datasets/${dataset}"
   current="$(mktemp)"
   status="$(curl --silent --show-error --output "$current" --write-out '%{http_code}' \
-    --header "Authorization: Bearer ${token}" "$url")"
+    --header @<(ema_flow_header Authorization "Bearer ${token}") "$url")"
   if [[ "$status" == "404" ]]; then
-    echo "${dataset}: does not exist; skipped"
+    echo "${dataset}: declared in infra/ but does not exist in ${PROJECT_ID}." >&2
     rm -f "$current"
-    continue
+    exit 1
   fi
   if [[ "$status" != "200" ]]; then
     echo "${dataset}: cannot read it: HTTP ${status}" >&2
@@ -114,7 +148,7 @@ PY
       # A 412 means the access list changed since it was read: nothing is applied, and the next
       # deploy tries again from the new list.
       status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
-        --request PATCH --header "Authorization: Bearer ${token}" \
+        --request PATCH --header @<(ema_flow_header Authorization "Bearer ${token}") \
         --header "Content-Type: application/json" --header "If-Match: ${etag}" \
         --data-binary "@${wanted}" "$url")"
       if [[ "$status" != "200" ]]; then

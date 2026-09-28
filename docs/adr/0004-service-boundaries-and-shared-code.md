@@ -48,10 +48,18 @@ Services are discrete in **identity and state**, never in code.
    Every step is warning-only and never fails the deploy, so a missing permission leaves a
    `::warning::` naming it rather than a silent gap. (It had not run against a project when this
    was written; it has run on every deploy of `dev` since, and the exports are in the bucket.)
-   Role grants that cannot be Terraform-managed — today the
-   deployer's bootstrap roles, `roles/documentai.editor` on the deployer, and the audit log
-   sink's writer identity — are listed in `docs/architecture.md` with the reason, and
-   re-confirmed at each deployment.
+   Amended by audit B08 (D-3): the export now reads every IAM policy in the project that a
+   grant to these accounts can live in (the project and the folders and organisation above it;
+   the Healthcare dataset and its stores; each bucket, BigQuery dataset and table, key, topic,
+   image repository, Cloud Run service and service account), covers the caller and the deployer
+   too, and names each role a service account holds that no Terraform resource declares
+   (`scripts/ci/effective-iam.py`, a warning, not a failure). It shows what those policies
+   grant; it cannot show that an account holds nothing else, and says so for a policy it could
+   not read. Role grants that cannot be Terraform-managed — today the deployer's bootstrap
+   roles, `roles/documentai.editor` on the deployer, and the audit log sink's writer identity —
+   are to be listed in `docs/architecture.md` with the reason (not yet done when B08 was
+   written; it is on the B17 documentation list), and the deployer's are exported, unjudged,
+   at each deployment.
 6. **One repository, until a second team exists.** Discrete deployables share one repository,
    one CI, and one release cadence. A repository split is a coordination decision, not a
    compliance one, and is deferred (ADR 0002, roadmap).

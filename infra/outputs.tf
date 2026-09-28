@@ -43,6 +43,22 @@ output "submission_bucket" {
   value       = google_storage_bucket.submissions.name
 }
 
+output "record_readers_targets" {
+  description = "Every Cloud Storage bucket and BigQuery dataset infra/ declares, read by scripts/gcp/record-readers.sh: the stores whose project viewer and editor access it removes after each apply. test/infra/record-readers.test.ts keeps this list equal to infra/'s bucket and dataset resources."
+  value = {
+    buckets = [
+      google_storage_bucket.evidence.name,
+      google_storage_bucket.submissions.name,
+      google_storage_bucket.profiles.name,
+      google_storage_bucket.build_staging.name,
+    ]
+    datasets = [
+      google_bigquery_dataset.ledger.dataset_id,
+      google_bigquery_dataset.fhir_analytics.dataset_id,
+    ]
+  }
+}
+
 output "fhir_changes_topic" {
   description = "Pub/Sub topic the target store publishes change notifications to (full resource id)."
   value       = google_pubsub_topic.fhir_changes.id

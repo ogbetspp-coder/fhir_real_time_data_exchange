@@ -12,7 +12,8 @@
 #     image holds the standards lock its run manifest names;
 #   - the validator runs as a user without root, holds no curl or wget, and starts with no
 #     network at all, loading only installed packages, under universal jurisdiction in the pinned
-#     locale (the same judgement as cloudbuild.images.yaml's validator-starts-offline step).
+#     locale (the same judgement, by the same script, as cloudbuild.images.yaml's
+#     validator-offline-verdict step).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -67,28 +68,8 @@ done
 log="$(mktemp)"
 docker logs offline >"$log" 2>&1 || true
 docker rm --force offline >/dev/null
-VALIDATOR_LOG="$log" node --input-type=module <<'JS'
-import { readFileSync } from "node:fs";
-import { networkUse } from "./scripts/ci/validator-pins.mjs";
-
-const lines = readFileSync(process.env.VALIDATOR_LOG, "utf8").split(/\r?\n/);
-const { installs, other } = networkUse(lines);
-const failures = [];
-if (installs.length > 0) failures.push("it needed a package that is not installed in the image");
-if (other.length > 0) failures.push("it attempted a network request its policy did not refuse");
-if (!lines.some((line) => line.includes("FHIR Validator HTTP Service started")))
-  failures.push("it did not start with networking disabled");
-if (!lines.some((line) => line.includes("Jurisdiction: Global (Whole world)")))
-  failures.push("it is not validating under universal jurisdiction");
-if (!lines.some((line) => line.includes("Locale: United States/US")))
-  failures.push("it is not running in the pinned locale");
-for (const line of [...installs, ...other]) console.error(line.slice(0, 200));
-if (failures.length > 0) {
-  for (const line of lines.slice(-40)) console.error(line.slice(0, 200));
-  console.error(`The validator image failed its offline start: ${failures.join("; ")}.`);
-  process.exit(1);
-}
-for (const line of lines.filter((l) => /Jurisdiction:|Locale:|Package Summary|HTTP Service started/.test(l)))
-  console.log(line.slice(0, 200));
-JS
+# The verdict by the script Cloud Build's validator-offline-verdict step runs
+# (scripts/ci/validator-offline.mjs, offlineStartVerdict in validator-pins.mjs), so CI and the
+# image build judge the offline start the same way.
+node scripts/ci/validator-offline.mjs "$log"
 rm -f "$log"
