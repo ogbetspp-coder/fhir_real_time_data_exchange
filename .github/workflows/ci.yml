@@ -273,8 +273,10 @@ jobs:
       - name: Check the vendored contracts
         run: uv run --frozen python scripts/sync_contract.py --check
 
-      # Hermetic: the tests stand up the four tools on a real MCP streamable-HTTP server on an
-      # ephemeral loopback port and connect the real ADK toolset to it. No model is called.
+      # The tests stand up the four tools on a real MCP streamable-HTTP server on an ephemeral
+      # loopback port and connect the real ADK toolset to it. No model is called. Not wholly
+      # hermetic: two deploy-requirement tests resolve against the package index's metadata,
+      # and skip (never pass) when it cannot be reached (tests/test_deploy_requirements.py).
       # Under line coverage, with the floor in agent/pyproject.toml [tool.coverage.report].
       - name: Test
         run: uv run --frozen pytest --cov

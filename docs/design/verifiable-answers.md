@@ -2,13 +2,16 @@
 
 - Status: Proposed 2026-09-20. The query service is deployed (`ema-flow-dev-query`, first
   2026-09-20; all four tools answered live 2026-09-21). The agent is deployed to Agent Engine
-  (`reasoningEngines/6226059359072288768`, europe-west4, Python 3.14), registered in Gemini
-  Enterprise, and redeployed on 2026-09-23 with the draft-hold fix (PR #98); its post-check has
-  not yet run in a live Gemini turn. Both are delivered (were roadmap items 1 and 1b). Google
-  product capabilities below were read from Google's public documentation (dated per source,
-  inline); the MCP connector, Agent Engine and agent registration have since been exercised in
-  this project's tenant, the rest has not and must be re-confirmed in the console before it is
-  relied on
+  (`reasoningEngines/6226059359072288768`, europe-west4, Python 3.14) and registered in Gemini
+  Enterprise; its post-check has not yet run in a live Gemini turn. Which build the engine runs
+  is recorded in `agent/deploy/README.md` and, since 2026-09-27, in every audit record's
+  `serviceVersion` (`agent/<version>+<commit>`). The build deployed before 2026-09-27 predates
+  that day's audit fixes — among them, it fails every turn whose user id is an e-mail address —
+  so the live post-check (roadmap item 1) waits on a redeploy from `main`. Both are delivered
+  (were roadmap items 1 and 1b). Google product capabilities below were read from Google's
+  public documentation (dated per source, inline); the MCP connector, Agent Engine and agent
+  registration have since been exercised in this project's tenant, the rest has not and must be
+  re-confirmed in the console before it is relied on
 - Related: `docs/design/epi-mcp-query-service.md`, `docs/adr/0004-service-boundaries-and-shared-code.md`,
   `docs/roadmap.md` (the query service, the agent and the demonstration enablers: delivered, were
   items 1, 1b and 1c; the live post-check is current item 1)
@@ -26,14 +29,29 @@ regulated buyer. What can be made true is this:
 
 That is a different promise from "the assistant is correct", and a narrower one than "every
 sentence is checked". It is achievable, it is testable, and it is the promise a QA function
-can put an intended-use statement around. Two design consequences keep it honest: the agent
-fills a quotation slot only by reference to a tool result received in that turn — it never
-copies text into one — so an unverified string cannot be presented as a quotation; and an
-acceptance test flags an answer whose free-text part contains a span matching a stored section
-above a threshold, which is the paraphrase the post-check would otherwise miss. The assistant is
-never the source of truth; it is a guide to the source of truth, and every pointer it gives
-can be checked. This is the brand rule — AI proposes, math proves, humans decide — applied to
-reading.
+can put an intended-use statement around. What keeps it honest, as built (2026-09-27):
+
+- **Quotation slots are filled by code, never by the model.** Every section the model fetches
+  with `get_section` in the turn becomes a block, verbatim from the tool result, with its
+  citation; the model cannot write into one. So an unverified string cannot be presented as a
+  quotation. The blocks are what was read, not a selection the model vouches for, and the answer
+  says so; at most eight are shown, and the answer says how many more were read.
+- **The model's own words cannot pass for a block, and do not carry what a block carries.** Any
+  line of them that opens with a label reserved for checked text is removed, read after
+  compatibility folding, with every gap and zero-width character removed and every leading
+  non-letter stripped; checksum-like runs of hexadecimal digits and named document identifiers
+  are removed; and the words end at a delimiter line. Each removal is said in the answer and
+  recorded (`assistantFlags`).
+- **Label text in the model's own words is pointed out, not checked.** Where they share eight or
+  more consecutive words with a block, the answer says they repeat label text and are not
+  checked, and the record carries `label-text-repeated`. This is a runtime flag, not the
+  acceptance test over model answers this note once promised; a paraphrase that shares fewer
+  than eight words in a row is not caught, and nothing sends a quotation in the model's words
+  through `verify_quote`. Both are open.
+
+The assistant is never the source of truth; it is a guide to the source of truth, and every
+pointer it gives can be checked. This is the brand rule — AI proposes, math proves, humans
+decide — applied to reading.
 
 ## Three layers of enforcement, from hard to soft
 
@@ -41,20 +59,30 @@ reading.
    `narrativeDivSha256` and `normalizedTextSha256`, names the document version, and marks
    content fields with `ContentNotice`. It has no tool that summarises, drafts, or writes. A
    client cannot obtain paraphrased label text from it because none exists.
-2. **Mechanical: the post-check.** After the assistant composes an answer, every span it
-   presents as label content is sent back through `verify_quote`. A span that does not match
-   is flagged in the answer as unverified, and the audit record shows it. This check does not
-   depend on the model: a model update can make the assistant less helpful, but it cannot make
-   an altered quote pass as verified. It is the single most important piece and it is small.
+2. **Mechanical: the post-check.** At the end of every turn, every block of label content is
+   sent back through `verify_quote`, in chunks of at most 2,000 UTF-16 units. A block is
+   verified only when every chunk comes back `match` in the section cited, at exactly the
+   code-point offsets the chunk was cut from — so the matches cover the block end to end — and
+   every hash agrees: each match names the section's own `normalizedTextSha256`, each answer
+   hashes the chunk that was sent, the block's text and XHTML hash to the values the reader is
+   shown, and the answer was computed under the normalisation version the agent was built
+   against (`fidelity-norm/3.1.0`). Anything else is flagged on the block, and the audit record
+   shows it. A block holding a table or a picture is flagged `table-not-quotable`: the service
+   refuses a quote carrying their markers, so that part is not sent. This check does not depend
+   on the model: a model update can make the assistant less helpful, but it cannot make an
+   altered quote pass as verified. It is the single most important piece and it is small.
 3. **Soft: the instruction.** The agent's system instruction tells it to answer from tool
-   results, to quote rather than paraphrase, and to cite. This is the least reliable layer and
-   is treated as such — it improves quality; it proves nothing.
+   results, to fetch the sections that answer the question, and to say in its own words only
+   which of them do and why — never to reproduce label text, identifiers or hashes, which the
+   checked blocks carry. This is the least reliable layer and is treated as such — it improves
+   quality; it proves nothing.
 
 Layers 1 and 2 are ours; layer 3 and everything a user sees are Google's. The **validated
 boundary** is narrower than "ours": it is the query service, the fidelity library, and the
-store. The post-check is our code, but it runs inside the agent at the model's discretion, so
-its _invocation_ lies outside the boundary — an answer card without a verification stamp is,
-procedurally, unverified.
+store. The post-check is our code and runs on every turn, unconditionally — the agent's
+`after_agent_callback` composes, checks and renders, and the model's own text is held back until
+then — but it runs inside the agent, which is outside the boundary, so a block without a
+verification stamp is, procedurally, unverified.
 
 ## Google-native surfaces, no custom frontend — what is confirmed
 
@@ -78,8 +106,11 @@ project's tenant.
 
 Not used: the Conversational Agents (Dialogflow CX) messenger widget — it fronts a CX
 playbook, not an Agent Engine agent, so it would add a hop for nothing. Grounding-style
-inline citations do not coexist with strict JSON output, which is why structured display goes
-through A2UI cards instead.
+inline citations do not coexist with strict JSON output, which is why structured display was
+planned through A2UI cards. **Not yet used either:** the deployed agent returns its answer as
+plain structured text, the text of the turn's final event (`finish.py` renders for the `text`
+surface). The A2UI renderer is built and tested (`render.render_a2ui`), but sending it needs an
+A2A surface that advertises the extension, and nothing in the deployed path does.
 
 Sources: Gemini Enterprise custom MCP server set-up and Agent Gallery registration
 (docs.cloud.google.com/gemini/enterprise, 2026-09-18); ADK MCP tools
@@ -138,8 +169,25 @@ For the ADK agent path, the `header_provider` route was built: `tools.begin_turn
 per-request `bearer_header_provider` reads the user's token and that id from session state and
 sends `Authorization` and `X-Query-Turn-Id` on every request of the turn. Agent Engine's
 brokered Agent Identity was not used. The delegated-trust fallback (the agent asserting a user
-under its own identity) is **not needed** and is not built. The wiring is proven with
-in-process ADK contexts, not against a deployed runtime.
+under its own identity) is **not needed** and is not built.
+
+Cloud Run's edge does not accept the user's OAuth token, so the first live turn through the
+agent was refused `401` before the service saw it (2026-09-22). The same callback therefore
+also sends `X-Serverless-Authorization`: an ID token for the service's own URL, minted from the
+runtime's credentials (off the event loop, cached for the hour), which Cloud Run consumes and
+strips; the service still sees, verifies and entitles only the user's `Authorization`. That
+runtime identity is, unless the agent is deployed with its own service account
+(`AGENT_ENGINE_SERVICE_ACCOUNT`, `agent/deploy/README.md`), the project's shared Reasoning
+Engine service agent — so it is the whole project's Agent Engine, not this agent alone, that
+the query service's edge admits. A dedicated account holding `run.invoker` alone is the fix, and
+an owner step.
+
+The user id the agent is given is Gemini Enterprise's, and it is the user's e-mail address. The
+agent's audit record never carries it: `principal` is the fixed value `session-user-withheld`,
+with an optional keyed digest beside it (`principalDigest`), and the principal the query service
+verified from the user's own token is on the service's records of the same `turnId`. The wiring
+is proven with in-process ADK contexts and a real ADK `Runner`; the edge header and the
+header provider were exercised on Agent Engine, the post-check has not yet been.
 
 ## Rollout, in two steps
 
@@ -162,21 +210,28 @@ else:
 1. Calls the query service's tools through the MCP toolset over streamable HTTP, passing the
    user's token per request.
 2. Composes answers in a fixed shape: verbatim blocks from tool results, each with its
-   citation (document, version, `sourceKey`, hash), rendered as A2UI cards; the assistant's
-   own words in a separate, labelled part.
-3. Runs the post-check: every verbatim block back through `verify_quote`; flags any
-   `no-match` on the card.
-4. Emits one structured record per turn through the same no-narrative logging discipline as
-   everything else. Its shape is a published contract like every other evidence artefact —
-   `AgentTurnRecord` (`src/contracts/agent-turn.ts`, version 1.0.0): `service`
-   (`ema-flow-agent`), `serviceVersion`, `at`, `principal`, `turnId`, `tools` (per call: tool
-   name, outcome, duration, result count — at most 200), `spansVerified`, `spansFlagged`,
-   `sectionsDropped`, `flags` (the distinct closed flag names raised), `durationMs`. It is
-   narrower than first sketched here: no model id, no per-span entries, and no argument digest
-   — a `verify_quote` argument _is_ narrative, and a digest of a quote is a way of asking
-   whether a document contains a sentence. Which spans failed is on the card; how many, and
-   why, is in the record. Without it, the demonstration's first two scenes would produce no
-   assessable evidence, so it is part of the agent, not an afterthought.
+   citation (document, version, `sourceKey`, hash) and the product and language `find_product`
+   named for that document version in the turn, rendered as plain structured text (A2UI is
+   built, not sent — see above); the assistant's own words in a separate, labelled part.
+3. Runs the post-check: every verbatim block back through `verify_quote`, held to exact
+   coverage and matching hashes (layer 2 above); flags anything else on the block.
+4. Emits one structured record per turn — on every way a turn can end, including those that
+   show no answer — through the same no-narrative logging discipline as everything else. Its
+   shape is a published contract like every other evidence artefact — `AgentTurnRecord`
+   (`src/contracts/agent-turn.ts`, version 1.1.0): `service` (`ema-flow-agent`),
+   `serviceVersion`, `at`, `principal` (never an e-mail address) and optionally
+   `principalDigest`, `turnId`, `outcome` (`answered`, `tools-unavailable`, `model-failed`,
+   `turn-id-missing`, `internal-error`) and optionally `errorClass`, `tools` (per call: tool
+   name, outcome, duration, result count — at most 200 — for the model's calls and the
+   post-check's alike), `spansVerified`, `spansFlagged`, `sectionsDropped`, `flags` (the
+   distinct closed flag names raised), `assistantFlags`, `durationMs`. It is narrower than first
+   sketched here: no model id, no per-span entries, and no argument digest — a `verify_quote`
+   argument _is_ narrative, and a digest of a quote is a way of asking whether a document
+   contains a sentence. Which spans failed is on the card; how many, and why, is in the record.
+   The record is built apart from the answer: if the full record cannot be built, a minimal one
+   with the exception's class is written, and the checked answer is still shown. Without it,
+   the demonstration's first two scenes would produce no assessable evidence, so it is part of
+   the agent, not an afterthought.
 
 The two audit trails join on one value. The agent generates `turnId` before the model runs and
 sends it as `X-Query-Turn-Id` on every request of the turn; the query service copies it into
@@ -228,8 +283,19 @@ with.
   health authorities, safety reporting, patient- or healthcare-professional-facing
   communication, or any use where the _absence_ of information matters: the post-check
   detects alteration, never omission.
-- **Outputs and retention.** The system retains only the per-turn record (who, which tools,
-  which spans verified); answer text is not retained by this system.
+- **Outputs and retention.** The agent's own audit trail retains only the per-turn record
+  (which tools, which spans verified, how the turn ended), and the query service's only its
+  per-call records. **Answer text is retained elsewhere, by the platform.** Deployed on Agent
+  Engine with the default session service, the agent's conversation is stored in Agent Engine
+  Sessions (`VertexAiSessionService`, which `AdkApp` selects when the runtime names its engine;
+  `agent/deploy/deploy_agent_engine.py` sets no other): the user's question, every tool result
+  of the turn — including each `get_section` answer, the full section narrative — and the
+  rendered answer, in the engine's region (`europe-west4`), for the session's lifetime, readable
+  by anyone holding Agent Engine session read permissions on the project. The user's token is
+  not among them (`temp:` state is not persisted). This repository sets no session lifetime and
+  has not confirmed the default; Gemini Enterprise keeps its own conversation history under its
+  own settings. Not retaining any of this (an in-memory session service, at the cost of
+  conversation history across runtime instances) is an owner decision, open.
 - **Periodic review.** Annually, and on any change to the model version, the normalisation
   version, or the tool contract.
 
@@ -243,9 +309,22 @@ with.
   something out, which is why "the answer is the tool result" matters more than "the assistant
   is careful", and why absence-dependent uses are excluded above.
 - **Mis-attribution.** `verify_quote` proves a span is in the document the assistant _named_;
-  it does not prove the assistant named the right product, version, or language. The card
-  displays product, `bundleId`, `versionId`, and language for the user to confirm, and the
-  demonstration shows this being checked.
+  it does not prove the assistant named the right product, version, or language. Each block
+  shows `bundleId`, `versionId`, `sourceKey` and the checksum, and the product name and language
+  that a `find_product` answer of the same turn gave for that exact document version — or, when
+  the turn looked up no such answer (or two disagreed), says the product and language were not
+  confirmed, rather than guess. The user confirms them; the demonstration shows this being
+  checked. The product line is as good as `find_product`'s answer, which is not itself
+  re-checked.
+- **The assistant's own words.** They are shown, labelled, and never checked. What is enforced
+  is that they cannot pass for a checked block and do not carry checksums or identifiers (see
+  "The promise"); what is not: a paraphrase of label text sharing fewer than eight words in a
+  row with a block, and a reserved label spelt with look-alike letters from another script
+  (compatibility folding does not fold confusables).
+- **Exact coverage fails closed.** A chunk of a block whose text also occurs earlier in the same
+  section matches there first, at other offsets, and the block is flagged `coverage-gap` although
+  it is the label's text. A block holding a table or a picture cannot be checked at all yet
+  (`table-not-quotable`); cell-level quoting is roadmap 3a's.
 - **Data handling outside the boundary.** Regulated narrative leaves the validated boundary at the
   tool-result hop and is processed by Gemini and Agent Engine. Before anything but synthetic data
   crosses that hop, three things must be written down here: the contractual basis on which prompts

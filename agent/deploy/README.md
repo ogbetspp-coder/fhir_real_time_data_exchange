@@ -3,9 +3,16 @@
 Written first from Google's documentation, with every claim cited, and corrected by the first
 real deploy on 2026-09-22 (below). The agent is live as
 `projects/398017980210/locations/europe-west4/reasoningEngines/6226059359072288768`, Python
-3.14, and was redeployed on 2026-09-23 with the draft-hold fix (PR #98) and again from `main` at
-`caa5d9a`. Its post-check has not yet run in a live Gemini turn. Documentation dates are the
-dates the pages were read, 2026-09-18 to 2026-09-20.
+3.14. Its post-check has not yet run in a live Gemini turn. Documentation dates are the dates
+the pages were read, 2026-09-18 to 2026-09-20.
+
+**Which build is live.** The build deployed before 2026-09-27 (from `caa5d9a`) predates that
+day's audit fixes: it fails every turn whose user id is an e-mail address, which is every Gemini
+Enterprise turn, and it records none of the post-check's calls. Redeploy from `main` before the
+live turn. From that redeploy on, the deployed build is named by the `serviceVersion` of its own
+audit records, `agent/<version>+<commit>`, which the deploy script derives and refuses to derive
+from a tree that differs from its commit; record the commit in `docs/roadmap.md` beside `main`'s
+when you deploy.
 
 Six steps. Steps 1 and 4 were done for the MCP connector on 2026-09-21 and are reused; the
 OAuth client is a console decision, the invoker grant a Terraform variable.
@@ -73,13 +80,34 @@ AGENT_ENGINE_LOCATION=<region> \
 AGENT_ENGINE_STAGING_BUCKET=gs://<bucket> \
 QUERY_SERVICE_MCP_URL=https://<query-service-host>/mcp \
 AGENT_MODEL=<pinned-gemini-model-version> \
-AGENT_SERVICE_VERSION=agent/0.1.0 \
 .uv-bootstrap/bin/uv run --frozen python deploy/deploy_agent_engine.py --dry-run
 ```
 
 Drop `--dry-run` to deploy; add `--update projects/.../reasoningEngines/...` to update in
 place. The script refuses to run if any variable is unset: there is no default project, no
-default region, and no guessed bucket.
+default region, and no guessed bucket. It also refuses when anything under `agent/` differs from
+the commit (modified, staged or untracked), and when `AGENT_SERVICE_VERSION` is set: the version
+is derived, `agent/<package version>+<commit>`, so every audit record names the code that wrote
+it. Until 2026-09-27 it was typed by hand, and the engine ran a build that predated the fixes it
+was assumed to carry.
+
+Optional, each passed through only when set:
+
+- `MCP_TIMEOUT_SECONDS` — the agent's MCP timeout, above 0 and at most 600 (default 30).
+- `AGENT_PRINCIPAL_DIGEST_SECRET` — the name of a Secret Manager secret in the project holding a
+  random key. The engine then gets `AGENT_PRINCIPAL_DIGEST_KEY` as a secret reference (never a
+  value; the key passes through neither this script nor the engine's configuration), and each
+  audit record carries `principalDigest`, an HMAC-SHA256 of the Gemini Enterprise user's e-mail
+  address under it. Without it the agent's records identify no user at all (`principal` is
+  `session-user-withheld`); the query service's records of the same `turnId` still carry the
+  principal it verified. The runtime's identity needs `roles/secretmanager.secretAccessor` on
+  the secret. The key is read at run time, so it is never in the pickled agent.
+- `AGENT_ENGINE_SERVICE_ACCOUNT` — the service account the engine runs as. See "The edge
+  identity" below.
+
+The configuration the agent is built with (`QUERY_SERVICE_MCP_URL`, `AGENT_MODEL`,
+`AGENT_SERVICE_VERSION`, `MCP_TIMEOUT_SECONDS`) is pickled with it, and passed as environment
+variables too, so the deployed runtime and the pickled agent agree.
 
 The script needs the Vertex AI SDK, which is **not** in `uv.lock` — it pulls the whole Google
 Cloud client stack, none of which the agent runs. Supply it for the one command:
@@ -104,9 +132,11 @@ documentation before the SDK's 2.0 split:
   requirement too, added after the `uv.lock` pins.
 - **`extra_packages` is relative and the upload runs from `src/`.** The SDK archives each path as
   given, so an absolute path would nest the code under the deploying machine's home directory.
-- **Requirements come from `uv.lock`.** `requirements_from_lock()` walks the dependency graph
-  from this package's own `dependencies`, so the deployed runtime gets the 61 packages the CI
-  gate ran against, plus the SDK, and none of the dev-only ones.
+- **Requirements come from `uv.lock`.** `requirements_from_lock()` asks uv itself
+  (`uv export --frozen --no-dev`) for every runtime package at its locked version with its
+  platform marker, so the deployed runtime gets the packages the CI gate ran against, plus the
+  SDK, and none of the dev-only ones. (A hand reading of the lock that dropped the markers failed
+  the first deploy on `pywin32`.)
 - **The query service URL must be the one it validates against.** The service accepts ID tokens
   whose audience equals `QUERY_AUDIENCE`:
   `https://ema-flow-dev-query-<project number>.<region>.run.app`. Cloud Run also answers on its
@@ -134,6 +164,22 @@ POST https://<ENDPOINT_LOCATION>-discoveryengine.googleapis.com/v1alpha/projects
 
 Prerequisites: the Gemini Enterprise Admin role, the Discovery Engine API enabled, an existing
 Gemini Enterprise app, and the agent already deployed (step 2).
+
+`register.sh` does this from the repository. It takes the app from `GEMINI_APP_ID` and has no
+default, since an agent registered in the wrong app is offered to the wrong people; and
+`authorization.sh` takes the OAuth client from `GEMINI_OAUTH_CLIENT_ID`, likewise. The `dev`
+values, which both scripts once carried as silent defaults:
+
+```bash
+GEMINI_APP_ID=gemini-enterprise-17899354_1789935441481
+GEMINI_OAUTH_CLIENT_ID=398017980210-mgn6flks5a9nmlbkgkhh1pple9tv2075.apps.googleusercontent.com
+```
+
+The registration's description says only what the agent does (2026-09-27): it shows the label
+sections it read, verbatim and re-checked; its own remarks are labelled and not checked; it reads
+only documents the user is entitled to, and any other is answered as not found. It used to say
+the agent "machine-checks every quotation" and "refuses questions about products the user is not
+entitled to", neither of which is what it does.
 
 Sources: [Register and manage an ADK agent](https://docs.cloud.google.com/gemini/enterprise/docs/register-and-manage-an-adk-agent),
 [Agent Gallery](https://docs.cloud.google.com/gemini/enterprise/docs/agent-gallery).
@@ -227,6 +273,42 @@ carries 451 permissions including create and delete on every Vertex AI resource.
 AGENT_RESOURCE=projects/<number>/locations/<region>/reasoningEngines/<id> \
   bash agent/deploy/grant-invoker.sh
 ```
+
+The regional endpoint is read from `AGENT_RESOURCE` itself (it once came from a separate
+`GCP_REGION` defaulting to `europe-west4`), and an error answer from the IAM API now stops the
+script with the answer shown, rather than being parsed as the policy and posted back.
+
+## The edge identity
+
+The agent's calls reach the query service through Cloud Run's edge, which does not accept the
+user's OAuth token, so the agent also sends an ID token minted from the runtime's own
+credentials (`X-Serverless-Authorization`; `tools.edge_auth_token`). Deployed without
+`AGENT_ENGINE_SERVICE_ACCOUNT`, that runtime identity is the project's shared Reasoning Engine
+service agent (`service-<number>@gcp-sa-aiplatform-re.iam.gserviceaccount.com`), and whatever
+it has been granted on the query service is granted to every Agent Engine deployment in the
+project, not to this agent alone. The service still verifies and entitles only the user's own
+token, so the edge admits a caller, never a user; but the edge is meant to admit this agent.
+
+The fix, an owner step: create a service account for the agent alone, grant it
+`roles/run.invoker` on the query service (through `query_invokers`, as step 4 does for Gemini
+Enterprise) and whatever Agent Engine needs to run it (logging, the staging bucket, and the
+digest secret if one is used), remove the shared service agent from `query_invokers` if it is
+there, and deploy with `AGENT_ENGINE_SERVICE_ACCOUNT` set to it. The exact runtime roles have not
+been established in this project; confirm them against Agent Engine's documentation for a
+custom service account before relying on this.
+
+## What the agent keeps, and where
+
+The agent's own audit record carries no narrative (`agent/README.md`, "Audit"). Agent Engine
+does keep the conversation: with no `session_service_builder`, `AdkApp` uses Agent Engine
+Sessions (`VertexAiSessionService`) whenever the runtime names its engine, which it does on
+Agent Engine. Each session holds the user's question, every tool result of every turn —
+including each `get_section` answer, the full section narrative — and the rendered answer, in
+the engine's region, for the session's lifetime (not set here, and not yet confirmed), readable
+with Agent Engine session permissions on the project. `temp:` state, and so the user's token, is
+not persisted. `docs/design/verifiable-answers.md` ("Intended use") states this as the
+retention it is; switching to an in-memory session service, which keeps nothing but loses a
+conversation's history across runtime instances, is an owner decision.
 
 ## Step 5 — the Google Chat app (optional)
 

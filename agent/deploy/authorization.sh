@@ -10,9 +10,11 @@
 # constant. The token is the end user's, for the same OAuth client the MCP connector uses, so the
 # query service sees the same principal, entitlement and audit identity either way.
 #
-# The client secret is read from the terminal, never from an argument or a file, and sent once
-# to the API, which stores it encrypted. Run by the owner: it is the same consent screen decision
-# as the connector's client.
+# The client secret is never a command-line argument and is never printed or written by this
+# script: it is read from the clipboard, from Google's client_secret JSON download or a file
+# holding it alone, or from a hidden prompt (the modes below), and sent once to the API, which
+# stores it encrypted. Run by the owner: it is the same consent screen decision as the
+# connector's client.
 #
 # The OAuth client must list BOTH redirect URIs, or the consent window never closes:
 #   https://vertexaisearch.cloud.google.com/oauth-redirect          (the MCP connector)
@@ -31,7 +33,9 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../scripts/gcp" && pwd)/common.s
 # and no project at all fails rather than falling back to a hard-coded one.
 PROJECT_ID="${GCP_PROJECT_ID:-$(ema_flow_resolve_project)}"
 AUTHORIZATION_ID="query_service_bearer_token"
-CLIENT_ID="${GEMINI_OAUTH_CLIENT_ID:-398017980210-mgn6flks5a9nmlbkgkhh1pple9tv2075.apps.googleusercontent.com}"
+# No default: the connector's OAuth client is a per-tenant console decision. The dev client's id
+# is in deploy/README.md. Required below, once --check (which does not use it) has returned.
+CLIENT_ID="${GEMINI_OAUTH_CLIENT_ID:-}"
 BASE="https://discoveryengine.googleapis.com/v1alpha"
 
 PROJECT_NUMBER="$(gcloud --quiet projects describe "$PROJECT_ID" --format='value(projectNumber)')"
@@ -46,6 +50,7 @@ if [[ "${1:-}" == "--check" ]]; then
   exit 1
 fi
 
+: "${CLIENT_ID:?GEMINI_OAUTH_CLIENT_ID names the OAuth client the connector uses}"
 echo "project ${PROJECT_ID} (${PROJECT_NUMBER}); authorization ${AUTHORIZATION_ID} will be created or updated."
 
 # Three ways to supply the secret, because a hidden prompt refuses a paste in some terminals:
