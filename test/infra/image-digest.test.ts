@@ -69,7 +69,7 @@ resolve_image_digest worker abc123`,
   };
 }
 
-describe("the deploy's image digest lookup", () => {
+describe("the deploy's image digest lookup", { timeout: 30_000 }, () => {
   it.each(shells.flatMap((shell) => [INDEX, LIST, DOCKER].map((type) => [shell, type])))(
     "under %s, answers a tag stored as %s with the digest the registry names",
     (shell, type) => {

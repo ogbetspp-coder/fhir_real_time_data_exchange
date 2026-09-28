@@ -100,7 +100,7 @@
     },
     "NormalizationVersion": {
       "type": "string",
-      "pattern": "^fidelity-norm\\/\\d+\\.\\d+\\.\\d+$",
+      "pattern": "^fidelity-norm\\/[0-9]+\\.[0-9]+\\.[0-9]+$",
       "description": "Version of docs/fidelity-normalization.md the hashes were computed under."
     },
     "Sha256Hex": {
@@ -116,7 +116,7 @@
         },
         "path": {
           "type": "string",
-          "pattern": "^Composition\\.section\\[\\d+\\](?:\\.section\\[\\d+\\])*$"
+          "pattern": "^Composition\\.section\\[[0-9]+\\](?:\\.section\\[[0-9]+\\])*$"
         },
         "status": {
           "$ref": "#/$defs/SectionStatus"

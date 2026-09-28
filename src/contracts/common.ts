@@ -21,7 +21,7 @@ const URL_TAIL = "[A-Za-z0-9._~:/?#@!$&'()*+,;=%|-]";
 
 export const HttpUrl = z
   .string()
-  .regex(new RegExp(`^https?://[A-Za-z0-9.-]{1,253}(?::\\d{1,5})?(?:[/?#]${URL_TAIL}*)?$`))
+  .regex(new RegExp(`^https?://[A-Za-z0-9.-]{1,253}(?::[0-9]{1,5})?(?:[/?#]${URL_TAIL}*)?$`))
   .max(256)
   .meta({ id: "HttpUrl", description: "http(s) URL without whitespace; may carry |version." });
 
@@ -59,7 +59,7 @@ export const Token = z
 // JSON path of a target field inside the Bundle, e.g. Composition.section[0].section[1].code.
 export const TargetPath = z
   .string()
-  .regex(/^[A-Za-z][A-Za-z0-9]*(?:\[\d+\])?(?:\.[A-Za-z][A-Za-z0-9]*(?:\[\d+\])?)*$/)
+  .regex(/^[A-Za-z][A-Za-z0-9]*(?:\[[0-9]+\])?(?:\.[A-Za-z][A-Za-z0-9]*(?:\[[0-9]+\])?)*$/)
   .max(256)
   .meta({ id: "TargetPath" });
 
@@ -106,13 +106,13 @@ export const PositiveInt = z.number().int().positive();
 // A FHIR package as the package registry and the HL7 validator name it: `id#version`.
 export const PackageRef = z
   .string()
-  .regex(/^[A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)*#\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/)
+  .regex(/^[A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)*#[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/)
   .max(256)
   .meta({ id: "PackageRef", description: "FHIR package id#version." });
 
 export const NormalizationVersion = z
   .string()
-  .regex(/^fidelity-norm\/\d+\.\d+\.\d+$/)
+  .regex(/^fidelity-norm\/[0-9]+\.[0-9]+\.[0-9]+$/)
   .meta({
     id: "NormalizationVersion",
     description: "Version of docs/fidelity-normalization.md the hashes were computed under.",

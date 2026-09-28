@@ -20,7 +20,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 
 # BuildKit, as Cloud Build's docker:29 builder uses (cloudbuild.images.yaml; audit B13), with the
-# same flags: no attestations, so each image is one image, as the deploy pins it.
+# same flags: no attestations, so each image is one image, as the deploy pins it. Named, not left
+# to the runner's default.
+export DOCKER_BUILDKIT=1
+
 docker build --provenance=false --sbom=false --target worker --tag ema-flow/worker:ci .
 docker build --provenance=false --sbom=false --target query --tag ema-flow/query:ci .
 docker build --provenance=false --sbom=false --file Dockerfile.validator --tag ema-flow/validator:ci .

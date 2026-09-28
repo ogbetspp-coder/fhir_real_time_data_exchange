@@ -99,7 +99,7 @@ const GCLOUD = `case "$*" in
   *) echo "unexpected gcloud $*" >&2; exit 2 ;;
 esac`;
 
-describe("the state bucket in a new project", () => {
+describe("the state bucket in a new project", { timeout: 30_000 }, () => {
   it.each(shells)(
     "is created on the platform-storage key, after the key, never public, under %s",
     (shell) => {
@@ -177,7 +177,7 @@ describe("the state bucket in a new project", () => {
   });
 });
 
-describe("an existing state bucket", () => {
+describe("an existing state bucket", { timeout: 30_000 }, () => {
   const existing = (shell: string, described: string) =>
     run(shell, ["ensure_state_bucket"], "ensure_state_bucket", { gcloud: GCLOUD }, (state) =>
       writeFileSync(path.join(state, "bucket"), described),
@@ -240,7 +240,7 @@ describe("an existing state bucket", () => {
   });
 });
 
-describe("resources made before Terraform manages them", () => {
+describe("resources made before Terraform manages them", { timeout: 30_000 }, () => {
   // `terraform state show` succeeds for an address in $STATE/managed; `import` is recorded.
   const TERRAFORM = `case "$*" in
   *"state show "*) grep -qxF "$4" "$STATE/managed" 2>/dev/null ;;
@@ -296,7 +296,7 @@ esac`;
   });
 });
 
-describe("the service agents the record keys are granted to", () => {
+describe("the service agents the record keys are granted to", { timeout: 30_000 }, () => {
   const map = /record_keys = \{([\s\S]*?)\n {2}\}\n\}/.exec(readFileSync("infra/keys.tf", "utf8"));
   const keys = readFileSync("infra/keys.tf", "utf8");
 

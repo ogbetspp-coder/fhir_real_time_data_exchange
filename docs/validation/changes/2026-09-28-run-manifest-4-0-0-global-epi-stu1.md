@@ -11,8 +11,10 @@
      both, with the same SHA-256 (`hl7.fhir.uv.extensions.r5#5.3.0`), so the list has twelve
      entries: the count the validator's own Package Summary reports. Every SHA-256 is the one its
      lock records; none is computed or assumed here. The worker image ships both locks, and the
-     pipeline reads them before any side effect (`src/fhir/standards-lock.ts`). A package the two
-     locks record with different SHA-256s fails the run.
+     pipeline reads them before it writes anything (`src/fhir/standards-lock.ts`); only the document
+     gate runs first, and for an authority import its fetch of the authority's files only reads. A
+     package the two locks record with different SHA-256s fails the run. (Corrected by the #142
+     follow-up: this said "before any side effect".)
    - `standards.globalEpiPackage` and `standards.emaPackage` are taken from that list. The schema
      refuses a manifest whose named packages are not among `packages`, and one that lists a package
      (an `id#version`) twice; one id at several versions is allowed, and `hl7.terminology.r5` is at
@@ -103,7 +105,8 @@ frozen since February 2026, with 34 fixed advisories it could never receive.
 6. None.
 
 **Blast radius.** A worker without `fhir/standards.lock.json` or `fhir/validator-packages.lock`
-refuses every run before any side effect. A deploy whose validator image reference has no digest is refused at plan time (the deploy
+refuses every run before it writes anything (an authority import's fetch, which only reads,
+runs first). A deploy whose validator image reference has no digest is refused at plan time (the deploy
 passes one by digest already).
 
 **Step 7.** Not applicable: no approved content changes.

@@ -77,7 +77,7 @@ async function fixtureManifest() {
 }
 
 describe("the pinned standards", () => {
-  // Four of the thirteen packages the validator loads were named until review round 1 (Low-1):
+  // Four of the twelve packages the validator loads were named until review round 1 (Low-1):
   // the validator lock's nine are part of what validated the run.
   it("are every package of both locks, each once, with the hash its lock records", () => {
     const fromStandards = lock.artifacts

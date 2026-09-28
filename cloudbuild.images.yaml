@@ -22,7 +22,9 @@ substitutions:
 # provenance and SBOM attestations by default, and those would make each pushed tag an OCI index
 # rather than one image. Every build here passes --provenance=false and --sbom=false, so a tag
 # stays a single image; scripts/gcp/deploy.sh's digest lookup accepts an index as well, and pins
-# whatever digest the registry names for the tag.
+# whatever digest the registry names for the tag. Each build step says DOCKER_BUILDKIT=1 by name
+# rather than relying on the builder's default (as the held builder's steps said =0; audit B07
+# follow-up, Low-1), and CI's Images job builds the same way.
 #
 # The three images build at once (waitFor: ["-"]): none reads another. The worker and the query
 # service are two targets of one Dockerfile (audit B07, S-5). The validator image starts from the
@@ -38,6 +40,7 @@ steps:
   - id: build-app-image
     name: gcr.io/cloud-builders/docker@sha256:b7e5a7271b51a9fe4ee29ebaa98a06ecef86a5f0c51fd7a4bfab8e6a57294d94
     waitFor: ["-"]
+    env: ["DOCKER_BUILDKIT=1"]
     args:
       - build
       - --provenance=false
@@ -61,6 +64,7 @@ steps:
   - id: build-validator-image
     name: gcr.io/cloud-builders/docker@sha256:b7e5a7271b51a9fe4ee29ebaa98a06ecef86a5f0c51fd7a4bfab8e6a57294d94
     waitFor: ["pull-validator-cache"]
+    env: ["DOCKER_BUILDKIT=1"]
     args:
       - build
       - --provenance=false
@@ -122,6 +126,7 @@ steps:
   - id: build-query-image
     name: gcr.io/cloud-builders/docker@sha256:b7e5a7271b51a9fe4ee29ebaa98a06ecef86a5f0c51fd7a4bfab8e6a57294d94
     waitFor: ["-"]
+    env: ["DOCKER_BUILDKIT=1"]
     args:
       - build
       - --provenance=false

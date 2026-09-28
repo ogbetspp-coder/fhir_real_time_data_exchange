@@ -18,21 +18,30 @@ const stages = [...dockerfile.matchAll(/^FROM (\S+)(?: AS (\S+))?$/gm)].map(([, 
 // The builder cloudbuild.images.yaml holds: docker:29, which builds with BuildKit (audit B13).
 const DOCKER_29 = "sha256:b7e5a7271b51a9fe4ee29ebaa98a06ecef86a5f0c51fd7a4bfab8e6a57294d94";
 
-// Each `docker build` step's argument list.
-function cloudbuildBuilds(): string[][] {
-  const builds: string[][] = [];
-  for (const [, args] of cloudbuild.matchAll(/args:\n((?:\s+- [^\n]*\n)+)/g)) {
-    const list = [...(args ?? "").matchAll(/- (\S+)/g)].map((match) => match[1] ?? "");
-    if (list[0] === "build") builds.push(list);
-  }
-  return builds;
+// Each step of cloudbuild.images.yaml: its id, image, env list and argument list.
+function cloudbuildSteps(): { id: string; name: string; env: string[]; args: string[] }[] {
+  return cloudbuild
+    .split(/\n(?= {2}- id: )/)
+    .slice(1)
+    .map((text) => {
+      const field = (key: string) => new RegExp(`^ {4}${key}: (.*)$`, "m").exec(text)?.[1] ?? "";
+      const argsBlock = /^ {4}args:\n((?: {6}- [^\n]*\n?)+)/m.exec(text)?.[1] ?? "";
+      return {
+        id: /^ {2}- id: (\S+)/.exec(text)?.[1] ?? "",
+        name: field("name"),
+        env: field("env") === "" ? [] : (JSON.parse(field("env")) as string[]),
+        args: [...argsBlock.matchAll(/^ {6}- (.*)$/gm)].map((match) => match[1] ?? ""),
+      };
+    });
 }
+
+const builds = () => cloudbuildSteps().filter((step) => step.args[0] === "build");
 
 function cloudbuildDockerfiles(): string[] {
   const files = new Set<string>();
-  for (const list of cloudbuildBuilds()) {
-    const at = list.indexOf("--file");
-    files.add(at === -1 ? "Dockerfile" : (list[at + 1] ?? ""));
+  for (const { args } of builds()) {
+    const at = args.indexOf("--file");
+    files.add(at === -1 ? "Dockerfile" : (args[at + 1] ?? ""));
   }
   return [...files].sort();
 }
@@ -94,7 +103,7 @@ describe("the worker and query image", () => {
 
 describe("the Cloud Build configuration", () => {
   it("builds the worker and the query service from their targets", () => {
-    const targets = cloudbuildBuilds().map((list) => list[list.indexOf("--target") + 1]);
+    const targets = builds().map(({ args }) => args[args.indexOf("--target") + 1]);
     expect(targets).toContain("worker");
     expect(targets).toContain("query");
     expect(cloudbuild).not.toContain("Dockerfile.query");
@@ -111,17 +120,47 @@ describe("the Cloud Build configuration", () => {
     expect([...builders]).toEqual([DOCKER_29]);
   });
 
+  // Every step runs one of two pinned images, and every build runs docker:29 with BuildKit on by
+  // name, not by the builder's default (as audit B07 follow-up, Low-1, named it off for the held
+  // builder). What it reads, and so what it holds: the text of cloudbuild.images.yaml, split at
+  // each top-level `- id:`; in each step its `name:`, a one-line flow-style `env: [...]` and the
+  // `- ` items of its `args:`. A build is a step whose first argument is `build`. It does not
+  // parse YAML (an anchor, a block-style env list or a quoted key is not read), and it does not
+  // read a docker build run from inside another step's script (`entrypoint: bash` with `-c`):
+  // images:check pins every step's image, and review holds the rest.
+  it("runs every step in docker:29 or the pinned node image, and builds with BuildKit named", () => {
+    const nodeImage = /^FROM (node:\S+@sha256:[0-9a-f]{64}) AS build$/m.exec(dockerfile)?.[1];
+    const steps = cloudbuildSteps();
+    expect(steps.length).toBeGreaterThanOrEqual(6);
+    for (const step of steps) {
+      expect([step.id, [`gcr.io/cloud-builders/docker@${DOCKER_29}`, nodeImage]]).toEqual([
+        step.id,
+        expect.arrayContaining([step.name]),
+      ]);
+    }
+    for (const step of builds()) {
+      expect([step.id, step.name, step.env]).toEqual([
+        step.id,
+        `gcr.io/cloud-builders/docker@${DOCKER_29}`,
+        ["DOCKER_BUILDKIT=1"],
+      ]);
+    }
+    expect(builds().map(({ id }) => id)).toEqual([
+      "build-app-image",
+      "build-validator-image",
+      "build-query-image",
+    ]);
+  });
+
   // BuildKit attaches provenance and SBOM attestations by default, which make a pushed tag an OCI
   // index; the deploy pins each tag's digest (scripts/gcp/deploy.sh, resolve_image_digest).
   it("builds every image as one image, with no attestation, in Cloud Build and in CI", () => {
-    const builds = cloudbuildBuilds();
     expect(cloudbuildDockerfiles()).toEqual(["Dockerfile", "Dockerfile.validator"]);
-    expect(builds).toHaveLength(3);
-    for (const list of builds) {
-      expect(list.slice(1, 3)).toEqual(["--provenance=false", "--sbom=false"]);
+    for (const { id, args } of builds()) {
+      expect([id, args.slice(1, 3)]).toEqual([id, ["--provenance=false", "--sbom=false"]]);
     }
     const script = readFileSync("scripts/ci/build-images.sh", "utf8");
-    expect(script).not.toContain("DOCKER_BUILDKIT=0");
+    expect(script).toMatch(/^export DOCKER_BUILDKIT=1$/m);
     const ciBuilds = script.match(/^docker build .*$/gm) ?? [];
     expect(ciBuilds).toHaveLength(3);
     for (const line of ciBuilds) {
@@ -132,11 +171,22 @@ describe("the Cloud Build configuration", () => {
   // Under BuildKit, --cache-from reads only an image built with its cache metadata inline.
   it("pushes the validator's cache with its cache metadata inline, and builds from it", () => {
     const validator = (
-      cloudbuildBuilds().find((list) => list.includes("Dockerfile.validator")) ?? []
+      builds().find(({ args }) => args.includes("Dockerfile.validator"))?.args ?? []
     ).join(" ");
     expect(validator).toContain("--build-arg BUILDKIT_INLINE_CACHE=1");
     expect(validator).toMatch(/--cache-from \S+\/validator:buildcache /);
     expect(validator).toMatch(/--tag \S+\/validator:buildcache /);
+  });
+
+  // An escape directive changes the line continuation the pin readers and check-dockerfiles.mjs
+  // assume (audit B07 follow-up); BuildKit reads it as the legacy builder did.
+  it("builds Dockerfiles with no escape directive", () => {
+    for (const file of cloudbuildDockerfiles()) {
+      expect([file, /^\s*#\s*escape\s*=/im.test(readFileSync(file, "utf8"))]).toEqual([
+        file,
+        false,
+      ]);
+    }
   });
 
   // One judgement of the validator's offline start, in CI and in the image build (audit B08's

@@ -44,16 +44,18 @@ const STAGE_INDEX = /^\d+$/;
 
 // Continuation lines are joined so a `--mount` or `--from` written after a trailing backslash
 // is scanned; the reported line number is the first physical line of the joined instruction.
-// Comment lines are dropped first, as the builder drops them.
+// Joined as the builder joins them (moby's parser, as scripts/ci/validator-pins.mjs does): the
+// backslash removed and the next line appended with no space added, comment and blank lines
+// dropped, inside a continuation too (audit B07 follow-up, review L3-b).
 function instructions(text) {
   const joined = [];
   let open = null;
   text.split(/\r?\n/).forEach((line, index) => {
-    if (/^\s*#/.test(line)) return;
-    const continued = /\\\s*$/.test(line);
-    const body = continued ? line.replace(/\\\s*$/, "") : line;
+    if (/^\s*#/.test(line) || /^\s*$/.test(line)) return;
+    const continued = /\\[ \t]*$/.test(line);
+    const body = continued ? line.replace(/\\[ \t]*$/, "") : line;
     if (open === null) open = { line: index + 1, text: body };
-    else open.text += ` ${body.trim()}`;
+    else open.text += body;
     if (!continued) {
       joined.push(open);
       open = null;

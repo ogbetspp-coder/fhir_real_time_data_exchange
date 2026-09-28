@@ -349,12 +349,12 @@
     "HttpUrl": {
       "type": "string",
       "maxLength": 256,
-      "pattern": "^https?:\\/\\/[A-Za-z0-9.-]{1,253}(?::\\d{1,5})?(?:[/?#][A-Za-z0-9._~:/?#@!$&'()*+,;=%|-]*)?$",
+      "pattern": "^https?:\\/\\/[A-Za-z0-9.-]{1,253}(?::[0-9]{1,5})?(?:[/?#][A-Za-z0-9._~:/?#@!$&'()*+,;=%|-]*)?$",
       "description": "http(s) URL without whitespace; may carry |version."
     },
     "SectionPath": {
       "type": "string",
-      "pattern": "^Composition(?:\\.section\\[\\d{1,4}\\]){1,16}$"
+      "pattern": "^Composition(?:\\.section\\[[0-9]{1,4}\\]){1,16}$"
     },
     "ExtractionTooling": {
       "type": "object",
@@ -532,12 +532,12 @@
     "TargetPath": {
       "type": "string",
       "maxLength": 256,
-      "pattern": "^[A-Za-z][A-Za-z0-9]*(?:\\[\\d+\\])?(?:\\.[A-Za-z][A-Za-z0-9]*(?:\\[\\d+\\])?)*$"
+      "pattern": "^[A-Za-z][A-Za-z0-9]*(?:\\[[0-9]+\\])?(?:\\.[A-Za-z][A-Za-z0-9]*(?:\\[[0-9]+\\])?)*$"
     },
     "SourcePath": {
       "type": "string",
       "maxLength": 256,
-      "pattern": "^(?:List|Bundle|Composition)(?:\\.[A-Za-z][A-Za-z0-9]*(?:\\[(?:\\d{1,4}|[A-Za-z][A-Za-z0-9]*)\\])?)*$"
+      "pattern": "^(?:List|Bundle|Composition)(?:\\.[A-Za-z][A-Za-z0-9]*(?:\\[(?:[0-9]{1,4}|[A-Za-z][A-Za-z0-9]*)\\])?)*$"
     },
     "DecisionAction": {
       "type": "string",
@@ -616,7 +616,7 @@
     },
     "NormalizationVersion": {
       "type": "string",
-      "pattern": "^fidelity-norm\\/\\d+\\.\\d+\\.\\d+$",
+      "pattern": "^fidelity-norm\\/[0-9]+\\.[0-9]+\\.[0-9]+$",
       "description": "Version of docs/fidelity-normalization.md the hashes were computed under."
     },
     "FidelityStatus": {
