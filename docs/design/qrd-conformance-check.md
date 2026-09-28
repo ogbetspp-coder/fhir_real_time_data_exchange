@@ -74,7 +74,9 @@ case, so a change to either list shows until it is recorded. From `epi-reader/1.
 takes Word's `tab-stops` and a `position: relative` shift as T does (a shift of a point or more
 marked as a superscript or subscript, bounded at 6pt; as T4, no shift inside another or inside
 a superscript, a subscript or a `vertical-align`, and none of a point or more around one, since
-each is bounded only on its own), judges faint text by its contrast with the background painted
+each is bounded only on its own; a shift under a point may hold a superscript, where T drops a
+shift only under 0.1 of the smallest text beneath it, so the two differ between that bound and
+a point, a divergence the shared cases record), judges faint text by its contrast with the background painted
 under it (text on its own colour cannot be seen; white on black can), refuses a colour or
 background keyword a browser drops (`color: none`, `background-color: auto`, which leave the
 declaration before them in force: "color: black; color: none" on black is hidden), and refuses a

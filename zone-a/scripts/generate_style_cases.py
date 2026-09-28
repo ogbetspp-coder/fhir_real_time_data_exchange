@@ -51,6 +51,9 @@ _TEMPLATES = {
         '<p>Store at <span style="position: relative; top: .5pt">m<sup style="{style}">2</sup>'
         "</span> C, not for clinical use.</p>"
     ),
+    "span holding a sup": (
+        '<p>Store at m<span style="{style}">x<sup>2</sup></span> C, not for clinical use.</p>'
+    ),
     "span in sup": (
         '<p>Store at 9<sup><span style="{style}">2</span></sup> C, not for clinical use.</p>'
     ),
@@ -101,6 +104,11 @@ CASES: list[tuple[str, str]] = [
     ("sup in shifted span", ""),
     ("sup in slightly shifted span", ""),
     ("span in sup", "position: relative; top: -3pt"),
+    ("span holding a sup", "position: relative; top: .5pt"),
+    ("span holding a sup", "position: relative; top: -0.9pt"),
+    ("span holding a sup", "position: relative; top: -1.3px"),
+    ("span holding a sup", "font-size: 10pt; position: relative; top: -0.8pt"),
+    ("span holding a sup", "position: relative; top: -1pt"),
     ("span", "color: black; color: none"),
     ("span", "background-color: black; background-color: auto"),
     ("span", "background: black; background: none"),
@@ -200,6 +208,12 @@ _BACKGROUND_NONE = (
     "T takes only a colour as a background (T3a); the reader takes the shorthand's none, which "
     "a browser reads as no background (a colour keyword a browser drops refuses in both)"
 )
+_SLIGHT_SHIFT = (
+    "T drops a shift only under 0.1 of the smallest text beneath it (T4: under 0.9pt around a "
+    "superscript of 12pt text, less under a smaller font) and refuses one around a superscript "
+    "otherwise; the reader, which does not follow font sizes, lets any shift under a point hold "
+    "one"
+)
 
 # (element, style) -> (T's answer, why): only where T answers otherwise than the reader.
 DIVERGENCES: dict[tuple[str, str], tuple[str, str]] = {
@@ -225,6 +239,18 @@ DIVERGENCES: dict[tuple[str, str], tuple[str, str]] = {
     ("p", "border-bottom: 1px solid"): ("refused:css-property", _BOXES),
     ("span", "visibility: visible"): ("refused:css-property", _VISIBILITY),
     ("span", "background: black; background: none"): ("refused:css-value", _BACKGROUND_NONE),
+    ("span holding a sup", "position: relative; top: -0.9pt"): (
+        "refused:baseline-shift",
+        _SLIGHT_SHIFT,
+    ),
+    ("span holding a sup", "position: relative; top: -1.3px"): (
+        "refused:baseline-shift",
+        _SLIGHT_SHIFT,
+    ),
+    ("span holding a sup", "font-size: 10pt; position: relative; top: -0.8pt"): (
+        "refused:baseline-shift",
+        _SLIGHT_SHIFT,
+    ),
 }
 
 

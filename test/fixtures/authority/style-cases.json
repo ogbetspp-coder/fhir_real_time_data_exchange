@@ -331,6 +331,54 @@
   "reader": "refused:unsupported-style"
  },
  {
+  "element": "span holding a sup",
+  "style": "position: relative; top: .5pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at m<span style=\"position: relative; top: .5pt\">x<sup>2</sup></span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "superscript"
+  ]
+ },
+ {
+  "element": "span holding a sup",
+  "style": "position: relative; top: -0.9pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at m<span style=\"position: relative; top: -0.9pt\">x<sup>2</sup></span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "superscript"
+  ],
+  "t": "refused:baseline-shift",
+  "why": "T drops a shift only under 0.1 of the smallest text beneath it (T4: under 0.9pt around a superscript of 12pt text, less under a smaller font) and refuses one around a superscript otherwise; the reader, which does not follow font sizes, lets any shift under a point hold one"
+ },
+ {
+  "element": "span holding a sup",
+  "style": "position: relative; top: -1.3px",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at m<span style=\"position: relative; top: -1.3px\">x<sup>2</sup></span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "superscript"
+  ],
+  "t": "refused:baseline-shift",
+  "why": "T drops a shift only under 0.1 of the smallest text beneath it (T4: under 0.9pt around a superscript of 12pt text, less under a smaller font) and refuses one around a superscript otherwise; the reader, which does not follow font sizes, lets any shift under a point hold one"
+ },
+ {
+  "element": "span holding a sup",
+  "style": "font-size: 10pt; position: relative; top: -0.8pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at m<span style=\"font-size: 10pt; position: relative; top: -0.8pt\">x<sup>2</sup></span> C, not for clinical use.</p></div>",
+  "reader": "read",
+  "marks": [
+   "superscript"
+  ],
+  "t": "refused:baseline-shift",
+  "why": "T drops a shift only under 0.1 of the smallest text beneath it (T4: under 0.9pt around a superscript of 12pt text, less under a smaller font) and refuses one around a superscript otherwise; the reader, which does not follow font sizes, lets any shift under a point hold one"
+ },
+ {
+  "element": "span holding a sup",
+  "style": "position: relative; top: -1pt",
+  "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at m<span style=\"position: relative; top: -1pt\">x<sup>2</sup></span> C, not for clinical use.</p></div>",
+  "reader": "refused:unsupported-style"
+ },
+ {
   "element": "span",
   "style": "color: black; color: none",
   "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Store at <span style=\"color: black; color: none\">9</span> C, not for clinical use.</p></div>",

@@ -61,6 +61,55 @@ def test_only_a_url_the_gate_fetches_is_fetched() -> None:
             script.fetch(url)
 
 
+class _Body:
+    """A response that returns what has arrived, one chunk per read, the clock moving on."""
+
+    status = 200
+
+    def __init__(self, chunks: list[bytes], clock: list[float], step: float) -> None:
+        self.chunks, self.clock, self.step = chunks, clock, step
+
+    def __enter__(self) -> _Body:
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        return None
+
+    def read1(self, _: int) -> bytes:
+        self.clock[0] += self.step
+        return self.chunks.pop(0) if self.chunks else b""
+
+
+@pytest.mark.parametrize(
+    ("chunks", "step", "outcome"),
+    [
+        ([b"a" * 10, b"b" * 10], 1.0, None),
+        # A slow body: each read returns soon, and the deadline ends the fetch.
+        ([b"a"] * 100, 1.0, "timed out"),
+        ([b"a" * (3 * 1024 * 1024)] * 2, 0.0, "over the size limit"),
+    ],
+)
+def test_the_deadline_and_the_limit_bound_the_whole_body(
+    monkeypatch: pytest.MonkeyPatch, chunks: list[bytes], step: float, outcome: str | None
+) -> None:
+    script = _script()
+    clock = [0.0]
+    body = _Body(list(chunks), clock, step)
+
+    class _Opener:
+        def open(self, *_: object, **__: object) -> _Body:
+            return body
+
+    monkeypatch.setattr(script.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(script.urllib.request, "build_opener", lambda *_: _Opener())
+    url = "https://epi.ema.europa.eu/consuming/api/fhir/Bundle/6301d093-9501-4e2e-a500-794dd263f9a2"
+    if outcome is None:
+        assert script.fetch(url) == b"".join(chunks)
+    else:
+        with pytest.raises(script.RefusedError, match=outcome):
+            script.fetch(url)
+
+
 def test_a_list_two_labels_share_is_fetched_once() -> None:
     script = _script()
     lock = json.loads((ROOT / "labels" / "ema-epi" / "sources.lock.json").read_text("utf-8"))

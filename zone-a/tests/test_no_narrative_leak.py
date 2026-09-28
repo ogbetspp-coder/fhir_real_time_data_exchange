@@ -6,9 +6,13 @@ labels (``labels/ema-epi/``, the QRD check and the ePI reader's tests, under the
 in ``AGENTS.md``) and the EMA's templates, so a test that printed what it read would put an SmPC's
 text in a CI log. Three checks:
 
-1. no test may print, log, warn or write to standard output or error at all, however it reaches
-   them (``sys.stdout.write``, ``from sys import stdout``, ``pprint``, ``warnings``,
-   ``logging``), so a future test cannot put label or vector text there;
+1. no test may print, log, warn or write to standard output or error by any route it names
+   (``print``, ``sys.stdout.write``, ``from sys import stdout``, ``os.write``, ``pprint``,
+   ``warnings``, ``logging``, ``traceback``, a path to a stream under /dev/ or /proc/self/), so a
+   future test cannot put label or vector text there by accident. It is a lint over names, not a
+   sandbox: a test that builds the route at run time still passes it (``getattr(sys, "std" +
+   "out")``, a path assembled from parts, a subprocess that echoes, ``ctypes``), and review is
+   what catches that;
 2. no test compares a whole check result as text, which a failing assertion would print (the
    committed results are compared by digest, and differences named by JSON pointer);
 3. no Python or Markdown file in ``zone-a/`` may contain a run of text taken from the vectors,
@@ -35,8 +39,15 @@ MINIMUM_QUOTED_RUN = 24
 FORBIDDEN_CALLS = {"print", "breakpoint", "pprint", "pp"}
 # Modules that write to a stream or a log: importing one at all is refused.
 FORBIDDEN_MODULES = {"logging", "pprint", "warnings", "faulthandler", "traceback"}
-# The process's own streams, however they are reached.
+# The process's own streams, by name.
 STREAMS = {"stdout", "stderr", "__stdout__", "__stderr__"}
+# Writing to a file descriptor directly (os.write(1, ...)).
+OS_WRITES = {"write", "writev"}
+# Paths that are the process's streams or terminal, assembled so this module names none of them.
+STREAM_PATHS = (
+    *("/dev/" + name for name in ("stdout", "stderr", "tty", "fd/")),
+    "/proc/self/" + "fd/",
+)
 
 
 def _is_project_file(path: Path) -> bool:
@@ -99,8 +110,16 @@ def _violations(source: str) -> list[str]:
                 out.append(f"reaches .{node.attr}")
             if node.attr in FORBIDDEN_CALLS:
                 out.append(f"calls .{node.attr}")
+            if (
+                node.attr in OS_WRITES
+                and isinstance(node.value, ast.Name)
+                and node.value.id == "os"
+            ):
+                out.append(f"reaches os.{node.attr}")
         elif isinstance(node, ast.Name) and node.id in STREAMS:
             out.append(f"names {node.id}")
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+            out.extend(f"names {path}" for path in STREAM_PATHS if path in node.value)
         elif isinstance(node, ast.Import):
             out.extend(
                 f"imports {alias.name}"
@@ -113,7 +132,9 @@ def _violations(source: str) -> list[str]:
             out.extend(
                 f"imports {alias.name}"
                 for alias in node.names
-                if alias.name in STREAMS or alias.name in FORBIDDEN_CALLS
+                if alias.name in STREAMS
+                or alias.name in FORBIDDEN_CALLS
+                or (node.module == "os" and alias.name in OS_WRITES)
             )
     return out
 
@@ -142,10 +163,30 @@ def test_no_test_module_prints_or_logs(path: Path) -> None:
         "from logging import getLogger",
         "import traceback\ntraceback.print_exc()",
         "breakpoint()",
+        "import os\nos.write(1, b'x')",
+        "from os import write\nwrite(2, b'x')",
+        # Split here so this module's own source names no stream path.
+        "open('/dev/" + "stdout', 'w').write('x')",
+        "open('/dev/" + "stderr', 'a')",
+        "open('/dev/" + "tty', 'w')",
+        "open('/proc/self/" + "fd/1', 'w')",
     ],
 )
 def test_every_way_to_print_is_caught(source: str) -> None:
     assert _violations(source), source
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "import sys\ngetattr(sys, 'std' + 'out').write('x')",
+        "open('/dev/' + 'std' + 'out', 'w')",
+        "import subprocess\nsubprocess.run(['echo', 'x'])",
+    ],
+)
+def test_a_route_built_at_run_time_is_not_caught(source: str) -> None:
+    # The stated limit of a lint over names (module docstring): review catches these.
+    assert _violations(source) == [], source
 
 
 def test_no_test_compares_a_committed_result_as_text() -> None:

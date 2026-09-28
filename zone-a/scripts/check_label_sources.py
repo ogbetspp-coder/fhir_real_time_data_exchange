@@ -8,7 +8,8 @@ For every label in labels/ema-epi/sources.lock.json it downloads the document an
 List two labels share once) and compares each SHA-256 with the lock. It fetches as the gate's
 fetcher does (src/authority/fetch.ts, ``emaFetcher``): only a URL of its template (the EMA's
 host, a Bundle or List by GUID), one ``Accept: application/fhir+json`` header, no redirect
-followed, HTTP 200 only, one 30 s deadline on the whole fetch and a 4 MiB limit on the body, so
+followed, HTTP 200 only, a 30 s deadline on the whole fetch (checked after each read, see
+``fetch``) and a 4 MiB limit on the body, so
 "unchanged" means the gate would read the same bytes; tests/test_label_sources.py keeps the
 values in step with fetch.ts. It writes nothing. Exit status 1 means at least one file differs
 or could not be fetched: the EMA has republished that ePI (or serves it otherwise), and pinning
@@ -59,7 +60,10 @@ def fetch(url: str) -> bytes:
 
     The URL must be one the gate would fetch, and the whole fetch, the body included, must end
     within ``TIMEOUT_SECONDS`` (fetch.ts aborts the request on one deadline; a socket timeout
-    alone bounds each read, not their sum).
+    alone bounds each read, not their sum). The deadline is checked after each ``read1``, which
+    returns what has arrived rather than waiting for a whole chunk, and one read waits at most
+    the socket timeout, so a fetch ends within twice ``TIMEOUT_SECONDS`` at worst, a refusal
+    when it ran past the deadline (the workflow's job timeout bounds the run as a whole).
     """
     if not URL.fullmatch(url):
         raise RefusedError("not a URL the gate fetches")
@@ -72,7 +76,7 @@ def fetch(url: str) -> bytes:
         with opener.open(request, timeout=TIMEOUT_SECONDS) as response:
             if response.status != 200:
                 raise RefusedError(f"HTTP {response.status}")
-            while chunk := response.read(_CHUNK):
+            while chunk := response.read1(_CHUNK):
                 size += len(chunk)
                 if size > MAX_BYTES:
                     raise RefusedError("over the size limit")

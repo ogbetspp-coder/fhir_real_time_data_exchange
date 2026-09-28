@@ -737,8 +737,11 @@ def _paint_element(style: str, builder: _Builder, name: str) -> None:
     As T4: a shifted box is painted over the text around it, so a background on or inside one is
     refused; and a shift is bounded only on its own, so one inside another shift or inside a
     superscript, a subscript or a ``vertical-align`` is refused (five nested 6pt shifts move text
-    30pt), and so is one of a point or more around them (one under a point, which T drops, may
-    hold a superscript: Imatinib Teva's 5.1 writes "m" and a raised "2" so).
+    30pt), and so is one of a point or more around them. One under a point may hold a
+    superscript (Imatinib Teva's 5.1 writes "m" and a raised "2" in a 0.5pt shift). T drops a
+    shift only under 0.1 of the smallest text beneath it and refuses a larger one around a
+    superscript, so between that bound and a point (0.9pt around a superscript of 12pt text) the
+    two differ: a recorded divergence of the shared style cases (``generate_style_cases.py``).
     """
     painted = _paint(style, builder)
     declared = dict(_importance_ordered(style))
@@ -752,7 +755,7 @@ def _paint_element(style: str, builder: _Builder, name: str) -> None:
     if aligned and builder.moved:
         raise _RefusedError("unsupported-style", f"{name}: a raised text inside a shifted one")
     builder.shifted = builder.shifted or shifted
-    # A shift under a point, which T drops (under 0.1 of the font), may hold a superscript.
+    # A shift under a point may hold a superscript (see the docstring for T's own bound).
     builder.moved = builder.moved or bool(shifted and _shift(name, style))
     builder.raised = builder.raised or aligned
     if painted and builder.shifted:

@@ -465,9 +465,12 @@ reverts recorded above.
 The vectors and fixtures are synthetic by construction, but the readers' and the QRD check's
 tests read real, authority-published labels, so a test that printed what it read would put an
 SmPC's text in a CI log. `tests/test_no_narrative_leak.py` parses every test module and fails if
-it calls `print` or `pprint`, reaches `sys.stdout` or `sys.stderr` in any way (`.write`, an
-alias, `from sys import stdout`), or imports `logging`, `pprint`, `warnings` or `traceback`, with
-a negative case for each; and it fails if any Python or Markdown file in this directory contains
+it calls `print` or `pprint`, names `sys.stdout` or `sys.stderr` (`.write`, an alias,
+`from sys import stdout`), calls `os.write`, names a stream's path (`/dev/stdout`, `/dev/fd/1`),
+or imports `logging`, `pprint`, `warnings` or `traceback`, with a negative case for each. It is a
+lint over names, not a sandbox: a route built at run time (`getattr(sys, "std" + "out")`, a path
+assembled from parts, a subprocess that echoes, `ctypes`) passes it, a limit its own tests pin,
+and review is what catches those. It also fails if any Python or Markdown file in this directory contains
 a run of 24 or more characters taken from a vector's normalisation input, XHTML input, page
 text, or section markup. Vector comparisons are made on the values themselves, as the TypeScript
 tests do, but a failing comparison reports only the vector name, the canonical lengths, and two
