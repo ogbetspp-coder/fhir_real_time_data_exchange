@@ -74,39 +74,78 @@ describe("the deploy's pending moves", () => {
     const pairs = result.stdout.trim().split("\n");
     expect(pairs).toHaveLength(blocks.length);
     expect(pairs).toContain(
-      "google_monitoring_notification_channel.query_entitlement_denials_email google_monitoring_notification_channel.alert_email",
+      "google_monitoring_alert_policy.query_entitlement_denials[0] google_monitoring_alert_policy.query_entitlement_denials",
     );
     for (const pair of pairs) expect(pair).toMatch(/^\S+ \S+$/);
   });
 
+  // A configuration of its own, so the cases do not depend on which moves infra/ holds today: a
+  // whole-resource move, an instance move, and a removed block that is not a move.
+  const fixture = () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), "pending-moves-infra-"));
+    dirs.push(cwd);
+    mkdirSync(path.join(cwd, "infra"));
+    writeFileSync(
+      path.join(cwd, "infra", "x.tf"),
+      `moved {
+  from = google_monitoring_notification_channel.old_email
+  to   = google_monitoring_notification_channel.alert_email
+}
+
+moved {
+  from = google_monitoring_alert_policy.key_availability[0]
+  to   = google_monitoring_alert_policy.key_availability
+}
+
+removed {
+  from = google_monitoring_notification_channel.forgotten
+
+  lifecycle {
+    destroy = false
+  }
+}
+`,
+    );
+    return cwd;
+  };
+
   it("completes each move whose old address, or an instance of it, is in the state", () => {
-    const result = run([
-      "google_monitoring_alert_policy.key_availability[0]",
-      "google_monitoring_notification_channel.query_entitlement_denials_email[0]",
-      "google_monitoring_alert_policy.pipeline_failures",
-    ]);
+    const result = run(
+      [
+        "google_monitoring_alert_policy.key_availability[0]",
+        "google_monitoring_notification_channel.old_email[0]",
+        "google_monitoring_notification_channel.forgotten[0]",
+        "google_monitoring_alert_policy.pipeline_failures",
+      ],
+      fixture(),
+    );
     expect(result.status).toBe(0);
     expect(moves(result.calls)).toEqual([
+      "-chdir=infra state mv google_monitoring_notification_channel.old_email google_monitoring_notification_channel.alert_email",
       "-chdir=infra state mv google_monitoring_alert_policy.key_availability[0] google_monitoring_alert_policy.key_availability",
-      "-chdir=infra state mv google_monitoring_notification_channel.query_entitlement_denials_email google_monitoring_notification_channel.alert_email",
     ]);
   });
 
   it("does nothing once the moves are done", () => {
-    const result = run([
-      "google_monitoring_alert_policy.key_availability",
-      "google_monitoring_notification_channel.alert_email[0]",
-      "google_monitoring_alert_policy.query_entitlement_denials",
-    ]);
+    const result = run(
+      [
+        "google_monitoring_alert_policy.key_availability",
+        "google_monitoring_notification_channel.alert_email[0]",
+      ],
+      fixture(),
+    );
     expect(result.status).toBe(0);
     expect(moves(result.calls)).toEqual([]);
   });
 
   it("does not take a resource whose name only begins with an old address", () => {
-    const result = run([
-      "google_monitoring_notification_channel.query_entitlement_denials_email_other[0]",
-      "google_monitoring_alert_policy.query_entitlement_denials[1]",
-    ]);
+    const result = run(
+      [
+        "google_monitoring_notification_channel.old_email_other[0]",
+        "google_monitoring_alert_policy.key_availability[1]",
+      ],
+      fixture(),
+    );
     expect(result.status).toBe(0);
     expect(moves(result.calls)).toEqual([]);
   });

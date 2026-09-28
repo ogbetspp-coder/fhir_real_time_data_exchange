@@ -271,6 +271,11 @@ So the claim is narrow and should stay narrow:
   `ALERT_NOTIFICATION_EMAIL` repository variable through `deploy.yml` and `deploy.sh`; the
   metric already existed, so the channel and the policy (more than five denials in a rolling
   hour) are created on the first deploy after the address is set.
+- Delete dev's old e-mail channel, "EMA Flow query entitlement denials (dev)", by hand. Since #138, Terraform
+  forgets it rather than deleting it: it is deleted before the policies stop naming it, and the
+  Monitoring API refuses to delete a channel in use. After the first green deploy no policy
+  names it. `gcloud beta monitoring channels list --filter='displayName="EMA Flow query entitlement denials (dev)"'`
+  finds it, and `gcloud beta monitoring channels delete <name> --force` deletes it.
 
 ### Production gate — required before any environment holds a client's real content
 

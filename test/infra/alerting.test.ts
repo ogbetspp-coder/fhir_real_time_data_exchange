@@ -244,8 +244,16 @@ describe("the key availability alert", () => {
     expect(terraform).toMatch(
       /moved \{\n\s+from = google_monitoring_alert_policy\.key_availability\[0\]\n\s+to\s+= google_monitoring_alert_policy\.key_availability\n\}/,
     );
+  });
+
+  it("forgets the old e-mail channel instead of deleting it while policies still name it", () => {
+    // A delete would run before the policies stop naming the channel, and the Monitoring API
+    // refuses to delete a channel in use (the first deploy after #125, reviewed in #138).
     expect(terraform).toMatch(
-      /moved \{\n\s+from = google_monitoring_notification_channel\.query_entitlement_denials_email\n\s+to\s+= google_monitoring_notification_channel\.alert_email\n\}/,
+      /removed \{\n\s+from = google_monitoring_notification_channel\.query_entitlement_denials_email\n\n\s+lifecycle \{\n\s+destroy = false\n\s+\}\n\}/,
+    );
+    expect(terraform).not.toMatch(
+      /from = google_monitoring_notification_channel\.[\w]+\n\s+to\s+=/,
     );
   });
 });
