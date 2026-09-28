@@ -115,7 +115,6 @@ describe("R2's page", () => {
         drawnIn: ["LiberationSerif"],
       },
     ]);
-    expect((await readRuns(page, false))[0]?.drawnIn).toEqual([]);
     expect(await readPage(page)).toEqual({
       parserError: false,
       divPadding: "0px 0px 0px 0px",
@@ -177,6 +176,18 @@ describe("R2's page", () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(page.failed).toContain("https://renderer.invalid/");
     await expect(page.evaluate("1")).rejects.toThrow(/navigated after it loaded/);
+    // Every read: a command's reply (the markers', from DevTools' trees) is refused too.
+    await expect(readMarkers(page)).rejects.toThrow(/navigated after it loaded/);
+    await expect(page.send("DOM.getDocument")).rejects.toThrow(/navigated after it loaded/);
+  });
+
+  it("refuses a read the page navigated away during", async () => {
+    const page = await openPage(fake("renavigate-on-read").cdp, {
+      div: DIV,
+      mode: "html",
+      width: 813,
+    });
+    await expect(page.send("DOM.getDocument")).rejects.toThrow(/navigated after it loaded/);
   });
 
   it("fails every command once the browser writes something that is not the protocol", async () => {

@@ -31,10 +31,10 @@
     },
     {
       "name": "run-request",
-      "version": "1.0.0",
-      "$id": "https://khs.dev/contracts/run-request/1.0.0/schema.json",
+      "version": "2.0.0",
+      "$id": "https://khs.dev/contracts/run-request/2.0.0/schema.json",
       "file": "run-request.schema.json",
-      "sha256": "19b54de36548b86ab3c88cc38c1fa6610654b5eef98eb9f929295ccf2fb0101c"
+      "sha256": "eaaf59302d3deabed0a77e263ee395b9a20d68ddab44dba2a4652495eda39d5f"
     },
     {
       "name": "query-tools",
@@ -52,10 +52,10 @@
     },
     {
       "name": "run-manifest",
-      "version": "2.0.0",
-      "$id": "https://khs.dev/contracts/run-manifest/2.0.0/schema.json",
+      "version": "3.0.0",
+      "$id": "https://khs.dev/contracts/run-manifest/3.0.0/schema.json",
       "file": "run-manifest.schema.json",
-      "sha256": "5795f28a663a984cf9b051639126d6882bbef80f20f347ade863889dbc4ceef6"
+      "sha256": "959445ee4031ccd740c4a1b93cd0a3361cb440e9c1ff2c9950d30bddd7097b54"
     }
   ]
 }

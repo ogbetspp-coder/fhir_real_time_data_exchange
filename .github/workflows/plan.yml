@@ -13,8 +13,11 @@ name: Terraform plan
 # request carries the `allow-replace` label: a destroy on merge is applied unattended, so it must
 # be acknowledged here first. Adding or removing the label re-runs the check.
 #
-# A pull request opened by Dependabot cannot request the identity token this needs. For one that
-# touches infra/ (a provider bump), push any commit to its branch as a person and the check
+# A run Dependabot triggers gets a read-only token and cannot request the identity token this
+# needs, whatever the pull request touches. Most of its pull requests (npm, uv, base images,
+# Actions outside this file) change nothing the plan reads, so for those the check passes without
+# planning; the first step names the paths. For one that changes anything else (a provider bump
+# in infra/), the check fails and says so: push any commit to its branch as a person and the check
 # re-runs under that person.
 
 on:
@@ -54,8 +57,48 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          # The merge commit and both its parents, so the first step can list what the pull
+          # request changes against main.
+          fetch-depth: 2
+          persist-credentials: false
+
+      # A person's run always plans. A Dependabot run plans nothing, and passes only for
+      # Dependabot's own pull request from a branch of this repository (not a fork, not a person's
+      # pull request Dependabot pushed to) when every path it changes, each side of a rename
+      # counted, is one the plan never reads: the npm and uv lockfiles and manifests, the
+      # Dockerfiles (the plan uses the images running now), and the other workflows. Anything
+      # else, known or not, fails closed with the instruction above.
+      - name: Decide whether this run can and must plan
+        id: scope
+        env:
+          ACTOR: ${{ github.actor }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          if [[ "$ACTOR" != "dependabot[bot]" ]]; then
+            echo "plan=true" >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ "$AUTHOR" != "dependabot[bot]" || "$HEAD_REPOSITORY" != "$REPOSITORY" ]]; then
+            echo "::error::Dependabot's run cannot plan, and this is not Dependabot's own pull request from this repository. Push any commit to its branch as a person; the check re-runs under that person." >&2
+            exit 1
+          fi
+          git rev-parse -q --verify HEAD^2 >/dev/null || { echo "::error::Expected the pull request's merge commit." >&2; exit 1; }
+          unread='^(package\.json|package-lock\.json|(agent|zone-a)/(pyproject\.toml|uv\.lock)|Dockerfile(\.[a-z]+)?|\.github/workflows/(ci|deploy|vulnerabilities)\.yml)$'
+          # --no-renames: a rename is listed as its deletion and its addition, so moving a file the
+          # plan reads to an allowed name still names the path it left.
+          read="$(git diff --no-renames --name-only HEAD^1 HEAD | grep -Ev "$unread" || true)"
+          if [[ -n "$read" ]]; then
+            echo "::error::Dependabot's run cannot plan, and this pull request changes what the plan may read: ${read//$'\n'/, }. Push any commit to its branch as a person; the check re-runs under that person." >&2
+            exit 1
+          fi
+          echo "A Dependabot pull request that changes nothing the plan reads: no plan needed."
+          echo "plan=false" >>"$GITHUB_OUTPUT"
 
       - name: Authenticate to Google Cloud as the planner
+        if: steps.scope.outputs.plan == 'true'
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           project_id: ${{ vars.GCP_PROJECT_ID }}
@@ -65,18 +108,22 @@ jobs:
           export_environment_variables: true
 
       - name: Set up Google Cloud CLI
+        if: steps.scope.outputs.plan == 'true'
         uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
       - name: Set up Terraform
+        if: steps.scope.outputs.plan == 'true'
         uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: 1.16.3
           terraform_wrapper: false
 
       - name: Terraform init
+        if: steps.scope.outputs.plan == 'true'
         run: bash scripts/gcp/deploy.sh init
 
       - name: Plan against live state
         id: plan
+        if: steps.scope.outputs.plan == 'true'
         env:
           DEPLOY_SERVICE_ACCOUNT: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
           QUERY_INVOKERS: ${{ vars.QUERY_INVOKERS }}
@@ -97,6 +144,7 @@ jobs:
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
           SUMMARY: ${{ runner.temp }}/plan-summary.md
         run: |

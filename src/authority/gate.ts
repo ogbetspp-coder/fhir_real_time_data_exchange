@@ -1,6 +1,8 @@
 import {
   CanonicalSubmissionSchema,
   SubmissionRejectedError,
+  documentShapeIssues,
+  losslessParseIssues,
   verifyDocumentSubmission,
   type DocumentGateResult,
   type DocumentSubmissionInput,
@@ -9,7 +11,13 @@ import {
 import type { EmaMapping } from "../fhir/mapping.js";
 import { sha256 } from "../lib/hash.js";
 import { AuthorityFetchError, type AuthorityFetcher, type Fetched } from "./fetch.js";
-import { IMPORTER_VERSION, ImportRefusedError, importPublication, sha256Bytes } from "./import.js";
+import {
+  IMPORTER_EXTRACTOR,
+  IMPORTER_VERSION,
+  ImportRefusedError,
+  importPublication,
+  sha256Bytes,
+} from "./import.js";
 
 // Zone B's gate for an authority import (docs/design/authority-import-contract.md, D1): fetch
 // the authority's files itself, require the bytes the submission pinned, run the importer on
@@ -32,9 +40,19 @@ export async function verifyAuthorityImport(
   options: GateOptions & { dryRun: boolean },
   fetcher: AuthorityFetcher,
 ): Promise<AuthorityGateResult> {
+  // The shape bound comes before the parse, whose refinement hashes the Bundle, exactly as in the
+  // ordinary gate: a pathological document is a classified rejection, never a RangeError.
+  const structural = documentShapeIssues(input);
+  if (structural.length > 0) {
+    throw new SubmissionRejectedError("Document submission rejected", structural);
+  }
   const parsed = CanonicalSubmissionSchema.safeParse(input.submission);
-  // A submission that does not parse is refused by the ordinary gate, with its own reasons.
-  if (!parsed.success) {
+  // A submission that does not parse, or parses to another value than it is, is refused by the
+  // ordinary gate, with its own reasons.
+  if (
+    !parsed.success ||
+    losslessParseIssues("submission", input.submission, parsed.data).length > 0
+  ) {
     verifyDocumentSubmission(input, mapping.sourceCodeSystem, options);
     return rejected("Canonical submission is invalid");
   }
@@ -50,6 +68,13 @@ export async function verifyAuthorityImport(
   }
   const reportUri = submission.provenance.fidelity.reportUri;
   if (reportUri === undefined) return rejected("An authority import names its report's location");
+  // The gate recomputes with the importer it runs, so a submission another version made is
+  // refused before anything is fetched (D10). The parse has already bound the extractor to the
+  // parser (`authority-import/<parser.version>`), so the extractor names both: a submission
+  // whose two disagree never parses.
+  if (source.extractedText.extractorVersion !== IMPORTER_EXTRACTOR) {
+    return rejected("The submission was made by another importer version than the gate runs");
+  }
 
   const fetched: Fetched[] = [];
   for (const [file, pin] of [

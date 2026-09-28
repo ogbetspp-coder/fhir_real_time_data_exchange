@@ -191,6 +191,8 @@ resource "google_bigquery_table" "transformation_runs" {
     { name = "ingestion_source_hash", type = "STRING", mode = "NULLABLE", description = "SHA-256 of the source document: a drawn document, or the authority's pinned document" },
     { name = "fidelity_status", type = "STRING", mode = "NULLABLE", description = "Narrative fidelity outcome; only passed can be persisted" },
     { name = "approval_hash", type = "STRING", mode = "NULLABLE", description = "SHA-256 of the approved content: approved by a person, or an authority's publication imported at a person's request" },
+    { name = "transaction_sha256", type = "STRING", mode = "NULLABLE", description = "SHA-256 of the FHIR transaction the signed manifest authorised and the run committed; null before run manifest 3.0.0" },
+    { name = "target_bundle_version_id", type = "STRING", mode = "NULLABLE", description = "The EMA document Bundle version the transaction wrote, as its response named it" },
   ])
 
   # Never destroyed by an apply (docs/foundations.md; docs/design/cmek-rollout.md, step 0).

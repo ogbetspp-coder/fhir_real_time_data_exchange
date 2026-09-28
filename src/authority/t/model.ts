@@ -2,14 +2,8 @@ import { xhtmlToText, XhtmlError } from "../../fidelity/xhtml.js";
 import { canonicalJson } from "../../lib/hash.js";
 import type { Rgb } from "./css.js";
 import type { ComputedStyle, Size } from "./style.js";
-import {
-  analyseSection,
-  colours,
-  markerFor,
-  transformSection,
-  TRefusal,
-  type Analysis,
-} from "./transform.js";
+import { analyseDocument } from "./document.js";
+import { analyseSection, colours, markerFor, type Analysis } from "./transform.js";
 import { treeIndex, type ElementNode, type TextNode } from "./tree.js";
 
 // T's model output (docs/design/authority-import-renderer-model.md): for a section T accepts,
@@ -441,21 +435,12 @@ export function modelSection(div: string, evidence?: ReadonlySet<string>): strin
   return canonicalJson(buildModel(analyseSection(div, evidence, { model: true })));
 }
 
-// The model of each section of a document, in the order given (pre-order): T's two passes as
-// transformDocument makes them (T5), so a section accepted only with the plus-sign waiver is
+// The model of each section of a document, in the order given (pre-order): T's two passes, the
+// very routine that makes T(div) (T5), so a section accepted only with the plus-sign waiver is
 // modelled with the evidence that accepted it. A section T refuses, whose T(div) the scanner
 // refuses (the addendum's M2: T's "one tree" holds only with the scanner's nesting rules), or with
 // no div, has none.
 export function modelDocument(divs: readonly (string | undefined)[]): (string | undefined)[] {
-  const evidence = new Set<string>();
-  for (const div of divs) {
-    if (div === undefined) continue;
-    try {
-      for (const token of transformSection(div).plainTokens) evidence.add(token);
-    } catch (error) {
-      if (!(error instanceof TRefusal)) throw error;
-    }
-  }
   const scanned = (analysis: Analysis): string | undefined => {
     try {
       xhtmlToText(analysis.output);
@@ -465,19 +450,7 @@ export function modelDocument(divs: readonly (string | undefined)[]): (string | 
     }
     return canonicalJson(buildModel(analysis));
   };
-  return divs.map((div) => {
-    if (div === undefined) return undefined;
-    try {
-      return scanned(analyseSection(div, undefined, { model: true }));
-    } catch (error) {
-      if (!(error instanceof TRefusal)) throw error;
-      if (error.reason !== "underline") return undefined;
-    }
-    try {
-      return scanned(analyseSection(div, evidence, { model: true }));
-    } catch (error) {
-      if (!(error instanceof TRefusal)) throw error;
-      return undefined;
-    }
-  });
+  return analyseDocument(divs, scanned, { model: true }).map((outcome) =>
+    outcome !== undefined && "accepted" in outcome ? outcome.accepted : undefined,
+  );
 }

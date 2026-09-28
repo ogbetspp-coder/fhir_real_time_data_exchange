@@ -26,8 +26,9 @@ fhir/vendor/
 .claude/settings.local.json
 
 # The full differential corpus CI writes at the root (the committed smoke corpus lives in
-# zone-a/tests/fixtures/).
+# zone-a/tests/fixtures/), and the nightly parity sweep's digests.
 differential.jsonl
+parity-sweep.txt
 
 # The owner's local copy of the EMA's IG downloads (hundreds of MB); each file is pinned by URL
 # and hash in fhir/standards.lock.json instead.

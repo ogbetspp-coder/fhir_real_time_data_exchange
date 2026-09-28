@@ -41,8 +41,9 @@ page listed version 10.4 as current and the version 11 draft as "consultation cl
 
 Two checks keep the pin honest. `zone-a/tests/test_qrd_registry.py` compares every committed
 file with its lock entry, offline, in CI. `zone-a/scripts/check_qrd_sources.py` downloads each
-URL and compares hashes on demand, never in CI; a difference means the EMA has published a new
-version, and adopting it is a reviewed change: new bytes, new lock entry, regenerated registry.
+URL and compares hashes, on demand and weekly (`.github/workflows/ema-drift.yml`, which opens an
+issue on a difference and never gates a pull request); a difference means the EMA has published a
+new version, and adopting it is a reviewed change: new bytes, new lock entry, regenerated registry.
 
 ## The reader
 
@@ -211,9 +212,14 @@ segment, and the registry records the template's reading. Nothing changes.
 - The two optional ATMP subsections 2.1 and 2.2 are followed in the template by "<Excipient(s)
   with known effect>" and "<For the full list of excipients, see section 6.1.>", which apply to
   section 2 of every product. The registry files them under 2.2 because that is where they
-  stand; a matcher must not read that as "ATMP only".
-- Statement patterns are stored, not yet matched against label text. Matching them, and
-  recording which Appendix I, II or III option a label uses, is the next step.
+  stand; a matcher must not read that as "ATMP only", and the QRD check does not: it reads an
+  optional subsection the mapping does not list as part of its section, and matches these two
+  in section 2 (`docs/design/qrd-conformance-check.md`).
+- The patterns are matched against label text by the QRD conformance check
+  (`docs/design/qrd-conformance-check.md`), which records which option a label uses for a
+  statement made of alternatives (Appendix I's `lactation.1`, Appendix III's "<Do not
+  <refrigerate> <or> <freeze>.>"), but not for the four Appendix I entries whose brackets do
+  not balance.
 - The classification into subheading and statement is mechanical and could be wrong for a
   future template; the committed JSON shows every classification, so a change is visible in
   review.

@@ -7,6 +7,7 @@ import {
   type EmaMapping,
   type SectionRule,
 } from "./mapping.js";
+import { SPOR_ORGANISATIONS } from "./standards.js";
 import {
   isComposition,
   type BundleEntry,
@@ -354,7 +355,8 @@ function mapSection(
     action: rule.targetCode === rule.sourceKey ? "structurally-moved" : "code-mapped",
     sourceHash: sha256(match.section),
     targetHash: sha256(target),
-    narrativePreserved: match.section.text?.div === target.text?.div,
+    // Decided once the Composition is assembled (transformType2ToEma), against what is persisted.
+    narrativePreserved: false,
   });
 
   return target;
@@ -371,7 +373,6 @@ function findComposition(bundle: FhirBundle): { composition: FhirComposition; en
 }
 
 const EXTENSION_BASE = "http://ema.europa.eu/fhir/StructureDefinition/";
-const SPOR_ORGANISATIONS = "https://spor.ema.europa.eu/v1/organisations/";
 export const PROCEDURE_NUMBER_SYSTEM = "http://ema.europa.eu/fhir/procedureIdentifierNumber";
 
 type Identifier = { system?: unknown; value?: unknown };
@@ -522,6 +523,12 @@ export function sourceIdentifierValue(sourceBundle: FhirBundle): string {
   return value;
 }
 
+// The `urn:uuid` fullUrl a document Bundle is named by: the List's entry references it, and the
+// persisted transaction resolves it to `Bundle/<id>` (src/gcp/healthcare.ts).
+export function documentBundleFullUrl(bundleId: string): string {
+  return `urn:uuid:${bundleId}`;
+}
+
 type Reidentified = { entries: BundleEntry[]; fullUrls: Map<string, string> };
 
 // Gives every entry after the Composition a new id and `urn:uuid` fullUrl derived from the source
@@ -620,12 +627,6 @@ export function transformType2ToEma(
   if (issues.length > 0 || root === undefined) {
     throw new TransformationError("EMA QRD transformation failed closed", issues);
   }
-  if (decisions.some((decision) => !decision.narrativePreserved)) {
-    throw new TransformationError("Narrative preservation check failed", [
-      "At least one source XHTML narrative changed during transformation",
-    ]);
-  }
-
   // Every id the run persists derives from this one checked value, so a run writes only into its
   // own namespace (docs/design/authority-import-contract.md, D7): no fallback to Bundle.id.
   const sourceIdentifier = sourceIdentifierValue(sourceBundle);
@@ -633,7 +634,7 @@ export function transformType2ToEma(
   const compositionId = stableUuid("ema-composition", sourceIdentifier);
   const bundleId = stableUuid("ema-bundle", sourceIdentifier);
   const compositionFullUrl = `urn:uuid:${compositionId}`;
-  const bundleFullUrl = `urn:uuid:${bundleId}`;
+  const bundleFullUrl = documentBundleFullUrl(bundleId);
   const copied = reidentifiedEntries(sourceBundle, sourceIdentifier, compositionFullUrl);
 
   // The Composition with its references rewritten; everything below is built from this, never
@@ -675,6 +676,28 @@ export function transformType2ToEma(
     },
     section: [root],
   };
+
+  // Each mapped section's narrative as it stands in the assembled Composition, the one the run
+  // persists, compared with the source section's, found by the id its rule fixes. (It used to be
+  // compared with its own structuredClone, which could never differ.)
+  const assembled = new Map<string, unknown>();
+  const collect = (children: CompositionSection[] | undefined): void => {
+    for (const section of children ?? []) {
+      if (section.id !== undefined) assembled.set(section.id, section.text?.div);
+      collect(section.section);
+    }
+  };
+  collect(targetComposition.section);
+  for (const decision of decisions) {
+    const sourceDiv = index.get(decision.sourceKey)?.[0]?.section.text?.div;
+    decision.narrativePreserved =
+      sourceDiv === assembled.get(stableUuid("ema-qrd-section", decision.sourceKey));
+  }
+  if (decisions.some((decision) => !decision.narrativePreserved)) {
+    throw new TransformationError("Narrative preservation check failed", [
+      "At least one source XHTML narrative changed during transformation",
+    ]);
+  }
 
   // The output Bundle carries only these elements; any other the source has (a signature, a link,
   // an entry's request or search) is refused, not dropped and not copied: it could carry a

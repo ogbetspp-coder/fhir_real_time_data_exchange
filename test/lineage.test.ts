@@ -34,14 +34,16 @@ vi.mock("../src/fhir/official-validator.js", () => ({
   },
 }));
 
-vi.mock("../src/gcp/healthcare.js", () => ({
+vi.mock("../src/gcp/healthcare.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../src/gcp/healthcare.js")>()),
   HealthcareApiClient: class {
     public validate = (): Promise<typeof passed> => Promise.resolve(passed);
-    public persistPackage = (): Promise<object> => Promise.resolve({ resourceType: "Bundle" });
+    public executeTransaction = (): Promise<object> => Promise.resolve({ resourceType: "Bundle" });
   },
 }));
 
-vi.mock("../src/gcp/evidence.js", () => ({
+vi.mock("../src/gcp/evidence.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../src/gcp/evidence.js")>()),
   GcpEvidenceStore: class {
     public writeJson = (runId: string, name: string): Promise<string> =>
       Promise.resolve(`gs://evidence/runs/${runId}/${name}`);
@@ -70,6 +72,9 @@ describe("lineage", () => {
       EVIDENCE_BUCKET: "evidence",
       FHIR_VALIDATOR_URL: "http://validator.invalid",
       FHIR_ANALYTICS_DATASET: "analytics",
+      KMS_MANIFEST_KEY:
+        "projects/p/locations/europe-west4/keyRings/evidence/cryptoKeys/manifest-signing/cryptoKeyVersions/1",
+      TRANSFORMATION_LEDGER_DATASET: "ledger",
     });
 
     const result = await runPipeline(

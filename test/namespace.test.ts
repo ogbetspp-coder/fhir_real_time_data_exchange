@@ -134,9 +134,12 @@ describe("run namespaces", () => {
     ];
     const ema = transformType2ToEma(source, mapping);
     const transaction = buildPersistTransaction(ema.list, ema.documentBundle, "run");
+    // Inside the document Bundle a reference is an entry's fullUrl; on a standalone resource it
+    // is the Type/id of a transaction entry (src/gcp/healthcare.ts).
     const outputs = new Set([
       ...ema.documentBundle.entry.map(({ fullUrl }) => fullUrl),
       `urn:uuid:${ema.documentBundle.id ?? ""}`,
+      ...transaction.entry.map(({ request }) => request.url),
     ]);
     for (const { resource } of transaction.entry) {
       for (const reference of references(resource))

@@ -254,6 +254,57 @@ describe("Dockerfile image pinning gate", () => {
     expect(result.stderr).toContain("pin different digests");
   });
 
+  it("fails an unpinned syntax directive, the frontend image BuildKit runs the file with", () => {
+    const result = check({
+      Dockerfile: ["# syntax=docker/dockerfile:1", "", `FROM ${PINNED_NODE} AS build`].join("\n"),
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "Dockerfile:1: # syntax docker/dockerfile:1 is not pinned by @sha256 digest",
+    );
+  });
+
+  it("fails the directive in every spelling BuildKit accepts", () => {
+    const result = check({
+      Dockerfile: `\uFEFF#SYNTAX = docker/dockerfile:1.7\nFROM ${PINNED_NODE} AS build\n`,
+      "Dockerfile.slash": `// syntax=example.com/frontend:latest\nFROM ${PINNED_NODE} AS build\n`,
+      "Dockerfile.json": JSON.stringify({ syntax: "example.com/frontend:json" }),
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Dockerfile:1: # syntax docker/dockerfile:1.7 is not pinned");
+    expect(result.stderr).toContain(
+      "Dockerfile.slash:1: # syntax example.com/frontend:latest is not pinned",
+    );
+    expect(result.stderr).toContain(
+      "Dockerfile.json:1: # syntax example.com/frontend:json is not pinned",
+    );
+  });
+
+  it("passes a syntax directive pinned by digest", () => {
+    const result = check({
+      Dockerfile: [
+        `# syntax=docker/dockerfile:1@${OTHER_DIGEST}`,
+        "",
+        `FROM ${PINNED_NODE} AS build`,
+      ].join("\n"),
+    });
+
+    expect([result.status, result.stderr]).toEqual([0, ""]);
+  });
+
+  it("fails the directive's shape even where BuildKit would read it as a comment", () => {
+    // Failing closed: the check never has to model exactly where BuildKit stops reading
+    // directives, and a comment that only looks like one is reworded.
+    const result = check({
+      Dockerfile: [`FROM ${PINNED_NODE} AS build`, "# syntax=docker/dockerfile:1"].join("\n"),
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Dockerfile:2: # syntax docker/dockerfile:1 is not pinned");
+  });
+
   it("fails when the directory holds no Dockerfile at all", () => {
     const result = check({ "not-a-dockerfile.txt": "FROM node:latest\n" });
 

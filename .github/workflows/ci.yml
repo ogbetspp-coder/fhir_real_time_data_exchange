@@ -72,6 +72,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
@@ -87,12 +89,14 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      # Keyed by the Dockerfile and the package list: the script verifies every cached tarball
-      # against its pinned checksum before use, so a stale or tampered entry is re-downloaded,
-      # never trusted. The seeded package cache lives inside this directory too. There is no
-      # separate cache of ~/.fhir/packages any more: that one was restored from any earlier key,
-      # so on a warm runner it hid every download the validator made and could supply packages
-      # nobody had pinned.
+      # Keyed by the Dockerfile and the package list. On a miss the cache is saved after this job's
+      # own steps have run (npm ci with its install scripts, tsx), so nothing in it is trusted as
+      # restored: the script re-hashes the jar and every tarball against its pinned checksum on
+      # every run, re-downloading a stale or tampered one, and deletes the unpacked package cache
+      # (home/, also inside this directory) and unpacks it afresh from the verified tarballs
+      # (test/ci/official-validate.test.ts). There is no separate cache of ~/.fhir/packages any
+      # more: that one was restored from any earlier key, so on a warm runner it hid every
+      # download the validator made and could supply packages nobody had pinned.
       - name: Cache the validator and its packages
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -104,10 +108,14 @@ jobs:
 
   # The renderer gate's image (docs/design/authority-import-renderer.md, R1's pre-check and R6):
   # built from Dockerfile.renderer, every download checked against its pin and every library
-  # Chrome links resolved, then run with no network, a read-only workspace and no credentials, to
-  # prove the browser starts offline, loads both modes, fails every request but the page's, and
-  # draws every family the fontconfig binds in the pinned face it names. Its own job, since it
-  # needs Docker and ~200 MB of downloads; scripts/check-all.sh leaves it out.
+  # Chrome links resolved, then run with no network, a read-only workspace and no credentials
+  # (scripts/render/run.mjs), to prove the browser starts offline, loads both modes, fails every
+  # request but the page's, and draws every family the fontconfig binds in the pinned face it
+  # names. Its own job, since it needs Docker and ~200 MB of downloads; scripts/check-all.sh leaves
+  # it out. A pull request that changes no renderer input (scripts/ci/renderer-inputs.mjs: only
+  # documentation, the Python deployables, the infrastructure, assistant settings or Markdown)
+  # skips the image and the checks, and the job passes, saying so on its summary (a rename counts
+  # at both its paths); a push to main always runs them.
   renderer:
     name: Renderer
     runs-on: ubuntu-24.04
@@ -117,9 +125,11 @@ jobs:
         shell: bash --noprofile --norc -eo pipefail {0}
 
     steps:
+      # The merge commit and its parents, so the change can be read against its base.
       - name: Check out repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
+          fetch-depth: 2
           persist-credentials: false
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
@@ -127,37 +137,56 @@ jobs:
           node-version: 22.22.0
           cache: npm
 
+      - name: Name whether a renderer input changed
+        id: inputs
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: node scripts/ci/renderer-inputs.mjs >> "$GITHUB_OUTPUT"
+
       - name: Install Node dependencies
+        if: steps.inputs.outputs.run == 'true'
         run: npm ci --no-audit --no-fund
 
       - name: Build the renderer image
+        if: steps.inputs.outputs.run == 'true'
         run: npm run renderer:image
 
       - name: Check the renderer image offline
+        if: steps.inputs.outputs.run == 'true'
         run: npm run renderer:smoke
 
-      # R3: T's model against Chrome's computed style for every accepted T case, every synthetic
-      # model case and every section of the pinned labels T and the scanner accept, in both modes
-      # (docs/design/authority-import-renderer-model.md, M4). Any mismatch fails.
-      - name: Compare T's model with the drawn page
+      # The judge's unit tests read Chrome's output for the model cases from a recording
+      # (test/fixtures/render/recorded.json); it must be this browser's, of each case as it stands.
+      - name: Record the model cases again
+        if: steps.inputs.outputs.run == 'true'
+        run: npm run renderer:record
+
+      # Every section (src/render/sections.ts: every accepted T case, every model case, and every
+      # section of every pinned label) drawn once per ratio and read by every check, each with its
+      # own verdict: R3's model against Chrome's computed style; R2's page, R3's fonts and scripts
+      # and R6's coverage; R3's character boxes; and R2's second drawing
+      # (docs/design/authority-import-renderer.md, Delivery 3c-B and 3c-C1; the model addendum's M4).
+      - name: Check every section
+        if: steps.inputs.outputs.run == 'true'
         run: npm run renderer:check
 
-      # R2's page, R3's fonts and scripts, R6's coverage and R3's character boxes, on every section
-      # of every pinned label, T's or not, and every seeded refusal
+      # The seeded refusals of the page, font and box checks, each in every mode it names
       # (docs/design/authority-import-renderer.md, Delivery 3c-B2a).
-      - name: Check the fonts and pages
+      - name: Check the seeded refusals
+        if: steps.inputs.outputs.run == 'true'
         run: npm run renderer:fonts
 
       # R3's exact character box: every size form in every pinned face at every ratio, each box
       # the bound face's ascent plus descent and each baseline where the model puts it
       # (docs/design/authority-import-renderer.md, Delivery 3c-C1).
       - name: Check the character box model
+        if: steps.inputs.outputs.run == 'true'
         run: npm run renderer:boxes
 
-      # R2's second drawing: the authority's and T(div)'s text, list numbers, grids and pictures,
-      # the same at the named widths in both modes, and the picture forms drawn as stated
+      # The second drawing's seeded differences and the picture forms
       # (docs/design/authority-import-renderer.md, Delivery 3c-B2b).
-      - name: Compare the two drawings
+      - name: Check the seeded differences of the second drawing
+        if: steps.inputs.outputs.run == 'true'
         run: npm run renderer:drawings
 
   zone-a:
@@ -172,6 +201,10 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          # Zone A's version lock test reads main's history as released (LOCK_BASE below).
+          fetch-depth: 0
+          persist-credentials: false
       # The differential corpus is produced by the TypeScript implementation, so this job needs
       # the Node toolchain as well: the whole point is that the two languages are compared, and
       # a corpus committed to the repository would only prove agreement with a past revision.
@@ -223,6 +256,23 @@ jobs:
         working-directory: .
         run: npx tsx scripts/fidelity/differential.ts --seed 20260920 --count 2000 > differential.jsonl
 
+      # And 2000 cases more at a seed of this run's own, so every run reaches inputs the fixed seed
+      # never does. The generator prints the seed and every case records it: a failure here is
+      # reproduced anywhere with `--seed <that seed> --count 2000`.
+      - name: Add a differential corpus at this run's seed
+        working-directory: .
+        env:
+          DIFFERENTIAL_RUN_SEED: ${{ github.run_id }}
+        run: npx tsx scripts/fidelity/differential.ts --seed "$DIFFERENTIAL_RUN_SEED" --count 2000 >> differential.jsonl
+
+      # The history tests/test_versions_lock.py reads as released, as for the importer's lock: a
+      # released reader, registry or check version never changes its code.
+      - name: Name the version lock's base
+        working-directory: .
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+        run: bash scripts/ci/lock-base.sh
+
       - name: Test
         env:
           DIFFERENTIAL_CORPUS: ${{ github.workspace }}/differential.jsonl
@@ -240,6 +290,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:

@@ -1,7 +1,7 @@
 """The EMA ePI reader: the text a browser shows, or a refusal with a reason.
 
-Most cases build a one-section Bundle in memory so each rule is tested on its own; the last
-group reads the three pinned EMA ePIs, where the rules were found.
+Most cases build a one-section Bundle in memory so each rule is tested on its own; one group
+reads the pinned EMA ePIs, where the rules were found.
 """
 
 from __future__ import annotations
@@ -246,6 +246,12 @@ def test_what_the_pinned_epis_refuse_and_note() -> None:
     jentadueto = _read("jentadueto-smpc-en.json")
     assert not [s for s in jentadueto if s.refusal]
     assert sum(1 for s in jentadueto if s.notes) == 7
+    # From epi-reader/1.2.0 Word's tab-stops (section 1) and the relative shifts of 4.2 are read,
+    # as the importer's T reads them; 5.1's line height under 12pt still refuses.
+    for name in ("imatinib-teva-smpc-en.json", "imatinib-teva-tablets-smpc-en.json"):
+        assert [(s.title, s.refusal.detail) for s in _read(name) if s.refusal] == [
+            ("5.1 Pharmacodynamic properties", "p line-height: 11.7pt")
+        ], name
 
 
 def test_the_black_triangle_is_read_where_the_markup_is_well_formed() -> None:
@@ -326,11 +332,13 @@ def test_nearly_white_is_faint_and_nearly_black_is_nothing() -> None:
 
 def test_colour_keywords_are_not_marks_and_light_greys_are_faint() -> None:
     body = (
-        '<p><span style="color: none">a</span><span style="background: auto">b</span>'
+        '<p><span style="color: inherit">a</span><span style="background: transparent">b</span>'
         '<span style="background: currentcolor">c</span><span style="color: #EFEFEF">d</span>'
         '<span style="color: #EEECE1">e</span></p>'
     )
-    assert kinds(body) == [(3, 5, "faint")]
+    # From epi-reader/1.2.0 a background of the text's own colour (currentcolor) hides it, and
+    # "color: none" and "background: auto", which a browser drops, refuse (audit B12 review 1).
+    assert kinds(body) == [(2, 5, "faint")]
 
 
 @pytest.mark.parametrize(
@@ -920,3 +928,179 @@ def test_a_bundle_that_is_not_a_document_bundle_refuses(changes: dict[str, Any])
     document.update(changes)
     with pytest.raises(EpiRefusedError):
         read_epi(json.dumps(document).encode())
+
+
+# --- audit B12 -------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("inner", "expected"),
+    [
+        # Text on a background of its own colour cannot be seen: faint, whatever the colours.
+        ('<p style="background: black">x</p>', ["faint", "shading-black"]),
+        ('<p style="background: navy; color: navy">x</p>', ["faint", "shading-navy"]),
+        ('<p style="background: #111111; color: #000">x</p>', ["faint", "shading-#111111"]),
+        (
+            '<p style="background: black"><span style="color: #0d0d0d">x</span></p>',
+            ["faint", "shading-black"],
+        ),
+        # White text on a dark background is read, and reported by its colour.
+        ('<p style="background: black; color: white">x</p>', ["color-white", "shading-black"]),
+        (
+            '<p style="background: black"><span style="color: white">x</span></p>',
+            ["color-white", "shading-black"],
+        ),
+        # A child's readable colour undoes its parent's faint one; a transparent background
+        # keeps what is under it; the last declaration wins.
+        ('<p style="color: white"><span style="color: red">x</span></p>', ["color-red"]),
+        (
+            '<p style="background: black"><span style="background: transparent">x</span></p>',
+            ["faint", "shading-black"],
+        ),
+        ('<p style="color: white; color: black">x</p>', []),
+        # A row group's or a row's background reaches its cells' text.
+        (
+            '<table><tbody style="background: black"><tr><td>x</td></tr></tbody></table>',
+            ["faint", "shading-black"],
+        ),
+        (
+            '<table><tr style="background: navy; color: navy"><td>x</td></tr></table>',
+            ["faint", "shading-navy"],
+        ),
+        (
+            '<table><tr style="background: black"><td style="color: white">x</td></tr></table>',
+            ["color-white", "shading-black"],
+        ),
+    ],
+)
+def test_text_is_faint_where_it_cannot_be_told_from_its_background(
+    inner: str, expected: list[str]
+) -> None:
+    paragraphs, refused, _ = read_div(div(inner))
+    assert refused is None, refused
+    assert sorted({m.kind for m in paragraphs[0].marks}) == expected
+
+
+@pytest.mark.parametrize(
+    ("character", "code"),
+    [
+        ("&#xF0B3;", "private-use-character"),
+        ("\ue000", "private-use-character"),
+        ("\U000f0000", "private-use-character"),
+        ("\ufe0f", "format-character"),
+        ("\u115f", "format-character"),
+        ("\u3164", "format-character"),
+        ("\u034f", "format-character"),
+        ("\u0378", "unassigned-character"),
+        ("\U0002fffe", "unassigned-character"),
+    ],
+)
+def test_a_character_a_browser_does_not_show_as_itself_refuses(character: str, code: str) -> None:
+    assert refusal(f"<p>Very common ({character} 1/10)</p>") == code
+
+
+@pytest.mark.parametrize(
+    ("style", "expected"),
+    [
+        ("position: relative; top: -5pt", ["superscript"]),
+        ("position: relative; top: -5.0pt", ["superscript"]),
+        ("position: relative; bottom: 3px", ["superscript"]),
+        ("position: relative; top: 1.5pt", ["subscript"]),
+        ("position: relative; top: .5pt", []),
+        ("position: relative; top: 0", []),
+        ("position: relative; top: -0.4em", ["superscript"]),
+        ("position: relative; top: 6pt", ["subscript"]),
+    ],
+)
+def test_a_relative_shift_is_read_as_the_importer_reads_it(style: str, expected: list[str]) -> None:
+    assert [
+        m.kind for m in read_div(div(f'<p>10<span style="{style}">9</span></p>'))[0][0].marks
+    ] == [*expected]
+
+
+@pytest.mark.parametrize(
+    "inner",
+    [
+        '<p>a<span style="position: absolute; top: -5pt">9</span></p>',
+        '<p>a<span style="position: static">9</span></p>',
+        '<p>a<span style="top: -5pt">9</span></p>',
+        '<p style="position: relative; top: -5pt">9</p>',
+        '<p>a<sup style="position: relative; top: -5pt">9</sup></p>',
+        '<p>a<span style="position: relative; top: -5pt; bottom: 1pt">9</span></p>',
+        '<p>a<span style="position: relative">9</span></p>',
+        '<p>a<span style="position: relative; top: -6.1pt">9</span></p>',
+        '<p>a<span style="position: relative; top: -1em">9</span></p>',
+        '<p>a<span style="position: relative; top: 5%">9</span></p>',
+        '<p>a<span style="position: relative; top: 5">9</span></p>',
+        '<p>a<span style="position: relative; top: -5pt; vertical-align: super">9</span></p>',
+        '<p>a<span style="position: relative; top: -5pt; background: yellow">9</span></p>',
+        '<p>a<span style="position: relative; top: -5pt"><span style="background: red">9</span>'
+        "</span></p>",
+        '<p>a<span style="left: 5pt">9</span></p>',
+        # Review 1: each shift is bounded on its own, so none may sit inside another (five
+        # nested 6pt shifts move text 30pt), or inside or around a raised or lowered text.
+        '<p>a<span style="position: relative; top: -6pt">b<span style="position: relative; '
+        'top: -6pt">9</span></span></p>',
+        "<p>a" + '<span style="position: relative; top: -6pt">' * 5 + "9" + "</span>" * 5 + "</p>",
+        '<p>a<span style="position: relative; top: -5pt"><sup>9</sup></span></p>',
+        '<p>a<span style="position: relative; top: -5pt"><sub>9</sub></span></p>',
+        '<p>a<span style="position: relative; top: -5pt"><span style="vertical-align: super">9'
+        "</span></span></p>",
+        '<p>a<span style="position: relative; top: -5pt"><span style="vertical-align: top">9'
+        "</span></span></p>",
+        '<p>a<sup><span style="position: relative; top: -5pt">9</span></sup></p>',
+        '<p>a<span style="vertical-align: sub"><span style="position: relative; top: 2pt">9'
+        "</span></span></p>",
+        # The last declaration wins, !important ones last.
+        '<p>a<span style="position: relative; top: -6pt; top: -30pt">9</span></p>',
+        '<p>a<span style="position: relative; top: -30pt !important; top: -1pt">9</span></p>',
+        '<p>a<span style="position: static !important; position: relative; top: -1pt">9</span></p>',
+    ],
+)
+def test_any_other_shift_refuses(inner: str) -> None:
+    assert refusal(inner) == "unsupported-style"
+
+
+def test_a_shift_under_a_point_may_hold_a_superscript() -> None:
+    # As in Imatinib Teva's 5.1 ("5 MIU/m" and a raised "2" in a span shifted by 0.5pt), which T
+    # drops too (under 0.1 of the superscript's size); T refuses one from 0.9pt at 12pt, which
+    # the reader reads (a divergence recorded in scripts/generate_style_cases.py).
+    body = '<p>a<span style="position: relative; top: .5pt">m<sup>2</sup></span></p>'
+    assert kinds(body) == [(2, 3, "superscript")]
+
+
+def test_a_shift_beside_a_raised_text_is_read() -> None:
+    body = (
+        '<p>a<sup>2</sup><span style="position: relative; top: -5pt">9</span>'
+        '<span style="vertical-align: super">3</span></p>'
+    )
+    assert kinds(body) == [(1, 4, "superscript")]
+
+
+@pytest.mark.parametrize(
+    "inner",
+    [
+        # A browser drops these as no value of the property and keeps the declaration before
+        # ("color: black; color: none" is black on the black background: hidden); the reader
+        # read the last, as visible text (review 1).
+        '<p style="background: black; color: white"><span style="color: black; color: none">x'
+        "</span></p>",
+        '<p style="background: black; color: white"><span style="color: black; color: auto">x'
+        "</span></p>",
+        '<p><span style="background-color: black; background-color: none">x</span></p>',
+        '<p><span style="background-color: black; background-color: auto">x</span></p>',
+        '<p><span style="background: black; background: auto">x</span></p>',
+    ],
+)
+def test_a_colour_a_browser_drops_refuses(inner: str) -> None:
+    assert refusal(inner) == "unsupported-style"
+
+
+def test_background_none_is_no_background() -> None:
+    # Valid: no image, and the colour reset to transparent, so the text is read.
+    body = '<p><span style="background: black; background: none">x</span></p>'
+    assert "faint" not in [kind for _, _, kind in kinds(body)]
+
+
+def test_words_tab_stops_are_ignored_as_a_browser_ignores_them() -> None:
+    assert texts('<p style="tab-stops: 35.4pt; mso-pagination: none">1. x</p>') == ["1. x"]

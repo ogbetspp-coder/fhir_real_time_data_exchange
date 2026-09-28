@@ -3,7 +3,8 @@
 // JSON) and answers the commands src/render/page.ts sends, with the page's requests played as
 // Fetch.requestPaused events. Behaviour is chosen by FAKE_CHROME: "ok", "navigate-error",
 // "evaluate-throws", "garbage", "crash" (the target crashes instead of loading), "renavigate" (the
-// page asks for itself again and navigates after it loaded), "refuse-replies" (replies to paused
+// page asks for itself again and navigates after it loaded), "renavigate-on-read" (it navigates
+// while its document is read), "refuse-replies" (replies to paused
 // requests and the target's close fail), "no-load" (the page never loads), "unresolved" (a
 // page-side node cannot be resolved by reference), "whitespace-node" and "lost-node" (DevTools
 // keeps no node for the text), "fonts-error" (another protocol error), "with-whitespace" (a
@@ -142,6 +143,10 @@ function reply(message) {
       });
     // A div holding an ol of two items, the second with no marker node, and a stray marker.
     case "DOM.getDocument":
+      // The page navigates while the read runs: the event arrives before the reply.
+      if (mode === "renavigate-on-read") {
+        write({ method: "Page.frameNavigated", sessionId: "S1", params: { frame: {} } });
+      }
       return answer({
         root: {
           nodeType: 9,

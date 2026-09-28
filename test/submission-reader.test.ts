@@ -201,6 +201,27 @@ describe("by-reference submission reader", () => {
     );
   });
 
+  // The cap is one budget for the three parts together: each part fits under it on its own, and
+  // the last one to be read is refused for what the two before it used.
+  it("caps the three parts together, not each part", async () => {
+    const objects = storeFor(fixture.submission);
+    const sizes = [...objects.values()].map(({ length }) => length);
+    const largest = Math.max(...sizes);
+    const total = sizes.reduce((sum, size) => sum + size, 0);
+    const ref = { uri: SYNTHETIC_SUBMISSION_URI, sha256: sha256(fixture.submission) };
+    expect(largest).toBeLessThan(total - 1);
+
+    await rejects(objects, ref, "object-too-large", "source-text", {
+      SUBMISSION_MAX_BYTES: String(Math.max(1_024, total - 1)),
+    });
+    await expect(
+      readerFor(objects, { SUBMISSION_MAX_BYTES: String(Math.max(1_024, total)) }).read(
+        ref,
+        RUN_ID,
+      ),
+    ).resolves.toBeDefined();
+  });
+
   it("reports unparseable bytes as a classified failure", async () => {
     const objects = storeFor(fixture.submission);
     objects.set(objectKey(SYNTHETIC_SOURCE_TEXT_URI), Buffer.from("{ not json", "utf8"));

@@ -18,6 +18,19 @@ describe("json shape bounds", () => {
     expect(jsonShapeIssues("doc", nested)).toEqual(["doc nesting exceeds depth 48"]);
   });
 
+  // An own `__proto__` member, as JSON.parse makes one, is dropped by a parser that rebuilds the
+  // object, so what is checked would not be what is stored; the other two are prototype pollution.
+  it.each(["__proto__", "constructor", "prototype"])(
+    "rejects the reserved property name %s at any depth",
+    (key) => {
+      const value: unknown = JSON.parse(`{"a":[{"b":{"${key}":{"note":"x"}}}]}`);
+
+      expect(jsonShapeIssues("doc", value)).toEqual([
+        `doc carries the reserved property name ${key}`,
+      ]);
+    },
+  );
+
   // The regression: a wide array must be rejected by counting it, not by expanding it onto the
   // work stack one entry at a time.
   it("rejects a wide array without expanding it", () => {

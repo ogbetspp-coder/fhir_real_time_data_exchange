@@ -6,10 +6,50 @@
       "indexSha256": "7b30f4e26bbfe85554dd9a88104efc00219886f17e34b35c9b1d1bb9e0ddbda4",
       "outcome": {
         "imported": {
-          "submissionSha256": "635afff407e8f4b1d07385a85e3a3cdb75179cd8c8a2f56b30ef929677f5193f",
-          "sourceTextSha256": "a9efebd369e7d9a886f50ab3ab8e2ac213f403bb1d4db88b2838b375b740b5f7",
-          "reportSha256": "44223e55d143aa04d194459ccb38066ee983b9017cc7e1ffc9fb094bd447b6dd"
+          "submissionSha256": "3978fe2236a39adf6b95e21294917f40a292a2940790221960aec5aeeda12fa5",
+          "sourceTextSha256": "15a5732528c7e1dee29f3eb43b92627724b98ce16f7094b2514b7c081dcdfabf",
+          "reportSha256": "27b2403f789b2fa879daa9c9a6dae6b123cff246914dfefe1ffcc26747c61f06"
         }
+      }
+    },
+    {
+      "name": "ema-shaped",
+      "documentSha256": "0ad793065bcfa78f74b5f2893fd43f4df0570623b6e33414427c23aa22a68ab5",
+      "indexSha256": "27ce937d18f89f58cf0d9bde52adeae55bf364a553963716ff08c7aad83e59bc",
+      "outcome": {
+        "refused": "rendering: renderer-evidence-missing"
+      }
+    },
+    {
+      "name": "synthetic-date-free-text",
+      "documentSha256": "eb6c7b48d8cc654455b9bd76bb8dec3be1c63253450aed748540038fac735e37",
+      "indexSha256": "7b30f4e26bbfe85554dd9a88104efc00219886f17e34b35c9b1d1bb9e0ddbda4",
+      "outcome": {
+        "refused": "shape: document-shape"
+      }
+    },
+    {
+      "name": "synthetic-date-not-on-the-calendar",
+      "documentSha256": "4ad316705a6897ec6135e9aade61b2d8f8c129a9840118ee9ffcc70dfb6794b6",
+      "indexSha256": "7b30f4e26bbfe85554dd9a88104efc00219886f17e34b35c9b1d1bb9e0ddbda4",
+      "outcome": {
+        "refused": "shape: document-shape"
+      }
+    },
+    {
+      "name": "synthetic-timestamp-without-a-time",
+      "documentSha256": "522f080c74ddb6925749184dee0f51f40c465a5ad574406df5b87132a0e77ee3",
+      "indexSha256": "7b30f4e26bbfe85554dd9a88104efc00219886f17e34b35c9b1d1bb9e0ddbda4",
+      "outcome": {
+        "refused": "shape: document-shape"
+      }
+    },
+    {
+      "name": "synthetic-picture-source-only-in-data-src",
+      "documentSha256": "e4c49193b1acd1842868c29a6ed9ad7138a9b402267ff3d7aab1b559fe8a3f31",
+      "indexSha256": "7b30f4e26bbfe85554dd9a88104efc00219886f17e34b35c9b1d1bb9e0ddbda4",
+      "outcome": {
+        "refused": "pictures: picture-without-a-source"
       }
     },
     {
@@ -49,7 +89,7 @@
       "documentSha256": "3256838d8d4a270581a4b41e9bf302b4cd2e073a9c3ad75f999563b731f73828",
       "indexSha256": "2956503ab020d2cd6f50253a728877862b5a913912047a12744f9a27bf81c351",
       "outcome": {
-        "refused": "pictures: pictures-not-enabled"
+        "refused": "narrative: markup"
       }
     }
   ],
@@ -1636,6 +1676,18 @@
       "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>CrCl &gt;<span style=\"margin-left: -1.65pt\">_</span></p><p>not for clinical use</p></div>",
       "evidence": null,
       "refused": "offset"
+    },
+    {
+      "name": "indent-on-inline",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Dose <span style=\"text-indent: 10pt\">5 mg</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "refused": "offset"
+    },
+    {
+      "name": "inherited-indent-restated-on-inline",
+      "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p style=\"text-indent: 10pt\">Dose <span style=\"text-indent: 10pt\">5 mg</span></p><p>not for clinical use</p></div>",
+      "evidence": null,
+      "output": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>Dose 5 mg</p><p>not for clinical use</p></div>"
     },
     {
       "name": "em-on-a-margin",

@@ -3,11 +3,12 @@ import { readFileSync } from "node:fs";
 import type { EmaMapping } from "../fhir/mapping.js";
 import { sha256 } from "../lib/hash.js";
 import { ImportRefusedError, importPublication, sha256Bytes, type ImportRun } from "./import.js";
-import { syntheticPublication } from "./synthetic.js";
+import { emaShapedPublication, syntheticPublication } from "./synthetic.js";
 import { transformDocument } from "./t/document.js";
 
 // The importer's golden vectors (docs/design/authority-import-contract.md, D10): what it makes of
-// the synthetic publication, and where it refuses each pinned EMA label. Regenerated and
+// the synthetic publication, where it refuses changed copies of it (the EMA-shaped one at the last
+// stage, `rendering`), and where it refuses each pinned EMA label. Regenerated and
 // compared under `npm run contracts:check`; importer.lock.json ties them to the version.
 
 const RUN: ImportRun = {
@@ -53,15 +54,67 @@ function outcome(
 
 const LABELS = "labels/ema-epi";
 
+type Json = Record<string, unknown>;
+
+// The synthetic document's bytes with `change` made to its JSON.
+function changed(document: Uint8Array, change: (json: Json) => void): Uint8Array {
+  const json = JSON.parse(new TextDecoder().decode(document)) as Json;
+  change(json);
+  return new TextEncoder().encode(JSON.stringify(json, null, 2));
+}
+
+function composition(document: Json): Json {
+  return (document.entry as Json[])[0]?.resource as Json;
+}
+
+// The Composition's first leaf section, whose div a case replaces.
+function firstLeaf(document: Json): Json {
+  let [section] = composition(document).section as [Json];
+  while (Array.isArray(section.section)) [section] = section.section as [Json];
+  return section;
+}
+
 export function importerVectors(mapping: EmaMapping): Vector[] {
   const synthetic = syntheticPublication(mapping);
+  const vector = (
+    name: string,
+    publication: Pick<typeof synthetic, "request" | "document" | "index">,
+  ): Vector => ({
+    name,
+    documentSha256: sha256Bytes(publication.document),
+    indexSha256: sha256Bytes(publication.index),
+    outcome: outcome(publication.request, publication.document, publication.index, mapping),
+  });
+  const withDocument = (change: (document: Json) => void) => ({
+    ...synthetic,
+    document: changed(synthetic.document, change),
+  });
   const vectors: Vector[] = [
-    {
-      name: "synthetic",
-      documentSha256: sha256Bytes(synthetic.document),
-      indexSha256: sha256Bytes(synthetic.index),
-      outcome: outcome(synthetic.request, synthetic.document, synthetic.index, mapping),
-    },
+    vector("synthetic", synthetic),
+    // Every stage but the last passes a publication in the EMA's form; the renderer gate's
+    // evidence is missing (A-1 of the 2026-09-28 audit).
+    vector("ema-shaped", emaShapedPublication(mapping)),
+    vector(
+      "synthetic-date-free-text",
+      withDocument((document) => (composition(document).date = "next tuesday")),
+    ),
+    vector(
+      "synthetic-date-not-on-the-calendar",
+      withDocument((document) => (composition(document).date = "2026-02-30")),
+    ),
+    vector(
+      "synthetic-timestamp-without-a-time",
+      withDocument((document) => (document.timestamp = "2026-09-24")),
+    ),
+    vector(
+      "synthetic-picture-source-only-in-data-src",
+      withDocument((document) => {
+        firstLeaf(document).text = {
+          status: "generated",
+          div: '<div xmlns="http://www.w3.org/1999/xhtml"><p><img data-src="#picture"/> not for clinical use</p></div>',
+        };
+      }),
+    ),
   ];
   const lock = JSON.parse(readFileSync(`${LABELS}/sources.lock.json`, "utf8")) as {
     sources: { file: string; url: string; list: string; listFile: string }[];

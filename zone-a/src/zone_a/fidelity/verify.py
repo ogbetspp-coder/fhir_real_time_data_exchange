@@ -23,6 +23,7 @@ normalisation to ``int`` that Python's slicing and arithmetic need afterwards.
 from __future__ import annotations
 
 import unicodedata
+from array import array
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -30,6 +31,7 @@ from zone_a.canonical_json import sha256_json, sha256_utf8
 
 from .normalize import (
     NORMALIZATION_VERSION,
+    SOFT_HYPHEN,
     NormalizationError,
     count_words,
     find_forbidden_character,
@@ -37,7 +39,7 @@ from .normalize import (
     is_whitespace,
     normalize_text,
 )
-from .xhtml import SOFT_HYPHEN, XhtmlError, has_drawn_text, xhtml_to_text
+from .xhtml import XhtmlError, has_drawn_text, xhtml_to_text
 
 # Most text a page may exclude as running header/footer. The body range is declared by the
 # extractor, so it is bounded and must sit on line boundaries rather than trusted outright.
@@ -61,6 +63,13 @@ class PageIndex:
     ``body_start`` and ``body_end`` bound the page's body in code points; ``malformed`` is set
     when the page holds a forbidden character, and ``body_issue`` names what is wrong with the
     body range, if anything.
+
+    What the slice rules read of the body's lines is precomputed, so that each read is O(1) and a
+    section of many spans on one long line costs linear time, not a walk to the line's ends per
+    span: ``tab_line`` is 1 for each code point in the body whose line (between two U+000A,
+    inside the body) contains U+0009; for each offset from ``body_start`` to ``body_end``,
+    ``line_break_before`` is the U+000A ``_from_line_start`` reads a slice starting there from,
+    or -1, and ``tab_before`` is 1 when a U+0009 lies between that U+000A and the offset.
     """
 
     page: int
@@ -69,6 +78,9 @@ class PageIndex:
     body_end: int
     malformed: bool
     body_issue: str | None
+    tab_line: bytearray
+    line_break_before: array[int]
+    tab_before: bytearray
 
 
 @dataclass(slots=True)
@@ -157,6 +169,37 @@ def _body_issue_for(text: str, body_start: int, body_end: int) -> str | None:
     return None
 
 
+def _index_lines(
+    text: str, body_start: int, body_end: int
+) -> tuple[bytearray, array[int], bytearray]:
+    """One pass over the body for the reads of ``_last_line_has_tab`` and ``_from_line_start``.
+
+    At ``body_start`` the read stops: the code point before it, if U+000A, is the line break
+    (section 1). After it, U+000A is the break, other whitespace is read past, and anything else
+    stops the read at the offset itself.
+    """
+    tab_line = bytearray(len(text))
+    line_start = body_start
+    for line in text[body_start:body_end].split("\n"):
+        line_end = line_start + len(line)
+        if "\t" in line:
+            tab_line[line_start:line_end] = b"\x01" * (line_end - line_start)
+        line_start = line_end + 1
+    line_break_before = array("q", [-1]) * (body_end - body_start + 1)
+    tab_before = bytearray(body_end - body_start + 1)
+    if _at(text, body_start - 1) == "\n":
+        line_break_before[0] = body_start - 1
+    for position in range(body_start + 1, body_end + 1):
+        at = position - body_start
+        character = text[position - 1]
+        if character == "\n":
+            line_break_before[at] = position - 1
+        elif is_whitespace(ord(character)):
+            line_break_before[at] = line_break_before[at - 1]
+            tab_before[at] = 1 if character == "\t" else tab_before[at - 1]
+    return tab_line, line_break_before, tab_before
+
+
 def index_pages(source: Json) -> tuple[dict[int, PageIndex], list[str]]:
     """The pages of a source document text by page number, and the body issues found.
 
@@ -197,6 +240,7 @@ def index_pages(source: Json) -> tuple[dict[int, PageIndex], list[str]]:
         body_issue = _body_issue_for(text, body_start, body_end)
         if body_issue is not None:
             issues.append(f"Page {number}: {body_issue}")
+        tab_line, line_break_before, tab_before = _index_lines(text, body_start, body_end)
         pages[number] = PageIndex(
             page=number,
             text=text,
@@ -204,6 +248,9 @@ def index_pages(source: Json) -> tuple[dict[int, PageIndex], list[str]]:
             body_end=body_end,
             malformed=find_forbidden_character(text) is not None,
             body_issue=body_issue,
+            tab_line=tab_line,
+            line_break_before=line_break_before,
+            tab_before=tab_before,
         )
     if structural:
         raise FidelityError("Source document text is invalid", structural)
@@ -217,33 +264,22 @@ def _from_line_start(index: PageIndex, start: int) -> int:
     it and ``start`` (before ``bodyStart``, section 1 makes that code point U+000A), otherwise
     ``start``. Normalisation does not treat the start of a text as the start of a line (section
     3 step 4), so a slice that begins at a line start carries its line terminator with it.
+    ``start`` is in ``[body_start, body_end]``.
     """
-    position = start
-    while position > index.body_start:
-        character = index.text[position - 1]
-        if character == "\n":
-            return position - 1
-        if not is_whitespace(ord(character)):
-            return start
-        position -= 1
-    return position - 1 if _at(index.text, position - 1) == "\n" else start
+    line_break = index.line_break_before[start - index.body_start]
+    return start if line_break < 0 else line_break
 
 
 def _last_line_has_tab(index: PageIndex, end: int) -> bool:
     """Whether the whole page line a slice ending at ``end`` ends on contains U+0009.
 
     The line is read in the body from the U+000A before it to the next U+000A, not only its part
-    inside the slice. A slice that ends with U+000A ends on no partial line.
+    inside the slice. A slice that ends with U+000A ends on no partial line. ``end`` is at most
+    ``body_end``.
     """
     if end <= index.body_start or index.text[end - 1] == "\n":
         return False
-    line_start = end - 1
-    while line_start > index.body_start and index.text[line_start - 1] != "\n":
-        line_start -= 1
-    line_end = end
-    while line_end < index.body_end and index.text[line_end] != "\n":
-        line_end += 1
-    return "\t" in index.text[line_start:line_end]
+    return index.tab_line[end - 1] == 1
 
 
 @dataclass(slots=True)
@@ -253,17 +289,29 @@ class _Resolved:
 
 
 def _is_blank_slice(index: PageIndex, start: int, end: int) -> bool:
+    """Whether a gap between spans normalises to nothing.
+
+    The gap is read from its line start (``_from_line_start``), but the whitespace between that
+    U+000A and the gap is not copied: all it can change is whether the line holds U+0009 (for
+    step 4), so U+000A and, if one is there, U+0009 stand for it. Every other code point in it
+    becomes a space that step 5 collapses, and none composes with what follows (a whitespace code
+    point is a starter no mark combines with). This keeps a run of many spans across one
+    whitespace line linear.
+    """
     if end <= start:
         return True
     try:
-        text = index.text[_from_line_start(index, start) : end]
+        at = start - index.body_start
+        head = "" if index.line_break_before[at] < 0 else "\n\t" if index.tab_before[at] else "\n"
+        text = head + index.text[start:end]
         return not normalize_text(text, last_line_has_tab=_last_line_has_tab(index, end))
     except NormalizationError:
         return False
 
 
 # Whitespace for the edge rules: section 3 step 5's list without U+00A0 and U+2007, which join the
-# groups of a number (`10 000`) and so are not a boundary between tokens.
+# groups of a number (`10 000`) and so are not a boundary between tokens. (U+202F is not whitespace
+# at all from fidelity-norm/3.0.0: it is a thin space, content.)
 NUMBER_JOINERS: Final = frozenset({0x00A0, 0x2007})
 
 
@@ -492,15 +540,16 @@ def _coverage(pages: dict[int, PageIndex], verified_spans: list[Json]) -> dict[s
     body_code_points = 0
     covered_code_points = 0
     uncovered_gaps = 0
+    # The spans of each page, grouped once rather than filtered from every span per page.
+    spans_by_page: dict[int, list[Json]] = {}
+    for span in verified_spans:
+        spans_by_page.setdefault(span["page"], []).append(span)
     for index in pages.values():
         # Page totals are reported alongside body totals so a reviewer can see how much text the
         # extractor-declared body range excludes; the body range itself is not trusted blindly.
         page_code_points += len(index.text)
         body_code_points += index.body_end - index.body_start
-        spans = sorted(
-            (span for span in verified_spans if span["page"] == index.page),
-            key=lambda span: span["startOffset"],
-        )
+        spans = sorted(spans_by_page.get(index.page, []), key=lambda span: span["startOffset"])
         cursor = index.body_start
         for span in spans:
             if not _is_blank_slice(index, cursor, span["startOffset"]):
@@ -544,13 +593,38 @@ def _assert_unique_keys(keys: list[str], what: str) -> None:
         raise FidelityError(f"Duplicate {what}", duplicates)
 
 
+def _assert_string_keys(payload: Json) -> None:
+    """Every source key is a string, refused otherwise before any is written or compared.
+
+    ``True``, ``1`` and ``1.0`` are one dictionary key in Python and three in JavaScript, and an
+    f-string writes ``True`` where a template literal writes ``true``.
+    """
+    invalid = [
+        f"Source section {position} has no string key"
+        for position, section in enumerate(payload["sections"])
+        if not isinstance(section.get("sourceKey"), str)
+    ] + [
+        f"Provenance entry {position} has no string key"
+        for position, entry in enumerate(payload["provenance"])
+        if not isinstance(entry.get("sourceKey"), str)
+    ]
+    if invalid:
+        raise FidelityError("Source key is invalid", invalid)
+
+
 def verify_narrative_fidelity(payload: Json) -> dict[str, Json]:
     """Verify every narrative section against the extractor's page text and emit the report."""
-    if payload["normalizationVersion"] != NORMALIZATION_VERSION:
+    version = payload["normalizationVersion"]
+    if not isinstance(version, str) or version != NORMALIZATION_VERSION:
         raise FidelityError(
             "Normalization version mismatch",
-            [f"Expected {NORMALIZATION_VERSION}, received {payload['normalizationVersion']}"],
+            [
+                f"Expected {NORMALIZATION_VERSION}, received {version}"
+                if isinstance(version, str)
+                else f"Expected {NORMALIZATION_VERSION}, received a value that is not a string"
+            ],
         )
+    _assert_string_keys(payload)
     _assert_unique_keys([s["sourceKey"] for s in payload["sections"]], "source section")
     _assert_unique_keys([e["sourceKey"] for e in payload["provenance"]], "provenance entry")
     _assert_integer_spans(payload["provenance"])
@@ -565,6 +639,8 @@ def verify_narrative_fidelity(payload: Json) -> dict[str, Json]:
 
     results: list[dict[str, Json]] = []
     verified_spans: list[tuple[str, Json]] = []
+    # compute_narrative_binding's bindings, from the scan each section gets here, not a second.
+    bindings: list[Json] = []
 
     for section in payload["sections"]:
         entry = provenance.get(section["sourceKey"])
@@ -574,6 +650,12 @@ def verify_narrative_fidelity(payload: Json) -> dict[str, Json]:
             {"normalizedTextSha256": sha256_utf8(normalized["text"])}
             if "text" in normalized
             else {}
+        )
+        bindings.append(
+            {
+                "sourceKey": section["sourceKey"],
+                "normalizedTextSha256": normalized_hash.get("normalizedTextSha256"),
+            }
         )
 
         if entry is None:
@@ -652,7 +734,7 @@ def verify_narrative_fidelity(payload: Json) -> dict[str, Json]:
         "reportVersion": "1.0.0",
         "normalizationVersion": NORMALIZATION_VERSION,
         "extractedTextSha256": sha256_json(payload["source"]),
-        "narrativeBindingSha256": compute_narrative_binding(payload["sections"])[1],
+        "narrativeBindingSha256": sha256_json(bindings),
         "status": status,
         "sections": sections,
         "issues": issues,

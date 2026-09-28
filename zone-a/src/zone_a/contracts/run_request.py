@@ -21,8 +21,14 @@ class Uuid(RootModel[str]):
     ]
 
 
-class FhirId(RootModel[str]):
-    root: Annotated[str, Field(pattern="^[A-Za-z0-9\\-.]{1,64}$")]
+class AddressableFhirId(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            description="FHIR id that begins with a letter or digit, so a single URL path segment.",
+            pattern="^[A-Za-z0-9][A-Za-z0-9\\-.]{0,63}$",
+        ),
+    ]
 
 
 class StorageUri(RootModel[str]):
@@ -51,7 +57,7 @@ class RunRequest1(BaseModel):
 class RunRequest2(BaseModel):
     model_config = ConfigDict(extra="forbid")
     source: Literal["healthcare-api"]
-    bundleId: FhirId
+    bundleId: AddressableFhirId
     runId: Uuid | None = None
 
 
