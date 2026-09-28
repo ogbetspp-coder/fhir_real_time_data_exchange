@@ -199,11 +199,12 @@ resource "google_cloud_run_v2_service" "worker" {
   # A cache slower than that answers `committed-unrecorded` for a run that did commit.
   depends_on = [
     google_project_service.required,
-    google_healthcare_dataset_iam_member.worker_fhir_editor,
+    google_healthcare_fhir_store_iam_member.worker_source_reader,
+    google_healthcare_fhir_store_iam_member.worker_validated_editor,
     google_storage_bucket_iam_member.worker_evidence_writer,
     google_storage_bucket_iam_member.worker_submission_reader,
     google_kms_crypto_key_iam_member.worker_manifest_signer_hsm,
-    google_bigquery_dataset_iam_member.worker_ledger_writer,
+    google_bigquery_table_iam_member.worker_ledger_appender,
     google_bigquery_table.transformation_runs,
   ]
 }

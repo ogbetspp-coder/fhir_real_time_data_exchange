@@ -93,3 +93,13 @@ output "bigquery_console_url" {
   description = "Cloud console link to the FHIR analytics dataset in BigQuery."
   value       = "https://console.cloud.google.com/bigquery?project=${var.project_id}&ws=!1m4!1m3!3m2!1s${var.project_id}!2s${google_bigquery_dataset.fhir_analytics.dataset_id}"
 }
+
+output "operations_dashboard_json" {
+  description = "The operations dashboard as configured (infra/observability.tf), before the Monitoring API rewrites it. Terraform ignores the dashboard's text; scripts/ci/dashboard-drift.py compares this with the live dashboard instead."
+  value       = jsonencode(local.operations_dashboard)
+}
+
+output "operations_dashboard_id" {
+  description = "Resource name of the operations dashboard (projects/<number>/dashboards/<id>), read by the deploy's dashboard drift check."
+  value       = google_monitoring_dashboard.operations.id
+}

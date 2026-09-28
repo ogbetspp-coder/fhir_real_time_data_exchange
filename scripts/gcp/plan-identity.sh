@@ -49,6 +49,7 @@ PERMISSIONS=(
   resourcemanager.projects.get
   resourcemanager.projects.getIamPolicy
   serviceusage.services.list
+  iam.roles.get
   iam.serviceAccounts.get
   iam.serviceAccounts.getIamPolicy
   artifactregistry.repositories.get
@@ -56,10 +57,12 @@ PERMISSIONS=(
   bigquery.datasets.get
   bigquery.datasets.getIamPolicy
   bigquery.tables.get
+  bigquery.tables.getIamPolicy
   run.services.get
   run.services.getIamPolicy
   healthcare.datasets.get
   healthcare.datasets.getIamPolicy
+  healthcare.fhirStores.getIamPolicy
   cloudkms.keyRings.get
   cloudkms.cryptoKeys.get
   cloudkms.cryptoKeys.getIamPolicy

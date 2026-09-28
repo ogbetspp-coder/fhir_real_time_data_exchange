@@ -53,7 +53,9 @@ describe("the Terraform interface", () => {
       /tf_common_vars=\(\n(?:[^\n]*\n)*?\s*-var="environment=\$\{ENVIRONMENT\}"/,
     );
     const calls = [...deploy.matchAll(/terraform -chdir=infra (plan|apply|import)\b[\s\S]*?\n\n/g)];
-    expect(calls.length).toBe(4);
+    // phase_apis's import and targeted apply, phase_apply's apply, sync_dashboard's replacement,
+    // phase_plan's plan.
+    expect(calls.length).toBe(5);
     for (const [call] of calls) {
       expect(/"\$\{tf_common_vars\[@\]\}"|"\$\{TF_DEPLOY_VARS\[@\]\}"/.test(call)).toBe(true);
     }

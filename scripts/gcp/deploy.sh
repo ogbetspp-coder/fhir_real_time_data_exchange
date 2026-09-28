@@ -15,6 +15,17 @@ export CLOUDSDK_CORE_PROJECT="$PROJECT_ID"
 REGION="${GCP_REGION:-europe-west4}"
 ENVIRONMENT="${EMA_FLOW_ENVIRONMENT:-dev}"
 
+# The environment's own inputs (QUERY_LOG_REJECTION_REASON, ALLOW_SYNTHETIC_SOURCES,
+# REQUIRE_ALERT_RECIPIENT), set in one file that the pull-request plan and the deploy both read through this script, so the plan is
+# what applies. A missing file is refused rather than read as "all defaults".
+ENVIRONMENT_INPUTS="${ROOT}/scripts/gcp/environments/${ENVIRONMENT}.env"
+if [[ ! -f "$ENVIRONMENT_INPUTS" ]]; then
+  echo "No inputs file for environment ${ENVIRONMENT}: ${ENVIRONMENT_INPUTS#"${ROOT}/"} does not exist." >&2
+  exit 1
+fi
+# shellcheck source=/dev/null
+source "$ENVIRONMENT_INPUTS"
+
 if [[ -d .git ]]; then
   TAG="$(git rev-parse --short=12 HEAD)"
 else
@@ -95,17 +106,43 @@ tf_deploy_vars() {
   # identifiers, and this log is attached to a failure issue by .github/workflows/deploy.yml.
   echo "query access configuration: query_invokers=${#query_invokers_json} bytes, query_token_creators=${#query_token_creators_json} bytes, query_oauth_client_ids=${#query_oauth_client_ids_json} bytes, query_entitlements_json=${#query_entitlements_json} bytes (2 bytes is the empty default)"
 
-  # The entitlement-denial alert's recipient (infra/variables.tf `alert_notification_email`).
-  # Until 2026-09-21 nothing passed it, so the variable existed, the metric was created, and no
-  # alert could ever fire from a deploy. Presence only is logged: an address is personal data
-  # and this log can be attached to a failure issue. Unset, like the query variables above,
-  # means the Terraform default -- which also means a deploy run without it removes a channel
-  # an earlier deploy created, so set it wherever deploys run.
-  local alert_notification_email="${ALERT_NOTIFICATION_EMAIL:-}"
-  if [[ -n "$alert_notification_email" ]]; then
-    echo "alert configuration: alert_notification_email is set; the denial alert and its e-mail channel are declared"
-  else
-    echo "alert configuration: alert_notification_email is not set; the denial metric exists with no alert"
+  # Who every alert pages (infra/variables.tf `alert_notification_email` and
+  # `alert_notification_channels`): an encryption key made unavailable (one hour before the FHIR
+  # dataset is disabled), a failed pipeline run, and entitlement probing. Required: with neither,
+  # this refuses here, before Terraform, and Terraform's preconditions refuse too. Until
+  # 2026-09-27 both were optional and a deploy without them silently dropped the key alert.
+  # The one exception is dev (owner decision, 2026-09-28): its inputs file sets
+  # REQUIRE_ALERT_RECIPIENT=false, and its alert policies are created but page no one. Any other
+  # environment is refused that setting, here and by infra/variables.tf, wherever it came from.
+  # Presence and counts only are logged: an address is personal data and this log can be
+  # attached to a failure issue.
+  local alert_notification_email="${ALERT_NOTIFICATION_EMAIL:-}" alert_notification_channels_json
+  local require_alert_recipient="${REQUIRE_ALERT_RECIPIENT:-true}"
+  alert_notification_channels_json="$(ema_flow_json_array "${ALERT_NOTIFICATION_CHANNELS:-}")"
+  if [[ "$require_alert_recipient" != "true" && "$require_alert_recipient" != "false" ]]; then
+    echo "::error title=Invalid alert setting::REQUIRE_ALERT_RECIPIENT must be true or false." >&2
+    return 1
+  fi
+  if [[ "$require_alert_recipient" == "false" && "${ENVIRONMENT:-}" != "dev" ]]; then
+    echo "::error title=Alert recipient required::REQUIRE_ALERT_RECIPIENT=false is accepted only in dev; ${ENVIRONMENT:-this environment}'s alerts must page someone." >&2
+    return 1
+  fi
+  if [[ "$require_alert_recipient" == "true" && -z "$alert_notification_email" && "$alert_notification_channels_json" == "[]" ]]; then
+    echo "::error title=No alert recipient::Set ALERT_NOTIFICATION_EMAIL (a repository variable in GitHub Actions) or ALERT_NOTIFICATION_CHANNELS. Every alert policy must page someone; none is deployed without." >&2
+    return 1
+  fi
+  # A placeholder is no recipient either: an address in a domain reserved so that nothing is ever
+  # delivered there (RFC 2606: example.com/.org/.net, and the .test, .invalid, .example and
+  # .localhost top-level domains), or a `you@` local part left from a template, pages nobody,
+  # however well-formed. The address is not printed; infra/variables.tf refuses the same shapes.
+  if [[ -n "$alert_notification_email" ]] &&
+    printf '%s' "$alert_notification_email" | grep -Eiq '^you@|@([^@]+\.)?example\.(com|org|net)$|[@.](test|invalid|example|localhost)$'; then
+    echo "::error title=Placeholder alert recipient::ALERT_NOTIFICATION_EMAIL is a placeholder (a reserved example or test domain, or a you@ address). Set it to a real, watched address." >&2
+    return 1
+  fi
+  echo "alert configuration: alert_notification_email is $([[ -n "$alert_notification_email" ]] && echo set || echo 'not set'), alert_notification_channels=${#alert_notification_channels_json} bytes, require_alert_recipient=${require_alert_recipient}"
+  if [[ -z "$alert_notification_email" && "$alert_notification_channels_json" == "[]" ]]; then
+    echo "::notice title=Alerts page no one::${ENVIRONMENT:-This environment} has no alert recipient: its alert policies are created but notify nobody. Before production or any real data, set a real, monitored address."
   fi
 
   TF_DEPLOY_VARS=(
@@ -120,10 +157,14 @@ tf_deploy_vars() {
     -var="query_oauth_client_ids=${query_oauth_client_ids_json}"
     -var="query_entitlements_json=${query_entitlements_json}"
     -var="alert_notification_email=${alert_notification_email}"
+    -var="alert_notification_channels=${alert_notification_channels_json}"
+    -var="require_alert_recipient=${require_alert_recipient}"
     # Dev logs why a credential was refused (a category, never the token); production does not.
+    # Set by the environment's inputs file (scripts/gcp/environments/).
     -var="query_log_rejection_reason=${QUERY_LOG_REJECTION_REASON:-false}"
     # Whether the worker accepts synthetic content, and with it the gate-bypassing sources
-    # (docs/design/authority-import-contract.md, D7). Unset is the Terraform default, false.
+    # (docs/design/authority-import-contract.md, D7). Set by the environment's inputs file; unset
+    # is the Terraform default, false.
     -var="allow_synthetic_sources=${ALLOW_SYNTHETIC_SOURCES:-false}"
   )
 }
@@ -159,7 +200,8 @@ phase_init() {
     gcloud --quiet storage buckets create "gs://${state_bucket}" \
       --project="$PROJECT_ID" \
       --location="$REGION" \
-      --uniform-bucket-level-access
+      --uniform-bucket-level-access \
+      --public-access-prevention
     gcloud --quiet storage buckets update "gs://${state_bucket}" --versioning
   fi
   terraform -chdir=infra init -input=false \
@@ -167,6 +209,39 @@ phase_init() {
     -backend-config="prefix=terraform/state"
   terraform -chdir=infra fmt -check -recursive
   terraform -chdir=infra validate
+}
+
+# Every `moved` block in infra/, one "from to" pair per line. A block missing either end is refused
+# rather than skipped, so a pending move can never be passed over silently.
+moved_pairs() {
+  awk '
+    /^moved \{/ { inside = 1; from = ""; to = ""; next }
+    inside && /^[[:space:]]*from[[:space:]]*=/ { sub(/^[^=]*=[[:space:]]*/, ""); sub(/[[:space:]]+$/, ""); from = $0 }
+    inside && /^[[:space:]]*to[[:space:]]*=/ { sub(/^[^=]*=[[:space:]]*/, ""); sub(/[[:space:]]+$/, ""); to = $0 }
+    inside && /^\}/ {
+      if (from == "" || to == "") { print "A moved block in " FILENAME " has no from or no to." > "/dev/stderr"; exit 1 }
+      print from, to; inside = 0
+    }
+  ' infra/*.tf
+}
+
+# Terraform refuses a -target apply that leaves out either end of a pending `moved` block ("Moved
+# resource instances excluded by targeting"), and phase_apis and sync_dashboard apply with -target.
+# So a pending move is completed in the state first, as the full apply would complete it:
+# `terraform state mv` changes no resource, only the address the state keeps it under. A move is
+# pending while its old address, or an instance of it, is in the state; once done, its block is
+# inert and this does nothing.
+complete_pending_moves() {
+  local state pairs from to
+  state="$(terraform -chdir=infra state list)"
+  pairs="$(moved_pairs)"
+  while read -r from to; do
+    [[ -n "$from" ]] || continue
+    if awk -v address="$from" '$0 == address || index($0, address "[") == 1 { found = 1 } END { exit !found }' <<<"$state"; then
+      echo "Completing the pending move ${from} -> ${to} in the Terraform state."
+      terraform -chdir=infra state mv "$from" "$to"
+    fi
+  done <<<"$pairs"
 }
 
 phase_apis() {
@@ -202,6 +277,8 @@ phase_apis() {
         "projects/${PROJECT_ID}/locations/${REGION}/repositories/${REPOSITORY_ID}"
     fi
   fi
+
+  complete_pending_moves
 
   # The three placeholder images below carry no digest. The precondition on
   # google_cloud_run_v2_service.query rejects a digest-less query_image, and that resource is
@@ -322,7 +399,8 @@ resolve_image_digest() {
 # the function still returns 0, so evidence collection never fails a deploy.
 export_effective_iam() {
   echo "=== effective IAM policy export ==="
-  local out_dir dataset bucket stamp date_path sa short_name policy_file exported=0
+  local out_dir dataset bucket stamp date_path sa short_name policy_file store exported=0
+  local source_store target_store
   if ! out_dir="$(mktemp -d)"; then
     echo "::warning::Could not create a temporary directory for the effective IAM export; skipping it."
     return 0
@@ -331,11 +409,13 @@ export_effective_iam() {
   date_path="$(date -u +%Y/%m/%d)"
   dataset="$(terraform -chdir=infra output -raw healthcare_dataset_id 2>/dev/null || true)"
   bucket="$(terraform -chdir=infra output -raw evidence_bucket 2>/dev/null || true)"
+  source_store="$(terraform -chdir=infra output -raw source_fhir_store_id 2>/dev/null || true)"
+  target_store="$(terraform -chdir=infra output -raw target_fhir_store_id 2>/dev/null || true)"
 
   # The third account is the impersonation-only caller (google_service_account.caller). It is
-  # expected to hold no project role and no dataset role at all, so its two exports are
+  # expected to hold no project, dataset or store role at all, so each of its exports is
   # expected to be empty: that emptiness is the evidence, since its only declared binding is
-  # roles/run.invoker on one Cloud Run service, which neither of these policies covers.
+  # roles/run.invoker on one Cloud Run service, which none of these policies covers.
   for sa in "ema-flow-worker-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com" \
     "ema-flow-query-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com" \
     "ema-flow-caller-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com"; do
@@ -371,6 +451,30 @@ export_effective_iam() {
       rm -f "$policy_file"
       echo "::warning::Could not read the Healthcare dataset IAM policy for ${sa}. Grant the deployer healthcare.datasets.getIamPolicy to record this evidence."
     fi
+
+    # The services' FHIR roles are bound on each store since audit B04. Until its phase 2 removes
+    # the transitional dataset-wide grants (test/infra/transitional-grants.ts), the dataset export
+    # above still shows the worker's fhirResourceEditor and the query service's
+    # fhirResourceReader; from phase 2 on it is expected to be empty for both, and these store
+    # exports carry the evidence.
+    for store in "$source_store" "$target_store"; do
+      [[ -z "$store" ]] && continue
+      echo "--- FHIR store ${store}: roles held by ${sa} ---"
+      policy_file="${out_dir}/store-iam-${store}-${short_name}.json"
+      if gcloud --quiet healthcare fhir-stores get-iam-policy "$store" \
+        --dataset="$dataset" \
+        --location="$REGION" \
+        --project="$PROJECT_ID" \
+        --flatten='bindings[].members' \
+        --filter="bindings.members:serviceAccount:${sa}" \
+        --format='json(bindings.role,bindings.members,bindings.condition)' >"$policy_file"; then
+        cat "$policy_file"
+        exported=$((exported + 1))
+      else
+        rm -f "$policy_file"
+        echo "::warning::Could not read the IAM policy of FHIR store ${store} for ${sa}. Grant the deployer healthcare.fhirStores.getIamPolicy to record this evidence."
+      fi
+    done
   done
 
   if [[ -z "$dataset" ]]; then
@@ -392,6 +496,175 @@ export_effective_iam() {
 
   rm -rf "$out_dir"
   return 0
+}
+
+# Permissions the apply needs that the deployer's hand-made roles (README.md) did not always carry,
+# one line per kind of resource infra/ declares that needs one (test/infra/deploy-preflight.test.ts
+# keeps the two in step). An apply that lacks one does not stop cleanly: Terraform refuses the
+# create that needs it while carrying out every change that does not, so a grant can be removed
+# before its replacement exists. So they are tested first, and a missing one stops the deploy
+# before anything changes.
+APPLY_PERMISSIONS=(
+  iam.roles.create # google_project_iam_custom_role
+  iam.roles.delete
+  iam.roles.get
+  iam.roles.update
+  bigquery.tables.getIamPolicy # google_bigquery_table_iam_member
+  bigquery.tables.setIamPolicy
+  healthcare.fhirStores.getIamPolicy # google_healthcare_fhir_store_iam_member
+  healthcare.fhirStores.setIamPolicy
+  resourcemanager.projects.getIamPolicy # google_project_iam_audit_config, google_project_iam_member
+  resourcemanager.projects.setIamPolicy
+)
+
+# The narrowest predefined role that carries each permission above, for the message that says
+# how to grant a missing one.
+apply_permission_role() {
+  case "$1" in
+    iam.roles.*) echo "roles/iam.roleAdmin" ;;
+    bigquery.tables.*) echo "roles/bigquery.dataOwner" ;;
+    healthcare.fhirStores.*) echo "roles/healthcare.fhirStoreAdmin" ;;
+    resourcemanager.projects.*) echo "roles/resourcemanager.projectIamAdmin" ;;
+    *) echo "a role carrying $1" ;;
+  esac
+}
+
+# Asks Resource Manager which of APPLY_PERMISSIONS the deploy's own credential holds on the
+# project (testIamPermissions needs no permission of its own) and fails, naming the missing ones
+# and the gcloud command that grants each role that carries them, unless it holds all of them.
+# The question changes nothing, so no answer, a 429 or a 5xx is asked again, three times in all;
+# any other refusal, or an answer it cannot read, fails.
+preflight_apply_permissions() {
+  local body response status attempt missing permission account role
+  body="$(python3 -c 'import json,sys;print(json.dumps({"permissions":sys.argv[1:]}))' "${APPLY_PERMISSIONS[@]}")"
+  response="$(mktemp)"
+  for attempt in 1 2 3; do
+    status="$(curl --silent --output "$response" --write-out '%{http_code}' --request POST \
+      --header "Authorization: Bearer $(ema_flow_access_token)" \
+      --header 'Content-Type: application/json' \
+      --data "$body" \
+      "https://cloudresourcemanager.googleapis.com/v1/projects/${PROJECT_ID}:testIamPermissions" || true)"
+    case "$status" in
+      000 | 429 | 5??)
+        if [[ "$attempt" -lt 3 ]]; then
+          echo "testIamPermissions answered ${status:-nothing} (attempt ${attempt}/3); asking again in ${PREFLIGHT_RETRY_SECONDS:-5}s."
+          sleep "${PREFLIGHT_RETRY_SECONDS:-5}"
+          continue
+        fi
+        ;;
+    esac
+    break
+  done
+  if [[ "$status" != "200" ]]; then
+    rm -f "$response"
+    echo "::error title=Deploy permissions::Could not ask Resource Manager which permissions the deploy holds (testIamPermissions answered HTTP ${status}); not applying." >&2
+    return 1
+  fi
+  if ! missing="$(python3 -c '
+import json, sys
+held = set(json.load(open(sys.argv[1])).get("permissions") or [])
+print(" ".join(p for p in sys.argv[2:] if p not in held))
+' "$response" "${APPLY_PERMISSIONS[@]}")"; then
+    rm -f "$response"
+    echo "::error title=Deploy permissions::Resource Manager answered testIamPermissions with something unreadable; not applying." >&2
+    return 1
+  fi
+  rm -f "$response"
+  if [[ -n "$missing" ]]; then
+    account="$(gcloud --quiet auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null | head -n 1 || true)"
+    echo "::error title=Deploy permissions::The deploy identity lacks ${missing}. Nothing was applied. Grant the roles below, then deploy again." >&2
+    while read -r role; do
+      echo "  gcloud projects add-iam-policy-binding ${PROJECT_ID} --member=serviceAccount:${account:-<deployer service account>} --role=${role} --condition=None" >&2
+    done < <(for permission in $missing; do apply_permission_role "$permission"; done | sort -u)
+    return 1
+  fi
+  echo "deploy permissions: all ${#APPLY_PERMISSIONS[@]} the apply needs are held"
+}
+
+# The services' FHIR grants are bound on each store (infra/security.tf, infra/query.tf), and the
+# stores are created by reconcile-fhir-stores.sh, not by Terraform. So before an apply, a missing
+# store is created first; an existing one is left for phase_bootstrap to reconcile as before.
+# Only the HTTP status of each lookup is read. A project with no dataset in the state yet (the
+# first deploy) has nowhere to create a store: its apply creates the dataset and fails at the
+# store grants, and the next deploy creates the stores here and completes.
+ensure_fhir_stores() {
+  local dataset store status token missing=0
+  dataset="$(terraform -chdir=infra output -raw healthcare_dataset_id 2>/dev/null || true)"
+  if [[ -z "$dataset" ]]; then
+    echo "::notice::No Healthcare dataset in the Terraform state yet. This apply creates it and then fails at the FHIR store grants, because the stores do not exist; deploy again and the stores are created before the next apply."
+    return 0
+  fi
+  token="$(ema_flow_access_token)"
+  for store in "$(terraform -chdir=infra output -raw source_fhir_store_id)" \
+    "$(terraform -chdir=infra output -raw target_fhir_store_id)"; do
+    if [[ -z "$store" ]]; then
+      echo "::error::terraform output named no FHIR store id; cannot check the stores exist." >&2
+      return 1
+    fi
+    status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
+      --header "Authorization: Bearer ${token}" \
+      "https://healthcare.googleapis.com/v1/projects/${PROJECT_ID}/locations/${REGION}/datasets/${dataset}/fhirStores/${store}" || true)"
+    case "$status" in
+      200) ;;
+      404) missing=1 ;;
+      *)
+        echo "::error::Could not look up FHIR store ${store}: HTTP ${status}." >&2
+        return 1
+        ;;
+    esac
+  done
+  if [[ "$missing" == "1" ]]; then
+    echo "A FHIR store is missing; creating it before the apply grants access to it."
+    GOOGLE_CLOUD_PROJECT="$PROJECT_ID" bash scripts/gcp/reconcile-fhir-stores.sh
+  fi
+}
+
+# The operations dashboard's text is ignored by Terraform (infra/observability.tf), so this is
+# what keeps it current: when the live dashboard lacks a configured value, it is replaced. A
+# dashboard holds no record, so replacing it loses nothing. Anything this cannot read or compare
+# fails the deploy, like a failed apply: an unchecked dashboard is how the perpetual diff hid.
+sync_dashboard() {
+  echo "=== operations dashboard ==="
+  local id configured live verdict=0
+  id="$(terraform -chdir=infra output -raw operations_dashboard_id 2>/dev/null || true)"
+  configured="$(mktemp)"
+  live="$(mktemp)"
+  if [[ -z "$id" ]] ||
+    ! terraform -chdir=infra output -raw operations_dashboard_json >"$configured" 2>/dev/null ||
+    ! gcloud --quiet monitoring dashboards describe "$id" --format=json >"$live"; then
+    echo "::error title=Dashboard drift::Could not read the operations dashboard or its configuration." >&2
+    rm -f "$configured" "$live"
+    return 1
+  fi
+  python3 scripts/ci/dashboard-drift.py "$configured" "$live" || verdict=$?
+  if [[ "$verdict" == "1" ]]; then
+    echo "Replacing the operations dashboard with its configuration."
+    terraform -chdir=infra apply \
+      -input=false \
+      -auto-approve \
+      -replace=google_monitoring_dashboard.operations \
+      -target=google_monitoring_dashboard.operations \
+      "${TF_DEPLOY_VARS[@]}"
+
+    id="$(terraform -chdir=infra output -raw operations_dashboard_id)"
+    if ! gcloud --quiet monitoring dashboards describe "$id" --format=json >"$live"; then
+      echo "::error title=Dashboard drift::Could not read the replaced operations dashboard." >&2
+      rm -f "$configured" "$live"
+      return 1
+    fi
+    verdict=0
+    python3 scripts/ci/dashboard-drift.py "$configured" "$live" || verdict=$?
+    if [[ "$verdict" == "1" ]]; then
+      echo "::warning::The replaced dashboard still differs from its configuration: scripts/ci/dashboard-drift.py does not model some rewrite the Monitoring API makes. Every deploy will replace it until that is fixed."
+      verdict=0
+    fi
+  fi
+  rm -f "$configured" "$live"
+  # 2 (or anything but 0 and 1) is the checker failing, never drift.
+  if [[ "$verdict" != "0" ]]; then
+    echo "::error title=Dashboard drift::scripts/ci/dashboard-drift.py could not compare the dashboard with its configuration (exit ${verdict})." >&2
+    return 1
+  fi
 }
 
 phase_apply() {
@@ -423,6 +696,9 @@ phase_apply() {
     "${REPOSITORY}/query@${QUERY_DIGEST}" \
     "$SERVICE_VERSION"
 
+  preflight_apply_permissions
+  ensure_fhir_stores
+
   if ! terraform -chdir=infra apply \
     -input=false \
     -auto-approve \
@@ -452,6 +728,7 @@ phase_apply() {
   terraform -chdir=infra output query_audience || true
   terraform -chdir=infra output query_caller_service_account || true
 
+  sync_dashboard
   export_effective_iam
 }
 
@@ -491,6 +768,9 @@ phase_plan() {
   # including a crash of the summariser, fails the check.
   local verdict=0
   python3 scripts/ci/plan-summary.py "$plan_json" "$out" "$summary" "$code" || verdict=$?
+  if [[ "$plan_json" != "-" && -f "$summary" ]]; then
+    plan_dashboard_drift "$plan_json" >>"$summary"
+  fi
   [[ "$plan_json" != "-" ]] && rm -f "$plan_json"
   case "$verdict" in
     0) return 0 ;;
@@ -500,6 +780,30 @@ phase_plan() {
       return 3
       ;;
     *) return 1 ;;
+  esac
+}
+
+# One summary line on the operations dashboard, whose text Terraform ignores (sync_dashboard):
+# whether the pull request's configuration of it differs from the live dashboard, which the
+# deploy would then replace. Informational; it never changes the plan's verdict.
+plan_dashboard_drift() {
+  local plan_json="$1" id configured live verdict=0
+  configured="$(mktemp)"
+  live="$(mktemp)"
+  id="$(terraform -chdir=infra output -raw operations_dashboard_id 2>/dev/null || true)"
+  if [[ -n "$id" ]] &&
+    python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['planned_values']['outputs']['operations_dashboard_json']['value'])" "$plan_json" >"$configured" 2>/dev/null &&
+    gcloud --quiet monitoring dashboards describe "$id" --format=json >"$live" 2>/dev/null; then
+    python3 scripts/ci/dashboard-drift.py "$configured" "$live" >/dev/null || verdict=$?
+  else
+    verdict=2
+  fi
+  rm -f "$configured" "$live"
+  echo ""
+  case "$verdict" in
+    0) echo "The operations dashboard matches its configuration." ;;
+    1) echo "**The operations dashboard differs from its configuration; the deploy will replace it.**" ;;
+    *) echo "The operations dashboard's drift could not be checked (its text is ignored by Terraform)." ;;
   esac
 }
 

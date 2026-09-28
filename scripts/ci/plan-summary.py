@@ -69,6 +69,8 @@ headline = next((l for l in text.splitlines() if l.startswith("Plan:") or l.star
 lines = header + [f"**{headline or 'Plan summary line not found.'}**", ""] + (rows or ["No resource changes."])
 if destroys:
     lines += ["", f"**{destroys} destroy or replace.** Applied unattended on merge; the check fails unless the pull request carries the `allow-replace` label."]
-lines += ["", "_Inputs are the deployed images and version; the dashboard's perpetual diff (foundations C10) is expected._"]
+# No change is expected here: the dashboard's text is ignored by Terraform and drift-checked
+# separately (the line after this summary), and the environment's inputs come from one file.
+lines += ["", "_Inputs are the deployed images and version, so a change listed is this pull request's, or drift in the live project; none is expected otherwise._"]
 write(lines)
 sys.exit(4 if destroys else 0)
