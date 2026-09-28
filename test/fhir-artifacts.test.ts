@@ -40,8 +40,8 @@ type ConceptMap = {
   }[];
 };
 
-function artifact<T>(file: string): T {
-  return JSON.parse(readFileSync(`fhir/generated/${file}`, "utf8")) as T;
+function artifact(file: string): unknown {
+  return JSON.parse(readFileSync(`fhir/generated/${file}`, "utf8"));
 }
 
 let mapping: EmaMapping;
@@ -50,8 +50,8 @@ let conceptMap: ConceptMap;
 
 beforeAll(async () => {
   mapping = await loadEmaMapping();
-  structureMap = artifact("StructureMap-type2-to-ema-cap-smpc-en.json");
-  conceptMap = artifact("ConceptMap-canonical-to-ema-cap-smpc-en.json");
+  structureMap = artifact("StructureMap-type2-to-ema-cap-smpc-en.json") as StructureMap;
+  conceptMap = artifact("ConceptMap-canonical-to-ema-cap-smpc-en.json") as ConceptMap;
 });
 
 function rule(name: string): Rule {
