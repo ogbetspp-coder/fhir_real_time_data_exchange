@@ -103,6 +103,13 @@ export const Count = z.number().int().nonnegative();
 
 export const PositiveInt = z.number().int().positive();
 
+// A FHIR package as the package registry and the HL7 validator name it: `id#version`.
+export const PackageRef = z
+  .string()
+  .regex(/^[A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)*#\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/)
+  .max(256)
+  .meta({ id: "PackageRef", description: "FHIR package id#version." });
+
 export const NormalizationVersion = z
   .string()
   .regex(/^fidelity-norm\/\d+\.\d+\.\d+$/)

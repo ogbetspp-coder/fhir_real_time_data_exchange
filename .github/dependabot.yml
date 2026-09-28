@@ -11,7 +11,24 @@
 # The first run, on 2026-09-21, proposed TypeScript 6 to 7, three Actions majors, and Node 22 to
 # 26 in every image, all at once and all but TypeScript green.
 #
-# The Node base image moves by digest only, never by version. ADR 0003 pins the runtime to
+# The majors ignored, and what each waits for (recorded 2026-09-28, audit B07, S-2; the pin-freshness
+# workflow reports the pins Dependabot does not read at all):
+#   - actions/checkout v5 -> v7, actions/setup-node v5 -> v7, astral-sh/setup-uv v7 -> v10: read
+#     each release's breaking changes against the steps that use it (checkout's credential and
+#     depth handling, setup-node's cache defaults, setup-uv's cache and version inputs), then move
+#     all workflows at once; test/ci/deploy-permissions.test.ts holds the checkout settings.
+#   - typescript 6 -> 7: blocked by typescript-eslint 8.x, whose peer range is <6.1.0.
+#   - @types/node: pinned to the runtime's major (~22) on purpose, not by this rule; it moves with
+#     Node, under ADR 0003.
+#   - Transitive majors, not pinned here and held by the ranges of the packages that require them:
+#     mcp 1 -> 2 (google-adk 2.9.2 requires mcp<2), websockets 15 -> 17 and multidict 6 -> 7
+#     (agent), isort 8 -> 9 (Zone A). They move when those packages allow it.
+#   - No other direct major was open on 2026-09-28.
+#
+# The Node base image moves by digest only, never by version. The worker's and the query
+# service's runtime is debian:bookworm-slim by digest, with the pinned Node binary copied in
+# (Dockerfile, audit B07, S-1): that digest moves weekly here, so the operating system is
+# refreshed while Node, its ICU and its Unicode stay put. ADR 0003 pins the runtime to
 # node:22.22.0 because NFC — step 3 of the fidelity normalisation — depends on the runtime's
 # Unicode tables, and a different Node can change every NFC-dependent hash. CI would not have
 # noticed: it tests on its own Node install, not the one inside the image. Moving it is a change

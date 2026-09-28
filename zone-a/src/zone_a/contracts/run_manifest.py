@@ -44,13 +44,21 @@ class IsoDateTime(RootModel[str]):
     ]
 
 
-class ManifestStandards(BaseModel):
+class PackageRef(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            description="FHIR package id#version.",
+            max_length=256,
+            pattern="^[A-Za-z][A-Za-z0-9-]*(?:\\.[A-Za-z0-9-]+)*#\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?$",
+        ),
+    ]
+
+
+class ManifestPackage(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    fhir: Literal["5.0.0"]
-    globalEpiPackage: Annotated[str, Field(max_length=1024, min_length=1)]
-    emaPackage: Literal["EUePI#1.0.0"]
-    qrdTemplate: Annotated[str, Field(max_length=1024, min_length=1)]
-    mappingVersion: Annotated[str, Field(max_length=1024, min_length=1)]
+    package: PackageRef
+    sha256: Sha256Hex
 
 
 class HttpUrl(RootModel[str]):
@@ -76,6 +84,7 @@ class ManifestRuntime(BaseModel):
     sourceCommit: Annotated[str, Field(max_length=1024, min_length=1)]
     imageDigest: Annotated[str, Field(max_length=1024, min_length=1)]
     workflowRevision: Annotated[str, Field(max_length=1024, min_length=1)]
+    validatorImageDigest: Annotated[str, Field(max_length=1024, min_length=1)]
 
 
 class SourceKind(StrEnum):
@@ -196,6 +205,16 @@ class Source(BaseModel):
     hash: Sha256Hex
 
 
+class ManifestStandards(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    fhir: Literal["5.0.0"]
+    globalEpiPackage: PackageRef
+    emaPackage: Literal["EUePI#1.0.0"]
+    qrdTemplate: Annotated[str, Field(max_length=1024, min_length=1)]
+    mappingVersion: Annotated[str, Field(max_length=1024, min_length=1)]
+    packages: Annotated[list[ManifestPackage], Field(min_length=1)]
+
+
 class ManifestValidation(BaseModel):
     model_config = ConfigDict(extra="forbid")
     preflightErrors: Annotated[int, Field(ge=0, le=9007199254740991)]
@@ -274,7 +293,7 @@ class IngestionEvidence(BaseModel):
 
 class AuthorisedRunManifest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    schemaVersion: Literal["3.0.0"]
+    schemaVersion: Literal["4.0.0"]
     source: Source1
     runId: Uuid
     startedAt: IsoDateTime
@@ -291,7 +310,7 @@ class AuthorisedRunManifest(BaseModel):
 
 class ValidatedRunManifest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    schemaVersion: Literal["3.0.0"]
+    schemaVersion: Literal["4.0.0"]
     source: Source
     runId: Uuid
     startedAt: IsoDateTime

@@ -45,4 +45,27 @@ describe("the worker's provenance environment", () => {
       /precondition \{\s*condition\s*=\s*local\.worker_image_digest != null/,
     );
   });
+
+  // Run manifest 4.0.0 names the validator sidecar that checked the run (audit B07, S-4).
+  it("sets VALIDATOR_IMAGE_DIGEST from the validator image reference, which must carry one", () => {
+    expect(envValue(workerContainer(), "VALIDATOR_IMAGE_DIGEST")?.trim()).toBe(
+      "local.validator_image_digest",
+    );
+    const infra = readInfra();
+    expect(infra).toMatch(
+      /validator_image_digest = try\(regex\("@\(sha256:\[0-9a-f\]\{64\}\)\$", var\.validator_image\)\[0\], null\)/,
+    );
+    const worker = terraformBlocks(infra).find(
+      ({ type, name }) => type === "google_cloud_run_v2_service" && name === "worker",
+    );
+    expect(worker?.body).toMatch(
+      /precondition \{\s*condition\s*=\s*local\.validator_image_digest != null/,
+    );
+  });
+
+  // The packages come from the lock in the image; a free-form variable named one until 4.0.0.
+  it("no longer names a standard package in the environment", () => {
+    expect(envValue(workerContainer(), "GLOBAL_EPI_PACKAGE")).toBeUndefined();
+    expect(readInfra()).not.toMatch(/name\s*=\s*"GLOBAL_EPI_PACKAGE"/);
+  });
 });

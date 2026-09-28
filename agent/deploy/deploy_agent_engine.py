@@ -127,6 +127,11 @@ def requirements_from_lock() -> list[str]:
             "--frozen",
             "--no-dev",
             "--no-emit-project",
+            # Without hashes, deliberately (audit B07, S-5; read in SDK 2.1.3's _runtimes_utils.py).
+            # The SDK parses each requirement with packaging's Requirement, which refuses a line
+            # carrying --hash, then appends what it finds missing without one; pip would run in
+            # hash-checking mode with unhashed lines and the build would fail. The closure the
+            # runtime resolves is scanned instead (scripts/ci/vuln-scan.sh, reported).
             "--no-hashes",
             "--all-extras",
             "--format",

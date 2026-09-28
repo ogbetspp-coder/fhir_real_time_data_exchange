@@ -68,6 +68,74 @@ describe("the validator sidecar as built", () => {
   });
 });
 
+// The FHIR store's profile import and the worker's run manifest read fhir/standards.lock.json;
+// the sidecar reads its own ARGs. Two places, held equal here (audit B07, S-4): the EMA has shipped
+// two different 1.0.0 editions, so an id#version alone does not say which bytes validated a run.
+describe("the sidecar and the standards lock", () => {
+  const pins = readSidecarPins("Dockerfile.validator");
+  const lock = JSON.parse(readFileSync("fhir/standards.lock.json", "utf8")) as {
+    artifacts: { name: string; package?: string; version?: string; url: string; sha256: string }[];
+  };
+
+  it("download every package the lock pins, from the same URL, with the same SHA-256", () => {
+    const fromLock = lock.artifacts
+      .filter((artifact) => artifact.package !== undefined)
+      .map(({ url, sha256 }) => ({ url, sha256 }));
+    const fromSidecar = pins.artefacts
+      .filter(({ file }) => file !== "validator_cli.jar")
+      .map(({ url, sha256 }) => ({ url, sha256 }));
+    expect(fromSidecar).toHaveLength(fromLock.length);
+    expect(new Set(fromSidecar.map((pin) => JSON.stringify(pin)))).toEqual(
+      new Set(fromLock.map((pin) => JSON.stringify(pin))),
+    );
+  });
+
+  it("run the validator the lock pins", () => {
+    const jar = pins.artefacts.find(({ file }) => file === "validator_cli.jar");
+    const locked = lock.artifacts.find(({ name }) => name === "HL7 FHIR Validator CLI");
+    expect(jar).toEqual({ file: "validator_cli.jar", url: locked?.url, sha256: locked?.sha256 });
+    expect(pins.version).toBe(locked?.version);
+  });
+
+  // HL7's unversioned URL serves whichever release is current; the STU1 path does not move.
+  it("fetch the Global ePI package at its versioned URL", () => {
+    const global = pins.artefacts.find(({ file }) => file === "global-epi-package.tgz");
+    expect(global?.url).toBe("https://hl7.org/fhir/uv/emedicinal-product-info/STU1/package.tgz");
+  });
+});
+
+// The runtime stage (audit B07, S-5): what was downloaded and verified, a user without root, and
+// no download tool; no stage installs from a live package archive.
+describe("the validator image's runtime", () => {
+  const stages = dockerfile.split(/^FROM /m).slice(1);
+  const runtime = stages.at(-1) ?? "";
+
+  it("is a second stage that copies only the verified files", () => {
+    expect(stages).toHaveLength(2);
+    expect(stages[0]).toMatch(/ AS fetch\n/);
+    expect(runtime).toMatch(
+      /^COPY --from=fetch --chown=validator:validator \/opt\/fhir \/opt\/fhir$/m,
+    );
+    expect(runtime).not.toMatch(/\bcurl\s+-/);
+  });
+
+  it("runs as a user without root, and removes curl and wget, failing if either remains", () => {
+    expect(runtime).toMatch(/^USER validator$/m);
+    expect(runtime).toMatch(/useradd --system --uid 10001/);
+    expect(runtime).toMatch(/apt-get purge --yes --auto-remove curl wget/);
+    expect(runtime).toMatch(/if command -v "\$tool" >\/dev\/null; then [^\n]*exit 1; fi/);
+    expect(runtime.indexOf("USER validator")).toBeLessThan(runtime.indexOf("ENTRYPOINT"));
+  });
+
+  it("installs nothing from a package archive", () => {
+    const code = dockerfile
+      .split("\n")
+      .filter((line) => !/^\s*#/.test(line))
+      .join("\n");
+    expect(code).not.toMatch(/apt-get\s+(update|install)|apt\s+(update|install)/);
+  });
+});
+
 describe("the pinned package list", () => {
   const entries = readPackageLock(PACKAGE_LOCK);
 

@@ -39,11 +39,19 @@ describe("dependency installs", () => {
         name !== "Dockerfile.renderer" &&
         /^FROM\s+node:/m.test(readFileSync(name, "utf8")),
     );
-    expect(node.length).toBeGreaterThan(1);
+    expect(node).toEqual(["Dockerfile"]);
     for (const name of node) {
       const text = readFileSync(name, "utf8");
       expect([name, text.includes("COPY package.json package-lock.json ./")]).toEqual([name, true]);
-      expect([name, /^RUN npm ci --no-audit --no-fund$/m.test(text)]).toEqual([name, true]);
+      // Without install scripts, and refusing a Node other than engines names (audit B07, S-5).
+      expect([
+        name,
+        /^RUN npm ci --no-audit --no-fund --ignore-scripts --engine-strict$/m.test(text),
+      ]).toEqual([name, true]);
+      expect([name, /^RUN npm prune --omit=dev --ignore-scripts$/m.test(text)]).toEqual([
+        name,
+        true,
+      ]);
     }
   });
 });

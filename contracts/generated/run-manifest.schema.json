@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://khs.dev/contracts/run-manifest/3.0.0/schema.json",
+  "$id": "https://khs.dev/contracts/run-manifest/4.0.0/schema.json",
   "$ref": "#/$defs/RunManifest",
   "$defs": {
     "RunManifest": {
@@ -18,7 +18,7 @@
       "properties": {
         "schemaVersion": {
           "type": "string",
-          "const": "3.0.0"
+          "const": "4.0.0"
         },
         "source": {
           "type": "object",
@@ -111,9 +111,7 @@
           "const": "5.0.0"
         },
         "globalEpiPackage": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "$ref": "#/$defs/PackageRef"
         },
         "emaPackage": {
           "type": "string",
@@ -128,9 +126,43 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 1024
+        },
+        "packages": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ManifestPackage"
+          }
         }
       },
-      "required": ["fhir", "globalEpiPackage", "emaPackage", "qrdTemplate", "mappingVersion"],
+      "required": [
+        "fhir",
+        "globalEpiPackage",
+        "emaPackage",
+        "qrdTemplate",
+        "mappingVersion",
+        "packages"
+      ],
+      "additionalProperties": false,
+      "description": "globalEpiPackage and emaPackage are each the package of an entry of packages; no two entries of packages name the same package (id#version); one id may appear at several versions."
+    },
+    "PackageRef": {
+      "type": "string",
+      "maxLength": 256,
+      "pattern": "^[A-Za-z][A-Za-z0-9-]*(?:\\.[A-Za-z0-9-]+)*#\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?$",
+      "description": "FHIR package id#version."
+    },
+    "ManifestPackage": {
+      "type": "object",
+      "properties": {
+        "package": {
+          "$ref": "#/$defs/PackageRef"
+        },
+        "sha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        }
+      },
+      "required": ["package", "sha256"],
       "additionalProperties": false
     },
     "ManifestValidation": {
@@ -215,9 +247,14 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 1024
+        },
+        "validatorImageDigest": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
         }
       },
-      "required": ["sourceCommit", "imageDigest", "workflowRevision"],
+      "required": ["sourceCommit", "imageDigest", "workflowRevision", "validatorImageDigest"],
       "additionalProperties": false
     },
     "IngestionEvidence": {
@@ -561,7 +598,7 @@
       "properties": {
         "schemaVersion": {
           "type": "string",
-          "const": "3.0.0"
+          "const": "4.0.0"
         },
         "source": {
           "type": "object",

@@ -7,7 +7,7 @@ import {
   type EmaMapping,
   type SectionRule,
 } from "./mapping.js";
-import { SPOR_ORGANISATIONS } from "./standards.js";
+import { QRD_TEMPLATE_VERSION, SPOR_ORGANISATIONS } from "./standards.js";
 import {
   isComposition,
   type BundleEntry,
@@ -602,7 +602,7 @@ function rewriteReferences<T>(value: T, fullUrls: Map<string, string>, at: strin
 export function transformType2ToEma(
   sourceBundle: FhirBundle,
   mapping: EmaMapping,
-  qrdTemplateVersion = "10.4",
+  qrdTemplateVersion = QRD_TEMPLATE_VERSION,
 ): EmaPackage {
   if (sourceBundle.type !== "document") {
     throw new TransformationError("Source ePI must be a document Bundle", [

@@ -84,6 +84,7 @@ export function readRendererPins(dockerfile = RENDERER_DOCKERFILE) {
   ) {
     throw new Error(`${name}: the Debian packages are not installed over HTTPS as pinned`);
   }
+  aptStaysPinned(name, lines, apt[0]);
   const chromeVersion = required("CHROME_VERSION", /^\d+\.\d+\.\d+\.\d+$/);
   const googleFontsCommit = required("GOOGLE_FONTS_COMMIT", /^[0-9a-f]{40}$/);
 
@@ -100,10 +101,9 @@ export function readRendererPins(dockerfile = RENDERER_DOCKERFILE) {
   for (const line of lines) {
     // Common ways a download could reach the image unchecked are refused here: an ADD, another
     // image's files, fetchers other than a checksummed curl, heredocs this reader cannot see into,
-    // and a checksum whose failure could be swallowed. It is a denylist, not a proof: the control
-    // is the review of Dockerfile.renderer itself (CODEOWNERS is recommended, the renderer note's
-    // stated residuals), which this
-    // reader supports by catching the usual mistakes.
+    // and a checksum whose failure could be swallowed. It is a denylist, not a proof, and nothing
+    // else holds Dockerfile.renderer today: CODEOWNERS names an owner, but branch protection
+    // requires no review (the renderer note's stated residuals). It catches the usual mistakes.
     if (/^\s*ADD\s/i.test(line)) throw new Error(`${name}: ADD; copy local files with COPY`);
     if (/^\s*COPY\s.*--from/i.test(line)) throw new Error(`${name}: COPY --from another image`);
     if (!/^\s*RUN\b/.test(line)) continue;
@@ -221,4 +221,108 @@ export function readRendererPins(dockerfile = RENDERER_DOCKERFILE) {
     fonts,
     artefacts,
   };
+}
+
+// The HTTPS rule above constrains the RUN that writes the snapshot's sources. These close the ways
+// around it (audit B07, carried from B11's review): apt run anywhere else, or in that RUN before its
+// sources are written; another apt source or configuration written (sources.list, apt.conf*); TLS
+// verification or the https transport configured by option; and the scheme argument of snapshot()
+// reassigned inside it. A denylist like the rest of this reader, not a proof.
+//
+// Review round 1 (L-1) found the first version of these rules passed an apt command with options
+// before its action (`apt-get -o Dir::Etc::SourceList=… update`), a long option, and a quoted
+// action. An apt command is now `apt` or `apt-get` as a command word (a path before it allowed),
+// then anything up to the end of that simple command, and an action among it, bare or quoted; and
+// no apt command anywhere, the pinned RUN's included, may take an option that re-points or
+// re-configures it (-o, --option, -c, --config-file). The configuration those options would set
+// is refused by name wherever it appears.
+const APT_WORD = /(?:^|[\s;&|(`'"/])apt(?:-get)?(?=[\s'"])([^;&|)`\n]*)/g;
+const APT_ACTION =
+  /(?:^|[\s'"=])["']?(?:install|update|upgrade|dist-upgrade|full-upgrade)["']?(?=[\s'";&|)`]|$)/;
+const APT_OPTION = /(?:^|\s)["']?(?:-o|--option|-c|--config-file)(?=[\s="']|\S)/;
+
+// Each apt command in `text`, as the arguments after the command word.
+function aptCommands(text) {
+  return [...text.matchAll(APT_WORD)].map((match) => match[1]);
+}
+
+function installsOrUpdates(text) {
+  return aptCommands(text).some((args) => APT_ACTION.test(args));
+}
+
+function aptStaysPinned(name, lines, pinned) {
+  for (const line of lines) {
+    if (line !== pinned && installsOrUpdates(line)) {
+      throw new Error(`${name}: apt installs or updates outside the snapshot's RUN`);
+    }
+    if (aptCommands(line).some((args) => APT_OPTION.test(args))) {
+      throw new Error(`${name}: an apt command takes an option that re-points or re-configures it`);
+    }
+    if (/Verify-Peer|Verify-Host|Acquire::https/i.test(line)) {
+      throw new Error(`${name}: apt's TLS verification or https transport is configured`);
+    }
+    if (/Dir::(?:Etc|State)/i.test(line)) {
+      throw new Error(`${name}: apt's configuration or state directory is re-pointed`);
+    }
+    // The snapshot's two sources say `Check-Valid-Until: no`, each Release then held to its
+    // pinned date; nothing else may touch the check.
+    const validUntil = line === pinned ? line.split('"Check-Valid-Until: no"').join("") : line;
+    if (line === pinned && line.split('"Check-Valid-Until: no"').length !== 3) {
+      throw new Error(`${name}: the snapshot's sources do not set Check-Valid-Until as pinned`);
+    }
+    if (/Check-Valid-Until/i.test(validUntil)) {
+      throw new Error(`${name}: apt's Release validity check is configured outside the sources`);
+    }
+  }
+
+  // snapshot()'s body, by its braces (${...} and { ...; } groups inside it balance).
+  const start = pinned.indexOf("snapshot() {");
+  if (start === -1) throw new Error(`${name}: the snapshot's RUN defines no snapshot()`);
+  let depth = 0;
+  let end = -1;
+  for (let index = pinned.indexOf("{", start); index < pinned.length; index += 1) {
+    if (pinned[index] === "{") depth += 1;
+    else if (pinned[index] === "}" && (depth -= 1) === 0) {
+      end = index + 1;
+      break;
+    }
+  }
+  if (end === -1) throw new Error(`${name}: snapshot() is not closed`);
+  const body = pinned.slice(start, end);
+  // The scheme is the function's first argument, read in the two URIs and nowhere else.
+  if (
+    (body.match(/\$1\b/g) ?? []).length !== 2 ||
+    /\$\{1|\bset\s+(?:-\S+\s+)*--|\bshift\b/.test(body)
+  ) {
+    throw new Error(`${name}: snapshot() reads or reassigns its scheme argument`);
+  }
+  const outside = pinned.slice(0, start) + pinned.slice(end);
+  const first = outside.indexOf("snapshot http;");
+  const before = outside.slice(0, first === -1 ? outside.length : first);
+  if (installsOrUpdates(before)) {
+    throw new Error(`${name}: apt runs before the snapshot's sources are written`);
+  }
+
+  // Every mention of apt's own configuration, less the two the pinned RUN makes: clearing the
+  // sources, and writing the snapshot's.
+  const allowed = [
+    "rm -rf /etc/apt/sources.list /etc/apt/sources.list.d/* /var/lib/apt/lists/*;",
+    "> /etc/apt/sources.list.d/snapshot.sources;",
+  ];
+  for (const line of lines) {
+    let rest = line;
+    if (line === pinned) {
+      for (const text of allowed) {
+        if (rest.split(text).length !== 2) {
+          throw new Error(`${name}: the snapshot's RUN does not write its sources as pinned`);
+        }
+        rest = rest.replace(text, "");
+      }
+    }
+    if (
+      /\/etc\/apt\/(?:sources\.list|apt\.conf|preferences|trusted\.gpg)|\bAPT_CONFIG\b/.test(rest)
+    ) {
+      throw new Error(`${name}: an apt source or configuration is written`);
+    }
+  }
 }
