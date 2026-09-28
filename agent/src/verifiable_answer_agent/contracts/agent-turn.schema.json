@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://khs.dev/contracts/agent-turn/1.0.0/schema.json",
+  "$id": "https://khs.dev/contracts/agent-turn/1.1.0/schema.json",
   "$ref": "#/$defs/AgentTurnRecord",
   "$defs": {
     "AgentTurnRecord": {
@@ -19,8 +19,17 @@
         "principal": {
           "$ref": "#/$defs/PrincipalId"
         },
+        "principalDigest": {
+          "$ref": "#/$defs/Sha256Hex"
+        },
         "turnId": {
           "$ref": "#/$defs/Uuid"
+        },
+        "outcome": {
+          "$ref": "#/$defs/AgentTurnOutcome"
+        },
+        "errorClass": {
+          "$ref": "#/$defs/ErrorClassName"
         },
         "tools": {
           "maxItems": 200,
@@ -45,10 +54,17 @@
           "maximum": 9007199254740991
         },
         "flags": {
-          "maxItems": 6,
+          "maxItems": 9,
           "type": "array",
           "items": {
             "$ref": "#/$defs/VerificationFlag"
+          }
+        },
+        "assistantFlags": {
+          "maxItems": 4,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AssistantFlag"
           }
         },
         "durationMs": {
@@ -71,7 +87,7 @@
         "durationMs"
       ],
       "additionalProperties": false,
-      "description": "One structured line per assistant turn: the principal, the tool calls made, how many quoted spans verified or were flagged, and which flags. Never narrative, never a quote, never an argument."
+      "description": "One structured line per assistant turn: the principal, how the turn ended, the tool calls made, how many quoted spans verified or were flagged, and which flags. Never narrative, never a quote, never an argument."
     },
     "Token": {
       "type": "string",
@@ -88,10 +104,23 @@
       "type": "string",
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
     },
+    "Sha256Hex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Lower-case hexadecimal SHA-256 digest."
+    },
     "Uuid": {
       "type": "string",
       "format": "uuid",
       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "AgentTurnOutcome": {
+      "type": "string",
+      "enum": ["answered", "tools-unavailable", "model-failed", "turn-id-missing", "internal-error"]
+    },
+    "ErrorClassName": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
     },
     "AgentToolCall": {
       "type": "object",
@@ -133,7 +162,19 @@
         "verification-unavailable",
         "section-mismatch",
         "document-mismatch",
-        "empty-block"
+        "empty-block",
+        "coverage-gap",
+        "checksum-mismatch",
+        "table-not-quotable"
+      ]
+    },
+    "AssistantFlag": {
+      "type": "string",
+      "enum": [
+        "reserved-label-removed",
+        "checksum-removed",
+        "identifier-removed",
+        "label-text-repeated"
       ]
     }
   }

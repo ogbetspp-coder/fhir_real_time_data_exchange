@@ -22,22 +22,38 @@ __all__ = ["AssistantPart", "Citation", "DraftAnswer", "QuotedBlock"]
 @final
 @dataclass(frozen=True, slots=True)
 class Citation:
-    """Where a block came from, in the four fields a reader needs to check it."""
+    """Where a block came from: the fields a reader needs to check it, and what it is about.
+
+    ``normalized_text_sha256`` is the section's hash of the text shown, which every
+    ``verify_quote`` match must name. ``product_name`` and ``language`` come from a
+    ``find_product`` result of the same turn for the same document version, and are ``None``
+    when the turn looked up no such result: the reader is then told they were not confirmed,
+    rather than shown a guess.
+    """
 
     bundle_id: str
     version_id: str
     source_key: str
     narrative_div_sha256: str
+    normalized_text_sha256: str
+    product_name: str | None = None
+    language: str | None = None
 
 
 @final
 @dataclass(frozen=True, slots=True)
 class QuotedBlock:
-    """A candidate quotation. Not yet checked, therefore not yet showable as label content."""
+    """A candidate quotation. Not yet checked, therefore not yet showable as label content.
+
+    ``div_sha256`` is the SHA-256 of the section's stored XHTML as the tool returned it, taken
+    when the block was composed: the post-check holds the citation's ``narrative_div_sha256`` —
+    the checksum a reader is shown — to it.
+    """
 
     block_id: str
     citation: Citation
     text: str
+    div_sha256: str
 
 
 @final
@@ -51,7 +67,11 @@ class AssistantPart:
 @final
 @dataclass(frozen=True, slots=True)
 class DraftAnswer:
-    """The composed answer before the post-check has run. Never rendered."""
+    """The composed answer before the post-check has run. Never rendered.
+
+    ``sections_not_shown`` counts sections read in the turn beyond the most one answer shows.
+    """
 
     blocks: tuple[QuotedBlock, ...]
     assistant: AssistantPart
+    sections_not_shown: int = 0

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 from datetime import UTC, datetime
@@ -12,14 +13,20 @@ from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
 from verifiable_answer_agent.audit import (
+    ERROR_CLASS_PATTERN,
     FORBIDDEN_KEYS,
     MAX_TOOL_CALLS,
+    NIL_TURN_ID,
     PRINCIPAL_PATTERN,
+    SHA256_PATTERN,
     TOKEN_PATTERN,
     UUID_PATTERN,
+    WITHHELD_PRINCIPAL,
     NarrativeLeakError,
     ToolCallRecord,
     emit,
+    minimal_record,
+    principal_fields,
     turn_record,
 )
 from verifiable_answer_agent.contract import load_agent_turn_schema
@@ -77,12 +84,14 @@ def test_a_record_with_no_tool_calls_and_no_flags_also_validates() -> None:
     clean = post_check(
         DRAFT,
         {
-            block.block_id: [ChunkCheck(0, verification(source_key=block.citation.source_key))]
+            block.block_id: [
+                ChunkCheck(0, verification(text=block.text, source_key=block.citation.source_key))
+            ]
             for block in DRAFT.blocks
         },
     )
     payload = record(answer=clean, tools=(), sections_dropped=0).model_dump(
-        by_alias=True, mode="json"
+        by_alias=True, mode="json", exclude_none=True
     )
     assert not list(agent_turn_validator().iter_errors(payload))
 
@@ -90,11 +99,78 @@ def test_a_record_with_no_tool_calls_and_no_flags_also_validates() -> None:
 def test_the_record_carries_exactly_the_contracts_fields() -> None:
     contract = load_agent_turn_schema()["$defs"]["AgentTurnRecord"]
     payload = emitted()
-    assert sorted(payload) == sorted(contract["required"])
-    assert sorted(payload) == sorted(contract["properties"])
+    assert set(contract["required"]) <= set(payload) <= set(contract["properties"])
+    # Every field the model can carry is one the contract names, and nothing more.
+    full = record(principal_digest="a" * 64, assistant_flags=("checksum-removed",)).model_dump(
+        by_alias=True, mode="json", exclude_none=True
+    ) | {"errorClass": "ValueError"}
+    assert sorted(full) == sorted(contract["properties"])
     tool_call = load_agent_turn_schema()["$defs"]["AgentToolCall"]
     for tool in payload["tools"]:
         assert sorted(tool) == sorted(tool_call["required"])
+
+
+def test_the_enumerations_the_model_enforces_are_the_contracts() -> None:
+    from typing import get_args
+
+    from verifiable_answer_agent.audit import TurnOutcome
+    from verifiable_answer_agent.postcheck import VerificationFlag
+    from verifiable_answer_agent.render import AssistantFlag
+
+    defs = load_agent_turn_schema()["$defs"]
+    assert list(get_args(VerificationFlag)) == defs["VerificationFlag"]["enum"]
+    assert list(get_args(TurnOutcome)) == defs["AgentTurnOutcome"]["enum"]
+    assert list(get_args(AssistantFlag)) == defs["AssistantFlag"]["enum"]
+
+
+# --- the principal (audit AG-1) -----------------------------------------------------------
+
+
+def test_an_e_mail_user_id_is_withheld_never_recorded() -> None:
+    # Gemini Enterprise hands the agent the user's e-mail address as the session's user id. The
+    # contract's principal refuses one, and until 2026-09-27 that refusal failed every live turn.
+    principal, digest = principal_fields("alice@example.com", None)
+    assert (principal, digest) == (WITHHELD_PRINCIPAL, None)
+    payload = record(principal=principal).model_dump(by_alias=True, mode="json", exclude_none=True)
+    assert not list(agent_turn_validator().iter_errors(payload))
+    assert "alice" not in json.dumps(payload)
+
+
+def test_with_a_key_the_withheld_user_is_a_keyed_digest() -> None:
+    principal, digest = principal_fields("alice@example.com", b"deployment-key")
+    again = principal_fields("alice@example.com", b"deployment-key")[1]
+    other_key = principal_fields("alice@example.com", b"another-key")[1]
+    assert principal == WITHHELD_PRINCIPAL
+    assert digest is not None
+    assert digest == again
+    assert digest != other_key
+    assert digest != hashlib.sha256(b"alice@example.com").hexdigest()
+    payload = record(principal=principal, principal_digest=digest).model_dump(
+        by_alias=True, mode="json", exclude_none=True
+    )
+    assert payload["principalDigest"] == digest
+    assert not list(agent_turn_validator().iter_errors(payload))
+
+
+def test_an_opaque_user_id_is_carried_as_it_is() -> None:
+    assert principal_fields("urn:reviewer:synthetic-01", b"key") == (
+        "urn:reviewer:synthetic-01",
+        None,
+    )
+
+
+def test_a_minimal_record_validates_and_keeps_only_a_plain_class_name() -> None:
+    for error_class in ("ValidationError", "not a class name: it has a message in it"):
+        payload = minimal_record(
+            service_version="agent/0.1.0",
+            principal=WITHHELD_PRINCIPAL,
+            turn_id=NIL_TURN_ID,
+            outcome="internal-error",
+            error_class=error_class,
+        ).model_dump(by_alias=True, mode="json", exclude_none=True)
+        assert not list(agent_turn_validator().iter_errors(payload)), payload
+        assert payload.get("errorClass") in {"ValidationError", None}
+        assert (payload["spansVerified"], payload["spansFlagged"], payload["flags"]) == (0, 0, [])
 
 
 def test_the_patterns_the_model_enforces_are_the_contracts() -> None:
@@ -102,6 +178,8 @@ def test_the_patterns_the_model_enforces_are_the_contracts() -> None:
     assert defs["Token"]["pattern"] == TOKEN_PATTERN
     assert defs["PrincipalId"]["pattern"] == PRINCIPAL_PATTERN
     assert defs["Uuid"]["pattern"] == UUID_PATTERN
+    assert defs["Sha256Hex"]["pattern"] == SHA256_PATTERN
+    assert defs["ErrorClassName"]["pattern"] == ERROR_CLASS_PATTERN
     assert defs["AgentTurnRecord"]["properties"]["tools"]["maxItems"] == MAX_TOOL_CALLS
 
 
@@ -115,7 +193,7 @@ def test_a_tool_outside_the_four_makes_no_record() -> None:
         ToolCallRecord(tool="write_section", outcome="ok", duration_ms=1, result_count=1)  # type: ignore[arg-type]
 
 
-def test_a_flag_outside_the_six_makes_no_record() -> None:
+def test_a_flag_outside_the_contracts_makes_no_record() -> None:
     from verifiable_answer_agent.audit import TurnAuditRecord
 
     with pytest.raises(ValidationError, match="flags"):
@@ -140,7 +218,9 @@ def test_more_tool_calls_than_the_contract_allows_makes_no_record_rather_than_a_
     )
     with pytest.raises(ValidationError, match="tools"):
         record(tools=too_many)
-    assert record(tools=too_many[:-1]).model_dump(by_alias=True, mode="json")["tools"]
+    assert record(tools=too_many[:-1]).model_dump(by_alias=True, mode="json", exclude_none=True)[
+        "tools"
+    ]
 
 
 def test_the_record_counts_what_happened() -> None:
@@ -198,7 +278,9 @@ def test_a_fully_verified_turn_reports_no_flags() -> None:
     clean = post_check(
         DRAFT,
         {
-            block.block_id: [ChunkCheck(0, verification(source_key=block.citation.source_key))]
+            block.block_id: [
+                ChunkCheck(0, verification(text=block.text, source_key=block.citation.source_key))
+            ]
             for block in DRAFT.blocks
         },
     )
@@ -210,7 +292,7 @@ def test_a_fully_verified_turn_reports_no_flags() -> None:
         tools=(),
         sections_dropped=0,
         duration_ms=1,
-    ).model_dump(by_alias=True, mode="json")
+    ).model_dump(by_alias=True, mode="json", exclude_none=True)
     assert payload["spansFlagged"] == 0
     assert payload["flags"] == []
     assert payload["at"].endswith("Z")
