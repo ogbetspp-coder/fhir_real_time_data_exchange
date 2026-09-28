@@ -49,6 +49,21 @@ export function readRendererPins(dockerfile = RENDERER_DOCKERFILE) {
     return value;
   };
   const debianSnapshot = required("DEBIAN_SNAPSHOT", /^\d{8}T\d{6}Z$/);
+  // Each suite's Release date, which the build holds apt's Release to (a downgrade fails it):
+  // pinned, and read by a RUN line.
+  const debianReleases = Object.fromEntries(
+    [
+      ["bookworm", "DEBIAN_BOOKWORM_DATE"],
+      ["bookworm-updates", "DEBIAN_BOOKWORM_UPDATES_DATE"],
+      ["bookworm-security", "DEBIAN_BOOKWORM_SECURITY_DATE"],
+    ].map(([suite, key]) => {
+      const date = required(key, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+      if (!lines.some((line) => /^\s*RUN\b/.test(line) && line.includes(`"${suite} \${${key}}"`))) {
+        throw new Error(`${name}: ARG ${key} is not checked against ${suite}'s Release`);
+      }
+      return [suite, date];
+    }),
+  );
   const chromeVersion = required("CHROME_VERSION", /^\d+\.\d+\.\d+\.\d+$/);
   const googleFontsCommit = required("GOOGLE_FONTS_COMMIT", /^[0-9a-f]{40}$/);
 
@@ -178,6 +193,7 @@ export function readRendererPins(dockerfile = RENDERER_DOCKERFILE) {
   return {
     base,
     debianSnapshot,
+    debianReleases,
     chromeVersion,
     googleFontsCommit,
     chrome,

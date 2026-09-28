@@ -1,185 +1,353 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 
-import { transformDocument } from "../../src/authority/t/document.js";
-import { modelDocument, modelSection, type Model } from "../../src/authority/t/model.js";
-import { TRefusal, transformSection } from "../../src/authority/t/transform.js";
-import { xhtmlToText, XhtmlError } from "../../src/fidelity/xhtml.js";
-import { launchChrome } from "../../src/render/cdp.js";
+import { launchChrome, type Browser } from "../../src/render/cdp.js";
 import { compareModel, compareText, type Mismatch } from "../../src/render/compare-style.js";
-import { readElements, readMarkers, readTexts } from "../../src/render/measure.js";
-import { openPage, type Mode } from "../../src/render/page.js";
-import { T_CASES } from "../../test/fixtures/authority/t-cases.js";
-import { MODEL_CASES } from "../../test/fixtures/render/model-cases.js";
+import {
+  comparePictureLists,
+  compareDrawings,
+  listPictures,
+  readDrawing,
+  type Drawing,
+  type ListedPicture,
+} from "../../src/render/drawing.js";
+import { checkTextNode, loadFaces } from "../../src/render/fonts.js";
+import {
+  readElements,
+  readHeights,
+  readMarkers,
+  readPage,
+  readRuns,
+  readTexts,
+  type ChromeHeights,
+  type ChromeRun,
+} from "../../src/render/measure.js";
+import { checkHeights, checkPage } from "../../src/render/page-checks.js";
+import { openPage, type Mode, type Page } from "../../src/render/page.js";
+import {
+  PictureError,
+  preparePictures,
+  UNPINNED_URL,
+  type Contained,
+} from "../../src/render/pictures.js";
+import { carriedMismatch, RATIOS, WIDTHS, type Section } from "../../src/render/sections.js";
+import { EXECUTABLE, FONTS, NO_SANDBOX, sections } from "./sections.js";
 
-// R3 as a check (docs/design/authority-import-renderer.md, and its model addendum): for every
-// accepted T case and every section of every pinned label that T and the scanner both accept, T's
-// model against Chrome's computed style, in both modes, at the named widths and every ratio. Any
-// mismatch fails. Run inside the renderer image in CI (the Renderer job); locally with
-// RENDERER_CHROME set to a chrome-headless-shell of the pinned version.
+// The renderer gate's sweep of every section (docs/design/authority-import-renderer.md, R2, R3
+// and R6; the model addendum's M4), in the renderer image. Each page is drawn once per ratio and
+// every check reads it, each keeping its own verdict:
+// - R3: T's model against Chrome's computed style, list markers and (XML mode) text ranges, for
+//   every carried section (src/render/sections.ts) in both modes, at R2's named widths at ratio 1
+//   and at 813 px at every other ratio (a computed style does not depend on the width, M4);
+// - fonts and page (3c-B2a): at ratio 1 and 813 px, each carried section's page and fonts, and its
+//   T(div)'s (T drops the styles, so its drawing can fall back where the authority's did not);
+//   and every section T or the scanner refuses, only reported (it is withheld or refuses the
+//   import anyway);
+// - boxes (3c-C1): every character box of each carried section at 813 px in both modes and at
+//   every ratio, exactly R3's, from the face bound at ratio 1 (a face does not depend on the width
+//   or the ratio, a stated residual);
+// - second drawing (3c-B2b): at ratio 1, each carried section's drawing against T(div)'s at the
+//   named widths in both modes, with its pictures drawn as the import carries them.
+// Each check counts the carried sections it judged, and fails if that is not every one. The
+// seeded refusals are scripts/render/check-fonts.ts's and check-drawings.ts's. The ratios are
+// drawn by separate browsers, `--parallel` at a time (ratio 1 first, the longest).
 //
-// usage: node --import tsx scripts/render/check.ts [--ratios 1,2] [--modes html,xml]
-//          [--widths 813,360,1240] [--out report.json]
-
-const EXECUTABLE =
-  process.env.RENDERER_CHROME ??
-  "/opt/renderer/chrome-headless-shell-linux64/chrome-headless-shell";
-// Chrome's sandbox is off only inside the render container, which has no network, no credentials
-// and a read-only workspace (R1, R6); the container's run sets RENDERER_NO_SANDBOX=1.
-const NO_SANDBOX = process.env.RENDERER_NO_SANDBOX === "1";
-const RATIOS = [0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.625, 3];
-const WIDTHS = [813, 360, 1240];
-const LABELS = "labels/ema-epi";
-const ROOT = '<div xmlns="http://www.w3.org/1999/xhtml">';
-const MARKED = "<p>not for clinical use</p></div>";
+// usage (inside the image): node --import tsx scripts/render/check.ts [--ratios 1,2]
+//          [--parallel 2] [--out report.json]
 
 function option(name: string): string | undefined {
   const index = process.argv.indexOf(`--${name}`);
   return index < 0 ? undefined : process.argv[index + 1];
 }
-const numbers = (value: string | undefined, fallback: number[]): number[] =>
-  value === undefined ? fallback : value.split(",").map(Number);
-const ratios = numbers(option("ratios"), RATIOS);
-const widths = numbers(option("widths"), WIDTHS);
-// A computed style does not depend on the width (M4), so the named widths other than the EMA
-// viewer's 813 px are drawn at ratio 1 only, unless --widths names them.
-const widthsAt = (ratio: number): number[] =>
-  option("widths") !== undefined || ratio === 1 ? widths : widths.filter((width) => width === 813);
-const modes = (option("modes")?.split(",") ?? ["html", "xml"]) as Mode[];
+// Ratio 1 is always drawn: the fonts and the second drawing are judged there.
+const ratios = [
+  ...new Set([1, ...(option("ratios")?.split(",").map(Number) ?? RATIOS)]),
+] as number[];
+if (!ratios.every((ratio) => Number.isFinite(ratio) && ratio > 0)) {
+  throw new Error("--ratios takes positive numbers");
+}
+const parallel = Number(option("parallel") ?? "2");
+if (!Number.isInteger(parallel) || parallel < 1) throw new Error("--parallel takes a whole number");
+const widthsAt = (ratio: number): readonly number[] => (ratio === 1 ? WIDTHS : [813]);
+const MODES: readonly Mode[] = ["html", "xml"];
+const FONT_WIDTH = 813;
 
-type Case = { name: string; div: string; model: Model };
+const faces = loadFaces(FONTS);
+const all = sections();
 
-// Whether the scanner accepts a T(div); only its own refusal counts as no.
-function scannerAccepts(output: string): boolean {
+type R3Failure = { name: string; mode: Mode; ratio: number; width: number; mismatches: Mismatch[] };
+const r3: R3Failure[] = [];
+const fonts: string[] = [];
+const drawingFailures: string[] = [];
+const boxFailures: string[] = [];
+// A carried section whose pictures cannot be prepared is not drawn: a failure of every check.
+const notDrawn: string[] = [];
+// Per check, the carried sections it judged (R3 and the boxes by ratio).
+const judgedR3 = new Map<number, string[]>();
+const judgedBoxes = new Map<number, string[]>();
+const judgedFonts: string[] = [];
+const judgedDrawings: string[] = [];
+// What the sections T or the scanner refuse report, by refusal.
+const reported = new Map<string, number>();
+// The faces bound at ratio 1, and every ratio's character boxes, judged once all are drawn.
+const runsOf = new Map<string, ChromeRun[]>();
+const heightsOf = new Map<string, ChromeHeights>();
+let pages = 0;
+let r3Drawings = 0;
+let secondDrawings = 0;
+
+const push = <T>(map: Map<number, T[]>, key: number, value: T): void => {
+  map.set(key, [...(map.get(key) ?? []), value]);
+};
+
+// A page's R2 refusals and, unless it did not parse (nothing of the section's to read), its text
+// nodes with their faces and their font refusals.
+async function pageAndFonts(
+  page: Page,
+  mode: Mode,
+  width: number,
+): Promise<{ refusals: string[]; runs: ChromeRun[] }> {
+  const refusals = checkPage(await readPage(page), width, mode).map(
+    ({ refusal, detail }) => `${refusal}: ${detail}`,
+  );
+  if (refusals.some((refusal) => refusal.startsWith("parsererror"))) return { refusals, runs: [] };
+  const runs = await readRuns(page);
+  for (const run of runs) {
+    for (const { refusal, detail } of checkTextNode(run, faces)) {
+      refusals.push(`${refusal}: ${detail}`);
+    }
+  }
+  return { refusals, runs };
+}
+
+// A drawing, its picture list, and its page's own refusals: R2's page, and a picture not drawn as
+// prepared, or a request failed other than the unpinned picture's.
+type Drawn = { drawing: Drawing; pictures: ListedPicture[]; page: string[] };
+
+async function drawing(
+  page: Page,
+  prepared: ReturnType<typeof preparePictures>,
+  mode: Mode,
+  width: number,
+): Promise<Drawn> {
+  const refusals = checkPage(await readPage(page), width, mode).map(
+    ({ refusal, detail }) => `${refusal}: ${detail}`,
+  );
+  const drawn = await readDrawing(page);
+  const { list, problems } = listPictures(prepared.pictures, prepared.urls, drawn);
+  refusals.push(...problems);
+  for (const url of page.failed) {
+    if (url !== UNPINNED_URL) refusals.push(`request-failed: ${url.slice(0, 80)}`);
+  }
+  return { drawing: drawn, pictures: list, page: refusals };
+}
+
+async function open(
+  browser: Browser,
+  prepared: ReturnType<typeof preparePictures>,
+  mode: Mode,
+  width: number,
+): Promise<Page> {
+  pages += 1;
+  return openPage(browser.cdp, {
+    div: prepared.div,
+    mode,
+    width,
+    resources: prepared.resources,
+  });
+}
+
+function prepare(div: string, contained: Contained): ReturnType<typeof preparePictures> | string {
   try {
-    xhtmlToText(output);
-    return true;
+    return preparePictures(div, contained);
   } catch (error) {
-    if (error instanceof XhtmlError) return false;
-    throw error;
+    if (!(error instanceof PictureError)) throw error;
+    return `picture-grammar: ${error.message}`;
   }
 }
 
-// Every section R3 draws, and nothing silently skipped: an accepted T case T or the scanner now
-// refuses, a model case refused, or a label section T and the scanner accept without a model, all
-// fail the check (the first code review).
-function cases(): Case[] {
-  const found: Case[] = [];
-  const broken: string[] = [];
-  for (const testCase of T_CASES) {
-    if (!("div" in testCase.expected)) continue;
-    const div = `${testCase.root ?? ROOT}${testCase.inner}${MARKED}`;
-    const evidence = testCase.evidence === undefined ? undefined : new Set(testCase.evidence);
-    try {
-      if (!scannerAccepts(transformSection(div, evidence).div)) {
-        broken.push(`t-case ${testCase.name}: accepted in t-cases.ts, refused by the scanner`);
-        continue;
-      }
-      found.push({
-        name: `t-case ${testCase.name}`,
-        div,
-        model: JSON.parse(modelSection(div, evidence)) as Model,
-      });
-    } catch (error) {
-      if (!(error instanceof TRefusal)) throw error;
-      broken.push(`t-case ${testCase.name}: accepted in t-cases.ts, refused (${error.reason})`);
-    }
+// One carried section at one ratio: every page it is drawn on, read by every check.
+async function carried(
+  browser: Browser,
+  section: Extract<Section, { carried: true }>,
+  ratio: number,
+): Promise<void> {
+  const authority = prepare(section.div, section.contained);
+  const t = ratio === 1 ? prepare(section.output, section.contained) : undefined;
+  if (typeof authority === "string") {
+    notDrawn.push(`${section.name} (ratio ${ratio}): not drawn, ${authority}`);
+    return;
   }
-  for (const modelCase of MODEL_CASES) {
-    const div = `${ROOT}${modelCase.inner}${MARKED}`;
-    try {
-      if (!scannerAccepts(transformSection(div).div)) {
-        broken.push(`model-case ${modelCase.name}: the scanner refuses it`);
-        continue;
-      }
-      found.push({
-        name: `model-case ${modelCase.name}`,
-        div,
-        model: JSON.parse(modelSection(div)) as Model,
-      });
-    } catch (error) {
-      if (!(error instanceof TRefusal)) throw error;
-      broken.push(`model-case ${modelCase.name}: T refuses it (${error.reason})`);
-    }
+  if (typeof t === "string") {
+    notDrawn.push(`${section.name}: T(div) not drawn, ${t}`);
+    return;
   }
-  const lock = JSON.parse(readFileSync(`${LABELS}/sources.lock.json`, "utf8")) as {
-    sources: { file: string }[];
-  };
-  if (lock.sources.length === 0) broken.push(`${LABELS}/sources.lock.json pins no label`);
-  type Section = { text?: { div?: string }; section?: Section[] };
-  for (const { file } of lock.sources) {
-    const document = JSON.parse(readFileSync(`${LABELS}/sources/${file}`, "utf8")) as {
-      entry?: { resource?: { section?: Section[] } }[];
-    };
-    const placed: { path: string; div: string | undefined }[] = [];
-    const walk = (sections: Section[], base: string): void => {
-      sections.forEach((section, position) => {
-        const path = `${base}[${position}]`;
-        placed.push({ path, div: section.text?.div });
-        walk(section.section ?? [], `${path}.section`);
-      });
-    };
-    walk(document.entry?.[0]?.resource?.section ?? [], "Composition.section");
-    if (placed.length === 0) broken.push(`${file}: no sections`);
-    const models = modelDocument(placed.map(({ div }) => div));
-    const outcomes = transformDocument(placed.map(({ div }) => div));
-    placed.forEach(({ path, div }, index) => {
-      const outcome = outcomes[index];
-      if (div === undefined || outcome === undefined || !("div" in outcome)) return;
-      if (!scannerAccepts(outcome.div)) return;
-      const model = models[index];
-      if (model === undefined) {
-        broken.push(`${file} ${path}: accepted by T and the scanner, but has no model`);
-        return;
-      }
-      found.push({ name: `${file} ${path}`, div, model: JSON.parse(model) as Model });
-    });
-  }
-  if (broken.length > 0) {
-    console.error(broken.join("\n"));
-    process.exit(1);
-  }
-  return found;
-}
-
-const all = cases();
-const failures: {
-  name: string;
-  mode: Mode;
-  ratio: number;
-  width: number;
-  mismatches: Mismatch[];
-}[] = [];
-let drawings = 0;
-for (const ratio of ratios) {
-  const browser = launchChrome({ executable: EXECUTABLE, ratio, noSandbox: NO_SANDBOX });
-  try {
-    for (const { name, div, model } of all) {
-      for (const mode of modes) {
-        for (const width of widthsAt(ratio)) {
-          const page = await openPage(browser.cdp, { div, mode, width });
-          try {
-            const elements = await readElements(page);
-            const markers = await readMarkers(page);
-            const mismatches = compareModel(model, elements, markers, ratio, mode);
-            if (mode === "xml") mismatches.push(...compareText(model, await readTexts(page)));
-            drawings += 1;
-            if (mismatches.length > 0) failures.push({ name, mode, ratio, width, mismatches });
-          } finally {
-            await page.close();
+  for (const mode of MODES) {
+    const fontRefusals: string[] = [];
+    for (const width of widthsAt(ratio)) {
+      const page = await open(browser, authority, mode, width);
+      let drawn: Drawn | undefined;
+      try {
+        const mismatches = compareModel(
+          section.model,
+          await readElements(page),
+          await readMarkers(page),
+          ratio,
+          mode,
+        );
+        if (mode === "xml") mismatches.push(...compareText(section.model, await readTexts(page)));
+        r3Drawings += 1;
+        if (mismatches.length > 0) r3.push({ name: section.name, mode, ratio, width, mismatches });
+        if (width === FONT_WIDTH) {
+          heightsOf.set(`${section.name} ${mode} ${ratio}`, await readHeights(page));
+        }
+        if (ratio === 1) {
+          // The drawing, with the requests the page made, before the fonts: reading the faces
+          // through DevTools asks for the page again (measured), a request of the judge's, not the
+          // page's, which the drawing's check of failed requests must not count.
+          drawn = await drawing(page, authority, mode, width);
+          if (width === FONT_WIDTH) {
+            const { refusals, runs } = await pageAndFonts(page, mode, width);
+            fontRefusals.push(...refusals);
+            runsOf.set(`${section.name} ${mode}`, runs);
           }
         }
+      } finally {
+        await page.close();
       }
+      if (drawn === undefined || t === undefined) continue;
+      // T(div)'s drawing at the same width, for the second drawing and (at 813 px) its fonts.
+      const tPage = await open(browser, t, mode, width);
+      try {
+        const tDrawn = await drawing(tPage, t, mode, width);
+        if (width === FONT_WIDTH) {
+          for (const refusal of (await pageAndFonts(tPage, mode, width)).refusals) {
+            fontRefusals.push(`T(div) ${refusal}`);
+          }
+        }
+        secondDrawings += 2;
+        const problems = [
+          ...drawn.page,
+          ...tDrawn.page.map((problem) => `T(div) ${problem}`),
+          ...[
+            ...compareDrawings(drawn.drawing, tDrawn.drawing),
+            ...comparePictureLists(drawn.pictures, tDrawn.pictures),
+          ].map(
+            ({ property, authority: a, t: b }) =>
+              `second-drawing ${property}: ${a.slice(0, 120)} / ${b.slice(0, 120)}`,
+          ),
+        ];
+        if (problems.length > 0) {
+          drawingFailures.push(`${section.name} (${mode}, ${width} px): ${problems.join("; ")}`);
+        }
+      } finally {
+        await tPage.close();
+      }
+    }
+    if (fontRefusals.length > 0)
+      fonts.push(`${section.name} (${mode}): ${fontRefusals.join("; ")}`);
+  }
+  push(judgedR3, ratio, section.name);
+  push(judgedBoxes, ratio, section.name);
+  if (ratio === 1) {
+    judgedFonts.push(section.name);
+    judgedDrawings.push(section.name);
+  }
+}
+
+// A section T or the scanner refuses, at ratio 1: its page and fonts, reported by refusal.
+async function refused(browser: Browser, section: Section): Promise<void> {
+  for (const mode of MODES) {
+    pages += 1;
+    const page = await openPage(browser.cdp, { div: section.div, mode, width: FONT_WIDTH });
+    try {
+      for (const refusal of (await pageAndFonts(page, mode, FONT_WIDTH)).refusals) {
+        const code = refusal.split(":")[0] ?? "";
+        reported.set(code, (reported.get(code) ?? 0) + 1);
+      }
+    } finally {
+      await page.close();
+    }
+  }
+}
+
+async function sweep(ratio: number): Promise<void> {
+  const browser = launchChrome({ executable: EXECUTABLE, ratio, noSandbox: NO_SANDBOX });
+  try {
+    for (const section of all) {
+      if (section.carried) await carried(browser, section, ratio);
+      else if (ratio === 1) await refused(browser, section);
     }
   } finally {
     await browser.close();
   }
 }
 
+// The ratios, `parallel` browsers at a time; every one is waited for before a failure is thrown.
+const queue = [...ratios];
+const errors: unknown[] = [];
+await Promise.all(
+  Array.from({ length: Math.min(parallel, queue.length) }, async () => {
+    for (let ratio = queue.shift(); ratio !== undefined; ratio = queue.shift()) {
+      try {
+        await sweep(ratio);
+      } catch (error) {
+        errors.push(error);
+        queue.length = 0;
+      }
+    }
+  }),
+);
+if (errors.length > 0) throw errors[0];
+
+// The boxes, from the faces bound at ratio 1.
+let boxes = 0;
+for (const ratio of ratios) {
+  for (const section of all) {
+    if (!section.carried) continue;
+    for (const mode of MODES) {
+      const heights = heightsOf.get(`${section.name} ${mode} ${ratio}`);
+      if (heights === undefined) continue;
+      boxes += heights.reduce((sum, { heights: list }) => sum + list.length, 0);
+      const wrong = checkHeights(
+        runsOf.get(`${section.name} ${mode}`) ?? [],
+        heights,
+        faces,
+        ratio,
+      );
+      if (wrong.length > 0) {
+        boxFailures.push(
+          `${section.name} (${mode}, ratio ${ratio}): ${wrong
+            .map(({ detail }) => detail)
+            .slice(0, 3)
+            .join("; ")}`,
+        );
+      }
+    }
+  }
+}
+
+// Each check judged every carried section (at every ratio it draws).
+const counts = [
+  ...ratios.map((ratio) => carriedMismatch(`R3 at ${ratio}`, judgedR3.get(ratio) ?? [], all)),
+  ...ratios.map((ratio) => carriedMismatch(`boxes at ${ratio}`, judgedBoxes.get(ratio) ?? [], all)),
+  carriedMismatch("fonts and page", judgedFonts, all),
+  carriedMismatch("second drawing", judgedDrawings, all),
+].filter((mismatch): mismatch is string => mismatch !== undefined);
+
 const out = option("out");
-if (out !== undefined)
-  writeFileSync(out, `${JSON.stringify({ drawings, cases: all.length, failures }, null, 2)}\n`);
-if (failures.length > 0) {
-  for (const failure of failures.slice(0, 40)) {
+if (out !== undefined) {
+  writeFileSync(
+    out,
+    `${JSON.stringify({ pages, sections: all.length, notDrawn, r3, fonts, boxes: boxFailures, drawings: drawingFailures, counts }, null, 2)}\n`,
+  );
+}
+
+const carriedCount = all.filter((section) => section.carried).length;
+let failed = counts.length > 0 || notDrawn.length > 0;
+if (failed) console.error([...notDrawn, ...counts].join("\n"));
+if (r3.length > 0) {
+  failed = true;
+  for (const failure of r3.slice(0, 40)) {
     console.error(
       `${failure.name} (${failure.mode}, ${failure.width} px, ratio ${failure.ratio}): ` +
         failure.mismatches
@@ -191,9 +359,39 @@ if (failures.length > 0) {
           .join("; "),
     );
   }
-  console.error(`R3: ${failures.length} of ${drawings} drawings mismatch`);
-  process.exit(1);
+  console.error(`R3: ${r3.length} of ${r3Drawings} drawings mismatch`);
+} else {
+  console.log(
+    `R3: ${carriedCount} carried sections and cases, ${r3Drawings} drawings, T's model equals Chrome's computed style in every one`,
+  );
 }
-console.log(
-  `R3: ${all.length} sections, ${drawings} drawings, T's model equals Chrome's computed style in every one`,
-);
+for (const [check, failures] of [
+  ["fonts and page", fonts],
+  ["boxes", boxFailures],
+  ["second drawing", drawingFailures],
+] as const) {
+  if (failures.length === 0) continue;
+  failed = true;
+  console.error(failures.slice(0, 60).join("\n"));
+  console.error(`${check}: ${failures.length} failures`);
+}
+if (fonts.length === 0) {
+  const summary = [...reported].map(([refusal, count]) => `${refusal} ${count}`).join(", ");
+  console.log(
+    `fonts and page: ${carriedCount} carried sections and cases pass in both modes, T(div) too; ` +
+      `the ${all.length - carriedCount} sections T or the scanner refuse report: ${summary || "none"}`,
+  );
+}
+if (boxFailures.length === 0) {
+  console.log(
+    `boxes: ${boxes} character boxes of ${carriedCount} carried sections and cases exactly R3's in both modes at ${ratios.length} ratios`,
+  );
+}
+if (drawingFailures.length === 0) {
+  console.log(
+    `second drawing: ${carriedCount} carried sections and cases, ${secondDrawings} drawings at ${WIDTHS.length} widths in both modes, ` +
+      `the same text, list numbers, grids and pictures as T(div)'s`,
+  );
+}
+console.log(`pages: ${pages} drawn at ${ratios.length} ratios, each read by every check`);
+if (failed) process.exit(1);

@@ -108,10 +108,13 @@ jobs:
 
   # The renderer gate's image (docs/design/authority-import-renderer.md, R1's pre-check and R6):
   # built from Dockerfile.renderer, every download checked against its pin and every library
-  # Chrome links resolved, then run with no network, a read-only workspace and no credentials, to
-  # prove the browser starts offline, loads both modes, fails every request but the page's, and
-  # draws every family the fontconfig binds in the pinned face it names. Its own job, since it
-  # needs Docker and ~200 MB of downloads; scripts/check-all.sh leaves it out.
+  # Chrome links resolved, then run with no network, a read-only workspace and no credentials
+  # (scripts/render/run.mjs), to prove the browser starts offline, loads both modes, fails every
+  # request but the page's, and draws every family the fontconfig binds in the pinned face it
+  # names. Its own job, since it needs Docker and ~200 MB of downloads; scripts/check-all.sh leaves
+  # it out. A pull request that changes no renderer input (scripts/ci/renderer-inputs.mjs: only
+  # documentation, the Python deployables, the infrastructure, assistant settings or Markdown)
+  # skips the image and the checks, and the job passes; a push to main always runs them.
   renderer:
     name: Renderer
     runs-on: ubuntu-24.04
@@ -121,9 +124,11 @@ jobs:
         shell: bash --noprofile --norc -eo pipefail {0}
 
     steps:
+      # The merge commit and its parents, so the change can be read against its base.
       - name: Check out repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
+          fetch-depth: 2
           persist-credentials: false
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
@@ -131,37 +136,56 @@ jobs:
           node-version: 22.22.0
           cache: npm
 
+      - name: Name whether a renderer input changed
+        id: inputs
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: node scripts/ci/renderer-inputs.mjs >> "$GITHUB_OUTPUT"
+
       - name: Install Node dependencies
+        if: steps.inputs.outputs.run == 'true'
         run: npm ci --no-audit --no-fund
 
       - name: Build the renderer image
+        if: steps.inputs.outputs.run == 'true'
         run: npm run renderer:image
 
       - name: Check the renderer image offline
+        if: steps.inputs.outputs.run == 'true'
         run: npm run renderer:smoke
 
-      # R3: T's model against Chrome's computed style for every accepted T case, every synthetic
-      # model case and every section of the pinned labels T and the scanner accept, in both modes
-      # (docs/design/authority-import-renderer-model.md, M4). Any mismatch fails.
-      - name: Compare T's model with the drawn page
+      # The judge's unit tests read Chrome's output for the model cases from a recording
+      # (test/fixtures/render/recorded.json); it must be this browser's, of each case as it stands.
+      - name: Record the model cases again
+        if: steps.inputs.outputs.run == 'true'
+        run: npm run renderer:record
+
+      # Every section (src/render/sections.ts: every accepted T case, every model case, and every
+      # section of every pinned label) drawn once per ratio and read by every check, each with its
+      # own verdict: R3's model against Chrome's computed style; R2's page, R3's fonts and scripts
+      # and R6's coverage; R3's character boxes; and R2's second drawing
+      # (docs/design/authority-import-renderer.md, Delivery 3c-B and 3c-C1; the model addendum's M4).
+      - name: Check every section
+        if: steps.inputs.outputs.run == 'true'
         run: npm run renderer:check
 
-      # R2's page, R3's fonts and scripts, R6's coverage and R3's character boxes, on every section
-      # of every pinned label, T's or not, and every seeded refusal
+      # The seeded refusals of the page, font and box checks, each in every mode it names
       # (docs/design/authority-import-renderer.md, Delivery 3c-B2a).
-      - name: Check the fonts and pages
+      - name: Check the seeded refusals
+        if: steps.inputs.outputs.run == 'true'
         run: npm run renderer:fonts
 
       # R3's exact character box: every size form in every pinned face at every ratio, each box
       # the bound face's ascent plus descent and each baseline where the model puts it
       # (docs/design/authority-import-renderer.md, Delivery 3c-C1).
       - name: Check the character box model
+        if: steps.inputs.outputs.run == 'true'
         run: npm run renderer:boxes
 
-      # R2's second drawing: the authority's and T(div)'s text, list numbers, grids and pictures,
-      # the same at the named widths in both modes, and the picture forms drawn as stated
+      # The second drawing's seeded differences and the picture forms
       # (docs/design/authority-import-renderer.md, Delivery 3c-B2b).
-      - name: Compare the two drawings
+      - name: Check the seeded differences of the second drawing
+        if: steps.inputs.outputs.run == 'true'
         run: npm run renderer:drawings
 
   zone-a:
