@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 
 from zone_a.docx.reader import Mark, Numbering, Paragraph
-from zone_a.qrd.headings import index, match_heading
+from zone_a.qrd.headings import HeadingPatternError, forms, index, match_heading
 from zone_a.qrd.pattern import UnbalancedTemplateError, parse, render
 from zone_a.qrd.registry import (
     ERRATA,
@@ -301,6 +301,15 @@ def test_headings_are_recognised(line: str, key: str) -> None:
 )
 def test_near_misses_are_not_headings(line: str) -> None:
     assert match_heading(line, TABLE) is None
+
+
+@pytest.mark.parametrize("title", ["Title <and {X}>", "Title <[guidance]>", "Title <and <more>>"])
+def test_a_heading_title_a_form_cannot_expand_is_refused_at_any_depth(title: str) -> None:
+    # A fill-in inside an optional segment would be written as its placeholder's name ("Title
+    # and X"), and a nested segment has no flag of its own (it raised IndexError).
+    section = {"key": "smpc.4.1", "number": "4.1", "dotted": False, "title": parse(title)}
+    with pytest.raises(HeadingPatternError):
+        forms(section)
 
 
 # --- refusals of the build ----------------------------------------------------------------

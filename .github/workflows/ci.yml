@@ -177,6 +177,8 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
+          # Zone A's version lock test reads main's history as released (LOCK_BASE below).
+          fetch-depth: 0
           persist-credentials: false
       # The differential corpus is produced by the TypeScript implementation, so this job needs
       # the Node toolchain as well: the whole point is that the two languages are compared, and
@@ -228,6 +230,14 @@ jobs:
       - name: Generate the differential corpus from the TypeScript implementation
         working-directory: .
         run: npx tsx scripts/fidelity/differential.ts --seed 20260920 --count 2000 > differential.jsonl
+
+      # The history tests/test_versions_lock.py reads as released, as for the importer's lock: a
+      # released reader, registry or check version never changes its code.
+      - name: Name the version lock's base
+        working-directory: .
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+        run: bash scripts/ci/lock-base.sh
 
       - name: Test
         env:
