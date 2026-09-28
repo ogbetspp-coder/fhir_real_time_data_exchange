@@ -26,44 +26,51 @@ from zone_a.contracts.fidelity_report import FidelityReport
 from zone_a.contracts.run_request import RunRequest
 from zone_a.contracts.source_document_text import SourceDocumentText
 from zone_a.fidelity import verify_report_hash
+from zone_a.run_manifest_rules import VerifiedRunManifest
+
+from .conftest import CONTRACT_SCHEMAS, load_json, run_manifest_fixtures
 
 
-def _assert_no_float(value: Any, path: str = "$") -> None:
-    """JavaScript and Python format non-integer numbers differently, so refuse to guess.
-
-    ``canonical_json`` raises on a non-integral float rather than emitting one. This walk states
-    the same thing about the fixtures themselves, so the reason a hash matches is documented:
-    every number in this data is an integer, and integer formatting is identical in both
-    languages. It also catches an integral float, which ``canonical_json`` *does* encode (it is
-    the same JSON number as the integer) but which no fixture should be carrying.
-    """
-    if isinstance(value, bool):
-        return
+def _floats(value: Any, path: str = "$") -> list[str]:
+    """Where a document carries a non-integer number."""
     if isinstance(value, float):
-        raise AssertionError(f"fixture carries a non-integer number at {path}")
+        return [path]
     if isinstance(value, list):
-        for position, item in enumerate(value):
-            _assert_no_float(item, f"{path}[{position}]")
-    elif isinstance(value, dict):
-        for key, item in value.items():
-            _assert_no_float(item, f"{path}.{key}")
+        return [
+            found for index, item in enumerate(value) for found in _floats(item, f"{path}[{index}]")
+        ]
+    if isinstance(value, dict):
+        return [found for key, item in value.items() for found in _floats(item, f"{path}.{key}")]
+    return []
 
 
-def test_fixtures_contain_no_floats(
-    submission: Any, fidelity_report: Any, source_document_text: Any, run_request: Any
-) -> None:
-    for fixture in (submission, fidelity_report, source_document_text, run_request):
-        _assert_no_float(fixture)
+def test_the_decimal_fixture_carries_a_decimal(decimal_submission: Any) -> None:
+    """The smoke product's strength is 2.5 mg, so a non-integer number is hashed across languages.
+
+    Until 2026-09-28 every synthetic number was an integer and ``canonical_json`` refused any
+    other (audit C-10): the parity below held only because no fixture tested it.
+    """
+    found = _floats(decimal_submission)
+    assert found != []
+    assert all(".strength[" in path and path.startswith("$.bundle.") for path in found)
 
 
-def test_canonical_json_refuses_floats() -> None:
-    with pytest.raises(CanonicalJsonError):
-        canonical_json({"value": 1.5})
-    # Beyond Number.MAX_SAFE_INTEGER the two languages disagree about the digits themselves.
+def test_canonical_json_writes_a_float_as_javascript_does() -> None:
+    assert canonical_json({"value": 2.5}) == '{"value":2.5}'
+    assert canonical_json({"value": 1e21}) == '{"value":1e+21}'
+    assert canonical_json({"value": 1e-7}) == '{"value":1e-7}'
+    assert canonical_json({"value": 0.000001}) == '{"value":0.000001}'
+    assert canonical_json({"value": -0.0}) == '{"value":0}'
+
+
+def test_canonical_json_refuses_what_javascript_would_hold_differently() -> None:
+    # Beyond Number.MAX_SAFE_INTEGER, JSON gives Python the exact integer and JavaScript the
+    # nearest double: two values, refused rather than guessed.
     with pytest.raises(CanonicalJsonError):
         canonical_json({"value": 9007199254740993})
-    with pytest.raises(CanonicalJsonError):
-        canonical_json({"value": 1e21})
+    for value in (float("nan"), float("inf"), float("-inf")):
+        with pytest.raises(CanonicalJsonError):
+            canonical_json({"value": value})
 
 
 def test_canonical_json_encodes_an_integral_float_as_the_integer() -> None:
@@ -139,6 +146,72 @@ def test_run_request_names_the_submission(run_request: Any, submission: Any) -> 
     assert run_request["submissionRef"]["sha256"] == sha256_json(submission)
 
 
+# --- the other submissions TypeScript wrote (audit C-8, C-10) --------------------------------
+
+
+def _approved_content(document: Any) -> Any:
+    return {
+        "schemaVersion": document["schemaVersion"],
+        "graphType": document["graphType"],
+        "bundle": document["bundle"],
+        "provenance": document["provenance"],
+    }
+
+
+def test_an_authority_import_hashes_alike(
+    type1_submission: Any, type1_fidelity_report: Any, type1_source_document_text: Any
+) -> None:
+    """A Type 1 record, an ``authority-publication`` source and approval, and their pictures."""
+    assert type1_submission["graphType"] == "type1"
+    assert type1_submission["provenance"]["sourceDocument"]["kind"] == "authority-publication"
+    assert type1_submission["approval"]["method"] == "authority-publication"
+    assert sha256_json(type1_submission["bundle"]) == type1_submission["bundleSha256"]
+    assert (
+        sha256_json(_approved_content(type1_submission))
+        == type1_submission["approval"]["approvedContentSha256"]
+    )
+    declared = type1_submission["provenance"]["sourceDocument"]["extractedText"]["sha256"]
+    assert sha256_json(type1_source_document_text) == declared
+    assert verify_report_hash(type1_fidelity_report)
+    assert (
+        type1_submission["provenance"]["fidelity"]["reportSha256"]
+        == (type1_fidelity_report["reportHash"])
+    )
+
+
+def test_a_decimal_hashes_alike(decimal_submission: Any) -> None:
+    assert sha256_json(decimal_submission["bundle"]) == decimal_submission["bundleSha256"]
+    assert (
+        sha256_json(_approved_content(decimal_submission))
+        == decimal_submission["approval"]["approvedContentSha256"]
+    )
+
+
+def _published_version(name: str) -> str:
+    """The version ``contracts/generated/index.json`` publishes a contract at."""
+    index = load_json(CONTRACT_SCHEMAS / "index.json")
+    return str(next(entry["version"] for entry in index["contracts"] if entry["name"] == name))
+
+
+def test_the_emitted_manifests_verify_and_round_trip() -> None:
+    """The current version's manifests, as the worker's own code emitted them, verify here.
+
+    A fixture run and a document run, so the ingestion block, its approval union and the rules
+    between fields (``VerifiedRunManifest``) are all read, and each dumps back to its own bytes.
+    """
+    version = _published_version("run-manifest")
+    manifests = {
+        name: manifest
+        for name, manifest in run_manifest_fixtures().items()
+        if manifest["schemaVersion"] == version
+    }
+    assert sorted(manifests) == [f"{version}-document.json", f"{version}-fixture.json"]
+    for document in manifests.values():
+        parsed = VerifiedRunManifest.model_validate(document)
+        dumped = parsed.model_dump(by_alias=True, exclude_none=True, mode="json")
+        assert canonical_json(dumped) == canonical_json(document)
+
+
 # --- the models neither drop nor invent fields -----------------------------------------------
 
 
@@ -202,6 +275,19 @@ def test_fixture_round_trips_through_its_model(
         "run-request": run_request,
     }[name]
     assert canonical_json(_round_trip(model, document)) == canonical_json(document)
+
+
+def test_the_other_submissions_round_trip_and_still_hash(
+    type1_submission: Any, type1_fidelity_report: Any, decimal_submission: Any
+) -> None:
+    for document in (type1_submission, decimal_submission):
+        assert _find_nulls(document) == []
+        dumped = _round_trip(CanonicalSubmission, document)
+        assert canonical_json(dumped) == canonical_json(document)
+        assert sha256_json(dumped["bundle"]) == document["bundleSha256"]
+    assert canonical_json(_round_trip(FidelityReport, type1_fidelity_report)) == canonical_json(
+        type1_fidelity_report
+    )
 
 
 def test_round_tripped_submission_still_hashes(submission: Any) -> None:

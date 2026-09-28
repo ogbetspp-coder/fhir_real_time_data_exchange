@@ -1,3 +1,13 @@
+import type { z } from "zod";
+
+import {
+  FIDELITY_REPORT_VERSION,
+  type DiffHintSchema,
+  type FidelityReportSchema,
+  type SectionResultSchema,
+  type SectionStatus as SectionStatusSchema,
+  type SourceDocumentTextSchema,
+} from "../contracts/fidelity-report.js";
 import type { SectionProvenance, SourceSpan } from "../contracts/ingestion-provenance.js";
 import { sha256, sha256Utf8 } from "../lib/hash.js";
 import {
@@ -15,17 +25,10 @@ import { hasDrawnText, XhtmlError, xhtmlToText } from "./xhtml.js";
 // only structurally unusable input (wrong normalisation version, duplicate keys, invalid pages)
 // throws. Nothing here logs, performs I/O, or places narrative text in its outputs.
 
-export type SourcePage = {
-  page: number;
-  text: string;
-  bodyStart: number;
-  bodyEnd: number;
-};
-
-export type SourceDocumentText = {
-  extractorVersion: string;
-  pages: SourcePage[];
-};
+// The page text and the report are contract objects (src/contracts/fidelity-report.ts): their
+// types are the schemas' own, never a hand-written twin (audit C-6).
+export type SourceDocumentText = z.infer<typeof SourceDocumentTextSchema>;
+export type SourcePage = SourceDocumentText["pages"][number];
 
 export type NarrativeSection = {
   sourceKey: string;
@@ -40,57 +43,16 @@ export type FidelityInput = {
   provenance: SectionProvenance[];
 };
 
-export type SectionStatus =
-  | "verified"
-  | "mismatch"
-  | "span-not-found"
-  | "invalid-provenance"
-  | "missing-provenance"
-  | "malformed-narrative";
-
-export type DiffHint = {
-  expectedLength: number;
-  actualLength: number;
-  firstDifferingOffset: number;
-  commonSuffixLength: number;
-  expectedWordCount: number;
-  actualWordCount: number;
-  expectedSha256: string;
-  actualSha256: string;
-};
-
-export type SectionResult = {
-  sourceKey: string;
-  path: string;
-  status: SectionStatus;
-  spanCount: number;
-  reason?: string | undefined;
-  details?: DiffHint | undefined;
-  normalizedTextSha256?: string | undefined;
-};
+export type SectionStatus = z.infer<typeof SectionStatusSchema>;
+export type DiffHint = z.infer<typeof DiffHintSchema>;
+export type SectionResult = z.infer<typeof SectionResultSchema>;
 
 export type NarrativeBinding = {
   sourceKey: string;
   normalizedTextSha256: string | null;
 };
 
-export type FidelityReport = {
-  reportVersion: "1.0.0";
-  normalizationVersion: string;
-  extractedTextSha256: string;
-  narrativeBindingSha256: string;
-  status: "passed" | "failed";
-  sections: SectionResult[];
-  issues: string[];
-  summary: { total: number; verified: number };
-  coverage: {
-    pageCodePoints: number;
-    bodyCodePoints: number;
-    coveredCodePoints: number;
-    uncoveredGaps: number;
-  };
-  reportHash: string;
-};
+export type FidelityReport = z.infer<typeof FidelityReportSchema>;
 
 // Structural view of a Composition section as it arrives from an untrusted submission. Both the
 // repository's FhirComposition and a Zod-validated loose object satisfy it.
@@ -736,7 +698,7 @@ export function verifyNarrativeFidelity(input: FidelityInput): FidelityReport {
   const status: FidelityReport["status"] =
     verified === sections.length && issues.length === 0 ? "passed" : "failed";
   const body: Omit<FidelityReport, "reportHash"> = {
-    reportVersion: "1.0.0",
+    reportVersion: FIDELITY_REPORT_VERSION,
     normalizationVersion: NORMALIZATION_VERSION,
     extractedTextSha256: sha256(input.source),
     narrativeBindingSha256: sha256(bindings),

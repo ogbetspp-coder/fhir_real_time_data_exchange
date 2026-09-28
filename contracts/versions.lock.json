@@ -1,0 +1,66 @@
+{
+  "agent-turn": {
+    "1.2.0": [
+      {
+        "sha256": "236211e4c864b90586a7f77f2f88751cc63c1af9eec7f45729bbcd5232247724",
+        "record": "docs/validation/changes/2026-09-28-contract-versions-lock-and-parity.md"
+      }
+    ]
+  },
+  "canonical-submission": {
+    "2.0.0": [
+      {
+        "sha256": "222552ef9804bd1f73ffee1da3d6a34bda64f8c70e0dc82b51dc6c2646440529",
+        "record": "docs/validation/changes/2026-09-28-contract-versions-lock-and-parity.md"
+      }
+    ]
+  },
+  "fidelity-report": {
+    "1.0.0": [
+      {
+        "sha256": "a14c9cafdcc20ea97d13060584ff0a8f1c9d07f485352364c83d838e695d9099",
+        "record": "docs/validation/changes/2026-09-28-contract-versions-lock-and-parity.md"
+      }
+    ]
+  },
+  "ingestion-provenance": {
+    "2.0.0": [
+      {
+        "sha256": "4aa09b94d82464390bfc588cc1cb9804fc02164648b00b32ec334875ef64edcf",
+        "record": "docs/validation/changes/2026-09-28-contract-versions-lock-and-parity.md"
+      }
+    ]
+  },
+  "query-tools": {
+    "4.1.0": [
+      {
+        "sha256": "82f004c346bc9453d59f497d4ee8ef1fff08eec3bd083fc74fd3004e1fe0db2b",
+        "record": "docs/validation/changes/2026-09-28-contract-versions-lock-and-parity.md"
+      }
+    ]
+  },
+  "run-manifest": {
+    "5.0.0": [
+      {
+        "sha256": "2cdb10777fadccf4e49871104e3bd14d13c764faf022aacd0000557c4d27fdd4",
+        "record": "docs/validation/changes/2026-09-28-contract-versions-lock-and-parity.md"
+      }
+    ]
+  },
+  "run-request": {
+    "2.0.0": [
+      {
+        "sha256": "2419762024354d7c733a976792db40e147544a93f0f4dd7fbf1a7d50d46dd6ba",
+        "record": "docs/validation/changes/2026-09-28-contract-versions-lock-and-parity.md"
+      }
+    ]
+  },
+  "source-document-text": {
+    "1.0.0": [
+      {
+        "sha256": "bca39bb9ac2bd4adea886d6338e5193e4071cb80e42d8823ef586369b1662627",
+        "record": "docs/validation/changes/2026-09-28-contract-versions-lock-and-parity.md"
+      }
+    ]
+  }
+}

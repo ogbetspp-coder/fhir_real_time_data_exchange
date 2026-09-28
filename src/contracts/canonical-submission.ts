@@ -78,7 +78,11 @@ function countWordsAnyScript(value: string): number {
   return words;
 }
 
-const CanonicalSubmissionBase = z.strictObject({
+// The submission's shape, without the gate's structural invariants (below): the language the
+// published schema states. The contract verdict corpus decides by it
+// (scripts/contracts/contract-verdicts.ts), since a model generated from the schema can hold a
+// submission to its shape and not to its recomputed hashes.
+export const CanonicalSubmissionBase = z.strictObject({
   schemaVersion: z.literal(CANONICAL_SUBMISSION_VERSION),
   submissionId: Uuid,
   createdAt: IsoDateTime,

@@ -10,7 +10,8 @@ committed module is out of date with ``contracts/generated/``.
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel
+from pydantic import ConfigDict, Field, RootModel, StrictBool, StrictInt, StrictStr
+from zone_a.contract_model import ContractModel
 
 
 class Kind(StrEnum):
@@ -19,24 +20,25 @@ class Kind(StrEnum):
     document = "document"
 
 
-class Sha256Hex(RootModel[str]):
+class Sha256Hex(RootModel[StrictStr]):
     root: Annotated[
-        str, Field(description="Lower-case hexadecimal SHA-256 digest.", pattern="^[0-9a-f]{64}$")
+        StrictStr,
+        Field(description="Lower-case hexadecimal SHA-256 digest.", pattern="^[0-9a-f]{64}$"),
     ]
 
 
-class Uuid(RootModel[str]):
+class Uuid(RootModel[StrictStr]):
     root: Annotated[
-        str,
+        StrictStr,
         Field(
             pattern="^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         ),
     ]
 
 
-class IsoDateTime(RootModel[str]):
+class IsoDateTime(RootModel[StrictStr]):
     root: Annotated[
-        str,
+        StrictStr,
         Field(
             description="RFC 3339 timestamp with Z or a numeric offset.",
             pattern="^(?:(?:[0-9][0-9][2468][048]|[0-9][0-9][13579][26]|[0-9][0-9]0[48]|[02468][048]00|[13579][26]00)-02-29|[0-9]{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|(?:02)-(?:0[1-9]|1[0-9]|2[0-8])))T(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|([+-](?:[01][0-9]|2[0-3]):[0-5][0-9])))$",
@@ -44,9 +46,9 @@ class IsoDateTime(RootModel[str]):
     ]
 
 
-class PackageRef(RootModel[str]):
+class PackageRef(RootModel[StrictStr]):
     root: Annotated[
-        str,
+        StrictStr,
         Field(
             description="FHIR package id#version.",
             max_length=256,
@@ -55,15 +57,25 @@ class PackageRef(RootModel[str]):
     ]
 
 
-class ManifestPackage(BaseModel):
+class Token(RootModel[StrictStr]):
+    root: Annotated[
+        StrictStr,
+        Field(
+            description="Identifier: letters, digits, and . _ : / @ + - only.",
+            pattern="^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$",
+        ),
+    ]
+
+
+class ManifestPackage(ContractModel):
     model_config = ConfigDict(extra="forbid")
     package: PackageRef
     sha256: Sha256Hex
 
 
-class HttpUrl(RootModel[str]):
+class HttpUrl(RootModel[StrictStr]):
     root: Annotated[
-        str,
+        StrictStr,
         Field(
             description="http(s) URL without whitespace; may carry |version.",
             max_length=256,
@@ -72,19 +84,22 @@ class HttpUrl(RootModel[str]):
     ]
 
 
-class ManifestTransformation(BaseModel):
+class ManifestTransformation(ContractModel):
     model_config = ConfigDict(extra="forbid")
     inputHash: Sha256Hex
     outputHash: Sha256Hex
-    decisions: Annotated[int, Field(ge=0, le=9007199254740991)]
+    decisions: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
 
 
-class ManifestRuntime(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    sourceCommit: Annotated[str, Field(max_length=1024, min_length=1)]
-    imageDigest: Annotated[str, Field(max_length=1024, min_length=1)]
-    workflowRevision: Annotated[str, Field(max_length=1024, min_length=1)]
-    validatorImageDigest: Annotated[str, Field(max_length=1024, min_length=1)]
+class GitCommit(RootModel[StrictStr]):
+    root: Annotated[
+        StrictStr,
+        Field(description="Full lower-case hexadecimal git commit id.", pattern="^[0-9a-f]{40}$"),
+    ]
+
+
+class ImageDigest(RootModel[StrictStr]):
+    root: Annotated[StrictStr, Field(pattern="^sha256:[0-9a-f]{64}$")]
 
 
 class SourceKind(StrEnum):
@@ -96,12 +111,12 @@ class Status(StrEnum):
     passed = "passed"
 
 
-class Coverage(BaseModel):
+class Coverage(ContractModel):
     model_config = ConfigDict(extra="forbid")
-    pageCodePoints: Annotated[int, Field(ge=0, le=9007199254740991)]
-    bodyCodePoints: Annotated[int, Field(ge=0, le=9007199254740991)]
-    coveredCodePoints: Annotated[int, Field(ge=0, le=9007199254740991)]
-    uncoveredGaps: Annotated[int, Field(ge=0, le=9007199254740991)]
+    pageCodePoints: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
+    bodyCodePoints: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
+    coveredCodePoints: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
+    uncoveredGaps: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
 
 
 class GraphType(StrEnum):
@@ -109,19 +124,9 @@ class GraphType(StrEnum):
     type2 = "type2"
 
 
-class Token(RootModel[str]):
+class NormalizationVersion(RootModel[StrictStr]):
     root: Annotated[
-        str,
-        Field(
-            description="Identifier: letters, digits, and . _ : / @ + - only.",
-            pattern="^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$",
-        ),
-    ]
-
-
-class NormalizationVersion(RootModel[str]):
-    root: Annotated[
-        str,
+        StrictStr,
         Field(
             description="Version of docs/fidelity-normalization.md the hashes were computed under.",
             pattern="^fidelity-norm\\/[0-9]+\\.[0-9]+\\.[0-9]+$",
@@ -129,8 +134,8 @@ class NormalizationVersion(RootModel[str]):
     ]
 
 
-class PrincipalId(RootModel[str]):
-    root: Annotated[str, Field(pattern="^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$")]
+class PrincipalId(RootModel[StrictStr]):
+    root: Annotated[StrictStr, Field(pattern="^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$")]
 
 
 class ApproverRole(StrEnum):
@@ -147,8 +152,8 @@ class ApprovalMeaning(StrEnum):
     reviewed_fidelity_and_structure = "reviewed-fidelity-and-structure"
 
 
-class RecordRef(RootModel[str]):
-    root: Annotated[str, Field(pattern="^[A-Za-z0-9][A-Za-z0-9._:/#?=&%+-]{0,511}$")]
+class RecordRef(RootModel[StrictStr]):
+    root: Annotated[StrictStr, Field(pattern="^[A-Za-z0-9][A-Za-z0-9._:/#?=&%+-]{0,511}$")]
 
 
 class Authority(StrEnum):
@@ -160,9 +165,9 @@ class AuthorityStatus(StrEnum):
     pilot = "pilot"
 
 
-class AuthorityId(RootModel[str]):
+class AuthorityId(RootModel[StrictStr]):
     root: Annotated[
-        str,
+        StrictStr,
         Field(
             description="A lower-case GUID.",
             pattern="^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$",
@@ -170,73 +175,81 @@ class AuthorityId(RootModel[str]):
     ]
 
 
-class FetchedItem(BaseModel):
+class FetchedItem(ContractModel):
     model_config = ConfigDict(extra="forbid")
     url: HttpUrl
     sha256: Sha256Hex
-    byteLength: Annotated[int, Field(ge=0, le=9007199254740991)]
+    byteLength: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
     fetchedAt: IsoDateTime
-    evidenceUri: Annotated[str | None, Field(max_length=1024, min_length=1)] = None
+    evidenceUri: Annotated[StrictStr | None, Field(max_length=1024, min_length=1)] = None
 
 
-class AuthorityFetch(BaseModel):
+class AuthorityFetch(ContractModel):
     model_config = ConfigDict(extra="forbid")
     importerVersion: Token
     fetched: Annotated[list[FetchedItem], Field(min_length=2)]
 
 
-class Source1(BaseModel):
+class Source1(ContractModel):
     model_config = ConfigDict(extra="forbid")
     kind: Kind
-    resource: Annotated[str, Field(max_length=1024, min_length=1)]
+    resource: Annotated[StrictStr, Field(max_length=1024, min_length=1)]
     hash: Sha256Hex
 
 
-class ManifestPersistence(BaseModel):
+class ManifestPersistence(ContractModel):
     model_config = ConfigDict(extra="forbid")
-    targetStore: Annotated[str, Field(max_length=1024, min_length=1)]
+    targetStore: Token
     transactionSha256: Sha256Hex
 
 
-class Source(BaseModel):
+class Source(ContractModel):
     model_config = ConfigDict(extra="forbid")
     kind: Kind
-    resource: Annotated[str, Field(max_length=1024, min_length=1)]
+    resource: Annotated[StrictStr, Field(max_length=1024, min_length=1)]
     hash: Sha256Hex
 
 
-class ManifestStandards(BaseModel):
+class ManifestStandards(ContractModel):
     model_config = ConfigDict(extra="forbid")
     fhir: Literal["5.0.0"]
     globalEpiPackage: PackageRef
     emaPackage: Literal["EUePI#1.0.0"]
-    qrdTemplate: Annotated[str, Field(max_length=1024, min_length=1)]
-    mappingVersion: Annotated[str, Field(max_length=1024, min_length=1)]
+    qrdTemplate: Token
+    mappingVersion: Token
     packages: Annotated[list[ManifestPackage], Field(min_length=1)]
 
 
-class ManifestValidation(BaseModel):
+class ManifestValidation(ContractModel):
     model_config = ConfigDict(extra="forbid")
-    preflightErrors: Annotated[int, Field(ge=0, le=9007199254740991)]
-    officialValidationExecuted: bool
-    officialProfileErrors: Annotated[int, Field(ge=0, le=9007199254740991)]
-    cloudValidationExecuted: bool
-    cloudProfileErrors: Annotated[int, Field(ge=0, le=9007199254740991)]
+    preflightErrors: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
+    officialValidationExecuted: StrictBool
+    officialProfileErrors: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
+    cloudValidationExecuted: StrictBool
+    cloudProfileErrors: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
     profiles: list[HttpUrl]
 
 
-class Fidelity(BaseModel):
+class ManifestRuntime(ContractModel):
+    model_config = ConfigDict(extra="forbid")
+    sourceCommit: GitCommit | Literal["development"]
+    imageDigest: ImageDigest | Literal["development"]
+    validatorImageDigest: ImageDigest | Literal["development"]
+    workflowRevision: Token
+
+
+class Fidelity(ContractModel):
     model_config = ConfigDict(extra="forbid")
     status: Status
     normalizationVersion: NormalizationVersion
-    sectionsChecked: Annotated[int, Field(ge=0, le=9007199254740991)]
-    sectionsMatched: Annotated[int, Field(ge=0, le=9007199254740991)]
+    sectionsChecked: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
+    sectionsMatched: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
     reportSha256: Sha256Hex
     narrativeBindingSha256: Sha256Hex
     coverage: Coverage
 
 
-class AttestedApproval(BaseModel):
+class AttestedApproval(ContractModel):
     model_config = ConfigDict(extra="forbid")
     approverId: PrincipalId
     approverRole: ApproverRole
@@ -247,7 +260,7 @@ class AttestedApproval(BaseModel):
     recordRef: RecordRef | None = None
 
 
-class Publication(BaseModel):
+class Publication(ContractModel):
     model_config = ConfigDict(extra="forbid")
     epiId: Token
     documentId: AuthorityId
@@ -257,7 +270,7 @@ class Publication(BaseModel):
     authorityTimestamp: IsoDateTime
 
 
-class AuthorityApproval(BaseModel):
+class AuthorityApproval(ContractModel):
     model_config = ConfigDict(extra="forbid")
     method: Literal["authority-publication"]
     meaning: Literal["authority-publication-imported"]
@@ -273,13 +286,13 @@ class Approval(RootModel[AttestedApproval | AuthorityApproval]):
     root: AttestedApproval | AuthorityApproval
 
 
-class IngestionEvidence(BaseModel):
+class IngestionEvidence(ContractModel):
     model_config = ConfigDict(extra="forbid")
     submissionId: Uuid
     contractVersion: Literal["2.0.0"]
     sourceKind: SourceKind
     graphType: GraphType
-    allowSyntheticSources: bool
+    allowSyntheticSources: StrictBool
     sourceDocumentSha256: Sha256Hex
     extractionRunId: Uuid
     parser: Token
@@ -291,9 +304,9 @@ class IngestionEvidence(BaseModel):
     provenanceResourceId: Uuid
 
 
-class AuthorisedRunManifest(BaseModel):
+class AuthorisedRunManifest(ContractModel):
     model_config = ConfigDict(extra="forbid")
-    schemaVersion: Literal["4.0.0"]
+    schemaVersion: Literal["5.0.0"]
     source: Source1
     runId: Uuid
     startedAt: IsoDateTime
@@ -308,9 +321,9 @@ class AuthorisedRunManifest(BaseModel):
     persistence: ManifestPersistence
 
 
-class ValidatedRunManifest(BaseModel):
+class ValidatedRunManifest(ContractModel):
     model_config = ConfigDict(extra="forbid")
-    schemaVersion: Literal["4.0.0"]
+    schemaVersion: Literal["5.0.0"]
     source: Source
     runId: Uuid
     startedAt: IsoDateTime

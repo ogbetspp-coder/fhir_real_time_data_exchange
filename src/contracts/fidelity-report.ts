@@ -2,6 +2,12 @@ import { z } from "zod";
 
 import { Count, NormalizationVersion, PositiveInt, Sha256Hex, SourceKey, Token } from "./common.js";
 
+// The published versions of the two contracts in this file (contracts/generated/index.json).
+// FIDELITY_REPORT_VERSION is also every report's `reportVersion`, which `reportHash` covers: a
+// change to it changes every report hash, and so every approved submission's content.
+export const SOURCE_DOCUMENT_TEXT_VERSION = "1.0.0";
+export const FIDELITY_REPORT_VERSION = "1.0.0";
+
 // The extractor's page text. It contains narrative, so it travels by reference and is never
 // logged or placed in a submission; it is validated here because it is untrusted input to the
 // Zone B re-execution of the fidelity check.
@@ -22,9 +28,10 @@ export const SourceDocumentTextSchema = z
   })
   .meta({ id: "SourceDocumentText" });
 
-// Wire schema for the FidelityReport that Zone A produces and Zone B re-verifies. It mirrors
-// `src/fidelity/verify.ts`'s FidelityReport type field for field so that a report crossing the
-// zone boundary is validated like every other contract object, not merely typed.
+// Wire schema for the FidelityReport that Zone A produces and Zone B re-verifies. It is the one
+// definition: `src/fidelity/verify.ts` takes its report types from here (z.infer), so a report
+// crossing the zone boundary is validated like every other contract object, and the type the
+// verifier builds cannot drift from the schema it is checked against (audit C-6).
 
 export const SectionStatus = z
   .enum([
@@ -67,7 +74,7 @@ export const SectionResultSchema = z
 
 export const FidelityReportSchema = z
   .strictObject({
-    reportVersion: z.literal("1.0.0"),
+    reportVersion: z.literal(FIDELITY_REPORT_VERSION),
     normalizationVersion: NormalizationVersion,
     extractedTextSha256: Sha256Hex,
     narrativeBindingSha256: Sha256Hex,

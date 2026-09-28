@@ -29,7 +29,11 @@ from verifiable_answer_agent.audit import (
     principal_fields,
     turn_record,
 )
-from verifiable_answer_agent.contract import load_agent_turn_schema
+from verifiable_answer_agent.contract import (
+    EcmaDraft202012Validator,
+    load_agent_turn_schema,
+    load_schema,
+)
 from verifiable_answer_agent.postcheck import ChunkCheck, post_check
 
 from .test_postcheck import verification
@@ -61,9 +65,9 @@ def record(**overrides: Any) -> Any:
 
 def agent_turn_validator() -> Draft202012Validator:
     schema = load_agent_turn_schema()
-    Draft202012Validator.check_schema(schema)
+    EcmaDraft202012Validator.check_schema(schema)
     # No format checker, as in contract.py: every ``format`` here has a ``pattern`` beside it.
-    return Draft202012Validator(schema)
+    return EcmaDraft202012Validator(schema)
 
 
 def emitted() -> dict[str, Any]:
@@ -96,6 +100,23 @@ def test_a_record_with_no_tool_calls_and_no_flags_also_validates() -> None:
         by_alias=True, mode="json", exclude_none=True
     )
     assert not list(agent_turn_validator().iter_errors(payload))
+
+
+# Which rule decided a `match`: the agent-turn and query-tools versions of the vendored copies,
+# on every record, full or minimal (agent-turn 1.2.0, audit C-9).
+def test_the_record_names_the_contracts_it_was_written_and_checked_under() -> None:
+    payload = emitted()
+    assert payload["contractVersion"] == load_agent_turn_schema()["$id"].split("/")[-2]
+    assert payload["queryToolsVersion"] == load_schema()["$id"].split("/")[-2]
+    assert (payload["contractVersion"], payload["queryToolsVersion"]) == ("1.2.0", "4.1.0")
+    minimal = minimal_record(
+        service_version="agent/0.1.0",
+        principal="urn:reviewer:synthetic-01",
+        turn_id=TURN_ID,
+        outcome="model-failed",
+    ).model_dump(by_alias=True, mode="json", exclude_none=True)
+    assert minimal["queryToolsVersion"] == "4.1.0"
+    assert not list(agent_turn_validator().iter_errors(minimal))
 
 
 def test_the_record_carries_exactly_the_contracts_fields() -> None:

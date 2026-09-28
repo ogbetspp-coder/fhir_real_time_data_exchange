@@ -161,6 +161,11 @@ describe("the entitlement map", () => {
       { "112233445566778899001": { bundles: [], organisation: "x" } },
     ],
     ["a bundle id that is not a FHIR id", { "112233445566778899001": { bundles: ["has space"] } }],
+    // Never a URL path segment the parser resolves (Bundle/.. is the store itself): the service
+    // reads only entitled ids, so none may be . or .. or begin with either.
+    ["the bundle id ..", { "112233445566778899001": { bundles: [".."] } }],
+    ["the bundle id .", { "112233445566778899001": { bundles: ["."] } }],
+    ["a bundle id that begins with -", { "112233445566778899001": { bundles: ["-bundle"] } }],
     ["a principal keyed by e-mail address", { "someone@example.com": { bundles: [] } }],
   ])("refuses %s, counting the issues but not quoting them", (_label, value) => {
     let thrown: unknown;

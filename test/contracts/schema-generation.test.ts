@@ -5,7 +5,13 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { CONTRACTS, contractId, type ContractDefinition } from "../../src/contracts/index.js";
-import { asciiDigits, contractJsonSchema } from "../../src/contracts/json-schema.js";
+import {
+  REFINEMENTS,
+  asciiDigits,
+  contractJsonSchema,
+  publishedSchema,
+  refinedSchemaIds,
+} from "../../src/contracts/json-schema.js";
 import { sha256 } from "../../src/lib/hash.js";
 
 const GENERATED = path.resolve("contracts/generated");
@@ -36,9 +42,9 @@ function generate(contract: ContractDefinition, io: "input" | "output"): JsonObj
   return contractJsonSchema(contract.schema, io);
 }
 
+// What scripts/contracts/generate-schemas.ts writes: the same pure call, not a copy of it.
 function document(contract: ContractDefinition): JsonObject {
-  const { $schema, ...rest } = generate(contract, "input");
-  return { $schema: $schema ?? DRAFT, $id: contractId(contract.name, contract.version), ...rest };
+  return publishedSchema(contract);
 }
 
 function structure(value: JsonObject): JsonObject {
@@ -143,6 +149,38 @@ describe("generated contract JSON Schemas", () => {
     expect(asciiDigits(String.raw`^a\.b\[c\]$`)).toBe(String.raw`^a\.b\[c\]$`);
     for (const shorthand of ["w", "W", "s", "S", "b", "B", "D"]) {
       expect(() => asciiDigits(`^a\\${shorthand}$`)).toThrow(/reads as Unicode/);
+    }
+  });
+
+  // z.toJSONSchema drops every .refine and .superRefine silently (audit C-8). Each is listed, and
+  // the ones JSON Schema can state are published.
+  it("lists every refinement a published contract carries, and no other", () => {
+    const carried = new Set(CONTRACTS.flatMap(({ schema }) => refinedSchemaIds(schema)));
+    expect([...carried].sort()).toEqual(Object.keys(REFINEMENTS).sort());
+  });
+
+  it("refuses to publish a refinement it does not list, or one on a schema without an id", () => {
+    const unlisted = z
+      .strictObject({ a: z.number(), b: z.number() })
+      .refine(({ a, b }) => a < b)
+      .meta({ id: "UnlistedRefinement" });
+    expect(() => contractJsonSchema(unlisted, "input")).toThrow(
+      /UnlistedRefinement carries a refinement/,
+    );
+    const anonymous = z.strictObject({ a: z.number() }).refine(({ a }) => a > 0);
+    expect(() => contractJsonSchema(z.strictObject({ inner: anonymous }), "input")).toThrow(
+      /no id/,
+    );
+  });
+
+  it("publishes the run manifest's two rules between fields", async () => {
+    const manifest = await readJson<JsonObject>("run-manifest.schema.json");
+    const definitions = manifest.$defs as Record<string, JsonObject>;
+    for (const id of ["RunManifest", "IngestionEvidence"]) {
+      const disposition = REFINEMENTS[id];
+      expect(disposition !== undefined && "expressed" in disposition).toBe(true);
+      if (disposition === undefined || !("expressed" in disposition)) continue;
+      expect(definitions[id]).toMatchObject(disposition.expressed);
     }
   });
 

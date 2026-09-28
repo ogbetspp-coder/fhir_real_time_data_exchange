@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { GoogleAuth } from "google-auth-library";
 
+import { AddressableFhirId } from "../contracts/common.js";
 import type { FhirBundle, FhirResource } from "../fhir/types.js";
 import { sha256, sha256Utf8 } from "../lib/hash.js";
 import type { QueryConfig } from "./config.js";
@@ -37,6 +38,16 @@ export class FhirReadError extends Error {
     super(message);
     this.name = "FhirReadError";
   }
+}
+
+// A Bundle id as a URL path segment. Encoding leaves `.` and `..` as they are and the URL parser
+// resolves them, so `Bundle/..` would read the store itself; an entitled id is always an
+// `AddressableFhirId` (./entitlements.ts), so one that is not is refused here, never read.
+function addressable(bundleId: string): string {
+  if (!AddressableFhirId.safeParse(bundleId).success) {
+    throw new FhirReadError("A Bundle id must be a single URL path segment");
+  }
+  return encodeURIComponent(bundleId);
 }
 
 // How long one store read may take, whatever the request's own deadline: a read the store never
@@ -212,10 +223,7 @@ export class HealthcareFhirReader implements FhirReader {
   }
 
   public async readBundle(bundleId: string, signal?: AbortSignal): Promise<FhirBundle | undefined> {
-    return this.#read<FhirBundle>(
-      `${this.#storeBase()}/Bundle/${encodeURIComponent(bundleId)}`,
-      signal,
-    );
+    return this.#read<FhirBundle>(`${this.#storeBase()}/Bundle/${addressable(bundleId)}`, signal);
   }
 
   public async readBundleVersion(
@@ -223,7 +231,7 @@ export class HealthcareFhirReader implements FhirReader {
     versionId: string,
     signal?: AbortSignal,
   ): Promise<FhirBundle | undefined> {
-    const url = `${this.#storeBase()}/Bundle/${encodeURIComponent(bundleId)}/_history/${encodeURIComponent(versionId)}`;
+    const url = `${this.#storeBase()}/Bundle/${addressable(bundleId)}/_history/${encodeURIComponent(versionId)}`;
     return this.#read<FhirBundle>(url, signal);
   }
 

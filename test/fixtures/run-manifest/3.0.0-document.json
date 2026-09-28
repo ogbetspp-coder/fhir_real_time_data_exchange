@@ -1,0 +1,79 @@
+{
+  "schemaVersion": "3.0.0",
+  "runId": "00000000-0000-4000-8000-00000000d001",
+  "startedAt": "2026-09-28T21:34:33.851Z",
+  "completedAt": "2026-09-28T21:34:33.868Z",
+  "status": "validated",
+  "dryRun": true,
+  "source": {
+    "kind": "document",
+    "resource": "gs://synthetic-submissions/synthetic-submission.json",
+    "hash": "e95421e1d5de87f5e637edb5900487ab0bd5cc6942e0861c629d129f03836490"
+  },
+  "standards": {
+    "fhir": "5.0.0",
+    "globalEpiPackage": "hl7.fhir.uv.emedicinal-product-info#1.0.0",
+    "emaPackage": "EUePI#1.0.0",
+    "qrdTemplate": "10.4",
+    "mappingVersion": "1.3.0"
+  },
+  "validation": {
+    "preflightErrors": 0,
+    "officialValidationExecuted": false,
+    "officialProfileErrors": 0,
+    "cloudValidationExecuted": false,
+    "cloudProfileErrors": 0,
+    "profiles": [
+      "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/Bundle-uv-epi",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUEpiList",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUEpiBundle",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUEpiComposition",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUEpiCompositionSmPC",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUEpiCompositionCAP",
+      "http://ema.europa.eu/fhir/StructureDefinition/EUQRD-CAP-template-new-SmPC-en"
+    ]
+  },
+  "transformation": {
+    "inputHash": "e95421e1d5de87f5e637edb5900487ab0bd5cc6942e0861c629d129f03836490",
+    "outputHash": "2bbcea5b1f88692ac92fb6fc634f91f256bfe90915df0f18c2649ee4a8865fb4",
+    "decisions": 32
+  },
+  "runtime": {
+    "sourceCommit": "development",
+    "imageDigest": "development",
+    "workflowRevision": "development"
+  },
+  "ingestion": {
+    "submissionId": "4b1d2c3e-5f60-4a71-8b92-0c1d2e3f4a5b",
+    "contractVersion": "2.0.0",
+    "sourceKind": "drawn",
+    "graphType": "type2",
+    "allowSyntheticSources": true,
+    "sourceDocumentSha256": "c226c77c373a69ba2a0e131298356e48916601fabdf85cb58d87a516c14674b4",
+    "extractionRunId": "7c8d9e0f-1a2b-4c3d-9e4f-5a6b7c8d9e0f",
+    "parser": "synthetic-extractor@1.0.0",
+    "fidelity": {
+      "status": "passed",
+      "normalizationVersion": "fidelity-norm/3.1.0",
+      "sectionsChecked": 32,
+      "sectionsMatched": 32,
+      "reportSha256": "d47998d567e2cfd73b0b71125e0610d3b4072bdbbbecf66bc01982dcd3d502be",
+      "narrativeBindingSha256": "dbc8cf153c23e248a34c79d2bb6176030b2b206646e92060ac9c7ce6e7b786dd",
+      "coverage": {
+        "pageCodePoints": 2433,
+        "bodyCodePoints": 2187,
+        "coveredCodePoints": 2155,
+        "uncoveredGaps": 0
+      }
+    },
+    "approval": {
+      "approverId": "urn:reviewer:synthetic-01",
+      "approverRole": "content-reviewer",
+      "approvedAt": "2026-09-19T00:00:00Z",
+      "method": "api-attestation",
+      "meaning": "reviewed-fidelity-and-structure",
+      "approvedContentSha256": "3f74ae046b294a2ac0529437c22b5d7d6bad7708b59818159300929a2cb3b30e"
+    },
+    "provenanceResourceId": "cabf3a37-fd9f-50f7-ab33-3ce39360ab90"
+  }
+}

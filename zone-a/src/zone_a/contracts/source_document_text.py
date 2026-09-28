@@ -9,20 +9,21 @@ committed module is out of date with ``contracts/generated/``.
 
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel
+from pydantic import ConfigDict, Field, RootModel, StrictInt, StrictStr
+from zone_a.contract_model import ContractModel
 
 
-class Page(BaseModel):
+class Page(ContractModel):
     model_config = ConfigDict(extra="forbid")
-    page: Annotated[int, Field(gt=0, le=9007199254740991)]
-    text: Annotated[str, Field(max_length=500000)]
-    bodyStart: Annotated[int, Field(ge=0, le=9007199254740991)]
-    bodyEnd: Annotated[int, Field(ge=0, le=9007199254740991)]
+    page: Annotated[StrictInt, Field(gt=0, le=9007199254740991)]
+    text: Annotated[StrictStr, Field(max_length=500000)]
+    bodyStart: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
+    bodyEnd: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
 
 
-class Token(RootModel[str]):
+class Token(RootModel[StrictStr]):
     root: Annotated[
-        str,
+        StrictStr,
         Field(
             description="Identifier: letters, digits, and . _ : / @ + - only.",
             pattern="^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$",
@@ -30,7 +31,7 @@ class Token(RootModel[str]):
     ]
 
 
-class SourceDocumentText(BaseModel):
+class SourceDocumentText(ContractModel):
     model_config = ConfigDict(extra="forbid")
     extractorVersion: Token
     pages: Annotated[list[Page], Field(max_length=2000, min_length=1)]

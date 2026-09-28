@@ -152,10 +152,20 @@ Two things were needed to make that reproducible, and both are worth knowing:
   a trailing comma only when its own width estimate wraps a call, and ruff's formatter preserves
   one where it finds it, so the same input could produce two stable-but-different files.
 
-**Strictness is not configured, and it is not assumed.** datamodel-code-generator maps
-`additionalProperties: false` to `ConfigDict(extra="forbid")` and an open object to
-`ConfigDict(extra="allow")` by itself, so no generator option or shared base class was needed.
-`tests/test_contracts_strictness.py` proves it per model instead of trusting it: it counts the
+**Strictness is configured where the generator is lax, and it is never assumed.**
+datamodel-code-generator maps `additionalProperties: false` to `ConfigDict(extra="forbid")` and an
+open object to `ConfigDict(extra="allow")` by itself. It does not make the types strict: until
+2026-09-28 pydantic's lax mode took `"1"` or `true` for an integer and `null` for an absent
+field, accepted what Zod refuses, and dumped it back as another document with another hash (audit
+C-7). The generator now runs with `--strict-types str int float bool` and
+`--base-class zone_a.contract_model.ContractModel`, whose validator refuses `null` for a declared
+field. `tests/test_contract_verdicts.py` holds every model to Zod's verdicts on the corpus in
+`test/fixtures/contracts/contract-verdicts.json`; one consequence is stated rather than hidden: a
+strict integer refuses an integral float (`1.0`, as `json.loads` reads a JSON `1.0`), which Zod
+takes as `1`, and Zone B's submission reader refuses that spelling of a number anyway (ADR 0002,
+"Numbers"). The contracts generated are every one `contracts/generated/index.json` lists, except
+`query-tools` and `agent-turn`, which Zone A does not read. `tests/test_contracts_strictness.py`
+proves the extra-field policy per model instead of trusting it: it counts the
 closed and open object schemas in each JSON Schema, counts the models that actually reject and
 actually accept an unknown field, and requires the counts to match. It also names the three
 models that are allowed to be open — `CanonicalBundle`, `EntryItem`, `Resource`, the FHIR objects
@@ -169,12 +179,16 @@ item 1.
 ## What the parity test proves
 
 `tests/test_contracts_parity.py` recomputes, in Python, four digests that TypeScript wrote into
-the fixtures. The Python canonical JSON encoder is an independent port of `src/lib/hash.ts`; if
-the two implementations disagree about key order, string escaping, or number formatting by one
+the fixtures, for a drawn Type 2 submission, an authority import's Type 1 record
+(`canonical-submission-type1.json`) and the smoke product's submission, whose strength is a decimal
+(`canonical-submission-decimal.json`); and it parses, verifies and round-trips the current run
+manifest version's manifests as the worker's code emitted them (`test/fixtures/run-manifest/`).
+The Python canonical JSON encoder is an independent port of `src/lib/hash.ts`; if the two
+implementations disagree about key order, string escaping, or number formatting by one
 byte, every digest differs and these tests fail.
 
 1. `sha256(canonical_json(submission.bundle))` equals `submission.bundleSha256`.
-2. `sha256(canonical_json({schemaVersion, bundle, provenance}))` equals
+2. `sha256(canonical_json({schemaVersion, graphType, bundle, provenance}))` equals
    `submission.approval.approvedContentSha256` — the hash a human approval is bound to
    (`approvedContent()` in `src/contracts/canonical-submission.ts`).
 3. `sha256(canonical_json(source-document-text.json))` equals
@@ -202,15 +216,16 @@ defaults are wrong:
   every astral character _after_ U+E000–U+FFFF; RFC 8785 and `src/lib/hash.ts` put it before,
   because the key is compared as UTF-16 code units. Keys are therefore sorted on
   `key.encode("utf-16-be")`. There is a test for exactly this case.
-- **Non-integral floats are refused, not formatted.** The specification says "`JSON.stringify`
-  number and string formatting", which is a normative reference to a JavaScript function rather
-  than a language-neutral rule. Rather than guess where the two languages' shortest-round-trip
-  formatting diverges, `canonical_json` raises on a float with a fractional part, and a test
-  asserts that no number anywhere in the four fixtures is a non-integer. An integral float up to
-  2^53-1 (`1.0`, as `json.loads` reads a JSON `1.0`) is the same JSON number as the integer, and
-  is written as that integer, as `JSON.stringify` writes it; one beyond is refused. Integer
-  formatting is identical in both languages, so the hashes that do match, match for a stated
-  reason.
+- **A float is written by RFC 8785, not by `json.dumps`.** "`JSON.stringify` number formatting"
+  is RFC 8785 section 3.2.2.3, ECMAScript's `Number::toString`: the shortest digits that
+  round-trip, placed in full up to an exponent of 21 and down to `0.000001`, and otherwise as
+  `1e+21` or `1e-7`. `canonical_json` does the same (`ecmascript_number`), where it refused every
+  non-integral float until 2026-09-28 (audit C-10): a 2.5 mg strength could not be hashed in Zone A.
+  `tests/test_canonical_json_parity.py` reproduces JavaScript's text for the doubles in
+  `test/fixtures/contracts/canonical-json-numbers.json`, each carried by its IEEE 754 bits, and the
+  decimal submission's hashes. An integral float is the integer it equals (`1.0` is `1`). An
+  _integer_ beyond 2^53-1 is still refused: JSON gives Python the exact integer and JavaScript the
+  nearest double, two values.
 
 ## Vector results
 
@@ -639,8 +654,10 @@ integral non-integer JSON number is not one", or the converse.
 
 **17. `Number.MAX_SAFE_INTEGER` is a bound on the contract, not on the hash.** Every numeric
 field in `contracts/generated/` is capped at 9007199254740991, but canonical JSON is specified
-over arbitrary JSON values, and above that bound JavaScript and Python disagree about the digits
-a number is written with (JavaScript switches to exponential notation at 1e21 and loses precision
-above 2^53−1). `canonical_json` refuses a number outside the safe range rather than guessing,
-which is the same posture it already took towards non-integral floats. No fixture or vector comes
-near it; the refusal is there so that a future one fails loudly instead of hashing differently.
+over arbitrary JSON values, and above that bound JavaScript and Python hold different values for
+one JSON integer (Python the exact integer, JavaScript the nearest double). `canonical_json`
+refuses an integer outside the safe range rather than guessing. A float is a double in both
+languages, and since 2026-09-28 it is written as JavaScript writes it, at any magnitude (RFC 8785;
+see "What the parity test proves" above), where every non-integral float used to be refused. No
+fixture or vector comes near the integer bound; the refusal is there so that a future one fails
+loudly instead of hashing differently.

@@ -3,8 +3,8 @@ import path from "node:path";
 
 import { format, resolveConfig } from "prettier";
 
-import { CONTRACTS, contractId, type ContractDefinition } from "../../src/contracts/index.js";
-import { contractJsonSchema } from "../../src/contracts/json-schema.js";
+import { CONTRACTS, contractId } from "../../src/contracts/index.js";
+import { publishedSchema } from "../../src/contracts/json-schema.js";
 import { sha256 } from "../../src/lib/hash.js";
 
 // Emits one JSON Schema (draft 2020-12) per contract root plus an index with content hashes.
@@ -15,20 +15,11 @@ const output = path.resolve("contracts/generated");
 await mkdir(output, { recursive: true });
 const prettierOptions = { ...(await resolveConfig(output)), parser: "json" as const };
 
-export function buildJsonSchema(contract: ContractDefinition): Record<string, unknown> {
-  const generated = contractJsonSchema(contract.schema, "input");
-  const { $schema, ...rest } = generated;
-  return {
-    $schema: $schema ?? "https://json-schema.org/draft/2020-12/schema",
-    $id: contractId(contract.name, contract.version),
-    ...rest,
-  };
-}
-
 const index: { name: string; version: string; $id: string; file: string; sha256: string }[] = [];
 
 for (const contract of CONTRACTS) {
-  const document = buildJsonSchema(contract);
+  // src/contracts/json-schema.ts builds the document; this script only writes it.
+  const document = publishedSchema(contract);
   const file = `${contract.name}.schema.json`;
   const text = await format(JSON.stringify(document, null, 2), prettierOptions);
   await writeFile(path.join(output, file), text);

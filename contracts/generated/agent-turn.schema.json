@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://khs.dev/contracts/agent-turn/1.1.0/schema.json",
+  "$id": "https://khs.dev/contracts/agent-turn/1.2.0/schema.json",
   "$ref": "#/$defs/AgentTurnRecord",
   "$defs": {
     "AgentTurnRecord": {
@@ -12,6 +12,12 @@
         },
         "serviceVersion": {
           "$ref": "#/$defs/Token"
+        },
+        "contractVersion": {
+          "$ref": "#/$defs/ContractVersion"
+        },
+        "queryToolsVersion": {
+          "$ref": "#/$defs/ContractVersion"
         },
         "at": {
           "$ref": "#/$defs/IsoDateTime"
@@ -93,6 +99,11 @@
       "type": "string",
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$",
       "description": "Identifier: letters, digits, and . _ : / @ + - only."
+    },
+    "ContractVersion": {
+      "type": "string",
+      "pattern": "^[0-9]{1,4}\\.[0-9]{1,4}\\.[0-9]{1,4}$",
+      "description": "A published contract's version, major.minor.patch."
     },
     "IsoDateTime": {
       "type": "string",

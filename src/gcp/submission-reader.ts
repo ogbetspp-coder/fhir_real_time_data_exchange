@@ -5,6 +5,7 @@ import type { AppConfig } from "../config.js";
 import { Sha256Hex, StorageUri } from "../contracts/common.js";
 import type { DocumentSubmissionInput, SubmissionRef } from "../contracts/index.js";
 import { sha256 } from "../lib/hash.js";
+import { hasNonCanonicalNumber } from "../lib/json-numbers.js";
 import { jsonShapeIssues } from "../lib/json-shape.js";
 import { log } from "../lib/logger.js";
 
@@ -33,6 +34,7 @@ export type SubmissionReadReason =
   | "object-too-large"
   | "invalid-json"
   | "malformed-json"
+  | "non-canonical-number"
   | "hash-mismatch"
   | "missing-reference";
 
@@ -168,14 +170,21 @@ export class GcsSubmissionReader implements SubmissionReader {
     if (bytes.length > budget) throw new SubmissionReadError("object-too-large", part);
 
     let value: unknown;
+    const text = bytes.toString("utf8");
     try {
-      value = JSON.parse(bytes.toString("utf8"));
+      value = JSON.parse(text);
     } catch {
       throw new SubmissionReadError("invalid-json", part);
     }
     // Canonical hashing recurses, so a pathological document is refused before it is hashed.
     if (jsonShapeIssues(part, value).length > 0) {
       throw new SubmissionReadError("malformed-json", part);
+    }
+    // A number not written as the pipeline would store it (`2.50`, `1.0`, `1e2`, a digit
+    // beyond a double) would be stored as another text than the one approved, its precision
+    // dropped silently: refused instead (ADR 0002, "Numbers"; audit C-10).
+    if (hasNonCanonicalNumber(text)) {
+      throw new SubmissionReadError("non-canonical-number", part);
     }
     return { value, byteLength: bytes.length };
   }

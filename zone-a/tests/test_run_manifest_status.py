@@ -20,7 +20,7 @@ HASH = "a" * 64
 
 def _manifest(**overrides: Any) -> dict[str, Any]:
     manifest: dict[str, Any] = {
-        "schemaVersion": "4.0.0",
+        "schemaVersion": "5.0.0",
         "source": {"kind": "fixture", "resource": "fixture:test", "hash": HASH},
         "runId": "33333333-3333-4333-a333-333333333333",
         "startedAt": "2026-09-27T00:00:00Z",
@@ -46,10 +46,10 @@ def _manifest(**overrides: Any) -> dict[str, Any]:
         },
         "transformation": {"inputHash": HASH, "outputHash": HASH, "decisions": 1},
         "runtime": {
-            "sourceCommit": "c",
-            "imageDigest": "d",
-            "workflowRevision": "r",
-            "validatorImageDigest": "v",
+            "sourceCommit": "0123456789abcdef0123456789abcdef01234567",
+            "imageDigest": "sha256:" + "d" * 64,
+            "workflowRevision": "ema-flow-worker-00001-abc",
+            "validatorImageDigest": "development",
         },
         "status": "authorised",
         "dryRun": False,
@@ -93,3 +93,21 @@ def test_names_every_package_with_its_hash_and_the_validator_image() -> None:
         RunManifest.model_validate(
             {**manifest, "standards": {**manifest["standards"], "packages": unhashed}}
         )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("sourceCommit", "local"),
+        ("sourceCommit", "0123456"),
+        ("imageDigest", "latest"),
+        ("validatorImageDigest", "sha256:" + "A" * 64),
+        ("workflowRevision", "a revision"),
+    ],
+)
+def test_names_the_code_and_the_images_in_their_own_grammars(field: str, value: str) -> None:
+    """5.0.0: a commit id, image digests or ``development``, and a token; no longer free text."""
+    manifest = _manifest()
+    RunManifest.model_validate(manifest)
+    with pytest.raises(ValidationError):
+        RunManifest.model_validate({**manifest, "runtime": {**manifest["runtime"], field: value}})

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://khs.dev/contracts/run-manifest/4.0.0/schema.json",
+  "$id": "https://khs.dev/contracts/run-manifest/5.0.0/schema.json",
   "$ref": "#/$defs/RunManifest",
   "$defs": {
     "RunManifest": {
@@ -11,14 +11,33 @@
         {
           "$ref": "#/$defs/AuthorisedRunManifest"
         }
-      ]
+      ],
+      "if": {
+        "properties": {
+          "source": {
+            "properties": {
+              "kind": {
+                "const": "document"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": ["ingestion"]
+      },
+      "else": {
+        "not": {
+          "required": ["ingestion"]
+        }
+      }
     },
     "ValidatedRunManifest": {
       "type": "object",
       "properties": {
         "schemaVersion": {
           "type": "string",
-          "const": "4.0.0"
+          "const": "5.0.0"
         },
         "source": {
           "type": "object",
@@ -118,14 +137,10 @@
           "const": "EUePI#1.0.0"
         },
         "qrdTemplate": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "$ref": "#/$defs/Token"
         },
         "mappingVersion": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "$ref": "#/$defs/Token"
         },
         "packages": {
           "minItems": 1,
@@ -151,6 +166,11 @@
       "maxLength": 256,
       "pattern": "^[A-Za-z][A-Za-z0-9-]*(?:\\.[A-Za-z0-9-]+)*#[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$",
       "description": "FHIR package id#version."
+    },
+    "Token": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$",
+      "description": "Identifier: letters, digits, and . _ : / @ + - only."
     },
     "ManifestPackage": {
       "type": "object",
@@ -234,28 +254,54 @@
       "type": "object",
       "properties": {
         "sourceCommit": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GitCommit"
+            },
+            {
+              "type": "string",
+              "const": "development"
+            }
+          ]
         },
         "imageDigest": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
-        },
-        "workflowRevision": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ImageDigest"
+            },
+            {
+              "type": "string",
+              "const": "development"
+            }
+          ]
         },
         "validatorImageDigest": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ImageDigest"
+            },
+            {
+              "type": "string",
+              "const": "development"
+            }
+          ]
+        },
+        "workflowRevision": {
+          "$ref": "#/$defs/Token"
         }
       },
-      "required": ["sourceCommit", "imageDigest", "workflowRevision", "validatorImageDigest"],
-      "additionalProperties": false
+      "required": ["sourceCommit", "imageDigest", "validatorImageDigest", "workflowRevision"],
+      "additionalProperties": false,
+      "description": "The code and the images that produced the run: a full git commit id and image digests, or `development` off Cloud Run."
+    },
+    "GitCommit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$",
+      "description": "Full lower-case hexadecimal git commit id."
+    },
+    "ImageDigest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
     },
     "IngestionEvidence": {
       "type": "object",
@@ -386,16 +432,26 @@
         "provenanceResourceId"
       ],
       "additionalProperties": false,
-      "description": "Hashes, counts, enumerations, and identifiers only; never narrative."
+      "description": "Hashes, counts, enumerations, and identifiers only; never narrative.",
+      "if": {
+        "properties": {
+          "sourceKind": {
+            "const": "authority-publication"
+          }
+        }
+      },
+      "then": {
+        "required": ["authority"]
+      },
+      "else": {
+        "not": {
+          "required": ["authority"]
+        }
+      }
     },
     "GraphType": {
       "type": "string",
       "enum": ["type1", "type2"]
-    },
-    "Token": {
-      "type": "string",
-      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$",
-      "description": "Identifier: letters, digits, and . _ : / @ + - only."
     },
     "NormalizationVersion": {
       "type": "string",
@@ -598,7 +654,7 @@
       "properties": {
         "schemaVersion": {
           "type": "string",
-          "const": "4.0.0"
+          "const": "5.0.0"
         },
         "source": {
           "type": "object",
@@ -675,9 +731,7 @@
       "type": "object",
       "properties": {
         "targetStore": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1024
+          "$ref": "#/$defs/Token"
         },
         "transactionSha256": {
           "$ref": "#/$defs/Sha256Hex"
