@@ -70,26 +70,84 @@ ema_flow_acknowledged() {
   [[ -n "$1" && -n "$2" && "${ALLOW_REPLACE_ACK:-}" == "$1:$2" ]]
 }
 
-# The one option an operator script takes, or none, in EMA_FLOW_OPTION. --help prints the
-# script's header comment and exits; any other argument is refused before the script does
-# anything (review round 2: plan-identity.sh read --help as "apply").
-#   ema_flow_option --check "$@"
+# The script that sourced this file, as an absolute path taken now, before the script's own
+# `cd "$ROOT"`: a script run as `cd scripts/gcp && bash deploy.sh --help` names itself relative to
+# a directory it has left (review of the B08 follow-up). EMA_FLOW_ROOT is the repository.
+EMA_FLOW_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+EMA_FLOW_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[1]:-${BASH_SOURCE[0]}}")" && pwd)/$(basename "${BASH_SOURCE[1]:-${BASH_SOURCE[0]}}")"
+
+# A script's header comment, its usage: the lines between the shebang and `set -euo pipefail`.
+#   ema_flow_help     prints the sourcing script's, and exits 0
+ema_flow_help() {
+  sed -n '2,/^set -euo pipefail$/p' "$EMA_FLOW_SCRIPT" | sed '$d' | sed -E 's/^# ?//'
+  exit 0
+}
+
+# Refuses a command line before the script does anything, and exits 2. The refused arguments are
+# described by position and length only, never echoed: an argument given by mistake can be a
+# secret (an OAuth client secret was exposed on a command line on 2026-09-22).
+#   ema_flow_refuse <what the script takes> <the arguments given...>
+ema_flow_refuse() {
+  local takes="$1" described="" index=0 argument
+  shift
+  for argument in "$@"; do
+    index=$((index + 1))
+    described+="${described:+, }argument ${index} (${#argument} characters)"
+  done
+  echo "Usage: bash ${EMA_FLOW_SCRIPT#"${EMA_FLOW_ROOT}/"} ${takes} (--help for more); refused: ${described:-no arguments}" >&2
+  exit 2
+}
+
+# The options an operator script takes -- none, or one of a space-separated list -- in
+# EMA_FLOW_OPTION. --help (or -h) prints the script's header comment and exits 0; any other
+# argument is refused with exit 2, before the script does anything (review round 2:
+# plan-identity.sh read --help as "apply"; round 3: api-trim.sh, deploy-identity.sh and
+# key-guard.sh did the same, and api-trim.sh's apply disables APIs).
+#   ema_flow_option --check "$@"        ema_flow_option "" "$@"   (takes no argument)
 ema_flow_option() {
-  local allowed="$1" script="${BASH_SOURCE[1]}"
+  local allowed="$1" option
   shift
   EMA_FLOW_OPTION=""
-  case "$#:${1:-}" in
-    0:) ;;
-    "1:${allowed}") EMA_FLOW_OPTION="$allowed" ;;
-    1:--help | 1:-h)
-      sed -n '2,/^set -euo pipefail$/p' "$script" | sed '$d' | sed -E 's/^# ?//'
-      exit 0
-      ;;
-    *)
-      echo "Usage: bash ${script#"$(pwd)/"} [${allowed}] (--help for more); refused: $*" >&2
-      exit 2
-      ;;
-  esac
+  if [[ "$#" == 0 ]]; then
+    return 0
+  fi
+  if [[ "$#" == 1 && ("$1" == "--help" || "$1" == "-h") ]]; then
+    ema_flow_help
+  fi
+  if [[ "$#" == 1 ]]; then
+    for option in $allowed; do
+      if [[ "$1" == "$option" ]]; then
+        EMA_FLOW_OPTION="$1"
+        return 0
+      fi
+    done
+  fi
+  ema_flow_refuse "${allowed:+[${allowed// /|}]}" "$@"
+}
+
+# The EXIT trap every script uses, around its own cleanup (a function name). Under bash 3.2 --
+# macOS's /bin/bash, which runs the owner's `bash scripts/...` -- any EXIT trap turns an
+# expansion error (${VAR:?}) or an unset variable under `set -u` into exit status 0, whatever the
+# trap does with $? (review round 3). So a script that ends with status 0 without having reached
+# ema_flow_finish did not finish, and fails here. Bash 4 and later exit non-zero on those errors
+# anyway; there the check changes nothing.
+#   cleanup() { rm -f "$tmp"; }; ema_flow_on_exit cleanup     ...     ema_flow_finish
+EMA_FLOW_FINISHED=false
+EMA_FLOW_CLEANUP=true
+ema_flow_on_exit() {
+  EMA_FLOW_CLEANUP="$1"
+  trap 'ema_flow_exit_status=$?
+"$EMA_FLOW_CLEANUP" || true
+if [[ "$ema_flow_exit_status" == 0 && "$EMA_FLOW_FINISHED" != "true" ]]; then
+  echo "Stopped before finishing (an unset variable or a failed expansion, under bash ${BASH_VERSION}); failing." >&2
+  ema_flow_exit_status=1
+fi
+exit "$ema_flow_exit_status"' EXIT
+}
+# Marks the script as having finished, and exits 0.
+ema_flow_finish() {
+  EMA_FLOW_FINISHED=true
+  exit 0
 }
 
 ema_flow_access_token() {

@@ -1,5 +1,14 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync, readdirSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -157,10 +166,16 @@ describe("the deploy's alert recipient", () => {
   it("is never relaxed by an unnamed environment: deploy.sh refuses to run without one", () => {
     // Until audit B08 (L1) an unset EMA_FLOW_ENVIRONMENT read as dev, whose inputs file relaxes
     // the recipient, on whatever project the shell named. deploy.sh itself, not tf_deploy_vars.
+    // Stand-ins for the cloud CLIs first on PATH: the refusal must come before any of them.
+    const stub = mkdtempSync(path.join(tmpdir(), "alerting-cloud-"));
+    for (const cli of ["gcloud", "terraform", "curl"]) {
+      writeFileSync(path.join(stub, cli), `#!/bin/sh\necho "$0" >>"${stub}/calls"\nexit 3\n`);
+      chmodSync(path.join(stub, cli), 0o755);
+    }
     const run = spawnSync("bash", ["scripts/gcp/deploy.sh", "plan"], {
       encoding: "utf8",
       env: {
-        PATH: process.env.PATH ?? "",
+        PATH: `${stub}:${process.env.PATH ?? ""}`,
         GOOGLE_CLOUD_PROJECT: "any-project",
         REQUIRE_ALERT_RECIPIENT: "false",
       },
@@ -168,6 +183,8 @@ describe("the deploy's alert recipient", () => {
     expect(run.status).not.toBe(0);
     expect(run.stderr).toContain("EMA_FLOW_ENVIRONMENT names the environment to deploy");
     expect(`${run.stdout}${run.stderr}`).not.toContain("require_alert_recipient=false");
+    expect(existsSync(path.join(stub, "calls"))).toBe(false);
+    rmSync(stub, { recursive: true, force: true });
   });
 
   it.each(["False", "no", "0", " false"])(

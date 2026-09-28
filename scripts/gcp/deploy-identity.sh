@@ -25,6 +25,7 @@ set -euo pipefail
 
 # shellcheck source=scripts/gcp/common.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+ema_flow_option --check "$@"
 # GOOGLE_CLOUD_PROJECT or GCP_PROJECT_ID (refused when the two differ), else the gcloud
 # configuration; no project at all fails rather than falling back to a hard-coded one.
 PROJECT_ID="$(ema_flow_resolve_project)"
@@ -44,7 +45,7 @@ if [[ "$current" == "$CONDITION" ]]; then
   echo "The deploy identity condition is as intended."
   exit 0
 fi
-if [[ "${1:-}" == "--check" ]]; then
+if [[ "$EMA_FLOW_OPTION" == "--check" ]]; then
   echo "intended: ${CONDITION}" >&2
   echo "The deploy identity condition differs from the intended one." >&2
   exit 1

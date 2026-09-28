@@ -147,8 +147,9 @@ describe("the deploy's applies", { timeout: 30_000 }, () => {
 
   it("leave no saved plan behind, however the run ends", () => {
     // A saved plan holds sensitive values; deploy.sh removes every one on exit.
+    // Through common.sh's EXIT trap (ema_flow_on_exit), which also fails a run cut short.
     expect(deploy).toContain(
-      `trap 'deploy_status=$?; rm -f \${DEPLOY_TEMP_FILES[@]+"\${DEPLOY_TEMP_FILES[@]}"}; exit "$deploy_status"' EXIT`,
+      `deploy_cleanup() { rm -f \${DEPLOY_TEMP_FILES[@]+"\${DEPLOY_TEMP_FILES[@]}"}; }\nema_flow_on_exit deploy_cleanup`,
     );
     expect(extract("plan_reviewed")).toContain(
       'DEPLOY_TEMP_FILES+=("$plan_file" "$plan_text" "$plan_json" "$summary")',

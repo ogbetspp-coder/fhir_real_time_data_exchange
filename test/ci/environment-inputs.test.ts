@@ -26,6 +26,20 @@ const deployScript = readFileSync("scripts/gcp/deploy.sh", "utf8");
 const environments = readdirSync("scripts/gcp/environments").filter((name) =>
   name.endsWith(".env"),
 );
+// Every deploy.sh run here has stand-ins for the cloud CLIs first on its PATH, each recording its
+// call and failing (review of the B08 follow-up): the cases stop at a refusal before any cloud
+// call, and if a change ever reordered deploy.sh, the owner's authenticated gcloud must not be
+// what runs. The last test below holds that none was called.
+const CLOUD_STUB = mkdtempSync(path.join(tmpdir(), "environment-inputs-cloud-"));
+for (const cli of ["gcloud", "bq", "gsutil", "terraform", "curl"]) {
+  writeFileSync(
+    path.join(CLOUD_STUB, cli),
+    `#!/bin/sh\necho "${cli} $*" >>"${CLOUD_STUB}/calls"\nexit 3\n`,
+  );
+  chmodSync(path.join(CLOUD_STUB, cli), 0o755);
+}
+const STUBBED_PATH = `${CLOUD_STUB}:${process.env.PATH ?? ""}`;
+
 const DEV_PROJECT =
   /^EXPECTED_PROJECT_ID=(\S+)$/m.exec(
     readFileSync("scripts/gcp/environments/dev.env", "utf8"),
@@ -117,31 +131,32 @@ describe("each environment's own inputs", () => {
 
   it("are read by deploy.sh for the environment it runs, and a missing file is refused", () => {
     const run = (environment: string) =>
-      spawnSync("bash", ["scripts/gcp/deploy.sh", "no-such-phase"], {
+      spawnSync("bash", ["scripts/gcp/deploy.sh", "plan"], {
         encoding: "utf8",
         env: {
-          PATH: process.env.PATH ?? "",
+          PATH: STUBBED_PATH,
           GOOGLE_CLOUD_PROJECT: DEV_PROJECT,
           EMA_FLOW_ENVIRONMENT: environment,
         },
       });
     const dev = run("dev");
-    expect(dev.stderr).toContain("Unknown deploy phase: no-such-phase");
+    expect(dev.stderr).toContain("DEPLOY_SERVICE_ACCOUNT names the account");
     const unknown = run("staging");
     expect(unknown.status).toBe(1);
     expect(unknown.stderr).toContain("No inputs file for environment staging");
-    expect(unknown.stderr).not.toContain("Unknown deploy phase");
+    expect(unknown.stderr).not.toContain("DEPLOY_SERVICE_ACCOUNT names the account");
   });
 });
 
 // The environment names its project, and nothing defaults to dev (audit B08, L1). Until then an
 // unset or empty EMA_FLOW_ENVIRONMENT read as dev, and dev's inputs (alerts that page no one,
 // synthetic sources) applied to whatever project the shell named. Each case runs deploy.sh itself,
-// with a phase that does not exist, so it stops at the first refusal or at "Unknown deploy phase".
+// with the plan phase and no DEPLOY_SERVICE_ACCOUNT, so it stops at the first refusal or, past
+// every environment check, at the plan's own refusal of a missing account.
 function deployWith(env: Record<string, string>) {
-  return spawnSync("bash", ["scripts/gcp/deploy.sh", "no-such-phase"], {
+  return spawnSync("bash", ["scripts/gcp/deploy.sh", "plan"], {
     encoding: "utf8",
-    env: { PATH: process.env.PATH ?? "", ...env },
+    env: { PATH: STUBBED_PATH, ...env },
   });
 }
 
@@ -160,7 +175,7 @@ describe("the environment deploy.sh deploys", () => {
     const run = deployWith({ GOOGLE_CLOUD_PROJECT: DEV_PROJECT, ...env });
     expect(run.status).not.toBe(0);
     expect(run.stderr).toContain("EMA_FLOW_ENVIRONMENT names the environment to deploy");
-    expect(run.stderr).not.toContain("Unknown deploy phase");
+    expect(run.stderr).not.toContain("DEPLOY_SERVICE_ACCOUNT names the account");
   });
 
   it("is deployed only to the project its inputs file names", () => {
@@ -170,7 +185,7 @@ describe("the environment deploy.sh deploys", () => {
     });
     expect(run.status).toBe(1);
     expect(run.stderr).toContain(`dev is deployed to ${DEV_PROJECT} only`);
-    expect(run.stderr).not.toContain("Unknown deploy phase");
+    expect(run.stderr).not.toContain("DEPLOY_SERVICE_ACCOUNT names the account");
   });
 
   it.each(["prod", "validation"])("is refused as %s, which names no project yet", (environment) => {
@@ -203,7 +218,7 @@ describe("the environment deploy.sh deploys", () => {
       ],
       {
         encoding: "utf8",
-        env: { PATH: process.env.PATH ?? "", ALLOW_SYNTHETIC_SOURCES: "true" },
+        env: { PATH: STUBBED_PATH, ALLOW_SYNTHETIC_SOURCES: "true" },
       },
     );
     expect(run.stdout).toBe("false");
@@ -258,7 +273,7 @@ describe("the alert recipient's dev exception", () => {
     spawnSync("bash", ["-c", stepScript(deployWorkflow, "Check deployment configuration")], {
       encoding: "utf8",
       env: {
-        PATH: process.env.PATH ?? "",
+        PATH: STUBBED_PATH,
         GCP_PROJECT_ID: "p",
         GCP_REGION: "europe-west4",
         GCP_DEPLOY_SERVICE_ACCOUNT: "sa",
@@ -373,7 +388,7 @@ describe("deploy.sh's refusals, whichever bash runs it", () => {
     const run = spawnSync(shell, ["scripts/gcp/deploy.sh", "plan"], {
       encoding: "utf8",
       env: {
-        PATH: process.env.PATH ?? "",
+        PATH: STUBBED_PATH,
         GOOGLE_CLOUD_PROJECT: DEV_PROJECT,
         EMA_FLOW_ENVIRONMENT: "dev",
       },
@@ -385,7 +400,7 @@ describe("deploy.sh's refusals, whichever bash runs it", () => {
   it.each(shells)("fails with no environment named, under %s", (shell) => {
     const run = spawnSync(shell, ["scripts/gcp/deploy.sh", "plan"], {
       encoding: "utf8",
-      env: { PATH: process.env.PATH ?? "", GOOGLE_CLOUD_PROJECT: DEV_PROJECT },
+      env: { PATH: STUBBED_PATH, GOOGLE_CLOUD_PROJECT: DEV_PROJECT },
     });
     expect(run.status).toBe(1);
   });
@@ -393,5 +408,12 @@ describe("deploy.sh's refusals, whichever bash runs it", () => {
   it("uses no ${VAR:?} expansion after its EXIT trap", () => {
     const afterTrap = deployScript.slice(deployScript.indexOf("' EXIT\n"));
     expect(afterTrap).not.toMatch(/\$\{\w+:\?/);
+  });
+});
+
+describe("the deploy.sh runs above", () => {
+  it("called no cloud CLI", () => {
+    expect(existsSync(path.join(CLOUD_STUB, "calls"))).toBe(false);
+    rmSync(CLOUD_STUB, { recursive: true, force: true });
   });
 });

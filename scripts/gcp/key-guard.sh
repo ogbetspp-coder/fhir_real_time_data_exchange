@@ -24,6 +24,7 @@ set -euo pipefail
 
 # shellcheck source=scripts/gcp/common.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+ema_flow_option --check "$@"
 # GOOGLE_CLOUD_PROJECT or GCP_PROJECT_ID (refused when the two differ), else the gcloud
 # configuration; no project at all fails rather than falling back to a hard-coded one.
 PROJECT_ID="$(ema_flow_resolve_project)"
@@ -32,7 +33,8 @@ POLICY_ID="key-guard"
 ATTACHMENT="cloudresourcemanager.googleapis.com%2Fprojects%2F${PROJECT_ID}"
 
 policy="$(mktemp)"
-trap 'rm -f "$policy"' EXIT
+key_guard_cleanup() { rm -f "$policy"; }
+ema_flow_on_exit key_guard_cleanup
 cat > "$policy" <<JSON
 {
   "displayName": "Protect the record's encryption keys",
@@ -78,8 +80,8 @@ PY
 )"
 echo "key-guard deny policy: ${same}"
 
-if [[ "$same" == "same" ]]; then exit 0; fi
-if [[ "${1:-}" == "--check" ]]; then exit 1; fi
+if [[ "$same" == "same" ]]; then ema_flow_finish; fi
+if [[ "$EMA_FLOW_OPTION" == "--check" ]]; then exit 1; fi
 
 if [[ "$same" == "missing" ]]; then
   gcloud iam policies create "$POLICY_ID" --attachment-point="$ATTACHMENT" \
@@ -95,3 +97,4 @@ PY
     --kind=denypolicies --policy-file="$policy"
 fi
 bash "$0" --check
+ema_flow_finish

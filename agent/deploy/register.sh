@@ -14,6 +14,7 @@ set -euo pipefail
 
 # shellcheck source=scripts/gcp/common.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../scripts/gcp" && pwd)/common.sh"
+ema_flow_option --check "$@"
 # GOOGLE_CLOUD_PROJECT or GCP_PROJECT_ID (refused when the two differ), else the gcloud
 # configuration; no project at all fails rather than falling back to a hard-coded one.
 PROJECT_ID="$(ema_flow_resolve_project)"
@@ -30,7 +31,8 @@ NAME="${PARENT}/agents/${AGENT_ID}"
 TOKEN="$(gcloud --quiet auth print-access-token)"
 hdr=(--header "X-Goog-User-Project: ${PROJECT_ID}" --header "Content-Type: application/json")
 work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT
+register_cleanup() { rm -rf "$work"; }
+ema_flow_on_exit register_cleanup
 
 # The access token reaches curl on its standard input, as a config line, never as an argument:
 # an argument is visible to every process on the machine for the life of the call.
@@ -50,10 +52,10 @@ case "$code" in
     ;;
 esac
 current="$(cat "${work}/current.json")"
-if [[ "${1:-}" == "--check" ]]; then
+if [[ "$EMA_FLOW_OPTION" == "--check" ]]; then
   if [[ "$exists" == "yes" ]]; then
     python3 -c "import sys,json;d=json.loads(sys.argv[1]);print('registered:',d['name'].split('/')[-1],'->',d.get('adkAgentDefinition',{}).get('provisionedReasoningEngine',{}).get('reasoningEngine'),'state',d.get('state'),'auth',d.get('authorizationConfig'))" "$current"
-    exit 0
+    ema_flow_finish
   fi
   echo "agent ${AGENT_ID}: not registered" >&2
   exit 1
@@ -117,3 +119,4 @@ response="$(google_curl --fail-with-body --request "$verb" "${hdr[@]}" \
   exit 1
 }
 python3 -c "import sys,json;print('registered:',json.loads(sys.argv[1])['name'])" "$response"
+ema_flow_finish

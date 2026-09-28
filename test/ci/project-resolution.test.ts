@@ -55,6 +55,19 @@ describe("operator scripts resolve the project, never default it", () => {
       expect([file, run.status, run.stderr]).toEqual([file, 0, ""]);
     }
   });
+
+  it("keep single quotes out of heredocs inside a command substitution", () => {
+    // bash 3.2 (macOS's /bin/bash, the owner's) parses such a heredoc only when it runs, and an
+    // apostrophe in it -- even in a Python comment -- is a syntax error there; `bash -n` and bash 5
+    // pass it (audit B08 follow-up: bootstrap.sh failed so under 3.2).
+    for (const file of scripts) {
+      const text = readFileSync(file, "utf8");
+      for (const match of text.matchAll(/\$\([^\n]*<<'(\w+)'[^\n]*\n([\s\S]*?)^\1$/gm)) {
+        const quoted = (match[2] ?? "").split("\n").filter((line) => line.includes("'"));
+        expect([file, quoted]).toEqual([file, []]);
+      }
+    }
+  });
 });
 
 describe("the resolution itself", () => {

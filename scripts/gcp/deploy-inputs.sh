@@ -15,9 +15,18 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# shellcheck source=scripts/gcp/common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 cd "$ROOT"
 
-OUT="${1:?Usage: deploy-inputs.sh <output directory>}"
+# One argument, a directory; --help prints this header, and anything else is refused.
+case "$#:${1:-}" in
+  1:--help | 1:-h) ema_flow_help ;;
+  1:-* | 1: | 0:*) ema_flow_refuse "<output directory>" "$@" ;;
+  1:*) ;;
+  *) ema_flow_refuse "<output directory>" "$@" ;;
+esac
+OUT="$1"
 if [[ -e "$OUT" && -n "$(ls -A "$OUT")" ]]; then
   echo "${OUT} is not empty; the deploy inputs are made in an empty directory." >&2
   exit 1
