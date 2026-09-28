@@ -224,8 +224,14 @@ defaults are wrong:
   `tests/test_canonical_json_parity.py` reproduces JavaScript's text for the doubles in
   `test/fixtures/contracts/canonical-json-numbers.json`, each carried by its IEEE 754 bits, and the
   decimal submission's hashes. An integral float is the integer it equals (`1.0` is `1`). An
-  _integer_ beyond 2^53-1 is still refused: JSON gives Python the exact integer and JavaScript the
-  nearest double, two values.
+  _integer_ beyond 2^53-1 is still refused here: JSON gives Python the exact integer and
+  JavaScript the nearest double, which may be two values. Zone B is not as strict: it accepts such
+  an integer when it is written as JavaScript writes the double (item 17 below).
+- **Write every submission part with `canonical_json`.** Zone B's submission reader refuses a part
+  whose numbers are not written as JavaScript writes them (`non-canonical-number`; ADR 0002,
+  "Numbers"), and `json.dumps` writes several differently: `1e-07` for `1e-7`, `1e+16` for
+  `10000000000000000`, `1.0` for `1`. `canonical_json` writes every number as JavaScript does, so a
+  part written with it is never refused for its numbers; one written with `json.dumps` may be.
 
 ## Vector results
 
@@ -656,7 +662,11 @@ integral non-integer JSON number is not one", or the converse.
 field in `contracts/generated/` is capped at 9007199254740991, but canonical JSON is specified
 over arbitrary JSON values, and above that bound JavaScript and Python hold different values for
 one JSON integer (Python the exact integer, JavaScript the nearest double). `canonical_json`
-refuses an integer outside the safe range rather than guessing. A float is a double in both
+refuses an integer outside the safe range rather than guessing. Zone B's submission reader is not
+that strict: it accepts an integer beyond the bound written as JavaScript writes its nearest double
+(`9007199254740992`), and refuses one it is not (`9007199254740993`). Only an open FHIR resource in
+a Bundle can carry one, since every contract field is capped; Zone A cannot hash such a Bundle, so
+its producers must not write one. A float is a double in both
 languages, and since 2026-09-28 it is written as JavaScript writes it, at any magnitude (RFC 8785;
 see "What the parity test proves" above), where every non-integral float used to be refused. No
 fixture or vector comes near the integer bound; the refusal is there so that a future one fails

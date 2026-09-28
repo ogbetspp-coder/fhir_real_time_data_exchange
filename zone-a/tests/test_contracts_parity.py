@@ -73,6 +73,13 @@ def test_canonical_json_refuses_what_javascript_would_hold_differently() -> None
             canonical_json({"value": value})
 
 
+def test_canonical_json_refuses_what_json_has_no_form_for() -> None:
+    with pytest.raises(CanonicalJsonError, match="string object keys"):
+        canonical_json({1: "a"})
+    with pytest.raises(CanonicalJsonError, match="cannot encode set"):
+        canonical_json({"value": {1, 2}})
+
+
 def test_canonical_json_encodes_an_integral_float_as_the_integer() -> None:
     # `JSON.stringify({"page": 1.0})` is `{"page":1}`: JSON has one number type. A Zone B report
     # over a source whose page numbers were written `1.0` must reproduce here, hash included.

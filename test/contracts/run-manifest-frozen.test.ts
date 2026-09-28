@@ -26,6 +26,14 @@ import { manifestRuntime } from "../../src/pipeline.js";
 // submission, each emitted by that version's code: 1.0.0 at 499e2b2, 1.1.0 at dd78a14, 2.0.0 at
 // 2a035f3 (#113), 3.0.0 at 95e7207 (#128), 4.0.0 at 9b4cb2a, 5.0.0 at this change. They are never
 // regenerated: each is the evidence that its version reads what that code wrote.
+//
+// Those are dry runs, which carry no persistence block. `*.synthetic.json` beside them are
+// persist-mode manifests of the frozen versions (review of #148, part A L5), each derived from its
+// version's own dry-run manifest by the one change a persisting run made: `persisted` with the
+// transaction response's hash up to 2.0.0, `authorised` with the transaction's hash from 3.0.0,
+// both validations executed. They are synthetic, not emitted: no code of those versions ran against
+// a store here. The real persisted manifests in the dev evidence bucket are read by
+// scripts/dev/check-evidence-manifests.ts, run by hand.
 
 const FIXTURES = path.resolve("test/fixtures/run-manifest");
 
@@ -57,6 +65,37 @@ describe("the run manifest's released versions", () => {
     for (const version of Object.keys(BY_VERSION)) {
       expect(files).toContain(`${version}-fixture.json`);
       if (version !== "1.0.0") expect(files).toContain(`${version}-document.json`);
+    }
+  });
+
+  it("reads a persist-mode manifest of every frozen version, with its own persistence only", () => {
+    const persisted = emitted().filter(({ file }) => file.endsWith(".synthetic.json"));
+    expect(persisted.map(({ version }) => version)).toEqual([
+      "1.0.0",
+      "1.1.0",
+      "2.0.0",
+      "3.0.0",
+      "4.0.0",
+    ]);
+    for (const { file, version, manifest } of persisted) {
+      const schema = BY_VERSION[version];
+      if (schema === undefined) throw new Error(`no schema for ${version}`);
+      expect([file, schema.safeParse(manifest).success]).toEqual([file, true]);
+      const persistence = manifest.persistence as Record<string, string>;
+      const signedBefore = "transactionSha256" in persistence;
+      expect([file, signedBefore]).toEqual([file, version >= "3.0.0"]);
+      // The other era's persistence block, or none, is refused.
+      const { transactionSha256, transactionResponseHash, targetStore } = persistence;
+      const other = signedBefore
+        ? { targetStore, transactionResponseHash: transactionSha256 }
+        : { targetStore, transactionSha256: transactionResponseHash };
+      expect(schema.safeParse({ ...manifest, persistence: other }).success).toBe(false);
+      if (signedBefore) {
+        const without = Object.fromEntries(
+          Object.entries(manifest).filter(([key]) => key !== "persistence"),
+        );
+        expect(schema.safeParse(without).success).toBe(false);
+      }
     }
   });
 
@@ -137,6 +176,68 @@ describe("the run manifest's released versions", () => {
       expect(RunManifestSchema.safeParse({ ...authorised, persistence }).success).toBe(false);
     }
   });
+});
+
+// The rules between fields each version held, held by its frozen copy too: a copy that lost a
+// refinement would read rows its version refused.
+describe("the rules between a manifest's fields, in every version that has them", () => {
+  const at = (file: string): Record<string, unknown> => {
+    const found = emitted().find((entry) => entry.file === file);
+    if (found === undefined) throw new Error(`no ${file}`);
+    return found.manifest;
+  };
+  const AUTHORITY = {
+    importerVersion: "2.2.0",
+    fetched: [1, 2].map((index) => ({
+      url: `https://epi.example/${String(index)}`,
+      sha256: String(index).repeat(64),
+      byteLength: 1,
+      fetchedAt: "2026-09-28T00:00:00Z",
+    })),
+  };
+
+  it.each(["1.1.0", "2.0.0", "3.0.0", "4.0.0", RUN_MANIFEST_VERSION])(
+    "%s: a document run, and only one, carries an ingestion block",
+    (version) => {
+      const schema = BY_VERSION[version];
+      if (schema === undefined) throw new Error(`no schema for ${version}`);
+      const document = at(`${version}-document.json`);
+      const fixture = at(`${version}-fixture.json`);
+      const without = Object.fromEntries(
+        Object.entries(document).filter(([key]) => key !== "ingestion"),
+      );
+      expect(schema.safeParse(without).success).toBe(false);
+      expect(schema.safeParse({ ...fixture, ingestion: document.ingestion }).success).toBe(false);
+    },
+  );
+
+  it.each(["2.0.0", "3.0.0", "4.0.0", RUN_MANIFEST_VERSION])(
+    "%s: an authority import, and only one, records what Zone B fetched",
+    (version) => {
+      const schema = BY_VERSION[version];
+      if (schema === undefined) throw new Error(`no schema for ${version}`);
+      const document = at(`${version}-document.json`);
+      const ingestion = { ...(document.ingestion as object), authority: AUTHORITY };
+      expect(schema.safeParse({ ...document, ingestion }).success).toBe(false);
+    },
+  );
+
+  it.each(["4.0.0", RUN_MANIFEST_VERSION])(
+    "%s: the named packages are pinned, each once",
+    (version) => {
+      const schema = BY_VERSION[version];
+      if (schema === undefined) throw new Error(`no schema for ${version}`);
+      const manifest = at(`${version}-fixture.json`);
+      const standards = manifest.standards as { packages: { package: string }[] };
+      const unpinned = standards.packages.filter(({ package: ref }) => !ref.startsWith("EUePI#"));
+      const twice = [...standards.packages, ...standards.packages.slice(0, 1)];
+      for (const packages of [unpinned, twice]) {
+        expect(
+          schema.safeParse({ ...manifest, standards: { ...standards, packages } }).success,
+        ).toBe(false);
+      }
+    },
+  );
 });
 
 describe("the manifest's runtime, read through the configuration", () => {

@@ -6,13 +6,23 @@ import { hasNonCanonicalNumber } from "../src/lib/json-numbers.js";
 // part whose numbers are written otherwise would lose what it wrote (ADR 0002, "Numbers").
 
 describe("numbers written as JavaScript writes them", () => {
-  it.each(["0", "-1", "2.5", "500", "0.000001", "1e-7", "1e+21", "5e-324", "9007199254740991"])(
-    "accepts %s",
-    (written) => {
-      expect(hasNonCanonicalNumber(`{"a":[${written}]}`)).toBe(false);
-      expect(JSON.stringify(JSON.parse(written))).toBe(written);
-    },
-  );
+  // 9007199254740992 is beyond Number.MAX_SAFE_INTEGER and still accepted: it is written as
+  // JavaScript writes its double. Zone A's canonical JSON refuses it (ADR 0002, "Numbers").
+  it.each([
+    "0",
+    "-1",
+    "2.5",
+    "500",
+    "0.000001",
+    "1e-7",
+    "1e+21",
+    "5e-324",
+    "9007199254740991",
+    "9007199254740992",
+  ])("accepts %s", (written) => {
+    expect(hasNonCanonicalNumber(`{"a":[${written}]}`)).toBe(false);
+    expect(JSON.stringify(JSON.parse(written))).toBe(written);
+  });
 
   it.each([
     ["-0", "which JavaScript writes 0"],

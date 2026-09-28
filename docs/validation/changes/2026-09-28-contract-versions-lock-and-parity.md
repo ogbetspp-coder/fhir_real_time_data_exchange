@@ -30,13 +30,19 @@ two items carried from the review of #145 (L2-d, and ADR 0002's amendment for re
      `run-request` 2.0.0: unchanged, schema and version.
 2. **The version lock** (C-6): `contracts/versions.lock.json`, each version's structure hash (the
    published document without its `$id`), `npm run contracts:lock`, and
-   `test/contracts/versions-lock.test.ts`, which refuses a changed schema under a locked version and
-   a lock that rewrites an entry `main` released. The versions already published enter the lock at
-   their current schemas; the lock has no history before this change.
+   `test/contracts/versions-lock.test.ts`, which refuses a changed schema under a locked version, a
+   structure `main` published that the lock lacks, and a lock that rewrites an entry `main`
+   released. The lock is seeded from `main`'s history: every structure each version was ever
+   published with (30 structures under 17 versions, retired versions included;
+   `ingestion-provenance` 1.0.0 alone has five), so a retired version number cannot come back with
+   another schema. A re-spelling
+   (`--respelling`) is appended only when nothing but `pattern` values differs from the schema
+   `main` last published under that version (review of #148, part A L1, L2).
 3. **Refinements** (C-8): every `.refine` of a published contract is listed in
-   `src/contracts/json-schema.ts` (`REFINEMENTS`) as expressed or unexpressed, and generation refuses
-   an unlisted one. The schema generator's document builder (`publishedSchema`) moved out of the
-   script into that module, and the test calls it rather than re-implementing it.
+   `src/contracts/json-schema.ts` (`REFINEMENTS`) as expressed or unexpressed, with how many the
+   schema carries, and generation refuses an unlisted one or a count that differs (review of #148,
+   part A L3). The schema generator's document builder (`publishedSchema`) moved out of the script
+   into that module, and the test calls it rather than re-implementing it.
 4. **Python readers** (C-7, L2-d): Zone A's models are generated with `--strict-types` and a base
    class that refuses `null` for a declared field; the list of contracts is derived from
    `contracts/generated/index.json`. The agent reads every `pattern` as ECMA-262 does
@@ -48,7 +54,12 @@ two items carried from the review of #145 (L2-d, and ADR 0002's amendment for re
 5. **Fixtures that cross languages** (C-8, C-9, C-10): an authority import's Type 1 submission, its
    fidelity report and page text; the smoke product's submission, whose strength is now 2.5 mg; the
    manifests each run-manifest version's own code emitted (a fixture run and a document run each;
-   1.0.0 a fixture run only), in `test/fixtures/run-manifest/`, never regenerated.
+   1.0.0 a fixture run only), in `test/fixtures/run-manifest/`, never regenerated; beside them, a
+   synthetic persist-mode manifest of each frozen version, derived from its dry run
+   (`*.synthetic.json`). The 91 real signed manifests in the dev evidence bucket (67 × 1.1.0
+   persisted, 7 × 2.0.0 persisted, 13 × 3.0.0 authorised, 4 × 4.0.0 authorised) all parse under
+   their own frozen version and hash to their `manifestHash`
+   (`scripts/dev/check-evidence-manifests.ts`, read-only, run by hand on 2026-09-28).
 6. **Numbers** (C-10): Zone A's `canonical_json` writes a double by RFC 8785 section 3.2.2.3, where
    it refused every non-integral float; the submission reader refuses a document part whose numbers
    are not written as JavaScript writes them (`non-canonical-number`). ADR 0002 records the decision.
@@ -143,7 +154,12 @@ UR-39; their text, and the procedure's paragraph that names `query-tools` 2.0.1 
 **Blast radius.**
 
 - A worker whose `GIT_COMMIT` is not a full commit id, or whose image digests are not digests,
-  does not start; `scripts/gcp/deploy.sh` sets all three.
+  does not start. `scripts/gcp/deploy.sh` sets all three from a clean checkout, and refuses a
+  working tree that differs from its commit before building anything (it used to build and name
+  it `<commit>-dirty-<tree>`, which the manifest can no longer carry).
+- A local run (`scripts/dev/run-pipeline.ts`, `scripts/dev/run-demo.ts`) never copies the
+  deployment's commit, image digests or revision: its manifest names this checkout's commit when
+  the checkout is clean, and `development` otherwise (review of #148, M1).
 - A document part written with a number JavaScript would write differently is refused
   (`non-canonical-number`); every producer in this repository writes with `JSON.stringify`.
 - An entitlement map naming a Bundle id that begins with `.` or `-` stops the query service at

@@ -2,10 +2,16 @@ import { loadConfig } from "../../src/config.js";
 import { loadEmaMapping } from "../../src/fhir/mapping.js";
 import { createSyntheticType2Bundle } from "../../src/fixtures/synthetic.js";
 import { runPipeline } from "../../src/pipeline.js";
+import { cleanHead, localEnvironment } from "./local-runtime.js";
 
 const mapping = await loadEmaMapping();
+// This shell's environment, without anything in it that would name a deployed commit or image
+// as what ran (./local-runtime.ts): the manifest names this checkout's commit when it is clean.
+const shell = new Map(
+  Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined),
+);
 const config = loadConfig({
-  ...process.env,
+  ...localEnvironment(shell, cleanHead()),
   DRY_RUN: "true",
   NODE_ENV: "development",
   ALLOW_SYNTHETIC_SOURCES: "true",

@@ -6,8 +6,8 @@ same field names, the same closed enumerations for tool names, outcomes and flag
 patterns for ``serviceVersion``, ``contractVersion``, ``queryToolsVersion``, ``principal``,
 ``principalDigest``, ``turnId`` and ``errorClass``, so that a record this module builds
 serialises to an instance the contract accepts. ``tests/test_audit.py`` validates an emitted
-record against the vendored schema. Each record names the agent-turn version it was written
-under and the query-tools version whose answers the turn checked (agent-turn 1.2.0).
+record against the vendored schema. Each record names the versions of the agent's vendored
+copies of agent-turn and query-tools (agent-turn 1.2.0).
 
 What is absent is the point. No narrative. No argument values — a ``verify_quote`` argument
 *is* narrative, so not even a digest of one is carried, because a digest of a quote is a way of
@@ -57,8 +57,9 @@ AGENT_TURN_VERSION: Final = contract_version(load_agent_turn_schema())
 """The agent-turn version every record is written under: the vendored copy's."""
 
 QUERY_TOOLS_VERSION: Final = contract_version(load_schema())
-"""The query-tools version every tool answer of the turn was validated against, whose ``match``
-rule the turn's verification stamps rest on: the vendored copy's (audit C-9)."""
+"""The query-tools version of the vendored copy every tool answer of the turn was validated against
+(audit C-9). Not the version the service answered under, which decides a ``match``: the service's
+own audit records of the same ``turnId`` carry that, as their ``contractVersion``."""
 
 ToolOutcome = Literal["ok", "schema-invalid", "tool-error", "transport-error", "not-an-object"]
 """``AgentToolOutcome`` in the agent-turn contract."""

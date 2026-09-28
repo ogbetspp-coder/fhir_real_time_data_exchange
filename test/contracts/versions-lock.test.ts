@@ -4,9 +4,15 @@ import { z } from "zod";
 import { resolveBase } from "../../scripts/authority/lock-hashes.js";
 import {
   currentStructures,
+  identify,
+  publishedHistory,
   readVersionsLock,
   recordExists,
   releasedLocks,
+  respellingIssues,
+  updateLock,
+  type Structure,
+  type VersionsLock,
 } from "../../scripts/contracts/versions-lock.js";
 import { CONTRACTS } from "../../src/contracts/index.js";
 import { publishedSchema, structureSha256 } from "../../src/contracts/json-schema.js";
@@ -79,5 +85,131 @@ describe("the contract version lock", () => {
         }
       }
     }
+  });
+
+  // Review of #148, part A L2: a retired version number can never be published again with a
+  // schema it was not published with, because every structure main ever published is locked.
+  it("records every structure main has published, under its version", () => {
+    const base = process.env.LOCK_BASE ?? "origin/main";
+    const commit = resolveBase(base);
+    if (process.env.CI === "true") expect(commit, "CI must name the lock's base").toBeDefined();
+    if (commit === undefined) return;
+    const lock = readVersionsLock();
+    const history = publishedHistory(commit);
+    expect(history.length).toBeGreaterThan(20);
+    for (const { name, version, sha256 } of history) {
+      expect(
+        [name, version, lock[name]?.[version]?.some((entry) => entry.sha256 === sha256)],
+        `${name}@${version}: main published ${sha256}; run npm run contracts:lock`,
+      ).toEqual([name, version, true]);
+    }
+  });
+});
+
+// updateLock, over synthetic schemas: what `npm run contracts:lock` may and may not record.
+describe("updating the version lock", () => {
+  const RECORD = "docs/validation/changes/2026-09-28-contract-versions-lock-and-parity.md";
+  const document = (pattern: string, extra: Record<string, unknown> = {}): unknown => ({
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    $id: "https://khs.dev/contracts/thing/1.0.0/schema.json",
+    $defs: { Id: { type: "string", pattern, maxLength: 64, description: "An id.", ...extra } },
+  });
+  const structure = (version: string, published: unknown): Structure => ({
+    name: "thing",
+    version,
+    sha256: structureSha256(published as Record<string, unknown>),
+    document: published,
+  });
+  const before = structure("1.0.0", document(String.raw`^\d+$`));
+  const lock: VersionsLock = { thing: { "1.0.0": [{ sha256: before.sha256, record: RECORD }] } };
+  const update = (current: Structure, respelling = false, released = [lock]) =>
+    updateLock({
+      lock,
+      history: [before],
+      current: [current],
+      released,
+      record: RECORD,
+      respelling,
+    });
+
+  it("appends a re-spelling, only when asked to, and never over what main released", () => {
+    const respelt = structure("1.0.0", document("^[0-9]+$"));
+    expect(() => update(respelt)).toThrow(/a re-spelling is appended with --respelling/);
+    const { lock: updated } = update(respelt, true);
+    expect(updated.thing?.["1.0.0"]?.map(({ sha256 }) => sha256)).toEqual([
+      before.sha256,
+      respelt.sha256,
+    ]);
+  });
+
+  // The escape hatch the review of #148 found unchecked (part A L1): a structural change passed off
+  // as a re-spelling.
+  it.each([
+    ["a bound", document("^[0-9]+$", { maxLength: 65 })],
+    ["a description", document("^[0-9]+$", { description: "Another id." })],
+    ["a keyword added", document("^[0-9]+$", { minLength: 1 })],
+    ["a type", document("^[0-9]+$", { type: "integer" })],
+  ])("refuses %s changed under --respelling", (_, disguised) => {
+    expect(() => update(structure("1.0.0", disguised), true)).toThrow(/is not a re-spelling/);
+  });
+
+  it("relocks a version main never published, and records what main published but the lock lacks", () => {
+    const next = structure("2.0.0", document("^[a-z]+$"));
+    const draft: VersionsLock = {
+      thing: { "2.0.0": [{ sha256: "0".repeat(64), record: RECORD }] },
+    };
+    const { lock: updated, changed } = updateLock({
+      lock: draft,
+      history: [before],
+      current: [next],
+      released: [],
+      record: RECORD,
+      respelling: false,
+    });
+    expect(updated.thing).toEqual({
+      "1.0.0": [{ sha256: before.sha256, record: RECORD }],
+      "2.0.0": [{ sha256: next.sha256, record: RECORD }],
+    });
+    expect(changed).toEqual([
+      expect.stringContaining("thing@1.0.0 published structure"),
+      "thing@2.0.0 locked",
+    ]);
+  });
+
+  it("drops what only this branch locked when the schema returns to the one main published", () => {
+    const branch: VersionsLock = {
+      thing: {
+        "1.0.0": [...(lock.thing?.["1.0.0"] ?? []), { sha256: "2".repeat(64), record: RECORD }],
+      },
+    };
+    const { lock: updated } = updateLock({
+      lock: branch,
+      history: [before],
+      current: [before],
+      released: [lock],
+      record: RECORD,
+      respelling: false,
+    });
+    expect(updated).toEqual(lock);
+  });
+
+  it("refuses to drop or change an entry main released", () => {
+    const tampered: VersionsLock = {
+      thing: { "1.0.0": [{ sha256: "1".repeat(64), record: RECORD }] },
+    };
+    expect(() => update(before, false, [tampered])).toThrow(/an entry main released was changed/);
+  });
+
+  it("reads a version from the $id, and refuses a document without one", () => {
+    expect(identify(document("^a$"))).toEqual({ name: "thing", version: "1.0.0" });
+    expect(() => identify({ $id: "https://example.org/schema.json" })).toThrow(/names no contract/);
+    expect(() => identify(null)).toThrow(/names no contract/);
+  });
+
+  it("compares arrays and scalars as well as objects", () => {
+    expect(respellingIssues([1, { pattern: "a" }], [1, { pattern: "b" }])).toEqual([]);
+    expect(respellingIssues([1], [1, 2])).toEqual(["$ has another length"]);
+    expect(respellingIssues({ a: [1] }, { a: [2] })).toEqual(["$.a[0] changed"]);
+    expect(respellingIssues({ pattern: 1 }, { pattern: 2 })).toEqual(["$.pattern changed"]);
   });
 });

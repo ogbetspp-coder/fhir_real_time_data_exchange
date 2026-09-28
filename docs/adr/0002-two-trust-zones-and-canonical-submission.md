@@ -296,26 +296,32 @@ every request is (invariant 2); before PR 5 lifts the dry run it is bound to an 
 Audit batch B14 (C-6 to C-10) and the review of #145. The decision above is otherwise unchanged;
 the change record is `docs/validation/changes/2026-09-28-contract-versions-lock-and-parity.md`.
 
-**A version names one schema.** `contracts/versions.lock.json` records, for every published
-contract version, the structure hash of the schema it names: the SHA-256 of the published document
-without its `$id`. `test/contracts/versions-lock.test.ts` refuses a schema that differs from the one
-its version is locked to, and a lock that drops or rewrites an entry `main` has released;
-`npm run contracts:lock` adds a new version's entry. Nothing held this before: `ingestion-provenance`
-took a required `kind` and a union (2026-09-24, #113) and two earlier tightenings under the `$id`
-of 1.0.0, and only the index's content hash moved. It is 2.0.0 now, the provenance of
-`CanonicalSubmission` 2.0.0; the documents it accepts are unchanged by the bump.
+**A version names one schema.** `contracts/versions.lock.json` records, for every contract version
+`main` has ever published, the structure hash of each schema it was published with: the SHA-256 of
+the published document without its `$id`. Retired versions are in it, with every structure `main`
+published under them, so a retired version number can never be published again with a schema it
+did not have. `test/contracts/versions-lock.test.ts` refuses a schema that differs from the one its
+version is locked to, a structure `main` published that the lock lacks, and a lock that drops or
+rewrites an entry `main` has released; `npm run contracts:lock` adds a new version's entry. Nothing
+held this before: `ingestion-provenance` took a required `kind` and a union (2026-09-24, #113) and
+two earlier tightenings under the `$id` of 1.0.0, and only the index's content hash moved. It is
+2.0.0 now, the provenance of `CanonicalSubmission` 2.0.0; the documents it accepts are unchanged by
+the bump.
 
 **A re-spelling is not a version change** (decided in #145). A change to a schema's text that
 leaves unchanged the set of documents it accepts under the dialect it declares (JSON Schema 2020-12,
 whose `pattern` is an ECMA-262 regular expression) and every description is not a version change:
 `\d` written as `[0-9]` is one. Its `$id` stays, the index's content hash moves, and the lock
 appends the new structure hash to the version's entry (`npm run contracts:lock -- --respelling`),
-naming the change record that argues it; nothing recorded is replaced. A change that alters an
-accepted document, or a description, is classified by the rule above.
+naming the change record that argues it; nothing recorded is replaced. The lock appends it only when
+nothing but `pattern` values differs from the schema `main` last published under that version; that
+each respelt pattern accepts the same language is the change record's argument. A change that alters
+an accepted document, or a description, is classified by the rule above.
 
 **Refinements are published or named.** `z.toJSONSchema` drops every `.refine` silently, so a
 generated schema accepted what Zod refuses. Every refinement a published contract carries is listed
-in `src/contracts/json-schema.ts` (`REFINEMENTS`), and generation refuses an unlisted one. Those JSON
+in `src/contracts/json-schema.ts` (`REFINEMENTS`) with how many the schema carries, and generation
+refuses an unlisted one or a count that differs. Those JSON
 Schema can state are published as `if`/`then`/`else` (run manifest 5.0.0: a document run, and only
 one, carries an ingestion block; an authority import, and only one, records what Zone B fetched);
 the others (`startOffset < endOffset`, the manifest's package rules, the gate's recomputed hashes)
@@ -338,6 +344,12 @@ it. Decided: precision is not carried, and it is not dropped silently either. A 
 (RFC 8785 section 3.2.2.3: no trailing zeros, no exponent where JavaScript places the digits, no
 digit beyond a double, no `-0`) is refused by the submission reader (`non-canonical-number`), before
 it is hashed. Zone A's canonical JSON writes a double by the same rule, so a 2.5 mg strength (the
-smoke product's) hashes alike in both languages; an integer beyond `Number.MAX_SAFE_INTEGER` is
-refused in both. A product-graph value whose precision must survive would need a contract that
-carries it as text; none does today.
+smoke product's) hashes alike in both languages. An integer beyond `Number.MAX_SAFE_INTEGER` is
+not treated alike (corrected in the review of #148, part A L4). Zone B's reader accepts one written
+as JavaScript writes its nearest double (`9007199254740992`, `1e+21`) and refuses any other
+(`9007199254740993`, whose double JavaScript writes `9007199254740992`). Zone A's canonical JSON
+refuses every integer beyond the bound, since JSON gives Python the exact integer where JavaScript
+holds the double. Every integer field of every contract is capped at the bound, so only the open
+FHIR resources of a Bundle can carry one; a Zone A producer cannot hash, and so must not write, such
+a Bundle. A product-graph value whose precision must survive would need a contract that carries it
+as text; none does today.

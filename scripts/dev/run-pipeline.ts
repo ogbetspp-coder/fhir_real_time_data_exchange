@@ -5,6 +5,7 @@ import { loadEmaMapping } from "../../src/fhir/mapping.js";
 import { createSyntheticSubmission } from "../../src/fixtures/synthetic-submission.js";
 import { createSyntheticType2Bundle } from "../../src/fixtures/synthetic.js";
 import { runPipeline, type PipelineInput } from "../../src/pipeline.js";
+import { cleanHead, localEnvironment } from "./local-runtime.js";
 import {
   SMOKE_PRODUCT_ID,
   SYNTHETIC_PRODUCT_IDS,
@@ -161,10 +162,12 @@ if (deployed.size === 0) {
   process.exit(1);
 }
 
-// The validator is the one thing that is not the deployed value: the sidecar's URL is inside
-// Cloud Run's network. DRY_RUN is forced on unless --persist, and is set last so a deployed
-// DRY_RUN cannot quietly re-enable writing.
-const environment: Record<string, string> = Object.fromEntries(deployed);
+// Three things are not the deployed values. What names the code and images that ran is this
+// machine's, never the deployment's (./local-runtime.ts): the commit when the checkout is clean,
+// `development` otherwise. The validator's URL: the sidecar's is inside Cloud Run's network.
+// DRY_RUN is forced on unless --persist, and is set last so a deployed DRY_RUN cannot quietly
+// re-enable writing.
+const environment = localEnvironment(deployed, cleanHead());
 environment.FHIR_VALIDATOR_URL = args.validatorUrl;
 environment.DRY_RUN = args.persist ? "false" : "true";
 
@@ -218,6 +221,8 @@ try {
         targetBundleId: result.emaBundle.id,
         // The input the signed manifest and lineage name: kind, resource name and hash only.
         source: result.evidence.manifest.source,
+        // What the manifest says produced the run: this checkout, never the deployment.
+        runtime: result.evidence.manifest.runtime,
         mappingDecisions: result.mappingDecisions.length,
         validation: result.evidence.manifest.validation,
         artifacts: result.artifactUris.length,

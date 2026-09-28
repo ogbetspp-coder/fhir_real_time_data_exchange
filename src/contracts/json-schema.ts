@@ -59,27 +59,36 @@ function asciiPatterns(node: unknown): void {
 // refinement in a published contract is listed here, by the `id` of the schema that carries it,
 // with what the published schema does about it: `expressed`, a JSON Schema fragment merged into
 // that schema's `$defs` entry that states the same rule; or `unexpressed`, why JSON Schema cannot
-// state it, and where it is enforced instead. Generation refuses a refinement not listed here, a
+// state it, and where it is enforced instead. Each entry also counts the refinements that schema
+// carries (`checks`): an id names a schema, not a rule, so a second `.refine` on a listed schema
+// would otherwise be taken as the one already described and dropped as silently as before (review
+// of #148, part A L3). Generation refuses a refinement not listed here, a count that differs, a
 // refinement on a schema without an id, and a listed one no contract carries.
-export type RefinementDisposition =
-  { expressed: Record<string, unknown> } | { unexpressed: string };
+export type RefinementDisposition = { checks: number } & (
+  { expressed: Record<string, unknown> } | { unexpressed: string }
+);
 
 export const REFINEMENTS: Readonly<Record<string, RefinementDisposition>> = {
   CanonicalSubmission: {
+    checks: 1,
     unexpressed:
       "Zone B's gate (structuralInvariantIssues): recomputed hashes, fidelity counts, span limits and unique source keys, which JSON Schema cannot compute; and the fields each decision action requires, which it could state but which would change canonical-submission 2.0.0's published language (listed for 3.0.0).",
   },
   SourceSpan: {
+    checks: 1,
     unexpressed: "startOffset < endOffset: JSON Schema cannot compare two fields.",
   },
   QuoteMatch: {
+    checks: 1,
     unexpressed: "startOffset < endOffset: JSON Schema cannot compare two fields.",
   },
   ManifestStandards: {
+    checks: 1,
     unexpressed:
       "Stated in the ManifestStandards description (STANDARDS_RULES) and enforced by Zone A's VerifiedRunManifest: JSON Schema cannot say that a value is among an array's members, or that an array's members are unique by one field.",
   },
   IngestionEvidence: {
+    checks: 1,
     expressed: {
       if: { properties: { sourceKind: { const: "authority-publication" } } },
       then: { required: ["authority"] },
@@ -87,6 +96,7 @@ export const REFINEMENTS: Readonly<Record<string, RefinementDisposition>> = {
     },
   },
   RunManifest: {
+    checks: 1,
     expressed: {
       if: { properties: { source: { properties: { kind: { const: "document" } } } } },
       then: { required: ["ingestion"] },
@@ -155,31 +165,47 @@ export function namedSchemas(schema: z.ZodType): Map<string, z.ZodType> {
   return named;
 }
 
-// The ids of the schemas in `schema` that carry a refinement.
-export function refinedSchemaIds(schema: z.ZodType): string[] {
-  const found = new Set<string>();
+// How many refinements the schemas in `schema` carry, by the id of the schema carrying them.
+export function refinementCounts(schema: z.ZodType): Map<string, number> {
+  const counts = new Map<string, number>();
   for (const current of everySchema(schema)) {
     const def = definition(current);
-    if (!(def.checks ?? []).some((check) => check._zod.def.check === "custom")) continue;
+    const custom = (def.checks ?? []).filter((check) => check._zod.def.check === "custom").length;
+    if (custom === 0) continue;
     const id = schemaId(current);
     if (id === undefined) {
       throw new Error(
         `a ${def.type} schema carries a refinement but no id, so it cannot be listed in REFINEMENTS`,
       );
     }
-    found.add(id);
+    counts.set(id, (counts.get(id) ?? 0) + custom);
   }
-  return [...found].sort();
+  return counts;
 }
 
-// Merges each expressed refinement into its schema's `$defs` entry; refuses an unlisted one.
-function publishRefinements(schema: z.ZodType, document: Record<string, unknown>): void {
+// The ids of the schemas in `schema` that carry a refinement.
+export function refinedSchemaIds(schema: z.ZodType): string[] {
+  return [...refinementCounts(schema).keys()].sort();
+}
+
+// Merges each expressed refinement into its schema's `$defs` entry; refuses an unlisted one, and
+// a count that differs from the one listed.
+function publishRefinements(
+  schema: z.ZodType,
+  document: Record<string, unknown>,
+  refinements: Readonly<Record<string, RefinementDisposition>>,
+): void {
   const definitions = (document.$defs ?? {}) as Record<string, Record<string, unknown>>;
-  for (const id of refinedSchemaIds(schema)) {
-    const disposition = REFINEMENTS[id];
+  for (const [id, count] of refinementCounts(schema)) {
+    const disposition = refinements[id];
     if (disposition === undefined) {
       throw new Error(
         `${id} carries a refinement the published schema would drop silently; list it in REFINEMENTS (src/contracts/json-schema.ts)`,
+      );
+    }
+    if (disposition.checks !== count) {
+      throw new Error(
+        `${id} carries ${String(count)} refinements and REFINEMENTS describes ${String(disposition.checks)}; describe each (src/contracts/json-schema.ts)`,
       );
     }
     if (!("expressed" in disposition)) continue;
@@ -196,6 +222,8 @@ function publishRefinements(schema: z.ZodType, document: Record<string, unknown>
 export function contractJsonSchema(
   schema: z.ZodType,
   io: "input" | "output",
+  // Tests pass their own; every contract is generated with REFINEMENTS.
+  refinements: Readonly<Record<string, RefinementDisposition>> = REFINEMENTS,
 ): Record<string, unknown> {
   const document = z.toJSONSchema(schema, {
     target: "draft-2020-12",
@@ -205,7 +233,7 @@ export function contractJsonSchema(
     reused: "inline",
   });
   asciiPatterns(document);
-  publishRefinements(schema, document);
+  publishRefinements(schema, document, refinements);
   return document;
 }
 

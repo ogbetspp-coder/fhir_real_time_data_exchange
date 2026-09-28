@@ -86,14 +86,22 @@ describe("the commit a deploy names", { timeout: 30_000 }, () => {
     expect(result.version).toBe(commit);
   });
 
-  it("carries the same -dirty-<tree> on both when a tracked file differs from HEAD", () => {
+  // A run manifest names the code that ran by a full commit id only (run manifest 5.0.0, and
+  // infra/run.tf's precondition on service_version), so a dirty tree is refused before anything
+  // is built, outside Actions too (review of #148, part B L1): until then it was built and pushed,
+  // then refused at plan.
+  it("names a tree that differs from HEAD -dirty-<tree>, and refuses to build or apply it", () => {
     const { dir, commit } = worktree();
     writeFileSync(path.join(dir, "a.txt"), "two\n");
     const first = provenance(dir);
     expect(first.version).toMatch(new RegExp(`^${commit}-dirty-[0-9a-f]{12}$`));
     expect(first.tag).toBe(`${commit.slice(0, 12)}${first.version.slice(commit.length)}`);
-    expect(first.status).toBe(0);
+    expect(first.status).not.toBe(0);
     expect(first.out).toContain("Uncommitted changes");
+    expect(first.out).toContain("Not building or applying");
+    expect(provenance(dir, { GITHUB_ACTIONS: "true" }).out).toContain(
+      "a step of this job changed it",
+    );
     // The same edits name the same tree; other edits another.
     expect(provenance(dir).version).toBe(first.version);
     writeFileSync(path.join(dir, "a.txt"), "three\n");

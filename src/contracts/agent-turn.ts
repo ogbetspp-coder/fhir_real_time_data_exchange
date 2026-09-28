@@ -28,9 +28,11 @@ import { QueryToolName } from "./query-tools.js";
 // in the assistant's own words; and three verification flags.
 //
 // 1.2.0 (minor: two optional fields; audit C-9): `contractVersion`, the version of this contract
-// the record was written under, and `queryToolsVersion`, the version of the query-tools contract
-// the agent checked the tools' answers against. A `match` meant a different thing under
-// query-tools 2.0.0 and 2.0.1, and no record said which rule decided it.
+// the record was written under, and `queryToolsVersion`, the version of the agent's vendored copy
+// of the query-tools contract, which it validated the tools' answers against. That is not the
+// version the service answered under, which is what decides a `match` (it meant a different thing
+// under query-tools 2.0.0 and 2.0.1): the service's own audit records carry that, as their
+// `contractVersion` (query-tools 4.1.0), joined to this record on `turnId`.
 
 export const AGENT_TURN_VERSION = "1.2.0";
 
@@ -105,10 +107,11 @@ export const AgentTurnRecordSchema = z
   .strictObject({
     service: z.literal("ema-flow-agent"),
     serviceVersion: Token,
-    // The agent-turn version the record was written under, and the query-tools version whose
-    // answers the turn validated and whose `match` rule its verification stamps rest on: the
-    // agent's vendored copies of the two contracts. Optional in the contract, which gained them
-    // at 1.2.0; the agent always writes both.
+    // The versions of the agent's vendored copies: of this contract, which the record was written
+    // under, and of query-tools, which the turn's tool answers were validated against. Not the
+    // version the service answered under, which decides `match`: the service's own audit records
+    // of the same `turnId` name that. Optional in the contract, which gained them at 1.2.0; the
+    // agent always writes both.
     contractVersion: ContractVersion.optional(),
     queryToolsVersion: ContractVersion.optional(),
     at: IsoDateTime,

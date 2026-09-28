@@ -18,10 +18,13 @@ Four places where Python's defaults are wrong and must not be relied on:
   So a FHIR decimal (a 2.5 mg strength) hashes as Zone B hashes it (audit C-10; until 2026-09-28
   any non-integral float was refused). ``tests/test_canonical_json_parity.py`` reproduces
   JavaScript's text for the doubles of ``test/fixtures/contracts/canonical-json-numbers.json``,
-  carried by their bits. An *integer* beyond ``Number.MAX_SAFE_INTEGER`` is still refused: JSON
-  gives Python the exact integer and JavaScript the nearest double, so the two hold different
-  values, and the contracts cap every integer there for the same reason. ``nan`` and the
-  infinities have no JSON form and are refused.
+  carried by their bits. An *integer* beyond ``Number.MAX_SAFE_INTEGER`` is still refused here:
+  JSON gives Python the exact integer and JavaScript the nearest double, so the two may hold
+  different values. Zone B does not refuse every such integer: its submission reader accepts one
+  written as JavaScript writes its double (``9007199254740992``) and refuses any other, so a Bundle
+  Zone B accepts can carry one this module cannot hash. The contracts cap every integer field at
+  the bound; only an open FHIR resource can carry one, and a Zone A producer must not write it.
+  ``nan`` and the infinities have no JSON form and are refused.
 * ``json.dumps(..., ensure_ascii=False)`` emits an unpaired surrogate raw, and encoding that to
   UTF-8 raises ``UnicodeEncodeError``. ``JSON.stringify`` is well-formed (ES2019): it writes
   ``\udXXX``, lower-case, for every unpaired surrogate. ``_escape_lone_surrogates`` does the
