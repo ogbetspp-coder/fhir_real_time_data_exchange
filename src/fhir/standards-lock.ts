@@ -68,7 +68,7 @@ const cache = new Map<string, PinnedPackage[]>();
 // Every FHIR package of the two locks: the standards lock's in its order, then the validator
 // lock's. A package in both is named once when both record the same SHA-256, and refused when
 // they differ; a package is keyed by id#version, so one id at several versions is several
-// packages (hl7.terminology.r5 is at three). Cached per pair of paths: the locks are part of the
+// packages (hl7.terminology.r5 is at four). Cached per pair of paths: the locks are part of the
 // image and do not change while the process runs.
 export function pinnedPackages(
   lockPath = path.resolve(STANDARDS_LOCK),

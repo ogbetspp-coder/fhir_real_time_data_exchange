@@ -124,6 +124,25 @@ describe("pin freshness", () => {
     expect(workflowInputs("astral-sh/setup-uv", "version")).toHaveLength(4);
   });
 
+  // A setup step with no version input installs whatever is newest, which the equality above
+  // would pass for having nothing to compare (audit B07 follow-up, L-3).
+  it.each([
+    ["astral-sh/setup-uv", "version"],
+    ["hashicorp/setup-terraform", "terraform_version"],
+    ["google-github-actions/setup-gcloud", "version"],
+    ["actions/setup-node", "node-version"],
+    ["actions/setup-python", "python-version"],
+    ["actions/setup-java", "java-version"],
+  ])("finds a version input on every %s step", (action, key) => {
+    const steps = readdirSync(".github/workflows").flatMap((file) => [
+      ...readFileSync(path.join(".github/workflows", file), "utf8").matchAll(
+        new RegExp(`uses: ${action.replace(/[./-]/g, "\\$&")}@`, "g"),
+      ),
+    ]);
+    expect(steps.length).toBeGreaterThan(0);
+    expect(workflowInputs(action, key)).toHaveLength(steps.length);
+  });
+
   it("refuses a pin that differs between the places it is installed", () => {
     const directory = mkdtempSync(path.join(tmpdir(), "pin-freshness-"));
     try {

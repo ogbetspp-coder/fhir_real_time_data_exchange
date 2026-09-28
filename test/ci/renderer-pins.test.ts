@@ -18,6 +18,10 @@ function variant(edit: (text: string) => string): string {
   return file;
 }
 
+// The allowlist refuses each of these before the rule written for it: any of its refusals will do.
+const APT_REFUSED =
+  /an apt, aptitude or dpkg command|does not use apt as pinned|an apt source or configuration is written|before the snapshot's sources are written|not installed over HTTPS as pinned/;
+
 describe("the renderer image's pins", () => {
   it("reads the base, the snapshot, Chrome and every font with its checksum", () => {
     const pins = readRendererPins();
@@ -283,7 +287,7 @@ describe("the renderer image's pins", () => {
       "apt-get update before the snapshot's sources are written",
       (text) =>
         text.replace("    snapshot http; \\\n", "    apt-get update; \\\n    snapshot http; \\\n"),
-      /before the snapshot's sources are written/,
+      APT_REFUSED,
     ],
     [
       "a write to /etc/apt/sources.list",
@@ -292,7 +296,7 @@ describe("the renderer image's pins", () => {
           "    snapshot http; \\\n",
           "    echo 'deb http://deb.debian.org/debian bookworm main' > /etc/apt/sources.list; \\\n    snapshot http; \\\n",
         ),
-      /an apt source or configuration is written/,
+      APT_REFUSED,
     ],
     [
       "a file under /etc/apt/apt.conf.d",
@@ -301,7 +305,7 @@ describe("the renderer image's pins", () => {
           "    snapshot http; \\\n",
           "    touch /etc/apt/apt.conf.d/99local; \\\n    snapshot http; \\\n",
         ),
-      /an apt source or configuration is written/,
+      APT_REFUSED,
     ],
     [
       "TLS peer verification switched off",
@@ -310,7 +314,7 @@ describe("the renderer image's pins", () => {
           "apt-get install --yes --no-install-recommends \\\n      ca-certificates curl",
           "apt-get install --yes -o Acquire::https::Verify-Peer=false --no-install-recommends \\\n      ca-certificates curl",
         ),
-      /re-points or re-configures it/,
+      APT_REFUSED,
     ],
     [
       "host verification switched off",
@@ -382,7 +386,7 @@ describe("the renderer image's pins", () => {
           "    snapshot http; \\\n",
           "    apt-get -q 'update'; \\\n    snapshot http; \\\n",
         ),
-      /before the snapshot's sources are written/,
+      APT_REFUSED,
     ],
     [
       "-o Acquire::Check-Valid-Until=false on the pinned install",
@@ -391,7 +395,7 @@ describe("the renderer image's pins", () => {
           "apt-get install --yes --no-install-recommends \\\n      ca-certificates curl",
           "apt-get install --yes -o Acquire::Check-Valid-Until=false --no-install-recommends \\\n      ca-certificates curl",
         ),
-      /re-points or re-configures it/,
+      APT_REFUSED,
     ],
     [
       "--option on the pinned install",
@@ -400,13 +404,13 @@ describe("the renderer image's pins", () => {
           "apt-get install --yes --no-install-recommends \\\n      ca-certificates curl",
           "apt-get install --yes --option Dir::Etc::SourceParts=/tmp --no-install-recommends \\\n      ca-certificates curl",
         ),
-      /re-points or re-configures it/,
+      APT_REFUSED,
     ],
     [
       "-c, another configuration file, on the pinned update",
       (text) =>
         text.replace("      apt-get update; \\\n", "      apt-get -c /tmp/apt.conf update; \\\n"),
-      /re-points or re-configures it/,
+      APT_REFUSED,
     ],
     [
       "Dir::State written for apt to read later",
@@ -425,6 +429,133 @@ describe("the renderer image's pins", () => {
           "RUN set -eu; \\\n    echo 'Acquire::Check-Valid-Until \\\"false\\\";' > /tmp/x; \\\n    unzip -q",
         ),
       /Release validity check is configured outside the sources/,
+    ],
+    // Review round 2 (audit B07 follow-up, Low-3): each passed the denylist the allowlist replaced.
+    [
+      "an apt command through a variable",
+      (text) =>
+        text.replace(
+          "RUN set -eu; \\\n    unzip -q",
+          "RUN set -eu; \\\n    CMD=apt-get; $CMD install x; \\\n    unzip -q",
+        ),
+      APT_REFUSED,
+    ],
+    [
+      "an apt command through xargs",
+      (text) =>
+        text.replace(
+          "RUN set -eu; \\\n    unzip -q",
+          "RUN set -eu; \\\n    echo x | xargs apt-get install; \\\n    unzip -q",
+        ),
+      APT_REFUSED,
+    ],
+    [
+      "an apt command inside a function",
+      (text) =>
+        text.replace(
+          "RUN set -eu; \\\n    unzip -q",
+          'RUN set -eu; \\\n    f() { apt-get "$@"; }; f install x; \\\n    unzip -q',
+        ),
+      APT_REFUSED,
+    ],
+    [
+      "an apt command through eval",
+      (text) =>
+        text.replace(
+          "RUN set -eu; \\\n    unzip -q",
+          'RUN set -eu; \\\n    eval "apt-get install x"; \\\n    unzip -q',
+        ),
+      APT_REFUSED,
+    ],
+    [
+      "an apt name split across quotes in sh -c",
+      (text) =>
+        text.replace(
+          "RUN set -eu; \\\n    unzip -q",
+          'RUN set -eu; \\\n    sh -c "ap""t-get install x"; \\\n    unzip -q',
+        ),
+      APT_REFUSED,
+    ],
+    [
+      "an apt name split by single quotes",
+      (text) =>
+        text.replace(
+          "RUN set -eu; \\\n    unzip -q",
+          "RUN set -eu; \\\n    a'p't-get install x; \\\n    unzip -q",
+        ),
+      APT_REFUSED,
+    ],
+    [
+      "aptitude",
+      (text) =>
+        text.replace(
+          "RUN set -eu; \\\n    unzip -q",
+          "RUN set -eu; \\\n    aptitude install x; \\\n    unzip -q",
+        ),
+      APT_REFUSED,
+    ],
+    [
+      "apt-get reinstall",
+      (text) =>
+        text.replace(
+          "RUN set -eu; \\\n    unzip -q",
+          "RUN set -eu; \\\n    apt-get reinstall x; \\\n    unzip -q",
+        ),
+      APT_REFUSED,
+    ],
+    [
+      "apt-get satisfy",
+      (text) =>
+        text.replace(
+          "RUN set -eu; \\\n    unzip -q",
+          "RUN set -eu; \\\n    apt-get satisfy x; \\\n    unzip -q",
+        ),
+      APT_REFUSED,
+    ],
+    [
+      "apt-get build-dep",
+      (text) =>
+        text.replace(
+          "RUN set -eu; \\\n    unzip -q",
+          "RUN set -eu; \\\n    apt-get build-dep x; \\\n    unzip -q",
+        ),
+      APT_REFUSED,
+    ],
+    [
+      "dpkg",
+      (text) =>
+        text.replace(
+          "RUN set -eu; \\\n    unzip -q",
+          "RUN set -eu; \\\n    dpkg -i x.deb; \\\n    unzip -q",
+        ),
+      APT_REFUSED,
+    ],
+    [
+      "apt-helper",
+      (text) =>
+        text.replace(
+          "RUN set -eu; \\\n    unzip -q",
+          "RUN set -eu; \\\n    /usr/lib/apt/apt-helper download-file https://e/x /x; \\\n    unzip -q",
+        ),
+      APT_REFUSED,
+    ],
+    [
+      "a relative sources.list write",
+      (text) =>
+        text.replace(
+          "RUN set -eu; \\\n    unzip -q",
+          "RUN set -eu; \\\n    echo deb http://e/d bookworm main > sources.list; \\\n    unzip -q",
+        ),
+      /an apt source or configuration is written/,
+    ],
+    [
+      "apt-get reinstall in place of the pinned install",
+      (text) =>
+        text.replace(
+          "apt-get install --yes --no-install-recommends \\\n      ca-certificates curl",
+          "apt-get reinstall --yes --no-install-recommends \\\n      ca-certificates curl",
+        ),
+      APT_REFUSED,
     ],
     [
       "a third Check-Valid-Until in the snapshot's RUN",
