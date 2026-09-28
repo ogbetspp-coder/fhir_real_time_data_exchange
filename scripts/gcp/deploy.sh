@@ -994,6 +994,12 @@ phase_apply() {
 # request (label `allow-replace`) before the check passes.
 phase_plan() {
   echo "=== terraform plan (read-only) ==="
+  # An explicit check, not a "colon-question" expansion: after the EXIT trap, a failed expansion
+  # ends bash 3.2 (macOS) with status 0 (review round 2).
+  if [[ -z "${DEPLOY_SERVICE_ACCOUNT:-}" ]]; then
+    echo "DEPLOY_SERVICE_ACCOUNT names the account the deploy runs as; the plan needs it." >&2
+    exit 1
+  fi
   local out="${PLAN_OUT:-plan.txt}" summary="${PLAN_SUMMARY:-plan-summary.md}"
   local worker_service="ema-flow-${ENVIRONMENT}-worker" query_service="ema-flow-${ENVIRONMENT}-query"
   local images live_version
@@ -1004,7 +1010,7 @@ phase_plan() {
   local query_image
   query_image="$(gcloud --quiet run services describe "$query_service" --region="$REGION" --format='value(spec.template.spec.containers[0].image)')"
 
-  tf_deploy_vars "${DEPLOY_SERVICE_ACCOUNT:?DEPLOY_SERVICE_ACCOUNT names the account the deploy runs as}" \
+  tf_deploy_vars "$DEPLOY_SERVICE_ACCOUNT" \
     "${images% *}" "${images#* }" "$query_image" "$live_version"
 
   local code=0 plan_file plan_json="-"

@@ -36,6 +36,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # shellcheck source=scripts/gcp/common.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+ema_flow_option --check "$@"
 cd "$ROOT"
 # GOOGLE_CLOUD_PROJECT or GCP_PROJECT_ID (refused when the two differ), else the gcloud
 # configuration; no project at all fails rather than falling back to a hard-coded one.
@@ -43,7 +44,7 @@ PROJECT_ID="$(ema_flow_resolve_project)"
 # Created by hand for the agent's deploy, outside Terraform and without the environment in its name.
 EXTRA_BUCKETS=("${PROJECT_ID}-ema-flow-agent-staging")
 CHECK="false"
-[[ "${1:-}" == "--check" ]] && CHECK="true"
+[[ "$EMA_FLOW_OPTION" == "--check" ]] && CHECK="true"
 drift=0
 
 if ! targets="$(terraform -chdir=infra output -json record_readers_targets 2>/dev/null)"; then

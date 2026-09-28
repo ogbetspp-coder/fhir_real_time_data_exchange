@@ -23,6 +23,7 @@ set -euo pipefail
 
 # shellcheck source=scripts/gcp/common.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+ema_flow_option --check "$@"
 # GOOGLE_CLOUD_PROJECT or GCP_PROJECT_ID (refused when the two differ), else the gcloud
 # configuration; no project at all fails rather than falling back to a hard-coded one.
 PROJECT_ID="$(ema_flow_resolve_project)"
@@ -34,7 +35,7 @@ STATE_BUCKET="${PROJECT_ID}-ema-flow-tfstate"
 STATE_BUCKET_ADMIN="${STATE_BUCKET_ADMIN:-user:khs@khsadvisory.com}"
 BUCKETS=("$STATE_BUCKET" "${PROJECT_ID}-ema-flow-agent-staging")
 CHECK="false"
-[[ "${1:-}" == "--check" ]] && CHECK="true"
+[[ "$EMA_FLOW_OPTION" == "--check" ]] && CHECK="true"
 drift=0
 
 # Rewriting the state while Terraform holds its lock could corrupt it: a deploy is running whenever

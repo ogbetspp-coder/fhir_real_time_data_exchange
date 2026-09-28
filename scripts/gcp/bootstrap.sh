@@ -69,7 +69,8 @@ PY
 )"
 # The set's resources, "Type/id" one per line, sorted and unique: what the store must hold, of the
 # import's types, and nothing more. A file that is not one resource of those types with a FHIR id
-# fails here, before the store is touched.
+# fails here, before the store is touched. An id made only of dots is refused here and in the
+# listing: "ValueSet/." in a URL is the type itself to curl and to the store.
 EXPECTED="$TMP/expected.txt"
 python3 - "$TMP/import" "$IMPORT_TYPES" >"$EXPECTED" <<'PY'
 import json, os, re, sys
@@ -79,7 +80,7 @@ for dirpath, _, files in os.walk(root):
     for name in files:
         resource = json.load(open(os.path.join(dirpath, name), encoding="utf-8"))
         kind, rid = resource.get("resourceType"), resource.get("id")
-        if kind not in types or not isinstance(rid, str) or not re.fullmatch(r"[A-Za-z0-9.-]{1,64}", rid):
+        if kind not in types or not isinstance(rid, str) or not re.fullmatch(r"(?!\.+$)[A-Za-z0-9.-]{1,64}", rid):
             sys.exit(f"{name}: not a resource of the import's types with a FHIR id")
         found.add(f"{kind}/{rid}")
 if not found:
@@ -93,10 +94,12 @@ LC_ALL=C sort -u -o "$EXPECTED" "$EXPECTED"
 # answers with each resource's meta), with accurate totals. A version the store does not report is
 # "-". Any page that cannot be read fails, and a next-page link is followed only within this store.
 #
-# Paging is not a snapshot: the store's ValueSet total has been seen to change between pages
-# (2622, 2623, 2622), and a page can repeat an entry. So the listing says when it cannot be
-# trusted: STORE_LISTING_UNSTABLE names why (an entry listed twice, a type whose total changed
-# between pages or differs from what was listed), and is empty when it can.
+# Paging is not a snapshot, and a page could repeat an entry. So the listing says when it cannot
+# be trusted: STORE_LISTING_UNSTABLE names why (an entry listed twice, or a type whose unique
+# count differs from the total its first page reported), and is empty when it can. Only the first
+# page's total is read (review round 2): the live store's ValueSet pages report [2622, 2623, 2622]
+# on every read, with 2622 unique entries, exactly the pinned set, so a rule that also compared
+# later pages' totals never trusted a listing and every deploy re-imported for nothing.
 store_listing() {
   local out="$1" type url page status
   : >"$out"
@@ -122,7 +125,7 @@ with open(out, "a", encoding="utf-8") as listing:
     for entry in bundle.get("entry") or []:
         resource = entry.get("resource") or {}
         rid = resource.get("id")
-        if resource.get("resourceType") != kind or not isinstance(rid, str) or not re.fullmatch(r"[A-Za-z0-9.-]{1,64}", rid):
+        if resource.get("resourceType") != kind or not isinstance(rid, str) or not re.fullmatch(r"(?!\.+$)[A-Za-z0-9.-]{1,64}", rid):
             sys.exit(f"the {kind} search answered with something that is not a {kind} with a FHIR id")
         version = (resource.get("meta") or {}).get("versionId")
         version = version if isinstance(version, str) and re.fullmatch(r"[A-Za-z0-9.-]{1,64}", version) else "-"
@@ -142,20 +145,18 @@ PY
 import collections, sys
 out = sys.argv[1]
 refs = collections.Counter(line.split(" ")[0] for line in open(out, encoding="utf-8").read().splitlines() if line)
-totals = collections.defaultdict(set)
+first_total = {}
 for line in open(out + ".totals", encoding="utf-8").read().splitlines():
     kind, total = line.split(" ")
-    totals[kind].add(int(total))
+    first_total.setdefault(kind, int(total))
 reasons = []
 repeated = sorted(ref for ref, n in refs.items() if n > 1)
 if repeated:
     reasons.append(f"{len(repeated)} resource(s) listed more than once")
-for kind in sorted(totals):
+for kind in sorted(first_total):
     listed = sum(1 for ref in refs if ref.startswith(kind + "/"))
-    if len(totals[kind]) > 1:
-        reasons.append(f"the {kind} total changed between pages")
-    elif listed != next(iter(totals[kind])):
-        reasons.append(f"{listed} {kind} listed against a total of {next(iter(totals[kind]))}")
+    if listed != first_total[kind]:
+        reasons.append(f"{listed} {kind} listed against a first-page total of {first_total[kind]}")
 print("; ".join(reasons))
 PY
 )"
@@ -328,7 +329,7 @@ else
   while read -r reference; do
     [[ -z "$reference" ]] && continue
     status="$(curl --silent --show-error --output "$TMP/delete.json" --write-out '%{http_code}' \
-      --request DELETE --header @<(ema_flow_header Authorization "Bearer ${TOKEN}") \
+      --path-as-is --request DELETE --header @<(ema_flow_header Authorization "Bearer ${TOKEN}") \
       "${TARGET_FHIR}/${reference}" || true)"
     if [[ "$status" == 2?? ]]; then
       deleted=$((deleted + 1))

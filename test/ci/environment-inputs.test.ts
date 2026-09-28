@@ -298,11 +298,14 @@ describe("the alert recipient's dev exception", () => {
 // dev assumed, on another project, would strip that project's planner. Each runs with stand-in
 // cloud CLIs that record any call; a refusal must come before the first.
 describe("the operator scripts' environment", () => {
-  const operatorScripts = [
-    "scripts/gcp/plan-identity.sh",
-    "scripts/gcp/storage-keys.sh",
-    "scripts/gcp/bq-cmek-convert.sh",
-  ];
+  // Each script and the one option it takes (its report-only mode).
+  const options: Record<string, string> = {
+    "scripts/gcp/plan-identity.sh": "--check",
+    "scripts/gcp/storage-keys.sh": "--check",
+    "scripts/gcp/bq-cmek-convert.sh": "--dry-run",
+    "scripts/gcp/record-readers.sh": "--check",
+  };
+  const operatorScripts = Object.keys(options).filter((file) => !file.includes("record-readers"));
   const stub = mkdtempSync(path.join(tmpdir(), "operator-env-"));
   afterAll(() => rmSync(stub, { recursive: true, force: true }));
   // Every cloud CLI the scripts start (bq-cmek-convert.sh starts with bq), each recording its call,
@@ -311,9 +314,9 @@ describe("the operator scripts' environment", () => {
     writeFileSync(path.join(stub, cli), `#!/bin/sh\necho "${cli} $*" >>"${stub}/calls"\nexit 3\n`);
     chmodSync(path.join(stub, cli), 0o755);
   }
-  const run = (script: string, env: Record<string, string>) => {
+  const run = (script: string, env: Record<string, string>, args = [options[script] ?? ""]) => {
     rmSync(path.join(stub, "calls"), { force: true });
-    const result = spawnSync("bash", [script, "--check"], {
+    const result = spawnSync("bash", [script, ...args], {
       encoding: "utf8",
       env: { PATH: `${stub}:${process.env.PATH ?? ""}`, ...env },
     });
@@ -342,4 +345,53 @@ describe("the operator scripts' environment", () => {
       expect(result.called).toBe(true);
     },
   );
+
+  // Review round 2: plan-identity.sh read any argument but --check, --help included, as "apply".
+  it.each(Object.keys(options))(
+    "%s refuses an argument it does not take, before doing anything, and answers --help",
+    (script) => {
+      const env = { GCP_PROJECT_ID: DEV_PROJECT, EMA_FLOW_ENVIRONMENT: "dev" };
+      for (const args of [["--apply"], ["--help", "extra"], [options[script] ?? "", "--force"]]) {
+        const refused = run(script, env, args);
+        expect([args, refused.status, refused.called]).toEqual([args, 2, false]);
+        expect(refused.stderr).toContain("Usage: bash");
+      }
+      const help = run(script, env, ["--help"]);
+      expect([help.status, help.called]).toEqual([0, false]);
+      expect(help.stdout).toContain(options[script]);
+      expect(help.stdout).not.toMatch(/^#/m);
+    },
+  );
+});
+
+// DEPLOY_SERVICE_ACCOUNT is checked explicitly: after deploy.sh's EXIT trap, a failed
+// ${DEPLOY_SERVICE_ACCOUNT:?} ended bash 3.2 (macOS) with status 0 (review round 2).
+describe("deploy.sh's refusals, whichever bash runs it", () => {
+  const shells = ["bash", ...(existsSync("/bin/bash") ? ["/bin/bash"] : [])];
+
+  it.each(shells)("fails the plan with no DEPLOY_SERVICE_ACCOUNT, under %s", (shell) => {
+    const run = spawnSync(shell, ["scripts/gcp/deploy.sh", "plan"], {
+      encoding: "utf8",
+      env: {
+        PATH: process.env.PATH ?? "",
+        GOOGLE_CLOUD_PROJECT: DEV_PROJECT,
+        EMA_FLOW_ENVIRONMENT: "dev",
+      },
+    });
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain("DEPLOY_SERVICE_ACCOUNT names the account");
+  });
+
+  it.each(shells)("fails with no environment named, under %s", (shell) => {
+    const run = spawnSync(shell, ["scripts/gcp/deploy.sh", "plan"], {
+      encoding: "utf8",
+      env: { PATH: process.env.PATH ?? "", GOOGLE_CLOUD_PROJECT: DEV_PROJECT },
+    });
+    expect(run.status).toBe(1);
+  });
+
+  it("uses no ${VAR:?} expansion after its EXIT trap", () => {
+    const afterTrap = deployScript.slice(deployScript.indexOf("' EXIT\n"));
+    expect(afterTrap).not.toMatch(/\$\{\w+:\?/);
+  });
 });

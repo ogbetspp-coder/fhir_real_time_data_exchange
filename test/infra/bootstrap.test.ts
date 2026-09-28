@@ -120,8 +120,13 @@ entry = [resource(of_kind[page])] if page < len(of_kind) else []
 # STUB_REPEAT: page 0 also answers page 1's entry, as a search that is not a snapshot can.
 if os.environ.get("STUB_REPEAT") and page == 0 and len(of_kind) > 1:
     entry.append(resource(of_kind[1]))
-# STUB_TOTAL_SKEW: the total grows by one on every page after the first.
-total = len(of_kind) + (page if os.environ.get("STUB_TOTAL_SKEW") else 0)
+# STUB_TOTAL_SKEW: the live store's pattern, [N, N+1, N, N+1, ...]: every odd page reports one
+# more than there are. STUB_FIRST_TOTAL_OFF: the first page reports one more than there are.
+total = len(of_kind)
+if os.environ.get("STUB_TOTAL_SKEW") and page % 2 == 1:
+    total += 1
+if os.environ.get("STUB_FIRST_TOTAL_OFF") and page == 0:
+    total += 1
 link = []
 if page + 1 < len(of_kind):
     following = os.environ.get("STUB_NEXT_BASE", base) + kind + "?_page_token=" + str(page + 1)
@@ -361,22 +366,53 @@ describe.concurrent("the deploy's FHIR bootstrap", { timeout: 60_000 }, () => {
     expect(again.store.map((line) => line.split(" ")[0])).toEqual(EXPECTED);
   });
 
-  it("skips the prune, and records nothing, on a listing that moved while it was read", async () => {
+  it("trusts the live store's listing, whose later pages report one more than there are", async () => {
+    // Review round 2: the live ValueSet pages report [2622, 2623, 2622] on every read, with 2622
+    // unique entries, the pinned set. Judged by every page's total, no listing was ever trusted,
+    // and every deploy re-imported. Only the first page's total counts.
+    const setup = await setUp();
+    const first = await bootstrap(setup, { STUB_TOTAL_SKEW: "1" });
+    expect(first.status).toBe(0);
+    expect(first.out).not.toContain("Profile set not confirmed");
+    expect(first.marker.split("\n").filter(Boolean)).toHaveLength(2);
+    const second = await bootstrap(setup, { STUB_TOTAL_SKEW: "1" });
+    expect(second.out).toContain("sync and import skipped");
+    expect(imports(second.calls)).toBe(4);
+  });
+
+  it("skips the prune, and records nothing, when the first page's total and the listing disagree", async () => {
     const setup = await setUp();
     await bootstrap(setup);
     const store = path.join(setup.stubs, "store.txt");
     writeFileSync(store, `${readFileSync(store, "utf8")}StructureDefinition/foreign 1\n`);
     const marker = readFileSync(path.join(setup.stubs, "marker"), "utf8");
     const result = await bootstrap(setup, {
-      STUB_TOTAL_SKEW: "1",
+      STUB_FIRST_TOTAL_OFF: "1",
       ALLOW_REPLACE_ACK: ack("c1", "StructureDefinition/foreign"),
       DEPLOY_COMMIT: "c1",
     });
     expect(result.status).toBe(0);
-    expect(result.out).toContain("total changed between pages");
+    expect(result.out).toContain("listed against a first-page total of");
     expect(result.out).toContain("Profile set not confirmed");
     expect(result.calls).not.toContain("DELETE");
     expect(readFileSync(path.join(setup.stubs, "marker"), "utf8")).toBe(marker);
+  });
+
+  it("refuses an id made only of dots, which a DELETE would send to the type itself", async () => {
+    const setup = await setUp();
+    await bootstrap(setup);
+    const store = path.join(setup.stubs, "store.txt");
+    writeFileSync(store, `${readFileSync(store, "utf8")}ValueSet/. 1\nValueSet/.. 1\n`);
+    const result = await bootstrap(setup, {
+      ALLOW_REPLACE_ACK: ack("c1", "ValueSet/.", "ValueSet/.."),
+      DEPLOY_COMMIT: "c1",
+    });
+    expect(result.status).not.toBe(0);
+    expect(result.out).toContain("is not a ValueSet with a FHIR id");
+    expect(result.calls).not.toContain("DELETE");
+    expect(readFileSync("scripts/gcp/bootstrap.sh", "utf8")).toContain(
+      "--path-as-is --request DELETE",
+    );
   });
 
   it("keeps the deploy green when the store refuses a delete, and says what to do", async () => {

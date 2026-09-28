@@ -70,6 +70,28 @@ ema_flow_acknowledged() {
   [[ -n "$1" && -n "$2" && "${ALLOW_REPLACE_ACK:-}" == "$1:$2" ]]
 }
 
+# The one option an operator script takes, or none, in EMA_FLOW_OPTION. --help prints the
+# script's header comment and exits; any other argument is refused before the script does
+# anything (review round 2: plan-identity.sh read --help as "apply").
+#   ema_flow_option --check "$@"
+ema_flow_option() {
+  local allowed="$1" script="${BASH_SOURCE[1]}"
+  shift
+  EMA_FLOW_OPTION=""
+  case "$#:${1:-}" in
+    0:) ;;
+    "1:${allowed}") EMA_FLOW_OPTION="$allowed" ;;
+    1:--help | 1:-h)
+      sed -n '2,/^set -euo pipefail$/p' "$script" | sed '$d' | sed -E 's/^# ?//'
+      exit 0
+      ;;
+    *)
+      echo "Usage: bash ${script#"$(pwd)/"} [${allowed}] (--help for more); refused: $*" >&2
+      exit 2
+      ;;
+  esac
+}
+
 ema_flow_access_token() {
   local token=""
   # Workload Identity Federation in GitHub Actions authenticates gcloud itself.

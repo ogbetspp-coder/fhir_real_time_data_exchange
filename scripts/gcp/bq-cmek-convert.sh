@@ -23,6 +23,7 @@ set -euo pipefail
 
 # shellcheck source=scripts/gcp/common.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+ema_flow_option --dry-run "$@"
 # GOOGLE_CLOUD_PROJECT or GCP_PROJECT_ID (refused when the two differ), else the gcloud
 # configuration; no project at all fails rather than falling back to a hard-coded one.
 PROJECT_ID="$(ema_flow_resolve_project)"
@@ -33,7 +34,7 @@ KEY="projects/${PROJECT_ID}/locations/${REGION}/keyRings/ema-flow-${ENVIRONMENT}
 DATASETS=("ema_flow_ledger_${ENVIRONMENT}" "ema_flow_fhir_${ENVIRONMENT}")
 STAMP="$(date -u +%Y%m%d%H%M)"
 DRY_RUN="false"
-[[ "${1:-}" == "--dry-run" ]] && DRY_RUN="true"
+[[ "$EMA_FLOW_OPTION" == "--dry-run" ]] && DRY_RUN="true"
 
 tables() {
   bq ls --format=json --max_results=1000 "${PROJECT_ID}:$1" |

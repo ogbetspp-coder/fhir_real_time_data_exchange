@@ -31,6 +31,7 @@ set -euo pipefail
 
 # shellcheck source=scripts/gcp/common.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+ema_flow_option --check "$@"
 # GOOGLE_CLOUD_PROJECT or GCP_PROJECT_ID (refused when the two differ), else the gcloud
 # configuration; no project at all fails rather than falling back to a hard-coded one.
 PROJECT_ID="$(ema_flow_resolve_project)"
@@ -83,7 +84,7 @@ PERMISSIONS=(
 )
 
 CHECK="false"
-[[ "${1:-}" == "--check" ]] && CHECK="true"
+[[ "$EMA_FLOW_OPTION" == "--check" ]] && CHECK="true"
 drift=0
 note() { drift=1; echo "$*"; }
 apply() { [[ "$CHECK" == "false" ]]; }
