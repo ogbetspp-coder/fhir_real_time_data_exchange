@@ -2,20 +2,30 @@ import { describe, expect, it } from "vitest";
 
 import { normalizeText, xhtmlToText } from "../../src/fidelity/index.js";
 import { locateQuote } from "../../src/query/tools.js";
+import { growth } from "../support/growth.js";
 
 // The quote-edge rule reads a section's table grids once per search, not once per occurrence: a
 // quote that occurs at the edge of every one of section 5's 50 000 slots is decided in linear
 // time. Rebuilding the grid per occurrence took minutes here, inside a synchronous call the
 // request deadline cannot interrupt (fidelity-norm/3.0.0 review round 18).
+// The cost is asserted as its growth, a quarter of the table against the whole (test/support/
+// growth.ts): linear is about 4, the per-occurrence rebuild about 16. Until audit B15 it was a
+// 2 s bound, which failed under concurrent runs.
 describe("the quote-edge rule's cost", () => {
-  it("decides a quote at every cell edge of a 50 000-slot table quickly", () => {
+  const table = (rows: number): string => {
     const row = `<tr>${"<td>1</td>".repeat(200)}</tr>`;
-    const div = `<div xmlns="http://www.w3.org/1999/xhtml"><table>${row.repeat(250)}</table></div>`;
-    const text = normalizeText(xhtmlToText(div));
-    const started = performance.now();
-    expect(locateQuote(text, "1")).toBeUndefined();
-    expect(performance.now() - started).toBeLessThan(2000);
-  });
+    const div = `<div xmlns="http://www.w3.org/1999/xhtml"><table>${row.repeat(rows)}</table></div>`;
+    return normalizeText(xhtmlToText(div));
+  };
+
+  it("decides a quote at every cell edge of a 50 000-slot table in linear time", () => {
+    expect(locateQuote(table(250), "1")).toBeUndefined();
+    const ratio = growth((rows) => {
+      const text = table(rows);
+      return () => locateQuote(text, "1");
+    }, 62);
+    expect(ratio).toBeLessThan(10);
+  }, 120_000);
 });
 
 // Branches of the rule the worked examples do not reach, on normalised text written directly.

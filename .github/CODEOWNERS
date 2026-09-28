@@ -1,5 +1,7 @@
-# Every change needs the owner's review. The paths below are listed separately so that, when a
-# second maintainer exists, the controls that protect the record keep a named owner.
+# Names the owner of every path. Branch protection on main requires no review today (audit B15),
+# so this file requests the owner's review and enforces nothing; it takes effect when a required
+# review is turned on. The paths below are listed separately so that, when a second maintainer
+# exists, the controls that protect the record keep a named owner.
 *                   @ogbetspp-coder
 
 # Who can change production, what the record is encrypted with, and what CI enforces.
@@ -11,8 +13,7 @@
 /LICENSE            @ogbetspp-coder
 
 # What builds and checks the images and the pins (audit B07): the gates' readers and scanners, the
-# Dockerfiles and the Cloud Build configuration. Branch protection requires no review today, so
-# this names an owner and enforces nothing; it takes effect when a required review is turned on.
+# Dockerfiles and the Cloud Build configuration.
 /scripts/ci/        @ogbetspp-coder
 /Dockerfile*        @ogbetspp-coder
 /cloudbuild*.yaml   @ogbetspp-coder
