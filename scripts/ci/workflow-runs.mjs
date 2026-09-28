@@ -97,19 +97,62 @@ export function overlapping(jobs, since, now) {
   });
 }
 
+// Whether an answer is worth asking again, and after how long: a server error (5xx), or a rate
+// limit (429, or 403 with a retry-after or an exhausted quota, GitHub's secondary limits), after
+// its retry-after if it gives one (capped at a minute), else after `backoff` doubling per try.
+// Anything else (a 401, a 404, a plain 403) is an answer, and fails at once.
+export function retryDelay(status, headers, attempt, backoff) {
+  const limited =
+    status === 429 ||
+    (status === 403 &&
+      (headers["retry-after"] !== undefined || headers["x-ratelimit-remaining"] === "0"));
+  if (status < 500 && !limited) return undefined;
+  const after = Number(headers["retry-after"]);
+  return Number.isFinite(after) && after >= 0
+    ? Math.min(after * 1000, 60_000)
+    : backoff * 2 ** attempt;
+}
+
+export const API_TRIES = 3;
+
 async function api(path) {
   const base = process.env.GITHUB_API_URL || "https://api.github.com";
   const token = process.env.GH_TOKEN;
   if (!token) throw new Error("GH_TOKEN is required");
-  const response = await fetch(`${base}${path}`, {
-    headers: {
-      accept: "application/vnd.github+json",
-      authorization: `Bearer ${token}`,
-      "x-github-api-version": "2022-11-28",
-    },
-  });
-  if (!response.ok) throw new Error(`GitHub API ${path.split("?")[0]} answered ${response.status}`);
-  return await response.json();
+  const backoff = Number(process.env.WORKFLOW_RUNS_BACKOFF_MS ?? "2000");
+  const route = path.split("?")[0];
+  for (let attempt = 0; ; attempt += 1) {
+    let response;
+    try {
+      response = await fetch(`${base}${path}`, {
+        headers: {
+          accept: "application/vnd.github+json",
+          authorization: `Bearer ${token}`,
+          "x-github-api-version": "2022-11-28",
+        },
+        signal: globalThis.AbortSignal.timeout(30_000),
+      });
+    } catch (error) {
+      // A connection that failed or timed out is retried like a server error.
+      if (attempt + 1 >= API_TRIES) {
+        throw new Error(`GitHub API ${route} unreachable: ${error}`, { cause: error });
+      }
+      await sleep(backoff * 2 ** attempt);
+      continue;
+    }
+    if (response.ok) return await response.json();
+    const delay = retryDelay(
+      response.status,
+      Object.fromEntries(response.headers),
+      attempt,
+      backoff,
+    );
+    if (delay === undefined || attempt + 1 >= API_TRIES) {
+      throw new Error(`GitHub API ${route} answered ${response.status}`);
+    }
+    console.log(`GitHub API ${route} answered ${response.status}; asking again in ${delay} ms.`);
+    await sleep(delay);
+  }
 }
 
 function repository() {
@@ -118,15 +161,26 @@ function repository() {
   return repo;
 }
 
-async function jobsOf(repo, runId) {
+// A run's jobs: of its latest attempt only (`latest`, what CI's verdict reads), or of every
+// attempt (`all`): an earlier attempt of a re-run deploy may have changed live state too.
+async function jobsOf(repo, runId, filter = "latest") {
   const { jobs } = await api(
-    `/repos/${repo}/actions/runs/${runId}/jobs?filter=latest&per_page=100`,
+    `/repos/${repo}/actions/runs/${runId}/jobs?filter=${filter}&per_page=100`,
   );
   return jobs;
 }
 
 async function awaitCi() {
   const repo = repository();
+  // Only main deploys. A dispatch on another branch or a tag is refused here, at once, rather than
+  // after waiting out the deadline for a push run that will never exist while it holds the deploy's
+  // concurrency group.
+  if (process.env.GITHUB_REF !== "refs/heads/main") {
+    console.log(
+      `::error::Only refs/heads/main deploys; this run is on ${process.env.GITHUB_REF || "no ref"}.`,
+    );
+    return 1;
+  }
   const commit = process.env.COMMIT ?? "";
   if (!/^[0-9a-f]{40}$/.test(commit)) throw new Error("COMMIT must be a full commit SHA");
   const minutes = Number(process.env.AWAIT_CI_MINUTES ?? "75");
@@ -154,8 +208,8 @@ async function awaitCi() {
   }
 }
 
-// The Deploy jobs of the deploy workflow's recent runs that may overlap [since, now]: every run not
-// yet completed, and every run updated since `since`.
+// The Deploy jobs, of every attempt, of the deploy workflow's recent runs that may overlap
+// [since, now]: every run not yet completed, and every run updated since `since`.
 async function recentDeployJobs(repo, since) {
   const { workflow_runs: runs } = await api(
     `/repos/${repo}/actions/workflows/deploy.yml/runs?per_page=30`,
@@ -165,7 +219,8 @@ async function recentDeployJobs(repo, since) {
   );
   const jobs = [];
   for (const run of candidates) {
-    for (const job of await jobsOf(repo, run.id)) jobs.push({ ...job, run_url: run.html_url });
+    for (const job of await jobsOf(repo, run.id, "all"))
+      jobs.push({ ...job, run_url: run.html_url });
   }
   return jobs;
 }

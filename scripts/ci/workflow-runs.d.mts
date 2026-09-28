@@ -34,6 +34,13 @@ export const CI_JOBS: readonly string[];
 export const DEPLOY_JOB: string;
 export const MUTATING_STEPS: readonly string[];
 export const CLOCK_MARGIN_MS: number;
+export const API_TRIES: number;
+export function retryDelay(
+  status: number,
+  headers: Record<string, string>,
+  attempt: number,
+  backoff: number,
+): number | undefined;
 export function ciRunFor(runs: readonly WorkflowRun[], commit: string): WorkflowRun | undefined;
 export function ciVerdict(run: WorkflowRun | undefined, jobs: readonly WorkflowJob[]): Verdict;
 export function mutationWindow(

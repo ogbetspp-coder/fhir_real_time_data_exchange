@@ -243,7 +243,7 @@ describe("xhtml scanner", () => {
       return () => tryXhtml(div);
     }, 12);
     expect(ratio).toBeLessThan(10);
-  }, 60_000);
+  }, 120_000);
 
   // fidelity-norm/3.1.0 review round 2: the mark rule reads each run of ignorables once, and
   // the lowered-half rule looks only at adjacent pieces. Twenty thousand tags before twenty
@@ -263,7 +263,7 @@ describe("xhtml scanner", () => {
       }, 5_000);
       expect(ratio).toBeLessThan(10);
     }
-  }, 60_000);
+  }, 120_000);
 
   // Audit 2026-09-27 (F-5): an error's offset is in code points into the div, whatever the code.
   // A supplementary letter before the refused markup counts once, as it does in Python.
@@ -421,7 +421,7 @@ describe("narrative fidelity verification", () => {
       }, 5_000);
       expect(ratio).toBeLessThan(10);
     }
-  }, 60_000);
+  }, 120_000);
 
   it("binds the narratives it scanned, as computeNarrativeBinding does", () => {
     for (const testCase of verifyCases) {

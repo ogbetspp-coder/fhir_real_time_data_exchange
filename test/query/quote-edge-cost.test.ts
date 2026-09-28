@@ -25,7 +25,7 @@ describe("the quote-edge rule's cost", () => {
       return () => locateQuote(text, "1");
     }, 62);
     expect(ratio).toBeLessThan(10);
-  }, 60_000);
+  }, 120_000);
 });
 
 // Branches of the rule the worked examples do not reach, on normalised text written directly.

@@ -153,7 +153,9 @@ esac`,
   });
 });
 
-describe("the deploy's dashboard sync", () => {
+// A timeout of its own: each case starts bash and its stubs, which took over vitest's 5 s default
+// in a loaded full run (review of audit B15).
+describe("the deploy's dashboard sync", { timeout: 30_000 }, () => {
   const sync = (drift: string, gcloud = "echo '{}'") =>
     run(
       `TF_DEPLOY_VARS=(-var=x=1)

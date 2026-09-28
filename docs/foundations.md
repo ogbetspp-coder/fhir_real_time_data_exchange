@@ -354,7 +354,10 @@ one person; stated so that it is a decision and not a default.
 _Status 2026-09-28 (audit B15): still off, the owner's decision._ What the bypass reaches is
 narrower: a push to `main` by an administrator deploys only once CI's run on that commit has
 succeeded in every job (`scripts/ci/workflow-runs.mjs`, in the deploy job before any credential
-is taken), so the bypass skips the pull request, not the checks. `Renderer` has
+is taken), so the bypass skips the pull request and CI's checks do not, but only CI's: `Plan` and
+`Vulnerabilities` are other workflows, and the deploy does not wait for them. `Plan` runs on pull
+requests only, so a direct push has none; the push's own `Vulnerabilities` run may be red while
+its deploy goes on. `Renderer` has
 been required since 2026-09-28. Branch protection still requires no review, does not require a
 branch to be up to date with `main`, and binds the `Agent` check to no app.
 

@@ -9,8 +9,10 @@ import { promisify } from "node:util";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
+  API_TRIES,
   CI_JOBS,
   MUTATING_STEPS,
+  retryDelay,
   ciRunFor,
   ciVerdict,
   mutationWindow,
@@ -51,6 +53,66 @@ function steps(job: string): { name: string; text: string }[] {
     .map((text) => ({ name: /^name: (.+)$/m.exec(text)?.[1]?.trim() ?? "", text }));
 }
 
+// The part of GitHub's expression language a concurrency block of ours uses: property paths,
+// '...' strings, == (case-insensitive for strings), && and || (each yielding an operand, not a
+// boolean), and parentheses. Anything else is refused, so a group written in another form fails
+// the test rather than being read wrongly.
+type Context = { github: Record<string, string> };
+type Value = string | boolean | undefined;
+function evaluate(expression: string, context: Context): Value {
+  const tokens = expression.match(/\s*('[^']*'|[A-Za-z_][\w.]*|==|&&|\|\||\(|\)|\S)/g) ?? [];
+  const list = tokens.map((token) => token.trim());
+  let at = 0;
+  const unread = (): never => {
+    throw new Error(`Unread expression: ${expression}`);
+  };
+  const truthy = (value: Value): boolean => value !== undefined && value !== "" && value !== false;
+  const primary = (): Value => {
+    const token = list[at++] ?? unread();
+    if (token === "(") {
+      const value = or();
+      if (list[at++] !== ")") unread();
+      return value;
+    }
+    if (token.startsWith("'")) return token.slice(1, -1);
+    const path = /^github\.([a-z_]+)$/.exec(token);
+    return path === null ? unread() : context.github[path[1] ?? ""];
+  };
+  const equality = (): Value => {
+    const left = primary();
+    if (list[at] !== "==") return left;
+    at += 1;
+    const right = primary();
+    return String(left).toLowerCase() === String(right).toLowerCase();
+  };
+  const and = (): Value => {
+    let value = equality();
+    while (list[at] === "&&") {
+      at += 1;
+      const right = equality();
+      value = truthy(value) ? right : value;
+    }
+    return value;
+  };
+  const or = (): Value => {
+    let value = and();
+    while (list[at] === "||") {
+      at += 1;
+      const right = and();
+      value = truthy(value) ? value : right;
+    }
+    return value;
+  };
+  const value = or();
+  if (at !== list.length) unread();
+  return value;
+}
+function interpolate(text: string, context: Context): string {
+  return text.replace(/\$\{\{(.*?)\}\}/g, (_, expression: string) =>
+    String(evaluate(expression, context)),
+  );
+}
+
 const run = (fields: Partial<WorkflowRun>): WorkflowRun => ({
   id: 1,
   head_sha: COMMIT,
@@ -81,10 +143,34 @@ describe("the CI the deploy waits for", () => {
     );
   });
 
-  it("is never cancelled on main by a later push", () => {
-    expect(ci).toMatch(
-      /^ {2}cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' \}\}$/m,
-    );
+  // A concurrency group holds one running and one pending run, and a newer run cancels the pending
+  // one whatever cancel-in-progress says. So the invariant is that no two pushes share a group:
+  // the group and cancel-in-progress are evaluated here for the events CI runs on.
+  it("puts no two pushes to main in one concurrency group, and cancels only pull requests", () => {
+    const block = /^concurrency:\n {2}group: (.+)\n {2}cancel-in-progress: (.+)$/m.exec(ci);
+    expect(block).not.toBeNull();
+    const [, group = "", cancel = ""] = block ?? [];
+    const push = (sha: string): Context => ({
+      github: { event_name: "push", ref: "refs/heads/main", sha },
+    });
+    const pr = (sha: string): Context => ({
+      github: { event_name: "pull_request", ref: "refs/pull/7/merge", sha },
+    });
+    const pushes = ["a", "b", "c"].map((c) => interpolate(group, push(c.repeat(40))));
+    expect(new Set(pushes).size).toBe(3);
+    // A pull request's runs share one group, its own, and a newer one cancels the older.
+    expect(interpolate(group, pr("d".repeat(40)))).toBe(interpolate(group, pr("e".repeat(40))));
+    expect(pushes).not.toContain(interpolate(group, pr("a".repeat(40))));
+    expect(interpolate(cancel, pr("d".repeat(40)))).toBe("true");
+    expect(interpolate(cancel, push("a".repeat(40)))).toBe("false");
+  });
+
+  it("evaluates expressions as GitHub does, for the forms the group uses", () => {
+    const context: Context = { github: { event_name: "push", ref: "r", sha: "s" } };
+    expect(evaluate("github.event_name == 'push' && github.ref || github.sha", context)).toBe("r");
+    expect(evaluate("github.event_name == 'x' && github.ref || github.sha", context)).toBe("s");
+    expect(evaluate("(github.event_name == 'PUSH')", context)).toBe(true);
+    expect(() => evaluate("github.ref != 'r'", context)).toThrow("Unread expression");
   });
 
   it("is CI's run for a push of exactly this commit to main, the latest of them", () => {
@@ -224,16 +310,41 @@ describe("a deploy changing what a plan reads", () => {
   });
 });
 
-// The script itself, against a stand-in for the API that answers from `routes`.
+describe("the API's retries", () => {
+  it("asks again after a server error or a rate limit, and not after any other answer", () => {
+    expect(retryDelay(502, {}, 0, 100)).toBe(100);
+    expect(retryDelay(503, {}, 1, 100)).toBe(200);
+    expect(retryDelay(429, { "retry-after": "3" }, 0, 100)).toBe(3_000);
+    expect(retryDelay(429, {}, 0, 100)).toBe(100);
+    expect(retryDelay(403, { "retry-after": "999" }, 0, 100)).toBe(60_000);
+    expect(retryDelay(403, { "x-ratelimit-remaining": "0" }, 0, 100)).toBe(100);
+    expect(retryDelay(403, {}, 0, 100)).toBeUndefined();
+    expect(retryDelay(401, {}, 0, 100)).toBeUndefined();
+    expect(retryDelay(404, {}, 0, 100)).toBeUndefined();
+    expect(API_TRIES).toBe(3);
+  });
+});
+
+// The script itself, against a stand-in for the API that answers from `routes`, after first
+// answering each route's queued `failures`, and records every request it was sent.
 describe("scripts/ci/workflow-runs.mjs", () => {
   let server: Server;
   let base = "";
   let routes: Record<string, unknown> = {};
+  let failures: Record<string, { status: number; headers?: Record<string, string> }[]> = {};
+  const requests: string[] = [];
   let work = "";
 
   beforeAll(async () => {
     server = createServer((request, response) => {
+      requests.push(request.url ?? "");
       const route = (request.url ?? "").split("?")[0] ?? "";
+      const failure = failures[route]?.shift();
+      if (failure !== undefined) {
+        response.writeHead(failure.status, failure.headers ?? {});
+        response.end("{}");
+        return;
+      }
       const body = routes[route];
       const authorised = request.headers.authorization === "Bearer test-token";
       response.writeHead(body === undefined || !authorised ? 404 : 200, {
@@ -260,7 +371,9 @@ describe("scripts/ci/workflow-runs.mjs", () => {
           GITHUB_REPOSITORY: "owner/repo",
           GITHUB_API_URL: base,
           COMMIT,
+          GITHUB_REF: "refs/heads/main",
           AWAIT_CI_MINUTES: "0",
+          WORKFLOW_RUNS_BACKOFF_MS: "10",
           ...env,
         },
         timeout: 30_000,
@@ -303,6 +416,45 @@ describe("scripts/ci/workflow-runs.mjs", () => {
     expect((await node(["await-ci"], { GH_TOKEN: "wrong" })).code).toBe(1);
   }, 60_000);
 
+  it("refuses a run on any ref but main at once, without asking the API", async () => {
+    routes = {
+      "/repos/owner/repo/actions/workflows/ci.yml/runs": { workflow_runs: [run({ id: 42 })] },
+      "/repos/owner/repo/actions/runs/42/jobs": { jobs: succeeded },
+    };
+    requests.length = 0;
+    for (const ref of ["refs/heads/feature", "refs/tags/v1", ""]) {
+      const refused = await node(["await-ci"], { GITHUB_REF: ref, AWAIT_CI_MINUTES: "75" });
+      expect([ref, refused.code]).toEqual([ref, 1]);
+      expect(refused.stdout).toContain("::error::Only refs/heads/main deploys");
+    }
+    expect(requests).toEqual([]);
+  }, 60_000);
+
+  it("asks again after a server error or a rate limit, three times at most", async () => {
+    const runs = "/repos/owner/repo/actions/workflows/ci.yml/runs";
+    routes = {
+      [runs]: { workflow_runs: [run({ id: 42 })] },
+      "/repos/owner/repo/actions/runs/42/jobs": { jobs: succeeded },
+    };
+    failures = { [runs]: [{ status: 502 }, { status: 429, headers: { "retry-after": "0" } }] };
+    const recovered = await node(["await-ci"]);
+    expect(recovered.code).toBe(0);
+    expect(recovered.stdout).toContain("answered 502; asking again");
+    expect(recovered.stdout).toContain("answered 429; asking again in 0 ms");
+
+    failures = { [runs]: [{ status: 503 }, { status: 503 }, { status: 503 }] };
+    const down = await node(["await-ci"]);
+    expect(down.code).toBe(1);
+    expect(down.stdout).toContain(`::error::GitHub API ${runs} answered 503`);
+
+    // A plain 403 is an answer, not a limit: no second request.
+    requests.length = 0;
+    failures = { [runs]: [{ status: 403 }] };
+    expect((await node(["await-ci"])).code).toBe(1);
+    expect(requests).toHaveLength(1);
+    failures = {};
+  }, 60_000);
+
   it("marks a plan that overlapped a deploy unreliable, at the top of its summary", async () => {
     const now = new Date();
     const earlier = new Date(now.getTime() - 10 * 60_000).toISOString();
@@ -342,9 +494,18 @@ describe("scripts/ci/workflow-runs.mjs", () => {
     expect(readFileSync(summary, "utf8")).toMatch(
       /^\*\*Unreliable plan\.\*\* A deploy changed what the plan reads while it was read \(https:\/\/run\/7\)[^\n]*\n\n\| address \| action \|\n$/,
     );
-    const before = await node(["deploy-activity", "--since", "now"]);
+    // Every attempt's jobs are read: an earlier attempt of a re-run may have changed live state.
+    expect(requests).toContain("/repos/owner/repo/actions/runs/7/jobs?filter=all&per_page=100");
+
+    // Before the plan, a deploy still changing live state: no plan, and a summary that says so,
+    // which replaces the pull request's older plan comment.
+    const none = path.join(work, "no-plan.md");
+    const before = await node(["deploy-activity", "--since", "now"], { PLAN_SUMMARY: none });
     expect(before.code).toBe(1);
     expect(before.stdout).toContain("so no plan is taken");
+    expect(readFileSync(none, "utf8")).toMatch(
+      /^\*\*Unreliable plan\.\*\* A deploy is changing what the plan reads \(https:\/\/run\/7\), so no plan is taken\./,
+    );
 
     // Once the deploy is only waiting for CI, the plan may start, and says from when.
     routes["/repos/owner/repo/actions/runs/7/jobs"] = {

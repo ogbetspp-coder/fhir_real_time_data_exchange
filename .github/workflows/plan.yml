@@ -146,11 +146,14 @@ jobs:
         with:
           node-version: 22.22.0
           package-manager-cache: false
+      # If it waits in vain, it writes the summary itself, saying no plan was taken, so the pull
+      # request's plan comment is replaced rather than left showing an older plan as current.
       - name: Wait for any deploy changing live state
         id: before
         if: steps.scope.outputs.plan == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          PLAN_SUMMARY: ${{ runner.temp }}/plan-summary.md
         run: node scripts/ci/workflow-runs.mjs deploy-activity --since now --wait-minutes 15
 
       - name: Plan against live state
