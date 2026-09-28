@@ -41,9 +41,8 @@ BULLET_GLYPHS: Final = frozenset(
 
 # Closed list, section 3 step 5. U+000B, U+000C and U+0085 are not here: since fidelity-norm/2.0.0
 # section 2 rejects them. Nor, from 3.0.0, are the spaces a renderer does not draw as a gap: U+1680
-# OGHAM SPACE MARK is drawn as a stroke, and the spaces narrower than a quarter of an em
-# (THIN_SPACES: U+2006, U+2009, U+200A, U+202F and U+205F) can look like no space at all, so "2"
-# U+200A "10" looks like "210". They are content.
+# OGHAM SPACE MARK is drawn as a stroke, and U+2006, U+2009, U+200A and U+202F one or two pixels
+# wide, so "2" U+200A "10" looks like "210". They are content.
 WHITESPACE: Final = frozenset(
     {
         0x0009,

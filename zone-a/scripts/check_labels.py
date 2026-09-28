@@ -27,8 +27,8 @@ MAPPING = ROOT / "fhir" / "mappings" / "cap-smpc-en.json"
 def expected() -> dict[Path, str]:
     """The check result each pinned label should have, by the path it is committed at."""
     lock = json.loads((LABELS / "sources.lock.json").read_text(encoding="utf-8"))
-    registry = json.loads(REGISTRY.read_text(encoding="utf-8"))
-    mapping = json.loads(MAPPING.read_text(encoding="utf-8"))
+    registry = REGISTRY.read_bytes()
+    mapping = MAPPING.read_bytes()
     out: dict[Path, str] = {}
     for entry in lock["sources"]:
         data = (LABELS / "sources" / entry["file"]).read_bytes()

@@ -17,15 +17,20 @@ wording), ``order`` (mapped sections out of the template's order), ``duplicate-s
 Statements. The registry's items are matched against the text of the section they belong to: its
 own paragraphs and the titles and paragraphs of its subsections, except subsections that are
 registry sections themselves (4.1 under 4), which are checked on their own. A named subsection
-such as Posology belongs to its section's text. Label text and template text are both compared
-after runs of space, tab and no-break space are collapsed to one space. Characters the reader
-marked struck through or faint are masked: no statement matches them. In a pattern:
+such as Posology belongs to its section's text, and so does an optional registry subsection the
+mapping does not list (2.1 and 2.2, for advanced therapies: the template files section 2's
+standard statements under 2.2, and they apply to every product). Label text and template text
+are both compared after runs of space, tab and no-break space are collapsed to one space.
+Characters the reader marked struck through or faint (faint text includes text on a background
+it cannot be told from) are masked: no statement matches them. A subheading must be a line of
+its own, exactly, but for "(s)". In a pattern:
 
 - literal text must appear exactly, word for word, with a space wherever the template has one
   and a paragraph break wherever it has one (blank paragraphs fold into one break); the space or
   break before an optional segment belongs to the segment ("above <25 C>" is "above 25 C" or
   "above", never "above25 C"); two segments the template writes together between letters are
-  separated by a space, as a person writes them; nothing is required before the first word;
+  separated by a space, as a person writes them; nothing is required before the first word,
+  whose first letter may be either case (also after optional segments the label leaves out);
 - a fill-in (``{...}``) is any non-empty text of at most 300 characters within one paragraph (as
   little as possible, except at the very end of the pattern, where it takes the rest of the
   line);
@@ -56,17 +61,25 @@ so a statement set out over more paragraphs is found. Struck or faint text is on
 another statement of the same section or appendix explains are not compared again, and where two
 resemblances of one section or appendix overlap, only the closer is reported. A resemblance in
 the readable part of a section is reported even when another part was refused. A statement with
-no required literal text of at least ``MIN_LITERAL`` characters is ``not-checkable`` (too little
-to tell). A non-optional statement or subheading that is absent is a ``missing-statement`` or
-``missing-subheading`` finding.
+less than ``MIN_LITERAL`` characters of required literal text is too little to tell on its own;
+when it is made of alternatives, each is matched instead (``_alternatives``: each optional
+segment taken as required in turn, and in one still too short each of its own segments), and a
+``used`` statement names the alternatives that matched, a deviation the one it resembles. One
+with no alternative long enough is ``not-checkable`` (reason ``too-little-text``), and so is an
+Appendix I entry the EMA left unbalanced (``unbalanced-brackets``). A non-optional statement or
+subheading that is absent is a ``missing-statement`` or ``missing-subheading`` finding.
 
+Every statement and subheading of the registry gets exactly one status. One with no text to be
+checked against is ``not-checked`` with the reason: ``section-absent`` (its section is not in the
+document) or ``section-not-mapped`` (the mapping has no code for its section, as for section 12).
 Sections the reader refused are ``refused-section`` findings. A statement not found in a section
-with a refused part is ``not-checked``, not ``absent``: it may be in the part that could not be
-read, and the checker never guesses around it. Defects the reader read through by a stated rule
-are ``xhtml-defect`` findings. Colour, shading, strike-through and faint marks over text are
-``formatting`` findings: coloured, highlighted or struck text in a published SmPC is usually a
-left-over from review. So is an underline over text it can change (``zone_a.underline``: an
-underlined "<" is drawn "≤"), which the text alone reads as the plain sign.
+with a refused part is ``not-checked`` (``refused-part``), not ``absent``: it may be in the part
+that could not be read, and the checker never guesses around it. Defects the reader read through
+by a stated rule are ``xhtml-defect`` findings. Colour, shading, strike-through and faint marks
+over text are ``formatting`` findings: coloured, highlighted or struck text in a published SmPC
+is usually a left-over from review. So is an underline over text it can change
+(``zone_a.underline``: an underlined "<" is drawn "≤"), which the text alone reads as the plain
+sign.
 """
 
 from __future__ import annotations
@@ -76,7 +89,7 @@ import itertools
 import json
 import re
 from collections import Counter, deque
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from zone_a.docx.reader import Paragraph
@@ -85,7 +98,10 @@ from zone_a.qrd.headings import collapse, index, match_heading
 from zone_a.qrd.pattern import Token, children, parse
 from zone_a.underline import underline_changes
 
-CHECKER_VERSION = "qrd-check/1.1.0"
+# The version of the rules in this module and in headings.py, pattern.py and zone_a.underline.
+# A change to any of them changes its hash in versions.lock.json, and
+# tests/test_versions_lock.py then requires a new version here.
+CHECKER_VERSION = "qrd-check/1.2.0"
 SIMILARITY = 0.85
 MIN_LITERAL = 12
 FILL_LIMIT = 300
@@ -524,15 +540,24 @@ class _Match:
         return out
 
 
-def _search(pieces: list[_Piece], lines: list[_Line]) -> _Match | None:
+def _lead(pieces: list[_Piece]) -> _Piece | None:
+    """The first piece that is not optional: the one whose first letter ``_regex`` frees."""
+    return next((piece for piece in pieces if piece.kind != "optional"), None)
+
+
+def _search(pieces: list[_Piece], lines: list[_Line], views: _Views | None = None) -> _Match | None:
     # The longest stretch of required text, cut at each "(s)", must be in the window.
     stretches = [part for run in _required(pieces) for part in _PLURAL.split(run)]
-    anchor = max(stretches, key=len) if stretches else ""
-    if pieces and pieces[0].kind == "text" and anchor and pieces[0].text.startswith(anchor[:1]):
-        # The statement's first letter may be either case in the label.
+    longest = max(range(len(stretches)), key=lambda at: len(stretches[at])) if stretches else -1
+    anchor = stretches[longest] if stretches else ""
+    lead = _lead(pieces)
+    if longest == 0 and lead is not None and lead.kind == "text" and lead.text[:1].isalpha():
+        # The first stretch starts with the statement's first letter, which ``_regex`` lets be
+        # either case in the label, whatever optional segments stand before it.
         anchor = anchor[1:]
     compiled = re.compile(_regex(pieces))
-    for window in _windows(lines, _span(pieces)):
+    windows = views.windows(lines, _span(pieces)) if views else _windows(lines, _span(pieces))
+    for window in windows:
         if anchor and anchor not in window.text:
             continue
         match = compiled.search(window.text)
@@ -682,8 +707,16 @@ def _align(nodes: list[_Node], tokens: list[_Token]) -> _Alignment | None:
     match is missing, not replaced by the word beside the stretch.
     """
     rows, columns = len(nodes) + 1, len(tokens) + 1
-    # The first token of the statement, whose capital a label may drop mid-sentence.
-    opening = next((n for n, node in enumerate(nodes) if node.kind == "token"), -1)
+    # The tokens whose capital a label may drop mid-sentence: the statement's first, and the
+    # first outside its opening optional segments (where ``_regex`` frees the first letter).
+    opening = {next((n for n, node in enumerate(nodes) if node.kind == "token"), -1)}
+    depth = 0
+    for position, node in enumerate(nodes):
+        depth += (node.kind == "open") - (node.kind == "close")
+        if not depth and node.kind in ("token", "fill"):
+            if node.kind == "token":
+                opening.add(position)
+            break
     cost = [[_INFINITE] * columns for _ in range(rows)]
     hits = [[0] * columns for _ in range(rows)]
     back: list[list[tuple[str, int, int] | None]] = [[None] * columns for _ in range(rows)]
@@ -728,7 +761,7 @@ def _align(nodes: list[_Node], tokens: list[_Token]) -> _Alignment | None:
                 relax(row + 1, column, current[column] + 1, found[column], ("delete", row, column))
                 if column < columns - 1:
                     label = tokens[column].text
-                    equal = _same(node.text, label, first=row == opening)
+                    equal = _same(node.text, label, first=row in opening)
                     step = ("match" if equal else "replace", row, column)
                     # A word for a punctuation mark, or a mark for a word, is two changes (one
                     # missing, one added), not one substitution.
@@ -852,6 +885,8 @@ class _Near:
     window: _Window
     tokens: list[_Token]
     nodes: list[_Node]
+    # The alternative of the statement it resembles, for a statement of alternatives.
+    alternative: str | None = None
 
     def used(self) -> list[int]:
         """The tokens the alignment covers, from its first to its last."""
@@ -871,7 +906,60 @@ def _depths(nodes: list[_Node]) -> list[_Node]:
     return out
 
 
-def _closest(nodes: list[_Node], lines: list[_Line], size: int) -> _Near | None:
+@dataclass(frozen=True)
+class _Prepared:
+    """A window, its tokens, and the words it holds counted generously (see ``_closest``)."""
+
+    window: _Window
+    tokens: list[_Token]
+    held: Counter[str]
+
+
+def _prepare(window: _Window) -> _Prepared:
+    tokens = _tokens(window)
+    # Either case, with or without a final "s" or "(s)".
+    held = Counter(token.text.lower() for token in tokens)
+    held.update(token.text.lower()[:-1] for token in tokens if token.text.lower().endswith("s"))
+    held.update(
+        _PLURAL.sub("", token.text.lower()) for token in tokens if _PLURAL.search(token.text)
+    )
+    return _Prepared(window, tokens, held)
+
+
+class _Views:
+    """The windows of a section's lines, and their tokens, built once per check.
+
+    The same lines are searched by every statement of a section or appendix, and masked lines
+    are the same for every statement of a group, so each is built once. Keys are the lines'
+    identity, and each entry holds its lines, so an identity is never reused during a check.
+    """
+
+    def __init__(self) -> None:
+        self._windows: dict[tuple[int, int], tuple[list[_Line], list[_Window]]] = {}
+        self._prepared: dict[tuple[int, int], tuple[list[_Line], list[_Prepared]]] = {}
+        self._masked: dict[tuple[str, int], tuple[list[_Line], list[_Line]]] = {}
+
+    def windows(self, lines: list[_Line], size: int) -> list[_Window]:
+        key = (id(lines), size)
+        if key not in self._windows:
+            self._windows[key] = (lines, _windows(lines, size))
+        return self._windows[key][1]
+
+    def prepared(self, lines: list[_Line], size: int) -> list[_Prepared]:
+        key = (id(lines), size)
+        if key not in self._prepared:
+            self._prepared[key] = (lines, [_prepare(w) for w in self.windows(lines, size)])
+        return self._prepared[key][1]
+
+    def masked(self, group: str, lines: list[_Line], taken: _Taken) -> list[_Line]:
+        """``_mask`` of the lines with the group's taken characters (fixed after the first pass)."""
+        key = (group, id(lines))
+        if key not in self._masked:
+            self._masked[key] = (lines, _mask(lines, taken.get(group, {})))
+        return self._masked[key][1]
+
+
+def _closest(nodes: list[_Node], prepared: list[_Prepared]) -> _Near | None:
     """The best alignment over windows whose tokens hold enough of the statement's words."""
     nodes = _depths(nodes)
     every = Counter(_PLURAL.sub("", node.text).lower() for node in nodes if node.kind == "token")
@@ -881,17 +969,12 @@ def _closest(nodes: list[_Node], lines: list[_Line], size: int) -> _Near | None:
         if node.kind == "token" and not node.depth
     )
     best: _Near | None = None
-    for window in _windows(lines, size):
-        tokens = _tokens(window)
+    for view in prepared:
+        window, tokens, held = view.window, view.tokens, view.held
         # The best score this window could reach: every statement token it holds matched, and
         # every required token it lacks costing one. Below the threshold, it is not aligned.
         # Counted generously (either case, with or without a final "s"), so a window is
         # never passed over that could reach the threshold.
-        held = Counter(token.text.lower() for token in tokens)
-        held.update(token.text.lower()[:-1] for token in tokens if token.text.lower().endswith("s"))
-        held.update(
-            _PLURAL.sub("", token.text.lower()) for token in tokens if _PLURAL.search(token.text)
-        )
         present = sum(min(n, held[text]) for text, n in every.items())
         lacking = sum(max(0, n - held[text]) for text, n in required.items())
         if not present or present / (present + lacking) < SIMILARITY:
@@ -998,50 +1081,147 @@ class _Job:
 _Taken = dict[str, dict[tuple[int, int], set[int]]]
 
 
-def _exact(report: _Report, job: _Job, taken: _Taken) -> bool:
+def _literal(pieces: list[_Piece]) -> int:
+    """How many characters of literal text a statement requires."""
+    return sum(len(run) for run in _required(pieces))
+
+
+def _alternatives(
+    pieces: list[_Piece], start: int = 0, end: int | None = None, prefix: str = ""
+) -> list[tuple[str, list[_Piece]]]:
+    """The forms of a statement made of alternatives, each named by where it stands.
+
+    Each optional segment from ``start`` to ``end`` is taken as required in turn, its content in
+    its place. Its siblings there that are long enough to be alternatives of their own (Appendix
+    I's sentences, which the template separates with "[or]") are left out of the form; shorter
+    ones stay optional ("Do not <refrigerate> <or> <freeze>."). A form with too little literal
+    text takes each optional segment of the content in turn ("{Invented name}<is contraindicated
+    during breast-feeding ...> [or] <should not be used during breast-feeding>."), and one with
+    none left is dropped. Names count the segments from 1, one within another after a dot ("4.2").
+    """
+    stop = len(pieces) if end is None else end
+
+    def alternative(piece: _Piece) -> bool:
+        return piece.kind == "optional" and _literal(list(piece.pieces)) >= MIN_LITERAL
+
+    out: list[tuple[str, list[_Piece]]] = []
+    number = 0
+    for position in range(start, stop):
+        piece = pieces[position]
+        if piece.kind != "optional":
+            continue
+        number += 1
+        name = f"{prefix}{number}"
+        inner = list(piece.pieces)
+        # The segment's joint is its first piece's once the segment is required.
+        head = inner[0]
+        inner[0] = _Piece(piece.joint, head.kind, head.text, head.pieces)
+        before = [p for at, p in enumerate(pieces[:position]) if at < start or not alternative(p)]
+        after = [
+            p
+            for at, p in enumerate(pieces[position + 1 :], position + 1)
+            if at >= stop or not alternative(p)
+        ]
+        form = [*before, *inner, *after]
+        # Nothing is required before the first piece, whatever stood before it in the template.
+        first = form[0]
+        form[0] = _Piece("", first.kind, first.text, first.pieces)
+        if _literal(form) >= MIN_LITERAL:
+            out.append((name, form))
+        else:
+            out += _alternatives(form, len(before), len(before) + len(inner), f"{name}.")
+    return out
+
+
+def _forms(pattern: list[Token]) -> list[tuple[str | None, list[_Piece]]]:
+    """What a statement is matched as: itself, or its alternatives when it is too short.
+
+    A statement with less than ``MIN_LITERAL`` characters of required literal text is too
+    little to tell on its own; when it is made of alternatives (Appendix I's lactation.1, whose
+    every sentence is optional; Appendix III's "<Do not <refrigerate> <or> <freeze>.>"), each
+    alternative long enough is matched instead. None when neither is possible.
+    """
+    pieces = _statement(pattern)
+    if _literal(pieces) >= MIN_LITERAL:
+        return [(None, pieces)]
+    return [(name, form) for name, form in _alternatives(pieces)]
+
+
+def _exact(report: _Report, job: _Job, taken: _Taken, views: _Views) -> bool:
     """Record an exact match or a settled status; False leaves the item for the second pass."""
     item = job.item
     pattern = item.get("pattern")
     if pattern is None:
-        report.statements.append({"id": job.identifier, "status": "not-checkable"})
+        # Appendix I's entries whose brackets the EMA does not balance have no pattern.
+        report.statements.append(
+            {"id": job.identifier, "status": "not-checkable", "reason": "unbalanced-brackets"}
+        )
         return True
     tokens = _content(pattern)
     if item["kind"] == "subheading":
         wanted = collapse("".join(str(t["value"]) for t in tokens if t["kind"] == "text"))
-        found = next((line for line in job.lines if line.text == wanted), None)
+        # "(s)" is the template's choice of singular or plural, as in a statement.
+        heading = re.compile(
+            re.escape(wanted).replace(r"\(s\)", r"(?:s|\(s\))?").replace(r"\(S\)", r"(?:S|\(S\))?")
+        )
+        found = next((line for line in job.lines if heading.fullmatch(line.text)), None)
         if found is not None:
             report.statements.append({"id": job.identifier, "status": "used", "in": found.path})
         elif job.refused:
-            report.statements.append({"id": job.identifier, "status": "not-checked"})
+            report.statements.append(
+                {"id": job.identifier, "status": "not-checked", "reason": "refused-part"}
+            )
         else:
             report.statements.append({"id": job.identifier, "status": "absent"})
             if not item["optional"]:
                 report.finding("missing-subheading", id=job.identifier, text=wanted)
         return True
-    pieces = _statement(pattern)
-    if sum(len(run) for run in _required(pieces)) < MIN_LITERAL:
-        report.statements.append({"id": job.identifier, "status": "not-checkable"})
+    forms = _forms(pattern)
+    if not forms:
+        report.statements.append(
+            {"id": job.identifier, "status": "not-checkable", "reason": "too-little-text"}
+        )
         return True
-    match = _search(pieces, job.lines)
-    if match is None:
+    matches = [
+        (name, match)
+        for name, pieces in forms
+        if (match := _search(pieces, job.lines, views)) is not None
+    ]
+    if not matches:
         return False
     group = taken.setdefault(job.group, {})
-    for key, characters in match.characters().items():
-        group.setdefault(key, set()).update(characters)
-    report.statements.append({"id": job.identifier, "status": "used", **match.location()})
+    for _, match in matches:
+        for key, characters in match.characters().items():
+            group.setdefault(key, set()).update(characters)
+    statement = {"id": job.identifier, "status": "used", **matches[0][1].location()}
+    if matches[0][0] is not None:
+        # Where it matched is the first alternative's; every alternative that matched is named.
+        statement["alternatives"] = [name for name, _ in matches]
+    report.statements.append(statement)
     return True
 
 
-def _candidate(job: _Job, taken: _Taken) -> _Near | None:
-    """The closest resemblance of a statement not matched exactly, if close enough."""
-    pieces = _statement(job.item["pattern"])
+def _candidate(job: _Job, taken: _Taken, views: _Views) -> _Near | None:
+    """The closest resemblance of a statement not matched exactly, if close enough.
+
+    For a statement of alternatives, the closest of its alternatives' resemblances.
+    """
+    lines = views.masked(job.group, job.lines, taken)
+    best: _Near | None = None
+    for name, pieces in _forms(job.item["pattern"]):
+        near = _resemblance(pieces, lines, views)
+        if near is not None and (best is None or near.alignment.score > best.alignment.score):
+            best = replace(near, alternative=name)
+    return best
+
+
+def _resemblance(pieces: list[_Piece], lines: list[_Line], views: _Views) -> _Near | None:
     nodes = _nodes(pieces)
-    lines = _mask(job.lines, taken.get(job.group, {}))
-    near = _closest(nodes, lines, _span(pieces))
+    near = _closest(nodes, views.prepared(lines, _span(pieces)))
     if near is None or near.alignment.cost:
         # Also over two paragraphs more, for a statement set out over more paragraphs than the
         # template gives it; the closer of the two counts.
-        wider = _closest(nodes, lines, _span(pieces) + 2)
+        wider = _closest(nodes, views.prepared(lines, _span(pieces) + 2))
         if wider is not None and (near is None or wider.alignment.score > near.alignment.score):
             near = wider
     if near is None:
@@ -1092,9 +1272,11 @@ def _near(report: _Report, job: _Job, near: _Near | None) -> None:
         line = near.window.lines[near.tokens[near.used()[0]].line]
         # A resemblance in the readable part is reported even when another part of the section
         # was refused: the differing wording is there to see.
+        alternative = {} if near.alternative is None else {"alternative": near.alternative}
         report.finding(
             "deviation",
             id=job.identifier,
+            **alternative,
             similarity=round(near.alignment.score, 3),
             **{"in": line.path, "paragraph": line.paragraph},
             differences=differences,
@@ -1103,7 +1285,9 @@ def _near(report: _Report, job: _Job, near: _Near | None) -> None:
         return
     if job.refused:
         # Part of the section could not be read; the statement may be there.
-        report.statements.append({"id": job.identifier, "status": "not-checked"})
+        report.statements.append(
+            {"id": job.identifier, "status": "not-checked", "reason": "refused-part"}
+        )
         return
     report.statements.append({"id": job.identifier, "status": "absent"})
     if not job.item["optional"] and job.item["kind"] == "statement":
@@ -1113,8 +1297,9 @@ def _near(report: _Report, job: _Job, near: _Near | None) -> None:
 def check(document: Document, registry: dict[str, Any], mapping: dict[str, Any]) -> dict[str, Any]:
     """The findings and statement statuses for a document, by the rules in the module docstring.
 
-    The result also names the checker version, the template, the registry version and the
-    document's title and date, and counts the findings and statuses by kind.
+    The result also names the checker version, the template, the registry and mapping versions
+    and the document's title and date, and counts the findings and statuses by kind. Every
+    statement and subheading of the registry has exactly one status.
 
     Args:
         document: The ePI as ``zone_a.epi.reader.read_epi`` returns it.
@@ -1193,47 +1378,64 @@ def check(document: Document, registry: dict[str, Any], mapping: dict[str, Any])
             report.finding("missing-heading", key=target.key, expected=target.title)
 
     # Statements: every item of every section, then those placed around the sections, then
-    # the appendices.
+    # the appendices. Every item gets exactly one status: one with no text to be checked
+    # against is not-checked, with the reason.
+    identifiers: list[str] = []
     jobs: list[_Job] = []
+    unchecked: list[tuple[str, str]] = []
+    texts: dict[str, tuple[list[_Line], list[str]]] = {}
+    mapped = {target.key for target in targets.values()}
+
+    def add(identifier: str, item: dict[str, Any], key: str, group: str, why: str | None) -> None:
+        identifiers.append(identifier)
+        if why is None and key not in found:
+            why = "section-absent"
+        if why is not None:
+            unchecked.append((identifier, why))
+            return
+        if key not in texts:
+            texts[key] = _lines(found[key], own, paths)
+        lines, refused = texts[key]
+        jobs.append(_Job(identifier, item, lines, refused, group))
+
     for key, section_entry in sections_by_key.items():
-        part = found.get(key)
-        if part is None:
-            continue
-        lines, refused = _lines(part, own, paths)
+        home, why = key, None
+        if key not in mapped:
+            parent = key.rsplit(".", 1)[0]
+            if section_entry["optional"] and key.count(".") == 2 and parent in mapped:
+                # An optional subsection the mapping does not list (2.1 and 2.2, for advanced
+                # therapies) is read as part of its section: the template files "For the full
+                # list of excipients, see section 6.1." under 2.2, and it applies to every
+                # product's section 2.
+                home = parent
+            else:
+                why = "section-not-mapped"
         for number, item in enumerate(section_entry["items"]):
             if item["kind"] in ("statement", "subheading"):
-                jobs.append(_Job(f"{key}#{number}", item, lines, refused, key))
+                add(f"{key}#{number}", item, home, home, why)
     # The monitoring statement stands before section 1 (in the root section's own text); the
     # closing statement follows section 10, where an ePI puts it.
     for number, item in enumerate(registry["documentStatements"]):
-        place = found.get("smpc" if item["placement"] == "before-section-1" else "smpc.10")
-        if place is not None:
-            lines, refused = _lines(place, own, paths)
-            jobs.append(_Job(f"document#{number}", item, lines, refused, "document"))
+        place = "smpc" if item["placement"] == "before-section-1" else "smpc.10"
+        add(f"document#{number}", item, place, "document", None)
     appendices = registry["appendices"]
     for name, owner in (("I", "smpc.4.6"), ("III", "smpc.6.4")):
-        part = found.get(owner)
-        if part is None:
-            continue
-        lines, refused = _lines(part, own, paths)
         entries = appendices[name]["entries"] if name == "I" else appendices[name]["items"]
         for number, entry in enumerate(entries):
             item = {"kind": "statement", "optional": True, "pattern": entry.get("pattern")}
             identifier = f"appendix-{name}#{entry.get('id', number)}"
-            jobs.append(_Job(identifier, item, lines, refused, f"appendix-{name}"))
-    part = found.get("smpc.4.8")
-    if part is not None:
-        lines, refused = _lines(part, own, paths)
-        for group in appendices["II"]["groups"].values():
-            for row in group:
-                item = {"kind": "statement", "optional": True, "pattern": parse(row["text"])}
-                jobs.append(_Job(f"appendix-II#{row['code']}", item, lines, refused, "appendix-II"))
+            add(identifier, item, owner, f"appendix-{name}", None)
+    for group in appendices["II"]["groups"].values():
+        for row in group:
+            item = {"kind": "statement", "optional": True, "pattern": parse(row["text"])}
+            add(f"appendix-II#{row['code']}", item, "smpc.4.8", "appendix-II", None)
 
+    views = _Views()
     taken: _Taken = {}
-    pending = [job for job in jobs if not _exact(report, job, taken)]
+    pending = [job for job in jobs if not _exact(report, job, taken, views)]
     # A paragraph that resembles several statements of one section or appendix (alternatives
     # such as "waived" and "deferred") is a deviation of the one it resembles most.
-    candidates = {job.identifier: _candidate(job, taken) for job in pending}
+    candidates = {job.identifier: _candidate(job, taken, views) for job in pending}
     claimed: dict[str, set[tuple[tuple[int, int], int]]] = {}
     ranked = sorted(
         ((job, near) for job in pending if (near := candidates[job.identifier]) is not None),
@@ -1247,14 +1449,16 @@ def check(document: Document, registry: dict[str, Any], mapping: dict[str, Any])
             claimed[job.group] |= covered
     for job in pending:
         _near(report, job, candidates[job.identifier])
-    report.statements.sort(
-        key=lambda statement: [job.identifier for job in jobs].index(statement["id"])
-    )
+    for identifier, why in unchecked:
+        report.statements.append({"id": identifier, "status": "not-checked", "reason": why})
+    rank = {identifier: position for position, identifier in enumerate(identifiers)}
+    report.statements.sort(key=lambda statement: rank[statement["id"]])
 
     return {
         "checker": CHECKER_VERSION,
         "template": registry["template"],
         "registryVersion": registry["registryVersion"],
+        "mappingVersion": mapping["mappingVersion"],
         "document": {"title": document.title, "date": document.date},
         "summary": _summary(report),
         "findings": report.findings,
@@ -1322,11 +1526,27 @@ def _summary(report: _Report) -> dict[str, dict[str, int]]:
     }
 
 
-def report(file: str, data: bytes, registry: dict[str, Any], mapping: dict[str, Any]) -> str:
-    """The committed check result for one pinned source file, as JSON text."""
+def report(file: str, data: bytes, registry: bytes, mapping: bytes) -> str:
+    """The committed check result for one pinned source file, as JSON text.
+
+    Besides ``check``'s result it names the source file and the SHA-256 of the exact bytes of
+    the three inputs, and the reader's version: the registry's version does not change with
+    every byte of it (its ``readerVersion`` has), and the mapping's version names the heading
+    findings' source only as far as it is bumped.
+
+    Args:
+        file: The pinned source file's name.
+        data: Its bytes.
+        registry: The bytes of ``qrd/registry/cap-smpc-en-10.4.json``.
+        mapping: The bytes of ``fhir/mappings/cap-smpc-en.json``.
+    """
     result = {
         "source": {"file": file, "sha256": hashlib.sha256(data).hexdigest()},
         "reader": READER_VERSION,
-        **check(read_epi(data), registry, mapping),
+        "inputs": {
+            "registrySha256": hashlib.sha256(registry).hexdigest(),
+            "mappingSha256": hashlib.sha256(mapping).hexdigest(),
+        },
+        **check(read_epi(data), json.loads(registry), json.loads(mapping)),
     }
     return json.dumps(result, ensure_ascii=False, indent=2) + "\n"

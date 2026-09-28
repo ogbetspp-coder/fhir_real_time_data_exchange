@@ -1,15 +1,30 @@
-# Zone A skeleton
+# Zone A
 
-Delivered (was roadmap item 2). A Python project that consumes the published Zone B contracts,
-proves that the canonical hashes reproduce in a second language, and re-implements the narrative
-fidelity check with the golden vectors as its only oracle.
+A Python project with two jobs.
 
-This is the first real test of the claim in ADR 0002 that the contract and the fidelity
-specification are language-neutral: "A Zone A implementation in another language must generate
-its models from `contracts/generated/` and prove fidelity-check equivalence against the golden
-vectors." Nothing here structures a document yet. It establishes that the boundary can be
+The first, delivered as roadmap item 2, consumes the published Zone B contracts, proves that the
+canonical hashes reproduce in a second language, and re-implements the narrative fidelity check
+with the golden vectors as its only oracle. This is the first real test of the claim in ADR 0002
+that the contract and the fidelity specification are language-neutral: "A Zone A implementation
+in another language must generate its models from `contracts/generated/` and prove
+fidelity-check equivalence against the golden vectors." It establishes that the boundary can be
 implemented from the published artefacts, and it records — in the last section of this file —
 every place where it could not be.
+
+The second reads documents and checks them against the EMA's QRD template, and proposes; it never
+changes a word of a label. `zone_a.docx.reader` reads a Word body and `zone_a.epi.reader` an EMA
+ePI Bundle's sections into paragraphs and marks, exactly or with a refusal and its reason;
+`zone_a.qrd.registry` builds the QRD template registry (`qrd/registry/`) from the pinned EMA files
+(`docs/design/qrd-registry.md`); `zone_a.qrd.check` checks every ePI pinned in
+`labels/ema-epi/` against it and the section mapping and writes the results to
+`labels/ema-epi/checks/` (`docs/design/qrd-conformance-check.md`). `zone_a.underline` decides
+what an underline can change, and writes two inputs the authority importer reads
+(`src/authority/data/underline-letters.json`, `test/fixtures/authority/underline-cases.json`);
+`scripts/generate_style_cases.py` writes the CSS cases the importer's T shares with the ePI
+reader (`test/fixtures/authority/style-cases.json`). The readers', the registry's and the
+check's versions are tied to their code by `versions.lock.json` (`scripts/lock_versions.py`).
+These read authority-published labels under the scoped exception in `AGENTS.md`; nothing here
+logs their text.
 
 Nothing under `src/`, `docs/fidelity-normalization.md`, or the ADRs was changed to make any of
 this pass. Where the Python and the TypeScript disagreed, the TypeScript decided and the Python
@@ -19,20 +34,25 @@ that run them. None of that changes a byte of what the pipeline computes.
 
 ## What is proven
 
-| Claim                                                        | Where                                         |
-| ------------------------------------------------------------ | --------------------------------------------- |
-| Canonical JSON hashes reproduce across languages             | `tests/test_contracts_parity.py`              |
-| Canonical JSON is byte-identical where the defaults disagree | `tests/test_canonical_json_parity.py`         |
-| The generated models neither drop nor invent a field         | `tests/test_contracts_parity.py` (round trip) |
-| Strict objects reject, open objects accept and preserve      | `tests/test_contracts_strictness.py`          |
-| The fidelity check reproduces every golden vector            | `tests/test_golden_vectors.py`                |
-| The two implementations agree off the vectors as well        | `tests/test_differential.py`                  |
-| The runtime's Unicode Character Database is the pinned one   | `tests/test_environment.py`                   |
-| No test prints narrative and no file here quotes a vector    | `tests/test_no_narrative_leak.py`             |
-| A Word body is read exactly, or refused with a reason        | `tests/test_docx_reader.py`                   |
-| The QRD registry is what the pinned EMA files build          | `tests/test_qrd_registry.py`                  |
-| An EMA ePI section is read exactly, or refused with a reason | `tests/test_epi_reader.py`                    |
-| The conformance results are what the pinned ePIs give        | `tests/test_qrd_check.py`                     |
+| Claim                                                                  | Where                                         |
+| ---------------------------------------------------------------------- | --------------------------------------------- |
+| Canonical JSON hashes reproduce across languages                       | `tests/test_contracts_parity.py`              |
+| Canonical JSON is byte-identical where the defaults disagree           | `tests/test_canonical_json_parity.py`         |
+| The generated models neither drop nor invent a field                   | `tests/test_contracts_parity.py` (round trip) |
+| Strict objects reject, open objects accept and preserve                | `tests/test_contracts_strictness.py`          |
+| The fidelity check reproduces every golden vector                      | `tests/test_golden_vectors.py`                |
+| The two implementations agree off the vectors as well                  | `tests/test_differential.py`                  |
+| The runtime's Unicode Character Database is the pinned one             | `tests/test_environment.py`                   |
+| No test prints narrative and no file here quotes a vector              | `tests/test_no_narrative_leak.py`             |
+| A Word body is read exactly, or refused with a reason                  | `tests/test_docx_reader.py`                   |
+| The QRD registry is what the pinned EMA files build                    | `tests/test_qrd_registry.py`                  |
+| An EMA ePI section is read exactly, or refused with a reason           | `tests/test_epi_reader.py`                    |
+| The conformance results are what the pinned ePIs give                  | `tests/test_qrd_check.py`                     |
+| An underline is judged by what it can change, and the importer's port  | `tests/test_underline.py`                     |
+| is held to the same cases                                              |                                               |
+| The ePI reader's CSS answers are the cases the importer's T is held to | `tests/test_style_cases.py`                   |
+| A reader, registry or check change bumps its version                   | `tests/test_versions_lock.py`                 |
+| The weekly EMA drift check fetches as the import gate does             | `tests/test_label_sources.py`                 |
 
 The second and sixth rows are new, and they exist because the first version of this port was
 wrong in five places that 130 passing vectors could not see. See "What the vectors could not
@@ -92,11 +112,17 @@ run here. Nothing after the bootstrap needs it: `uv` is a static binary and the 
 code does not import `plistlib`. CI is unaffected — it uses `actions/setup-python` and
 `astral-sh/setup-uv`, and neither goes through `ensurepip`.
 
-The test suite reads three things from the repository root: the golden vectors
+The test suite reads from the repository root the golden vectors
 (`test/fixtures/fidelity/vectors.json`), the exported contract fixtures
-(`test/fixtures/contracts/`), and the differential smoke corpus
-(`tests/fixtures/differential-smoke.jsonl`). All three are generated and gate-checked on the Node
-side, so run `npm run check` from the repository root first if any is missing.
+(`test/fixtures/contracts/`) and the differential smoke corpus
+(`tests/fixtures/differential-smoke.jsonl`), which are generated and gate-checked on the Node
+side, so run `npm run check` from the repository root first if any is missing; and the committed
+inputs and outputs of the QRD check: the pinned EMA files and the registry (`qrd/`), the pinned
+ePIs, their Lists and check results (`labels/ema-epi/`), the section mapping
+(`fhir/mappings/cap-smpc-en.json`), the importer's source that the drift check follows
+(`src/authority/fetch.ts`), and the files Zone A writes for the importer
+(`src/authority/data/underline-letters.json`, `test/fixtures/authority/underline-cases.json`,
+`test/fixtures/authority/style-cases.json`).
 
 ## Regenerating the models
 
@@ -460,13 +486,20 @@ reverts recorded above.
 
 ## Narrative safety
 
-The vectors and fixtures are synthetic by construction, which is exactly why the habit is worth
-enforcing while it costs nothing. `tests/test_no_narrative_leak.py` parses every test module and
-fails if it calls `print`, writes to `sys.stdout`/`sys.stderr`, or imports `logging`; and it
-fails if any Python or Markdown file in this directory contains a run of 24 or more characters
-taken from a vector's normalisation input, XHTML input, page text, or section markup. Vector
-comparisons are made on the values themselves, as the TypeScript tests do, but a failing
-comparison reports only the vector name, the canonical lengths, and two digests.
+The vectors and fixtures are synthetic by construction, but the readers' and the QRD check's
+tests read real, authority-published labels, so a test that printed what it read would put an
+SmPC's text in a CI log. `tests/test_no_narrative_leak.py` parses every test module and fails if
+it calls `print` or `pprint`, names `sys.stdout` or `sys.stderr` (`.write`, an alias,
+`from sys import stdout`), calls `os.write`, names a stream's path (`/dev/stdout`, `/dev/fd/1`),
+or imports `logging`, `pprint`, `warnings` or `traceback`, with a negative case for each. It is a
+lint over names, not a sandbox: a route built at run time (`getattr(sys, "std" + "out")`, a path
+assembled from parts, a subprocess that echoes, `ctypes`) passes it, a limit its own tests pin,
+and review is what catches those. It also fails if any Python or Markdown file in this directory contains
+a run of 24 or more characters taken from a vector's normalisation input, XHTML input, page
+text, or section markup. Vector comparisons are made on the values themselves, as the TypeScript
+tests do, but a failing comparison reports only the vector name, the canonical lengths, and two
+digests; a committed check result is compared by digest, and a failure names only the JSON
+pointers that differ.
 
 ## Specification ambiguities found
 
