@@ -3,12 +3,14 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
 import { loadConfig, type AppConfig } from "../src/config.js";
 import { loadEmaMapping, type EmaMapping } from "../src/fhir/mapping.js";
-import type { OperationOutcome } from "../src/fhir/types.js";
+import { transformType2ToEma } from "../src/fhir/transform.js";
+import type { FhirBundle, FhirResource, OperationOutcome } from "../src/fhir/types.js";
+import { createSyntheticType2Bundle } from "../src/fixtures/synthetic.js";
 import { createSyntheticSubmission } from "../src/fixtures/synthetic-submission.js";
 import type { SignedManifest } from "../src/gcp/evidence.js";
 import type { PersistTransaction } from "../src/gcp/healthcare.js";
 import { sha256 } from "../src/lib/hash.js";
-import { runPipeline } from "../src/pipeline.js";
+import { officialValidationTargets, runPipeline } from "../src/pipeline.js";
 
 // A persisted run (DRY_RUN=false) with every Google client and both validators replaced, so what
 // is asserted is the pipeline's own behaviour: that each validation gate stops the run before any
@@ -31,6 +33,9 @@ const state = vi.hoisted(() => ({
   failLineage: false,
   objects: new Map<string, unknown>(),
   executed: [] as unknown[],
+  // What each validator was asked: the resource and its profiles, in order.
+  official: [] as { resource: FhirResource; profiles: string[] }[],
+  cloud: [] as { resource: FhirResource; profiles: string[] }[],
 }));
 
 const VERSION = "MTc5MDUyNzYzMTkyMTk4NTAwMA";
@@ -53,8 +58,9 @@ vi.mock("../src/fhir/preflight.js", async (importOriginal) => {
 vi.mock("../src/fhir/official-validator.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/fhir/official-validator.js")>()),
   OfficialFhirValidatorClient: class {
-    public validate(): Promise<OperationOutcome> {
+    public validate(resource: FhirResource, profiles: string[]): Promise<OperationOutcome> {
       state.events.push({ kind: "official-validate" });
+      state.official.push({ resource, profiles });
       return Promise.resolve(
         state.failOfficial
           ? { resourceType: "OperationOutcome", issue: [{ severity: "error", code: "invalid" }] }
@@ -67,8 +73,9 @@ vi.mock("../src/fhir/official-validator.js", async (importOriginal) => ({
 vi.mock("../src/gcp/healthcare.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/gcp/healthcare.js")>()),
   HealthcareApiClient: class {
-    public validate(): Promise<OperationOutcome> {
+    public validate(resource: FhirResource, profile: string): Promise<OperationOutcome> {
       state.events.push({ kind: "cloud-validate" });
+      state.cloud.push({ resource, profiles: [profile] });
       return Promise.resolve(
         state.failCloud
           ? { resourceType: "OperationOutcome", issue: [{ severity: "fatal", code: "invalid" }] }
@@ -183,6 +190,8 @@ beforeEach(() => {
   state.failLineage = false;
   state.objects.clear();
   state.executed.length = 0;
+  state.official.length = 0;
+  state.cloud.length = 0;
 });
 
 function kinds(): string[] {
@@ -224,6 +233,49 @@ describe("a persisted run's validation gates", () => {
     const order = kinds();
     expect(order.filter((kind) => kind === "official-validate")).toHaveLength(4);
     expect(order.lastIndexOf("official-validate")).toBeLessThan(order.indexOf("cloud-validate"));
+  });
+
+  // The one list CI's "Official validation" job validates too (scripts/ci/emit-validation-set.ts):
+  // the validators are asked about exactly officialValidationTargets, the official one per
+  // resource with all its profiles and $validate per resource and profile.
+  it("validate exactly the pipeline's validation targets", async () => {
+    await post();
+    const source = state.official[0]?.resource as FhirBundle;
+    const targets = officialValidationTargets(
+      source,
+      transformType2ToEma(source, mapping),
+      mapping,
+    );
+    expect(targets.map(({ name }) => name)).toEqual([
+      "source",
+      "ema-list",
+      "ema-bundle",
+      "ema-composition",
+    ]);
+    expect(state.official).toEqual(
+      targets.map(({ resource, profiles }) => ({ resource, profiles })),
+    );
+    expect(state.cloud).toEqual(
+      targets.flatMap(({ resource, profiles }) =>
+        profiles.map((profile) => ({ resource, profiles: [profile] })),
+      ),
+    );
+    const signed = state.objects.get("signed-manifest") as SignedManifest | undefined;
+    expect(signed?.manifest.validation.profiles).toEqual(
+      targets.flatMap(({ profiles }) => profiles),
+    );
+  });
+
+  it("finds no validation target in a document Bundle without a Composition", () => {
+    const source = createSyntheticType2Bundle(mapping);
+    const transformed = transformType2ToEma(source, mapping);
+    expect(() =>
+      officialValidationTargets(
+        source,
+        { ...transformed, documentBundle: { ...transformed.documentBundle, entry: [] } },
+        mapping,
+      ),
+    ).toThrow("Transformed Composition is missing");
   });
 });
 

@@ -11,6 +11,7 @@ import {
 } from "../../src/fhir/preflight.js";
 import { transformType2ToEma } from "../../src/fhir/transform.js";
 import type { FhirBundle, FhirResource } from "../../src/fhir/types.js";
+import { officialValidationTargets } from "../../src/pipeline.js";
 import { SMOKE_PRODUCT_ID } from "../../src/fixtures/synthetic-products.js";
 import { createSyntheticType2Bundle } from "../../src/fixtures/synthetic.js";
 
@@ -33,11 +34,11 @@ import { createSyntheticType2Bundle } from "../../src/fixtures/synthetic.js";
 // A third is the published interoperability artifacts, fhir/generated/ (the ConceptMap and the
 // StructureMap), as committed, against the base R5 definitions only: no profile applies to them.
 //
+// Each case's resources and profiles are the pipeline's own (officialValidationTargets in
+// src/pipeline.ts), so a resource or a profile the worker adds is validated here too. The set is
+// ten files: four per case, and the two artifacts.
+//
 // usage: tsx scripts/ci/emit-validation-set.ts OUTPUT_DIR
-
-// The literal in src/pipeline.ts (GLOBAL_TYPE2_PROFILE), which is not exported.
-const GLOBAL_TYPE2_PROFILE =
-  "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/Bundle-uv-epi";
 
 export type ValidationSetEntry = {
   file: string;
@@ -69,22 +70,11 @@ function caseOf(source: FhirBundle, graphType: "type1" | "type2", suffix: string
       `EMA structural preflight failed (${emaPreflight.issue.length} issues); the worker would refuse this transform before official validation`,
     );
   }
-  const composition = target.documentBundle.entry[0]?.resource;
-  if (composition === undefined) throw new Error("Transformed Composition is missing");
-  return [
-    { file: `source-${graphType}.json`, resource: source, profiles: [GLOBAL_TYPE2_PROFILE] },
-    { file: `ema-list${suffix}.json`, resource: target.list, profiles: [mapping.profiles.list] },
-    {
-      file: `ema-bundle${suffix}.json`,
-      resource: target.documentBundle,
-      profiles: [mapping.profiles.bundle],
-    },
-    {
-      file: `ema-composition${suffix}.json`,
-      resource: composition,
-      profiles: mapping.profiles.composition,
-    },
-  ];
+  return officialValidationTargets(source, target, mapping).map(({ name, resource, profiles }) => ({
+    file: name === "source" ? `source-${graphType}.json` : `${name}${suffix}.json`,
+    resource,
+    profiles,
+  }));
 }
 
 const publication = syntheticPublication(mapping);
