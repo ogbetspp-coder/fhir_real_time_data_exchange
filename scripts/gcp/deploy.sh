@@ -119,6 +119,14 @@ tf_deploy_vars() {
     echo "::error title=No alert recipient::Set ALERT_NOTIFICATION_EMAIL (a repository variable in GitHub Actions) or ALERT_NOTIFICATION_CHANNELS. Every alert policy must page someone; none is deployed without." >&2
     return 1
   fi
+  # A placeholder is no recipient either: an example.com/.org/.net address (reserved, RFC 2606)
+  # or a `you@` local part left from a template pages nobody, however well-formed. The address is
+  # not printed; infra/variables.tf refuses the same shapes.
+  if [[ -n "$alert_notification_email" ]] &&
+    printf '%s' "$alert_notification_email" | grep -Eiq '^you@|@([^@]+\.)?example\.(com|org|net)$'; then
+    echo "::error title=Placeholder alert recipient::ALERT_NOTIFICATION_EMAIL is a placeholder (an example.com/.org/.net domain or a you@ address). Set it to a real, watched address." >&2
+    return 1
+  fi
   echo "alert configuration: alert_notification_email is $([[ -n "$alert_notification_email" ]] && echo set || echo 'not set'), alert_notification_channels=${#alert_notification_channels_json} bytes"
 
   TF_DEPLOY_VARS=(
@@ -435,6 +443,54 @@ export_effective_iam() {
   return 0
 }
 
+# Permissions the apply needs that the deployer's hand-made roles (README.md) did not always carry,
+# one line per kind of resource infra/ declares that needs one (test/infra/deploy-preflight.test.ts
+# keeps the two in step). An apply that lacks one does not stop cleanly: Terraform refuses the
+# create that needs it while carrying out every change that does not, so a grant can be removed
+# before its replacement exists. So they are tested first, and a missing one stops the deploy
+# before anything changes.
+APPLY_PERMISSIONS=(
+  iam.roles.create # google_project_iam_custom_role
+  iam.roles.delete
+  iam.roles.get
+  iam.roles.update
+  bigquery.tables.getIamPolicy # google_bigquery_table_iam_member
+  bigquery.tables.setIamPolicy
+  healthcare.fhirStores.getIamPolicy # google_healthcare_fhir_store_iam_member
+  healthcare.fhirStores.setIamPolicy
+  resourcemanager.projects.getIamPolicy # google_project_iam_audit_config, google_project_iam_member
+  resourcemanager.projects.setIamPolicy
+)
+
+# Asks Resource Manager which of APPLY_PERMISSIONS the deploy's own credential holds on the
+# project (testIamPermissions needs no permission of its own) and fails, naming the missing ones,
+# unless it holds all of them. An answer it cannot read fails too.
+preflight_apply_permissions() {
+  local body response missing
+  body="$(python3 -c 'import json,sys;print(json.dumps({"permissions":sys.argv[1:]}))' "${APPLY_PERMISSIONS[@]}")"
+  if ! response="$(curl --silent --fail --request POST \
+    --header "Authorization: Bearer $(ema_flow_access_token)" \
+    --header 'Content-Type: application/json' \
+    --data "$body" \
+    "https://cloudresourcemanager.googleapis.com/v1/projects/${PROJECT_ID}:testIamPermissions")"; then
+    echo "::error title=Deploy permissions::Could not ask Resource Manager which permissions the deploy holds (testIamPermissions failed); not applying." >&2
+    return 1
+  fi
+  if ! missing="$(python3 -c '
+import json, sys
+held = set(json.loads(sys.argv[1]).get("permissions") or [])
+print(" ".join(p for p in sys.argv[2:] if p not in held))
+' "$response" "${APPLY_PERMISSIONS[@]}")"; then
+    echo "::error title=Deploy permissions::Resource Manager answered testIamPermissions with something unreadable; not applying." >&2
+    return 1
+  fi
+  if [[ -n "$missing" ]]; then
+    echo "::error title=Deploy permissions::The deploy identity lacks ${missing}. Grant them (README.md, the deployer's roles) and deploy again; nothing was applied." >&2
+    return 1
+  fi
+  echo "deploy permissions: all ${#APPLY_PERMISSIONS[@]} the apply needs are held"
+}
+
 # The services' FHIR grants are bound on each store (infra/security.tf, infra/query.tf), and the
 # stores are created by reconcile-fhir-stores.sh, not by Terraform. So before an apply, a missing
 # store is created first; an existing one is left for phase_bootstrap to reconcile as before.
@@ -475,8 +531,8 @@ ensure_fhir_stores() {
 
 # The operations dashboard's text is ignored by Terraform (infra/observability.tf), so this is
 # what keeps it current: when the live dashboard lacks a configured value, it is replaced. A
-# dashboard holds no record, so replacing it loses nothing. A lookup that fails only warns; a
-# replacement that fails fails the deploy, like any apply.
+# dashboard holds no record, so replacing it loses nothing. Anything this cannot read or compare
+# fails the deploy, like a failed apply: an unchecked dashboard is how the perpetual diff hid.
 sync_dashboard() {
   echo "=== operations dashboard ==="
   local id configured live verdict=0
@@ -486,9 +542,9 @@ sync_dashboard() {
   if [[ -z "$id" ]] ||
     ! terraform -chdir=infra output -raw operations_dashboard_json >"$configured" 2>/dev/null ||
     ! gcloud --quiet monitoring dashboards describe "$id" --format=json >"$live"; then
-    echo "::warning::Could not read the operations dashboard or its configuration; its drift was not checked."
+    echo "::error title=Dashboard drift::Could not read the operations dashboard or its configuration." >&2
     rm -f "$configured" "$live"
-    return 0
+    return 1
   fi
   python3 scripts/ci/dashboard-drift.py "$configured" "$live" || verdict=$?
   if [[ "$verdict" == "1" ]]; then
@@ -501,17 +557,24 @@ sync_dashboard() {
       "${TF_DEPLOY_VARS[@]}"
 
     id="$(terraform -chdir=infra output -raw operations_dashboard_id)"
+    if ! gcloud --quiet monitoring dashboards describe "$id" --format=json >"$live"; then
+      echo "::error title=Dashboard drift::Could not read the replaced operations dashboard." >&2
+      rm -f "$configured" "$live"
+      return 1
+    fi
     verdict=0
-    if gcloud --quiet monitoring dashboards describe "$id" --format=json >"$live"; then
-      python3 scripts/ci/dashboard-drift.py "$configured" "$live" || verdict=$?
-    fi
-    if [[ "$verdict" != "0" ]]; then
+    python3 scripts/ci/dashboard-drift.py "$configured" "$live" || verdict=$?
+    if [[ "$verdict" == "1" ]]; then
       echo "::warning::The replaced dashboard still differs from its configuration: scripts/ci/dashboard-drift.py does not model some rewrite the Monitoring API makes. Every deploy will replace it until that is fixed."
+      verdict=0
     fi
-  elif [[ "$verdict" != "0" ]]; then
-    echo "::warning::The dashboard drift check could not compare the two; its drift was not checked."
   fi
   rm -f "$configured" "$live"
+  # 2 (or anything but 0 and 1) is the checker failing, never drift.
+  if [[ "$verdict" != "0" ]]; then
+    echo "::error title=Dashboard drift::scripts/ci/dashboard-drift.py could not compare the dashboard with its configuration (exit ${verdict})." >&2
+    return 1
+  fi
 }
 
 phase_apply() {
@@ -543,6 +606,7 @@ phase_apply() {
     "${REPOSITORY}/query@${QUERY_DIGEST}" \
     "$SERVICE_VERSION"
 
+  preflight_apply_permissions
   ensure_fhir_stores
 
   if ! terraform -chdir=infra apply \

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { serviceAccountRoles, terraformBlocks } from "./terraform.js";
+import { serviceAccountRoles, terraformBlocks, withoutResources } from "./terraform.js";
 
 // The reader every least-privilege test relies on. Each evasion below would once have been
 // silently skipped, so "exactly these roles" would have passed while being false. Each must now
@@ -201,6 +201,105 @@ resource "google_project_iam_member" "two" {
 }
 `;
     expect(() => serviceAccountRoles(terraform, "build")).toThrow(/2 role assignments/);
+  });
+});
+
+describe("a member reached indirectly", () => {
+  // Review round 1 of audit B04: the account reached through another resource's attribute. The
+  // reference to google_service_account.build sits in a non-IAM resource, so without this rule
+  // the grant was counted for nobody and roles/editor went unseen.
+  const owner = (member: string) => `
+resource "google_project_iam_member" "sneaky" {
+  project = var.project_id
+  role    = "roles/editor"
+  member  = ${member}
+}
+`;
+
+  it.each([
+    [
+      "a Cloud Run service's runtime account",
+      `"serviceAccount:\${google_cloud_run_v2_service.w.template[0].service_account}"`,
+      `resource "google_cloud_run_v2_service" "w" {\n  template {\n    service_account = google_service_account.build.email\n  }\n}\n`,
+    ],
+    [
+      "a terraform_data output",
+      `"serviceAccount:\${terraform_data.x.output}"`,
+      `resource "terraform_data" "x" {\n  input = google_service_account.build.email\n}\n`,
+    ],
+    ["a module output", `"serviceAccount:\${module.m.email}"`, ""],
+  ])("is refused through %s", (_name, member, carrier) => {
+    const terraform = `${account}${carrier}${owner(member)}`;
+    expect(() => serviceAccountRoles(terraform, "build")).toThrow(/cannot follow/);
+  });
+
+  it("is refused when looked up by id in a data source", () => {
+    const terraform = `${account}
+data "google_service_account" "b" {
+  account_id = "ema-flow-build-dev"
+}
+${owner(`"serviceAccount:\${data.google_service_account.b.email}"`)}`;
+    expect(() => serviceAccountRoles(terraform, "build")).toThrow(/cannot follow/);
+  });
+
+  it("allows inputs, locals, for_each values and the Cloud Storage agent", () => {
+    const terraform = `${account}
+resource "google_project_iam_member" "a" {
+  role   = "roles/viewer"
+  member = "serviceAccount:\${var.deployer_account}"
+}
+resource "google_kms_crypto_key_iam_member" "b" {
+  role   = "roles/cloudkms.cryptoKeyEncrypterDecrypter"
+  member = "serviceAccount:\${data.google_storage_project_service_account.gcs.email_address}"
+}
+resource "google_kms_crypto_key_iam_member" "c" {
+  for_each = local.keys
+  role     = "roles/cloudkms.cryptoKeyEncrypterDecrypter"
+  member   = "serviceAccount:\${each.value.agent}"
+}
+`;
+    expect(serviceAccountRoles(terraform, "build")).toEqual([]);
+  });
+
+  it("the lexer holds for the review's other probes", () => {
+    const owner = `resource "google_project_iam_member" "owner" {\n  project = var.project_id\n  role    = "roles/owner"\n  member  = "serviceAccount:\${google_service_account.build.email}"\n}\n`;
+    for (const body of [
+      `resource "x" "y" {\n  d = <<-EOT\n    %{ if a == "}" }x%{ endif }\n  EOT\n}\n`,
+      `resource "x" "y" {\n  d = "\${merge(\n {a = "}"},\n {b = 1}\n)}"\n}\n`,
+      `resource "x" "y" {\n  d = <<-EOT\n\tfoo {\n\tEOT\n}\n`,
+      `resource "x" "y" {\n  d = "$\${not} {"\n}\n`,
+      `resource "x" "y" {\r\n  d = <<EOT\r\nfoo {\r\nEOT\r\n}\r\n`,
+      `resource "x" "y{" {\n  d = 1\n}\n`,
+      `resource "x" "y" { d = "{" }\n`,
+      `resource "x" "y" {\n  d = "\${trimspace(<<EOT\nfoo }\nEOT\n)}"\n}\n`,
+    ]) {
+      expect([body, serviceAccountRoles(`${account}${body}${owner}`, "build")]).toEqual([
+        body,
+        [{ type: "google_project_iam_member", role: "roles/owner" }],
+      ]);
+    }
+  });
+});
+
+describe("withoutResources", () => {
+  it("cuts exactly the named blocks, and refuses a name that is not there", () => {
+    const terraform = `${account}
+resource "google_project_iam_member" "keep" {
+  role   = "roles/logging.logWriter"
+  member = "serviceAccount:\${google_service_account.build.email}"
+}
+resource "google_project_iam_member" "cut" {
+  role   = "roles/owner"
+  member = "serviceAccount:\${google_service_account.build.email}"
+}
+`;
+    const cut = withoutResources(terraform, [["google_project_iam_member", "cut"]]);
+    expect(serviceAccountRoles(cut, "build")).toEqual([
+      { type: "google_project_iam_member", role: "roles/logging.logWriter" },
+    ]);
+    expect(() => withoutResources(terraform, [["google_project_iam_member", "gone"]])).toThrow(
+      /expected 1/,
+    );
   });
 });
 

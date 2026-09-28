@@ -1,20 +1,46 @@
 import { describe, expect, it } from "vitest";
 
-import { readInfra, serviceAccountRoles, terraformBlocks } from "../support/terraform.js";
+import {
+  readInfra,
+  serviceAccountRoles,
+  terraformBlocks,
+  withoutResources,
+} from "../support/terraform.js";
+import { TRANSITIONAL_GRANTS } from "./transitional-grants.js";
 
 // The worker's permissions, proven exhaustive (foundations C4; CMEK step 5c). Each role is bound on
 // the narrowest resource that serves: a key, a bucket, a FHIR store, a table — never the project,
 // except the two that exist only at project level. Until 2026-09-21 the worker edited FHIR
-// resources in any dataset in the project and held a Document AI role nothing it runs uses; until
-// 2026-09-27 it could edit the source store and delete or expire the ledger table.
+// resources in any dataset in the project and held a Document AI role nothing it runs uses. It can
+// still edit the source store and delete or expire the ledger table through two transitional
+// grants (audit B04, phase 1); the tests below prove the set that remains once they are removed.
 
 const terraform = readInfra();
 const block = (type: string, name: string) =>
   terraformBlocks(terraform).find((candidate) => candidate.type === type && candidate.name === name)
     ?.body ?? "";
 
-describe("the worker identity", () => {
-  const roles = serviceAccountRoles(terraform, "worker");
+describe("the worker identity during the transition (audit B04, phase 1)", () => {
+  it("holds the least-privilege set plus exactly the two transitional grants", () => {
+    const now = serviceAccountRoles(terraform, "worker");
+    const after = serviceAccountRoles(withoutResources(terraform, TRANSITIONAL_GRANTS), "worker");
+    const extra = [...now];
+    for (const role of after) {
+      const at = extra.findIndex(
+        ({ type, role: name }) => type === role.type && name === role.role,
+      );
+      expect(at).toBeGreaterThanOrEqual(0);
+      extra.splice(at, 1);
+    }
+    expect(extra).toEqual([
+      { type: "google_healthcare_dataset_iam_member", role: "roles/healthcare.fhirResourceEditor" },
+      { type: "google_bigquery_dataset_iam_member", role: "roles/bigquery.dataEditor" },
+    ]);
+  });
+});
+
+describe("the worker identity once the transitional grants are removed", () => {
+  const roles = serviceAccountRoles(withoutResources(terraform, TRANSITIONAL_GRANTS), "worker");
 
   it("holds exactly these roles, where each is bound", () => {
     expect(roles).toEqual(
@@ -72,6 +98,25 @@ describe("the worker identity", () => {
 
   it("holds no Document AI role", () => {
     expect(roles.some(({ role }) => role.startsWith("roles/documentai."))).toBe(false);
+  });
+});
+
+describe("the store each store-level grant names", () => {
+  it("is the source store for the source path and the validated store for the target path", () => {
+    // A swap here would give the query service the unvalidated store and the worker write access
+    // to its own input, while every grant still read "store-level".
+    const paths = Object.fromEntries(
+      [...terraform.matchAll(/^\s*(source|target)_fhir_store_path\s*=\s*"([^"\n]+)"$/gm)].map(
+        (match) => [match[1] ?? "", match[2] ?? ""],
+      ),
+    );
+    const prefix = "${var.project_id}/${var.region}/${google_healthcare_dataset.record.name}/";
+    expect(paths).toEqual({
+      source: `${prefix}\${local.source_fhir_store_id}`,
+      target: `${prefix}\${local.target_fhir_store_id}`,
+    });
+    expect(terraform).toMatch(/source_fhir_store_id = "\$\{local\.name_prefix\}-source-r5"/);
+    expect(terraform).toMatch(/target_fhir_store_id = "\$\{local\.name_prefix\}-validated-r5"/);
   });
 });
 

@@ -298,6 +298,12 @@ variable "alert_notification_email" {
     condition     = var.alert_notification_email == "" || can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.alert_notification_email))
     error_message = "alert_notification_email must be empty or an e-mail address."
   }
+
+  # A placeholder pages nobody: a reserved example domain (RFC 2606) or a template's you@.
+  validation {
+    condition     = !can(regex("(?i)^you@|@([^@]+\\.)?example\\.(com|org|net)$", var.alert_notification_email))
+    error_message = "alert_notification_email is a placeholder (an example.com/.org/.net domain or a you@ address); set a real, watched address."
+  }
 }
 
 variable "lock_regulated_audit_log_bucket" {

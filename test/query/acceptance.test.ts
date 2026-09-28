@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { serviceAccountRoles, terraformBlocks } from "../support/terraform.js";
+import { serviceAccountRoles, terraformBlocks, withoutResources } from "../support/terraform.js";
+import { TRANSITIONAL_GRANTS } from "../infra/transitional-grants.js";
 
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -1135,7 +1136,14 @@ describe("ePI query service, phase 1", () => {
     expect(declared).toContain("query");
     expect(declared).toContain("caller");
 
-    const roles = serviceAccountRoles(terraform, "query");
+    // Until phase 2 of audit B04 the query identity also holds its old dataset-wide reader,
+    // exactly that and nothing more; the set proven below is what remains once it is removed.
+    expect(serviceAccountRoles(terraform, "query")).toContainEqual({
+      type: "google_healthcare_dataset_iam_member",
+      role: "roles/healthcare.fhirResourceReader",
+    });
+    expect(serviceAccountRoles(terraform, "query")).toHaveLength(3);
+    const roles = serviceAccountRoles(withoutResources(terraform, TRANSITIONAL_GRANTS), "query");
     expect(new Set(roles.map(({ role }) => role))).toEqual(
       new Set(["roles/healthcare.fhirResourceReader", "roles/logging.logWriter"]),
     );

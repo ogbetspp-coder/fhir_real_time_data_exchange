@@ -297,8 +297,9 @@ resource "google_storage_bucket_iam_member" "worker_submission_reader" {
 
 # Bound on each store, for what the worker does there (foundations C4): it reads a source bundle
 # from the source store, and validates and writes the EMA package in the validated store. Until
-# CMEK step 5c the editor role was project-level; until 2026-09-27 it was bound on the dataset,
-# which let the worker, a service that parses untrusted XHTML, rewrite the source store too.
+# CMEK step 5c the editor role was project-level; it is still also bound on the dataset (below,
+# transitional), which lets the worker, a service that parses untrusted XHTML, rewrite the source
+# store too. Phase 2 removes that.
 resource "google_healthcare_fhir_store_iam_member" "worker_source_reader" {
   fhir_store_id = local.source_fhir_store_path
   role          = "roles/healthcare.fhirResourceReader"
@@ -313,9 +314,9 @@ resource "google_healthcare_fhir_store_iam_member" "worker_validated_editor" {
 
 # Append rows to the ledger table, and nothing else. The worker streams one row per run
 # (src/gcp/evidence.ts, tabledata.insertAll: bigquery.tables.updateData, with tables.get to find
-# the table). Until 2026-09-27 it held bigquery.dataEditor on the ledger dataset, which also
-# deletes a table or sets its expiration — the ledger's, from a service that parses untrusted
-# XHTML. The evidence bucket had already been cut down to create-only for the same reason.
+# the table). It also holds bigquery.dataEditor on the ledger dataset (below, transitional, removed
+# in phase 2), which deletes a table or sets its expiration — the ledger's, from a service that
+# parses untrusted XHTML. The evidence bucket was cut down to create-only for the same reason.
 resource "google_project_iam_custom_role" "ledger_appender" {
   role_id     = "emaFlowLedgerAppender_${var.environment}"
   title       = "EMA Flow ledger appender (${var.environment})"
@@ -327,6 +328,24 @@ resource "google_bigquery_table_iam_member" "worker_ledger_appender" {
   dataset_id = google_bigquery_table.transformation_runs.dataset_id
   table_id   = google_bigquery_table.transformation_runs.table_id
   role       = google_project_iam_custom_role.ledger_appender.name
+  member     = "serviceAccount:${google_service_account.worker.email}"
+}
+
+# TRANSITIONAL (audit B04, phase 1 of 2). The broad grants the three above replace stay until the
+# narrow ones are applied and a deploy's smoke run has proved them; phase 2 removes these blocks.
+# Removing them in the same apply that creates the narrow ones would leave the worker without
+# ledger or FHIR access if that apply stopped part-way (a create refused for want of a permission
+# while the independent removals still ran), and for the seconds IAM takes to propagate even if
+# it did not. test/infra/worker-identity.test.ts proves what remains once they are removed.
+resource "google_healthcare_dataset_iam_member" "worker_fhir_editor" {
+  dataset_id = google_healthcare_dataset.record.id
+  role       = "roles/healthcare.fhirResourceEditor"
+  member     = "serviceAccount:${google_service_account.worker.email}"
+}
+
+resource "google_bigquery_dataset_iam_member" "worker_ledger_writer" {
+  dataset_id = google_bigquery_dataset.ledger.dataset_id
+  role       = "roles/bigquery.dataEditor"
   member     = "serviceAccount:${google_service_account.worker.email}"
 }
 

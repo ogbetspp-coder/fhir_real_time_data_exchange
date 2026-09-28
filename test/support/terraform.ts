@@ -77,7 +77,63 @@ export function serviceAccountRoles(terraform: string, account: string): Terrafo
   if (blocks.some(({ kind, type }) => kind === "data" && type === "google_iam_policy")) {
     throw new Error('infra/ uses data "google_iam_policy", which this reader cannot follow');
   }
+  // So is an account looked up by id rather than referenced.
+  if (blocks.some(({ kind, type }) => kind === "data" && type === "google_service_account")) {
+    throw new Error('infra/ uses data "google_service_account", which this reader cannot follow');
+  }
+  refuseIndirectMembers(blocks);
   return bindings;
+}
+
+// What an IAM member line may refer to. An account reached through another resource's attribute —
+// a Cloud Run service's `template[0].service_account`, a `terraform_data` output, a module output —
+// is the account all the same, but its reference to google_service_account.<name> sits in a
+// non-IAM resource (form 3 above), so the scan would count nothing. Every reference in a member
+// line must therefore be the account itself, an input, a local (whose own references are refused
+// above), a for_each or count value, or the one data source that can only name the Cloud Storage
+// service agent.
+const MEMBER_REFERENCE =
+  /^(?:google_service_account\.[\w-]+\.\w+|(?:var|local|each|count)\.[\s\S]*|data\.google_storage_project_service_account\.[\w-]+\.\w+)$/;
+
+function refuseIndirectMembers(blocks: TopLevelBlock[]): void {
+  for (const block of blocks) {
+    if (block.kind !== "resource" || !/_iam_(member|binding|policy)$/.test(block.type)) continue;
+    for (const line of block.code.split("\n")) {
+      if (!/^\s*members?\s*=/.test(line)) continue;
+      const expression = line.replace(/^\s*members?\s*=/, "");
+      for (const [reference] of expression.matchAll(
+        /\b[A-Za-z_][\w-]*(?:\.[A-Za-z_][\w-]*|\[[^\]]*\])+/g,
+      )) {
+        if (!MEMBER_REFERENCE.test(reference)) {
+          throw new Error(
+            `${block.type}.${block.name} names a member through ${reference}, which this reader cannot follow`,
+          );
+        }
+      }
+    }
+  }
+}
+
+// The configuration with the named resource blocks cut out, as a later change that deletes them
+// would leave it: what a least-privilege test runs against to prove what remains.
+export function withoutResources(
+  terraform: string,
+  resources: [type: string, name: string][],
+): string {
+  const cut = topLevelBlocks(terraform).filter(
+    ({ kind, type, name }) =>
+      kind === "resource" && resources.some(([t, n]) => t === type && n === name),
+  );
+  if (cut.length !== resources.length) {
+    throw new Error(
+      `expected ${String(resources.length)} resources to cut, found ${String(cut.length)}`,
+    );
+  }
+  let result = terraform;
+  for (const { start, end } of [...cut].sort((a, b) => b.start - a.start)) {
+    result = result.slice(0, start) + result.slice(end);
+  }
+  return result;
 }
 
 // The one `role` a grant assigns: a quoted literal, or a reference to a custom role declared in

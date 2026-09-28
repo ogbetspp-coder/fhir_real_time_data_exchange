@@ -2,7 +2,7 @@
 # component with a different trust level than the worker is its own deployable, with its own
 # service account holding least-privilege IAM, its own configuration, and its own image. This
 # service never writes: it holds a reader role on the validated FHIR store, a log writer role,
-# and nothing else.
+# and nothing else (after phase 2 of audit B04 removes its transitional dataset-wide reader).
 
 locals {
   query_service_name = "${local.name_prefix}-query"
@@ -28,13 +28,21 @@ resource "google_service_account" "query" {
   display_name = "EMA Flow query service (${var.environment})"
 }
 
-# The validated store only: the query service reads what passed validation and nothing else. Until
-# 2026-09-27 this was bound on the dataset, which also holds the source store, so the one
-# internet-facing identity could read unvalidated source bundles.
+# The validated store only: the query service reads what passed validation and nothing else. Its
+# dataset-wide reader (below, transitional until phase 2) also reaches the source store, so until
+# that is removed the one internet-facing identity can read unvalidated source bundles.
 resource "google_healthcare_fhir_store_iam_member" "query_fhir_reader" {
   fhir_store_id = local.target_fhir_store_path
   role          = "roles/healthcare.fhirResourceReader"
   member        = "serviceAccount:${google_service_account.query.email}"
+}
+
+# TRANSITIONAL (audit B04, phase 1 of 2): the dataset-wide reader the grant above replaces, kept
+# until that grant is applied and proved, then removed in phase 2 (infra/security.tf says why).
+resource "google_healthcare_dataset_iam_member" "query_fhir_reader" {
+  dataset_id = google_healthcare_dataset.record.id
+  role       = "roles/healthcare.fhirResourceReader"
+  member     = "serviceAccount:${google_service_account.query.email}"
 }
 
 resource "google_project_iam_member" "query_log_writer" {

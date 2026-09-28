@@ -106,6 +106,15 @@ describe("the dashboard drift check", () => {
     expect(compare(configured, "<html>").status).toBe(2);
   });
 
+  it("exits 2, an error, never 1, drift, on a failure it did not foresee", () => {
+    // Nesting deep enough to exhaust Python's recursion limit raises RecursionError, which no
+    // handler names; uncaught it exited 1, and the deploy would have replaced the dashboard.
+    const deep = `{"a":${"[".repeat(100_000)}${"]".repeat(100_000)}}`;
+    expect(compare(configured, deep).status).toBe(2);
+    const nested: unknown = JSON.parse(`{"a":${"[".repeat(2000)}${"]".repeat(2000)}}`);
+    expect(compare(nested, nested).status).toBe(2);
+  });
+
   it("compares the configuration Terraform deploys", () => {
     // The dashboard's JSON is ignored by Terraform and published as an output for this check.
     const observability = readFileSync("infra/observability.tf", "utf8");

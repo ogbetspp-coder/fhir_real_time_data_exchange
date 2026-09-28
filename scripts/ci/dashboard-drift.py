@@ -12,7 +12,8 @@ ignored; a configured zero value may be absent. A list must have the same length
 by item, because the order of tiles and data sets is meaningful.
 
 Prints each differing path, never a value. Exit codes: 0 the live dashboard carries the
-configuration; 1 it does not (the deploy replaces it); 2 either input could not be read.
+configuration; 1 it does not (the deploy replaces it); 2 anything else — an input that could not
+be read, or any failure of this script — which the deploy treats as an error, never as drift.
 """
 import json
 import sys
@@ -74,7 +75,11 @@ def main():
     if not isinstance(configured, dict) or not isinstance(live, dict):
         print("dashboard drift: an input is not a JSON object")
         return 2
-    found = differences(configured, live)
+    try:
+        found = differences(configured, live)
+    except Exception as error:  # noqa: BLE001 -- any failure to compare is an error, never drift
+        print(f"dashboard drift: could not compare ({type(error).__name__})")
+        return 2
     if not found:
         print("dashboard drift: none; the live dashboard carries every configured value")
         return 0
@@ -85,4 +90,12 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # An uncaught error would exit 1, which reads as "drift" and replaces the dashboard; it is an
+    # error, 2, whatever it is.
+    try:
+        sys.exit(main())
+    except SystemExit:
+        raise
+    except BaseException as error:  # noqa: BLE001
+        print(f"dashboard drift: failed ({type(error).__name__})")
+        sys.exit(2)

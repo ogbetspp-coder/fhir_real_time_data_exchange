@@ -13,7 +13,9 @@ Two things an environment needs are deliberately not here:
   Terraform owns, refuses any R4 substitution, and never deletes a store. The services' FHIR
   grants are bound on each store in Terraform, so `deploy.sh` creates a missing store before it
   applies; a project's first deploy creates the dataset and fails at those grants, and the next
-  one completes.
+  one completes. Until phase 2 of audit B04, the worker's and query service's older dataset-wide
+  grants stay beside the narrow ones (marked TRANSITIONAL); the least-privilege tests prove the set
+  that remains once they are removed (`test/infra/transitional-grants.ts`).
 - **The identities that run Terraform.** The deployer and the read-only planner are bootstrapped
   outside this configuration (`scripts/gcp/deploy-identity.sh`, `scripts/gcp/plan-identity.sh`).
 
@@ -24,6 +26,9 @@ Only by the deploy workflow. A merge to `main` that touches a deployable path ru
 Identity Federation (admitted only for `main` and that workflow) and runs `scripts/gcp/deploy.sh`.
 That script is the only place the inputs below are assembled (`tf_deploy_vars`): it builds the
 images, resolves their digests, and applies with the deployed commit as `service_version`.
+Before applying it refuses a missing or placeholder alert recipient, and asks Resource Manager
+(`testIamPermissions`) whether the deployer holds every permission the apply needs
+(`APPLY_PERMISSIONS`): an apply missing one fails part-way, after its independent changes.
 
 Every pull request is planned first, by `.github/workflows/plan.yml`, as the read-only planner,
 with the same inputs and against the live state. The check fails on any destroy or replace until
