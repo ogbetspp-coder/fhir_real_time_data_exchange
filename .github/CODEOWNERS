@@ -9,4 +9,11 @@
 /contracts/         @ogbetspp-coder
 /fhir/              @ogbetspp-coder
 /LICENSE            @ogbetspp-coder
+
+# What builds and checks the images and the pins (audit B07): the gates' readers and scanners, the
+# Dockerfiles and the Cloud Build configuration. Branch protection requires no review today, so
+# this names an owner and enforces nothing; it takes effect when a required review is turned on.
+/scripts/ci/        @ogbetspp-coder
+/Dockerfile*        @ogbetspp-coder
+/cloudbuild*.yaml   @ogbetspp-coder
 /SECURITY.md        @ogbetspp-coder

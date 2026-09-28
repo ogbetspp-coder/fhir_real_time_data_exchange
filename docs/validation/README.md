@@ -406,3 +406,4 @@ order.
 - [The document gate's lossless parse and key budget, `RunRequest` 2.0.0, importer 2.1.1, 2026-09-28](changes/2026-09-28-document-gate-and-run-request-2-0-0.md)
 - [The fidelity proof's hardening, the `codePoints` vectors, importer 2.1.2, 2026-09-28](changes/2026-09-28-fidelity-proof-hardening-importer-2-1-2.md)
 - [The importer's hardening, importer 2.2.0, 2026-09-28](changes/2026-09-28-importer-hardening-2-2-0.md)
+- [Run manifest 4.0.0, the Global ePI package at its versioned URL, and the image runtimes, 2026-09-28](changes/2026-09-28-run-manifest-4-0-0-global-epi-stu1.md)

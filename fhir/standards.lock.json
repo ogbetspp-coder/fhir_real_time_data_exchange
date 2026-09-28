@@ -4,8 +4,8 @@
     {
       "name": "HL7 Global ePI package",
       "package": "hl7.fhir.uv.emedicinal-product-info#1.0.0",
-      "url": "https://hl7.org/fhir/uv/emedicinal-product-info/package.tgz",
-      "sha256": "6cdbc95ff054ef52c16e1beaec1c81c9e04fab1c0123b31de6ff1748e30ba0b1",
+      "url": "https://hl7.org/fhir/uv/emedicinal-product-info/STU1/package.tgz",
+      "sha256": "c997673388d2c53bd7dad43777a7589443e4d27f56a661a90aa0638bbce1cf3a",
       "status": "trial-use-published",
       "usedBy": ["bootstrap"]
     },

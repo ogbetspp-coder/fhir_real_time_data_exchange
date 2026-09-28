@@ -16,16 +16,32 @@ substitutions:
 # from the registry on 2026-09-22. Dependabot does not read this file; move it by hand. The node
 # image is the one the Dockerfiles start FROM, at the same digest (images:check holds them equal).
 #
-# The three images build at once (waitFor: ["-"]): none reads another. The validator image starts
-# from the layers of its previous build (--cache-from its buildcache tag), so an unchanged
+# Held deliberately (audit B07, review round 1, M-1). Docker 20.10.24 and its Ubuntu 20.04 are past
+# their end of life, and Google tags the image "no-new-use"; its replacement, docker:29, builds
+# with BuildKit, which has never run here: its provenance attestations would make each pushed tag
+# an OCI index that scripts/gcp/deploy.sh's digest lookup does not ask for. The move is its own
+# rehearsed change (audit batch B13). Until then this builder builds with the legacy builder, so
+# the Dockerfiles it builds use nothing BuildKit alone accepts (test/ci/images.test.ts), CI's
+# Images job builds them the same way (DOCKER_BUILDKIT=0), and scripts/ci/pin-freshness.mjs
+# reports the pin as held, with this reason, rather than as behind.
+#
+# The three images build at once (waitFor: ["-"]): none reads another. The worker and the query
+# service are two targets of one Dockerfile (audit B07, S-5). The validator image starts from the
+# layers of its previous build (--cache-from its buildcache tag), so an unchanged
 # Dockerfile.validator does not download the ~210 MB of validator and packages again; a changed
 # line rebuilds from that line on, and a first build, with no cache to pull, builds everything.
+# With two stages (audit B07, S-5) the legacy builder can reuse only the pushed runtime stage's
+# layers: the fetch stage, where the downloads are, is not in the pushed image, so it is likely
+# rebuilt every time. To be measured on the first deploy; the B13 move (BuildKit, inline cache
+# with mode=max or a cache export) is where that is fixed.
 steps:
   - id: build-app-image
     name: gcr.io/cloud-builders/docker@sha256:001fb4a870a84485cf198c80002f7af42f6456f2dbc261d70a0b5f0111470df4
     waitFor: ["-"]
     args:
       - build
+      - --target
+      - worker
       - --label
       - org.opencontainers.image.revision=${_REVISION}
       - --tag
@@ -102,8 +118,8 @@ steps:
     waitFor: ["-"]
     args:
       - build
-      - --file
-      - Dockerfile.query
+      - --target
+      - query
       - --label
       - org.opencontainers.image.revision=${_REVISION}
       - --tag

@@ -257,4 +257,187 @@ describe("the renderer image's pins", () => {
     expect(readFileSync(file, "utf8")).not.toBe(original);
     expect(() => readRendererPins(file)).toThrow(/Dockerfile\.renderer/);
   });
+
+  // The ways around the HTTPS rule, which constrained only the RUN that writes the sources
+  // (audit B07, carried from B11's review). Each is refused by its own rule, named in the error.
+  it.each<[string, (text: string) => string, RegExp]>([
+    [
+      "apt-get install in another RUN",
+      (text) =>
+        text.replace(
+          "RUN set -eu; \\\n    unzip -q",
+          "RUN set -eu; \\\n    apt-get install --yes x; \\\n    unzip -q",
+        ),
+      /outside the snapshot's RUN/,
+    ],
+    [
+      "apt update in another RUN",
+      (text) =>
+        text.replace(
+          "RUN set -eu; \\\n    unzip -q",
+          "RUN set -eu; \\\n    apt update; \\\n    unzip -q",
+        ),
+      /outside the snapshot's RUN/,
+    ],
+    [
+      "apt-get update before the snapshot's sources are written",
+      (text) =>
+        text.replace("    snapshot http; \\\n", "    apt-get update; \\\n    snapshot http; \\\n"),
+      /before the snapshot's sources are written/,
+    ],
+    [
+      "a write to /etc/apt/sources.list",
+      (text) =>
+        text.replace(
+          "    snapshot http; \\\n",
+          "    echo 'deb http://deb.debian.org/debian bookworm main' > /etc/apt/sources.list; \\\n    snapshot http; \\\n",
+        ),
+      /an apt source or configuration is written/,
+    ],
+    [
+      "a file under /etc/apt/apt.conf.d",
+      (text) =>
+        text.replace(
+          "    snapshot http; \\\n",
+          "    touch /etc/apt/apt.conf.d/99local; \\\n    snapshot http; \\\n",
+        ),
+      /an apt source or configuration is written/,
+    ],
+    [
+      "TLS peer verification switched off",
+      (text) =>
+        text.replace(
+          "apt-get install --yes --no-install-recommends \\\n      ca-certificates curl",
+          "apt-get install --yes -o Acquire::https::Verify-Peer=false --no-install-recommends \\\n      ca-certificates curl",
+        ),
+      /re-points or re-configures it/,
+    ],
+    [
+      "host verification switched off",
+      (text) =>
+        text.replace(
+          '"Check-Valid-Until: no" \\\n        "" \\',
+          '"Check-Valid-Until: no" \\\n        "Verify-Host: false" \\\n        "" \\',
+        ),
+      /TLS verification or https transport/,
+    ],
+    [
+      "the scheme argument reassigned inside snapshot()",
+      (text) =>
+        text.replace("    snapshot() { \\\n", "    snapshot() { \\\n      set -- http; \\\n"),
+      /reassigns its scheme argument/,
+    ],
+    [
+      "the scheme argument given a default inside snapshot()",
+      (text) =>
+        text.replace("    snapshot() { \\\n", '    snapshot() { \\\n      : "${1:=http}"; \\\n'),
+      /reassigns its scheme argument/,
+    ],
+    [
+      "the scheme argument shifted away",
+      (text) => text.replace("    snapshot() { \\\n", "    snapshot() { \\\n      shift; \\\n"),
+      /reassigns its scheme argument/,
+    ],
+    // Review round 1 (L-1): each was accepted by the first version of the rules.
+    [
+      "apt-get -o Dir::Etc::SourceList=… update in another RUN",
+      (text) =>
+        text.replace(
+          "RUN set -eu; \\\n    unzip -q",
+          "RUN set -eu; \\\n    apt-get -o Dir::Etc::SourceList=/tmp/evil.list update; \\\n    unzip -q",
+        ),
+      /outside the snapshot's RUN/,
+    ],
+    [
+      "apt-get --option=… install in another RUN",
+      (text) =>
+        text.replace(
+          "RUN set -eu; \\\n    unzip -q",
+          "RUN set -eu; \\\n    apt-get --option=APT::Get::AllowUnauthenticated=1 install x; \\\n    unzip -q",
+        ),
+      /outside the snapshot's RUN/,
+    ],
+    [
+      "a quoted install in another RUN",
+      (text) =>
+        text.replace(
+          "RUN set -eu; \\\n    unzip -q",
+          'RUN set -eu; \\\n    apt-get "install" --yes x; \\\n    unzip -q',
+        ),
+      /outside the snapshot's RUN/,
+    ],
+    [
+      "apt-get by path, with flags before its action, in another RUN",
+      (text) =>
+        text.replace(
+          "RUN set -eu; \\\n    unzip -q",
+          "RUN set -eu; \\\n    /usr/bin/apt-get -y -q install x; \\\n    unzip -q",
+        ),
+      /outside the snapshot's RUN/,
+    ],
+    [
+      "a quoted update with a flag before the snapshot's sources are written",
+      (text) =>
+        text.replace(
+          "    snapshot http; \\\n",
+          "    apt-get -q 'update'; \\\n    snapshot http; \\\n",
+        ),
+      /before the snapshot's sources are written/,
+    ],
+    [
+      "-o Acquire::Check-Valid-Until=false on the pinned install",
+      (text) =>
+        text.replace(
+          "apt-get install --yes --no-install-recommends \\\n      ca-certificates curl",
+          "apt-get install --yes -o Acquire::Check-Valid-Until=false --no-install-recommends \\\n      ca-certificates curl",
+        ),
+      /re-points or re-configures it/,
+    ],
+    [
+      "--option on the pinned install",
+      (text) =>
+        text.replace(
+          "apt-get install --yes --no-install-recommends \\\n      ca-certificates curl",
+          "apt-get install --yes --option Dir::Etc::SourceParts=/tmp --no-install-recommends \\\n      ca-certificates curl",
+        ),
+      /re-points or re-configures it/,
+    ],
+    [
+      "-c, another configuration file, on the pinned update",
+      (text) =>
+        text.replace("      apt-get update; \\\n", "      apt-get -c /tmp/apt.conf update; \\\n"),
+      /re-points or re-configures it/,
+    ],
+    [
+      "Dir::State written for apt to read later",
+      (text) =>
+        text.replace(
+          "RUN set -eu; \\\n    unzip -q",
+          "RUN set -eu; \\\n    echo 'Dir::State \\\"/tmp\\\";' > /tmp/x; \\\n    unzip -q",
+        ),
+      /configuration or state directory is re-pointed/,
+    ],
+    [
+      "Check-Valid-Until written outside the sources",
+      (text) =>
+        text.replace(
+          "RUN set -eu; \\\n    unzip -q",
+          "RUN set -eu; \\\n    echo 'Acquire::Check-Valid-Until \\\"false\\\";' > /tmp/x; \\\n    unzip -q",
+        ),
+      /Release validity check is configured outside the sources/,
+    ],
+    [
+      "a third Check-Valid-Until in the snapshot's RUN",
+      (text) =>
+        text.replace(
+          '"Suites: bookworm-security" \\\n',
+          '"Suites: bookworm-security" \\\n        "Check-Valid-Until: no" \\\n',
+        ),
+      /do not set Check-Valid-Until as pinned/,
+    ],
+  ])("refuses %s", (_, edit, reason) => {
+    const file = variant(edit);
+    expect(readFileSync(file, "utf8")).not.toBe(original);
+    expect(() => readRendererPins(file)).toThrow(reason);
+  });
 });

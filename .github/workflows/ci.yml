@@ -37,7 +37,7 @@ jobs:
           cache: npm
 
       - name: Install Node dependencies
-        run: npm ci --no-audit --no-fund
+        run: npm ci --no-audit --no-fund --engine-strict
 
       # The history test/authority/lock.test.ts reads as released: main's for a pull request, the
       # pre-push commit's for a push; an importer version never changes its code, data or vectors
@@ -148,6 +148,8 @@ jobs:
         id: inputs
         env:
           EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: node scripts/ci/renderer-inputs.mjs >> "$GITHUB_OUTPUT"
 
       - name: Install Node dependencies
@@ -195,6 +197,34 @@ jobs:
       - name: Check the seeded differences of the second drawing
         if: steps.inputs.outputs.run == 'true'
         run: npm run renderer:drawings
+
+  # The worker, query and validator images (audit B07), built from the files Cloud Build builds
+  # them from, so a Dockerfile change is proved before the deploy that would first build it. The
+  # worker's build asserts its Node, ICU and Unicode; each image's user and command are checked;
+  # the validator is started with no network and judged as the Cloud Build step judges it
+  # (scripts/ci/build-images.sh). Nothing is pushed and no credential is held; scripts/check-all.sh
+  # leaves it out, since it needs Docker and ~250 MB of downloads.
+  images:
+    name: Images
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash --noprofile --norc -eo pipefail {0}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 22.22.0
+          package-manager-cache: false
+
+      - name: Build and check the worker, query and validator images
+        run: bash scripts/ci/build-images.sh
 
   zone-a:
     name: Zone A

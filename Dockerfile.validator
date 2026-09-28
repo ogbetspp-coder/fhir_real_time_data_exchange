@@ -4,19 +4,27 @@
 # build (JAVA_VERSION=jdk-21.0.12+8) and the same LANG/LC_ALL in both images, so only the
 # operating system under the JRE moved. The Cloud Build step validator-starts-offline and the
 # deploy's smoke run are what prove the image; the CI official-validation job runs the same jar
-# on setup-java's Temurin 21, not in this image.
-FROM eclipse-temurin:21-jre-noble@sha256:7739f0ffce786528961eea6bf46d9610ee968ac6127c9b2e93494757bdecce9f
+# on setup-java's Temurin 21, not in this image. CI's Images job builds this file and starts it
+# offline on every pull request that changes it.
+#
+# Two stages (audit B07, S-5). `fetch` downloads and verifies the validator and every package;
+# the runtime stage copies what it verified and nothing else, drops the download tools the base
+# ships, and runs as a user without root. Neither stage installs anything from a package archive:
+# the base already carries curl and the CA certificates, so no build depends on what an Ubuntu
+# mirror serves that day (until B07 it ran apt-get update against the live archive).
+FROM eclipse-temurin:21-jre-noble@sha256:7739f0ffce786528961eea6bf46d9610ee968ac6127c9b2e93494757bdecce9f AS fetch
 
+# The validator and the four -ig packages. Each package's id#version and SHA-256 are also in
+# fhir/standards.lock.json, which the FHIR store's profile import and the worker's run manifest
+# read: test/ci/validator-pins.test.ts holds the two equal. The Global ePI package is HL7's
+# versioned STU1 URL, not the unversioned "current" one, which moves when HL7 publishes the next
+# release (audit B07, S-3; docs/validation/changes).
 ARG VALIDATOR_VERSION=6.10.4
 ARG VALIDATOR_SHA256=1106b9d58f9e363e47bea7c4fc065841e5fc91fe9d062775c3bfdd212bd653cc
-ARG GLOBAL_EPI_SHA256=6cdbc95ff054ef52c16e1beaec1c81c9e04fab1c0123b31de6ff1748e30ba0b1
+ARG GLOBAL_EPI_SHA256=c997673388d2c53bd7dad43777a7589443e4d27f56a661a90aa0638bbce1cf3a
 ARG EMA_EPI_SHA256=19fb9fbf55c6bb3819c78d427acac1e3e5b96b50c1045d80e70c94f09566bd80
 ARG TERMINOLOGY_SHA256=c2ee6bccc9d0130d0a90db5967e7adbf9dd175df7a3351c531642c3dce102d10
 ARG EXTENSIONS_SHA256=f1039cac888d79ebd29878d7debe5e647ffe7ed962a9033da095258a03a06105
-
-RUN apt-get update \
-    && apt-get install --yes --no-install-recommends ca-certificates curl \
-    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/fhir
 RUN curl -fL \
@@ -24,7 +32,7 @@ RUN curl -fL \
       -o validator_cli.jar \
     && echo "${VALIDATOR_SHA256}  validator_cli.jar" | sha256sum --check - \
     && curl -fsSL \
-      "https://hl7.org/fhir/uv/emedicinal-product-info/package.tgz" \
+      "https://hl7.org/fhir/uv/emedicinal-product-info/STU1/package.tgz" \
       -o global-epi-package.tgz \
     && echo "${GLOBAL_EPI_SHA256}  global-epi-package.tgz" | sha256sum --check - \
     && curl -fsSL \
@@ -66,6 +74,21 @@ RUN set -eu; \
     listed="$(wc -l < /tmp/packages.txt)"; \
     [ "$installed" -eq "$listed" ] || { echo "installed $installed packages, listed $listed" >&2; exit 1; }; \
     rm /tmp/packages.txt
+
+# The runtime: the verified files, owned by the user the validator runs as (it writes lock and
+# index files into its package cache on start), and no curl or wget, which the base image ships
+# and the validator never needs. Purging needs no package archive.
+FROM eclipse-temurin:21-jre-noble@sha256:7739f0ffce786528961eea6bf46d9610ee968ac6127c9b2e93494757bdecce9f
+
+RUN set -eu; \
+    apt-get purge --yes --auto-remove curl wget; \
+    for tool in curl wget; do \
+      if command -v "$tool" >/dev/null; then echo "$tool is still in the runtime image" >&2; exit 1; fi; \
+    done; \
+    useradd --system --uid 10001 --user-group --home-dir /opt/fhir/home --no-create-home --shell /usr/sbin/nologin validator
+COPY --from=fetch --chown=validator:validator /opt/fhir /opt/fhir
+WORKDIR /opt/fhir
+USER validator
 
 EXPOSE 8090
 # -Duser.home points the validator at the package cache installed above. The proxy settings give

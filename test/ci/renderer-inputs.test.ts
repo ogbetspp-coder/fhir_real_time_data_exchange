@@ -19,7 +19,14 @@ const SCRIPT = path.resolve("scripts/ci/renderer-inputs.mjs");
 
 // The step as CI runs it, in a scratch repository whose HEAD is a pull request's merge commit:
 // `change` is made on the branch; what the step prints, and what it writes to the job's summary.
-function mergeRun(change: (git: (...args: string[]) => void, root: string) => void): {
+// The event's base and head are the merge commit's parents unless `event` says otherwise.
+type EventShas = (parents: { base: string; head: string }) => Record<string, string>;
+const TRUE_EVENT: EventShas = ({ base, head }) => ({ BASE_SHA: base, HEAD_SHA: head });
+
+function mergeRun(
+  change: (git: (...args: string[]) => void, root: string) => void,
+  event: EventShas = TRUE_EVENT,
+): {
   output: string;
   summary: string;
 } {
@@ -59,9 +66,12 @@ function mergeRun(change: (git: (...args: string[]) => void, root: string) => vo
     git("merge", "-q", "--no-ff", "-m", "merge", "change");
     const summary = path.join(root, "summary.md");
     writeFileSync(summary, "");
+    const parent = (ref: string): string =>
+      execFileSync("git", ["rev-parse", ref], { cwd: root, env, encoding: "utf8" }).trim();
+    const shas = event({ base: parent("HEAD^1"), head: parent("HEAD^2") });
     const output = execFileSync(process.execPath, [SCRIPT], {
       cwd: root,
-      env: { ...env, EVENT_NAME: "pull_request", GITHUB_STEP_SUMMARY: summary },
+      env: { ...env, EVENT_NAME: "pull_request", GITHUB_STEP_SUMMARY: summary, ...shas },
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     });
@@ -140,6 +150,31 @@ describe("the renderer's inputs", () => {
     const docs = mergeRun((_, root) => writeFileSync(path.join(root, "docs/note.md"), "changed\n"));
     expect(docs.output).toBe("run=false\n");
     expect(docs.summary).toMatch(/^Renderer checks skipped: no renderer input changed \(1 files/u);
+  });
+
+  // A merge commit other than the one the event describes (GitHub recomputed it after the event,
+  // or something else was checked out) is not trusted to skip anything.
+  it.each<[string, EventShas]>([
+    [
+      "a base that is not the merge commit's first parent",
+      ({ head }) => ({ BASE_SHA: head, HEAD_SHA: head }),
+    ],
+    ["a head that is not its second parent", ({ base }) => ({ BASE_SHA: base, HEAD_SHA: base })],
+    ["no base or head named at all", () => ({})],
+  ])("run every check for %s", (_, event) => {
+    const docs = mergeRun(
+      (_git, root) => writeFileSync(path.join(root, "docs/note.md"), "changed\n"),
+      event,
+    );
+    expect(docs.output).toBe("run=true\n");
+    expect(docs.summary).toBe("");
+  });
+
+  it("are told the event's base and head in CI", () => {
+    const step =
+      /- name: Name whether a renderer input changed\n([\s\S]*?)run: /u.exec(workflow)?.[1] ?? "";
+    expect(step).toContain("BASE_SHA: ${{ github.event.pull_request.base.sha }}");
+    expect(step).toContain("HEAD_SHA: ${{ github.event.pull_request.head.sha }}");
   });
 
   it("gate every step of the Renderer job after the one that decides", () => {

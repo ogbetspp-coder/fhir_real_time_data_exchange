@@ -13,9 +13,11 @@ const script = readFileSync("scripts/check-all.sh", "utf8");
 // and ~200 MB of downloads and stays its own CI job (the script's header says so).
 // A local checkout already has origin/main; CI's shallow checkout fetches the importer lock's
 // base. The renderer image needs Docker and ~200 MB of downloads, and is its own CI job too, with
-// the step that decides whether it runs.
+// the step that decides whether it runs. So is the build of the deployed images (audit B07).
 const NOT_RUN_LOCALLY = new Set([
   "npm ci --no-audit --no-fund",
+  "npm ci --no-audit --no-fund --engine-strict",
+  "bash scripts/ci/build-images.sh",
   "npm run validate:official",
   // Downloads the standards the deploy imports, like the validator's job it runs in.
   'bash scripts/gcp/deploy-inputs.sh "${RUNNER_TEMP}/deploy-inputs" >/dev/null',
