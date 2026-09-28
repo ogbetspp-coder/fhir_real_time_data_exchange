@@ -23,9 +23,12 @@ carry).
 from __future__ import annotations
 
 import argparse
+import io
 import os
 import subprocess
 import sys
+import tarfile
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -177,12 +180,18 @@ def _git(*arguments: str) -> str:
     ).stdout
 
 
+# The branch a deployed commit must already be on: what is deployed has been through the merge
+# gate. Read from the local remote-tracking ref, so fetch before deploying.
+RELEASED_REF = "origin/main"
+
+
 def service_version() -> str:
-    """``agent/<package version>+<commit>``, from a clean ``agent/`` tree only.
+    """``agent/<package version>+<commit>``, for a clean ``agent/`` tree at a released commit.
 
     Raises:
         SystemExit: Anything under ``agent/`` differs from the commit (modified, staged or
-            untracked, ignored files aside), or the commit cannot be read.
+            untracked, ignored files aside — the upload is taken from the commit itself, see
+            ``export_package``), the commit is not on ``origin/main``, or it cannot be read.
     """
     try:
         dirty = _git("status", "--porcelain", "--untracked-files=all", "--", ".").strip()
@@ -194,9 +203,35 @@ def service_version() -> str:
             "refusing to deploy: agent/ differs from its commit, so the deployed code would not "
             "be the code the version names. Commit or remove:\n" + dirty
         )
+    try:
+        _git("merge-base", "--is-ancestor", commit, RELEASED_REF)
+    except OSError, subprocess.CalledProcessError:
+        raise SystemExit(
+            f"refusing to deploy: {commit[:12]} is not on {RELEASED_REF}. Deploy a merged commit "
+            "(git fetch first, so the local ref is current)."
+        ) from None
     from verifiable_answer_agent import __version__
 
     return f"agent/{__version__}+{commit}"
+
+
+def export_package(commit: str, destination: Path) -> Path:
+    """The package exactly as ``commit`` holds it, written under ``destination``; its parent.
+
+    ``git archive`` of ``agent/src/verifiable_answer_agent`` at the commit: no ignored file
+    (``__pycache__``, a stray ``.pyc``), no untracked file and no edit reaches the upload, which
+    a clean ``git status`` alone cannot promise (review of PR #129, L4).
+    """
+    root = Path(_git("rev-parse", "--show-toplevel").strip())
+    archive = subprocess.run(
+        ["git", "archive", "--format=tar", f"{commit}:agent/src", "verifiable_answer_agent"],
+        cwd=root,
+        check=True,
+        capture_output=True,
+    ).stdout
+    with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
+        tar.extractall(destination, filter="data")
+    return destination
 
 
 def build_config(settings: dict[str, str]) -> dict[str, Any]:
@@ -220,7 +255,7 @@ def build_config(settings: dict[str, str]) -> dict[str, Any]:
         ),
         "staging_bucket": settings["AGENT_ENGINE_STAGING_BUCKET"],
         "requirements": [*requirements_from_lock(), AGENT_PLATFORM_SDK, AIPLATFORM, CLOUDPICKLE],
-        # Relative, and main() runs the upload from src/: the SDK archives each extra package by
+        # Relative, and main() runs the upload from an exported src/: the SDK archives each one by
         # the path as given (``tar.add(path)``), so an absolute path would nest the code under the
         # deploying machine's home directory and the runtime could not import it.
         "extra_packages": ["verifiable_answer_agent"],
@@ -310,7 +345,11 @@ def main(argv: list[str]) -> int:
     from verifiable_answer_agent.config import AgentConfig
 
     app = AdkApp(agent=build_agent(AgentConfig.from_env()))
-    os.chdir(AGENT_ROOT / "src")  # see extra_packages in build_config
+    # The upload runs from a copy of the package as the commit holds it, not from the working
+    # tree (see extra_packages in build_config, and export_package).
+    upload_root = Path(tempfile.mkdtemp(prefix="agent-upload-"))
+    commit = settings["AGENT_SERVICE_VERSION"].rsplit("+", 1)[1]
+    os.chdir(export_package(commit, upload_root))
     client = agentplatform.Client(
         project=settings["AGENT_ENGINE_PROJECT"], location=settings["AGENT_ENGINE_LOCATION"]
     )

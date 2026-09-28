@@ -271,8 +271,15 @@ def chunk_spans(text: str, limit: int = VERIFY_QUOTE_MAX_UTF16) -> tuple[tuple[i
     flagged ``verification-unavailable``. Either way the block is not verified; only the second
     says why truthfully.
 
-    Linear in the block: the signs index is built once for the whole text (the service reads a
-    cut's sign over the whole section too), and each window is measured once.
+    The chunks are then evened out (review of PR #129): with as many chunks as the window of
+    ``limit`` needs, the smallest window that needs no more is used, so a block just over one
+    window is two halves rather than a full chunk and a sliver — a sliver of a few words is the
+    chunk most likely to occur elsewhere in the section and so to match at other offsets. Not
+    done when a chunk is over the bound, where the greedy split is kept as it is.
+
+    Each pass is linear in the block: the signs index is built once for the whole text (the
+    service reads a cut's sign over the whole section too), and each window is measured once;
+    evening out takes about a dozen passes.
     """
     if limit < 1:
         raise ValueError("limit must be at least one UTF-16 code unit")
@@ -282,6 +289,29 @@ def chunk_spans(text: str, limit: int = VERIFY_QUOTE_MAX_UTF16) -> tuple[tuple[i
     while end > start and text[end - 1] == " ":
         end -= 1
     signs = SignIndex(text)
+    greedy = _greedy_spans(text, start, end, limit, signs)
+    if len(greedy) < 2 or not _within(text, greedy, limit):
+        return greedy
+    low, high = -(-utf16_length(text[start:end]) // len(greedy)), limit
+    best = greedy
+    while low < high:
+        window = (low + high) // 2
+        candidate = _greedy_spans(text, start, end, window, signs)
+        if len(candidate) <= len(greedy) and _within(text, candidate, limit):
+            best, high = candidate, window
+        else:
+            low = window + 1
+    return best
+
+
+def _within(text: str, spans: tuple[tuple[int, int], ...], limit: int) -> bool:
+    return all(utf16_length(text[start:end]) <= limit for start, end in spans)
+
+
+def _greedy_spans(
+    text: str, start: int, end: int, limit: int, signs: SignIndex
+) -> tuple[tuple[int, int], ...]:
+    """Each chunk to the last acceptable cut inside a window of ``limit`` units."""
     spans: list[tuple[int, int]] = []
     while start < end:
         fits = _window_end(text, start, end, limit)

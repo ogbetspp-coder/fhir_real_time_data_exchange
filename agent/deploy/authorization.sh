@@ -42,11 +42,22 @@ PROJECT_NUMBER="$(gcloud --quiet projects describe "$PROJECT_ID" --format='value
 NAME="projects/${PROJECT_NUMBER}/locations/global/authorizations/${AUTHORIZATION_ID}"
 TOKEN="$(gcloud --quiet auth print-access-token)"
 
-status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
-  --header "Authorization: Bearer ${TOKEN}" --header "X-Goog-User-Project: ${PROJECT_ID}" "${BASE}/${NAME}")"
+# The access token reaches curl on its standard input, as a config line, never as an argument:
+# an argument is visible to every process on the machine for the life of the call.
+google_curl() {
+  printf 'header = "Authorization: Bearer %s"\n' "$TOKEN" | curl --config - --silent --show-error "$@"
+}
+
+status="$(google_curl --output /dev/null --write-out '%{http_code}' \
+  --header "X-Goog-User-Project: ${PROJECT_ID}" "${BASE}/${NAME}")" || status="curl-failed"
 if [[ "${1:-}" == "--check" ]]; then
   if [[ "$status" == "200" ]]; then echo "authorization ${AUTHORIZATION_ID}: present"; exit 0; fi
   echo "authorization ${AUTHORIZATION_ID}: missing (HTTP ${status})" >&2
+  exit 1
+fi
+# Present (200) or absent (404); anything else is a failure to find out, not "absent".
+if [[ "$status" != "200" && "$status" != "404" ]]; then
+  echo "reading authorization ${AUTHORIZATION_ID} failed (HTTP ${status})" >&2
   exit 1
 fi
 
@@ -173,9 +184,11 @@ fi
 echo "sending ${verb} to the Discovery Engine API…"
 response_file="$(mktemp)"
 trap 'rm -f "$body_file" "$response_file"' EXIT
-code="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' --request "$verb" \
-  --header "Authorization: Bearer ${TOKEN}" --header "X-Goog-User-Project: ${PROJECT_ID}" \
-  --header "Content-Type: application/json" --data-binary "@${body_file}" "$url")" || code="curl-failed"
+# --fail-with-body: an error status fails the call, and the body still lands in the file to be
+# reported below (the code is kept too; the script stops on anything but 200).
+code="$(google_curl --fail-with-body --output "$response_file" --write-out '%{http_code}' \
+  --request "$verb" --header "X-Goog-User-Project: ${PROJECT_ID}" \
+  --header "Content-Type: application/json" --data-binary "@${body_file}" "$url")" || true
 rm -f "$body_file"
 echo "HTTP ${code}"
 # Only the name, or the error, is printed: the response echoes the client id, never the secret.
@@ -188,11 +201,15 @@ except Exception:
 if 'error' in d:
     print('error:',d['error'].get('status'),d['error'].get('message')); sys.exit(1)
 print('authorization:',d['name'])" "$response_file"
+[[ "$code" == "200" ]] || { echo "the ${verb} was not accepted (HTTP ${code:-none})" >&2; exit 1; }
 
 # Read it back: the response echoes what was sent, not what was stored. The redirect_uri proves
 # the update applied; the secret can never be read back at all.
-stored="$(curl --silent --header "Authorization: Bearer ${TOKEN}" \
-  --header "X-Goog-User-Project: ${PROJECT_ID}" "${BASE}/${NAME}")"
+stored="$(google_curl --fail-with-body --header "X-Goog-User-Project: ${PROJECT_ID}" \
+  "${BASE}/${NAME}")" || {
+  echo "reading the authorization back failed: ${stored}" >&2
+  exit 1
+}
 python3 -c "
 import json, sys, urllib.parse
 d = json.loads(sys.argv[1])

@@ -27,6 +27,7 @@ trace a failed turn leaves (audit AG-6).
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import time
 from collections.abc import Awaitable, Callable, Sequence
@@ -123,6 +124,7 @@ class _VerifyQuoteThrough:
         self._invocation_id = invocation_id
         self._tool: BaseTool | None = None
         self._looked_up = False
+        self._lookup = asyncio.Lock()
 
     async def __call__(
         self, bundle_id: str, version_id: str, source_key: str, quote: str
@@ -157,10 +159,13 @@ class _VerifyQuoteThrough:
         return result
 
     async def _verify_quote_tool(self) -> BaseTool | None:
-        if not self._looked_up:
-            tools = await self._toolset.get_tools(self._tool_context)
-            self._tool = next((t for t in tools if t.name == "verify_quote"), None)
-            self._looked_up = True
+        # The post-check runs its calls concurrently: without the lock, every call that arrived
+        # before the first lookup finished would look the tool up again (review of PR #129).
+        async with self._lookup:
+            if not self._looked_up:
+                tools = await self._toolset.get_tools(self._tool_context)
+                self._tool = next((t for t in tools if t.name == "verify_quote"), None)
+                self._looked_up = True
         return self._tool
 
 
@@ -318,6 +323,8 @@ class TurnFinisher:
                         tools=tools,
                         error_class=_class(error),
                         duration_ms=duration_ms,
+                        answer=checked.answer if checked is not None else None,
+                        sections_dropped=checked.sections_dropped if checked is not None else 0,
                     )
                 )
 

@@ -24,6 +24,7 @@ import hmac
 import json
 import re
 import sys
+import unicodedata
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from typing import Any, Final, Literal, TextIO
@@ -77,6 +78,13 @@ WITHHELD_PRINCIPAL: Final = "session-user-withheld"
 """``principal`` when the session's user id is not an opaque identifier — an e-mail address,
 which is what Gemini Enterprise supplies (audit AG-1). The contract refuses an e-mail there, and
 until 2026-09-27 that refusal failed every live turn silently."""
+
+OPAQUE_PRINCIPAL_FORMS: Final = (r"[0-9]{1,64}", r"urn:[a-z][a-z0-9-]{0,31}:[A-Za-z0-9._:-]{1,90}")
+"""The session user ids carried as they are: a numeric subject (Google's ``sub``) or a URN.
+Anything else fitting the contract's character set could still be a person's name."""
+
+MIN_DIGEST_KEY_BYTES: Final = 32
+"""The shortest key ``principalDigest`` is made under: 256 bits, the HMAC-SHA256 output size."""
 
 NIL_TURN_ID: Final = "00000000-0000-0000-0000-000000000000"
 """``turnId`` for a turn that had none: no request of it carried one, so it joins nothing."""
@@ -160,17 +168,23 @@ class TurnAuditRecord(BaseModel):
 def principal_fields(user_id: str, key: bytes | None) -> tuple[str, str | None]:
     """``(principal, principalDigest)`` for a session user id. Never the address itself.
 
-    An opaque identifier is carried as it is. Anything else — an e-mail address, as Gemini
-    Enterprise supplies — is withheld, and with a deployment key configured it is carried as an
-    HMAC-SHA256 under that key: one user, one digest, and nobody without the key can test an
-    address against it. Without a key nothing identifies the session user in this record; the
-    query service's records of the same ``turnId`` carry the principal it verified.
+    Only a known opaque form is carried as it is: an identity provider's numeric subject, or a
+    URN (``urn:reviewer:synthetic-01``). Anything else — an e-mail address, as Gemini Enterprise
+    supplies, or a name that happens to fit the contract's character set — is withheld; with a
+    deployment key of at least ``MIN_DIGEST_KEY_BYTES`` it is carried as an HMAC-SHA256 under that
+    key of the casefolded id, so one user gives one digest however the address is capitalised,
+    and nobody without the key can test an address against it. A shorter key is not used.
+    Without a key nothing identifies the session user in this record; the query service's records
+    of the same ``turnId`` carry the principal it verified.
     """
-    if re.fullmatch(PRINCIPAL_PATTERN, user_id):
+    if re.fullmatch(PRINCIPAL_PATTERN, user_id) and any(
+        re.fullmatch(form, user_id) for form in OPAQUE_PRINCIPAL_FORMS
+    ):
         return user_id, None
-    if not key:
+    if key is None or len(key) < MIN_DIGEST_KEY_BYTES:
         return WITHHELD_PRINCIPAL, None
-    digest = hmac.new(key, user_id.encode("utf-8"), hashlib.sha256).hexdigest()
+    canonical = unicodedata.normalize("NFKC", user_id).casefold()
+    digest = hmac.new(key, canonical.encode("utf-8"), hashlib.sha256).hexdigest()
     return WITHHELD_PRINCIPAL, digest
 
 
@@ -225,14 +239,19 @@ def minimal_record(
     principal_digest: str | None = None,
     error_class: str | None = None,
     duration_ms: int = 0,
+    answer: CheckedAnswer | None = None,
+    sections_dropped: int = 0,
     at: datetime | None = None,
 ) -> TurnAuditRecord:
     """A record for a turn that showed no checked answer, or whose full record failed.
 
-    Every count is zero: nothing was verified. The tool calls are kept when there are no more
-    than the contract allows; the error class is kept when it is a plain class name. Whatever
-    cannot be carried is dropped rather than refused, because this is the record of last resort.
+    With no ``answer`` every count is zero: nothing was verified. With one — the full record of an
+    answered turn could not be built or written — its counts and flags are carried, so the record
+    of last resort still says what the reader was shown as verified and as flagged. The tool calls
+    are kept when there are no more than the contract allows; the error class is kept when it is a
+    plain class name. Whatever cannot be carried is dropped rather than refused.
     """
+    flagged = answer.flagged_blocks if answer is not None else ()
     return TurnAuditRecord(
         service_version=service_version,
         at=_timestamp(at),
@@ -246,10 +265,10 @@ def minimal_record(
             else None
         ),
         tools=tools if len(tools) <= MAX_TOOL_CALLS else (),
-        spans_verified=0,
-        spans_flagged=0,
-        sections_dropped=0,
-        flags=(),
+        spans_verified=len(answer.verified_blocks) if answer is not None else 0,
+        spans_flagged=len(flagged),
+        sections_dropped=max(0, sections_dropped),
+        flags=tuple(sorted({flag for block in flagged for flag in block.flags})),
         duration_ms=duration_ms,
     )
 

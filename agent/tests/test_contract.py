@@ -24,6 +24,7 @@ from verifiable_answer_agent.contract import (
 from verifiable_answer_agent.quote_edge import (
     edge_after,
     edge_before,
+    has_scanner_marker,
     locate_quote,
     number_before,
     number_from,
@@ -159,6 +160,39 @@ def test_the_spans_are_where_the_chunks_sit_and_tile_the_block() -> None:
     assert tuple(text[start:end] for start, end in spans) == split_for_verification(text, 100)
 
 
+def test_the_chunks_are_evened_out_rather_than_ending_in_a_sliver() -> None:
+    # A block just over one window used to be one full chunk and a few words; a few words are the
+    # chunk most likely to occur earlier in the section too (review of PR #129, L7).
+    text = " ".join(f"word{index:04d}" for index in range(24))
+    assert utf16_length(text) == 215
+    # Cut at the last space of a 200-unit window, the second chunk was "word0022 word0023".
+    chunks = split_for_verification(text, limit=200)
+    assert len(chunks) == 2
+    assert min(len(chunk) for chunk in chunks) > len("word0022 word0023")
+    assert abs(len(chunks[0]) - len(chunks[1])) <= 10
+    long_chunks = split_for_verification(long_section().text)
+    lengths = [utf16_length(chunk) for chunk in long_chunks]
+    assert max(lengths) - min(lengths) < VERIFY_QUOTE_MAX_UTF16 // 4
+
+
+def test_at_the_real_bound_every_chunk_is_found_where_it_was_cut() -> None:
+    # The exact-offset rule fails closed when a chunk's text also occurs earlier in its section
+    # (review of PR #129). Over every text the fixtures hold, at the contract's bound, no sendable
+    # chunk does. (At windows of a few hundred units some would: short chunks repeat.)
+    texts = [section["text"] for section in quote_edge_cases()["sections"]]
+    texts.append(long_section().text)
+    texts.extend(section.text for section in load_sections().values())
+    checked = 0
+    for text in texts:
+        for start, end in chunk_spans(text):
+            chunk = text[start:end]
+            if utf16_length(chunk) > VERIFY_QUOTE_MAX_UTF16 or has_scanner_marker(chunk):
+                continue
+            checked += 1
+            assert locate_quote(text, chunk) == (start, end), chunk[:60]
+    assert checked > 50
+
+
 def test_a_pathological_block_splits_in_linear_time() -> None:
     # 200,000 code points of "( ". The splitter used to walk back up to 256 steps from every
     # space, give up, count the walk as a sign, and so refuse every cut and re-measure the rest
@@ -177,7 +211,9 @@ def test_a_cut_never_parts_a_spaced_comparator_from_its_number() -> None:
     # and the second half has lost its comparator.
     text = "Reduce the dose when CrCl ≥ 30 ml/min."
     chunks = split_for_verification(text, limit=29)
-    assert chunks == ("Reduce the dose when CrCl", "≥ 30 ml/min.")
+    # Evened out, the cut moves to before "CrCl"; it still never falls after the comparator.
+    assert chunks == ("Reduce the dose when", "CrCl ≥ 30 ml/min.")
+    assert not any(chunk.endswith("≥") for chunk in chunks)
     assert all(locate_quote(text, chunk) is not None for chunk in chunks)
 
 

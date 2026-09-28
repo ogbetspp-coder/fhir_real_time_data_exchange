@@ -43,11 +43,16 @@ CHECK="false"
 [[ "${1:-}" == "--check" ]] && CHECK="true"
 TOKEN="$(gcloud --quiet auth print-access-token)"
 
+# The access token reaches curl on its standard input, as a config line, never as an argument:
+# an argument is visible to every process on the machine for the life of the call.
+google_curl() {
+  printf 'header = "Authorization: Bearer %s"\n' "$TOKEN" | curl --config - --silent --show-error "$@"
+}
+
 # --fail-with-body: an error answer is a failure, not a policy. Without it an error body was
 # parsed as the policy and, on the grant path, posted back as one.
-policy="$(curl --silent --show-error --fail-with-body --request POST \
-  --header "Authorization: Bearer ${TOKEN}" --header "Content-Type: application/json" \
-  --data '{}' "${API}:getIamPolicy")" || {
+policy="$(google_curl --fail-with-body --request POST \
+  --header "Content-Type: application/json" --data '{}' "${API}:getIamPolicy")" || {
   echo "getIamPolicy failed: ${policy}" >&2
   exit 1
 }
@@ -89,9 +94,9 @@ import json, sys
 policy = json.load(sys.stdin)
 policy.setdefault('bindings', []).append({'role': sys.argv[1], 'members': [sys.argv[2]]})
 json.dump({'policy': policy}, open(sys.argv[3], 'w'))" "$ROLE" "$MEMBER" "$request"
-  answer="$(curl --silent --show-error --fail-with-body --request POST \
-    --header "Authorization: Bearer ${TOKEN}" --header "Content-Type: application/json" \
-    --data-binary "@${request}" "${API}:setIamPolicy")" || {
+  answer="$(google_curl --fail-with-body --request POST \
+    --header "Content-Type: application/json" --data-binary "@${request}" \
+    "${API}:setIamPolicy")" || {
     echo "setIamPolicy failed: ${answer}" >&2
     exit 1
   }

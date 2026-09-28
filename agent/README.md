@@ -89,16 +89,30 @@ this fix used a closure and would have split them; the deep-copy cases in
 `tests/test_turn_events.py` fail if that comes back.
 
 The assistant's own words are still shown, under their own label and before an end line, and
-are not checked. What is enforced (`render.sanitise_assistant`) is that they cannot pass for a
-checked block and do not carry what one carries: any line of them that opens with a label
-reserved for checked text is removed — read after compatibility folding, with every gap and
-zero-width character removed and every leading non-letter stripped, so neither a zero-width
-space, an emoji, a list number, a table bar nor a doubled space hides one; runs of 32 or more
-hexadecimal digits and identifiers named by their field (`versionId 7`) are removed; and eight
-or more words in a row shared with a block are pointed out as label text that is not checked.
-Each is said in the answer and recorded as an `assistantFlags` value. The instruction asks the
-model never to write any of it (`instruction.py`). Checking a quotation in the assistant's
-words against the store is not done; neither is folding look-alike letters from other scripts.
+are not checked. **Structurally, they cannot render as a checked block:** on the text surface
+they sit inside a fenced code block (`render._fenced`) one backtick longer than any run of
+backticks in them, so no Markdown or HTML they contain is rendered and no line of them closes
+the fence. A fence rather than escaping, because CommonMark parses nothing inside one, it
+closes only on a line of as many backticks, and on a surface that renders no Markdown it still
+shows two marker lines around the words; escaping would rely on every escape being honoured,
+show backslashes where one is not, and draw no boundary. (The A2UI renderer gives them their own
+Text component instead.)
+
+As defence in depth (`render.sanitise_assistant`), the words are split on every kind of line
+break (`str.splitlines`: carriage return, U+0085, U+2028 as well as line feed), shown
+compatibility-folded with zero-width and format characters removed, and filtered: a line that
+opens with a label reserved for checked text, or has the citation line's whole shape ("From
+section … of document version"), is removed — compared as letters and digits only, after HTML
+entities are decoded, HTML comments and tags dropped and Cyrillic and Greek look-alikes folded,
+so emphasis, an entity, a comment, a tag, a backslash, a zero-width space, an emoji, a list
+number or a table bar does not hide one; the unverified status is reserved only in its own
+capitals, so "Not verified by me" stays. Runs of 32 or more hexadecimal digits (however Markdown
+is threaded through them) are removed, and so is an identifier named by its field when its
+value looks like one (`versionId 7`, not "the version ID shown"). Eight or more words in a row
+shared with a block are pointed out as label text that is not checked. Each is said in the
+answer and recorded as an `assistantFlags` value. The instruction asks the model never to write
+any of it (`instruction.py`). Checking a quotation in the assistant's words against the store is
+not done.
 
 ## The invariant, in the types
 
@@ -380,7 +394,15 @@ The splitter reads each cut's sign from an index built once over the whole block
 the service reads it over the section, and measures each window once: 200,000 code points of
 `( ` split in about a tenth of a second, where the bounded walk back from every space took
 21.9 s (audit AG-12). It gives each chunk's offsets (`chunk_spans`), which is what the
-post-check holds every match to.
+post-check holds every match to. The chunks are then evened out: the smallest window that needs
+no more chunks than the full one is used, so a block just over 2,000 units is two halves, not a
+full chunk and a sliver of a few words.
+
+**A normalisation-version bump needs this agent first.** The post-check accepts answers under
+`fidelity-norm/3.1.0` only (`quote_edge.NORMALIZATION_VERSION`, held to the service's own export
+by a test). When Zone B moves to a new normalisation version, port the quote-edge rule to it and
+redeploy the agent **before** the service answers under it; until then every block is flagged
+`checksum-mismatch` and shown unverified.
 
 **Tables and pictures cannot be checked yet.** A section's text carries the scanner's grid
 markers (U+FDD0–U+FDEF) and a picture's U+FFFC, and `verify_quote` refuses any quote holding
@@ -393,7 +415,8 @@ quoting is roadmap 3a PR 5.
 **A repeated chunk fails closed.** The service answers the first occurrence the quote-edge rule
 accepts. A chunk whose text also occurs earlier in its section matches there, at other offsets,
 and the block is flagged `coverage-gap` although it is the label's text. For a chunk of up to
-2,000 units in a real label this has not been seen; it is a false failure, never a false pass.
+2,000 units in a real label this has not been seen, and evening the chunks out keeps a short last
+chunk from making it likely; it is a false failure, never a false pass.
 
 ## Audit
 
@@ -410,10 +433,11 @@ enumerations and the cap are the schema's own values.
 **The principal is never an e-mail address** (audit AG-1). Gemini Enterprise gives the agent the
 user's e-mail as the session's user id; the contract's `principal` refuses one, and until
 2026-09-27 that refusal was raised inside the post-check's guard, so every live turn showed "could
-not be verified" and wrote nothing. Now an opaque user id is carried as it is, and any other is
-withheld (`session-user-withheld`), with an HMAC-SHA256 of it under
-`AGENT_PRINCIPAL_DIGEST_KEY` in `principalDigest` when the runtime has that key
-(`deploy/README.md`, step 2). The principal the query service verified from the user's token is
+not be verified" and wrote nothing. Now only a known opaque form — a numeric subject or a URN —
+is carried as it is; anything else, a name that fits the contract's characters included, is
+withheld (`session-user-withheld`), with an HMAC-SHA256 of it, casefolded, under
+`AGENT_PRINCIPAL_DIGEST_KEY` in `principalDigest` when the runtime has that key and it is at
+least 32 bytes (`deploy/README.md`, step 2); a shorter key is not used. The principal the query service verified from the user's token is
 on its own records of the same `turnId`.
 
 **Every turn writes one record, and the record never costs the answer** (audit AG-1, AG-6). The
@@ -421,8 +445,9 @@ turn's end (`finish.py`) decides what is shown first and builds the record apart
 `outcome` says which way the turn ended — `answered`, `tools-unavailable`, `model-failed`,
 `turn-id-missing` (with the nil UUID as `turnId`), `internal-error` — and `errorClass` names the
 exception's class where one ended it, never its message. If the full record cannot be built or
-written, a minimal one (every count zero, the tools if they fit, the class of that failure) is
-written instead, and the checked answer is still shown. Nothing else in the package may log, so
+written, a minimal one (the tools if they fit, the class of that failure, and — for an answered
+turn — the checked answer's own counts and flags, otherwise zeros) is written instead, and the
+checked answer is still shown. Nothing else in the package may log, so
 the record is the only trace a failed turn leaves.
 
 **Every call is recorded as it ran** (audit AG-5). `tools.ToolCallLog` is the agent's

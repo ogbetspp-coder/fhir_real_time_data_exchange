@@ -36,12 +36,18 @@ can put an intended-use statement around. What keeps it honest, as built (2026-0
   citation; the model cannot write into one. So an unverified string cannot be presented as a
   quotation. The blocks are what was read, not a selection the model vouches for, and the answer
   says so; at most eight are shown, and the answer says how many more were read.
-- **The model's own words cannot pass for a block, and do not carry what a block carries.** Any
-  line of them that opens with a label reserved for checked text is removed, read after
-  compatibility folding, with every gap and zero-width character removed and every leading
-  non-letter stripped; checksum-like runs of hexadecimal digits and named document identifiers
-  are removed; and the words end at a delimiter line. Each removal is said in the answer and
-  recorded (`assistantFlags`).
+- **The model's own words cannot render as anything but its own words.** On the text surface
+  they are shown inside a fenced code block, between a label line and an end line; Markdown
+  and HTML are not parsed inside a fence, and the fence is longer than any run of backticks in
+  them, so nothing the model writes — emphasis, an entity, a tag, a comment, a forged end line
+  — renders as markup or closes the box. That is the structural guarantee. As defence in depth
+  the words are also filtered: split on every kind of line break, compatibility-folded and
+  stripped of zero-width and format characters, a line that opens with (or has the shape of)
+  a label reserved for checked text is removed — read with Markdown, HTML and look-alike Cyrillic
+  and Greek letters set aside — and checksum-like runs of hexadecimal digits and document
+  identifiers named with an identifier-like value are removed. Each removal is said in the
+  answer and recorded (`assistantFlags`). The filters are patterns and can be missed; the fence
+  does not depend on them.
 - **Label text in the model's own words is pointed out, not checked.** Where they share eight or
   more consecutive words with a block, the answer says they repeat label text and are not
   checked, and the record carries `label-text-repeated`. This is a runtime flag, not the
@@ -67,7 +73,14 @@ decide — applied to reading.
    hashes the chunk that was sent, the block's text and XHTML hash to the values the reader is
    shown, and the answer was computed under the normalisation version the agent was built
    against (`fidelity-norm/3.1.0`). Anything else is flagged on the block, and the audit record
-   shows it. A block holding a table or a picture is flagged `table-not-quotable`: the service
+   shows it. So a normalisation-version bump in Zone B needs the agent redeployed, ported to the
+   new version, **before** the service answers under it; otherwise every block shows unverified
+   (`checksum-mismatch`) until it is. Each block says which checksum is confirmed by what: the
+   normalised text's hash is the one every `verify_quote` match must name; the approved
+   narrative's is the stored XHTML's, recomputed by the agent from what `get_section` returned
+   and required to agree, not re-confirmed by the service at check time. The chunks are evened
+   out in length, so a block just over one window is two halves rather than a chunk and a
+   sliver. A block holding a table or a picture is flagged `table-not-quotable`: the service
    refuses a quote carrying their markers, so that part is not sent. This check does not depend
    on the model: a model update can make the assistant less helpful, but it cannot make an
    altered quote pass as verified. It is the single most important piece and it is small.
@@ -183,8 +196,10 @@ the query service's edge admits. A dedicated account holding `run.invoker` alone
 an owner step.
 
 The user id the agent is given is Gemini Enterprise's, and it is the user's e-mail address. The
-agent's audit record never carries it: `principal` is the fixed value `session-user-withheld`,
-with an optional keyed digest beside it (`principalDigest`), and the principal the query service
+agent's audit record never carries it: `principal` is the fixed value `session-user-withheld`
+(only a numeric subject or a URN is carried as it is), with an optional digest beside it
+(`principalDigest`: HMAC-SHA256 of the casefolded id under a key of at least 32 bytes), and the
+principal the query service
 verified from the user's own token is on the service's records of the same `turnId`. The wiring
 is proven with in-process ADK contexts and a real ADK `Runner`; the edge header and the
 header provider were exercised on Agent Engine, the post-check has not yet been.
@@ -229,7 +244,8 @@ else:
    argument _is_ narrative, and a digest of a quote is a way of asking whether a document
    contains a sentence. Which spans failed is on the card; how many, and why, is in the record.
    The record is built apart from the answer: if the full record cannot be built, a minimal one
-   with the exception's class is written, and the checked answer is still shown. Without it,
+   with the exception's class — and, for an answered turn, the checked answer's counts and
+   flags — is written, and the checked answer is still shown. Without it,
    the demonstration's first two scenes would produce no assessable evidence, so it is part of
    the agent, not an afterthought.
 
@@ -310,20 +326,24 @@ with.
   is careful", and why absence-dependent uses are excluded above.
 - **Mis-attribution.** `verify_quote` proves a span is in the document the assistant _named_;
   it does not prove the assistant named the right product, version, or language. Each block
-  shows `bundleId`, `versionId`, `sourceKey` and the checksum, and the product name and language
+  shows `bundleId`, `versionId`, `sourceKey` and the checksums, and the product name and language
   that a `find_product` answer of the same turn gave for that exact document version — or, when
   the turn looked up no such answer (or two disagreed), says the product and language were not
   confirmed, rather than guess. The user confirms them; the demonstration shows this being
   checked. The product line is as good as `find_product`'s answer, which is not itself
   re-checked.
-- **The assistant's own words.** They are shown, labelled, and never checked. What is enforced
-  is that they cannot pass for a checked block and do not carry checksums or identifiers (see
-  "The promise"); what is not: a paraphrase of label text sharing fewer than eight words in a
-  row with a block, and a reserved label spelt with look-alike letters from another script
-  (compatibility folding does not fold confusables).
+- **The assistant's own words.** They are shown, labelled, fenced, and never checked. What is
+  enforced is that they cannot render as a checked block (the fence) and, as far as the
+  filters reach, do not carry reserved labels, checksums or identifiers (see "The promise").
+  What is not: a paraphrase of label text sharing fewer than eight words in a row with a block;
+  a checksum or identifier spelt in a form the patterns do not know (spaced into groups, or
+  named in prose — "document version 7"); a surface that does not render Markdown shows the
+  fence as two lines of backticks rather than a box; and the look-alike fold covers Cyrillic and
+  Greek only.
 - **Exact coverage fails closed.** A chunk of a block whose text also occurs earlier in the same
   section matches there first, at other offsets, and the block is flagged `coverage-gap` although
-  it is the label's text. A block holding a table or a picture cannot be checked at all yet
+  it is the label's text; evening out the chunks makes a short, repeatable last chunk unlikely,
+  not impossible. A block holding a table or a picture cannot be checked at all yet
   (`table-not-quotable`); cell-level quoting is roadmap 3a's.
 - **Data handling outside the boundary.** Regulated narrative leaves the validated boundary at the
   tool-result hop and is processed by Gemini and Agent Engine. Before anything but synthetic data

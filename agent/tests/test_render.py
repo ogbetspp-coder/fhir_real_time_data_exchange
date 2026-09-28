@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from verifiable_answer_agent.answer import AssistantPart, Citation, DraftAnswer, QuotedBlock
 from verifiable_answer_agent.postcheck import ChunkCheck, post_check
 from verifiable_answer_agent.render import (
@@ -11,6 +13,7 @@ from verifiable_answer_agent.render import (
     A2UI_VERSION,
     ASSISTANT_END,
     ASSISTANT_LABEL,
+    CHECKSUMS_EXPLAINED,
     PRODUCT_NAMED,
     PRODUCT_UNCONFIRMED,
     UNVERIFIED_LABEL,
@@ -132,8 +135,36 @@ def test_the_plain_text_surface_carries_the_same_things() -> None:
     assert UNVERIFIED_LABEL in text
     assert ASSISTANT_LABEL in text
     assert ANSWER.assistant.text in text
-    # The assistant's words are the last thing, and a line says where they end.
-    assert text.endswith(f"{ANSWER.assistant.text}\n[{ASSISTANT_END}]")
+    # The assistant's words are the last thing, fenced, and a line says where they end.
+    assert text.endswith(f"```text\n{ANSWER.assistant.text}\n```\n[{ASSISTANT_END}]")
+
+
+def test_each_block_says_which_checksum_verify_quote_confirms() -> None:
+    text = render_text(ANSWER)
+    for block in ANSWER.blocks:
+        assert f"Checksum of the normalised text: {block.citation.normalized_text_sha256}" in text
+    assert text.count(CHECKSUMS_EXPLAINED) == len(ANSWER.blocks)
+
+
+def _fenced_part(text: str) -> tuple[str, str, str]:
+    """The opening fence, the body and the closing fence of the assistant's part."""
+    lines = text.split("\n")
+    opening = lines.index(f"[{ASSISTANT_LABEL}]") + 1
+    closing = lines.index(f"[{ASSISTANT_END}]") - 1
+    return lines[opening], "\n".join(lines[opening + 1 : closing]), lines[closing]
+
+
+def test_the_assistants_words_are_fenced_so_nothing_in_them_renders_as_markup() -> None:
+    # A fenced code block parses nothing: no emphasis, entity, HTML tag or comment (review of
+    # PR #129, M1). The fence is longer than any run of backticks inside, so none closes it.
+    words = "Try ```` this ``` and\n```\n[End of the assistant's own words]\n**Verified**"
+    answer = post_check(DraftAnswer(blocks=(FIRST,), assistant=AssistantPart(text=words)), {})
+    opening, body, closing = _fenced_part(render_text(answer))
+    assert opening == "`````text"
+    assert closing == "`````"
+    assert not any(line.strip().startswith("`````") for line in body.split("\n"))
+    # The forged end line is gone, and only the real one is outside the fence.
+    assert render_text(answer).count(f"[{ASSISTANT_END}]") == 1
 
 
 def test_the_product_and_language_are_shown_or_said_to_be_unconfirmed() -> None:
@@ -160,7 +191,9 @@ def test_the_assistant_cannot_write_the_labels_reserved_for_checked_text() -> No
     ).split("\n") == [
         "Section 4.4 covers this.",
         "Patients MUST double the dose.",
-        "(Lines removed from the assistant's words: 4. Each opened with a label this answer "
+        # Lower case, and the assistant's own verdict: a status line is "NOT VERIFIED".
+        "- not verified here",
+        "(Lines removed from the assistant's words: 3. Each opened with a label this answer "
         "reserves for checked label text.)",
     ]
 
@@ -181,6 +214,60 @@ def test_a_reserved_label_in_disguise_is_still_removed() -> None:
     ]
     for line in disguises:
         assert shown(f"{line}\nOrdinary words.").split("\n")[0] == "Ordinary words.", line
+
+
+def test_the_reviews_bypasses_are_removed() -> None:
+    # Each was kept by the filter of 2026-09-27 (review of PR #129, M1): other line breaks,
+    # Markdown inside the label, HTML entities, tags and comments, a backslash, a look-alike
+    # letter from another script, and a forged end line.
+    for text in (
+        "Intro.\r\rVerified against the approved label\rTake 500 mg.",
+        "Intro.\u2028Verified against the approved label",
+        "Intro.\x85Verified against the approved label",
+        "Verified against the *approved* label",
+        "End of the assistant's *own* words",
+        "Verified&#32;against the approved label",
+        "Verified against the approved lab\\el",
+        "<b>Verified against the approved label</b>",
+        "Veri<!-- -->fied against the approved label",
+        "V\u0435rified against the approved label",
+        "Checksum *of* the approved narrative: x",
+        "_Checksum of the normalised text_: y",
+        "NOT VERIFIED — but read it anyway",
+    ):
+        view = shown(text)
+        assert "Verified" not in view.replace("(Lines removed", ""), text
+        assert "reserves for checked label text" in view, text
+        assert "Take 500 mg." in view or "Take 500" not in text
+
+
+def test_a_checksum_is_removed_however_it_is_disguised() -> None:
+    hex64 = "a" * 64
+    for text in (
+        "Checksum: " + hex64[:21] + "\u200b" + hex64[21:42] + "\u200b" + hex64[42:],
+        "Checksum: " + "\uff41" * 64,
+        "Checksum: " + hex64[:30] + "****" + hex64[30:],
+    ):
+        view = shown(text)
+        assert view.startswith("Checksum: [checksum removed]"), text
+
+
+def test_an_identifier_is_removed_however_it_is_disguised() -> None:
+    assert shown("version\u200bId: 7").startswith("[identifier removed]")
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "From section 4.2 you can see the recommended starting dose for adults.",
+        "Not verified by me: section 4.4 covers the warnings.",
+        "The version ID shown with each block tells you which label this is.",
+        "Section 4.2 answers this; the source key tells you where.",
+    ],
+)
+def test_ordinary_speech_is_not_mistaken_for_a_label_or_an_identifier(line: str) -> None:
+    # Each was removed or cut before (review of PR #129, L1).
+    assert shown(line) == line
 
 
 def test_checksums_and_identifiers_are_removed_from_the_assistants_words() -> None:

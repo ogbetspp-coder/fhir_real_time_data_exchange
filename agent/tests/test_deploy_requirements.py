@@ -11,6 +11,7 @@ found the conflict (audit AG-11)."""
 
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -108,18 +109,57 @@ def test_a_typed_service_version_is_refused(monkeypatch: pytest.MonkeyPatch) -> 
 def test_the_version_names_the_commit_and_a_changed_tree_is_refused(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    answers = {"status": "", "rev-parse": "0123abc" * 5 + "01234\n"}
+    answers = {"status": "", "rev-parse": "0123abc" * 5 + "01234\n", "merge-base": ""}
+    released = [True]
 
     def git(*arguments: str) -> str:
+        if arguments[0] == "merge-base" and not released[0]:
+            raise subprocess.CalledProcessError(1, ["git", *arguments])
         return answers[arguments[0]]
 
     monkeypatch.setattr(deploy_agent_engine, "_git", git)
     version = deploy_agent_engine.service_version()
     assert version.startswith("agent/")
     assert version.endswith("+" + answers["rev-parse"].strip())
+    # A commit that is not on origin/main has not been through the merge gate (review, L4).
+    released[0] = False
+    with pytest.raises(SystemExit, match="is not on origin/main"):
+        deploy_agent_engine.service_version()
     answers["status"] = " M src/verifiable_answer_agent/finish.py\n"
     with pytest.raises(SystemExit, match="differs from its commit"):
         deploy_agent_engine.service_version()
+
+
+def test_the_upload_is_the_package_as_the_commit_holds_it(tmp_path: Path) -> None:
+    # Taken with git archive, so no ignored or untracked file in the working tree (a
+    # __pycache__, a stray .pyc) can reach the upload (review of PR #129, L4).
+    stray = (
+        Path(deploy_agent_engine.AGENT_ROOT)
+        / "src"
+        / "verifiable_answer_agent"
+        / "__pycache__"
+        / "stray.pyc"
+    )
+    stray.parent.mkdir(exist_ok=True)
+    stray.write_bytes(b"not in the commit")
+    try:
+        root = deploy_agent_engine.export_package("HEAD", tmp_path)
+    finally:
+        stray.unlink()
+    exported = sorted(
+        path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file()
+    )
+    committed = sorted(
+        "verifiable_answer_agent/" + name
+        for name in deploy_agent_engine._git(
+            "ls-tree", "-r", "--name-only", "HEAD", "src/verifiable_answer_agent/"
+        )
+        .strip()
+        .replace("src/verifiable_answer_agent/", "")
+        .splitlines()
+    )
+    assert exported == committed
+    assert not any("__pycache__" in name for name in exported)
 
 
 def test_the_runtime_gets_its_settings_and_a_secret_by_reference_only(

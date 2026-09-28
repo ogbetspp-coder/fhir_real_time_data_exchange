@@ -9,6 +9,7 @@ shown as label content.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import json
 import socket
@@ -59,6 +60,7 @@ from .fake_query_service import (
 
 SECTION_KEY = "smpc.4.4"
 TURN_ID = "0f6d1a2e-3b4c-4d5e-8f60-718293a4b5c6"
+KEY = b"synthetic-deployment-key-32-bytes"
 
 
 @dataclass
@@ -218,14 +220,14 @@ async def test_with_a_key_the_e_mail_user_is_recorded_as_a_keyed_digest(
     query_service: FakeQueryService, capsys: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # Read from the runtime's environment when the turn ends, as Agent Engine supplies a secret.
-    monkeypatch.setenv("AGENT_PRINCIPAL_DIGEST_KEY", "deployment-key")
+    monkeypatch.setenv("AGENT_PRINCIPAL_DIGEST_KEY", KEY.decode())
     context = invocation_context(turn_id=TURN_ID, user_id="alice@example.com")
     context.session.events = _events(query_service, "synthetic-invocation")  # type: ignore[assignment]
     await _finish(config_for(query_service.url), context, _held(context, "Here is what it says."))
     (record,) = _records(capsys)
     assert _validates(record)
     assert record["principal"] == WITHHELD_PRINCIPAL
-    assert record["principalDigest"] == principal_fields("alice@example.com", b"deployment-key")[1]
+    assert record["principalDigest"] == principal_fields("alice@example.com", KEY)[1]
 
 
 async def test_a_record_that_cannot_be_built_never_hides_the_checked_answer(
@@ -245,7 +247,8 @@ async def test_a_record_that_cannot_be_built_never_hides_the_checked_answer(
     assert _validates(record)
     assert record["outcome"] == "answered"
     assert record["errorClass"] == "ValueError"
-    assert record["spansVerified"] == 0
+    # The fallback still carries what the reader was shown as verified (review of PR #129).
+    assert record["spansVerified"] == 1
 
 
 async def test_every_verify_quote_call_is_in_the_record_with_its_duration(
@@ -268,6 +271,35 @@ async def test_every_verify_quote_call_is_in_the_record_with_its_duration(
     # tools/list does not grow with the chunks (audit AG-10): the MCP client lists once for
     # itself per call in flight at most, and the post-check looks the tool up once.
     assert query_service.seen_methods.count("tools/list") <= 1 + MAX_CONCURRENT_CHECKS
+
+
+async def test_concurrent_calls_still_look_verify_quote_up_once() -> None:
+    # The post-check runs four calls at once; without a lock each call that arrived while the
+    # first lookup was in flight looked the tool up again (review of PR #129, L6).
+    lookups = 0
+
+    class _Tool:
+        name = "verify_quote"
+
+        async def run_async(self, *, args: dict[str, Any], tool_context: Any) -> dict[str, Any]:
+            del args, tool_context
+            await asyncio.sleep(0.001)
+            return {"isError": True, "content": []}
+
+    class _Toolset:
+        async def get_tools(self, _context: Any) -> list[Any]:
+            nonlocal lookups
+            lookups += 1
+            await asyncio.sleep(0.02)  # a tools/list round trip
+            return [_Tool()]
+
+    through = finish._VerifyQuoteThrough(
+        cast(Any, _Toolset()), cast(Any, None), ToolCallLog(), "synthetic-invocation"
+    )
+    async with asyncio.TaskGroup() as group:
+        for index in range(8):
+            group.create_task(through("synthetic-smpc", "1", "smpc.4.4", f"chunk {index}"))
+    assert lookups == 1
 
 
 async def test_the_post_check_looks_verify_quote_up_once_per_turn() -> None:

@@ -96,7 +96,9 @@ def principal_digest_key(env: Mapping[str, str] | None = None) -> bytes | None:
 
     ``AGENT_PRINCIPAL_DIGEST_KEY`` in the runtime's environment — on Agent Engine a Secret
     Manager reference the deploy script names, never a value it holds. Read when a turn ends, not
-    at deploy time. Without it a withheld session user is not identified in the record at all.
+    at deploy time. Without it a withheld session user is not identified in the record at all,
+    and a key shorter than 32 bytes is treated as none (``audit.MIN_DIGEST_KEY_BYTES``): a short
+    key over a guessable e-mail address would be a lookup table, not a pseudonym.
     """
     source = env if env is not None else os.environ
     key = source.get(PRINCIPAL_DIGEST_KEY, "").strip()

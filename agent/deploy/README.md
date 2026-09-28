@@ -86,16 +86,18 @@ AGENT_MODEL=<pinned-gemini-model-version> \
 Drop `--dry-run` to deploy; add `--update projects/.../reasoningEngines/...` to update in
 place. The script refuses to run if any variable is unset: there is no default project, no
 default region, and no guessed bucket. It also refuses when anything under `agent/` differs from
-the commit (modified, staged or untracked), and when `AGENT_SERVICE_VERSION` is set: the version
-is derived, `agent/<package version>+<commit>`, so every audit record names the code that wrote
-it. Until 2026-09-27 it was typed by hand, and the engine ran a build that predated the fixes it
+the commit (modified, staged or untracked), when the commit is not on `origin/main` (fetch
+first), and when `AGENT_SERVICE_VERSION` is set: the version is derived,
+`agent/<package version>+<commit>`, so every audit record names the code that wrote it. The
+package uploaded is taken from the commit itself (`git archive`), so no ignored or untracked file
+in the working tree — a `__pycache__`, a stray `.pyc` — can reach the runtime. Until 2026-09-27 it was typed by hand, and the engine ran a build that predated the fixes it
 was assumed to carry.
 
 Optional, each passed through only when set:
 
 - `MCP_TIMEOUT_SECONDS` — the agent's MCP timeout, above 0 and at most 600 (default 30).
 - `AGENT_PRINCIPAL_DIGEST_SECRET` — the name of a Secret Manager secret in the project holding a
-  random key. The engine then gets `AGENT_PRINCIPAL_DIGEST_KEY` as a secret reference (never a
+  random key of at least 32 bytes (a shorter one is not used; `openssl rand -base64 48`). The engine then gets `AGENT_PRINCIPAL_DIGEST_KEY` as a secret reference (never a
   value; the key passes through neither this script nor the engine's configuration), and each
   audit record carries `principalDigest`, an HMAC-SHA256 of the Gemini Enterprise user's e-mail
   address under it. Without it the agent's records identify no user at all (`principal` is
@@ -174,6 +176,11 @@ values, which both scripts once carried as silent defaults:
 GEMINI_APP_ID=gemini-enterprise-17899354_1789935441481
 GEMINI_OAUTH_CLIENT_ID=398017980210-mgn6flks5a9nmlbkgkhh1pple9tv2075.apps.googleusercontent.com
 ```
+
+`register.sh`, `authorization.sh` and `grant-invoker.sh` pass the access token to `curl` on its
+standard input (`--config -`), never on the command line where any process can read it, and
+stop on an HTTP error with the answer shown (`--fail-with-body`) rather than parse an error body
+as a result.
 
 The registration's description says only what the agent does (2026-09-27): it shows the label
 sections it read, verbatim and re-checked; its own remarks are labelled and not checked; it reads

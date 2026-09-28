@@ -25,6 +25,7 @@ answer and recorded in the turn's audit record.
 
 from __future__ import annotations
 
+import html
 import re
 import unicodedata
 from dataclasses import dataclass
@@ -79,6 +80,10 @@ READ_IN_TURN: Final = (
 )
 PRODUCT_NAMED: Final = "Product named for this version"
 PRODUCT_UNCONFIRMED: Final = "Product and language not confirmed"
+CHECKSUMS_EXPLAINED: Final = (
+    "Checksums: verify_quote confirms the normalised text's; the approved narrative's is "
+    "the stored XHTML's, recomputed from what the store returned."
+)
 
 _FLAG_TEXT: Final[dict[str, str]] = {
     "no-match": "verify_quote returned no-match for part of this block",
@@ -186,11 +191,15 @@ def render_text(answer: CheckedAnswer) -> str:
     """The same answer where no structured surface exists. Labels, not decoration.
 
     What a reader needs first is the quotation and whether it was verified; what an auditor
-    needs is the product, the version and the checksum, which follow it on their own lines. The
+    needs is the product, the version and the checksums, which follow it on their own lines. The
     block id is an internal handle and belongs in the audit record, not in a person's reading.
-    The checksum is written in full: this is the surface Gemini Enterprise shows, and a checksum
-    a reader cannot copy is not evidence. The assistant's words come last, between a label and
-    an end line, so a reader can see where they stop.
+    The checksums are written in full: this is the surface Gemini Enterprise shows, and a
+    checksum a reader cannot copy is not evidence.
+
+    The assistant's words come last, between a label and an end line, and inside a fenced code
+    block (``_fenced``): Gemini Enterprise renders this text as Markdown, and inside a fence
+    nothing is Markdown or HTML, so no emphasis, entity, comment or tag the model writes can make
+    its words render as anything but its own words in a box.
     """
     lines: list[str] = []
     for block in answer.blocks:
@@ -203,9 +212,28 @@ def render_text(answer: CheckedAnswer) -> str:
         lines.extend(after)
         lines.append("")
     lines.append(f"[{ASSISTANT_LABEL}]")
-    lines.append(sanitise_assistant(answer).text)
+    lines.extend(_fenced(sanitise_assistant(answer).text))
     lines.append(f"[{ASSISTANT_END}]")
     return "\n".join(lines)
+
+
+def _fenced(text: str) -> list[str]:
+    """``text`` as a fenced code block that nothing inside it can close.
+
+    A fence is chosen over escaping every Markdown and HTML character. CommonMark and GitHub
+    Flavored Markdown, which Gemini Enterprise's Markdown follows, parse nothing inside a fenced
+    block — no emphasis, no link, no entity, no HTML tag or comment — and close it only at a line
+    of at least as many backticks as opened it; the fence here is one longer than the longest
+    run of backticks in the text, so no line of the text can close it (and a tilde fence never
+    closes a backtick one). Escaping depends on the renderer honouring backslash escapes for
+    every character that could matter, shows the backslashes wherever it does not, and draws no
+    boundary; a fence is a visible box where Markdown is rendered and two plain marker lines
+    where it is not. ``text`` has no line breaks but line feeds (``sanitise_assistant`` splits on
+    every kind), so a carriage return cannot end a line early.
+    """
+    longest = max((len(run) for run in re.findall(r"`+", text)), default=0)
+    fence = "`" * max(3, longest + 1)
+    return [f"{fence}text", text, fence]
 
 
 def _after_blocks(answer: CheckedAnswer) -> list[str]:
@@ -232,50 +260,121 @@ class AssistantView:
 
 # The lines this module writes to say what is checked label content. The assistant may not write
 # them: a draft that opens with the verified label and closes with a citation line reads, on a
-# plain-text surface, exactly like a checked block (review of 2026-09-22).
+# plain-text surface, exactly like a checked block (review of 2026-09-22). Each is compared as
+# ``_probe`` reads a line: letters and digits only.
 _RESERVED_OPENINGS: Final = (
     VERIFIED_LABEL,
-    UNVERIFIED_LABEL,
     ASSISTANT_LABEL,
     ASSISTANT_END,
     READ_IN_TURN,
     PRODUCT_NAMED,
     PRODUCT_UNCONFIRMED,
-    "From section ",
-    "Checksum of the approved narrative",
+    CHECKSUMS_EXPLAINED,
+    "Checksum of the ",
 )
+# The status line of an unverified block, in its own capitals only: "Not verified by me" is the
+# assistant's own words, and a forged "NOT VERIFIED" could only make label text look less
+# trustworthy, never more.
+_UNVERIFIED_PROBE: Final = "NOTVERIFIED"
+# The citation line's whole shape, not its first two words: "From section 4.2 you can see" is
+# ordinary speech.
+_CITATION_SHAPE: Final = re.compile(r"fromsection.{1,200}?ofdocumentversion")
 
-# A checksum-like run: 32 or more hexadecimal digits standing alone. Only a checked block may
-# carry one; the model has been seen inventing them (deploy/README.md, 2026-09-22).
-_HEX_RUN: Final = re.compile(r"(?<![0-9A-Za-z])[0-9A-Fa-f]{32,}(?![0-9A-Za-z])")
-# A document identifier named by its field, with the value after it.
+# A checksum-like run: 32 or more hexadecimal digits standing alone, however Markdown emphasis or
+# code marks are threaded through it. Only a checked block may carry one; the model has been seen
+# inventing them (deploy/README.md, 2026-09-22). Read after compatibility folding and with
+# zero-width characters gone, so neither fullwidth digits nor a zero-width space hides one.
+_HEX_RUN: Final = re.compile(
+    r"(?<![0-9A-Za-z])[0-9A-Fa-f](?:[*_~`\\]*[0-9A-Fa-f]){31,}(?![0-9A-Za-z])"
+)
+# A document identifier named by its field, with the value after it. The value is removed only
+# when it looks like an identifier (a digit or one of . _ : / + - in it); "the version ID shown
+# with each block" is prose, and keeps its next word.
 _IDENTIFIER: Final = re.compile(
-    r"\b(?:bundle|version|source|narrativeDiv|normalizedText|quote)[ _-]?"
-    r"(?:id|key|sha256)\b[\s`'\"*]*[:=]?[\s`'\"*]*[A-Za-z0-9._:/+-]*",
+    r"\b(?:bundle|version|source|narrativeDiv|normalizedText|quote)[ _-]?(?:id|key|sha256)\b"
+    r"[\s`'\"*]*[:=]?[\s`'\"*]*(?P<value>[A-Za-z0-9._:/+-]+)",
     re.IGNORECASE,
+)
+_ID_LIKE: Final = re.compile(r"[0-9._:/+-]")
+_HTML_COMMENT: Final = re.compile(r"<!--.*?(?:-->|$)", re.DOTALL)
+_HTML_TAG: Final = re.compile(r"</?[A-Za-z][^>]*>")
+# Latin look-alikes from Cyrillic and Greek, folded before a line is compared with a reserved
+# label. Partial by design: the fence is the structural guarantee; this is defence in depth.
+_CONFUSABLES: Final = str.maketrans(
+    "аеорсухіјѕԁԛԝүһӏвкмнтАВЕКМНОРСТУХІЈЅαονικρτυχΑΒΕΖΗΙΚΜΝΟΡΤΥΧ",
+    "aeopcyxijsdqwyhlbkmhtABEKMHOPCTYXIJSaovikptuxABEZHIKMNOPTYX",
 )
 # How many words in a row the assistant may share with a block before it is pointed out.
 _REPEATED_WORDS: Final = 8
 
 
-def _probe(text: str) -> str:
-    """A line as a reader would take it in: compatibility-folded, casefolded, gaps removed.
+def _shown(line: str) -> str:
+    """A line of the assistant's words as it is shown: compatibility-folded, invisibles gone.
 
-    Every gap (whitespace, zero-width and default-ignorable code points) is removed, not
-    collapsed, so "From  section", and "From" and "section" joined by a zero-width space, both
-    read as "fromsection"; and every
-    leading character that is not a letter goes, so no emoji, number, table bar or Markdown
-    marker in front of a reserved label hides it.
+    NFKC folds fullwidth and other compatibility forms to their plain letters and digits;
+    format characters and every other zero-width or default-ignorable code point are removed;
+    any remaining gap (a no-break or thin space) becomes a plain space.
     """
-    folded = unicodedata.normalize("NFKC", text).casefold()
-    squeezed = "".join(character for character in folded if not is_gap(character))
-    index = 0
-    while index < len(squeezed) and not squeezed[index].isalpha():
-        index += 1
-    return squeezed[index:]
+    folded = unicodedata.normalize("NFKC", line)
+    kept: list[str] = []
+    for character in folded:
+        if unicodedata.category(character) == "Cf":
+            continue
+        if is_gap(character):
+            if character in _INVISIBLE_GAPS:
+                continue
+            kept.append(" ")
+            continue
+        kept.append(character)
+    return "".join(kept)
+
+
+# The gaps that draw nothing (zero-width and default-ignorable): removed, not turned to spaces.
+_INVISIBLE_GAPS: Final = frozenset(
+    chr(point)
+    for point in (0x034F, 0x115F, 0x1160, 0x17B4, 0x17B5, 0x3164, 0xFFA0, *range(0x180B, 0x1810))
+) | frozenset(chr(point) for point in (*range(0x200B, 0x2010), *range(0x2060, 0x2070)))
+
+
+def _probe(line: str, *, keep_case: bool = False) -> str:
+    """A shown line as a reader would take it in, letters and digits only.
+
+    HTML entities are decoded and HTML comments and tags dropped (a Markdown surface renders them
+    away); Cyrillic and Greek look-alikes are folded to Latin; then everything but letters and
+    digits goes — spaces, Markdown emphasis, table bars, list markers, emoji — and any leading
+    digits (a list number). Casefolded unless ``keep_case``.
+    """
+    text = _HTML_TAG.sub("", _HTML_COMMENT.sub("", html.unescape(line)))
+    text = unicodedata.normalize("NFKC", text).translate(_CONFUSABLES)
+    letters = "".join(character for character in text if character.isalnum())
+    letters = letters.lstrip("0123456789")
+    return letters if keep_case else letters.casefold()
 
 
 _RESERVED_PROBES: Final = tuple(_probe(opening) for opening in _RESERVED_OPENINGS)
+
+
+def _reserved(line: str) -> bool:
+    """Whether a shown line opens with, or has the shape of, a label reserved for checked text."""
+    probe = _probe(line)
+    return (
+        probe.startswith(_RESERVED_PROBES)
+        or _CITATION_SHAPE.match(probe) is not None
+        or _probe(line, keep_case=True).startswith(_UNVERIFIED_PROBE)
+    )
+
+
+def _without_identifiers(line: str) -> tuple[str, int]:
+    removed = 0
+
+    def replace(match: re.Match[str]) -> str:
+        nonlocal removed
+        if _ID_LIKE.search(match.group("value")) is None:
+            return match.group(0)
+        removed += 1
+        return "[identifier removed]"
+
+    return _IDENTIFIER.sub(replace, line), removed
 
 
 def _words(text: str) -> list[str]:
@@ -292,17 +391,22 @@ def _shingles(words: list[str]) -> set[tuple[str, ...]]:
 def sanitise_assistant(answer: CheckedAnswer) -> AssistantView:
     """The assistant's words as shown, and the ``AssistantFlag`` values for the audit record.
 
-    Pure, and a function of the answer alone, so every renderer and the audit record agree.
+    Pure, and a function of the answer alone, so every renderer and the audit record agree. The
+    words are split on every kind of line break (``str.splitlines``: carriage returns, U+0085,
+    U+2028 and the rest, not only line feeds), each line is shown folded and without invisibles
+    (``_shown``), and the filters run on what is shown. On the text surface the result is then
+    fenced (``render_text``), which is the structural guarantee; the filters are defence in depth.
     """
     flags: set[AssistantFlag] = set()
     kept: list[str] = []
     removed_lines = 0
-    for line in answer.assistant.text.split("\n"):
-        if _probe(line).startswith(_RESERVED_PROBES):
+    for raw in answer.assistant.text.splitlines():
+        line = _shown(raw)
+        if _reserved(line):
             removed_lines += 1
             continue
         without_checksums, checksums = _HEX_RUN.subn("[checksum removed]", line)
-        shown, identifiers = _IDENTIFIER.subn("[identifier removed]", without_checksums)
+        shown, identifiers = _without_identifiers(without_checksums)
         if checksums:
             flags.add("checksum-removed")
         if identifiers:
@@ -364,11 +468,20 @@ def _citation_line(block: CheckedBlock) -> str:
 
 
 def _reading_lines(block: CheckedBlock) -> list[str]:
-    """The citation as a person reads it: the section and version, the product, the checksum."""
+    """The citation as a person reads it: section and version, product, and both checksums.
+
+    Which checksum is confirmed by what (audit review, L5): ``verify_quote`` confirms the
+    normalised text's hash — every match names it, and the post-check requires that it is this
+    one; the approved narrative's hash is the stored XHTML's, recomputed by the agent from the
+    XHTML ``get_section`` returned and required to agree with it, and not re-confirmed by the
+    service at check time. The answer says so under each block.
+    """
     citation = block.citation
     return [
         f"From section {citation.source_key} of document version {citation.version_id} "
         f"({citation.bundle_id})",
         _product_line(block),
         f"Checksum of the approved narrative: {citation.narrative_div_sha256}",
+        f"Checksum of the normalised text: {citation.normalized_text_sha256}",
+        CHECKSUMS_EXPLAINED,
     ]

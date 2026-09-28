@@ -28,10 +28,28 @@ PROJECT_NUMBER="$(gcloud --quiet projects describe "$PROJECT_ID" --format='value
 PARENT="projects/${PROJECT_NUMBER}/locations/global/collections/default_collection/engines/${APP_ID}/assistants/default_assistant"
 NAME="${PARENT}/agents/${AGENT_ID}"
 TOKEN="$(gcloud --quiet auth print-access-token)"
-hdr=(--header "Authorization: Bearer ${TOKEN}" --header "X-Goog-User-Project: ${PROJECT_ID}" --header "Content-Type: application/json")
+hdr=(--header "X-Goog-User-Project: ${PROJECT_ID}" --header "Content-Type: application/json")
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
 
-current="$(curl --silent "${hdr[@]}" "${BASE}/${NAME}")"
-exists="$(python3 -c "import sys,json;print('no' if 'error' in json.loads(sys.argv[1]) else 'yes')" "$current")"
+# The access token reaches curl on its standard input, as a config line, never as an argument:
+# an argument is visible to every process on the machine for the life of the call.
+google_curl() {
+  printf 'header = "Authorization: Bearer %s"\n' "$TOKEN" | curl --config - --silent --show-error "$@"
+}
+
+# Registered (200), not registered (404), or a failure to say which — never guessed from a body.
+code="$(google_curl --output "${work}/current.json" --write-out '%{http_code}' "${hdr[@]}" \
+  "${BASE}/${NAME}")" || code="curl-failed"
+case "$code" in
+  200) exists="yes" ;;
+  404) exists="no" ;;
+  *)
+    echo "reading the registration failed (HTTP ${code}): $(cat "${work}/current.json" 2>/dev/null)" >&2
+    exit 1
+    ;;
+esac
+current="$(cat "${work}/current.json")"
 if [[ "${1:-}" == "--check" ]]; then
   if [[ "$exists" == "yes" ]]; then
     python3 -c "import sys,json;d=json.loads(sys.argv[1]);print('registered:',d['name'].split('/')[-1],'->',d.get('adkAgentDefinition',{}).get('provisionedReasoningEngine',{}).get('reasoningEngine'),'state',d.get('state'),'auth',d.get('authorizationConfig'))" "$current"
@@ -44,8 +62,7 @@ fi
 : "${AGENT_RESOURCE:?AGENT_RESOURCE names the reasoning engine deploy_agent_engine.py printed}"
 # Built by Python into a private file, not inside a command substitution: bash mis-parses a
 # heredoc containing parentheses there, which silently truncated this request on 2026-09-22.
-body_file="$(mktemp)"
-trap 'rm -f "$body_file"' EXIT
+body_file="${work}/body.json"
 NAME="$NAME" ENGINE="$AGENT_RESOURCE" NUMBER="$PROJECT_NUMBER" AUTH="$AUTHORIZATION_ID" python3 -c '
 import json, os
 number, auth = os.environ["NUMBER"], os.environ["AUTH"]
@@ -87,10 +104,16 @@ print(json.dumps({
 }))' >"$body_file"
 
 if [[ "$exists" == "yes" ]]; then
-  response="$(curl --silent --show-error --request PATCH "${hdr[@]}" --data-binary "@${body_file}" \
-    "${BASE}/${NAME}?updateMask=displayName,description,adkAgentDefinition,authorizationConfig,sharingConfig")"
+  verb=PATCH
+  url="${BASE}/${NAME}?updateMask=displayName,description,adkAgentDefinition,authorizationConfig,sharingConfig"
 else
-  response="$(curl --silent --show-error --request POST "${hdr[@]}" --data-binary "@${body_file}" \
-    "${BASE}/${PARENT}/agents?agentId=${AGENT_ID}")"
+  verb=POST
+  url="${BASE}/${PARENT}/agents?agentId=${AGENT_ID}"
 fi
-python3 -c "import sys,json;d=json.loads(sys.argv[1]);print('error:',json.dumps(d['error'])) if 'error' in d else print('registered:',d['name'])" "$response"
+# --fail-with-body: an error answer stops the script, with the answer shown.
+response="$(google_curl --fail-with-body --request "$verb" "${hdr[@]}" \
+  --data-binary "@${body_file}" "$url")" || {
+  echo "registration failed: ${response}" >&2
+  exit 1
+}
+python3 -c "import sys,json;print('registered:',json.loads(sys.argv[1])['name'])" "$response"
