@@ -103,6 +103,10 @@ import xml.etree.ElementTree as ET
 import zipfile
 from dataclasses import dataclass, field
 
+# The version of the rules above. A change to this file changes its hash in versions.lock.json,
+# and tests/test_versions_lock.py then requires a new version here.
+READER_VERSION = "docx-reader/1.1.0"
+
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
 MC = "http://schemas.openxmlformats.org/markup-compatibility/2006"

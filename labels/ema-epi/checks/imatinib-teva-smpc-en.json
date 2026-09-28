@@ -3,8 +3,12 @@
     "file": "imatinib-teva-smpc-en.json",
     "sha256": "b266a38b3a06e07f272b56da08d178198025d8d47761b70187b2c389b9f7e5e7"
   },
-  "reader": "epi-reader/1.1.0",
-  "checker": "qrd-check/1.1.0",
+  "reader": "epi-reader/1.2.0",
+  "inputs": {
+    "registrySha256": "37e919ac8e4f2b02b36e8ba2577522844a09aff42adfa67b1bcaff97da4f1d98",
+    "mappingSha256": "2fc44a767ebd85985cc2f4dd83c10bc09f67bbc9dcb502d83baaccf4b4e5b749"
+  },
+  "checker": "qrd-check/1.2.0",
   "template": {
     "family": "EMA QRD product-information template, centralised procedure",
     "version": "10.4",
@@ -14,23 +18,24 @@
     "language": "en"
   },
   "registryVersion": "1.0.0",
+  "mappingVersion": "1.3.0",
   "document": {
     "title": "Imatinib Teva",
     "date": "2025-02-06"
   },
   "summary": {
     "findings": {
-      "deviation": 7,
+      "deviation": 8,
       "document-quirk": 1,
-      "formatting": 3,
-      "refused-section": 2
+      "formatting": 12,
+      "refused-section": 1
     },
     "statements": {
-      "absent": 49,
-      "deviation": 7,
-      "not-checkable": 8,
-      "not-checked": 20,
-      "used": 39
+      "absent": 59,
+      "deviation": 8,
+      "not-checkable": 6,
+      "not-checked": 12,
+      "used": 41
     }
   },
   "findings": [
@@ -39,10 +44,67 @@
       "detail": "Composition.resourceType is 0, not 'Composition'"
     },
     {
-      "kind": "refused-section",
+      "kind": "formatting",
       "section": "4.2 Posology and method of administration > Posology",
-      "code": "unsupported-style",
-      "detail": "position: relative"
+      "paragraph": 7,
+      "mark": "color-#231f20",
+      "text": "The recommended dosage of Imatinib Teva is 400 mg/day for adult patients in chr…"
+    },
+    {
+      "kind": "formatting",
+      "section": "4.2 Posology and method of administration > Posology",
+      "paragraph": 9,
+      "mark": "color-#231f20",
+      "text": "The recommended dosage of Imatinib Teva is 600 mg/day for adult patients in acc…"
+    },
+    {
+      "kind": "formatting",
+      "section": "4.2 Posology and method of administration > Posology",
+      "paragraph": 9,
+      "mark": "color-#231f20",
+      "text": "15% but < 30% in blood or bone marrow, blasts plus promyelocytes"
+    },
+    {
+      "kind": "formatting",
+      "section": "4.2 Posology and method of administration > Posology",
+      "paragraph": 9,
+      "mark": "color-#231f20",
+      "text": "30% in blood or bone marrow (providing < 30% blasts), peripheral blood basophils"
+    },
+    {
+      "kind": "formatting",
+      "section": "4.2 Posology and method of administration > Posology",
+      "paragraph": 9,
+      "mark": "color-#231f20",
+      "text": "20%, platelets < 100 x 109/l unrelated to therapy."
+    },
+    {
+      "kind": "formatting",
+      "section": "4.2 Posology and method of administration > Posology",
+      "paragraph": 24,
+      "mark": "underline",
+      "text": "Posology for Ph+ ALL in adult patients"
+    },
+    {
+      "kind": "formatting",
+      "section": "4.2 Posology and method of administration > Posology",
+      "paragraph": 31,
+      "mark": "underline",
+      "text": "Posology for Ph+ ALL in children"
+    },
+    {
+      "kind": "formatting",
+      "section": "4.2 Posology and method of administration > Posology",
+      "paragraph": 47,
+      "mark": "color-#231f20",
+      "text": "malignant GIST."
+    },
+    {
+      "kind": "formatting",
+      "section": "4.2 Posology and method of administration > Posology",
+      "paragraph": 94,
+      "mark": "color-#231f20",
+      "text": "Accelerated phase CML and"
     },
     {
       "kind": "formatting",
@@ -62,7 +124,7 @@
       "kind": "refused-section",
       "section": "5.1 Pharmacodynamic properties",
       "code": "unsupported-style",
-      "detail": "position: relative"
+      "detail": "p line-height: 11.7pt"
     },
     {
       "kind": "formatting",
@@ -70,6 +132,25 @@
       "paragraph": 1,
       "mark": "color-blue",
       "text": "https://www.ema.europa.eu"
+    },
+    {
+      "kind": "deviation",
+      "id": "smpc.4.2#4",
+      "similarity": 0.905,
+      "in": "4.2 Posology and method of administration > Posology",
+      "paragraph": 129,
+      "differences": [
+        {
+          "change": "insert",
+          "template": "",
+          "label": "published"
+        },
+        {
+          "change": "replace",
+          "template": "described",
+          "label": "summarised"
+        }
+      ]
     },
     {
       "kind": "deviation",
@@ -177,6 +258,18 @@
   ],
   "statements": [
     {
+      "id": "smpc.2.2#0",
+      "status": "absent"
+    },
+    {
+      "id": "smpc.2.2#1",
+      "status": "used",
+      "in": "2. QUALITATIVE AND QUANTITATIVE COMPOSITION",
+      "paragraph": 6,
+      "start": 0,
+      "end": 49
+    },
+    {
       "id": "smpc.3#0",
       "status": "absent"
     },
@@ -203,31 +296,32 @@
     },
     {
       "id": "smpc.4.2#1",
-      "status": "not-checked"
+      "status": "used",
+      "in": "4.2 Posology and method of administration > Posology"
     },
     {
       "id": "smpc.4.2#2",
-      "status": "not-checked"
+      "status": "absent"
     },
     {
       "id": "smpc.4.2#3",
-      "status": "not-checked"
+      "status": "absent"
     },
     {
       "id": "smpc.4.2#4",
-      "status": "not-checked"
+      "status": "deviation"
     },
     {
       "id": "smpc.4.2#5",
-      "status": "not-checked"
+      "status": "absent"
     },
     {
       "id": "smpc.4.2#6",
-      "status": "not-checked"
+      "status": "absent"
     },
     {
       "id": "smpc.4.2#7",
-      "status": "not-checked"
+      "status": "absent"
     },
     {
       "id": "smpc.4.2#8",
@@ -236,11 +330,11 @@
     },
     {
       "id": "smpc.4.2#9",
-      "status": "not-checked"
+      "status": "absent"
     },
     {
       "id": "smpc.4.2#10",
-      "status": "not-checked"
+      "status": "absent"
     },
     {
       "id": "smpc.4.3#0",
@@ -318,47 +412,58 @@
     },
     {
       "id": "smpc.5.1#0",
-      "status": "not-checked"
+      "status": "not-checked",
+      "reason": "refused-part"
     },
     {
       "id": "smpc.5.1#1",
-      "status": "not-checked"
+      "status": "not-checked",
+      "reason": "refused-part"
     },
     {
       "id": "smpc.5.1#2",
-      "status": "not-checked"
+      "status": "not-checked",
+      "reason": "refused-part"
     },
     {
       "id": "smpc.5.1#3",
-      "status": "not-checked"
+      "status": "not-checked",
+      "reason": "refused-part"
     },
     {
       "id": "smpc.5.1#4",
-      "status": "not-checked"
+      "status": "not-checked",
+      "reason": "refused-part"
     },
     {
       "id": "smpc.5.1#5",
-      "status": "not-checked"
+      "status": "not-checked",
+      "reason": "refused-part"
     },
     {
       "id": "smpc.5.1#6",
-      "status": "not-checked"
+      "status": "not-checked",
+      "reason": "refused-part"
     },
     {
       "id": "smpc.5.1#7",
-      "status": "not-checked"
+      "status": "not-checked",
+      "reason": "refused-part"
     },
     {
       "id": "smpc.5.1#8",
-      "status": "not-checked"
+      "status": "not-checked",
+      "reason": "refused-part"
     },
     {
       "id": "smpc.5.1#9",
-      "status": "not-checked"
+      "status": "not-checked",
+      "reason": "refused-part"
     },
     {
       "id": "smpc.5.1#10",
-      "status": "not-checked"
+      "status": "not-checked",
+      "reason": "refused-part"
     },
     {
       "id": "smpc.5.2#0",
@@ -406,7 +511,8 @@
     },
     {
       "id": "smpc.6.1#0",
-      "status": "not-checkable"
+      "status": "not-checkable",
+      "reason": "too-little-text"
     },
     {
       "id": "smpc.6.2#0",
@@ -426,7 +532,8 @@
     },
     {
       "id": "smpc.6.3#0",
-      "status": "not-checkable"
+      "status": "not-checkable",
+      "reason": "too-little-text"
     },
     {
       "id": "smpc.6.4#0",
@@ -473,6 +580,11 @@
       "end": 41
     },
     {
+      "id": "smpc.12#0",
+      "status": "not-checked",
+      "reason": "section-not-mapped"
+    },
+    {
       "id": "document#0",
       "status": "absent"
     },
@@ -482,15 +594,18 @@
     },
     {
       "id": "appendix-I#pregnancy.1",
-      "status": "not-checkable"
+      "status": "not-checkable",
+      "reason": "unbalanced-brackets"
     },
     {
       "id": "appendix-I#pregnancy.2",
-      "status": "not-checkable"
+      "status": "not-checkable",
+      "reason": "unbalanced-brackets"
     },
     {
       "id": "appendix-I#pregnancy.3",
-      "status": "not-checkable"
+      "status": "not-checkable",
+      "reason": "unbalanced-brackets"
     },
     {
       "id": "appendix-I#pregnancy.4",
@@ -502,7 +617,8 @@
     },
     {
       "id": "appendix-I#pregnancy.6",
-      "status": "not-checkable"
+      "status": "not-checkable",
+      "reason": "unbalanced-brackets"
     },
     {
       "id": "appendix-I#pregnancy.7",
@@ -518,7 +634,7 @@
     },
     {
       "id": "appendix-I#lactation.1",
-      "status": "not-checkable"
+      "status": "absent"
     },
     {
       "id": "appendix-I#lactation.2",
@@ -554,7 +670,7 @@
     },
     {
       "id": "appendix-III#6",
-      "status": "not-checkable"
+      "status": "absent"
     },
     {
       "id": "appendix-III#7",

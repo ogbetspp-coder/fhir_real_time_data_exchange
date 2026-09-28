@@ -23,7 +23,10 @@ _SPACE = re.compile(r"[ \t\u00a0]+")
 
 
 class HeadingPatternError(ValueError):
-    """A heading title holds a fill-in or guidance, which a heading form cannot expand."""
+    """A heading title a heading form cannot expand.
+
+    A fill-in or guidance anywhere in it, or an optional segment inside another.
+    """
 
 
 @dataclass(frozen=True)
@@ -40,10 +43,18 @@ def collapse(text: str) -> str:
     return _SPACE.sub(" ", text).strip()
 
 
-def _optional_count(tokens: list[dict[str, Any]]) -> int:
+def _optional_count(tokens: list[dict[str, Any]], nested: bool = False) -> int:
+    """How many optional segments the title has; refuses a token a form cannot expand.
+
+    Every level is checked: a fill-in inside an optional segment would otherwise be written as
+    its placeholder's name, and an optional segment inside another has no flag of its own.
+    """
     count = 0
     for token in tokens:
         if token["kind"] == "optional":
+            if nested:
+                raise HeadingPatternError("a heading title nests an optional segment")
+            _optional_count(token["value"], nested=True)
             count += 1
         elif token["kind"] != "text":
             raise HeadingPatternError(f"a heading title holds a {token['kind']} token")

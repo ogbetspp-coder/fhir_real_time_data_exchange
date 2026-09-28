@@ -1,0 +1,14 @@
+{
+  "docx-reader": {
+    "docx-reader/1.1.0": "fe8d2711b071d26ad210f9541ffa1d11ea13b49401f38d7ce77040f30d7cc572"
+  },
+  "epi-reader": {
+    "epi-reader/1.2.0": "f43eb853ec9a0f323d4807561fe8b710f8338e00878be519b6770cc1d38638aa"
+  },
+  "qrd-check": {
+    "qrd-check/1.2.0": "731151adfff83d6948e3269d090099b214af594e8ffee153a7621acf4fe920b2"
+  },
+  "qrd-registry": {
+    "1.0.0": "fa7df5a8d2c5a3900eb6b34c0cd3071f67d51af25182e68da29b44e7a23c32e7"
+  }
+}
