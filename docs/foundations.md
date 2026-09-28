@@ -25,8 +25,10 @@ Stated first, because the gaps below should not obscure it.
   seven-year retention policy, and the encryption key rotates every 90 days.
 - **Every bucket enforces uniform access**, the organisation enforces it, and every container
   image is pinned by digest and checked in CI.
-- **Six required checks gate every merge** to `main` — `Check`, `Zone A`, `Agent`,
-  `Official validation`, `Plan` and `Vulnerabilities` — including the official HL7 validator.
+- **Seven required checks gate every merge** to `main` — `Check`, `Zone A`, `Agent`,
+  `Official validation`, `Plan`, `Vulnerabilities` and `Renderer` — including the official HL7
+  validator and the renderer gate, and the deploy of a commit waits for every job of CI's run on
+  it (`Images` too) to succeed.
 - **The FHIR stores keep full version history and enforce referential integrity**, and writes are
   atomic transactions.
 
@@ -160,7 +162,9 @@ that can read but not change, and must stop a merge that destroys anything until
 acknowledged it.
 
 _Status 2026-09-22: closed (PR #74)._ The identity exists, and `Plan` runs on every pull request as a
-required check. `.github/workflows/plan.yml` plans every pull request with the deploy's own inputs
+required check. Since audit B15 it waits for a deploy that is changing live state to finish before
+it plans, and fails, marked unreliable at the top of its summary, if a deploy changed live state
+while it planned: a plan read mid-deploy proposed reverting that deploy (#141). `.github/workflows/plan.yml` plans every pull request with the deploy's own inputs
 (one shared function in `scripts/gcp/deploy.sh`) against the deployed images and version, posts a
 summary of resource addresses and actions, never values, and fails on any destroy or replace unless
 the pull request is labelled `allow-replace`. It runs as `ema-flow-planner-dev`
@@ -346,6 +350,13 @@ and confirming it is on the production gate. `.github/CODEOWNERS` names the owne
 
 **D3. Administrators can bypass branch protection** (`enforce_admins` is off). Acceptable for
 one person; stated so that it is a decision and not a default.
+
+_Status 2026-09-28 (audit B15): still off, the owner's decision._ What the bypass reaches is
+narrower: a push to `main` by an administrator deploys only once CI's run on that commit has
+succeeded in every job (`scripts/ci/workflow-runs.mjs`, in the deploy job before any credential
+is taken), so the bypass skips the pull request, not the checks. `Renderer` has
+been required since 2026-09-28. Branch protection still requires no review, does not require a
+branch to be up to date with `main`, and binds the `Agent` check to no app.
 
 **D4. Secret scanning and push protection are unavailable** on a private repository without
 GitHub's paid secret protection. Nothing secret is committed today — the repository holds

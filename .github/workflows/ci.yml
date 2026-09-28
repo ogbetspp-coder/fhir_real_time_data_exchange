@@ -9,9 +9,12 @@ on:
 permissions:
   contents: read
 
+# A pull request's newer push cancels its older run. A push to main is never cancelled: the deploy
+# of each commit waits for CI's run on that commit to succeed (scripts/ci/workflow-runs.mjs,
+# await-ci), and would be refused if a later merge had cancelled it.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:
@@ -60,7 +63,7 @@ jobs:
   # and flags from that file, so this job has no pin of its own). It is its own job rather than
   # part of `npm run check` because it needs a JVM and ~200 MB of downloads; the downloads are
   # cached by the Dockerfile's content, so a pin change is a cache miss and a checksum check.
-  # Make this a required check on main once it is green.
+  # A required check on main since 2026-09-21, and the deploy waits for it (with every job here).
   official-validation:
     name: Official validation
     runs-on: ubuntu-24.04
@@ -122,7 +125,8 @@ jobs:
   # it out. A pull request that changes no renderer input (scripts/ci/renderer-inputs.mjs: only
   # documentation, the Python deployables, the infrastructure, assistant settings or Markdown)
   # skips the image and the checks, and the job passes, saying so on its summary (a rename counts
-  # at both its paths); a push to main always runs them.
+  # at both its paths); a push to main always runs them. A required check on main since
+  # 2026-09-28, and the deploy waits for it.
   renderer:
     name: Renderer
     runs-on: ubuntu-24.04
@@ -310,10 +314,11 @@ jobs:
           BEFORE_SHA: ${{ github.event.before }}
         run: bash scripts/ci/lock-base.sh
 
+      # Under line coverage, with the floor in zone-a/pyproject.toml [tool.coverage.report].
       - name: Test
         env:
           DIFFERENTIAL_CORPUS: ${{ github.workspace }}/differential.jsonl
-        run: uv run --frozen pytest
+        run: uv run --frozen pytest --cov
 
   agent:
     name: Agent

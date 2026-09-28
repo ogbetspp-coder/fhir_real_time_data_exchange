@@ -148,10 +148,12 @@ jobs:
     needs: gate
     runs-on: ubuntu-24.04
     permissions:
+      actions: read
       contents: read
       id-token: write
       issues: write
-    timeout-minutes: 90
+    # 90 for the deploy itself, and up to 75 more waiting for CI's slowest job (Renderer).
+    timeout-minutes: 165
     defaults:
       run:
         shell: bash --noprofile --norc -eo pipefail {0}
@@ -235,6 +237,18 @@ jobs:
         with:
           node-version: 22.22.0
           package-manager-cache: false
+      # CI's run for this push to main must succeed, every job of it (Check, Official validation,
+      # Renderer, Images, Zone A, Agent), before anything is changed (audit B15, G-1). The gate job
+      # runs the Node checks alone, so until then a push by an administrator, or a merge while
+      # Renderer or Official validation was red, deployed unattended. The gate job ran alongside
+      # CI, so this waits only for what CI has left. A dispatch on a commit with no such run is
+      # refused (scripts/ci/workflow-runs.mjs). The job's token is given to this step by name, as
+      # to the issue steps, for the runs it reads (actions: read).
+      - name: Wait for CI on this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT: ${{ github.sha }}
+        run: node scripts/ci/workflow-runs.mjs await-ci 2>&1 | tee -a deploy-run.log
       - name: Receive the deploy's inputs from the gate job
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:

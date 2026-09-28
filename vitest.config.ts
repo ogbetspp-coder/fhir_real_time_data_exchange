@@ -22,24 +22,29 @@ export default defineConfig({
       // directory is git-, prettier-, eslint- and docker-ignored.
       reporter: ["text-summary", "json-summary"],
       reportsDirectory: "coverage",
+      // Raised to the measured figures on 2026-09-28 (audit B15): until then most floors had never
+      // moved from the commit that set them and sat 2 to 10 points below the measurement, so a
+      // change could drop that much coverage and pass. Every directory of src/ has one
+      // (test/ci/coverage.test.ts).
       thresholds: {
-        // All of src/ together, which also holds the entry points and fixtures below.
-        lines: 92,
-        statements: 90,
-        functions: 92,
-        branches: 82,
+        // All of src/ together, which also holds the entry points (server.ts, config.ts).
+        lines: 97,
+        statements: 96,
+        functions: 98,
+        branches: 90,
         "src/fidelity/**": { lines: 99, statements: 98, functions: 100, branches: 92 },
-        "src/contracts/**": { lines: 94, statements: 93, functions: 95, branches: 82 },
+        "src/contracts/**": { lines: 97, statements: 96, functions: 97, branches: 92 },
         "src/query/**": { lines: 96, statements: 93, functions: 97, branches: 86 },
         "src/fhir/**": { lines: 99, statements: 98, functions: 100, branches: 92 },
-        "src/gcp/**": { lines: 93, statements: 90, functions: 92, branches: 85 },
+        "src/gcp/**": { lines: 94, statements: 92, functions: 94, branches: 88 },
         // The run's entry points, each on its own: a gate the pipeline stops at, or a failure
         // the API classifies, that no test reaches lowers these (test/persisted-run.test.ts).
-        "src/pipeline.ts": { lines: 97, statements: 95, functions: 100, branches: 80 },
+        "src/pipeline.ts": { lines: 97, statements: 97, functions: 100, branches: 81 },
         "src/app.ts": { lines: 100, statements: 97, functions: 100, branches: 87 },
-        "src/lib/**": { lines: 90, statements: 90, functions: 100, branches: 90 },
-        "src/authority/**": { lines: 93, statements: 91, functions: 92, branches: 85 },
-        "src/render/**": { lines: 97, statements: 96, functions: 96, branches: 86 },
+        "src/lib/**": { lines: 94, statements: 94, functions: 100, branches: 91 },
+        "src/authority/**": { lines: 98, statements: 97, functions: 99, branches: 92 },
+        "src/render/**": { lines: 97, statements: 96, functions: 99, branches: 87 },
+        "src/fixtures/**": { lines: 94, statements: 94, functions: 100, branches: 80 },
       },
     },
   },
