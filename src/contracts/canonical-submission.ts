@@ -49,6 +49,13 @@ const MAX_UNVERIFIED_STRING_LENGTH = 300;
 const MAX_UNVERIFIED_WORDS = 20;
 // Aggregate budget across the whole Bundle, so many short strings cannot add up to a document.
 // The synthetic Type 2 Bundle carries ~270 strings / ~7,000 characters outside its narratives.
+// Property names count toward the character budget too, each time one is written: a key is
+// bounded by JSON_KEY to 64 characters, but thousands of distinct CamelCase keys, or a small
+// vocabulary of them repeated in order, would otherwise carry a document outside every budget.
+// Keys are not counted as strings: the synthetic Type 2 Bundle writes ~510 of them (~2,800
+// characters, ~11,200 with its strings), and a larger label proportionally more, which the
+// string count was not sized for. The word rule is not applied to a key, which the segmenter
+// reads as one word however it is cased; its bound is JSON_KEY's 64 characters.
 const MAX_UNVERIFIED_STRINGS = 3_000;
 const MAX_UNVERIFIED_TOTAL_LENGTH = 40_000;
 const JSON_KEY = /^_?[A-Za-z][A-Za-z0-9]{0,63}$/;
@@ -247,6 +254,24 @@ export type DocumentGateResult = {
   report: FidelityReport;
 };
 
+// The bounds every part of a document submission meets before anything recursive (the contract
+// walk, canonical hashing) touches it. Both gates apply them first.
+export function documentShapeIssues(input: DocumentSubmissionInput): string[] {
+  return [
+    ...jsonShapeIssues("submission", input.submission),
+    ...jsonShapeIssues("fidelityReport", input.fidelityReport),
+    ...jsonShapeIssues("sourceText", input.sourceText),
+  ];
+}
+
+// A parse is trusted only when it is the input. Every hash the gate checks and every walk it makes
+// is over the parsed value, while what is stored and recorded is the input: a member the parser
+// dropped (zod drops an own `__proto__`) would be neither hashed nor walked, and the recorded
+// proof could not be reproduced from the stored object.
+export function losslessParseIssues(name: string, input: unknown, parsed: unknown): string[] {
+  return sha256(parsed) === sha256(input) ? [] : [`${name} does not parse to the value it is`];
+}
+
 function zodIssues(error: z.ZodError): string[] {
   return error.issues.map((issue) => {
     const path = issue.path.map(String).join(".");
@@ -293,6 +318,7 @@ function unverifiedTextIssues(bundle: unknown, verifiedDivPaths: Set<string>): s
           issues.push(`Unverified free text in a property name at ${path}`);
           continue;
         }
+        totalLength += key.length;
         walk(child, path.length === 0 ? key : `${path}.${key}`);
       }
     }
@@ -302,7 +328,9 @@ function unverifiedTextIssues(bundle: unknown, verifiedDivPaths: Set<string>): s
     issues.push(`Bundle carries more than ${MAX_UNVERIFIED_STRINGS} unverified strings`);
   }
   if (totalLength > MAX_UNVERIFIED_TOTAL_LENGTH) {
-    issues.push(`Unverified strings exceed ${MAX_UNVERIFIED_TOTAL_LENGTH} characters in total`);
+    issues.push(
+      `Unverified strings and property names exceed ${MAX_UNVERIFIED_TOTAL_LENGTH} characters in total`,
+    );
   }
   return issues;
 }
@@ -401,11 +429,7 @@ export function verifyDocumentSubmission(
   sourceCodeSystem: string,
   options: GateOptions,
 ): DocumentGateResult {
-  const structural = [
-    ...jsonShapeIssues("submission", input.submission),
-    ...jsonShapeIssues("fidelityReport", input.fidelityReport),
-    ...jsonShapeIssues("sourceText", input.sourceText),
-  ];
+  const structural = documentShapeIssues(input);
   if (structural.length > 0) {
     throw new SubmissionRejectedError("Document submission rejected", structural);
   }
@@ -420,6 +444,11 @@ export function verifyDocumentSubmission(
       zodIssues(parsedReport.error).map((issue) => `fidelityReport.${issue}`),
     );
   }
+  const lossy = [
+    ...losslessParseIssues("submission", input.submission, parsed.data),
+    ...losslessParseIssues("fidelityReport", input.fidelityReport, parsedReport.data),
+  ];
+  if (lossy.length > 0) throw new SubmissionRejectedError("Document submission rejected", lossy);
   const submission = parsed.data;
   const report: FidelityReport = parsedReport.data;
   const issues: string[] = [];
@@ -510,8 +539,13 @@ export function verifyDocumentSubmission(
   );
 
   const sourceText = SourceDocumentTextSchema.safeParse(input.sourceText);
+  const sourceTextLossy = sourceText.success
+    ? losslessParseIssues("sourceText", input.sourceText, sourceText.data)
+    : [];
   if (!sourceText.success) {
     issues.push(...zodIssues(sourceText.error).map((issue) => `sourceText.${issue}`));
+  } else if (sourceTextLossy.length > 0) {
+    issues.push(...sourceTextLossy);
   } else if (sha256(sourceText.data) !== extractedText.sha256) {
     issues.push("Extracted source text does not match sourceDocument.extractedText.sha256");
   } else if (sourceText.data.extractorVersion !== extractedText.extractorVersion) {

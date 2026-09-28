@@ -1,6 +1,8 @@
 import {
   CanonicalSubmissionSchema,
   SubmissionRejectedError,
+  documentShapeIssues,
+  losslessParseIssues,
   verifyDocumentSubmission,
   type DocumentGateResult,
   type DocumentSubmissionInput,
@@ -32,9 +34,19 @@ export async function verifyAuthorityImport(
   options: GateOptions & { dryRun: boolean },
   fetcher: AuthorityFetcher,
 ): Promise<AuthorityGateResult> {
+  // The shape bound comes before the parse, whose refinement hashes the Bundle, exactly as in the
+  // ordinary gate: a pathological document is a classified rejection, never a RangeError.
+  const structural = documentShapeIssues(input);
+  if (structural.length > 0) {
+    throw new SubmissionRejectedError("Document submission rejected", structural);
+  }
   const parsed = CanonicalSubmissionSchema.safeParse(input.submission);
-  // A submission that does not parse is refused by the ordinary gate, with its own reasons.
-  if (!parsed.success) {
+  // A submission that does not parse, or parses to another value than it is, is refused by the
+  // ordinary gate, with its own reasons.
+  if (
+    !parsed.success ||
+    losslessParseIssues("submission", input.submission, parsed.data).length > 0
+  ) {
     verifyDocumentSubmission(input, mapping.sourceCodeSystem, options);
     return rejected("Canonical submission is invalid");
   }

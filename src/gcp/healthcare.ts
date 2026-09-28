@@ -340,7 +340,13 @@ export class HealthcareApiClient {
   ): Promise<T> {
     const store = this.options.SOURCE_FHIR_STORE_ID;
     if (store === undefined) throw new Error("SOURCE_FHIR_STORE_ID is required");
-    const url = `${this.#storeBase(store)}/${encodeURIComponent(resourceType)}/${encodeURIComponent(id)}`;
+    const address = `/${encodeURIComponent(resourceType)}/${encodeURIComponent(id)}`;
+    const url = `${this.#storeBase(store)}${address}`;
+    // Encoding leaves `.` and `..` as they are, and the URL parser resolves them: `Bundle/..` would
+    // read the store itself. The id must name the resource, so the resolved path must end with it.
+    if (!new URL(url).pathname.endsWith(address)) {
+      throw new Error("A source resource id must be a single path segment");
+    }
     return this.#request<T>("read-source", url, runId);
   }
 
