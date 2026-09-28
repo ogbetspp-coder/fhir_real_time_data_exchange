@@ -10,16 +10,25 @@ ran against. Read ``deploy/README.md`` before using this: the Agent Engine deplo
 five steps, and the other four are console and Terraform work.
 
     AGENT_ENGINE_PROJECT=... AGENT_ENGINE_LOCATION=... AGENT_ENGINE_STAGING_BUCKET=gs://... \
-    QUERY_SERVICE_MCP_URL=... AGENT_MODEL=... AGENT_SERVICE_VERSION=... \
+    QUERY_SERVICE_MCP_URL=... AGENT_MODEL=... \
     uv run --frozen python deploy/deploy_agent_engine.py --dry-run
+
+``AGENT_SERVICE_VERSION`` is not typed by the operator: it is derived as
+``agent/<package version>+<commit>``, and the script refuses to package an ``agent/`` tree that
+differs from its commit, so the version on every audit record names the code that wrote it
+(audit AG-9: the deployed build was once typed by hand and predated the fixes it was assumed to
+carry).
 """
 
 from __future__ import annotations
 
 import argparse
+import io
 import os
 import subprocess
 import sys
+import tarfile
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -36,10 +45,22 @@ REQUIRED_ENV = (
     # deployed agent reads them the same way the local one does.
     "QUERY_SERVICE_MCP_URL",
     "AGENT_MODEL",
-    "AGENT_SERVICE_VERSION",
 )
 
+# Passed through when set; AGENT_SERVICE_VERSION is always set, by this script.
 RUNTIME_ENV = ("QUERY_SERVICE_MCP_URL", "AGENT_MODEL", "AGENT_SERVICE_VERSION")
+OPTIONAL_RUNTIME_ENV = ("MCP_TIMEOUT_SECONDS",)
+
+# A Secret Manager secret in the agent's project holding the key the audit record's
+# principalDigest is made under. Optional: without it a withheld (e-mail) session user is not
+# identified in the agent's record at all. Passed as a secret reference, never as a value, so the
+# key is neither in this process nor in the engine's configuration; the runtime's identity needs
+# roles/secretmanager.secretAccessor on it.
+PRINCIPAL_DIGEST_SECRET = "AGENT_PRINCIPAL_DIGEST_SECRET"
+# The service account the engine runs as. Optional: without it Agent Engine uses the project's
+# shared Reasoning Engine service agent, which also mints the agent's Cloud Run edge token, so
+# anything else deployed on Agent Engine in the project could reach the query service's edge too.
+SERVICE_ACCOUNT = "AGENT_ENGINE_SERVICE_ACCOUNT"
 
 # The deploy-time SDK, and also a runtime requirement: the runtime loads the AdkApp wrapper this
 # script builds, and AdkApp is how Gemini Enterprise's calls arrive (its
@@ -123,8 +144,12 @@ def requirements_from_lock() -> list[str]:
 def read_environment() -> dict[str, str]:
     """The deploy settings, every variable in ``REQUIRED_ENV`` read from the environment.
 
+    The optional ones (``OPTIONAL_RUNTIME_ENV``, ``AGENT_PRINCIPAL_DIGEST_SECRET``,
+    ``AGENT_ENGINE_SERVICE_ACCOUNT``) are included when set.
+
     Raises:
-        SystemExit: A variable is unset or blank, or the staging bucket is not a ``gs://`` URL.
+        SystemExit: A variable is unset or blank, the staging bucket is not a ``gs://`` URL, or
+            ``AGENT_SERVICE_VERSION`` is set (it is derived, never typed).
     """
     missing = [name for name in REQUIRED_ENV if not os.environ.get(name, "").strip()]
     if missing:
@@ -133,15 +158,95 @@ def read_environment() -> dict[str, str]:
             + ", ".join(missing)
             + ". There is no default project, region, or bucket."
         )
+    if os.environ.get("AGENT_SERVICE_VERSION", "").strip():
+        raise SystemExit(
+            "refusing to deploy: unset AGENT_SERVICE_VERSION. It is derived from the package "
+            "version and the commit, so it always names the code that is deployed."
+        )
     settings = {name: os.environ[name].strip() for name in REQUIRED_ENV}
+    for name in (*OPTIONAL_RUNTIME_ENV, PRINCIPAL_DIGEST_SECRET, SERVICE_ACCOUNT):
+        value = os.environ.get(name, "").strip()
+        if value:
+            settings[name] = value
     bucket = settings["AGENT_ENGINE_STAGING_BUCKET"]
     if not bucket.startswith("gs://"):
         raise SystemExit("AGENT_ENGINE_STAGING_BUCKET must start with gs://")
     return settings
 
 
-def build_config(settings: dict[str, str], resource_name: str | None) -> dict[str, Any]:
-    """The ``config`` argument for ``client.runtimes.create`` / ``.update``."""
+def _git(*arguments: str) -> str:
+    return subprocess.run(
+        ["git", *arguments], cwd=AGENT_ROOT, check=True, capture_output=True, text=True
+    ).stdout
+
+
+# The branch a deployed commit must already be on: what is deployed has been through the merge
+# gate. Read from the local remote-tracking ref, so fetch before deploying.
+RELEASED_REF = "origin/main"
+
+
+def service_version() -> str:
+    """``agent/<package version>+<commit>``, for a clean ``agent/`` tree at a released commit.
+
+    Raises:
+        SystemExit: Anything under ``agent/`` differs from the commit (modified, staged or
+            untracked, ignored files aside — the upload is taken from the commit itself, see
+            ``export_package``), the commit is not on ``origin/main``, or it cannot be read.
+    """
+    try:
+        dirty = _git("status", "--porcelain", "--untracked-files=all", "--", ".").strip()
+        commit = _git("rev-parse", "HEAD").strip()
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise SystemExit(f"refusing to deploy: cannot read the commit ({error})") from None
+    if dirty:
+        raise SystemExit(
+            "refusing to deploy: agent/ differs from its commit, so the deployed code would not "
+            "be the code the version names. Commit or remove:\n" + dirty
+        )
+    try:
+        _git("merge-base", "--is-ancestor", commit, RELEASED_REF)
+    except OSError, subprocess.CalledProcessError:
+        raise SystemExit(
+            f"refusing to deploy: {commit[:12]} is not on {RELEASED_REF}. Deploy a merged commit "
+            "(git fetch first, so the local ref is current)."
+        ) from None
+    from verifiable_answer_agent import __version__
+
+    return f"agent/{__version__}+{commit}"
+
+
+def export_package(commit: str, destination: Path) -> Path:
+    """The package exactly as ``commit`` holds it, written under ``destination``; its parent.
+
+    ``git archive`` of ``agent/src/verifiable_answer_agent`` at the commit: no ignored file
+    (``__pycache__``, a stray ``.pyc``), no untracked file and no edit reaches the upload, which
+    a clean ``git status`` alone cannot promise (review of PR #129, L4).
+    """
+    root = Path(_git("rev-parse", "--show-toplevel").strip())
+    archive = subprocess.run(
+        ["git", "archive", "--format=tar", f"{commit}:agent/src", "verifiable_answer_agent"],
+        cwd=root,
+        check=True,
+        capture_output=True,
+    ).stdout
+    with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
+        tar.extractall(destination, filter="data")
+    return destination
+
+
+def build_config(settings: dict[str, str]) -> dict[str, Any]:
+    """The ``config`` argument for ``client.runtimes.create`` / ``.update``.
+
+    ``settings`` must carry ``AGENT_SERVICE_VERSION`` (``service_version``).
+    """
+    env_vars: dict[str, Any] = {name: settings[name] for name in RUNTIME_ENV}
+    env_vars.update({name: settings[name] for name in OPTIONAL_RUNTIME_ENV if name in settings})
+    if PRINCIPAL_DIGEST_SECRET in settings:
+        # A reference Agent Engine resolves at run time: the key never passes through here.
+        env_vars["AGENT_PRINCIPAL_DIGEST_KEY"] = {
+            "secret": settings[PRINCIPAL_DIGEST_SECRET],
+            "version": "latest",
+        }
     config: dict[str, Any] = {
         "display_name": "Verifiable-answer agent",
         "description": (
@@ -150,14 +255,15 @@ def build_config(settings: dict[str, str], resource_name: str | None) -> dict[st
         ),
         "staging_bucket": settings["AGENT_ENGINE_STAGING_BUCKET"],
         "requirements": [*requirements_from_lock(), AGENT_PLATFORM_SDK, AIPLATFORM, CLOUDPICKLE],
-        # Relative, and main() runs the upload from src/: the SDK archives each extra package by
+        # Relative, and main() runs the upload from an exported src/: the SDK archives each one by
         # the path as given (``tar.add(path)``), so an absolute path would nest the code under the
         # deploying machine's home directory and the runtime could not import it.
         "extra_packages": ["verifiable_answer_agent"],
         "python_version": PYTHON_VERSION,
-        "env_vars": {name: settings[name] for name in RUNTIME_ENV},
+        "env_vars": env_vars,
     }
-    del resource_name  # update takes the name as its own argument, not in the config
+    if SERVICE_ACCOUNT in settings:
+        config["service_account"] = settings[SERVICE_ACCOUNT]
     return config
 
 
@@ -192,12 +298,26 @@ def main(argv: list[str]) -> int:
     arguments = parser.parse_args(argv[1:])
 
     settings = read_environment()
-    config = build_config(settings, arguments.update)
+    settings["AGENT_SERVICE_VERSION"] = service_version()
+    # The agent is built from this process's environment below and pickled with its version.
+    os.environ["AGENT_SERVICE_VERSION"] = settings["AGENT_SERVICE_VERSION"]
+    config = build_config(settings)
 
+    print(f"service version   {settings['AGENT_SERVICE_VERSION']}")
     print(f"project           {settings['AGENT_ENGINE_PROJECT']}")
     print(f"location          {settings['AGENT_ENGINE_LOCATION']}")
     print(f"staging bucket    {settings['AGENT_ENGINE_STAGING_BUCKET']}")
     print(f"python            {PYTHON_VERSION}")
+    runs_as = settings.get(SERVICE_ACCOUNT, "the shared Reasoning Engine service agent")
+    print(f"runs as           {runs_as}")
+    print(
+        "principal digest  "
+        + (
+            f"keyed by secret {settings[PRINCIPAL_DIGEST_SECRET]}"
+            if PRINCIPAL_DIGEST_SECRET in settings
+            else "off: an e-mail session user is withheld and not identified"
+        )
+    )
     print(f"requirements      {len(config['requirements']) - 3} pinned from uv.lock, plus the SDKs")
     check_resolves(config["requirements"])
     print(f"resolves          yes, for {BUILD_PLATFORM} / Python {PYTHON_VERSION}")
@@ -225,7 +345,11 @@ def main(argv: list[str]) -> int:
     from verifiable_answer_agent.config import AgentConfig
 
     app = AdkApp(agent=build_agent(AgentConfig.from_env()))
-    os.chdir(AGENT_ROOT / "src")  # see extra_packages in build_config
+    # The upload runs from a copy of the package as the commit holds it, not from the working
+    # tree (see extra_packages in build_config, and export_package).
+    upload_root = Path(tempfile.mkdtemp(prefix="agent-upload-"))
+    commit = settings["AGENT_SERVICE_VERSION"].rsplit("+", 1)[1]
+    os.chdir(export_package(commit, upload_root))
     client = agentplatform.Client(
         project=settings["AGENT_ENGINE_PROJECT"], location=settings["AGENT_ENGINE_LOCATION"]
     )

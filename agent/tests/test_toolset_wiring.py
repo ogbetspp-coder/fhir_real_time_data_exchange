@@ -80,29 +80,29 @@ async def test_a_missing_token_fails_the_call_closed(query_service: FakeQuerySer
     assert query_service.seen_authorization == []
 
 
-def test_the_header_provider_refuses_a_blank_token() -> None:
+async def test_the_header_provider_refuses_a_blank_token() -> None:
     for token in ("", "   "):
         context = invocation_context(token=token)
         with pytest.raises(MissingUserTokenError):
-            bearer_header_provider(ReadonlyContext(context))
+            await bearer_header_provider(ReadonlyContext(context))
 
 
-def test_the_header_provider_is_the_only_source_of_the_header() -> None:
-    headers = bearer_header_provider(ReadonlyContext(invocation_context()))
+async def test_the_header_provider_is_the_only_source_of_the_header() -> None:
+    headers = await bearer_header_provider(ReadonlyContext(invocation_context()))
     assert headers == {"Authorization": f"Bearer {TEST_TOKEN}"}
 
 
 TURN_ID = "0f6b3a2e-4c1d-4e8f-9a7b-1c2d3e4f5a6b"
 
 
-def test_a_context_carrying_a_turn_id_sends_it_with_the_token() -> None:
-    headers = bearer_header_provider(ReadonlyContext(invocation_context(turn_id=TURN_ID)))
+async def test_a_context_carrying_a_turn_id_sends_it_with_the_token() -> None:
+    headers = await bearer_header_provider(ReadonlyContext(invocation_context(turn_id=TURN_ID)))
     assert headers == {"Authorization": f"Bearer {TEST_TOKEN}", TURN_ID_HEADER: TURN_ID}
 
 
-def test_a_context_without_a_turn_id_sends_the_token_alone() -> None:
+async def test_a_context_without_a_turn_id_sends_the_token_alone() -> None:
     # The service accepts a call without the header; nothing is invented to fill it.
-    headers = bearer_header_provider(ReadonlyContext(invocation_context()))
+    headers = await bearer_header_provider(ReadonlyContext(invocation_context()))
     assert TURN_ID_HEADER not in headers
     assert current_turn_id(ReadonlyContext(invocation_context())) is None
 
@@ -110,24 +110,24 @@ def test_a_context_without_a_turn_id_sends_the_token_alone() -> None:
 @pytest.mark.parametrize(
     "planted", ["synthetic-turn", "", 7, "0F6B3A2E-4C1D-4E8F-9A7B-1C2D3E4F5A6B "]
 )
-def test_a_turn_id_that_is_not_a_uuid_fails_the_call_closed(planted: object) -> None:
+async def test_a_turn_id_that_is_not_a_uuid_fails_the_call_closed(planted: object) -> None:
     with pytest.raises(InvalidTurnIdError):
-        bearer_header_provider(ReadonlyContext(invocation_context(turn_id=planted)))
+        await bearer_header_provider(ReadonlyContext(invocation_context(turn_id=planted)))
 
 
-def test_the_missing_token_is_checked_before_the_turn_id() -> None:
+async def test_the_missing_token_is_checked_before_the_turn_id() -> None:
     with pytest.raises(MissingUserTokenError):
-        bearer_header_provider(ReadonlyContext(invocation_context(token=None, turn_id="bad")))
+        await bearer_header_provider(ReadonlyContext(invocation_context(token=None, turn_id="bad")))
 
 
-def test_begin_turn_puts_a_fresh_uuid_in_state_that_the_header_provider_then_sends() -> None:
+async def test_begin_turn_puts_a_fresh_uuid_in_state_that_the_header_provider_then_sends() -> None:
     context = invocation_context()
     assert TURN_ID_STATE_KEY not in context.session.state
     assert begin_turn(CallbackContext(context)) is None
     first = current_turn_id(ReadonlyContext(context))
     assert first is not None
     assert str(uuid.UUID(first)) == first
-    assert bearer_header_provider(ReadonlyContext(context))[TURN_ID_HEADER] == first
+    assert (await bearer_header_provider(ReadonlyContext(context)))[TURN_ID_HEADER] == first
     # A second turn is a second id.
     begin_turn(CallbackContext(context))
     assert current_turn_id(ReadonlyContext(context)) != first

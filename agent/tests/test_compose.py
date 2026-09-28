@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from verifiable_answer_agent.compose import compose
-from verifiable_answer_agent.contract import ToolResult, validate_tool_output
+from verifiable_answer_agent.compose import MAX_BLOCKS, compose, product_facts
+from verifiable_answer_agent.contract import ToolResult, sha256_hex, validate_tool_output
 
-from .fake_query_service import load_sections
+from .fake_query_service import BUNDLE_ID, VERSION_ID, load_sections
 
 SECTIONS = load_sections()
 KEYS = ["smpc.4.3", "smpc.4.4", "smpc.4.2.posology"]
@@ -71,3 +71,61 @@ def test_a_result_from_another_tool_never_becomes_a_block() -> None:
     composition = compose([provenance], "")
     assert composition.draft.blocks == ()
     assert composition.sections_dropped == 1
+
+
+def test_each_block_carries_the_hash_of_its_own_xhtml_and_its_text_hash() -> None:
+    # The post-check holds the checksum a reader is shown to the XHTML the tool returned.
+    for key, block in zip(KEYS, compose(results_for(KEYS), "").draft.blocks, strict=True):
+        payload = SECTIONS[key].payload
+        assert block.div_sha256 == sha256_hex(payload["div"])
+        assert block.citation.normalized_text_sha256 == payload["normalizedTextSha256"]
+
+
+def _find_product(name: str, language: str, version_id: str = VERSION_ID) -> ToolResult:
+    return ToolResult(
+        tool="find_product",
+        value={
+            "products": [
+                {
+                    "document": {
+                        "bundleId": BUNDLE_ID,
+                        "versionId": version_id,
+                        "lastUpdated": "2026-09-19T00:00:00Z",
+                    },
+                    "productName": name,
+                    "identifiers": [],
+                    "language": language,
+                    "sections": [],
+                }
+            ],
+            "truncated": False,
+        },
+        reason=None,
+    )
+
+
+def test_the_product_and_language_come_from_this_turns_lookup_of_the_same_version() -> None:
+    facts = product_facts([_find_product("Synthetic 10 mg tablets", "en")])
+    (block,) = compose(results_for(["smpc.4.3"]), "", facts).draft.blocks
+    assert (block.citation.product_name, block.citation.language) == (
+        "Synthetic 10 mg tablets",
+        "en",
+    )
+
+
+def test_a_lookup_of_another_version_or_two_disagreeing_lookups_name_nothing() -> None:
+    other_version = product_facts([_find_product("Synthetic 10 mg tablets", "en", "99")])
+    disagreeing = product_facts(
+        [_find_product("Synthetic 10 mg tablets", "en"), _find_product("Other", "de")]
+    )
+    for facts in (other_version, disagreeing, {}):
+        (block,) = compose(results_for(["smpc.4.3"]), "", facts).draft.blocks
+        assert (block.citation.product_name, block.citation.language) == (None, None)
+
+
+def test_at_most_max_blocks_are_shown_and_the_rest_are_counted() -> None:
+    keys = sorted(SECTIONS)[: MAX_BLOCKS + 3]
+    composition = compose(results_for(keys), "")
+    assert len(composition.draft.blocks) == MAX_BLOCKS
+    assert composition.sections_not_shown == 3
+    assert composition.draft.sections_not_shown == 3

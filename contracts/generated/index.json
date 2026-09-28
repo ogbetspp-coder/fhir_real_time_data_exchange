@@ -38,17 +38,17 @@
     },
     {
       "name": "query-tools",
-      "version": "2.0.1",
-      "$id": "https://khs.dev/contracts/query-tools/2.0.1/schema.json",
+      "version": "4.0.0",
+      "$id": "https://khs.dev/contracts/query-tools/4.0.0/schema.json",
       "file": "query-tools.schema.json",
-      "sha256": "8a15547165246a44318c6bea86c144bbf582f2863a8999d23d76bf0dd6aba8e8"
+      "sha256": "a11016b32f5c28cc6e0afc1b0dfd68a15af35d20169afb0225407fbdcf3382a4"
     },
     {
       "name": "agent-turn",
-      "version": "1.0.0",
-      "$id": "https://khs.dev/contracts/agent-turn/1.0.0/schema.json",
+      "version": "1.1.0",
+      "$id": "https://khs.dev/contracts/agent-turn/1.1.0/schema.json",
       "file": "agent-turn.schema.json",
-      "sha256": "7e568a5b2206f3c9bae42c1ec3163c3a880a3d1af709d037ef1b8efbd0548c6d"
+      "sha256": "22f8a86f956971da9a30e8d9b79dc3a3bfca8dd20079e5bf726b6fd3a767bba6"
     },
     {
       "name": "run-manifest",

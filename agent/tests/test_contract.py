@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import itertools
 import json
+import time
 from pathlib import Path
 
 import pytest
@@ -12,6 +14,7 @@ from verifiable_answer_agent.contract import (
     AGENT_TURN_RESOURCE,
     CONTRACT_RESOURCE,
     VERIFY_QUOTE_MAX_UTF16,
+    chunk_spans,
     load_agent_turn_schema,
     load_schema,
     split_for_verification,
@@ -21,6 +24,7 @@ from verifiable_answer_agent.contract import (
 from verifiable_answer_agent.quote_edge import (
     edge_after,
     edge_before,
+    has_scanner_marker,
     locate_quote,
     number_before,
     number_from,
@@ -39,8 +43,8 @@ def test_each_vendored_contract_is_the_published_one(name: str) -> None:
 
 
 def test_the_two_schemas_are_the_versions_the_agent_was_adapted_to() -> None:
-    assert load_schema()["$id"].endswith("/query-tools/2.0.1/schema.json")
-    assert load_agent_turn_schema()["$id"].endswith("/agent-turn/1.0.0/schema.json")
+    assert load_schema()["$id"].endswith("/query-tools/4.0.0/schema.json")
+    assert load_agent_turn_schema()["$id"].endswith("/agent-turn/1.1.0/schema.json")
 
 
 def test_not_entitled_is_no_longer_an_error_code_a_caller_can_see() -> None:
@@ -143,12 +147,73 @@ def test_a_cut_never_falls_inside_a_space_grouped_number() -> None:
     assert all(locate_quote(text, chunk) is not None for chunk in chunks)
 
 
+def test_the_spans_are_where_the_chunks_sit_and_tile_the_block() -> None:
+    # The post-check holds each match to these offsets, so they must be exact: code points into
+    # the block, in order, nothing between them but the spaces the cuts dropped.
+    text = "  " + " ".join(f"word{index:04d}" for index in range(300)) + " "
+    spans = chunk_spans(text, limit=100)
+    assert spans[0][0] == 2
+    assert spans[-1][1] == len(text) - 1
+    for (_, end), (start, _) in itertools.pairwise(spans):
+        assert end < start
+        assert set(text[end:start]) == {" "}
+    assert tuple(text[start:end] for start, end in spans) == split_for_verification(text, 100)
+
+
+def test_the_chunks_are_evened_out_rather_than_ending_in_a_sliver() -> None:
+    # A block just over one window used to be one full chunk and a few words; a few words are the
+    # chunk most likely to occur earlier in the section too (review of PR #129, L7).
+    text = " ".join(f"word{index:04d}" for index in range(24))
+    assert utf16_length(text) == 215
+    # Cut at the last space of a 200-unit window, the second chunk was "word0022 word0023".
+    chunks = split_for_verification(text, limit=200)
+    assert len(chunks) == 2
+    assert min(len(chunk) for chunk in chunks) > len("word0022 word0023")
+    assert abs(len(chunks[0]) - len(chunks[1])) <= 10
+    long_chunks = split_for_verification(long_section().text)
+    lengths = [utf16_length(chunk) for chunk in long_chunks]
+    assert max(lengths) - min(lengths) < VERIFY_QUOTE_MAX_UTF16 // 4
+
+
+def test_at_the_real_bound_every_chunk_is_found_where_it_was_cut() -> None:
+    # The exact-offset rule fails closed when a chunk's text also occurs earlier in its section
+    # (review of PR #129). Over every text the fixtures hold, at the contract's bound, no sendable
+    # chunk does. (At windows of a few hundred units some would: short chunks repeat.)
+    texts = [section["text"] for section in quote_edge_cases()["sections"]]
+    texts.append(long_section().text)
+    texts.extend(section.text for section in load_sections().values())
+    checked = 0
+    for text in texts:
+        for start, end in chunk_spans(text):
+            chunk = text[start:end]
+            if utf16_length(chunk) > VERIFY_QUOTE_MAX_UTF16 or has_scanner_marker(chunk):
+                continue
+            checked += 1
+            assert locate_quote(text, chunk) == (start, end), chunk[:60]
+    assert checked > 50
+
+
+def test_a_pathological_block_splits_in_linear_time() -> None:
+    # 200,000 code points of "( ". The splitter used to walk back up to 256 steps from every
+    # space, give up, count the walk as a sign, and so refuse every cut and re-measure the rest
+    # each time (21.9 s, audit AG-12). Read once, exactly, no sign stands before any of these
+    # spaces — which is what the service reads too — so each window is cut at its last space.
+    text = "( " * 100_000
+    started = time.monotonic()
+    spans = chunk_spans(text)
+    assert time.monotonic() - started < 5.0
+    assert len(spans) == 100
+    assert all(end - start <= VERIFY_QUOTE_MAX_UTF16 for start, end in spans)
+
+
 def test_a_cut_never_parts_a_spaced_comparator_from_its_number() -> None:
     # "…CrCl ≥" | "30 ml/min." was the other: the last space in a window of 29 is after "≥",
     # and the second half has lost its comparator.
     text = "Reduce the dose when CrCl ≥ 30 ml/min."
     chunks = split_for_verification(text, limit=29)
-    assert chunks == ("Reduce the dose when CrCl", "≥ 30 ml/min.")
+    # Evened out, the cut moves to before "CrCl"; it still never falls after the comparator.
+    assert chunks == ("Reduce the dose when", "CrCl ≥ 30 ml/min.")
+    assert not any(chunk.endswith("≥") for chunk in chunks)
     assert all(locate_quote(text, chunk) is not None for chunk in chunks)
 
 
@@ -157,7 +222,8 @@ def test_every_chunk_of_every_worked_example_is_one_the_service_confirms() -> No
     # each chunk within the bound is a match under that rule, and a chunk over the bound exists
     # only where the window held no acceptable cut.
     # A text carrying a table's grid markers is left out: the service refuses any quote holding
-    # one (``invalid-request``), so no chunk of it is ever sent, and quoting a table is the
+    # one (``invalid-request``), so ``postcheck.run_post_check`` does not send such a chunk and
+    # flags the block ``table-not-quotable`` (tests/test_postcheck.py); quoting a table is the
     # publishing step's work (roadmap 3a, PR 5).
     texts = [
         section["text"]

@@ -401,6 +401,8 @@ order.
 - [`fidelity-norm/3.0.0` → `fidelity-norm/3.1.0`, 2026-09-24](changes/2026-09-24-fidelity-norm-3-1-0.md)
 - [The authority importer's T, importer 2.0.0, 2026-09-24](changes/2026-09-24-authority-import-t.md)
 - [Run manifest 3.0.0 and the persisted run's commit order, 2026-09-27](changes/2026-09-27-run-manifest-3-0-0.md)
+- [`query-tools` 3.0.0 and an iterative `canonicalJson`, 2026-09-27](changes/2026-09-27-query-tools-3-0-0.md)
+- [`query-tools` 4.0.0 and `agent-turn` 1.1.0, 2026-09-27](changes/2026-09-27-query-tools-4-0-0-agent-turn-1-1-0.md)
 - [The document gate's lossless parse and key budget, `RunRequest` 2.0.0, importer 2.1.1, 2026-09-28](changes/2026-09-28-document-gate-and-run-request-2-0-0.md)
 - [The fidelity proof's hardening, the `codePoints` vectors, importer 2.1.2, 2026-09-28](changes/2026-09-28-fidelity-proof-hardening-importer-2-1-2.md)
 - [The importer's hardening, importer 2.2.0, 2026-09-28](changes/2026-09-28-importer-hardening-2-2-0.md)

@@ -63,12 +63,15 @@ describe("json shape bounds", () => {
     ]);
   });
 
-  // The bound has to hold before hashing, because canonical hashing is recursive.
-  it("refuses deep input that would otherwise overflow the canonical hasher", () => {
+  // The bound holds before hashing. Canonical hashing was recursive and overflowed at this
+  // depth; it is iterative since 2026-09-27 and no longer does, so the bound is the
+  // classification — a named rejection rather than an arbitrarily deep document accepted —
+  // and no longer the only thing between such a value and a RangeError.
+  it("refuses deep input the canonical hasher could take", () => {
     let nested: unknown = "x";
     for (let depth = 0; depth < 20_000; depth += 1) nested = [nested];
 
     expect(jsonShapeIssues("doc", nested)).toEqual(["doc nesting exceeds depth 48"]);
-    expect(() => sha256(nested)).toThrow(RangeError);
+    expect(sha256(nested)).toMatch(/^[0-9a-f]{64}$/);
   });
 });

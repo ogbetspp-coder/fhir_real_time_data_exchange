@@ -10,7 +10,7 @@ from __future__ import annotations
 import contextlib
 import time
 from collections.abc import AsyncIterator, Sequence
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from google.adk.agents.readonly_context import ReadonlyContext
@@ -23,6 +23,7 @@ from verifiable_answer_agent.contract import ToolResult
 from verifiable_answer_agent.postcheck import VerifyQuote
 from verifiable_answer_agent.tools import (
     TURN_ID_STATE_KEY,
+    ToolCallLog,
     build_query_toolset,
     read_tool_result,
     record_for,
@@ -37,7 +38,12 @@ TURN_ID = "0f6b3a2e-4c1d-4e8f-9a7b-1c2d3e4f5a6b"
 
 
 class Wiring:
-    """Holds the toolset, the ADK contexts, and the calls made, for one test."""
+    """Holds the toolset, the ADK contexts, and the calls made, for one test.
+
+    This is the tests' own wiring of ``answer_turn``, not the deployed agent's: that the deployed
+    turn records every call it makes is asserted on the record ``finish_turn`` emits
+    (``tests/test_finish_turn.py``, ``tests/test_turn_events.py``).
+    """
 
     def __init__(self, toolset: McpToolset, tools: dict[str, BaseTool], context: Any) -> None:
         self.toolset = toolset
@@ -176,3 +182,52 @@ async def test_a_section_the_contract_refuses_never_reaches_the_answer() -> None
     assert "schema-invalid" in {call.outcome for call in turn.audit.tools}
     assert isinstance(turn.rendered, str)
     assert "smpc.4.3" not in turn.rendered
+
+
+# --- the counts and the log (audit AG-5) --------------------------------------------------
+
+
+def test_each_count_is_the_one_the_service_records() -> None:
+    started = time.monotonic()
+    match = ToolResult(tool="verify_quote", value={"result": "match"}, reason=None)
+    no_match = ToolResult(tool="verify_quote", value={"result": "no-match"}, reason=None)
+    products = ToolResult(tool="find_product", value={"products": [{}, {}, {}]}, reason=None)
+    section = ToolResult(tool="get_section", value={"sourceKey": "smpc.4.3"}, reason=None)
+    failed = ToolResult(tool="get_section", value=None, reason="tool-error")
+    assert record_for("verify_quote", match, started).result_count == 1
+    # Until 2026-09-27 a no-match counted 1, where the service records 0.
+    assert record_for("verify_quote", no_match, started).result_count == 0
+    assert record_for("find_product", products, started).result_count == 3
+    assert record_for("get_section", section, started).result_count == 1
+    assert record_for("get_section", failed, started).result_count == 0
+
+
+class _NamedTool:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+
+class _Call:
+    def __init__(self, invocation_id: str, call_id: str) -> None:
+        self.invocation_id = invocation_id
+        self.function_call_id = call_id
+
+
+def test_the_log_times_each_call_and_keeps_turns_apart() -> None:
+    log = ToolCallLog()
+    tool, other = cast(Any, _NamedTool("get_section")), cast(Any, _NamedTool("not_a_query_tool"))
+    first, second = cast(Any, _Call("turn-a", "call-1")), cast(Any, _Call("turn-b", "call-1"))
+    response = {"isError": True, "content": []}
+    assert log.before_tool(tool, {"sourceKey": "x"}, first) is None
+    assert log.before_tool(other, {}, first) is None
+    time.sleep(0.01)
+    assert log.after_tool(tool, {"sourceKey": "x"}, first, response) is None
+    assert log.after_tool(other, {}, first, response) is None
+    log.before_tool(tool, {}, second)
+    assert log.on_tool_error(tool, {}, second, RuntimeError("a message")) is None
+    (call,) = log.take("turn-a")
+    assert (call.tool, call.outcome, call.result_count) == ("get_section", "tool-error", 0)
+    assert call.duration_ms >= 10
+    (failed,) = log.take("turn-b")
+    assert failed.outcome == "transport-error"
+    assert log.take("turn-a") == ()

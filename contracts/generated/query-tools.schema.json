@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://khs.dev/contracts/query-tools/2.0.1/schema.json",
+  "$id": "https://khs.dev/contracts/query-tools/4.0.0/schema.json",
   "$ref": "#/$defs/QueryTools",
   "$defs": {
     "QueryTools": {
@@ -8,7 +8,7 @@
       "properties": {
         "version": {
           "type": "string",
-          "const": "2.0.1"
+          "const": "4.0.0"
         },
         "tools": {
           "type": "object",
@@ -136,7 +136,7 @@
               },
               "value": {
                 "type": "string",
-                "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+                "pattern": "^[A-Za-z0-9._:/-]{1,128}$"
               }
             },
             "required": ["system", "value"],
@@ -440,53 +440,101 @@
       "additionalProperties": false
     },
     "QuoteVerification": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "document": {
+              "$ref": "#/$defs/DocumentRef"
+            },
+            "normalizationVersion": {
+              "$ref": "#/$defs/NormalizationVersion"
+            },
+            "quoteSha256": {
+              "$ref": "#/$defs/Sha256Hex"
+            },
+            "result": {
+              "type": "string",
+              "const": "match"
+            },
+            "sectionsSearched": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "match": {
+              "$ref": "#/$defs/QuoteMatch"
+            }
+          },
+          "required": [
+            "document",
+            "normalizationVersion",
+            "quoteSha256",
+            "result",
+            "sectionsSearched",
+            "match"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "document": {
+              "$ref": "#/$defs/DocumentRef"
+            },
+            "normalizationVersion": {
+              "$ref": "#/$defs/NormalizationVersion"
+            },
+            "quoteSha256": {
+              "$ref": "#/$defs/Sha256Hex"
+            },
+            "result": {
+              "type": "string",
+              "const": "no-match"
+            },
+            "sectionsSearched": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "match": {
+              "not": {}
+            }
+          },
+          "required": [
+            "document",
+            "normalizationVersion",
+            "quoteSha256",
+            "result",
+            "sectionsSearched"
+          ],
+          "additionalProperties": false
+        }
+      ],
+      "description": "Mechanical answer to 'is this quote what the label says?': match with the section and code-point offsets, or no-match. A match is a contiguous slice of the normalised section text whose edges fall on boundaries: never inside a word, never at punctuation joined to a number or word (a decimal point, a slash, a sign, an apostrophe). It proves the words the quote contains, not that nothing follows them. A match always carries its location, startOffset before endOffset, and has searched at least one section; a no-match carries no location. Never a paraphrase, never a suggestion."
+    },
+    "QuoteMatch": {
       "type": "object",
       "properties": {
-        "document": {
-          "$ref": "#/$defs/DocumentRef"
+        "sourceKey": {
+          "$ref": "#/$defs/SourceKey"
         },
-        "result": {
-          "type": "string",
-          "enum": ["match", "no-match"]
-        },
-        "normalizationVersion": {
-          "$ref": "#/$defs/NormalizationVersion"
-        },
-        "quoteSha256": {
-          "$ref": "#/$defs/Sha256Hex"
-        },
-        "sectionsSearched": {
+        "startOffset": {
           "type": "integer",
           "minimum": 0,
           "maximum": 9007199254740991
         },
-        "match": {
-          "type": "object",
-          "properties": {
-            "sourceKey": {
-              "$ref": "#/$defs/SourceKey"
-            },
-            "startOffset": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 9007199254740991
-            },
-            "endOffset": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 9007199254740991
-            },
-            "normalizedTextSha256": {
-              "$ref": "#/$defs/Sha256Hex"
-            }
-          },
-          "required": ["sourceKey", "startOffset", "endOffset", "normalizedTextSha256"],
-          "additionalProperties": false
+        "endOffset": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "normalizedTextSha256": {
+          "$ref": "#/$defs/Sha256Hex"
         }
       },
-      "required": ["document", "result", "normalizationVersion", "quoteSha256", "sectionsSearched"],
-      "additionalProperties": false,
-      "description": "Mechanical answer to 'is this quote what the label says?': match with the section and code-point offsets, or no-match. A match is a contiguous slice of the normalised section text whose edges fall on boundaries: never inside a word, never at punctuation joined to a number or word (a decimal point, a slash, a sign, an apostrophe). It proves the words the quote contains, not that nothing follows them. Never a paraphrase, never a suggestion."
+      "required": ["sourceKey", "startOffset", "endOffset", "normalizedTextSha256"],
+      "additionalProperties": false
     },
     "QueryError": {
       "type": "object",
@@ -499,7 +547,8 @@
         }
       },
       "required": ["tool", "error"],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "A failed call: `isError: true` and one text content item that is exactly `error`, one of the closed codes. No structured content, no message, no detail."
     },
     "QueryToolName": {
       "type": "string",
@@ -567,6 +616,10 @@
         },
         "turnId": {
           "$ref": "#/$defs/Uuid"
+        },
+        "degraded": {
+          "type": "string",
+          "enum": ["arguments-unhashable", "record-rejected"]
         }
       },
       "required": [

@@ -43,34 +43,34 @@ def test_the_audience_is_the_services_own_url() -> None:
     )
 
 
-def test_both_credentials_are_sent_and_the_user_is_the_authorization(
+async def test_both_credentials_are_sent_and_the_user_is_the_authorization(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(tools, "edge_auth_token", lambda _audience: "edge-token")
-    headers = tools.bearer_header_provider(
+    headers = await tools.bearer_header_provider(
         _context({tools.USER_TOKEN_STATE_KEY: "user-token"}), audience="https://svc.run.app"
     )
     assert headers["Authorization"] == "Bearer user-token"
     assert headers[tools.EDGE_AUTH_HEADER] == "Bearer edge-token"
 
 
-def test_no_edge_credential_means_no_header_rather_than_another_identity(
+async def test_no_edge_credential_means_no_header_rather_than_another_identity(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(tools, "edge_auth_token", lambda _audience: None)
-    headers = tools.bearer_header_provider(
+    headers = await tools.bearer_header_provider(
         _context({tools.USER_TOKEN_STATE_KEY: "user-token"}), audience="https://svc.run.app"
     )
     assert tools.EDGE_AUTH_HEADER not in headers
     assert headers["Authorization"] == "Bearer user-token"
 
 
-def test_the_edge_credential_never_stands_in_for_a_missing_user(
+async def test_the_edge_credential_never_stands_in_for_a_missing_user(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(tools, "edge_auth_token", lambda _audience: "edge-token")
     with pytest.raises(tools.MissingUserTokenError):
-        tools.bearer_header_provider(_context({}), audience="https://svc.run.app")
+        await tools.bearer_header_provider(_context({}), audience="https://svc.run.app")
 
 
 def test_the_edge_token_is_reused_until_it_nears_expiry(monkeypatch: pytest.MonkeyPatch) -> None:

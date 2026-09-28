@@ -46,6 +46,8 @@ def _decisions() -> list[tuple[str, dict[str, Any]]]:
 
 def test_the_export_is_at_the_fakes_normalisation_version_and_covers_both_answers() -> None:
     assert quote_edge_cases()["normalizationVersion"] == NORMALIZATION_VERSION
+    # The version the post-check accepts is the one the service exported its decisions under.
+    assert quote_edge.NORMALIZATION_VERSION == NORMALIZATION_VERSION
     answers = [quote["result"] for _, quote in _decisions()]
     assert answers.count("match") > 10
     assert answers.count("no-match") > 10
@@ -203,8 +205,8 @@ def test_a_long_run_of_brackets_and_spaces_is_read_in_one_pass() -> None:
     assert locate_quote(signed, "30 ml/min") is None
     plain = "Dose" + " (" * 400 + " 30 ml/min"
     assert locate_quote(plain, "30 ml/min") is not None
-    # Without the whole text (the answer splitter) a walk that runs too long counts as a sign:
-    # refusing that cut is the safe side.
+    # Without the whole text a walk that runs too long counts as a sign (the splitter reads with
+    # the whole text's index, contract.chunk_spans): refusing that cut is the safe side.
     start = len(plain) - len("30 ml/min")
     assert not quote_edge.edge_before(plain, start, "3")
     walked = "Dose ( + (" + " (" * 300 + " 30"

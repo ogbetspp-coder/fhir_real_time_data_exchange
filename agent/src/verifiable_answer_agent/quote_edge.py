@@ -26,15 +26,29 @@ from dataclasses import dataclass, field
 from typing import Final
 
 __all__ = [
+    "NORMALIZATION_VERSION",
+    "SignIndex",
     "drawn_from",
     "edge_after",
     "edge_before",
     "find_quote_occurrence",
+    "has_scanner_marker",
+    "is_default_ignorable",
+    "is_gap",
     "is_word_character",
     "locate_quote",
     "number_before",
     "number_from",
 ]
+
+NORMALIZATION_VERSION: Final = "fidelity-norm/3.1.0"
+"""The normalisation version this port was made against, and the one the post-check accepts.
+
+``verify_quote`` names the version its answer was computed under. An answer under any other
+version was decided by rules this port does not hold, so ``postcheck`` flags it rather than
+trusting it. ``tests/test_quote_edge.py`` holds this to the version the service's exported
+decisions carry.
+"""
 
 # src/query/tools.ts QUOTE_OPENERS, QUOTE_CLOSERS and PLAIN_PUNCTUATION, character for character,
 # by code point: several are look-alikes of the ASCII characters they must not be confused with.
@@ -83,6 +97,15 @@ def _scanner_marker(character: str) -> bool:
     """The scanner's grid markers and picture token delimiters: structure, never a sign."""
     point = ord(character)
     return point == 0xFFFC or 0xFDD0 <= point <= 0xFDEF
+
+
+def has_scanner_marker(text: str) -> bool:
+    """Whether ``text`` holds a table grid marker or a picture's U+FFFC.
+
+    ``verify_quote`` refuses any quote carrying one (``invalid-request``): they are the
+    scanner's, never a reader's, so a chunk of a table or a picture cannot be checked.
+    """
+    return any(_scanner_marker(character) for character in text)
 
 
 def _skipped_opener(character: str) -> bool:
@@ -218,6 +241,16 @@ _GAPS: Final = frozenset(
 def is_gap(character: str) -> bool:
     """Whether ``character`` is a gap (section 6): drawn as space or as nothing."""
     return ord(character) in _GAPS
+
+
+_IGNORABLE: Final = frozenset(
+    point for low, high in _DEFAULT_IGNORABLE for point in range(low, high + 1)
+)
+
+
+def is_default_ignorable(character: str) -> bool:
+    """Whether ``character`` is a Default_Ignorable_Code_Point (Unicode 16.0): drawn as nothing."""
+    return ord(character) in _IGNORABLE
 
 
 def non_gap(text: str, index: int, step: int) -> str | None:
@@ -406,6 +439,14 @@ class _Signs:
                 return walked
             self._reached = _signs_before(self._text)
         return self._reached[index]
+
+
+SignIndex = _Signs
+"""``signsBefore`` over one whole text, exact at every index: what the splitter reads cuts with.
+
+Built once per block, so a block of a hundred thousand spaces between brackets costs one pass
+rather than a bounded walk back from every space (audit AG-12: 21.9 s for 200,000 code points).
+"""
 
 
 def number_before(text: str, index: int) -> str | None:
