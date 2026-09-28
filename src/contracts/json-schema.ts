@@ -63,7 +63,10 @@ function asciiPatterns(node: unknown): void {
 // carries (`checks`): an id names a schema, not a rule, so a second `.refine` on a listed schema
 // would otherwise be taken as the one already described and dropped as silently as before (review
 // of #148, part A L3). Generation refuses a refinement not listed here, a count that differs, a
-// refinement on a schema without an id, and a listed one no contract carries.
+// refinement on a schema without an id, and a listed one no contract carries. What the count
+// cannot see: a rule added inside the body of a refinement already counted (one `superRefine` that
+// checks two things counts once). Such a change is a change to that entry's rule and must be
+// described here by whoever makes it; review is the only control on it.
 export type RefinementDisposition = { checks: number } & (
   { expressed: Record<string, unknown> } | { unexpressed: string }
 );

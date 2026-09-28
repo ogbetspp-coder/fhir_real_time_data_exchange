@@ -21,7 +21,9 @@ import {
 // A version main never published is (re)locked to what it publishes now, naming the change
 // record. A version main published whose schema changed is refused: a changed schema is a new
 // version (ADR 0002). With `--respelling`, the new structure is appended instead, and only when
-// nothing but `pattern` values differs from the schema main last published for it. It reads main's
+// every difference from the schema main last published for it is a `pattern` keyword respelt by
+// the table of re-spellings (./versions-lock.ts, respellingIssues). Every run checks each current
+// schema against main's history, whatever the lock already says. It reads main's
 // history (LOCK_BASE, or origin/main) and fails closed without it.
 
 function fail(message: string): never {

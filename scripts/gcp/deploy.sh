@@ -78,11 +78,13 @@ ema_flow_require_environment "$PROJECT_ID" >/dev/null
 # The image build (phase_images) uploads the working tree, not the commit, so a tree that differs
 # from HEAD -- a changed tracked file, or an untracked one .gitignore does not exclude, which the
 # upload honours too -- is not that commit. deploy_provenance then names it -dirty-<tree> (the id
-# of the tree the working copy would commit as), and require_provenance refuses it before anything
-# is built or applied, in Actions and outside it alike: a run manifest names the code that ran by
-# a full commit id and nothing else (run manifest 5.0.0; infra/run.tf refuses any other
-# service_version at plan time), so a dirty tree has no name a deploy could give it (review of
-# #148, part B L1; until then it was built and pushed, then refused at plan). Without git,
+# of the tree the working copy would commit as), and require_provenance refuses it, in Actions and
+# outside it alike: `all` before its first phase, `images` before it builds and `apply` before it
+# applies. A run manifest names the code that ran by a full commit id and nothing else (run
+# manifest 5.0.0; infra/run.tf refuses any other service_version at plan time), so a dirty tree has
+# no name a deploy could give it (review of #148, part B L1 and round 2 L-4; until then it was
+# built and pushed, then refused at plan). The phases before images, run one at a time (preflight,
+# deps, inputs, init, apis, as the deploy workflow runs them), do not check. Without git,
 # GITHUB_SHA names the commit; with neither, nothing is built or applied. In Actions, a checkout
 # whose HEAD is not GITHUB_SHA is refused the same way.
 deploy_provenance() {
@@ -1421,6 +1423,9 @@ case "$PHASE" in
   smoke) phase_smoke ;;
   query-smoke) phase_query_smoke ;;
   all)
+    # Before the first phase: apis applies (a targeted apply) before images would refuse a tree
+    # that is no commit (require_provenance; review of #148, round 2, L-4).
+    require_provenance
     phase_preflight
     phase_deps
     phase_inputs

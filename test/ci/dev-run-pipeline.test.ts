@@ -1,11 +1,17 @@
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { cleanHead, localEnvironment, RUNTIME_VARIABLES } from "../../scripts/dev/local-runtime.js";
+import {
+  cleanHead,
+  localEnvironment,
+  outsideRepository,
+  REPOSITORY_ROOT,
+  RUNTIME_VARIABLES,
+} from "../../scripts/dev/local-runtime.js";
 
 // `scripts/dev/run-pipeline.ts` is a script with a top-level body, so it is exercised the way an
 // operator meets it: by running it. `gcloud` is a stand-in on PATH that describes a worker with
@@ -31,7 +37,7 @@ afterAll(() => {
 
 type Result = { status: number; stdout: string; stderr: string };
 
-function run(deployed: Record<string, string>, args: string[]): Result {
+function run(deployed: Record<string, string>, args: string[], cwd = process.cwd()): Result {
   runs += 1;
   const description = path.join(bin, `service-${runs.toString()}.json`);
   const env = Object.entries({ NODE_ENV: "test", ...deployed }).map(([name, value]) => ({
@@ -43,6 +49,7 @@ function run(deployed: Record<string, string>, args: string[]): Result {
     JSON.stringify({ spec: { template: { spec: { containers: [{ env }] } } } }),
   );
   const result = spawnSync(TSX, [SCRIPT, ...args], {
+    cwd,
     encoding: "utf8",
     env: {
       ...process.env,
@@ -127,7 +134,7 @@ describe("scripts/dev/local-runtime.ts", () => {
     const answers =
       (status: string) =>
       (args: string[]): string =>
-        args[0] === "status" ? status : `${head}\n`;
+        args[2] === "status" ? status : `${head}\n`;
     expect(cleanHead(answers(""))).toBe(head);
     expect(cleanHead(answers(" M src/pipeline.ts\n"))).toBeUndefined();
     expect(cleanHead(answers("?? new.ts\n"))).toBeUndefined();
@@ -136,6 +143,30 @@ describe("scripts/dev/local-runtime.ts", () => {
         throw new Error("not a git repository");
       }),
     ).toBeUndefined();
-    expect(cleanHead((args) => (args[0] === "status" ? "" : "not-a-commit"))).toBeUndefined();
+    expect(cleanHead((args) => (args[2] === "status" ? "" : "not-a-commit"))).toBeUndefined();
+  });
+
+  // Review of #148, round 2, L-2: the commit named is the repository of the code that runs, not
+  // whatever repository the current directory is in.
+  it("asks git about the scripts' own repository, wherever it is run from", () => {
+    const asked: string[][] = [];
+    cleanHead((args) => {
+      asked.push(args);
+      return args.includes("status") ? "" : `${"a".repeat(40)}\n`;
+    });
+    expect(asked).toEqual([
+      ["-C", REPOSITORY_ROOT, "status", "--porcelain", "--untracked-files=all"],
+      ["-C", REPOSITORY_ROOT, "rev-parse", "HEAD"],
+    ]);
+    expect(realpathSync(REPOSITORY_ROOT)).toBe(realpathSync(process.cwd()));
+  });
+
+  it("runs only from the repository's root, whose mapping and locks it reads", () => {
+    expect(outsideRepository()).toBeUndefined();
+    expect(outsideRepository(path.join(REPOSITORY_ROOT, "scripts"))).toMatch(/repository's root/);
+    expect(outsideRepository(path.join(bin, "no-such-directory"))).toMatch(/repository's root/);
+    const elsewhere = run({ ALLOW_SYNTHETIC_SOURCES: "true" }, [], bin);
+    expect(elsewhere.status).toBe(1);
+    expect(elsewhere.stderr).toContain("Not running: run this from the repository's root");
   });
 });

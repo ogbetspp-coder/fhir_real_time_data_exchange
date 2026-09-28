@@ -2,7 +2,13 @@ import { loadConfig } from "../../src/config.js";
 import { loadEmaMapping } from "../../src/fhir/mapping.js";
 import { createSyntheticType2Bundle } from "../../src/fixtures/synthetic.js";
 import { runPipeline } from "../../src/pipeline.js";
-import { cleanHead, localEnvironment } from "./local-runtime.js";
+import { cleanHead, localEnvironment, outsideRepository } from "./local-runtime.js";
+
+const misplaced = outsideRepository();
+if (misplaced !== undefined) {
+  console.error(`Not running: ${misplaced}.`);
+  process.exit(1);
+}
 
 const mapping = await loadEmaMapping();
 // This shell's environment, without anything in it that would name a deployed commit or image

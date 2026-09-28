@@ -147,5 +147,13 @@ describe("the commit a deploy names", { timeout: 30_000 }, () => {
       expect(extract(phase)).toMatch(/^ {2}require_provenance$/m);
     }
     expect(deploy).not.toMatch(/\[\[ -d \.git \]\]/);
+    // `all` refuses before its first phase: apis applies before images would refuse (review of
+    // #148, round 2, L-4).
+    const all = /^ {2}all\)\n([\s\S]*?)^ {4};;$/m.exec(deploy)?.[1] ?? "";
+    const steps = all
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0 && !line.startsWith("#"));
+    expect(steps.slice(0, 2)).toEqual(["require_provenance", "phase_preflight"]);
   });
 });

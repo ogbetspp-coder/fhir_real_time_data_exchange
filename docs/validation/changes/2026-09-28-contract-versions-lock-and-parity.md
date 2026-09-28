@@ -35,9 +35,13 @@ two items carried from the review of #145 (L2-d, and ADR 0002's amendment for re
    released. The lock is seeded from `main`'s history: every structure each version was ever
    published with (30 structures under 17 versions, retired versions included;
    `ingestion-provenance` 1.0.0 alone has five), so a retired version number cannot come back with
-   another schema. A re-spelling
-   (`--respelling`) is appended only when nothing but `pattern` values differs from the schema
-   `main` last published under that version (review of #148, part A L1, L2).
+   another schema. A re-spelling (`--respelling`) is appended only when every difference from the
+   schema `main` last published under that version is a `pattern` keyword at a schema position
+   whose two spellings are equal after a fixed table of language-preserving rewrites (today one:
+   `\d` as `[0-9]`); `const`, `default` and `examples` values are data and must be equal. The check
+   runs against `main`'s history in both the lock script and the test, whatever the lock says, so
+   an entry appended to the lock by hand is refused (review of #148, part A L1, L2; round 2 M-1,
+   L-1).
 3. **Refinements** (C-8): every `.refine` of a published contract is listed in
    `src/contracts/json-schema.ts` (`REFINEMENTS`) as expressed or unexpressed, with how many the
    schema carries, and generation refuses an unlisted one or a count that differs (review of #148,

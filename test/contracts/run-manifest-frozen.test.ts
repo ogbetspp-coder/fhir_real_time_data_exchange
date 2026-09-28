@@ -217,8 +217,20 @@ describe("the rules between a manifest's fields, in every version that has them"
       const schema = BY_VERSION[version];
       if (schema === undefined) throw new Error(`no schema for ${version}`);
       const document = at(`${version}-document.json`);
-      const ingestion = { ...(document.ingestion as object), authority: AUTHORITY };
-      expect(schema.safeParse({ ...document, ingestion }).success).toBe(false);
+      const drawn = document.ingestion as Record<string, unknown>;
+      const refusal = (ingestion: Record<string, unknown>): string[] => {
+        const parsed = schema.safeParse({ ...document, ingestion });
+        return parsed.success ? [] : parsed.error.issues.map(({ message }) => message);
+      };
+      const RULE = "an authority import, and only one, records what Zone B fetched";
+      expect(refusal(drawn)).toEqual([]);
+      // A drawn source that records a fetch, and (review of #148, round 2, L-3) an authority
+      // import that records none: each refused by the rule, and by nothing else.
+      expect(refusal({ ...drawn, authority: AUTHORITY })).toEqual([RULE]);
+      expect(refusal({ ...drawn, sourceKind: "authority-publication" })).toEqual([RULE]);
+      expect(
+        refusal({ ...drawn, sourceKind: "authority-publication", authority: AUTHORITY }),
+      ).toEqual([]);
     },
   );
 

@@ -313,10 +313,18 @@ leaves unchanged the set of documents it accepts under the dialect it declares (
 whose `pattern` is an ECMA-262 regular expression) and every description is not a version change:
 `\d` written as `[0-9]` is one. Its `$id` stays, the index's content hash moves, and the lock
 appends the new structure hash to the version's entry (`npm run contracts:lock -- --respelling`),
-naming the change record that argues it; nothing recorded is replaced. The lock appends it only when
-nothing but `pattern` values differs from the schema `main` last published under that version; that
-each respelt pattern accepts the same language is the change record's argument. A change that alters
-an accepted document, or a description, is classified by the rule above.
+naming the change record that records it; nothing recorded is replaced.
+
+What counts as a re-spelling is decided mechanically, not argued (review of #148, round 2). Compared
+with the schema `main` last published under the version, the only difference allowed is in `pattern`
+keywords at schema positions (not a `pattern` member of a `const`, `default` or `examples` value,
+which is data and must be equal), and two patterns are re-spellings of each other only when they are
+equal after a fixed table of rewrites, each known to keep an ECMA-262 pattern's language. The table
+has one entry today: `\d` as `[0-9]` outside a character class and `0-9` inside one
+(`src/contracts/json-schema.ts`, `asciiDigits`). Adding an entry is a change to this ADR. The check
+runs in `npm run contracts:lock` and in `test/contracts/versions-lock.test.ts` against `main`'s
+history, whatever the lock says, so an entry appended to the lock by hand licenses nothing. A change
+that alters an accepted document, or a description, is classified by the rule above.
 
 **Refinements are published or named.** `z.toJSONSchema` drops every `.refine` silently, so a
 generated schema accepted what Zod refuses. Every refinement a published contract carries is listed

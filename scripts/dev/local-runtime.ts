@@ -1,4 +1,7 @@
 import { execFileSync } from "node:child_process";
+import { realpathSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 // What a run on this machine may say produced it (review of #148, M1). scripts/dev/run-pipeline.ts
 // takes its configuration from the deployed worker, and the worker's configuration names the
@@ -15,6 +18,26 @@ export const RUNTIME_VARIABLES = [
   "WORKFLOW_REVISION",
   "K_REVISION",
 ] as const;
+
+// The repository these scripts are part of: the code that runs. Not the current directory, which
+// may be another repository (review of #148, round 2, L-2).
+export const REPOSITORY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+
+// Why a local run may not start from `cwd`, or undefined when it may. The run reads the mapping
+// and the standards locks relative to the current directory (src/fhir/mapping.ts,
+// src/fhir/standards-lock.ts), so from anywhere but the repository it would read another tree's.
+export function outsideRepository(cwd: string = process.cwd()): string | undefined {
+  const real = (directory: string): string => {
+    try {
+      return realpathSync(directory);
+    } catch {
+      return path.resolve(directory);
+    }
+  };
+  return real(cwd) === real(REPOSITORY_ROOT)
+    ? undefined
+    : `run this from the repository's root (${REPOSITORY_ROOT}): it reads the mapping and the standards locks relative to the current directory`;
+}
 
 // The deployed environment without the variables that name what ran, and with GIT_COMMIT set to
 // `localCommit` when there is one.
@@ -35,13 +58,16 @@ function git(args: string[]): string {
   return execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 }
 
-// HEAD, when the working tree is exactly HEAD: nothing changed, staged or untracked (what
-// .gitignore excludes aside). Otherwise, or without git, undefined: the code that runs is then no
-// commit, and the manifest says `development`.
-export function cleanHead(run: Git = git): string | undefined {
+// The repository's HEAD, when its working tree is exactly HEAD: nothing changed, staged or
+// untracked (what .gitignore excludes aside). Otherwise, or without git, undefined: the code that
+// runs is then no commit, and the manifest says `development`. Git is asked about `root`, the
+// repository of the code that runs, whatever the current directory is.
+export function cleanHead(run: Git = git, root: string = REPOSITORY_ROOT): string | undefined {
   try {
-    if (run(["status", "--porcelain", "--untracked-files=all"]).trim() !== "") return undefined;
-    const head = run(["rev-parse", "HEAD"]).trim();
+    if (run(["-C", root, "status", "--porcelain", "--untracked-files=all"]).trim() !== "") {
+      return undefined;
+    }
+    const head = run(["-C", root, "rev-parse", "HEAD"]).trim();
     return /^[0-9a-f]{40}$/.test(head) ? head : undefined;
   } catch {
     return undefined;

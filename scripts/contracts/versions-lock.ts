@@ -2,15 +2,17 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 
 import { CONTRACTS } from "../../src/contracts/index.js";
-import { publishedSchema, structureSha256 } from "../../src/contracts/json-schema.js";
+import { asciiDigits, publishedSchema, structureSha256 } from "../../src/contracts/json-schema.js";
+import { canonicalJson } from "../../src/lib/hash.js";
 
 // The contract version lock (audit C-6; ADR 0002, "Versioning"). For every contract version ever
 // published it records the structure hash of each schema that version was published with: the
 // SHA-256 of the published document without its `$id` (src/contracts/json-schema.ts,
 // structureSha256), oldest first. From this change on a version names one structure. The one
 // exception, ADR 0002's amendment of 2026-09-28, is a re-spelling: the same schema with nothing
-// changed but the spelling of `pattern` values, accepting the same documents under the schema's
-// declared dialect; it is appended to its version's list, naming the change record that argues it.
+// changed but the spelling of `pattern` keywords, each by a rewrite of a fixed table known to keep
+// an ECMA-262 pattern's language (respellingIssues); it is appended to its version's list, naming
+// the change record that records it.
 // Nothing released is ever replaced, and the test (test/contracts/versions-lock.test.ts) holds
 // every list main has released to be a prefix of the one checked in, and every structure main has
 // published to be in the lock.
@@ -134,32 +136,106 @@ export function publishedHistory(commit: string): Structure[] {
   return found;
 }
 
-// Where `after` differs from `before` in anything but the value of a `pattern` (the `$id` aside):
-// a keyword added, removed or changed, a description, a bound, a type. Paths only, never values.
-// Empty for a re-spelling (ADR 0002, amendment of 2026-09-28); whether each respelt pattern
-// accepts the same language is the change record's argument, not something this can decide.
+// The keywords of JSON Schema 2020-12 whose value is a schema, an array of schemas, or a map of
+// names to schemas. Only these are walked as schemas; every other keyword's value is data (`const`,
+// `default`, `enum`, `examples`, `required`, a bound, a description) and is compared whole, so a
+// `pattern` member of a `const` object is data, not a pattern (review of #148, round 2, L-1).
+const SCHEMA_KEYWORDS = new Set([
+  "additionalItems",
+  "additionalProperties",
+  "contains",
+  "else",
+  "if",
+  "items",
+  "not",
+  "propertyNames",
+  "then",
+  "unevaluatedItems",
+  "unevaluatedProperties",
+]);
+const SCHEMA_ARRAY_KEYWORDS = new Set(["allOf", "anyOf", "oneOf", "prefixItems"]);
+const SCHEMA_MAP_KEYWORDS = new Set([
+  "$defs",
+  "definitions",
+  "dependentSchemas",
+  "patternProperties",
+  "properties",
+]);
+
+// The re-spellings a pattern may undergo without a version change: a fixed table of rewrites
+// each known to leave the language of an ECMA-262 pattern unchanged, applied to both sides before
+// they are compared. Today it has one entry: `\d` as `[0-9]` outside a class and `0-9` inside one
+// (asciiDigits, #145). A pattern that uses any other shorthand has no entry and is never a
+// re-spelling. Two patterns that differ after the table are a change of language, whatever the
+// change record argues: `[0-9]` to `[0-9a]` is refused, as is `^[0-9]+$` to `.*`.
+function respelt(pattern: string): string | undefined {
+  try {
+    return asciiDigits(pattern);
+  } catch {
+    return undefined;
+  }
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function sameData(before: unknown, after: unknown): boolean {
+  return canonicalJson(before) === canonicalJson(after);
+}
+
+// Where the schema `after` differs from `before` other than by a re-spelling of a `pattern`
+// keyword (the root `$id` aside). Paths only, never values. Empty exactly when every difference is
+// a `pattern` of a schema whose two spellings are equal after the table above: the rule of ADR
+// 0002's amendment of 2026-09-28, made checkable.
 export function respellingIssues(before: unknown, after: unknown, at = "$"): string[] {
-  if (Array.isArray(before) && Array.isArray(after)) {
-    if (before.length !== after.length) return [`${at} has another length`];
-    return before.flatMap((item, index) => respellingIssues(item, after[index], `${at}[${index}]`));
+  if (!isObject(before) || !isObject(after)) {
+    return sameData(before, after) ? [] : [`${at} changed`];
   }
-  const isObject = (value: unknown): value is Record<string, unknown> =>
-    value !== null && typeof value === "object" && !Array.isArray(value);
-  if (isObject(before) && isObject(after)) {
-    const keys = (value: Record<string, unknown>): string[] =>
-      Object.keys(value)
-        .filter((key) => !(at === "$" && key === "$id"))
-        .sort();
-    const left = keys(before);
-    const right = keys(after);
-    if (JSON.stringify(left) !== JSON.stringify(right)) return [`${at} has other keywords`];
-    return left.flatMap((key) =>
-      key === "pattern" && typeof before[key] === "string" && typeof after[key] === "string"
-        ? []
-        : respellingIssues(before[key], after[key], `${at}.${key}`),
-    );
-  }
-  return before === after ? [] : [`${at} changed`];
+  const keys = (value: Record<string, unknown>): string[] =>
+    Object.keys(value)
+      .filter((key) => !(at === "$" && key === "$id"))
+      .sort();
+  const left = keys(before);
+  if (JSON.stringify(left) !== JSON.stringify(keys(after))) return [`${at} has other keywords`];
+  return left.flatMap((key): string[] => {
+    const path = `${at}.${key}`;
+    const [one, other] = [before[key], after[key]];
+    if (key === "pattern" && typeof one === "string" && typeof other === "string") {
+      const [a, b] = [respelt(one), respelt(other)];
+      return a !== undefined && a === b ? [] : [`${path} is not a re-spelling`];
+    }
+    if (SCHEMA_KEYWORDS.has(key)) return respellingIssues(one, other, path);
+    if (SCHEMA_ARRAY_KEYWORDS.has(key) && Array.isArray(one) && Array.isArray(other)) {
+      if (one.length !== other.length) return [`${path} has another length`];
+      return one.flatMap((item, index) =>
+        respellingIssues(item, other[index], `${path}[${String(index)}]`),
+      );
+    }
+    if (SCHEMA_MAP_KEYWORDS.has(key) && isObject(one) && isObject(other)) {
+      const names = Object.keys(one).sort();
+      if (JSON.stringify(names) !== JSON.stringify(Object.keys(other).sort())) {
+        return [`${path} has other members`];
+      }
+      return names.flatMap((name) => respellingIssues(one[name], other[name], `${path}.${name}`));
+    }
+    return sameData(one, other) ? [] : [`${path} changed`];
+  });
+}
+
+// Why `current` may not be published under its version, or undefined when it may: main published
+// that version, last with another structure, and the change is not a re-spelling. Checked
+// whatever the lock says, so an entry appended to the lock by hand passes nothing (review of #148,
+// round 2, M-1).
+export function unpublishedChange(current: Structure, history: Structure[]): string | undefined {
+  const base = history
+    .filter((structure) => structure.name === current.name && structure.version === current.version)
+    .at(-1);
+  if (base === undefined || base.sha256 === current.sha256) return undefined;
+  const issues = respellingIssues(base.document, current.document);
+  return issues.length === 0
+    ? undefined
+    : `${current.name}@${current.version} is not a re-spelling of the schema main published: ${issues.join(", ")}`;
 }
 
 export class VersionsLockError extends Error {}
@@ -199,8 +275,12 @@ export function updateLock(update: LockUpdate): { lock: VersionsLock; changed: s
     }
   }
 
-  for (const { name, version, sha256, document } of update.current) {
+  for (const current of update.current) {
+    const { name, version, sha256 } = current;
     const entries = entriesOf(name, version);
+    // Before anything the lock says: a structure appended to it by hand is checked as well.
+    const refused = unpublishedChange(current, update.history);
+    if (refused !== undefined) throw new VersionsLockError(refused);
     if (entries.at(-1)?.sha256 === sha256) continue;
     const published = update.history.filter(
       (structure) => structure.name === name && structure.version === version,
@@ -210,18 +290,10 @@ export function updateLock(update: LockUpdate): { lock: VersionsLock; changed: s
       published.some(({ sha256: seen }) => seen === entry.sha256),
     );
     const base = published.at(-1);
-    if (base !== undefined && base.sha256 !== sha256) {
-      if (!update.respelling) {
-        throw new VersionsLockError(
-          `${name}@${version} was published with another schema: a changed schema is a new version (ADR 0002); a re-spelling is appended with --respelling`,
-        );
-      }
-      const issues = respellingIssues(base.document, document);
-      if (issues.length > 0) {
-        throw new VersionsLockError(
-          `${name}@${version} is not a re-spelling of the schema main published: ${issues.join(", ")}`,
-        );
-      }
+    if (base !== undefined && base.sha256 !== sha256 && !update.respelling) {
+      throw new VersionsLockError(
+        `${name}@${version} was published with another schema: a re-spelling is appended with --respelling`,
+      );
     }
     lock[name] = {
       ...lock[name],

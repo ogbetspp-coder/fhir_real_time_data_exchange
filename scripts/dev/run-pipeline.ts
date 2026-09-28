@@ -5,7 +5,7 @@ import { loadEmaMapping } from "../../src/fhir/mapping.js";
 import { createSyntheticSubmission } from "../../src/fixtures/synthetic-submission.js";
 import { createSyntheticType2Bundle } from "../../src/fixtures/synthetic.js";
 import { runPipeline, type PipelineInput } from "../../src/pipeline.js";
-import { cleanHead, localEnvironment } from "./local-runtime.js";
+import { cleanHead, localEnvironment, outsideRepository } from "./local-runtime.js";
 import {
   SMOKE_PRODUCT_ID,
   SYNTHETIC_PRODUCT_IDS,
@@ -135,6 +135,12 @@ function environmentOf(described: unknown): Map<string, string> {
 }
 
 const args = parseArgs(process.argv.slice(2));
+
+const misplaced = outsideRepository();
+if (misplaced !== undefined) {
+  console.error(`Not running: ${misplaced}.`);
+  process.exit(1);
+}
 
 const describeArgs = [
   "--quiet",

@@ -10,6 +10,7 @@ import {
   recordExists,
   releasedLocks,
   respellingIssues,
+  unpublishedChange,
   updateLock,
   type Structure,
   type VersionsLock,
@@ -104,11 +105,95 @@ describe("the contract version lock", () => {
       ).toEqual([name, version, true]);
     }
   });
+
+  // Review of #148, round 2, M-1: whatever the lock says, a version main published publishes its
+  // last published schema, or a re-spelling of it. An entry appended to the lock by hand is no
+  // licence.
+  it("publishes every version main published with its schema, or a re-spelling of it", () => {
+    const commit = resolveBase(process.env.LOCK_BASE ?? "origin/main");
+    if (process.env.CI === "true") expect(commit, "CI must name the lock's base").toBeDefined();
+    if (commit === undefined) return;
+    const history = publishedHistory(commit);
+    for (const current of currentStructures()) {
+      expect([current.name, unpublishedChange(current, history)]).toEqual([
+        current.name,
+        undefined,
+      ]);
+    }
+
+    // The reviewer's reproduction: fidelity-report 1.0.0's `issues` items widened from 256 to
+    // 257 characters, regenerated, and its hash appended to the lock by hand.
+    const report = currentStructures().find(({ name }) => name === "fidelity-report");
+    if (report === undefined) throw new Error("no fidelity-report");
+    const widened = structuredClone(report.document) as {
+      $defs: { FidelityReport: { properties: { issues: { items: { maxLength: number } } } } };
+    };
+    expect(widened.$defs.FidelityReport.properties.issues.items.maxLength).toBe(256);
+    widened.$defs.FidelityReport.properties.issues.items.maxLength = 257;
+    const handEdited = {
+      ...report,
+      document: widened,
+      sha256: structureSha256(widened),
+    };
+    expect(unpublishedChange(handEdited, history)).toMatch(
+      /fidelity-report@1\.0\.0 is not a re-spelling of the schema main published: .*maxLength changed/,
+    );
+    const lock = readVersionsLock();
+    const appended: VersionsLock = {
+      ...lock,
+      "fidelity-report": {
+        ...lock["fidelity-report"],
+        "1.0.0": [
+          ...(lock["fidelity-report"]?.["1.0.0"] ?? []),
+          { sha256: handEdited.sha256, record: RECORD },
+        ],
+      },
+    };
+    expect(() =>
+      updateLock({
+        lock: appended,
+        history,
+        current: [handEdited],
+        released: [],
+        record: RECORD,
+        respelling: true,
+      }),
+    ).toThrow(/is not a re-spelling/);
+  });
+
+  // The rule, on what main actually published: #145's `\d` to `[0-9]` is a re-spelling of every
+  // schema it touched; the changes ingestion-provenance 1.0.0 took before it are not.
+  it("reads #145 as a re-spelling, and ingestion-provenance 1.0.0's earlier changes as none", () => {
+    const commit = resolveBase(process.env.LOCK_BASE ?? "origin/main");
+    if (commit === undefined) return;
+    const history = publishedHistory(commit);
+    const under = (name: string, version: string): Structure[] =>
+      history.filter((structure) => structure.name === name && structure.version === version);
+    for (const [name, version] of [
+      ["canonical-submission", "2.0.0"],
+      ["fidelity-report", "1.0.0"],
+      ["query-tools", "4.0.0"],
+      ["agent-turn", "1.1.0"],
+      ["run-manifest", "4.0.0"],
+    ] as const) {
+      const [before, after] = under(name, version).slice(-2);
+      expect([name, respellingIssues(before?.document, after?.document)]).toEqual([name, []]);
+    }
+    const provenance = under("ingestion-provenance", "1.0.0");
+    expect(provenance).toHaveLength(5);
+    for (let index = 1; index < 4; index += 1) {
+      expect(
+        respellingIssues(provenance[index - 1]?.document, provenance[index]?.document),
+      ).not.toEqual([]);
+    }
+    expect(respellingIssues(provenance[3]?.document, provenance[4]?.document)).toEqual([]);
+  });
 });
+
+const RECORD = "docs/validation/changes/2026-09-28-contract-versions-lock-and-parity.md";
 
 // updateLock, over synthetic schemas: what `npm run contracts:lock` may and may not record.
 describe("updating the version lock", () => {
-  const RECORD = "docs/validation/changes/2026-09-28-contract-versions-lock-and-parity.md";
   const document = (pattern: string, extra: Record<string, unknown> = {}): unknown => ({
     $schema: "https://json-schema.org/draft/2020-12/schema",
     $id: "https://khs.dev/contracts/thing/1.0.0/schema.json",
@@ -151,6 +236,83 @@ describe("updating the version lock", () => {
     ["a type", document("^[0-9]+$", { type: "integer" })],
   ])("refuses %s changed under --respelling", (_, disguised) => {
     expect(() => update(structure("1.0.0", disguised), true)).toThrow(/is not a re-spelling/);
+  });
+
+  // Review of #148, round 2, L-1: a change of language made through `pattern` alone, and a
+  // `pattern` that is data rather than a keyword. Only the table's rewrites are re-spellings.
+  it.each([
+    ["a class widened", document("^[0-9a]+$"), "$.$defs.Id.pattern is not a re-spelling"],
+    ["anything", document(".*"), "$.$defs.Id.pattern is not a re-spelling"],
+    ["nothing", document(String.raw`[^\s\S]`), "$.$defs.Id.pattern is not a re-spelling"],
+    [
+      "a const whose pattern member changed",
+      document(String.raw`^\d+$`, { const: { pattern: "b" } }),
+      "$.$defs.Id has other keywords",
+    ],
+  ])("refuses %s as a re-spelling", (_, changed, issue) => {
+    expect(respellingIssues(before.document, changed)).toEqual([issue]);
+    expect(() => update(structure("1.0.0", changed), true)).toThrow(/is not a re-spelling/);
+  });
+
+  it("compares data keywords whole, a pattern member of a const or default included", () => {
+    const withData = (pattern: string, member: string): unknown =>
+      document(String.raw`^\d+$`, {
+        const: { pattern: member },
+        default: { pattern: member },
+        examples: [pattern],
+      });
+    expect(respellingIssues(withData("1", "a"), withData("1", "a"))).toEqual([]);
+    expect(respellingIssues(withData("1", "a"), withData("1", "b"))).toEqual([
+      "$.$defs.Id.const changed",
+      "$.$defs.Id.default changed",
+    ]);
+    expect(respellingIssues(withData("1", "a"), withData("2", "a"))).toEqual([
+      "$.$defs.Id.examples changed",
+    ]);
+  });
+
+  it("walks every kind of subschema, and respells only by the table", () => {
+    const tree = (pattern: string, extra: Record<string, unknown> = {}): unknown => ({
+      properties: { a: { pattern } },
+      items: { pattern },
+      allOf: [{ pattern }],
+      ...extra,
+    });
+    expect(respellingIssues(tree(String.raw`^[\d.]$`), tree("^[0-9.]$"))).toEqual([]);
+    expect(respellingIssues(tree(String.raw`^\w$`), tree(String.raw`^\w$`))).toEqual([
+      "$.allOf[0].pattern is not a re-spelling",
+      "$.items.pattern is not a re-spelling",
+      "$.properties.a.pattern is not a re-spelling",
+    ]);
+    expect(respellingIssues(tree("a"), tree("a", { allOf: [] }))).toEqual([
+      "$.allOf has another length",
+    ]);
+    expect(respellingIssues(tree("a"), tree("a", { properties: { b: { pattern: "a" } } }))).toEqual(
+      ["$.properties has other members"],
+    );
+  });
+
+  // Review of #148, round 2, M-1: a structure already appended to the lock (by hand, or by an
+  // earlier run) is checked again, not taken as licensed by being there.
+  it("checks a structure the lock already names, not only one it would append", () => {
+    const widened = structure("1.0.0", document(String.raw`^\d+$`, { maxLength: 65 }));
+    const handAppended: VersionsLock = {
+      thing: {
+        "1.0.0": [...(lock.thing?.["1.0.0"] ?? []), { sha256: widened.sha256, record: RECORD }],
+      },
+    };
+    expect(() =>
+      updateLock({
+        lock: handAppended,
+        history: [before],
+        current: [widened],
+        released: [lock],
+        record: RECORD,
+        respelling: true,
+      }),
+    ).toThrow(
+      /thing@1\.0\.0 is not a re-spelling of the schema main published: \$\.\$defs\.Id\.maxLength changed/,
+    );
   });
 
   it("relocks a version main never published, and records what main published but the lock lacks", () => {
@@ -206,10 +368,11 @@ describe("updating the version lock", () => {
     expect(() => identify(null)).toThrow(/names no contract/);
   });
 
-  it("compares arrays and scalars as well as objects", () => {
-    expect(respellingIssues([1, { pattern: "a" }], [1, { pattern: "b" }])).toEqual([]);
-    expect(respellingIssues([1], [1, 2])).toEqual(["$ has another length"]);
-    expect(respellingIssues({ a: [1] }, { a: [2] })).toEqual(["$.a[0] changed"]);
+  it("compares a schema that is not an object, and a pattern that is not a string, whole", () => {
+    expect(respellingIssues(true, true)).toEqual([]);
+    expect(respellingIssues(true, false)).toEqual(["$ changed"]);
+    expect(respellingIssues([{ pattern: "a" }], [{ pattern: "b" }])).toEqual(["$ changed"]);
+    expect(respellingIssues({ a: [1] }, { a: [2] })).toEqual(["$.a changed"]);
     expect(respellingIssues({ pattern: 1 }, { pattern: 2 })).toEqual(["$.pattern changed"]);
   });
 });
