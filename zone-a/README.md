@@ -176,12 +176,15 @@ defaults are wrong:
   every astral character _after_ U+E000–U+FFFF; RFC 8785 and `src/lib/hash.ts` put it before,
   because the key is compared as UTF-16 code units. Keys are therefore sorted on
   `key.encode("utf-16-be")`. There is a test for exactly this case.
-- **Floats are refused, not formatted.** The specification says "`JSON.stringify` number and
-  string formatting", which is a normative reference to a JavaScript function rather than a
-  language-neutral rule. Rather than guess where the two languages' shortest-round-trip
-  formatting diverges, `canonical_json` raises on a float, and a test asserts that no number
-  anywhere in the four fixtures is a non-integer. Integer formatting is identical in both
-  languages, so the hashes that do match, match for a stated reason.
+- **Non-integral floats are refused, not formatted.** The specification says "`JSON.stringify`
+  number and string formatting", which is a normative reference to a JavaScript function rather
+  than a language-neutral rule. Rather than guess where the two languages' shortest-round-trip
+  formatting diverges, `canonical_json` raises on a float with a fractional part, and a test
+  asserts that no number anywhere in the four fixtures is a non-integer. An integral float up to
+  2^53-1 (`1.0`, as `json.loads` reads a JSON `1.0`) is the same JSON number as the integer, and
+  is written as that integer, as `JSON.stringify` writes it; one beyond is refused. Integer
+  formatting is identical in both languages, so the hashes that do match, match for a stated
+  reason.
 
 ## Vector results
 
@@ -192,6 +195,16 @@ All 634 golden vectors of `fidelity-norm/3.1.0` pass, byte for byte, including e
 | `zone_a/fidelity/normalize.py` | normalize 71/71 |
 | `zone_a/fidelity/xhtml.py`     | xhtml 383/383   |
 | `zone_a/fidelity/verify.py`    | verify 180/180  |
+
+The vectors also carry a `codePoints` family: for every code point U+0000–U+10FFFF, which class
+of which closed list it falls in (forbidden, whitespace, gap, Default_Ignorable, word character,
+removed by step 1, a ligature, a bullet, reserved, a grid marker, an invisible break, a mark, and
+what `sup` and `sub` do with it). `tests/test_code_points.py` reads each class through the port's
+own functions and requires the same table, and the agent's `tests/test_quote_edge_code_points.py`
+holds its copy of the gap and word classes to it. The worked vectors reach a list only where their
+author wrote an input for it: dropping an ignorable or a thin space from one moved none of them
+(audit 2026-09-27). `test/fidelity-code-points.test.ts` pins the table to the normalisation
+version, so a list change is a version decision (`docs/fidelity-normalization.md` section 8).
 
 Under `fidelity-norm/1.1.1` there were 137 (25, 60 and 52). Seven of those were added by the
 first round of this port: six XHTML cases and one verify case, each of them pinning a divergence
@@ -310,9 +323,11 @@ cd zone-a && DIFFERENTIAL_CORPUS=/tmp/differential.jsonl .uv-bootstrap/bin/uv ru
 Three families, a third of the corpus each:
 
 - **normalize** — strings assembled from a weighted alphabet that covers every code point in the
-  specification's closed lists (the four invisibles, the six ligatures, the eleven bullet glyphs,
-  the whitespace class U+0009, U+000A, U+000D, U+0020, U+00A0, U+1680, U+2000–U+200A, U+2028,
-  U+2029, U+202F, U+205F and U+3000), plus the near misses that a wrong implementation would
+  specification's closed lists (the four invisibles, the six ligatures, the nine bullet glyphs,
+  the whitespace class U+0009, U+000A, U+000D, U+0020, U+00A0, U+2000–U+2005, U+2007, U+2008,
+  U+2028, U+2029 and U+3000; and the spaces `fidelity-norm/3.0.0` made content, U+1680 and the
+  thin spaces U+2006, U+2009, U+200A, U+202F and U+205F, with the other gaps, the blank glyphs and
+  the Default_Ignorable code points), plus the near misses that a wrong implementation would
   treat as members (U+FB05, U+180E, U+2024, and the accepted neighbours of every range
   `fidelity-norm/2.0.0` rejects), combining marks after invisibles, NFC singletons, Hangul jamo,
   U+00AD before LF, before CRLF and before a space, the section 2 forbidden characters including
@@ -345,6 +360,15 @@ it possible to report a divergence — here, or in this file — without ever qu
 mismatch prints the family, the index, the seed, the class list and two digests, and nothing else.
 `tests/test_differential.py` also asserts that the corpus reaches the classes the review named, so
 a future edit to the generator cannot quietly shrink the alphabet while the run goes on passing.
+
+**In CI** (`.github/workflows/ci.yml`, and `scripts/check-all.sh` locally) the corpus is 2000
+cases at the fixed seed 20260920 and 2000 more at a seed of the run's own, its run id (locally, the
+time, or `DIFFERENTIAL_RUN_SEED`). The generator prints the seed and every case records it, so a
+failure at a new seed is reproduced with `--seed <that seed> --count 2000`. Each night,
+`.github/workflows/parity-sweep.yml` runs the exhaustive sweep as well: every code point as a
+character reference inside `sup`, inside `sub` and after an inline tag, and raw in three
+normalisation contexts, digested by `scripts/fidelity/parity-sweep.ts` and compared by
+`tests/test_parity_sweep.py` (skipped unless `PARITY_SWEEP` names the TypeScript's digests).
 
 **Results.** 2000 cases at each of three seeds, 6000 in total, **zero divergences**:
 
