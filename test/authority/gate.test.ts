@@ -81,7 +81,7 @@ describe("the authority gate", () => {
       OPTIONS,
       serving(syntheticPublication(mapping)),
     );
-    expect(result.importerVersion).toBe("2.1.1");
+    expect(result.importerVersion).toBe("2.1.2");
     expect(result.fetched.map(({ url }) => url.split("/")[3])).toEqual(["document", "index"]);
     expect(result.gate.submission.graphType).toBe("type1");
   });

@@ -23,9 +23,10 @@ golden vector the TypeScript author wrote will never catch:
   value with text hidden after the last newline. Whole-value grammars use ``fullmatch`` and
   carry no anchors at all; the scan-position patterns (``END_TAG``, ``START_TAG``, ``ENTITY``)
   use ``match(div, index)``, which is the sticky ``/y`` flag of the TypeScript.
-* TypeScript offsets are UTF-16 code units and Python's are code points. Error offsets are not
-  part of any vector's expected value (an error vector records its code only), so indexing by
-  code point changes no accepted or rejected input, only the number in an exception message.
+* The TypeScript scans the div by UTF-16 index and Python by code point. An error's offset is a
+  code point offset into the div on both sides: the TypeScript converts the index it failed at.
+  Error offsets are not part of any vector's expected value (an error vector records its code
+  only), so they change no accepted or rejected input, only the number in an exception message.
 
 fidelity-norm/2.0.0 adds three more, about strings rather than regexes. A string decoded from
 JSON holds a lone surrogate as a code point Python accepts, and so does ``chr(0xD835)`` for a
@@ -154,7 +155,7 @@ def has_drawn_text(normalized: str) -> bool:
 TABLE_SLOT_LIMIT: Final = 50_000
 
 
-def _is_invisible_break(code_point: int) -> bool:
+def is_invisible_break(code_point: int) -> bool:
     """A soft hyphen or a zero-width space: a break a renderer may draw that the check never reads.
 
     At a narrow width "2" U+00AD "10" is drawn "2-" / "10" and "2" U+200B "10" as "2" / "10", where
@@ -166,7 +167,7 @@ def _is_invisible_break(code_point: int) -> bool:
 
 def _find_invisible_break(text: str) -> int | None:
     for offset, character in enumerate(text):
-        if _is_invisible_break(ord(character)):
+        if is_invisible_break(ord(character)):
             return offset
     return None
 
@@ -294,24 +295,37 @@ def _point_offsets(output: list[str]) -> Callable[[int], int]:
     return at
 
 
-def _check_composition(text: str, boundaries: list[int]) -> None:
+def _check_composition(text: str, boundaries: list[int], tags: list[int]) -> None:
+    """Refuse a composition across an inline tag.
+
+    The boundaries are offsets in the text, each with the offset in the div of the tag that makes
+    it, which an error reports.
+    """
     # The first code point at or after each boundary that is not a Default_Ignorable non-mark: a
     # word joiner or a zero-width joiner between the tag and a mark is drawn as nothing, and the
     # mark after it is still drawn apart from the letter before the tag. Boundaries only increase,
     # so one cursor reads each run of ignorables once.
     cursor = 0
-    for boundary in boundaries:
+    for boundary, tag in zip(boundaries, tags, strict=True):
         cursor = max(cursor, boundary)
         while cursor < len(text) and not (
             _is_mark(text[cursor]) or not is_default_ignorable(ord(text[cursor]))
         ):
             cursor += 1
         if cursor < len(text) and _is_mark(text[cursor]):
-            raise XhtmlError("combining-across-markup", boundary)
+            raise XhtmlError("combining-across-markup", tag)
+        # A boundary before a code point below U+0300, U+00AD aside, is stable: every such code
+        # point is a starter that NFC never composes with what precedes it (canonical combining
+        # class 0, NFC_QC=Yes; tests/test_composition_boundary.py checks each one), so the two
+        # sides compose the same apart as together. U+00AD, which step 1 removes, never reaches the
+        # text (section 2).
+        following = ord(text[boundary]) if boundary < len(text) else None
+        if following is None or (following < 0x0300 and following != 0x00AD):
+            continue
         before = text[max(0, boundary - COMPOSE_WINDOW) : boundary]
         after = text[boundary : boundary + COMPOSE_WINDOW]
         if compose_text(before + after) != compose_text(before) + compose_text(after):
-            raise XhtmlError("combining-across-markup", boundary)
+            raise XhtmlError("combining-across-markup", tag)
 
 
 def is_reserved(code_point: int) -> bool:
@@ -422,6 +436,30 @@ SCRIPT_RULES: Final[dict[str, _ScriptRule]] = {
 UNMAPPABLE_SIGNS: Final = frozenset({0x00B1, 0x2213})
 UNMAPPABLE_CATEGORIES: Final = frozenset({"Sm", "Ps", "Pe", "Pd"})
 
+
+def script_code_point(element: str, code_point: int) -> int | None:
+    r"""What ``sup`` or ``sub`` makes of one code point of text.
+
+    The code point it is folded to, the code point itself when it is kept, or None when it has no
+    script form there (``unmappable-script``). General category N is read from ``unicodedata``
+    because ``re`` has no ``\p{N}``.
+    """
+    rule = SCRIPT_RULES[element]
+    folded = rule.folding.get(code_point)
+    if folded is not None:
+        return folded
+    category = unicodedata.category(chr(code_point))
+    if (
+        code_point in UNMAPPABLE_SIGNS
+        or code_point in rule.foreign
+        or (
+            (category[0] == "N" or category in UNMAPPABLE_CATEGORIES) and code_point not in rule.own
+        )
+    ):
+        return None
+    return code_point
+
+
 # Whitespace inside a tag: U+0009, U+000A, U+000D and U+0020, and nothing else. Neither
 # language's `\s` is used: an HTML parser reads any other code point (U+00A0, U+3000, U+FEFF)
 # as part of the tag name, so `sup` followed by U+00A0 is an unknown element to a renderer and
@@ -458,8 +496,6 @@ PICTURE_DATA_PREFIXES: Final = ("data:image/png;base64,", "data:image/jpeg;base6
 # The base64 length of 1 MiB.
 PICTURE_DATA_LIMIT: Final = 1_398_104
 BASE64_ALPHABET: Final = re.compile(r"[A-Za-z0-9+/]*")
-
-SOFT_HYPHEN: Final = chr(0x00AD)
 
 
 def _structural_break(name: str, cell_depth: int) -> str:
@@ -613,7 +649,7 @@ def _decode_entity(match: re.Match[str], offset: int) -> int:
         raise XhtmlError("forbidden-character", offset)
     if is_reserved(code_point):
         raise XhtmlError("reserved-character", offset)
-    if _is_invisible_break(code_point):
+    if is_invisible_break(code_point):
         raise XhtmlError("invisible-character", offset)
     return code_point
 
@@ -816,11 +852,10 @@ def list_marker(style: str, ordinal: int) -> str:
 def _emit_text(
     code_point: int, parent: str | None, output: list[str], offset: int, is_reference: bool
 ) -> None:
-    r"""One code point of text inside the root, raw or decoded, as the scanner emits it.
+    """One code point of text inside the root, raw or decoded, as the scanner emits it.
 
     Rejected directly inside a table container unless it is raw whitespace; folded or rejected
-    inside ``sup`` and ``sub``; otherwise kept as it is. General category N is read from
-    ``unicodedata`` because ``re`` has no ``\p{N}``.
+    inside ``sup`` and ``sub`` (``script_code_point``); otherwise kept as it is.
     """
     character = chr(code_point)
     # A line feed or carriage return in text is a space to a renderer: only a block boundary or
@@ -836,24 +871,12 @@ def _emit_text(
     if emitted != character:
         output.append(emitted)
         return
-    rule = SCRIPT_RULES.get(parent) if parent is not None else None
-    if rule is not None:
-        folded = rule.folding.get(code_point)
-        if folded is not None:
-            output.append(chr(folded))
-            return
-        if (
-            code_point in UNMAPPABLE_SIGNS
-            or code_point in rule.foreign
-            or (
-                (
-                    unicodedata.category(character)[0] == "N"
-                    or unicodedata.category(character) in UNMAPPABLE_CATEGORIES
-                )
-                and code_point not in rule.own
-            )
-        ):
+    if parent in ("sup", "sub"):
+        scripted = script_code_point(parent, code_point)
+        if scripted is None:
             raise XhtmlError("unmappable-script", offset)
+        output.append(chr(scripted))
+        return
     output.append(character)
 
 
@@ -880,8 +903,10 @@ def xhtml_to_text(div: str) -> str:
     stack: list[str] = []
     tables: list[_TableState] = []
     lists: list[_ListState] = []
-    # The output positions (list indexes) where an inline tag splits the text.
+    # The output positions (list indexes) where an inline tag splits the text, and the offset in
+    # the div of each tag.
     splits: list[int] = []
+    split_tags: list[int] = []
     # Each ``sub`` holding ½, checked after the scan; and the one open now.
     halves: list[_LoweredHalf] = []
     lowered: _LoweredHalf | None = None
@@ -921,6 +946,7 @@ def xhtml_to_text(div: str) -> str:
                     raise XhtmlError("misnested-tag", index)
                 if name in SPLITTING_INLINE:
                     splits.append(len(output))
+                    split_tags.append(index)
                 if name == "sub" and lowered is not None:
                     if lowered.offset >= 0:
                         lowered.end = len(output)
@@ -982,6 +1008,7 @@ def xhtml_to_text(div: str) -> str:
                 raise XhtmlError("table-content", index)
             if name in SPLITTING_INLINE:
                 splits.append(len(output))
+                split_tags.append(index)
             table = tables[-1] if tables else None
             _enter_table_structure(name, parent, table, index)
             if name in ("td", "th") and table is not None:
@@ -1082,5 +1109,5 @@ def xhtml_to_text(div: str) -> str:
     if halves:
         _check_lowered_halves(output, halves, script_pieces)
     offsets = _point_offsets(output)
-    _check_composition(text, [offsets(split) for split in splits])
+    _check_composition(text, [offsets(split) for split in splits], split_tags)
     return text

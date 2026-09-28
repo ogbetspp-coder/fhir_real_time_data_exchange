@@ -2,6 +2,9 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import {
   CanonicalSubmissionSchema,
+  MAX_NARRATIVE_LENGTH,
+  MAX_SPANS,
+  MAX_SPANS_PER_SECTION,
   SubmissionRejectedError,
   approvedContent,
   verifyDocumentSubmission,
@@ -231,6 +234,49 @@ describe("canonical submission contract", () => {
     submission.provenance.fidelity.normalizationVersion = "fidelity-norm/0.9.0";
 
     rejectedByParse(seal(submission), "fidelity.normalizationVersion must be fidelity-norm/3.1.0");
+  });
+
+  // Audit 2026-09-27 (F-1): the spans the gate re-executes are bounded, per section and in all.
+  it("bounds the spans of a section and of the whole provenance", () => {
+    const submission = clone();
+    const first = firstSection(submission);
+    const [span] = first.spans;
+    if (span === undefined) throw new Error("Synthetic provenance requires a span");
+    first.spans = Array.from({ length: MAX_SPANS_PER_SECTION + 1 }, () => ({ ...span }));
+    rejectedByParse(
+      seal(submission),
+      `provenance.sections[0] has more than ${MAX_SPANS_PER_SECTION} spans`,
+    );
+
+    const many = clone();
+    const template = firstSection(many);
+    const sections = Math.ceil((MAX_SPANS + 1) / MAX_SPANS_PER_SECTION);
+    many.provenance.sections = Array.from({ length: sections }, (_, position) => ({
+      ...structuredClone(template),
+      sourceKey: `smpc.99.${position}`,
+      spans: Array.from({ length: MAX_SPANS_PER_SECTION }, () => ({ ...span })),
+    }));
+    const parsed = CanonicalSubmissionSchema.safeParse(seal(many));
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues.map(({ message }) => message)).toContain(
+      `provenance.sections have more than ${MAX_SPANS} spans`,
+    );
+  });
+
+  // Audit 2026-09-27 (F-3): a narrative is scanned several times at this gate, so its length is
+  // bounded before the first scan.
+  it("bounds a narrative's length before scanning it", () => {
+    const submission = clone();
+    const composition = submission.bundle.entry[0]?.resource as
+      { section?: { text?: { div: string } }[] } | undefined;
+    const section = composition?.section?.find(({ text }) => text !== undefined);
+    if (section?.text === undefined) throw new Error("Synthetic bundle requires a narrative");
+    section.text.div = `<div xmlns="http://www.w3.org/1999/xhtml"><p>${"a".repeat(MAX_NARRATIVE_LENGTH)}</p></div>`;
+
+    const issues = reject(seal(submission)).issues;
+    expect(issues.filter((issue) => issue.includes("narrative exceeds"))).toEqual([
+      `Composition.section[${composition?.section?.indexOf(section) ?? -1}] narrative exceeds ${MAX_NARRATIVE_LENGTH} UTF-16 code units`,
+    ]);
   });
 
   it("rejects source text that does not match sourceDocument.extractedText.sha256", () => {

@@ -249,6 +249,29 @@ describe("xhtml scanner", () => {
     expect(performance.now() - started).toBeLessThan(20_000);
   }, 30_000);
 
+  // Audit 2026-09-27 (F-5): an error's offset is in code points into the div, whatever the code.
+  // A supplementary letter before the refused markup counts once, as it does in Python.
+  it("reports every error at a code point offset into the div", () => {
+    const letter = String.fromCodePoint(0x1d6fc);
+    const offsetOf = (div: string): number | undefined => {
+      try {
+        xhtmlToText(div);
+      } catch (error) {
+        if (error instanceof XhtmlError) return error.offset;
+        throw error;
+      }
+      return undefined;
+    };
+    const root = (inner: string): string =>
+      `<div xmlns="http://www.w3.org/1999/xhtml"><p>${inner}</p></div>`;
+    const tagAt = Array.from(root(letter)).length - "</p></div>".length;
+    expect(offsetOf(root(`${letter}<q>x</q>`))).toBe(tagAt);
+    expect(offsetOf(root(`${letter}&bogus;`))).toBe(tagAt);
+    // The tag a combining mark follows, not the mark's place in the scanned text.
+    expect(offsetOf(root(`${letter}e<b>${String.fromCodePoint(0x0301)}</b>`))).toBe(tagAt + 1);
+    expect(offsetOf(root(`${letter}${String.fromCodePoint(0xfffe)}`))).toBe(tagAt);
+  });
+
   // Section 2 applies to the div as decoded from JSON (RFC 8259). The vectors are written by
   // JSON.stringify, which never escapes a valid pair, so the escaped form is pinned here.
   it("reads an escaped surrogate pair in JSON as one code point", () => {
@@ -293,6 +316,95 @@ describe("narrative fidelity verification", () => {
   it("throws FidelityError for structurally unusable input", () => {
     for (const testCase of throwCases) {
       expect(() => verifyNarrativeFidelity(testCase.input), testCase.name).toThrow(FidelityError);
+    }
+  });
+
+  // Audit 2026-09-27 (F-5): a key or a version that is not a string is refused before it is
+  // written into any string, the same way in both languages (Python writes `True` where
+  // JavaScript writes `true`, and merges the keys `1` and `true`).
+  it("refuses a source key or a normalisation version that is not a string", () => {
+    const [valid] = verifyCases;
+    if (valid === undefined) throw new Error("no verify case");
+    const issuesOf = (input: unknown): string[] => {
+      try {
+        verifyNarrativeFidelity(input as FidelityInput);
+      } catch (error) {
+        if (error instanceof FidelityError) return error.issues;
+        throw error;
+      }
+      return [];
+    };
+    const { input } = valid;
+    expect(issuesOf({ ...input, normalizationVersion: true })).toEqual([
+      `Expected ${NORMALIZATION_VERSION}, received a value that is not a string`,
+    ]);
+    expect(
+      issuesOf({
+        ...input,
+        sections: input.sections.map((section, position) =>
+          position === 0 ? { ...section, sourceKey: 1 } : section,
+        ),
+        provenance: [{ ...input.provenance[0], sourceKey: true }, ...input.provenance.slice(1)],
+      }),
+    ).toEqual(["Source section 0 has no string key", "Provenance entry 0 has no string key"]);
+  });
+
+  // Audit 2026-09-27 (F-1): the line a gap is on used to be read to both its ends for every gap.
+  // Twenty thousand one-space spans across one whitespace line, and as many one-word spans on one
+  // line of words, took about 50 s here before.
+  it("verifies many spans on one long line in linear time", () => {
+    const count = 20_000;
+    const words = Array.from({ length: count }, () => "a").join(" ");
+    const blank = `x\n${" ".repeat(2 * count)}\n`;
+    const cases = [
+      {
+        text: `${words}\n`,
+        div: paragraphs(words),
+        spans: Array.from({ length: count }, (_, position) => [2 * position, 2 * position + 1]),
+      },
+      {
+        text: blank,
+        div: paragraphs("x"),
+        spans: [
+          [0, 1],
+          ...Array.from({ length: count }, (_, position) => [2 + 2 * position, 3 + 2 * position]),
+        ],
+      },
+    ];
+    const started = performance.now();
+    for (const { text, div, spans } of cases) {
+      const report = verifyNarrativeFidelity({
+        normalizationVersion: NORMALIZATION_VERSION,
+        source: {
+          extractorVersion: "synthetic-linear/1.0.0",
+          pages: [{ page: 1, text, bodyStart: 0, bodyEnd: text.length }],
+        },
+        sections: [{ sourceKey: "s", path: "Composition.section[0]", div }],
+        provenance: [
+          {
+            sourceKey: "s",
+            spans: spans.map(([start = 0, end = 0]) => ({
+              page: 1,
+              startOffset: start,
+              endOffset: end,
+              textSha256: sha256Utf8(text.slice(start, end)),
+            })),
+            narrativeDivSha256: sha256Utf8(div),
+            normalizedTextSha256: "0".repeat(64),
+          },
+        ],
+      });
+      expect(report.status).toBe("passed");
+    }
+    expect(performance.now() - started).toBeLessThan(10_000);
+  }, 60_000);
+
+  it("binds the narratives it scanned, as computeNarrativeBinding does", () => {
+    for (const testCase of verifyCases) {
+      const report = verifyNarrativeFidelity(testCase.input);
+      expect(report.narrativeBindingSha256, testCase.name).toBe(
+        computeNarrativeBinding(testCase.input.sections).sha256,
+      );
     }
   });
 
