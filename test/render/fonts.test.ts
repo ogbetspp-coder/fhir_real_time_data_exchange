@@ -10,6 +10,7 @@ import {
 import type { Font } from "../../src/render/font.js";
 import { BINDINGS, boundFace, checkTextNode, namedFamily } from "../../src/render/fonts.js";
 import { boxPairs, checkHeights, checkPage, resolveBox } from "../../src/render/page-checks.js";
+import { REFUSAL_CASES } from "../fixtures/render/refusal-cases.js";
 
 // R3's fonts and scripts, R6's coverage, R2's page and R3's character boxes, as rules on what
 // Chrome reports (the renderer image's runs of scripts/render/check.ts and check-fonts.ts draw
@@ -48,6 +49,17 @@ const node = (
   style,
   drawnIn,
   text,
+});
+
+describe("the seeded refusals", () => {
+  it("are each drawn in at least one mode, and every mode named is one", () => {
+    expect(REFUSAL_CASES.length).toBeGreaterThan(10);
+    for (const { name, modes } of REFUSAL_CASES) {
+      const drawn = modes ?? ["html", "xml"];
+      expect([name, drawn.length > 0]).toEqual([name, true]);
+      for (const mode of drawn) expect(["html", "xml"]).toContain(mode);
+    }
+  });
 });
 
 describe("R6's bindings", () => {

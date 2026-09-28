@@ -220,6 +220,35 @@ describe("the renderer image's pins", () => {
       (text: string) => text.replace('"bookworm-security ${DEBIAN_BOOKWORM_SECURITY_DATE}"', ""),
     ],
     [
+      "apt over HTTP alone (the HTTPS pass reverted)",
+      (text: string) => text.replace("snapshot https; \\", "snapshot http; \\"),
+    ],
+    ["the HTTPS pass dropped", (text: string) => text.replace("    snapshot https; \\\n", "")],
+    [
+      "more than the CA certificates over HTTP",
+      (text: string) =>
+        text.replace(
+          "--no-install-recommends ca-certificates; \\",
+          "--no-install-recommends ca-certificates curl; \\",
+        ),
+    ],
+    [
+      "a snapshot source written for plain HTTP",
+      (text: string) =>
+        text.replace(
+          '"URIs: $1://snapshot.debian.org/archive/debian/${DEBIAN_SNAPSHOT}"',
+          '"URIs: http://snapshot.debian.org/archive/debian/${DEBIAN_SNAPSHOT}"',
+        ),
+    ],
+    [
+      "a third apt install",
+      (text: string) =>
+        text.replace(
+          "    rm -rf /var/lib/apt/lists/*\n",
+          "    apt-get install --yes x; \\\n    rm -rf /var/lib/apt/lists/*\n",
+        ),
+    ],
+    [
       "a malformed snapshot",
       (text: string) => text.replace(/ARG DEBIAN_SNAPSHOT=\S+/, "ARG DEBIAN_SNAPSHOT=latest"),
     ],

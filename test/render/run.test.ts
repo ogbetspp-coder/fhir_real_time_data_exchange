@@ -35,6 +35,15 @@ describe("the renderer image's run", () => {
       .filter((file) => file.endsWith(".ts") && file !== "sections.ts")
       .map((file) => `scripts/render/${file}`);
     expect(drawing.filter((file) => !run.has(file))).toEqual([]);
+    // And each runs a script that exists: a deleted one fails here, not only in the image.
+    for (const target of run) expect([target, existsSync(target ?? "")]).toEqual([target, true]);
+    // Every renderer step of CI's workflow names one of them.
+    const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
+    const steps = [...workflow.matchAll(/run: npm run (renderer:[a-z]+)$/gmu)].map(
+      ([, name]) => name ?? "",
+    );
+    expect(steps.length).toBeGreaterThanOrEqual(7);
+    for (const name of steps) expect([name, name in scripts]).toEqual([name, true]);
   });
 
   it("carries every flag the isolation needs, and mounts only what the scripts read, read-only", () => {

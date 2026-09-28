@@ -114,7 +114,8 @@ jobs:
   # names. Its own job, since it needs Docker and ~200 MB of downloads; scripts/check-all.sh leaves
   # it out. A pull request that changes no renderer input (scripts/ci/renderer-inputs.mjs: only
   # documentation, the Python deployables, the infrastructure, assistant settings or Markdown)
-  # skips the image and the checks, and the job passes; a push to main always runs them.
+  # skips the image and the checks, and the job passes, saying so on its summary (a rename counts
+  # at both its paths); a push to main always runs them.
   renderer:
     name: Renderer
     runs-on: ubuntu-24.04

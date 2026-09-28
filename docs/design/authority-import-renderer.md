@@ -936,7 +936,7 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
    letter a second one drawn at 105 % of its size must be its face's at its own size, and where
    Chrome drew it taller than the letter it is judged at the letter's size: of 110 740 such
    stretched boxes the model refuses 109 808 and passes 932 (where the letter's interval holds
-   two pairs), a count pinned too; every carried section's 3 020 620 boxes at the ten ratios are
+   two pairs), a count pinned too; every carried section's 3 021 100 boxes at the ten ratios are
    exactly R3's (`renderer:check`). Stated: the interval is set from Blink's code at the pinned
    version and the sweep, not proven for every size; a size whose drawn box falls outside it is a
    refusal of ours, never a pass. Below an ascent of 3 device pixels Blink keeps fractional

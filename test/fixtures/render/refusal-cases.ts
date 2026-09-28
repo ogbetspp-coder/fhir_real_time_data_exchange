@@ -14,7 +14,8 @@ export type RefusalCase = {
   div: string;
   refusal: FontRefusal | PageRefusal;
   drawing?: "t";
-  modes?: readonly Mode[];
+  // At least one: a seed judged in no mode would pass without being drawn.
+  modes?: readonly [Mode, ...Mode[]];
 };
 
 const div = (inner: string, root = '<div xmlns="http://www.w3.org/1999/xhtml">'): string =>

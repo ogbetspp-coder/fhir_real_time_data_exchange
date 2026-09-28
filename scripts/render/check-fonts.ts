@@ -76,6 +76,10 @@ const expectedSeeds = REFUSAL_CASES.reduce(
   0,
 );
 if (judged !== expectedSeeds) failures.push(`judged ${judged} seeds, not ${expectedSeeds}`);
+// A seed judged in no mode would pass undrawn (the type allows none; a cast could).
+for (const seeded of REFUSAL_CASES) {
+  if ((seeded.modes ?? MODES).length === 0) failures.push(`seeded ${seeded.name}: no mode`);
+}
 if (failures.length > 0) {
   console.error(failures.join("\n"));
   console.error(`seeded refusals: ${failures.length} failures`);

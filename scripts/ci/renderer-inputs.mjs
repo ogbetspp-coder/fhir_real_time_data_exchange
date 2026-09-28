@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { appendFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 // Whether a pull request changes anything the renderer image's checks read (CI's Renderer job,
@@ -27,14 +28,16 @@ export function rendererInputsChanged(files) {
   return files.length === 0 || files.some((file) => !NOT_INPUTS.some((path) => path.test(file)));
 }
 
-// The files a pull request's merge commit changes against its base (its first parent), or
-// undefined where that cannot be read.
+// The diff of a pull request's merge commit against its base (its first parent): every path it
+// adds, changes or deletes. Renames are not detected, so a file moved out of an input tree (into
+// docs/, say) is listed at its old path as well as its new one.
+export const DIFF_ARGS = ["diff", "--no-renames", "--name-only", "-z", "HEAD^1", "HEAD"];
+
+// The files that diff lists, or undefined where it cannot be read.
 function changedFiles() {
   try {
     execFileSync("git", ["rev-parse", "--verify", "--quiet", "HEAD^2"], { stdio: "ignore" });
-    const out = execFileSync("git", ["diff", "--name-only", "-z", "HEAD^1", "HEAD"], {
-      encoding: "utf8",
-    });
+    const out = execFileSync("git", DIFF_ARGS, { encoding: "utf8" });
     return out.split("\0").filter((file) => file !== "");
   } catch {
     return undefined;
@@ -49,5 +52,12 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       ? "renderer inputs: every check runs (not a pull request's merge commit)"
       : `renderer inputs: ${files.length} files changed; ${run ? "a renderer input among them, every check runs" : "none a renderer input, the checks are skipped"}`,
   );
+  // A skipped run is shown on the job's summary, not only in its log.
+  if (!run && process.env.GITHUB_STEP_SUMMARY !== undefined) {
+    appendFileSync(
+      process.env.GITHUB_STEP_SUMMARY,
+      `Renderer checks skipped: no renderer input changed (${files?.length ?? 0} files, each documentation, a Python deployable, infrastructure, assistant settings or Markdown).\n`,
+    );
+  }
   console.log(`run=${run}`);
 }

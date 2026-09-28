@@ -1,9 +1,75 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { NOT_INPUTS, rendererInputsChanged } from "../../scripts/ci/renderer-inputs.mjs";
+import { DIFF_ARGS, NOT_INPUTS, rendererInputsChanged } from "../../scripts/ci/renderer-inputs.mjs";
+
+const SCRIPT = path.resolve("scripts/ci/renderer-inputs.mjs");
+
+// The step as CI runs it, in a scratch repository whose HEAD is a pull request's merge commit:
+// `change` is made on the branch; what the step prints, and what it writes to the job's summary.
+function mergeRun(change: (git: (...args: string[]) => void, root: string) => void): {
+  output: string;
+  summary: string;
+} {
+  const root = mkdtempSync(path.join(tmpdir(), "renderer-inputs-"));
+  try {
+    // A clean environment: no GIT_DIR or the like from whatever runs the tests.
+    const env = Object.fromEntries(
+      Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")),
+    );
+    const git = (...args: string[]): void => {
+      execFileSync(
+        "git",
+        [
+          "-c",
+          "user.name=t",
+          "-c",
+          "user.email=t@example.org",
+          "-c",
+          "commit.gpgsign=false",
+          ...args,
+        ],
+        { cwd: root, env, stdio: "ignore" },
+      );
+    };
+    git("init", "-q", "-b", "main");
+    mkdirSync(path.join(root, "scripts/render"), { recursive: true });
+    mkdirSync(path.join(root, "docs"));
+    writeFileSync(path.join(root, "scripts/render/check-drawings.ts"), "export const x = 1;\n");
+    writeFileSync(path.join(root, "docs/note.md"), "a note\n");
+    git("add", "-A");
+    git("commit", "-q", "-m", "base");
+    git("checkout", "-q", "-b", "change");
+    change(git, root);
+    git("add", "-A");
+    git("commit", "-q", "-m", "change");
+    git("checkout", "-q", "main");
+    git("merge", "-q", "--no-ff", "-m", "merge", "change");
+    const summary = path.join(root, "summary.md");
+    writeFileSync(summary, "");
+    const output = execFileSync(process.execPath, [SCRIPT], {
+      cwd: root,
+      env: { ...env, EVENT_NAME: "pull_request", GITHUB_STEP_SUMMARY: summary },
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    return { output, summary: readFileSync(summary, "utf8") };
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
 import { MOUNTS } from "../../scripts/render/run.mjs";
 
 // Which pull requests skip CI's Renderer job's checks (scripts/ci/renderer-inputs.mjs). The
@@ -59,6 +125,21 @@ describe("the renderer's inputs", () => {
 
   it("run every check when nothing is known to have changed", () => {
     expect(rendererInputsChanged([])).toBe(true);
+  });
+
+  it("are read from a merge commit with renames undetected, so an input moved into docs/ still runs every check", () => {
+    expect(DIFF_ARGS).toContain("--no-renames");
+    for (const target of ["docs/check-drawings.ts", "docs/check-drawings.md"]) {
+      const moved = mergeRun((git) => git("mv", "scripts/render/check-drawings.ts", target));
+      expect([target, moved.output]).toEqual([target, "run=true\n"]);
+      expect(moved.summary).toBe("");
+    }
+  });
+
+  it("skip a merge commit that changes only documentation, and say so on the job's summary", () => {
+    const docs = mergeRun((_, root) => writeFileSync(path.join(root, "docs/note.md"), "changed\n"));
+    expect(docs.output).toBe("run=false\n");
+    expect(docs.summary).toMatch(/^Renderer checks skipped: no renderer input changed \(1 files/u);
   });
 
   it("gate every step of the Renderer job after the one that decides", () => {
