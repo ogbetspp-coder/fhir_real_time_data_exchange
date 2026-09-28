@@ -473,18 +473,23 @@ export async function runPipeline(
   try {
     // Hashes and identifiers only: what the transaction answered, bound to what was signed.
     artifactUris.push(
-      await store.writeJson(runId, "commit", {
+      await store.writeJson(
         runId,
-        manifestHash: evidence.manifestHash,
-        transactionSha256,
-        transactionResponseSha256: sha256(transactionResponse),
-        committedAt,
-        targetBundle: {
-          id: emaBundleId,
-          versionId: persistedBundle?.versionId ?? null,
-          lastUpdated: persistedBundle?.lastUpdated ?? null,
+        "commit",
+        {
+          runId,
+          manifestHash: evidence.manifestHash,
+          transactionSha256,
+          transactionResponseSha256: sha256(transactionResponse),
+          committedAt,
+          targetBundle: {
+            id: emaBundleId,
+            versionId: persistedBundle?.versionId ?? null,
+            lastUpdated: persistedBundle?.lastUpdated ?? null,
+          },
         },
-      }),
+        { afterCommit: true },
+      ),
     );
     await store.writeLedger(evidence, {
       committedAt,

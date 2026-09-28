@@ -10,11 +10,38 @@ import { log } from "../lib/logger.js";
 
 export type { RunManifest } from "../contracts/run-manifest.js";
 
-// How long to wait before each retry of an evidence write or of the ledger insert. Bounded: about
-// two minutes in all, inside the worker's request timeout. The ledger needs it most: BigQuery's
-// streaming path caches a table's schema for a few minutes, so a row naming a freshly added column
-// can be refused just after the column is added (infra/run.tf).
+// How long to wait before each retry of an evidence write or of the ledger insert: about two
+// minutes in all, inside the worker's request timeout.
 export const EVIDENCE_RETRY_DELAYS_MS: readonly number[] = [2_000, 5_000, 15_000, 30_000, 60_000];
+
+// The ledger insert's longer tail, for one refusal only: BigQuery's streaming path caches a
+// table's schema for a few minutes, so a row naming a column Terraform has just added is refused
+// with "no such field" until the cache catches up (infra/run.tf). Every persisted run writes the
+// 3.0.0 columns, the deploy's smoke run first among them, minutes after the apply that adds them.
+// Capped at one minute between attempts, about six minutes in all.
+export const LEDGER_SCHEMA_RETRY_DELAYS_MS: readonly number[] = [
+  ...EVIDENCE_RETRY_DELAYS_MS,
+  60_000,
+  60_000,
+  60_000,
+  60_000,
+];
+
+// Whether BigQuery refused a row for naming a column its streaming path does not yet know. The
+// client reports it as a PartialFailureError whose row errors say "no such field".
+function unknownColumn(error: unknown): boolean {
+  const rowErrors = (error as { errors?: unknown } | null | undefined)?.errors;
+  const messages = [
+    (error as { message?: unknown } | null | undefined)?.message,
+    ...(Array.isArray(rowErrors) ? rowErrors : []).flatMap((rowError: unknown) => {
+      const nested = (rowError as { errors?: unknown } | null | undefined)?.errors;
+      return (Array.isArray(nested) ? nested : []).map(
+        (item: unknown) => (item as { message?: unknown } | null | undefined)?.message,
+      );
+    }),
+  ];
+  return messages.some((message) => typeof message === "string" && /no such field/i.test(message));
+}
 
 // What the transaction wrote, as the ledger row records it.
 export type LedgerCommit = {
@@ -29,7 +56,7 @@ function statusCode(error: unknown): unknown {
 }
 
 // A failure a retry may cure: no HTTP answer at all (a reset, a timeout), a rate limit, or a
-// server error. Each leaves open whether the write landed.
+// server error. All but the rate limit leave open whether the write landed.
 function transient(error: unknown): boolean {
   const code = statusCode(error);
   return typeof code !== "number" || code === 429 || code >= 500;
@@ -57,6 +84,7 @@ export class GcpEvidenceStore {
   public constructor(
     private readonly config: AppConfig,
     private readonly retryDelaysMs: readonly number[] = EVIDENCE_RETRY_DELAYS_MS,
+    private readonly schemaRetryDelaysMs: readonly number[] = LEDGER_SCHEMA_RETRY_DELAYS_MS,
   ) {
     const projectId = config.GOOGLE_CLOUD_PROJECT;
     if (projectId === undefined) throw new Error("GOOGLE_CLOUD_PROJECT is required");
@@ -75,13 +103,23 @@ export class GcpEvidenceStore {
   // anything to the FHIR store, rather than persisting a second version and then failing on the
   // first run's retained objects.
   //
-  // A transient failure is retried. It leaves open whether the attempt landed, so a 412 on a
-  // retry means that attempt's object is there and is taken as written; the worker holds
-  // `objectCreator` and cannot read the object back to compare. A 412 on a first attempt is a
-  // reused runId. (Only the claim is exposed to a wrong guess: if an earlier run with this runId
-  // existed and the claim's first attempt went unanswered, the next object's first attempt still
-  // answers 412, before the FHIR store is touched.) A 403 is Cloud Storage refusing the write.
-  public async writeJson(runId: string, name: string, value: unknown): Promise<string> {
+  // A transient failure is retried. Every object written before the transaction fails closed on
+  // any 412, even one that answers a retry after an unanswered attempt: that 412 may be this
+  // run's own lost write, or another run's object under the same runId (an earlier run that died
+  // after its first write, or a concurrent one), and the worker holds `objectCreator` and cannot
+  // read the object back to tell. Taking it as written could pair another run's evidence with
+  // this run's signed manifest; refusing it wrongly leaves nothing live, and the caller retries
+  // under a new runId. Only `afterCommit` writes (the `commit` object, written once the
+  // transaction is live) take a 412 after an unanswered attempt as their own: by then this run
+  // has claimed the runId with every earlier object, and refusing would turn a committed run
+  // into an unrecorded one. A 429 is not unanswered: it certainly wrote nothing. A 403 is Cloud
+  // Storage refusing the write.
+  public async writeJson(
+    runId: string,
+    name: string,
+    value: unknown,
+    options: { afterCommit?: boolean } = {},
+  ): Promise<string> {
     const bucketName = this.config.EVIDENCE_BUCKET;
     if (bucketName === undefined) throw new Error("EVIDENCE_BUCKET is required");
     const objectName = `runs/${runId}/${name}.json`;
@@ -106,7 +144,7 @@ export class GcpEvidenceStore {
         return uri;
       } catch (error) {
         const code = statusCode(error);
-        if (code === 412 && unanswered) {
+        if (code === 412 && unanswered && options.afterCommit === true) {
           log("warning", "Evidence object found written after an unanswered attempt", {
             runId,
             stage: "evidence",
@@ -121,7 +159,7 @@ export class GcpEvidenceStore {
         }
         const delay = this.retryDelaysMs[attempt];
         if (!transient(error) || delay === undefined) throw error;
-        unanswered = true;
+        if (code !== 429) unanswered = true;
         await sleep(delay);
       }
     }
@@ -186,8 +224,10 @@ export class GcpEvidenceStore {
 
   // The ledger row records a committed run: written after the transaction succeeded, never
   // skipped (a persist-mode configuration without a ledger dataset does not start, src/config.ts),
-  // and retried within a bound. The insertId lets BigQuery drop the duplicate a retry after an
-  // unanswered insert could otherwise leave (best effort, within its deduplication window).
+  // and retried within a bound: the ordinary one for any failure, and the longer schema tail
+  // (LEDGER_SCHEMA_RETRY_DELAYS_MS) while BigQuery answers "no such field". The insertId lets
+  // BigQuery drop the duplicate a retry after an unanswered insert could otherwise leave (best
+  // effort, within its deduplication window).
   public async writeLedger(record: SignedManifest, commit: LedgerCommit): Promise<void> {
     const dataset = this.config.TRANSFORMATION_LEDGER_DATASET;
     if (dataset === undefined) throw new Error("TRANSFORMATION_LEDGER_DATASET is required");
@@ -201,7 +241,9 @@ export class GcpEvidenceStore {
           .insert([{ insertId: row.run_id, json: row }], { raw: true });
         return;
       } catch (error) {
-        const delay = this.retryDelaysMs[attempt];
+        const delay = (unknownColumn(error) ? this.schemaRetryDelaysMs : this.retryDelaysMs)[
+          attempt
+        ];
         if (delay === undefined) throw error;
         log("warning", "Ledger insert failed; retrying", {
           runId: row.run_id,

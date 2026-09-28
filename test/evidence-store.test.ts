@@ -5,7 +5,13 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { loadConfig, type AppConfig } from "../src/config.js";
 import { loadEmaMapping } from "../src/fhir/mapping.js";
 import { createSyntheticType2Bundle } from "../src/fixtures/synthetic.js";
-import { GcpEvidenceStore, ledgerRow, type SignedManifest } from "../src/gcp/evidence.js";
+import {
+  EVIDENCE_RETRY_DELAYS_MS,
+  GcpEvidenceStore,
+  LEDGER_SCHEMA_RETRY_DELAYS_MS,
+  ledgerRow,
+  type SignedManifest,
+} from "../src/gcp/evidence.js";
 import { crc32c } from "../src/lib/crc32c.js";
 import { canonicalJson, sha256 } from "../src/lib/hash.js";
 import { runPipeline } from "../src/pipeline.js";
@@ -256,15 +262,38 @@ describe("writing an evidence artefact", () => {
     expect(google.saves).toHaveLength(1);
   });
 
-  // A lost answer: the first attempt wrote the object, and the retry's precondition finds it.
-  // That is this run's object, not a replay's, so a fresh run is not reported as a reused runId.
-  it("takes a 412 on a retry after an unanswered attempt as its own write", async () => {
+  // After the commit only: the first attempt wrote the object and its answer was lost, so the
+  // retry's precondition finds it. This run has already claimed the runId with every earlier
+  // object, and refusing would turn a committed run into an unrecorded one.
+  it("takes a 412 after an unanswered attempt as its own write, after the commit only", async () => {
     const store = new GcpEvidenceStore(config(), NO_WAIT);
     google.saveErrors.push(error("Service Unavailable", 503, true), error("Precondition", 412));
-    await expect(store.writeJson(RUN_ID, "commit", { a: 1 })).resolves.toBe(
+    await expect(store.writeJson(RUN_ID, "commit", { a: 1 }, { afterCommit: true })).resolves.toBe(
       `gs://synthetic-evidence/runs/${RUN_ID}/commit.json`,
     );
     expect(google.saves).toHaveLength(1);
+  });
+
+  // Review round 2's repro. Run A wrote its claim under a runId and died; run B reuses the runId,
+  // its claim's first attempt goes unanswered without landing, and the retry answers 412 for A's
+  // object. Taking that as B's own write paired A's evidence with B's signed manifest. Before
+  // the transaction every 412 fails closed: a wrong refusal leaves nothing live.
+  it("refuses a 412 after an unanswered attempt before the commit: it may be another run's object", async () => {
+    const store = new GcpEvidenceStore(config(), NO_WAIT);
+    google.saveErrors.push(error("Service Unavailable", 503), error("Precondition", 412));
+    await expect(store.writeJson(RUN_ID, "source-type2", { from: "B" })).rejects.toThrow(
+      "Run evidence already exists for this run id",
+    );
+    expect(google.saves).toEqual([]);
+  });
+
+  // A 429 wrote nothing, so the 412 that follows it is another run's object even after the commit.
+  it("does not count a rate-limited attempt as unanswered", async () => {
+    const store = new GcpEvidenceStore(config(), NO_WAIT);
+    google.saveErrors.push(error("Too Many Requests", 429), error("Precondition", 412));
+    await expect(
+      store.writeJson(RUN_ID, "commit", { a: 1 }, { afterCommit: true }),
+    ).rejects.toThrow("Run evidence already exists for this run id");
   });
 
   it("gives up after its bounded retries, and passes a non-transient failure through", async () => {
@@ -310,15 +339,46 @@ describe("writing the ledger row", () => {
     });
   });
 
-  // BigQuery's streaming path can refuse a row naming a freshly added column for a few minutes.
-  it("retries a refused insert within its bound, then gives up", async () => {
-    const store = new GcpEvidenceStore(config(), [0, 0]);
-    google.insertErrors.push(error("no such field: transaction_sha256"));
+  it("retries a refused insert within its ordinary bound, then gives up", async () => {
+    const store = new GcpEvidenceStore(config(), [0, 0], [0, 0, 0, 0]);
+    google.insertErrors.push(error("Service Unavailable", 503));
     await store.writeLedger(authorised, COMMIT);
     expect(google.inserts).toHaveLength(1);
 
-    google.insertErrors.push(error("one"), error("two"), error("three"));
+    google.insertErrors.push(error("one"), error("two"), error("three"), error("four"));
     await expect(store.writeLedger(authorised, COMMIT)).rejects.toThrow("three");
+  });
+
+  // BigQuery's streaming path can refuse a row naming a freshly added column for a few minutes
+  // after Terraform adds it, and every persisted run writes the 3.0.0 columns. The client reports
+  // it as a PartialFailureError whose row errors say "no such field": that refusal, and only
+  // that one, gets the longer tail.
+  it("keeps retrying a 'no such field' refusal through the schema-cache tail", async () => {
+    const store = new GcpEvidenceStore(config(), [0, 0], [0, 0, 0, 0]);
+    const schemaRefusal = (): Error =>
+      Object.assign(new Error("A failure occurred during this request."), {
+        name: "PartialFailureError",
+        errors: [
+          {
+            row: {},
+            errors: [{ reason: "invalid", message: "no such field: transaction_sha256." }],
+          },
+        ],
+      });
+    google.insertErrors.push(schemaRefusal(), schemaRefusal(), schemaRefusal(), schemaRefusal());
+    await store.writeLedger(authorised, COMMIT);
+    expect(google.inserts).toHaveLength(1);
+
+    google.insertErrors.push(...Array.from({ length: 5 }, schemaRefusal));
+    await expect(store.writeLedger(authorised, COMMIT)).rejects.toThrow("A failure occurred");
+  });
+
+  it("gives the schema tail about six minutes, a minute at most between attempts", () => {
+    const total = LEDGER_SCHEMA_RETRY_DELAYS_MS.reduce((sum, delay) => sum + delay, 0);
+    expect(total).toBeGreaterThanOrEqual(5 * 60_000);
+    expect(total).toBeLessThanOrEqual(7 * 60_000);
+    expect(Math.max(...LEDGER_SCHEMA_RETRY_DELAYS_MS)).toBe(60_000);
+    expect(LEDGER_SCHEMA_RETRY_DELAYS_MS.length).toBeGreaterThan(EVIDENCE_RETRY_DELAYS_MS.length);
   });
 
   // The ledger row is the run's commit record; a persisted run without one is not recorded.
