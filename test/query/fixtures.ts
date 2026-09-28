@@ -380,6 +380,10 @@ export async function connectHarness(options: {
   await server.connect(serverTransport);
   const client = new Client({ name: "acceptance-test", version: "1.0.0" });
   await client.connect(clientTransport);
+  // As an assistant does before its first call. It is also what makes the SDK's client hold
+  // every result to the tool's published outputSchema — an error result included — so every
+  // test below sees what a validating client sees.
+  await client.listTools();
 
   return {
     client,
@@ -394,6 +398,8 @@ export async function connectHarness(options: {
 
 export type ToolAnswer = {
   isError: boolean;
+  // The success result's structured content; for an error, the contract's QueryError, read
+  // from what the wire carries — the tool called and the closed code that is the whole text.
   structured: Record<string, unknown>;
   text: string;
 };
@@ -409,8 +415,15 @@ export async function callTool(
     .map((item) => (item as { text?: unknown }).text)
     .filter((item): item is string => typeof item === "string")
     .join("\n");
+  if (result.isError === true) {
+    // An error result carries no structured content: the outputSchema describes success only.
+    if (result.structuredContent !== undefined) {
+      throw new Error("an error result must carry no structuredContent");
+    }
+    return { isError: true, structured: { tool: name, error: text }, text };
+  }
   return {
-    isError: result.isError === true,
+    isError: false,
     structured: (result.structuredContent ?? {}) as Record<string, unknown>,
     text,
   };

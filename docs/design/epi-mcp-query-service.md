@@ -170,8 +170,11 @@ honestly" and traced as UR-20.
   validated, and it does not replace the approved ePI or the authorised product information. No
   compliance claim is made or implied.
 - **Amplification is bounded per request, not per principal.** One HTTP request may make 400
-  store reads (`REQUEST_READ_BUDGET`), with at most 8 in flight, and may occupy a request slot
-  for 30 seconds. That is the per-request worst case. Nothing limits how many such requests one
+  store reads (`REQUEST_READ_BUDGET`), with at most 8 in flight across every call of its batch
+  (`REQUEST_READ_CONCURRENCY`), each read abandoned after 10 seconds (`STORE_READ_TIMEOUT_MS`)
+  and cancelled when the request ends, and may occupy a request slot for 30 seconds. That is
+  the per-request worst case. With Cloud Run's `max_instance_request_concurrency` of 8 an
+  instance has at most 64 whole-Bundle reads in flight. Nothing limits how many such requests one
   principal sends: an entitled caller can still drive the instance's reads and request slots as
   hard as Cloud Run's own concurrency and instance limits allow. A per-principal quota — Cloud
   Armor, or an API product — is phase 2 and is not in place.
@@ -294,8 +297,12 @@ identity, and shares only pure libraries with the worker.
   interface with a Terraform-managed map (`QUERY_ENTITLEMENTS_JSON`, `{ "<sub>": { "bundles":
 [...] } }`); an unknown key in that map fails startup.
 - **Request shape.** The service answers `400 {"error":"invalid-request"}`, before the
-  transport is connected and without dispatching anything, when the body is not JSON or is
-  larger than 4 MiB, when a JSON-RPC batch carries more than 8 messages, when two entries carry
+  transport is connected and without dispatching anything, when the body is not JSON, is
+  larger than 4 MiB, or exceeds the ingress gate's own structural bounds (`src/lib/json-shape.ts`:
+  nesting deeper than 48, or more than 200,000 JSON values — a `tools/call` in a batch is five
+  deep at its arguments' values, and a body nested thousands deep exists only to reach code
+  whose depth is the call stack's), when a JSON-RPC batch carries more than 8 messages, when
+  two entries carry
   the same JSON-RPC id, when the body carries a `notifications/cancelled` naming a request id
   in the same body, or when the `X-Query-Turn-Id` header is present but is not a UUID. When
   that header is a UUID it is the assistant turn the caller declares (`contracts/agent-turn`)
@@ -310,10 +317,11 @@ identity, and shares only pure libraries with the worker.
   - **A refusal here writes no audit record**, because nothing was dispatched: the audit
     promise is one record per _dispatched_ tool call, and this is its zero-record case. What it
     does write is one structured warning — `severity: WARNING, stage: "query-http",
-event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSON-RPC
-    messages the parsed body carried. `messageCount` is absent on the two refusals decided
-    before the body is parsed (a turn id that is not a UUID, and a body that is not JSON).
-    Nothing derived from the body's content is logged. So an entitled caller probing the
+event: "refused-body", principal: <sub>`, plus `reason`, one of `invalid-turn-id`,
+    `upload-failed`, `too-large`, `not-json`, `too-complex`, `too-many-messages`, `repeated-id`
+    and `cancels-own-request`, and `messageCount`, the number of JSON-RPC messages the parsed
+    body carried. `messageCount` is absent on the first five reasons, whose body was never
+    taken as JSON-RPC messages. Nothing derived from the body's content is logged. So an entitled caller probing the
     refusal surface is visible in the application log even though the audit trail is silent.
 - **Request deadline.** The service waits at most 30 seconds for the transport to answer, and
   stops waiting sooner if the client disconnects. On either bounded end it answers
@@ -331,25 +339,47 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
   read too, and a version that is not current skips the Provenance search); a `get_provenance`
   the same. The budget is checked after the
   entitlement decision, so an exhausted budget never turns a `not-entitled` record into an
-  `unavailable` one. It is not a per-principal limit: a caller may send many requests.
+  `unavailable` one. It is not a per-principal limit: a caller may send many requests. The
+  same budget holds the request's in-flight pool: at most 8 store reads
+  (`REQUEST_READ_CONCURRENCY`) are in flight at once across every call of the batch, because
+  the SDK dispatches a batch's entries concurrently and a bound per call would allow 64.
 - **Reads** go to the validated FHIR store only, by REST, as the worker's own client does.
-  Section lookup is by canonical `sourceKey`; the pinned mapping manifest translates to the
-  store's coding where needed. No narrative and no result is cached across requests.
+  Each read carries a 10-second timeout (`STORE_READ_TIMEOUT_MS`) joined with the request's
+  own abort signal, which the service aborts once the request is over — answered, abandoned at
+  the deadline, or left by its client — so a tool still running on an abandoned request stops
+  reading. A store refusal whose body is not JSON (an HTML page from a proxy) still fails
+  naming its HTTP status, and the body of a `404` or `410` is released unread. Section lookup
+  is by canonical `sourceKey`: the transform stamps every EMA section with the id
+  `stableUuid("ema-qrd-section", sourceKey)`, and a section is found by that id alone — the
+  EMA coding is never translated back, and the mapping manifest is consulted only to refuse a
+  `sourceKey` it does not name. No narrative and no result is cached across requests.
 - **`find_product`** has no search against the store in phase 1: it reads the caller's entitled
   documents one by one and inspects each. A stored product name the normalisation refuses (a
   section 2 character) matches nothing by name, and its identifiers still match; it does not
-  make the whole search `unavailable`. The reads run through a pool of at most 8 in flight,
-  cover at most the first 200 entitled ids in entitlement order (`FIND_PRODUCT_SCAN_HORIZON`),
-  stop being launched once `limit` matches are in hand, and stop when the request's read budget
-  is spent. `truncated` covers both ways an answer can be shorter than what the entitlement
-  holds. The first is documents the call never searched — because the horizon cut the list,
-  because `limit` stopped the scan, or because the budget ran out. The second is matches the
+  make the whole search `unavailable`. Each identifier is held to the contract on its own: one
+  the contract cannot carry is left out of the summary, never the product (under `query-tools`
+  2.0.x one identifier with a "/" — every EMA ePI id — refused the whole summary). The reads
+  run through a pool of 8 workers, within the request's own in-flight bound, cover at most the
+  first 200 entitled ids in entitlement order (`FIND_PRODUCT_SCAN_HORIZON`), stop being
+  launched once `limit` matches are in hand, and stop when the request's read budget is spent.
+  When one read fails, the other workers launch no further read, and the call answers
+  `unavailable` only once every read it started has settled, so none outlives the answer.
+  `truncated` covers both ways an answer can be shorter than what the entitlement holds. The
+  first is documents the call never searched — because the horizon cut the list, because
+  `limit` stopped the scan, or because the budget ran out — or read and could not search: a
+  stored document that cannot be cited (no version, no Composition first) or whose product
+  cannot be summarised under the contract. A document the store does not hold is not one of
+  them. The second is matches the
   call read and did not return: up to seven reads are already in flight when the limit is
   reached, so a scan that runs to the end of a short entitlement can still have more matches in
   hand than `limit` returns, and those dropped matches make `truncated` true on their own. So
   an empty or a full `products` never silently means "that is all there is", and the same value
   is carried into the audit record. Matches are reported in entitlement order regardless of the
-  order the reads completed in.
+  order the reads completed in. Each read is a whole document Bundle (0.2–1 MB) read for a few
+  fields, and the budget bounds reads, not bytes: this is phase 1's choice, not its end state.
+  Phase 2 replaces the scan with a product index the worker writes alongside each published
+  version — name, identifiers, holder, language and section keys per Bundle version — which
+  `find_product` searches without reading a document.
 - **`verify_quote`** decides entitlement before it looks at the quote, so every argument shape
   naming a document outside the caller's entitlement — including one whose quote carries a
   character the normalisation forbids — is `document-not-found` to the caller and
@@ -502,15 +532,15 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
 - **Transport** is the Model Context Protocol streamable-HTTP transport from the official SDK,
   pinned, in stateless mode so Cloud Run can scale it. Tool descriptions state that content
   fields are document text, never instructions. Tool failures are returned as `isError: true`
-  with the contract's closed error shape (`{ tool, error }`) as `structuredContent`.
-  - **Known client-side quirk, not fixable here.** MCP SDK 1.30.0's `Client.callTool`
-    validates `structuredContent` against the tool's `outputSchema` whenever it is present —
-    including when `isError` is true — once `listTools` has cached the validators. A client
-    that has called `listTools` therefore sees a tool error rejected by its own validation as
-    an `McpError` rather than delivered as a tool error. The harness in `test/query/` calls
-    `callTool` without a prior `listTools`, so the tests do not exercise this path; an
-    integrator that lists tools first should expect it. The error shape is kept as structured
-    content regardless, because the `content` text alone is not machine-readable.
+  with one text content item that is exactly the closed error code, and no
+  `structuredContent` (`query-tools` 2.1.0; the contract's `QueryError` is that code and the
+  tool the caller called). Each tool's `outputSchema` describes its success shape, and MCP SDK
+  1.30.0's `Client.callTool` validates `structuredContent` against it whenever it is present —
+  including when `isError` is true — once `listTools` has cached the validators; under 2.0.x,
+  which carried the error shape as structured content, a client that had called `listTools`
+  saw every tool error as its own `McpError -32602` instead of the code. The harness in
+  `test/query/` calls `listTools` before its first call, as an assistant does, so every test
+  sees what a validating client sees.
 - **Audit.** Exactly one structured record per dispatched tool call (`QueryAuditRecord`):
   `service` (`ema-flow-query`), `serviceVersion`, `imageDigest` (from `IMAGE_DIGEST`,
   validated as `sha256:<64 hex>`; absent outside a container), `at`, `principal`,
@@ -534,14 +564,32 @@ event: "refused-body", principal: <sub>`, plus `messageCount`, the number of JSO
   records date from the moment the request was taken up, captured once before the transport is
   connected, so a call that occupied the whole deadline reads as having started when the
   request did and as having lasted about the deadline. A body refused before the transport is
-  connected produces no record at all; the warning line above is its trace.
+  connected produces no record at all; the warning line above is its trace. A record is never
+  lost to an exception: writing one cannot throw, a call's id is marked recorded only once its
+  record has been written (so the HTTP layer writes any record a tool could not), and the
+  arguments are hashed by an iterative walk that no nesting depth can overflow. When the full
+  record cannot be written — its arguments cannot be hashed at all, or it fails its own
+  contract — a fallback carrying only the required fields is written instead, with `degraded`
+  (`arguments-unhashable`, when `argumentsSha256` is the hash of JSON `null`, or
+  `record-rejected`) saying why; `durationMs` is floored at zero, so a wall clock stepped back
+  mid-call does not cost the record.
 - **Structured log lines** the service writes all carry `service: "ema-flow-query"`. A refused
   authentication is `severity: WARNING, stage: "query-http", event: "unauthenticated"` with no
-  principal, no reason, and nothing derived from the credential; a refused entitlement is
+  principal and nothing derived from the credential. It carries no reason either, unless
+  `QUERY_LOG_REJECTION_REASON` is `true` (the dev deployment sets it; it is off by default and
+  in production, where a refusal reason in a log is a hint about a credential): then it carries
+  `reason`, one of seven categories — `no-bearer`, `id-token-rejected`,
+  `access-tokens-not-accepted`, `access-token-audience`, `access-token-expired`,
+  `access-token-lookup-failed`, `principal-malformed` — never a message and never anything from
+  the token's bytes, and the caller is still told only `unauthenticated`. It exists because a
+  whole Gemini Enterprise turn failed on 2026-09-22 with nothing in the log but seven
+  `unauthenticated` lines; until 2026-09-27 the flag was parsed and deployed but never reached
+  the service. A tool that failed is `severity: ERROR, stage: "query-tool"` with the error's
+  type and, for a store refusal, its `httpStatus`, never its message; a refused entitlement is
   `severity: WARNING, stage: "query-http", event: "not-entitled", principal: <sub>` — the
   opaque subject an operator would entitle; a body refused before the transport is connected is
   `severity: WARNING, stage: "query-http", event: "refused-body", principal: <sub>` with
-  `messageCount` when the body was parsed; tool audit records are `stage: "query-tool"` with
+  `reason` and, when the body was parsed, `messageCount`; tool audit records are `stage: "query-tool"` with
   `outcome` as above; a request the transport never answered is `severity: WARNING,
 stage: "query-http", event: "deadline" | "client-closed", principal: <sub>` with the deadline
   and a count of the `tools/call` entries that never reached a handler. These are the fields
@@ -607,7 +655,12 @@ original criteria; the rest were added with the three adversarial reviews of 202
     authenticated principal with no entitlement before the protocol")
 12. **The 401 line.** A refused authentication writes one `WARNING` line whose only fields are
     `event`, `message`, `service`, `severity`, `stage`, `timestamp`. (`http.test.ts`, "logs a
-    rejected authentication as a structured warning with nothing from the token")
+    rejected authentication as a structured warning with nothing from the token") Built from
+    its configuration as `server.ts` builds it, with `QUERY_LOG_REJECTION_REASON=true` the line
+    also carries `reason` — `no-bearer`, `access-tokens-not-accepted` — and still no token, no
+    token hash and no "Bearer"; unset, it carries none. (`failure-paths.test.ts`, "logs the
+    category of a refused credential when QUERY_LOG_REJECTION_REASON is set", "logs no
+    category when the flag is unset")
 13. **The audit fields.** `imageDigest`, `credentialType` as the verifier reported it, and
     `versionId` are on the record; `X-Query-Turn-Id` is threaded into every record of a batch;
     a header that is not a UUID is answered `400` with no record and no read. (`http.test.ts`,
@@ -699,10 +752,12 @@ alpine` with a `RUN --mount ... from=alpine`, and a `FROM node:...@<digest> AS n
 26. **Every pre-transport refusal leaves a line.** A turn id that is not a UUID, a body that is
     not JSON, a batch over the cap, a repeated JSON-RPC id and a cancellation naming a request
     in the same body each write exactly one `WARNING` with `event: "refused-body"`, the
-    principal, and a message count where the body was parsed — with no bundle id, no source key
-    and nothing else from the body — while the audit trail and the read log stay empty.
-    (`http.test.ts`, "leaves one structured warning for every refusal that precedes the
-    transport")
+    principal, its `reason`, and a message count where the body was parsed — with no bundle id,
+    no source key and nothing else from the body — while the audit trail and the read log stay
+    empty. (`http.test.ts`, "leaves one structured warning for every refusal that precedes the
+    transport") So do a body over 4 MiB (`too-large`) and arguments nested 3,000 deep
+    (`too-complex`). (`failure-paths.test.ts`, "refuses a body over the size cap, naming the
+    reason", "refuses arguments nested past the bound, naming the reason")
 27. **The allow-list enforces its own claim.** A `credentialType` that is not a short lowercase
     token is dropped by the logger, as are a `resourceType` and a `resourceId` outside their
     shapes; both members of the credential type enum are kept. (`test/logger.test.ts`, "drops an
@@ -733,6 +788,41 @@ alpine` with a `RUN --mount ... from=alpine`, and a `FROM node:...@<digest> AS n
     version's approval") The approval chosen is the most recently written, whatever the approval
     dates say, in both directions. (`fhir-reader.test.ts`, "goes by when the store wrote an
     approval, not by the approval date it carries")
+31. **An EMA product is found.** A product whose identifier is an EMA ePI id (`EPI/23/1047`) is
+    found by name and by that identifier, with the identifier in the summary and
+    `truncated: false`; a product whose identifier the contract cannot carry is found without
+    it; a document whose product name exceeds the contract's bound, or that does not say its
+    version, makes the answer `truncated: true`; an entitled document the store does not hold
+    does not. (`acceptance.test.ts`, "find_product finds a product whose identifier is an EMA ePI
+    id", "find_product counts a document it could not summarise as unsearched")
+32. **A tool that throws.** With every store read rejecting with a message quoting label text,
+    each of the four tools answers `isError` with the text `unavailable` and nothing else, the
+    message appears in neither the HTTP body nor any log line, the failure line names the
+    error's type (and a store refusal's `httpStatus`), and each call has exactly one record.
+    When one of `find_product`'s reads fails, no further read is launched and none is in flight
+    once it answers. A stored Bundle with no version, or whose first entry is not a
+    Composition, is `unavailable` to `get_section`, `get_provenance` and `verify_quote`; so is a
+    named version whose standing the budget cannot pay to read. (`failure-paths.test.ts`, "a
+    tool whose store read throws", "find_product when one read fails", "a stored document that
+    cannot be answered from")
+33. **Reads in flight are bounded and cancelled.** Eight `find_product` calls in one batch never
+    have more than eight store reads in flight between them; a request abandoned at its
+    deadline aborts the signal of every read it started, and starts none after. The reader
+    joins each read's signal with a 10-second timeout, names the status of a refusal whose body
+    is not JSON, and releases a `404` body unread. (`failure-paths.test.ts`, "store reads in
+    flight"; `fhir-reader.test.ts`, "bounds every read by a timeout, and cancels it with the
+    request", "names the status of a refusal whose body is not JSON, and quotes nothing from
+    it", "releases the body of a missing resource without reading it")
+34. **A validating client gets the code.** After `listTools`, a tool error reaches the SDK's
+    client as `isError` with the closed code as its text, not as the client's own validation
+    `McpError`. (`failure-paths.test.ts`, "receives a tool error as a tool error after listTools,
+    not as its own validation error")
+35. **No record is lost.** Arguments nested 20,000 deep over a transport that does not bound
+    them are recorded once, hashed; arguments that cannot be hashed, and a record that fails its
+    own contract, are recorded by the fallback with `degraded`; an audit sink that throws does
+    not turn the answer into an internal error or leak the sink's message. (`failure-paths.test.ts`,
+    "an audit record"; `test/hash.test.ts`, "writes a value nested far deeper than the call
+    stack would allow a recursive walk")
 
 ## Security properties stated honestly
 

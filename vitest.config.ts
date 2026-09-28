@@ -30,7 +30,7 @@ export default defineConfig({
         branches: 82,
         "src/fidelity/**": { lines: 98, statements: 97, functions: 100, branches: 91 },
         "src/contracts/**": { lines: 94, statements: 93, functions: 95, branches: 82 },
-        "src/query/**": { lines: 94, statements: 89, functions: 94, branches: 81 },
+        "src/query/**": { lines: 96, statements: 93, functions: 97, branches: 86 },
         "src/fhir/**": { lines: 92, statements: 91, functions: 91, branches: 84 },
         "src/gcp/**": { lines: 90, statements: 87, functions: 90, branches: 80 },
         "src/lib/**": { lines: 90, statements: 90, functions: 100, branches: 90 },

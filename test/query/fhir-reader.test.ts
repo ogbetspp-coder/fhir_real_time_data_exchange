@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FhirResource } from "../../src/fhir/types.js";
-import { sha256 } from "../../src/lib/hash.js";
+import { sha256, sha256Utf8 } from "../../src/lib/hash.js";
 import {
   FhirReadError,
   HealthcareFhirReader,
@@ -226,6 +226,7 @@ describe("reading a document Bundle", () => {
 
     expect(error).toBeInstanceOf(FhirReadError);
     expect((error as FhirReadError).name).toBe("FhirReadError");
+    expect((error as FhirReadError).httpStatus).toBe(403);
     expect((error as FhirReadError).message).toBe(
       `Healthcare API 403 Forbidden (response sha256 ${sha256(body)}, 2 issues)`,
     );
@@ -240,6 +241,57 @@ describe("reading a document Bundle", () => {
     await expect(reader.readBundleVersion("bundle-1", "1")).rejects.toThrow(
       `Healthcare API 500 Internal Server Error (response sha256 ${sha256(body)}, 0 issues)`,
     );
+  });
+
+  it("names the status of a refusal whose body is not JSON, and quotes nothing from it", async () => {
+    // An HTML error page from a proxy in front of the store: before, response.json() threw a
+    // bare SyntaxError and the status was lost.
+    const page = "<html><body>502 Bad Gateway: take two tablets</body></html>";
+    answer = () => new Response(page, { status: 502, statusText: "Bad Gateway" });
+    const reader = new HealthcareFhirReader(OPTIONS);
+
+    const error = await reader.readBundle("bundle-1").catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(FhirReadError);
+    expect((error as FhirReadError).httpStatus).toBe(502);
+    expect((error as FhirReadError).message).toBe(
+      `Healthcare API 502 Bad Gateway (non-JSON response sha256 ${sha256Utf8(page)})`,
+    );
+    expect((error as FhirReadError).message).not.toContain("tablets");
+  });
+
+  it("releases the body of a missing resource without reading it", async () => {
+    const answered: Response[] = [];
+    answer = () => {
+      const response = new Response(JSON.stringify({ resourceType: "OperationOutcome" }), {
+        status: 404,
+      });
+      answered.push(response);
+      return response;
+    };
+    const reader = new HealthcareFhirReader(OPTIONS);
+
+    expect(await reader.readBundle("bundle-1")).toBeUndefined();
+    expect(answered[0]?.bodyUsed).toBe(true);
+  });
+
+  it("bounds every read by a timeout, and cancels it with the request", async () => {
+    answer = respond(200, DOCUMENT);
+    const reader = new HealthcareFhirReader(OPTIONS);
+
+    // No request signal: the read still carries its own timeout.
+    await reader.readBundle("bundle-1");
+    const alone = sent[0]?.init.signal;
+    expect(alone).toBeInstanceOf(AbortSignal);
+    expect(alone?.aborted).toBe(false);
+
+    // With one: aborting the request aborts the read.
+    const request = new AbortController();
+    await reader.findProvenanceForBundle("bundle-1", request.signal);
+    const joined = sent[1]?.init.signal;
+    expect(joined?.aborted).toBe(false);
+    request.abort();
+    expect(joined?.aborted).toBe(true);
   });
 
   it("refuses when Application Default Credentials yield no token, before any request", async () => {

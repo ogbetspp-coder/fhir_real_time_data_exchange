@@ -7,12 +7,14 @@ The agent shares nothing with the worker or with Zone A except two published sch
 schema). Both are vendored into the package by ``scripts/sync_contract.py`` so the deployable
 is self-contained on Agent Engine, and CI fails if either copy has drifted.
 
-query-tools 2.0.1. Since 2.0.0, ``FindProductOutput`` carries ``truncated``, and
+query-tools 2.1.0. Since 2.0.0, ``FindProductOutput`` carries ``truncated``, and
 ``not-entitled`` is no longer an error code a caller can see — outside the caller's entitlement
 the service answers ``document-not-found``. Nothing here ever matched on an error code (an
 ``isError`` result is unavailable whatever its code), so that change alters no behaviour at this
 end. 2.0.1 changed descriptions and made ``verify_quote``'s ``match`` stricter; the shapes this
-module validates are unchanged.
+module validates are unchanged. 2.1.0 lets a product identifier's value carry "/" (an EMA ePI
+id), which this module now accepts as the schema does; an ``isError`` result no longer carries
+``structuredContent``, which nothing here read.
 
 Every tool result is validated against the schema before anything reads it. A result that does
 not validate is *unavailable*: it is never composed, never rendered, and never quoted. That is

@@ -476,6 +476,14 @@ describe("query service HTTP surface", () => {
       2,
       2,
     ]);
+    // Why, as one of a closed set of categories.
+    expect(refusals.map((line) => line.reason)).toEqual([
+      "invalid-turn-id",
+      "not-json",
+      "too-many-messages",
+      "repeated-id",
+      "cancels-own-request",
+    ]);
     const written = JSON.stringify(refusals);
     expect(written).not.toContain(SECTION_KEY);
     expect(written).not.toContain(store.bundleIdA);
@@ -524,17 +532,15 @@ describe("query service HTTP surface", () => {
 
       expect(response.status).toBe(200);
       const body = (await response.json()) as {
-        result?: { isError?: boolean; structuredContent?: unknown };
+        result?: { isError?: boolean; structuredContent?: unknown; content?: unknown };
       }[];
       expect(body).toHaveLength(4);
       // The budget is what stopped them, so at least one call was refused `unavailable`.
       const refused = body.filter((entry) => entry.result?.isError === true);
       expect(refused.length).toBeGreaterThan(0);
       for (const entry of refused) {
-        expect(entry.result?.structuredContent).toEqual({
-          tool: "get_section",
-          error: "unavailable",
-        });
+        expect(entry.result?.structuredContent).toBeUndefined();
+        expect(entry.result?.content).toEqual([{ type: "text", text: "unavailable" }]);
       }
       // Exactly the budget, across the whole batch: bundle reads and provenance reads together.
       expect(fake.log.bundles.length + fake.log.provenance.length).toBe(3);
@@ -608,12 +614,10 @@ describe("query service HTTP surface", () => {
       const body = (await response.json()) as {
         result?: { isError?: boolean; structuredContent?: unknown; content?: { text?: string }[] };
       };
-      // No validation message, no echo of the argument: the closed code and nothing else.
+      // No validation message, no echo of the argument: the closed code and nothing else, and
+      // no structured content for a client to hold to the success outputSchema.
       expect(body.result?.isError).toBe(true);
-      expect(body.result?.structuredContent).toEqual({
-        tool: "get_section",
-        error: "invalid-request",
-      });
+      expect(body.result?.structuredContent).toBeUndefined();
       expect(body.result?.content).toEqual([{ type: "text", text: "invalid-request" }]);
     }
     expect(audits.slice(before).map((record) => record.outcome)).toEqual([

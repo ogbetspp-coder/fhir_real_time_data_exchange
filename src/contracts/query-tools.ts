@@ -43,8 +43,22 @@ import { ApproverRole } from "./ingestion-provenance.js";
 // current version only. Patch, not minor, because no field, enum member or bound changed
 // (ADR 0002, "Versioning"); a `match` recorded under 2.0.0 was decided by the looser rule, and
 // the version on the record is what tells the two apart.
+//
+// 2.1.0: a product identifier's value may carry "/" — every EMA ePI id does ("EPI/23/1047"),
+// and so does every EU marketing authorisation number — where 2.0.x refused the whole product
+// summary over one such identifier, and find_product answered without the product; the audit
+// record gains an optional `degraded`, present only on the fallback record written when the
+// full one could not be; and a tool error is delivered as `isError` with the closed code as its
+// text and no `structuredContent`, because each tool's outputSchema describes its success shape
+// only. Minor: every value valid under 2.0.1 is valid under 2.1.0, and the one field added is
+// optional (ADR 0002, "Versioning").
 
-export const QUERY_TOOLS_VERSION = "2.0.1";
+export const QUERY_TOOLS_VERSION = "2.1.0";
+
+// A product identifier's value: letters, digits and ". _ : / -". The slash is what an EMA ePI
+// id ("EPI/23/1047") and an EU marketing authorisation number ("EU/1/12/780/003") are built
+// with.
+const ProductIdentifierValue = z.string().regex(/^[A-Za-z0-9._:/-]{1,128}$/);
 
 // The digest of the container image that answered, as Cloud Run reports it (ADR 0004: a
 // service's evidence names its image).
@@ -115,7 +129,7 @@ export const ProductSummarySchema = z
       .array(
         z.strictObject({
           system: CanonicalUri,
-          value: z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/),
+          value: ProductIdentifierValue,
         }),
       )
       .max(20),
@@ -262,9 +276,17 @@ export const QueryErrorCode = z
   ])
   .meta({ id: "QueryErrorCode" });
 
+// On the wire (from 2.1.0) a failed call is a tool result with `isError: true` whose one text
+// content item is exactly `error`, and it carries no `structuredContent`: each tool's
+// outputSchema describes its success shape, and an MCP client validates any structured content
+// it is given against that schema. `tool` is the tool the caller called.
 export const QueryErrorSchema = z
   .strictObject({ tool: QueryToolName, error: QueryErrorCode })
-  .meta({ id: "QueryError" });
+  .meta({
+    id: "QueryError",
+    description:
+      "A failed call: `isError: true` and one text content item that is exactly `error`, one of the closed codes. No structured content, no message, no detail.",
+  });
 
 // What the audit trail records about a call. A superset of the error codes: `not-entitled` is
 // written when a caller named a document outside their entitlement, and is the one outcome the
@@ -299,6 +321,12 @@ export const QueryAuditRecordSchema = z
     // `X-Query-Turn-Id` request header, a UUID). It is what joins this record to the assistant's
     // own turn record (contracts/agent-turn) after the fact.
     turnId: Uuid.optional(),
+    // Present only on a fallback record: the full record could not be written, and this one
+    // carries the required fields alone, so that no call goes unrecorded. Why:
+    // `arguments-unhashable`, the arguments could not be hashed and `argumentsSha256` is the
+    // hash of JSON `null`, not of the arguments; `record-rejected`, the full record failed its
+    // own contract.
+    degraded: z.enum(["arguments-unhashable", "record-rejected"]).optional(),
   })
   .meta({
     id: "QueryAuditRecord",

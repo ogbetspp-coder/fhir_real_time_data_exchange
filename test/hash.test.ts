@@ -42,6 +42,25 @@ describe("canonical JSON", () => {
     );
   });
 
+  it("writes a value nested far deeper than the call stack would allow a recursive walk", () => {
+    // A request body of a few kilobytes of brackets reaches this depth; the hash of its
+    // arguments is what the audit record carries, so it must be takeable.
+    let nested: unknown = 1;
+    for (let depth = 0; depth < 100_000; depth += 1)
+      nested = depth % 2 === 0 ? [nested] : { k: nested };
+    const written = canonicalJson(nested);
+    expect(written.length).toBe(400_001);
+    expect(written.startsWith('{"k":[{"k":[')).toBe(true);
+    expect(written.endsWith("]}]}")).toBe(true);
+  });
+
+  it("writes a hole in a sparse array as nothing, as the recursive form did", () => {
+    // Not JSON, and never produced by parsing JSON: pinned so that the iterative walk is
+    // byte-identical to the recursive one on every input, not only on JSON.
+    // eslint-disable-next-line no-sparse-arrays
+    expect(canonicalJson([1, , 3])).toBe("[1,,3]");
+  });
+
   it("hashes canonical JSON for values and raw UTF-8 for spans", () => {
     expect(sha256("abc")).not.toBe(sha256Utf8("abc"));
     expect(sha256({ b: 1, a: 2 })).toBe(sha256({ a: 2, b: 1 }));

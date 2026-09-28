@@ -38,10 +38,10 @@
     },
     {
       "name": "query-tools",
-      "version": "2.0.1",
-      "$id": "https://khs.dev/contracts/query-tools/2.0.1/schema.json",
+      "version": "2.1.0",
+      "$id": "https://khs.dev/contracts/query-tools/2.1.0/schema.json",
       "file": "query-tools.schema.json",
-      "sha256": "8a15547165246a44318c6bea86c144bbf582f2863a8999d23d76bf0dd6aba8e8"
+      "sha256": "1b2f789b536c776ec087fbd4822c52cb6751ae67a70ad782c5a1e7dd260043bd"
     },
     {
       "name": "agent-turn",
