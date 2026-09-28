@@ -38,7 +38,6 @@ export class Cdp {
     Pending & { method: string; timer: ReturnType<typeof setTimeout> }
   >();
   private readonly listeners = new Set<(event: CdpEvent) => void>();
-  private readonly waiters = new Set<(error: Error) => void>();
   private readonly aborts = new Set<(error: Error) => void>();
   // Bytes of a message not yet ended by its NUL.
   private partial: Buffer[] = [];
@@ -94,34 +93,6 @@ export class Cdp {
     return () => this.aborts.delete(listener);
   }
 
-  // The first event of `method` (in `sessionId`, if given) that `accept` takes; rejected if the
-  // pipe fails first.
-  waitFor(
-    method: string,
-    sessionId?: string,
-    accept: (params: Record<string, unknown>) => boolean = () => true,
-  ): Promise<Record<string, unknown>> {
-    return new Promise((resolve, reject) => {
-      if (this.closed !== undefined) {
-        reject(this.closed);
-        return;
-      }
-      const failed = (error: Error): void => {
-        stop();
-        reject(error);
-      };
-      this.waiters.add(failed);
-      const stop = this.on((event) => {
-        if (event.method !== method) return;
-        if (sessionId !== undefined && event.sessionId !== sessionId) return;
-        if (!accept(event.params)) return;
-        stop();
-        this.waiters.delete(failed);
-        resolve(event.params);
-      });
-    });
-  }
-
   // Each chunk is searched for NUL once, so a large reply costs its length, not its square.
   private receive(chunk: Buffer): void {
     let start = 0;
@@ -168,7 +139,7 @@ export class Cdp {
     }
   }
 
-  // Fails every pending command and waiter, and every later one.
+  // Fails every pending command, and every later one, and tells the abort listeners.
   abort(error: Error): void {
     if (this.closed !== undefined) return;
     this.closed = error;
@@ -177,8 +148,6 @@ export class Cdp {
       pending.reject(error);
     }
     this.pending.clear();
-    for (const waiter of [...this.waiters]) waiter(error);
-    this.waiters.clear();
     for (const listener of [...this.aborts]) listener(error);
     this.aborts.clear();
   }

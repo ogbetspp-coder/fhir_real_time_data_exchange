@@ -1,7 +1,9 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readRendererPins } from "../../scripts/ci/renderer-pins.mjs";
 import { modelSection, type Model } from "../../src/authority/t/model.js";
 import {
   borderAsDrawn,
@@ -17,10 +19,16 @@ import type { ChromeElement, ChromeText } from "../../src/render/measure.js";
 import { MODEL_CASES } from "../fixtures/render/model-cases.js";
 
 // R3's comparison on recorded Chrome output (test/fixtures/render/recorded.json, made by
-// scripts/render/record.ts with the pinned browser at ratio 1.25), so `npm run check` needs no
-// browser: T's model equals every recording, and each kind of model error is caught.
+// scripts/render/record.ts with the pinned browser at ratio 1.25 and recorded again in CI's
+// Renderer job), so `npm run check` needs no browser: T's model equals every recording, and each
+// kind of model error is caught.
 
-type Recording = { elements: ChromeElement[]; markers: [number, string][]; texts: ChromeText[] };
+type Recording = {
+  divSha256: string;
+  elements: ChromeElement[];
+  markers: [number, string][];
+  texts: ChromeText[];
+};
 const recorded = JSON.parse(readFileSync("test/fixtures/render/recorded.json", "utf8")) as Record<
   string,
   Recording
@@ -51,8 +59,19 @@ function element(model: Model, name: string, nth = 0) {
 }
 
 describe("R3 on the recorded drawings", () => {
-  it("was recorded with the pinned browser", () => {
-    expect(recorded.browser).toBe("HeadlessChrome/154.0.8037.57");
+  it("was recorded with the pinned browser, of every model case as it stands", () => {
+    expect(recorded.browser).toBe(`HeadlessChrome/${readRendererPins().chromeVersion}`);
+    const sha256 = (text: string): string =>
+      createHash("sha256").update(text, "utf8").digest("hex");
+    const expected = MODEL_CASES.flatMap(({ name, inner }) =>
+      (["html", "xml"] as const).map((mode) => [
+        `${name} ${mode}`,
+        sha256(`${ROOT}${inner}${MARKED}`),
+      ]),
+    );
+    // Every recording, in order, is of a model case's div as it stands, and nothing else.
+    const cases = Object.keys(recorded).filter((key) => key !== "browser" && key !== "ratio");
+    expect(cases.map((key) => [key, recorded[key]?.divSha256])).toEqual(expected);
   });
 
   for (const { name } of MODEL_CASES) {
@@ -404,6 +423,17 @@ describe("R3 on the recorded drawings", () => {
     expect(compareText({ ...model, waivers: [{ start: 0, end: 1 }] }, texts)).toContainEqual(
       expect.objectContaining({ property: "waiver 0", model: "+" }),
     );
+  });
+
+  it("compares a text node of any length", () => {
+    const long = "a".repeat(300_000);
+    const model = JSON.parse(modelSection(`${ROOT}<p>${long}</p>${MARKED}`)) as Model;
+    const texts = model.text.map(({ element, start, end }) => ({
+      parent: element,
+      length: end - start,
+      data: end - start === long.length ? long : "not for clinical use",
+    }));
+    expect(compareText(model, texts)).toEqual([]);
   });
 
   it("requires every marker Chrome draws to be in the model", () => {

@@ -41,7 +41,7 @@ export type Page = {
   contextId: number;
   // An expression evaluated in the judge's world, its value returned by value.
   evaluate: <T>(expression: string) => Promise<T>;
-  // A command in this page's session.
+  // A command in this page's session; like `evaluate`, refused once the page navigated.
   send: (method: string, params?: Record<string, unknown>) => Promise<Record<string, unknown>>;
   // The requests the page made that were failed, by URL (a test asserts what it expects there).
   failed: string[];
@@ -58,7 +58,7 @@ export type OpenOptions = {
 };
 
 // The viewport is 32 px wider than the div's content box (R2's 16 px padding on each side); its
-// height is a placeholder the measurement grows to the page's own.
+// height is a fixed 600 px, never grown: the judge reads the whole document, not the viewport.
 export async function openPage(cdp: Cdp, options: OpenOptions): Promise<Page> {
   const { targetId } = (await cdp.send("Target.createTarget", { url: "about:blank" })) as {
     targetId: string;
@@ -182,10 +182,22 @@ export async function openPage(cdp: Cdp, options: OpenOptions): Promise<Page> {
       worldName: "renderer-judge",
       grantUniveralAccess: false,
     })) as { executionContextId: number };
-    const evaluate = async <T>(expression: string): Promise<T> => {
-      // A page that navigated after it loaded is no longer the section drawn.
+    // Every read, an evaluation or a command: a page that navigated after it loaded, before the
+    // read or while it ran, is no longer the section drawn, and what was read of it is refused.
+    const stillDrawn = (): void => {
       if (navigatedAway) throw new Error("the page navigated after it loaded");
-      const reply = (await send("Runtime.evaluate", {
+    };
+    const read = async (
+      method: string,
+      params: Record<string, unknown> = {},
+    ): Promise<Record<string, unknown>> => {
+      stillDrawn();
+      const reply = await send(method, params);
+      stillDrawn();
+      return reply;
+    };
+    const evaluate = async <T>(expression: string): Promise<T> => {
+      const reply = (await read("Runtime.evaluate", {
         expression,
         contextId: executionContextId,
         returnByValue: true,
@@ -200,7 +212,7 @@ export async function openPage(cdp: Cdp, options: OpenOptions): Promise<Page> {
       sessionId,
       contextId: executionContextId,
       evaluate,
-      send,
+      send: read,
       failed,
       close: closeTarget,
     };

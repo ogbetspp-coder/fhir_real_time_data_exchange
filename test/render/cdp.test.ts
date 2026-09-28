@@ -45,16 +45,19 @@ describe("the DevTools pipe client", () => {
     await expect(pending).rejects.toBeInstanceOf(CdpError);
   });
 
-  it("delivers events to listeners and to waitFor, by method, session and predicate", async () => {
+  it("delivers every event to each listener, with its session and params, until it stops", async () => {
     const { cdp, say } = wired();
     const seen: string[] = [];
+    const params: unknown[] = [];
     const stop = cdp.on((event) => seen.push(`${event.method}@${event.sessionId ?? "-"}`));
-    const waited = cdp.waitFor("Page.loadEventFired", "S2", (params) => params.n === 2);
+    const stopParams = cdp.on((event) => params.push(event.params));
     say(`{"method":"Page.loadEventFired","params":{"n":1},"sessionId":"S2"}\0`);
     say(`{"method":"Page.loadEventFired","params":{"n":2},"sessionId":"S1"}\0`);
     say(`{"method":"Page.loadEventFired","params":{"n":2},"sessionId":"S2"}\0`);
     say(`{"method":"Target.targetCreated"}\0`);
-    await expect(waited).resolves.toEqual({ n: 2 });
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(params).toEqual([{ n: 1 }, { n: 2 }, { n: 2 }, {}]);
+    stopParams();
     stop();
     say(`{"method":"Page.frameNavigated","params":{}}\0`);
     await new Promise((resolve) => setImmediate(resolve));
@@ -80,7 +83,6 @@ describe("the DevTools pipe client", () => {
     closed.hangUp();
     await expect(pending).rejects.toThrow(/closed its pipe/);
     await expect(closed.cdp.send("Page.enable")).rejects.toThrow(/closed its pipe/);
-    await expect(closed.cdp.waitFor("Page.loadEventFired")).rejects.toThrow(/closed its pipe/);
 
     const garbled = wired();
     const waiting = garbled.cdp.send("Page.enable");
@@ -88,12 +90,12 @@ describe("the DevTools pipe client", () => {
     await expect(waiting).rejects.toThrow(/not JSON/);
   });
 
-  it("fails a command the browser never answers, and a waiter when the pipe fails", async () => {
+  it("fails a command the browser never answers, and a pending one when the pipe fails", async () => {
     const toBrowser = new PassThrough();
     const fromBrowser = new PassThrough();
     const cdp = new Cdp(toBrowser, fromBrowser, 20);
     await expect(cdp.send("Page.enable")).rejects.toThrow(/no reply within 20 ms/);
-    const waiting = cdp.waitFor("Page.loadEventFired");
+    const waiting = new Cdp(toBrowser, fromBrowser).send("Page.enable");
     fromBrowser.destroy();
     await expect(waiting).rejects.toThrow(/closed its pipe/);
   });
@@ -106,13 +108,15 @@ describe("the DevTools pipe client", () => {
     await expect(cdp.send("Page.enable")).rejects.toThrow(/EPIPE/);
   });
 
-  it("fails every command once reading from the browser fails, and waits past other events", async () => {
+  it("fails every command once reading from the browser fails, and reads two events in one chunk", async () => {
     const { cdp, say } = wired();
-    const waited = cdp.waitFor("Page.loadEventFired");
+    const seen: string[] = [];
+    cdp.on((event) => seen.push(event.method));
     say(
       `{"method":"Page.frameNavigated","params":{}}\0{"method":"Page.loadEventFired","params":{}}\0`,
     );
-    await expect(waited).resolves.toEqual({});
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(seen).toEqual(["Page.frameNavigated", "Page.loadEventFired"]);
     const fromBrowser = new PassThrough();
     const failing = new Cdp(new PassThrough(), fromBrowser);
     fromBrowser.destroy(new Error("EIO"));
