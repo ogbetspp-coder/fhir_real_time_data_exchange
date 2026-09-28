@@ -58,6 +58,106 @@ def test_every_pinned_label_matches_its_lock_entry_and_nothing_else_is_there() -
         assert entry["list"].startswith("https://epi.ema.europa.eu/consuming/api/fhir/List/")
 
 
+def _pin_script() -> Any:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "pin_label", ROOT / "zone-a" / "scripts" / "pin_label.py"
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_every_lock_entry_says_what_its_pinned_bytes_carry() -> None:
+    # The lock's EMA metadata, read back from the bytes it pins, as scripts/pin_label.py writes
+    # it: a value typed in by hand, or left behind when the bytes were re-pinned, fails here.
+    metadata = _pin_script().metadata
+    for entry in LOCK["sources"]:
+        document = (LABELS / "sources" / entry["file"]).read_bytes()
+        index = (LABELS / "lists" / entry["listFile"]).read_bytes()
+        carried = metadata(document, index)
+        assert entry["url"].rsplit("/", 1)[-1] == carried["documentId"], entry["file"]
+        assert entry["list"].rsplit("/", 1)[-1] == carried["listId"], entry["file"]
+        for key in ("epiId", "procedureNumber", "marketingAuthorisationHolder", "compositionDate"):
+            assert entry[key] == carried[key], (entry["file"], key)
+
+
+def test_every_lock_entry_carries_its_own_retrieval_dates() -> None:
+    # One lock-wide date once covered entries pinned on a later day.
+    assert "retrieved" not in LOCK
+    lists: dict[str, tuple[str, int, str, bool]] = {}
+    for entry in LOCK["sources"]:
+        for key in ("retrieved", "listRetrieved"):
+            assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", entry[key]), (entry["file"], key)
+        # A List two labels share is one file: one hash, one size, one retrieval.
+        shared = (
+            entry["listSha256"],
+            entry["listBytes"],
+            entry["listRetrieved"],
+            entry.get("listRetrievedReconstructed", False),
+        )
+        assert lists.setdefault(entry["listFile"], shared) == shared, entry["file"]
+
+
+# The files whose retrieval dates were reconstructed from the commit that added them (the lock's
+# note), by the SHA-256 each had when its date was reconstructed on 2026-09-28. Frozen: a file
+# pinned since has a recorded date, so a reconstructed flag beside any other hash is stale.
+RECONSTRUCTED_DOCUMENTS = {
+    "jentadueto-smpc-en.json": "544b2f24e69f410d3e792a80f3ee82c00ef60afcdf913526308e799db54a1ee4",
+    "nuvaxovid-smpc-en.json": "3256838d8d4a270581a4b41e9bf302b4cd2e073a9c3ad75f999563b731f73828",
+    "brukinsa-smpc-en.json": "d16e72035623a42023d271a76e0ac124c41970af4b1131d0a18479224f4dea5e",
+    "imatinib-teva-smpc-en.json": (
+        "b266a38b3a06e07f272b56da08d178198025d8d47761b70187b2c389b9f7e5e7"
+    ),
+    "imatinib-teva-tablets-smpc-en.json": (
+        "0cad9db87d0b60ac0d589d6cfb611efcacda0ce6d36b0c0f15182157af582037"
+    ),
+}
+RECONSTRUCTED_LISTS = {
+    "jentadueto-smpc-en.list.json": (
+        "3a4ac2e34a955ebeb0a128183b7ddf095e5b6150513d805f6582858ced9b47ea"
+    ),
+    "nuvaxovid-smpc-en.list.json": (
+        "2956503ab020d2cd6f50253a728877862b5a913912047a12744f9a27bf81c351"
+    ),
+    "brukinsa-smpc-en.list.json": (
+        "8060505c58c36baaaf437e281413bde7cbf9ae98f6fc6f3286a0706489c64a63"
+    ),
+    "imatinib-teva-smpc-en.list.json": (
+        "e7eef4b4ff86cccf0dc03974726e7887491bbf3fe98c3a874717d4e8f193519b"
+    ),
+}
+
+
+def test_a_reconstructed_date_is_marked_and_only_beside_the_bytes_it_was_reconstructed_for() -> (
+    None
+):
+    for entry in LOCK["sources"]:
+        for flag, file, digest, frozen in (
+            ("retrievedReconstructed", entry["file"], entry["sha256"], RECONSTRUCTED_DOCUMENTS),
+            (
+                "listRetrievedReconstructed",
+                entry["listFile"],
+                entry["listSha256"],
+                RECONSTRUCTED_LISTS,
+            ),
+        ):
+            # Absent, the date was recorded by scripts/pin_label.py; present, it is exactly true.
+            if flag not in entry:
+                continue
+            assert entry[flag] is True, (entry["file"], flag)
+            assert frozen.get(file) == digest, (entry["file"], flag)
+
+
+def test_the_committed_results_are_exactly_one_per_pinned_label() -> None:
+    # A result whose label left the lock would stay behind, unchecked, beside the rest.
+    checks = {path.name for path in (LABELS / "checks").iterdir()}
+    assert checks == {entry["file"] for entry in LOCK["sources"]}
+
+
 def test_the_committed_results_are_what_the_sources_give() -> None:
     import importlib.util
 

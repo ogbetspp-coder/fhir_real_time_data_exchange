@@ -25,7 +25,8 @@ import {
 // Runs the official HL7 FHIR validator — the same validator_cli.jar and the same four
 // implementation-guide packages the worker's sidecar runs, at the same pins — over the
 // resources a `{"source":"fixture"}` run sends it, and an authority import's Type 1 record with
-// its EMA output (scripts/ci/emit-validation-set.ts), against the same profiles. `npm run check`
+// its EMA output (scripts/ci/emit-validation-set.ts), against the same profiles, and over the
+// published ConceptMap and StructureMap (fhir/generated/) against base R5. `npm run check`
 // runs only the local structural preflights; official validation otherwise happens solely
 // inside the deployed pipeline, which is how a fixture that fails it stayed invisible until a
 // run was attempted. This is the CI gate that makes that class of defect visible on the pull
