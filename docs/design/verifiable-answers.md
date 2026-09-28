@@ -37,9 +37,9 @@ can put an intended-use statement around. What keeps it honest, as built (2026-0
   quotation. The blocks are what was read, not a selection the model vouches for, and the answer
   says so; at most eight are shown, and the answer says how many more were read.
 - **Verbatim display depends on the fence.** Gemini Enterprise renders the answer as Markdown,
-  and label text read as Markdown changes: "<ULN and bilirubin >" is taken for an HTML tag,
-  "_not_" for emphasis, "&micro;" for an entity, a line opening "# " or "1. " for a heading or a
-  list, and a "<!--" swallows the rest of the answer. So each block — status, quotation,
+  and label text read as Markdown changes: `<ULN and bilirubin >` is taken for an HTML tag,
+  `_not_` for emphasis, `&micro;` for an entity, a line opening `# ` or `1. ` for a heading or a
+  list, and a `<!--` swallows the rest of the answer. So each block — status, quotation,
   citation, checksums — is a fenced code block, in which nothing is parsed, the quotation
   wrapped at spaces so that its lines joined by single spaces are the stored text exactly. A
   test renders adversarial label text through a CommonMark parser and requires each quotation

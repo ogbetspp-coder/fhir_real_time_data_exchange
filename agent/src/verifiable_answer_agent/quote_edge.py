@@ -33,6 +33,7 @@ __all__ = [
     "edge_before",
     "find_quote_occurrence",
     "has_scanner_marker",
+    "is_default_ignorable",
     "is_gap",
     "is_word_character",
     "locate_quote",
@@ -240,6 +241,16 @@ _GAPS: Final = frozenset(
 def is_gap(character: str) -> bool:
     """Whether ``character`` is a gap (section 6): drawn as space or as nothing."""
     return ord(character) in _GAPS
+
+
+_IGNORABLE: Final = frozenset(
+    point for low, high in _DEFAULT_IGNORABLE for point in range(low, high + 1)
+)
+
+
+def is_default_ignorable(character: str) -> bool:
+    """Whether ``character`` is a Default_Ignorable_Code_Point (Unicode 16.0): drawn as nothing."""
+    return ord(character) in _IGNORABLE
 
 
 def non_gap(text: str, index: int, step: int) -> str | None:

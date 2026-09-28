@@ -98,20 +98,19 @@ shows two marker lines around the words; escaping would rely on every escape bei
 show backslashes where one is not, and draw no boundary.
 
 **The same fence carries every checked block** (review of PR #129, M2). Gemini Enterprise
-renders the answer as Markdown, and a label's own text is not Markdown: "ALT <ULN and bilirubin
-
-> 1.5 x ULN" lost "<ULN and bilirubin >" as an HTML tag, "_not_" became emphasis, "&micro;" an
-> entity, a label opening "# " or "1. " a heading or a list, and a "<!--" in a label swallowed the
-> rest of the answer. Each block — its status line, its quotation, its citation and checksums — is
-> now one fenced code block, the quotation wrapped at spaces to 80 characters (a normalised section
-> is a single line, and a code block does not wrap), so the lines joined by single spaces are the
-> stored text exactly. Only this module's own fixed sentences stand between the fences, each its
-> own paragraph. The verbatim display of a quotation therefore depends on the fence:
-> `tests/test_render.py` renders adversarial label text and the reviewer's escape attempts through
-> a CommonMark parser (markdown-it-py, a test-only dependency) and checks that each quotation comes
-> back out of its fence exactly and nothing leaks outside one. (The A2UI renderer gives each part
-> its own `Text` component and does not fence it; A2UI is not sent, and before it is the same
-> question has to be settled for that surface.)
+renders the answer as Markdown, and a label's own text is not Markdown: in
+`ALT <ULN and bilirubin >1.5 x ULN` the renderer took `<ULN and bilirubin >` for an HTML tag and
+dropped it, `_not_` became emphasis, `&micro;` an entity, a label opening `# ` or `1. ` a heading
+or a list, and a `<!--` in a label swallowed the rest of the answer. Each block (its status line,
+its quotation, its citation and checksums) is now one fenced code block, the quotation wrapped at
+spaces to 80 characters (a normalised section is a single line, and a code block does not wrap),
+so the lines joined by single spaces are the stored text exactly. Only this module's own fixed
+sentences stand between the fences, each its own paragraph. The verbatim display of a quotation
+therefore depends on the fence: `tests/test_render.py` renders adversarial label text and the
+reviewer's escape attempts through a CommonMark parser (markdown-it-py, a test-only dependency)
+and checks that each quotation comes back out of its fence exactly and nothing leaks outside one.
+The A2UI renderer gives each part its own `Text` component and does not fence it; A2UI is not
+sent, and before it is the same question has to be settled for that surface.
 
 As defence in depth (`render.sanitise_assistant`), the words are cut at 20,000 characters (with a
 marker saying so), split on every kind of line break (`str.splitlines`: carriage return,

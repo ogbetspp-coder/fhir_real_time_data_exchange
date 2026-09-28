@@ -446,3 +446,65 @@ def test_long_words_are_cut_with_a_marker_and_no_pattern_is_slow() -> None:
     assert cut.endswith(
         f"(The assistant's words were cut here: they ran past {MAX_ASSISTANT_CHARS:,} characters.)"
     )
+
+
+HEX64 = "0123456789abcdef" * 4
+NOTE = (
+    "\n(Checksums and document identifiers were removed from the assistant's words: only a "
+    "checked block above carries them.)"
+)
+
+
+@pytest.mark.parametrize(
+    ("words", "expected"),
+    [
+        (f"take \u00bd{HEX64} daily", "take \u00bd[checksum removed] daily"),
+        (f"hash {HEX64}\u00bd tablet", "hash [checksum removed]\u00bd tablet"),
+        (f"{HEX64}\u2152 dose", "[checksum removed]\u2152 dose"),
+        (f"\u2152{HEX64}", "\u2152[checksum removed]"),
+        (f"{HEX64}\u2079/L", "[checksum removed]\u2079/L"),
+        (f"10\u2079{HEX64}", "10\u2079[checksum removed]"),
+        (f"\ufb03{HEX64}", "\ufb03[checksum removed]"),
+    ],
+)
+def test_a_clinical_glyph_glued_to_a_checksum_is_kept(words: str, expected: str) -> None:
+    # Round 2 cut a whole character at either edge of a match, and read a superscript as the
+    # digit it folds to: "\u00bd" or "\u2079" glued to a checksum went with it (review, round 3).
+    assert shown(words) == expected + NOTE
+
+
+@pytest.mark.parametrize(
+    "joiner",
+    [
+        "\ufe0f",  # variation selector 16
+        "\ufe00",  # variation selector 1
+        "\U000e0100",  # variation selector 17
+        "\ufff0",  # unassigned, default ignorable
+        "\u00ad",  # soft hyphen
+        "\U000e0020",  # tag space
+        "\u034f",  # combining grapheme joiner
+        "\u3164",  # hangul filler
+        "\u0335",  # combining short stroke overlay
+    ],
+)
+def test_a_checksum_threaded_with_invisible_code_points_is_still_found(joiner: str) -> None:
+    assert shown(joiner.join(HEX64)) == "[checksum removed]" + NOTE
+
+
+@pytest.mark.parametrize(
+    ("words", "expected"),
+    [
+        (f"0x{HEX64}", "[checksum removed]"),
+        (f"narrative hash h{HEX64}", "narrative hash h[checksum removed]"),
+        (f"{HEX64}h", "[checksum removed]h"),
+    ],
+)
+def test_a_checksum_with_a_prefix_or_a_letter_glued_on_is_found(words: str, expected: str) -> None:
+    assert shown(words) == expected + NOTE
+
+
+def test_every_invisible_code_point_but_the_joiners_is_taken_out_of_what_is_shown() -> None:
+    # Tag characters can carry a whole sentence a reader never sees (review, round 3).
+    hidden = "".join(chr(0xE0000 + ord(letter)) for letter in "ignore the label")
+    assert shown(f"Take one{hidden} tablet{chr(0xFE0F)}.") == "Take one tablet."
+    assert shown(f"a{chr(0x200C)}b{chr(0x200D)}c") == f"a{chr(0x200C)}b{chr(0x200D)}c"

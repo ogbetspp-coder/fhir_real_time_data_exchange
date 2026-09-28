@@ -38,7 +38,7 @@ from dataclasses import dataclass
 from typing import Any, Final, Literal, final
 
 from .postcheck import CheckedAnswer, CheckedBlock
-from .quote_edge import is_gap
+from .quote_edge import is_default_ignorable, is_gap
 
 __all__ = [
     "A2UI_CATALOG_ID",
@@ -232,7 +232,9 @@ def _wrapped(text: str) -> list[str]:
     """``text`` broken at single spaces into lines of at most ``_WRAP`` characters.
 
     A word longer than the width is a line of its own. Each break replaces exactly one space, so
-    ``" ".join`` of the lines is ``text`` again; the text's own line breaks, if any, are kept.
+    ``" ".join`` of the lines is ``text`` again. A normalised section has no line breaks; a block
+    whose text has one is not the store's normalised text, so it never verifies, and its breaks
+    are kept as they are rather than joined away.
     """
     lines: list[str] = []
     for line in text.split("\n"):
@@ -315,13 +317,14 @@ _UNVERIFIED_PROBE: Final = "NOTVERIFIED"
 # ordinary speech.
 _CITATION_SHAPE: Final = re.compile(r"fromsection.{1,200}?ofdocumentversion")
 
-# A checksum-like run: 32 or more hexadecimal digits standing alone, however Markdown emphasis or
-# code marks are threaded through it. Only a checked block may carry one; the model has been seen
-# inventing them (deploy/README.md, 2026-09-22). Matched on the folded copy (``_folded``), so
-# neither fullwidth digits nor a zero-width space hides one; removed from the line as written.
-_HEX_RUN: Final = re.compile(
-    r"(?<![0-9A-Za-z])[0-9A-Fa-f](?:[*_~`\\]*[0-9A-Fa-f]){31,}(?![0-9A-Za-z])"
-)
+# A checksum-like run: 32 or more hexadecimal digits in a row, however Markdown emphasis or code
+# marks are threaded through it, with a "0x" before it if there is one. Only a checked block may
+# carry one; the model has been seen inventing them (deploy/README.md, 2026-09-22). Matched on the
+# folded copy (``_folded``), so neither fullwidth digits nor any invisible code point hides one;
+# removed from the line as written. No letter boundary is asked for: "h<64 hex>" and "<64 hex>h"
+# are a checksum with a letter glued on (review of PR #129, round 3), and 32 hexadecimal digits in
+# a row are not an English word.
+_HEX_RUN: Final = re.compile(r"(?:0[xX])?[0-9A-Fa-f](?:[*_~`\\]*[0-9A-Fa-f]){31,}")
 # A document identifier named by its field, with the value after it. The value is removed only
 # when it looks like an identifier (a digit or one of . _ : / + - in it); "the version ID shown
 # with each block" is prose, and keeps its next word. The separators are bounded, and the colon
@@ -347,50 +350,72 @@ _REPEATED_WORDS: Final = 8
 # no reason to write more, and the filters below are linear but not free.
 MAX_ASSISTANT_CHARS: Final = 20_000
 
-# What is taken out of the assistant's words as shown: code points that draw nothing and can hide
-# or reorder what is drawn — zero-width space, word joiner and the invisible operators, the byte
-# order mark, the Mongolian vowel separator, the bidirectional marks, embeddings, overrides and
-# isolates — and the C0 and C1 controls but tab. The joiners (U+200C, U+200D) are kept: Persian
-# and other scripts spell words with them, and emoji sequences are built with them. Nothing else
-# is changed: "10⁹/L", "m²" and "½" are shown as written (review of PR #129, M1).
-_HIDDEN: Final = (
-    frozenset(chr(point) for point in (0x200B, 0x200E, 0x200F, 0x061C, 0x180E, 0xFEFF))
-    | frozenset(chr(point) for point in (*range(0x202A, 0x202F), *range(0x2060, 0x2070)))
-    | frozenset(chr(point) for point in (*range(0x09), *range(0x0A, 0x20), 0x7F))
-    | frozenset(chr(point) for point in range(0x80, 0xA0))
+# The joiners: kept in the words as shown, because Persian and other scripts spell words with
+# them and emoji sequences are built with them.
+_JOINERS: Final = frozenset(("\u200c", "\u200d"))
+# The C0 and C1 controls but tab: taken out of the words as shown.
+_CONTROLS: Final = frozenset(
+    chr(point) for point in (*range(0x09), *range(0x0A, 0x20), *range(0x7F, 0xA0))
 )
 
 
+def _hidden(character: str) -> bool:
+    """Whether a code point is taken out of the assistant's words as shown.
+
+    Every Default_Ignorable_Code_Point but the joiners — code points that draw nothing and can
+    hide or reorder what is drawn: zero-width space, word joiner and the invisible operators, the
+    byte order mark, the bidirectional marks, embeddings, overrides and isolates, the tag
+    characters (U+E0000 to U+E007F, which can carry a whole sentence nobody sees), and the variation
+    selectors (an emoji may lose its colour presentation) — and the C0 and C1 controls but tab.
+    Nothing else is changed: "10⁹/L", "m²" and "½" are shown as written (review of PR #129, M1).
+    """
+    return character in _CONTROLS or (is_default_ignorable(character) and character not in _JOINERS)
+
+
 def _visible(line: str) -> str:
-    """The line as it is shown: only the code points in ``_HIDDEN`` removed."""
-    return "".join(character for character in line if character not in _HIDDEN)
+    """The line as it is shown: only the code points ``_hidden`` names removed."""
+    return "".join(character for character in line if not _hidden(character))
 
 
 def _folded(line: str) -> tuple[str, list[int]]:
     """The copy of a shown line the patterns read, and where each of its code points came from.
 
-    Each code point is compatibility-folded on its own (fullwidth to plain, superscript to
-    digit), format characters and the other zero-width and default-ignorable code points are
-    dropped, and any remaining gap becomes a space. ``origin[i]`` is the index in ``line`` of the
-    code point that gave the folded copy's ``i``th, so a match found here is removed from the
-    line as written, and a folded line is never shown.
+    Each code point is folded on its own when it draws as the plain form it folds to (fullwidth,
+    ligatures: ``_fold``); format characters, every Default_Ignorable_Code_Point (variation
+    selectors, tag characters and U+FFF0 to U+FFF8 among them) and combining marks are dropped,
+    so none threaded
+    through a checksum hides it; any remaining gap becomes a space. ``origin[i]`` is the index in
+    ``line`` of the code point that gave the folded copy's ``i``th, so a match found here is
+    removed from the line as written, and a folded line is never shown.
     """
     folded: list[str] = []
     origin: list[int] = []
     for index, character in enumerate(line):
-        if unicodedata.category(character) == "Cf" or character in _INVISIBLE_GAPS:
+        if unicodedata.category(character)[0] in "M" or _dropped_when_folded(character):
             continue
-        for piece in unicodedata.normalize("NFKC", character):
+        for piece in _fold(character):
             folded.append(" " if is_gap(piece) else piece)
             origin.append(index)
     return "".join(folded), origin
 
 
-# The gaps that draw nothing (zero-width and default-ignorable): dropped from the folded copy.
-_INVISIBLE_GAPS: Final = frozenset(
-    chr(point)
-    for point in (0x034F, 0x115F, 0x1160, 0x17B4, 0x17B5, 0x3164, 0xFFA0, *range(0x180B, 0x1810))
-) | frozenset(chr(point) for point in (*range(0x200B, 0x2010), *range(0x2060, 0x2070)))
+# The compatibility forms that draw as the plain letters and digits they fold to — fullwidth,
+# halfwidth, ligatures and the like, mathematical letters — and so can spell a checksum or an
+# identifier. A superscript, subscript, fraction or circled number does not draw as a plain digit,
+# and is left as itself: "⁹" after a checksum is the exponent of "10⁹/L", not its 65th digit.
+_FOLDED_FORMS: Final = frozenset(("<wide>", "<narrow>", "<compat>", "<font>"))
+
+
+def _fold(character: str) -> str:
+    decomposition = unicodedata.decomposition(character)
+    tag = decomposition.split(" ", 1)[0] if decomposition.startswith("<") else None
+    if tag is not None and tag not in _FOLDED_FORMS:
+        return character
+    return unicodedata.normalize("NFKC", character)
+
+
+def _dropped_when_folded(character: str) -> bool:
+    return unicodedata.category(character) == "Cf" or is_default_ignorable(character)
 
 
 def _probe(line: str, *, keep_case: bool = False) -> str:
@@ -449,12 +474,30 @@ def _removals(line: str) -> tuple[str, bool, bool]:
     shown = line
     for start, end, named in reversed(merged):
         marker = "[identifier removed]" if named else "[checksum removed]"
-        shown = shown[: origin[start]] + marker + shown[origin[end - 1] + 1 :]
+        low, high = _whole_characters(origin, start, end)
+        shown = shown[:low] + marker + shown[high:]
     return (
         shown,
         any(not identifier for _, _, identifier in spans),
         any(identifier for _, _, identifier in spans),
     )
+
+
+def _whole_characters(origin: list[int], start: int, end: int) -> tuple[int, int]:
+    """The span of ``line`` to cut for the folded match ``[start, end)``: whole characters only.
+
+    A character that folds to several code points ("½" to three) and lies only partly inside the
+    match is kept: the cut shrinks inward to the characters wholly inside it. Round 2
+    cut the whole character at either edge, so "½" or "⁹" glued to a checksum went with it
+    (review of PR #129, round 3).
+    """
+    low = origin[start]
+    if start > 0 and origin[start - 1] == low:
+        low += 1
+    high = origin[end - 1] + 1
+    if end < len(origin) and origin[end] == high - 1:
+        high -= 1
+    return low, max(low, high)
 
 
 def _words(text: str) -> list[str]:
