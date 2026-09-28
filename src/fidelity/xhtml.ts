@@ -322,9 +322,12 @@ function checkComposition(
     // A boundary before a code point below U+0300, U+00AD aside, is stable: every such code point
     // is a starter that NFC never composes with what precedes it (canonical combining class 0,
     // NFC_QC=Yes; test/fidelity-composition.test.ts checks each one), so the two sides compose the
-    // same apart as together. U+00AD, which step 1 removes, never reaches the text (section 2).
+    // same apart as together. U+00AD breaks that on either side (step 1 removes it with a line
+    // break that follows it), so a boundary next to one takes the full comparison; it never
+    // reaches the text anyway (section 2).
     const next = points[boundary]?.codePointAt(0);
-    if (next === undefined || (next < 0x0300 && next !== 0x00ad)) continue;
+    const previous = points[boundary - 1]?.codePointAt(0);
+    if (next === undefined || (next < 0x0300 && next !== 0x00ad && previous !== 0x00ad)) continue;
     const before = points.slice(Math.max(0, boundary - COMPOSE_WINDOW), boundary).join("");
     const after = points.slice(boundary, boundary + COMPOSE_WINDOW).join("");
     if (composeText(before + after) !== composeText(before) + composeText(after)) {
