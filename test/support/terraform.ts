@@ -45,12 +45,16 @@ export function serviceAccountRoles(terraform: string, account: string): Terrafo
     }
     if (block.type === `google_service_account` && block.name === account) continue;
 
-    const line = lineAt(lexed.code, at);
     const isIam = /_iam_(member|binding|policy)$/.test(block.type);
     if (!isIam) continue; // form 3: a runtime identity, not a grant
 
-    if (/^\s*service_account_id\s*=/.test(line)) continue; // form 2
-    if (!/^\s*members?\s*=/.test(line)) {
+    // Which assignment the reference is in, by the whole extent of its expression: a `members`
+    // list or a parenthesised `member` may span lines.
+    const relative = at - block.open;
+    const inside = (name: RegExp) =>
+      assignmentExtents(block, name).some(({ from, to }) => relative >= from && relative < to);
+    if (inside(/service_account_id/)) continue; // form 2
+    if (!inside(/members?/)) {
       throw new Error(`${where}: ${block.type}.${block.name} uses it on an unrecognised line`);
     }
     bindings.push({ type: block.type, role: literalRole(block, account, blocks) });
@@ -68,8 +72,10 @@ export function serviceAccountRoles(terraform: string, account: string): Terrafo
   if (accountId !== undefined) {
     for (const block of blocks) {
       if (block.kind !== "resource" || !block.type.includes("_iam_")) continue;
-      if (new RegExp(`members?\\s*=[^\\n]*serviceAccount:${accountId}`).test(block.body)) {
-        throw new Error(`${block.type}.${block.name} names ${account} by literal e-mail`);
+      for (const { from, to } of assignmentExtents(block, /members?/)) {
+        if (block.body.slice(from, to).includes(`serviceAccount:${accountId}`)) {
+          throw new Error(`${block.type}.${block.name} names ${account} by literal e-mail`);
+        }
       }
     }
   }
@@ -98,9 +104,9 @@ const MEMBER_REFERENCE =
 function refuseIndirectMembers(blocks: TopLevelBlock[]): void {
   for (const block of blocks) {
     if (block.kind !== "resource" || !/_iam_(member|binding|policy)$/.test(block.type)) continue;
-    for (const line of block.code.split("\n")) {
-      if (!/^\s*members?\s*=/.test(line)) continue;
-      const expression = line.replace(/^\s*members?\s*=/, "");
+    // The whole expression, however many lines its list or parentheses span.
+    for (const { from, to } of assignmentExtents(block, /members?/)) {
+      const expression = block.code.slice(from, to);
       for (const [reference] of expression.matchAll(
         /\b[A-Za-z_][\w-]*(?:\.[A-Za-z_][\w-]*|\[[^\]]*\])+/g,
       )) {
@@ -112,6 +118,33 @@ function refuseIndirectMembers(blocks: TopLevelBlock[]): void {
       }
     }
   }
+}
+
+// Each `name = expression` assignment in a block whose name matches `name` (the whole name), with
+// the extent of its expression in the block's text: from after the `=` to the newline that ends
+// it, which is the first newline outside every (, [ and { the expression opens. Read from the
+// lexed text, so a bracket in a string or comment does not count. An expression that never closes
+// is refused.
+function assignmentExtents(block: TopLevelBlock, name: RegExp): { from: number; to: number }[] {
+  const found: { from: number; to: number }[] = [];
+  const pattern = new RegExp(`^[ \\t]*(?:${name.source})[ \\t]*=(?!=)`, "gm");
+  for (const match of block.code.matchAll(pattern)) {
+    const from = match.index + match[0].length;
+    let depth = 0;
+    let to = from;
+    for (; to < block.code.length; to += 1) {
+      const character = block.code[to];
+      if (character === "(" || character === "[" || character === "{") depth += 1;
+      if (character === ")" || character === "]" || character === "}") depth -= 1;
+      if (character === "\n" && depth === 0) break;
+      if (depth < 0) break;
+    }
+    if (depth !== 0) {
+      throw new Error(`${block.type}.${block.name}: an assignment's expression does not close`);
+    }
+    found.push({ from, to });
+  }
+  return found;
 }
 
 // The configuration with the named resource blocks cut out, as a later change that deletes them
@@ -195,6 +228,8 @@ type TopLevelBlock = {
   // The same text lexed: comments, string literals and heredoc bodies blanked.
   code: string;
   start: number;
+  // Where `body` and `code` begin in the whole text, just after the opening brace.
+  open: number;
   end: number;
 };
 
@@ -248,6 +283,7 @@ function topLevelBlocks(terraform: string, lexed = lex(terraform)): TopLevelBloc
       body: plain.slice(open, close),
       code: code.slice(open, close),
       start: index,
+      open,
       end: close + 1,
     });
     index = close + 1;

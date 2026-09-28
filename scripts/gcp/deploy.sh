@@ -119,12 +119,13 @@ tf_deploy_vars() {
     echo "::error title=No alert recipient::Set ALERT_NOTIFICATION_EMAIL (a repository variable in GitHub Actions) or ALERT_NOTIFICATION_CHANNELS. Every alert policy must page someone; none is deployed without." >&2
     return 1
   fi
-  # A placeholder is no recipient either: an example.com/.org/.net address (reserved, RFC 2606)
-  # or a `you@` local part left from a template pages nobody, however well-formed. The address is
-  # not printed; infra/variables.tf refuses the same shapes.
+  # A placeholder is no recipient either: an address in a domain reserved so that nothing is ever
+  # delivered there (RFC 2606: example.com/.org/.net, and the .test, .invalid, .example and
+  # .localhost top-level domains), or a `you@` local part left from a template, pages nobody,
+  # however well-formed. The address is not printed; infra/variables.tf refuses the same shapes.
   if [[ -n "$alert_notification_email" ]] &&
-    printf '%s' "$alert_notification_email" | grep -Eiq '^you@|@([^@]+\.)?example\.(com|org|net)$'; then
-    echo "::error title=Placeholder alert recipient::ALERT_NOTIFICATION_EMAIL is a placeholder (an example.com/.org/.net domain or a you@ address). Set it to a real, watched address." >&2
+    printf '%s' "$alert_notification_email" | grep -Eiq '^you@|@([^@]+\.)?example\.(com|org|net)$|[@.](test|invalid|example|localhost)$'; then
+    echo "::error title=Placeholder alert recipient::ALERT_NOTIFICATION_EMAIL is a placeholder (a reserved example or test domain, or a you@ address). Set it to a real, watched address." >&2
     return 1
   fi
   echo "alert configuration: alert_notification_email is $([[ -n "$alert_notification_email" ]] && echo set || echo 'not set'), alert_notification_channels=${#alert_notification_channels_json} bytes"
@@ -361,9 +362,9 @@ export_effective_iam() {
   target_store="$(terraform -chdir=infra output -raw target_fhir_store_id 2>/dev/null || true)"
 
   # The third account is the impersonation-only caller (google_service_account.caller). It is
-  # expected to hold no project role and no dataset role at all, so its two exports are
+  # expected to hold no project, dataset or store role at all, so each of its exports is
   # expected to be empty: that emptiness is the evidence, since its only declared binding is
-  # roles/run.invoker on one Cloud Run service, which neither of these policies covers.
+  # roles/run.invoker on one Cloud Run service, which none of these policies covers.
   for sa in "ema-flow-worker-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com" \
     "ema-flow-query-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com" \
     "ema-flow-caller-${ENVIRONMENT}@${PROJECT_ID}.iam.gserviceaccount.com"; do
@@ -400,8 +401,11 @@ export_effective_iam() {
       echo "::warning::Could not read the Healthcare dataset IAM policy for ${sa}. Grant the deployer healthcare.datasets.getIamPolicy to record this evidence."
     fi
 
-    # The services' FHIR roles are bound on each store since 2026-09-27, so the dataset export
-    # above is expected to be empty for them and these two carry the evidence.
+    # The services' FHIR roles are bound on each store since audit B04. Until its phase 2 removes
+    # the transitional dataset-wide grants (test/infra/transitional-grants.ts), the dataset export
+    # above still shows the worker's fhirResourceEditor and the query service's
+    # fhirResourceReader; from phase 2 on it is expected to be empty for both, and these store
+    # exports carry the evidence.
     for store in "$source_store" "$target_store"; do
       [[ -z "$store" ]] && continue
       echo "--- FHIR store ${store}: roles held by ${sa} ---"
@@ -462,30 +466,65 @@ APPLY_PERMISSIONS=(
   resourcemanager.projects.setIamPolicy
 )
 
+# The narrowest predefined role that carries each permission above, for the message that says
+# how to grant a missing one.
+apply_permission_role() {
+  case "$1" in
+    iam.roles.*) echo "roles/iam.roleAdmin" ;;
+    bigquery.tables.*) echo "roles/bigquery.dataOwner" ;;
+    healthcare.fhirStores.*) echo "roles/healthcare.fhirStoreAdmin" ;;
+    resourcemanager.projects.*) echo "roles/resourcemanager.projectIamAdmin" ;;
+    *) echo "a role carrying $1" ;;
+  esac
+}
+
 # Asks Resource Manager which of APPLY_PERMISSIONS the deploy's own credential holds on the
-# project (testIamPermissions needs no permission of its own) and fails, naming the missing ones,
-# unless it holds all of them. An answer it cannot read fails too.
+# project (testIamPermissions needs no permission of its own) and fails, naming the missing ones
+# and the gcloud command that grants each role that carries them, unless it holds all of them.
+# The question changes nothing, so no answer, a 429 or a 5xx is asked again, three times in all;
+# any other refusal, or an answer it cannot read, fails.
 preflight_apply_permissions() {
-  local body response missing
+  local body response status attempt missing permission account role
   body="$(python3 -c 'import json,sys;print(json.dumps({"permissions":sys.argv[1:]}))' "${APPLY_PERMISSIONS[@]}")"
-  if ! response="$(curl --silent --fail --request POST \
-    --header "Authorization: Bearer $(ema_flow_access_token)" \
-    --header 'Content-Type: application/json' \
-    --data "$body" \
-    "https://cloudresourcemanager.googleapis.com/v1/projects/${PROJECT_ID}:testIamPermissions")"; then
-    echo "::error title=Deploy permissions::Could not ask Resource Manager which permissions the deploy holds (testIamPermissions failed); not applying." >&2
+  response="$(mktemp)"
+  for attempt in 1 2 3; do
+    status="$(curl --silent --output "$response" --write-out '%{http_code}' --request POST \
+      --header "Authorization: Bearer $(ema_flow_access_token)" \
+      --header 'Content-Type: application/json' \
+      --data "$body" \
+      "https://cloudresourcemanager.googleapis.com/v1/projects/${PROJECT_ID}:testIamPermissions" || true)"
+    case "$status" in
+      000 | 429 | 5??)
+        if [[ "$attempt" -lt 3 ]]; then
+          echo "testIamPermissions answered ${status:-nothing} (attempt ${attempt}/3); asking again in ${PREFLIGHT_RETRY_SECONDS:-5}s."
+          sleep "${PREFLIGHT_RETRY_SECONDS:-5}"
+          continue
+        fi
+        ;;
+    esac
+    break
+  done
+  if [[ "$status" != "200" ]]; then
+    rm -f "$response"
+    echo "::error title=Deploy permissions::Could not ask Resource Manager which permissions the deploy holds (testIamPermissions answered HTTP ${status}); not applying." >&2
     return 1
   fi
   if ! missing="$(python3 -c '
 import json, sys
-held = set(json.loads(sys.argv[1]).get("permissions") or [])
+held = set(json.load(open(sys.argv[1])).get("permissions") or [])
 print(" ".join(p for p in sys.argv[2:] if p not in held))
 ' "$response" "${APPLY_PERMISSIONS[@]}")"; then
+    rm -f "$response"
     echo "::error title=Deploy permissions::Resource Manager answered testIamPermissions with something unreadable; not applying." >&2
     return 1
   fi
+  rm -f "$response"
   if [[ -n "$missing" ]]; then
-    echo "::error title=Deploy permissions::The deploy identity lacks ${missing}. Grant them (README.md, the deployer's roles) and deploy again; nothing was applied." >&2
+    account="$(gcloud --quiet auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null | head -n 1 || true)"
+    echo "::error title=Deploy permissions::The deploy identity lacks ${missing}. Nothing was applied. Grant the roles below, then deploy again." >&2
+    while read -r role; do
+      echo "  gcloud projects add-iam-policy-binding ${PROJECT_ID} --member=serviceAccount:${account:-<deployer service account>} --role=${role} --condition=None" >&2
+    done < <(for permission in $missing; do apply_permission_role "$permission"; done | sort -u)
     return 1
   fi
   echo "deploy permissions: all ${#APPLY_PERMISSIONS[@]} the apply needs are held"

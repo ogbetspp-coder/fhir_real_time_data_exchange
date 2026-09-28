@@ -299,10 +299,11 @@ variable "alert_notification_email" {
     error_message = "alert_notification_email must be empty or an e-mail address."
   }
 
-  # A placeholder pages nobody: a reserved example domain (RFC 2606) or a template's you@.
+  # A placeholder pages nobody: a domain reserved by RFC 2606 (example.com/.org/.net, and the
+  # .test, .invalid, .example and .localhost top-level domains) or a template's you@.
   validation {
-    condition     = !can(regex("(?i)^you@|@([^@]+\\.)?example\\.(com|org|net)$", var.alert_notification_email))
-    error_message = "alert_notification_email is a placeholder (an example.com/.org/.net domain or a you@ address); set a real, watched address."
+    condition     = !can(regex("(?i)^you@|@([^@]+\\.)?example\\.(com|org|net)$|[@.](test|invalid|example|localhost)$", var.alert_notification_email))
+    error_message = "alert_notification_email is a placeholder (a reserved example or test domain, or a you@ address); set a real, watched address."
   }
 }
 

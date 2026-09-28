@@ -88,9 +88,9 @@ describe("the deploy's alert recipient", () => {
   });
 
   it("is passed to Terraform as an e-mail, a channel list, or both", () => {
-    const email = tfDeployVars({ ALERT_NOTIFICATION_EMAIL: "oncall@operations.test" });
+    const email = tfDeployVars({ ALERT_NOTIFICATION_EMAIL: "oncall@ema-flow-alerts.eu" });
     expect(email.status).toBe(0);
-    expect(email.out).toContain("-var=alert_notification_email=oncall@operations.test");
+    expect(email.out).toContain("-var=alert_notification_email=oncall@ema-flow-alerts.eu");
     expect(email.out).toContain("-var=alert_notification_channels=[]");
     // The address itself never reaches the log line tf_deploy_vars prints.
     expect(email.out.split("\n").filter((line) => line.includes("alert configuration"))).toEqual([
@@ -112,6 +112,11 @@ describe("the deploy's alert recipient", () => {
     "alerts@mail.example.net",
     "you@khsadvisory.com",
     "You@company.eu",
+    "oncall@operations.test",
+    "alerts@team.invalid",
+    "ops@mail.example",
+    "root@localhost",
+    "root@box.LOCALHOST",
   ])("is refused when it is a placeholder: %s", (address) => {
     const { status, out } = tfDeployVars({ ALERT_NOTIFICATION_EMAIL: address });
     expect(status).not.toBe(0);
@@ -119,18 +124,24 @@ describe("the deploy's alert recipient", () => {
     expect(out).not.toContain(address);
   });
 
-  it.each(["young@company.eu", "alerts@example.company.eu", "ops@notexample.com"])(
-    "is accepted when it only resembles one: %s",
-    (address) => {
-      expect(tfDeployVars({ ALERT_NOTIFICATION_EMAIL: address }).status).toBe(0);
-    },
-  );
+  it.each([
+    "young@company.eu",
+    "alerts@example.company.eu",
+    "ops@notexample.com",
+    "ops@testing.eu",
+    "qa@test.company.eu",
+  ])("is accepted when it only resembles one: %s", (address) => {
+    expect(tfDeployVars({ ALERT_NOTIFICATION_EMAIL: address }).status).toBe(0);
+  });
 
-  it("is refused as a placeholder by Terraform too", () => {
+  it("is refused as a placeholder by Terraform too, by the same pattern", () => {
     const variables = readFileSync("infra/variables.tf", "utf8");
-    expect(variables).toContain(
-      'condition     = !can(regex("(?i)^you@|@([^@]+\\\\.)?example\\\\.(com|org|net)$", var.alert_notification_email))',
-    );
+    const terraformPattern = /!can\(regex\("\(\?i\)(.+?)", var\.alert_notification_email\)\)/
+      .exec(variables)?.[1]
+      ?.replaceAll("\\\\", "\\");
+    const shellPattern = /grep -Eiq '([^']+)'/.exec(deploy)?.[1];
+    expect(terraformPattern).toBeDefined();
+    expect(terraformPattern).toBe(shellPattern);
   });
 });
 

@@ -57,14 +57,28 @@ function run(
 }
 
 describe("the deploy's permission preflight", () => {
-  const preflight = (answer: string, curlExit = 0) =>
+  // Each answer is [HTTP status, body]; the stand-in curl gives them in turn, the last one again
+  // once they run out, writing the body where --output says and printing the status.
+  const preflight = (...answers: [string, string][]) =>
     run(
       `${permissionsArray}
+PREFLIGHT_RETRY_SECONDS=0
 ema_flow_access_token() { printf token; }
+${extract("apply_permission_role")}
 ${extract("preflight_apply_permissions")}
 preflight_apply_permissions`,
-      { curl: `printf '%s' '${answer}'; exit ${String(curlExit)}` },
+      {
+        curl: `here="$(dirname "$0")"
+n=$(( $(cat "$here/n" 2>/dev/null || echo 0) + 1 )); echo "$n" >"$here/n"
+out=""; while [ $# -gt 0 ]; do [ "$1" = "--output" ] && out="$2"; shift; done
+case $n in
+${answers.map(([code, body], i) => `  ${String(i + 1)}) printf '%s' '${body}' >"$out"; printf '%s' '${code}' ;;`).join("\n")}
+  *) printf '%s' '${answers.at(-1)?.[1] ?? ""}' >"$out"; printf '%s' '${answers.at(-1)?.[0] ?? "000"}' ;;
+esac`,
+        gcloud: "echo ema-flow-deployer@test-project.iam.gserviceaccount.com",
+      },
     );
+  const held = (list: string[]): [string, string] => ["200", JSON.stringify({ permissions: list })];
 
   it("names a permission for every kind of resource this batch added", () => {
     const infra = readInfra();
@@ -81,7 +95,7 @@ preflight_apply_permissions`,
   });
 
   it("passes when every permission is held", () => {
-    const result = preflight(JSON.stringify({ permissions }));
+    const result = preflight(held(permissions));
     expect(result.status).toBe(0);
     expect(result.out).toContain(`all ${String(permissions.length)} the apply needs are held`);
     expect(result.calls).toContain(
@@ -89,18 +103,44 @@ preflight_apply_permissions`,
     );
   });
 
-  it("fails before the apply, naming what is missing", () => {
-    const held = permissions.filter((p) => !p.startsWith("iam.roles."));
-    const result = preflight(JSON.stringify({ permissions: held }));
+  it("fails before the apply, naming what is missing and the command that grants it", () => {
+    const result = preflight(held(permissions.filter((p) => !p.startsWith("iam.roles."))));
     expect(result.status).not.toBe(0);
     expect(result.out).toContain(
       "lacks iam.roles.create iam.roles.delete iam.roles.get iam.roles.update",
     );
+    const commands = result.out.split("\n").filter((line) => line.includes("gcloud projects"));
+    expect(commands).toEqual([
+      "  gcloud projects add-iam-policy-binding test-project --member=serviceAccount:ema-flow-deployer@test-project.iam.gserviceaccount.com --role=roles/iam.roleAdmin --condition=None",
+    ]);
   });
 
-  it("fails when it cannot ask, or cannot read the answer", () => {
-    expect(preflight("", 22).status).not.toBe(0);
-    expect(preflight("<html>").status).not.toBe(0);
+  it("names one role per kind of missing permission", () => {
+    const result = preflight(held([]));
+    const roles = [...result.out.matchAll(/--role=(\S+)/g)].map((match) => match[1]);
+    expect(roles).toEqual([
+      "roles/bigquery.dataOwner",
+      "roles/healthcare.fhirStoreAdmin",
+      "roles/iam.roleAdmin",
+      "roles/resourcemanager.projectIamAdmin",
+    ]);
+  });
+
+  it("asks again after no answer, a 429 or a 5xx, three times in all", () => {
+    const recovered = preflight(["503", ""], ["429", ""], held(permissions));
+    expect(recovered.status).toBe(0);
+    expect(recovered.calls.match(/^curl /gm)).toHaveLength(3);
+    const exhausted = preflight(["000", ""]);
+    expect(exhausted.status).not.toBe(0);
+    expect(exhausted.calls.match(/^curl /gm)).toHaveLength(3);
+    expect(exhausted.out).toContain("answered HTTP 000");
+  });
+
+  it("fails at once on a refusal, and on an answer it cannot read", () => {
+    const refused = preflight(["403", '{"error":{}}']);
+    expect(refused.status).not.toBe(0);
+    expect(refused.calls.match(/^curl /gm)).toHaveLength(1);
+    expect(preflight(["200", "<html>"]).status).not.toBe(0);
   });
 
   it("runs in phase_apply before the stores are touched and before the apply", () => {

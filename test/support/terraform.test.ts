@@ -233,6 +233,65 @@ resource "google_project_iam_member" "sneaky" {
     expect(() => serviceAccountRoles(terraform, "build")).toThrow(/cannot follow/);
   });
 
+  // Review round 2: the scan read only the `member(s) =` line, so a list or parentheses spanning
+  // lines carried the indirect reference past it.
+  it.each([
+    [
+      "a multi-line members list",
+      `google_project_iam_binding`,
+      `members = [\n    "serviceAccount:\${google_cloud_run_v2_service.w.template[0].service_account}",\n  ]`,
+    ],
+    [
+      "a one-line members list",
+      `google_project_iam_binding`,
+      `members = ["serviceAccount:\${google_cloud_run_v2_service.w.template[0].service_account}"]`,
+    ],
+    [
+      "a parenthesised member",
+      `google_project_iam_member`,
+      `member = (\n    "serviceAccount:\${google_cloud_run_v2_service.w.template[0].service_account}"\n  )`,
+    ],
+  ])("is refused through %s", (_name, type, assignment) => {
+    const terraform = `${account}
+resource "google_cloud_run_v2_service" "w" {
+  template {
+    service_account = google_service_account.build.email
+  }
+}
+resource "${type}" "sneaky" {
+  project = var.project_id
+  role    = "roles/owner"
+  ${assignment}
+}
+`;
+    expect(() => serviceAccountRoles(terraform, "build")).toThrow(/cannot follow/);
+  });
+
+  it("counts the account in a multi-line list, and refuses its literal e-mail there", () => {
+    const counted = `${account}
+resource "google_project_iam_binding" "logs" {
+  project = var.project_id
+  role    = "roles/logging.logWriter"
+  members = [
+    "serviceAccount:\${google_service_account.build.email}",
+  ]
+}
+`;
+    expect(serviceAccountRoles(counted, "build")).toEqual([
+      { type: "google_project_iam_binding", role: "roles/logging.logWriter" },
+    ]);
+    const literal = `${account}
+resource "google_project_iam_binding" "owner" {
+  project = var.project_id
+  role    = "roles/owner"
+  members = [
+    "serviceAccount:ema-flow-build-dev@p.iam.gserviceaccount.com",
+  ]
+}
+`;
+    expect(() => serviceAccountRoles(literal, "build")).toThrow(/literal e-mail/);
+  });
+
   it("is refused when looked up by id in a data source", () => {
     const terraform = `${account}
 data "google_service_account" "b" {
