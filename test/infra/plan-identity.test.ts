@@ -77,6 +77,14 @@ describe("the pull-request planner", () => {
     }
   });
 
+  it("can read the Logging settings the audit-logs key's grant is taken from", () => {
+    // infra/keys.tf reads them on every plan (audit I-10); without this every plan fails.
+    expect(readFileSync("infra/keys.tf", "utf8")).toContain(
+      'data "google_logging_project_settings" "current"',
+    );
+    expect(permissions).toContain("logging.settings.get");
+  });
+
   it("reads the state through the state bucket alone", () => {
     expect(script).toContain('--member="serviceAccount:${SA}" --role=roles/storage.objectViewer');
     expect(script).toContain("gs://${STATE_BUCKET}");

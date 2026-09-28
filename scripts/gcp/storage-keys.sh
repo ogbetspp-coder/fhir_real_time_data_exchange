@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # The buckets Terraform does not create, on the platform-storage key (docs/design/cmek-rollout.md,
 # step 7). The Terraform state bucket is created by `deploy.sh init` before Terraform exists to
-# create anything, and the agent staging bucket was created by hand for the Agent Engine deploy;
-# neither can take a key Terraform manages at creation, so this script sets it afterwards.
+# create anything, and the agent staging bucket was created by hand for the Agent Engine deploy.
+# Since audit I-10 `deploy.sh init` creates a new state bucket on the key, with public access
+# prevention and the lifecycle below, and refuses to deploy from one on any other key; this script
+# brings a bucket made before that into line, and checks both.
 #
 # For each bucket: the default key set, public access prevention enforced, then every existing
 # object rewritten under the key — a bucket's default key applies only to objects written after it
@@ -30,8 +32,8 @@ PROJECT_ID="$(ema_flow_resolve_project)"
 REGION="${GCP_REGION:-europe-west4}"
 # No default environment, and only the project its inputs file names (audit B08, L1).
 ENVIRONMENT="$(ema_flow_require_environment "$PROJECT_ID")"
-KEY="projects/${PROJECT_ID}/locations/${REGION}/keyRings/ema-flow-${ENVIRONMENT}-record/cryptoKeys/platform-storage"
-STATE_BUCKET="${PROJECT_ID}-ema-flow-tfstate"
+KEY="$(ema_flow_platform_key "$PROJECT_ID" "$REGION" "$ENVIRONMENT")"
+STATE_BUCKET="$(ema_flow_state_bucket "$PROJECT_ID")"
 STATE_BUCKET_ADMIN="${STATE_BUCKET_ADMIN:-user:khs@khsadvisory.com}"
 BUCKETS=("$STATE_BUCKET" "${PROJECT_ID}-ema-flow-agent-staging")
 CHECK="false"
@@ -91,20 +93,11 @@ for bucket in "${BUCKETS[@]}"; do
   fi
 done
 
-# Old generations of the state. The bucket is versioned so a bad apply can be rolled back, but with
-# no lifecycle rule every generation was kept forever — 168 of the state file by 2026-09-21, each an
-# earlier copy of the entitlement map and configuration, and all but the newest written before the
-# key existed. Noncurrent generations are deleted once 20 newer ones exist or after 30 days,
-# whichever comes first; the live state is never touched by the rule.
+# Old generations of the state expire (common.sh, ema_flow_state_lifecycle, which says why).
 lifecycle="$(mktemp)"
 storage_keys_cleanup() { rm -f "$lifecycle"; }
 ema_flow_on_exit storage_keys_cleanup
-cat > "$lifecycle" <<'JSON'
-{"rule": [
-  {"action": {"type": "Delete"}, "condition": {"isLive": false, "numNewerVersions": 20}},
-  {"action": {"type": "Delete"}, "condition": {"isLive": false, "daysSinceNoncurrentTime": 30}}
-]}
-JSON
+ema_flow_state_lifecycle >"$lifecycle"
 current_rules="$(gcloud storage buckets describe "gs://${STATE_BUCKET}" --format=json |
   python3 -c "import sys,json;print(json.dumps(sorted(json.dumps(r,sort_keys=True) for r in (json.load(sys.stdin).get('lifecycle_config') or {}).get('rule',[]))))")"
 wanted_rules="$(python3 -c "import sys,json;print(json.dumps(sorted(json.dumps(r,sort_keys=True) for r in json.load(open(sys.argv[1]))['rule'])))" "$lifecycle")"

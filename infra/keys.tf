@@ -1,9 +1,9 @@
-# Customer-managed keys for the record (docs/design/cmek-rollout.md, step 1).
+# Customer-managed keys for the record (docs/design/cmek-rollout.md).
 #
 # One key per purpose, each granted only to the one Google service agent that uses it: a mistake
 # or a compromise on one key then affects one kind of data, and data can be crypto-shredded by
-# kind. This step only creates the keys and grants; nothing is encrypted with them until the steps
-# that follow switch each resource over, one reviewed pull request at a time.
+# kind. Every resource that holds the record, the images or the Terraform state is encrypted with
+# one of them; the evidence and submission buckets use the evidence ring's key (security.tf).
 #
 # Losing a key loses the data. A Cloud Healthcare dataset whose key is unavailable is disabled
 # after one hour and deleted, stores and all, after 30 days. So every key here:
@@ -15,10 +15,21 @@
 # Rotation never re-encrypts existing data, so no version is ever destroyed either.
 
 locals {
-  # Service agents, spelled out from the project number: the provider's own email attributes for
-  # some of them have proved unreliable (see healthcare_service_identity_email in main.tf).
+  # The service agent each key is granted to. Google creates most of them only on first use, and a
+  # grant to an agent that does not exist yet is refused, so in a new project each is brought into
+  # being before its grant (audit I-10):
+  #   - Healthcare and Artifact Registry: google_project_service_identity (main.tf) creates them.
+  #     Their e-mails follow Google's fixed service-<number>@gcp-sa-<service> form and are spelled
+  #     out, because the provider's email attribute has proved unreliable (see
+  #     healthcare_service_identity_email in main.tf).
+  #   - BigQuery's encryption account, always bq-<number>@bigquery-encryption:
+  #     scripts/gcp/deploy.sh (ensure_bigquery_agent) asks BigQuery for it before the first apply,
+  #     which creates it, and stops unless BigQuery names this account.
+  #   - Logging's: read from the project's Logging settings, which creates it. Not spelled out,
+  #     because a project older than Logging's current form has cmek-p<number>@gcp-sa-logging.
+  #   - Cloud Storage's: the data source in security.tf, which creates it.
   bigquery_encryption_agent = "bq-${data.google_project.current.number}@bigquery-encryption.iam.gserviceaccount.com"
-  logging_agent             = "service-${data.google_project.current.number}@gcp-sa-logging.iam.gserviceaccount.com"
+  logging_agent             = data.google_logging_project_settings.current.kms_service_account_id
   artifact_registry_agent   = "service-${data.google_project.current.number}@gcp-sa-artifactregistry.iam.gserviceaccount.com"
 
   # 120 days, the maximum wait between a destruction request and the destruction.
@@ -78,14 +89,22 @@ resource "google_kms_crypto_key_iam_member" "record_agent" {
   role          = "roles/cloudkms.cryptoKeyEncrypterDecrypter"
   member        = "serviceAccount:${each.value.agent}"
 
-  depends_on = [google_project_service_identity.healthcare]
+  depends_on = [
+    google_project_service_identity.healthcare,
+    google_project_service_identity.artifact_registry,
+  ]
 }
 
-# Run manifests are signed in an HSM. The algorithm is the one the software key used, so the
-# verification code is unchanged; the protection level of a key cannot change after creation,
-# hence a new key. The software key in security.tf stays enabled so every manifest it signed stays
-# verifiable. The worker is switched to this key in step 2; it is granted here so that switch is
-# one configuration change.
+# The project's Logging settings, for the account Cloud Logging encrypts a log bucket with
+# (local.logging_agent). Reading them creates that account if it does not exist yet.
+data "google_logging_project_settings" "current" {
+  project = var.project_id
+}
+
+# Run manifests are signed in an HSM, with this key (run.tf, KMS_MANIFEST_KEY). Its algorithm is
+# the one dev's earlier software key used, so manifests signed with either verify the same way; a
+# key's protection level cannot change after creation, which is why this is a second key. The
+# software key (security.tf, dev only) stays enabled so every manifest it signed stays verifiable.
 resource "google_kms_crypto_key" "manifest_signing_hsm" {
   name                       = "manifest-signing-hsm"
   key_ring                   = google_kms_key_ring.evidence.id

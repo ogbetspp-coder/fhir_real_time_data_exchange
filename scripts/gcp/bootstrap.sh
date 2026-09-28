@@ -30,10 +30,9 @@ standard() {
 }
 
 REGION="$(terraform -chdir=infra output -raw region)"
-# HEALTHCARE_DATASET_OVERRIDE points this at a dataset the services are not using yet, so a new
-# dataset can be built and checked before anything is switched to it (CMEK step 5b). Unset, the
-# dataset is the one Terraform says the services use.
-DATASET="${HEALTHCARE_DATASET_OVERRIDE:-$(terraform -chdir=infra output -raw healthcare_dataset_id)}"
+# The dataset Terraform says the services use. (HEALTHCARE_DATASET_OVERRIDE, which pointed this at
+# a dataset not yet in use for CMEK step 5b, was retired with that migration: audit I-11.)
+DATASET="$(terraform -chdir=infra output -raw healthcare_dataset_id)"
 SOURCE_STORE="$(terraform -chdir=infra output -raw source_fhir_store_id)"
 TARGET_STORE="$(terraform -chdir=infra output -raw target_fhir_store_id)"
 PROFILE_BUCKET="$(terraform -chdir=infra output -raw profile_staging_bucket)"

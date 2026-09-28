@@ -296,18 +296,88 @@ phase_inputs() {
   export DEPLOY_INPUTS_DIR DEPLOY_INPUTS_SHA256
 }
 
-phase_init() {
-  echo "=== terraform init ==="
-  local state_bucket="${PROJECT_ID}-ema-flow-tfstate"
-  if ! gcloud --quiet storage buckets describe "gs://${state_bucket}" >/dev/null 2>&1; then
-    echo "Creating Terraform state bucket gs://${state_bucket}"
-    gcloud --quiet storage buckets create "gs://${state_bucket}" \
+# The Terraform state bucket, on the platform-storage key from the moment it exists (audit I-10).
+# The state holds the entitlement map and every resource's configuration, and the production
+# folder's gcp.restrictNonCmekServices refuses a bucket without a customer-managed key
+# (scripts/gcp/landing-zone.sh). But that key is Terraform's, and Terraform keeps its state in this
+# bucket. So in a new project this makes the key first, as Terraform declares it
+# (google_kms_key_ring.record and google_kms_crypto_key.record["platform-storage"], infra/keys.tf:
+# the same name, purpose, 90-day rotation, 120-day destruction wait and labels), grants the Cloud
+# Storage service agent its use, and creates the bucket on it, never public, versioned, with its
+# old generations expiring; phase_apis then imports the ring and the key into the state
+# (import_unmanaged), so Terraform manages them from its first apply.
+#
+# An existing bucket is only read, since the read-only planner runs this phase too: one on any
+# other key, or none, is refused, because the state would be written under it. Public access
+# prevention not enforced is reported (scripts/gcp/storage-keys.sh enforces it), not refused: the
+# dev bucket, made before this existed, inherits it.
+ensure_state_bucket() {
+  local bucket key ring err found default_key prevention next_rotation lifecycle
+  bucket="$(ema_flow_state_bucket "$PROJECT_ID")"
+  key="$(ema_flow_platform_key "$PROJECT_ID" "$REGION" "$ENVIRONMENT")"
+  ring="ema-flow-${ENVIRONMENT}-record"
+  err="$(mktemp)"
+  DEPLOY_TEMP_FILES+=("$err")
+  if ! found="$(gcloud --quiet storage buckets describe "gs://${bucket}" \
+    --format='value(default_kms_key,public_access_prevention)' 2>"$err")"; then
+    # Only "not found" means a new project; any other failure is not a reason to create anything.
+    if ! grep -qiE "not found|404" "$err"; then
+      echo "::error title=State bucket::Could not read gs://${bucket}: $(head -c 300 "$err")" >&2
+      return 1
+    fi
+    echo "No Terraform state bucket gs://${bucket}: creating its key, then the bucket on it."
+    gcloud --quiet services enable cloudkms.googleapis.com storage.googleapis.com --project="$PROJECT_ID"
+    if ! gcloud --quiet kms keyrings describe "$ring" --location="$REGION" --project="$PROJECT_ID" >/dev/null 2>&1; then
+      gcloud --quiet kms keyrings create "$ring" --location="$REGION" --project="$PROJECT_ID"
+    fi
+    if ! gcloud --quiet kms keys describe platform-storage --keyring="$ring" --location="$REGION" \
+      --project="$PROJECT_ID" >/dev/null 2>&1; then
+      # 90d is Terraform's rotation_period "7776000s", and 120d its key_destroy_wait "10368000s";
+      # the destruction wait is fixed at creation, so a different one here would be a replacement
+      # Terraform's prevent_destroy refuses.
+      next_rotation="$(python3 -c 'import datetime as d;print((d.datetime.now(d.timezone.utc)+d.timedelta(days=90)).strftime("%Y-%m-%dT%H:%M:%SZ"))')"
+      gcloud --quiet kms keys create platform-storage --keyring="$ring" --location="$REGION" \
+        --project="$PROJECT_ID" \
+        --purpose=encryption \
+        --rotation-period=90d \
+        --next-rotation-time="$next_rotation" \
+        --destroy-scheduled-duration=120d \
+        --labels="application=ema-flow,environment=${ENVIRONMENT},managed_by=terraform,data_class=regulated-product-information,purpose=platform-storage"
+    fi
+    # The Cloud Storage service agent, created if need be, granted the key (infra/keys.tf declares
+    # the same grant, record_agent["platform-storage"]; granting it again changes nothing).
+    gcloud --quiet storage service-agent --project="$PROJECT_ID" --authorize-cmek="$key" >/dev/null
+    gcloud --quiet storage buckets create "gs://${bucket}" \
       --project="$PROJECT_ID" \
       --location="$REGION" \
       --uniform-bucket-level-access \
-      --public-access-prevention
-    gcloud --quiet storage buckets update "gs://${state_bucket}" --versioning
+      --public-access-prevention \
+      --default-encryption-key="$key"
+    lifecycle="$(mktemp)"
+    DEPLOY_TEMP_FILES+=("$lifecycle")
+    ema_flow_state_lifecycle >"$lifecycle"
+    gcloud --quiet storage buckets update "gs://${bucket}" --versioning --lifecycle-file="$lifecycle"
+    found="$(gcloud --quiet storage buckets describe "gs://${bucket}" \
+      --format='value(default_kms_key,public_access_prevention)')"
   fi
+  default_key="${found%%$'\t'*}"
+  prevention=""
+  if [[ "$found" == *$'\t'* ]]; then prevention="${found#*$'\t'}"; fi
+  if [[ "$default_key" != "$key" ]]; then
+    echo "::error title=State bucket off its key::gs://${bucket} encrypts new objects with '${default_key:-a Google-managed key}', not ${key}. Terraform would write its state under it; nothing is initialised. Put the bucket on the key with storage-keys.sh in scripts/gcp, then deploy again." >&2
+    return 1
+  fi
+  if [[ "$prevention" != "enforced" ]]; then
+    echo "::warning title=State bucket::gs://${bucket} does not enforce public access prevention (it is '${prevention}'), which storage-keys.sh in scripts/gcp enforces."
+  fi
+  echo "state bucket gs://${bucket}: on the platform-storage key"
+}
+
+phase_init() {
+  echo "=== terraform init ==="
+  local state_bucket
+  state_bucket="$(ema_flow_state_bucket "$PROJECT_ID")"
+  ensure_state_bucket
   # -lockfile=readonly: the provider versions and checksums are the committed lock's, and an
   # init that would change the lock fails instead of rewriting it in the checkout it deploys.
   terraform -chdir=infra init -input=false -lockfile=readonly \
@@ -336,14 +406,16 @@ moved_pairs() {
 # So a pending move is completed in the state first, as the full apply would complete it:
 # `terraform state mv` changes no resource, only the address the state keeps it under. A move is
 # pending while its old address, or an instance of it, is in the state; once done, its block is
-# inert and this does nothing.
+# inert and this does nothing. A move onto an instance of the same resource (a `count` added, as
+# for dev's legacy resources in audit I-11: from X to X[0]) is pending only while X itself is in
+# the state, since X[0] is where it arrives.
 complete_pending_moves() {
   local state pairs from to
   state="$(terraform -chdir=infra state list)"
   pairs="$(moved_pairs)"
   while read -r from to; do
     [[ -n "$from" ]] || continue
-    if awk -v address="$from" '$0 == address || index($0, address "[") == 1 { found = 1 } END { exit !found }' <<<"$state"; then
+    if awk -v address="$from" -v to="$to" '$0 == address || (index(to, address "[") != 1 && index($0, address "[") == 1) { found = 1 } END { exit !found }' <<<"$state"; then
       echo "Completing the pending move ${from} -> ${to} in the Terraform state."
       terraform -chdir=infra state mv "$from" "$to"
     fi
@@ -421,6 +493,54 @@ for change in json.load(open(sys.argv[1])).get('resource_changes', []):
   REVIEWED_PLAN="$plan_file"
 }
 
+# Imports a resource that exists in the project but not in the Terraform state, so the next apply
+# manages it instead of failing to create it again (409): the image repository after a lost state,
+# and, in a new project, the key ring and key ensure_state_bucket made for the state bucket.
+# Nothing is done for a resource already in the state, or one the command given does not find.
+#   import_unmanaged <address> <import id> <command that succeeds when the resource exists...>
+import_unmanaged() {
+  local address="$1" id="$2"
+  shift 2
+  if terraform -chdir=infra state show "$address" >/dev/null 2>&1; then
+    return 0
+  fi
+  if ! "$@" >/dev/null 2>&1; then
+    return 0
+  fi
+  echo "Importing ${address}, which exists in ${PROJECT_ID} but not in the Terraform state."
+  terraform -chdir=infra import \
+    "${tf_common_vars[@]}" \
+    -var="worker_image=us-docker.pkg.dev/cloudrun/container/hello" \
+    -var="validator_image=us-docker.pkg.dev/cloudrun/container/hello" \
+    -var="query_image=us-docker.pkg.dev/cloudrun/container/hello" \
+    "$address" "$id"
+}
+
+# BigQuery's encryption service account, bq-<project number>@bigquery-encryption, is created by
+# Google only when something first asks for it, and a grant to an account that does not exist yet
+# is refused: in a new project the first apply's grant of the ledger-analytics key (infra/keys.tf)
+# would fail (audit I-10). Asking for it creates it, and the answer must be the account
+# infra/keys.tf grants. The deploy asks rather than Terraform because Terraform's data source for
+# it would need the read-only plan identity to hold bigquery.jobs.create, which runs queries.
+ensure_bigquery_agent() {
+  local number expected token answer
+  number="$(gcloud --quiet projects describe "$PROJECT_ID" --format='value(projectNumber)')"
+  expected="bq-${number}@bigquery-encryption.iam.gserviceaccount.com"
+  token="$(ema_flow_access_token)"
+  if ! answer="$(curl --fail --silent --show-error \
+    --header @<(ema_flow_header Authorization "Bearer ${token}") \
+    "https://bigquery.googleapis.com/bigquery/v2/projects/${PROJECT_ID}/serviceAccount" |
+    python3 -c 'import json,sys;print(json.load(sys.stdin).get("email",""))')"; then
+    echo "::error title=BigQuery service account::Could not ask BigQuery for ${PROJECT_ID}'s encryption service account; nothing was applied." >&2
+    return 1
+  fi
+  if [[ -z "$number" || "$answer" != "$expected" ]]; then
+    echo "::error title=BigQuery service account::BigQuery names '${answer}' as ${PROJECT_ID}'s encryption service account, not ${expected}, the account infra/keys.tf grants the ledger-analytics key; nothing was applied." >&2
+    return 1
+  fi
+  echo "BigQuery encryption service account: present"
+}
+
 phase_apis() {
   echo "=== enable APIs and artifact registry ==="
   gcloud --quiet services enable \
@@ -438,22 +558,21 @@ phase_apis() {
     workflows.googleapis.com \
     --project="$PROJECT_ID"
 
-  # The Artifact Registry repo can already exist in GCP (e.g. created by an earlier
-  # run) without being in the current Terraform state (e.g. after the state backend
-  # was lost or reset). Reconcile that drift with an import instead of failing on a
-  # 409 from `apply`.
-  if ! terraform -chdir=infra state show google_artifact_registry_repository.images_cmek >/dev/null 2>&1; then
-    if gcloud --quiet artifacts repositories describe "$REPOSITORY_ID" --location="$REGION" --project="$PROJECT_ID" >/dev/null 2>&1; then
-      echo "Importing pre-existing Artifact Registry repository into Terraform state."
-      terraform -chdir=infra import \
-        "${tf_common_vars[@]}" \
-        -var="worker_image=us-docker.pkg.dev/cloudrun/container/hello" \
-        -var="validator_image=us-docker.pkg.dev/cloudrun/container/hello" \
-        -var="query_image=us-docker.pkg.dev/cloudrun/container/hello" \
-        google_artifact_registry_repository.images_cmek \
-        "projects/${PROJECT_ID}/locations/${REGION}/repositories/${REPOSITORY_ID}"
-    fi
-  fi
+  ensure_bigquery_agent
+
+  # The state bucket's key ring and key, made by ensure_state_bucket in a new project; and the
+  # image repository, which can exist without being in the state (after the state backend was
+  # lost or reset). Each is imported rather than created again.
+  local ring="ema-flow-${ENVIRONMENT}-record"
+  import_unmanaged google_kms_key_ring.record \
+    "projects/${PROJECT_ID}/locations/${REGION}/keyRings/${ring}" \
+    gcloud --quiet kms keyrings describe "$ring" --location="$REGION" --project="$PROJECT_ID"
+  import_unmanaged 'google_kms_crypto_key.record["platform-storage"]' \
+    "$(ema_flow_platform_key "$PROJECT_ID" "$REGION" "$ENVIRONMENT")" \
+    gcloud --quiet kms keys describe platform-storage --keyring="$ring" --location="$REGION" --project="$PROJECT_ID"
+  import_unmanaged google_artifact_registry_repository.images_cmek \
+    "projects/${PROJECT_ID}/locations/${REGION}/repositories/${REPOSITORY_ID}" \
+    gcloud --quiet artifacts repositories describe "$REPOSITORY_ID" --location="$REGION" --project="$PROJECT_ID"
 
   complete_pending_moves
 
@@ -463,6 +582,19 @@ phase_apis() {
   # not run against a project since the query service was added: that is what the -target list
   # implies, not something observed. If an apply here ever fails on that error message, the
   # -target list is reaching further than it reads.
+  #
+  # Every custom role is created here (custom_role_targets), minutes before phase_apply binds it.
+  # A role created in the same apply as its binding is not yet known where the binding is made:
+  # the first deploy of #125 failed with "Role ... does not exist in the resource's hierarchy" and
+  # passed on a re-run. The image build between the two phases is the wait.
+  local role_targets=() address
+  while read -r address; do
+    if [[ -n "$address" ]]; then role_targets+=("-target=${address}"); fi
+  done < <(custom_role_targets)
+  if [[ "${#role_targets[@]}" == "0" ]]; then
+    echo "::error title=Custom roles::Found no custom role in infra/ to create ahead of its bindings; custom_role_targets no longer reads the configuration." >&2
+    return 1
+  fi
   plan_reviewed apis \
     -target=google_project_service.required \
     -target=google_artifact_registry_repository.images_cmek \
@@ -471,9 +603,9 @@ phase_apis() {
     -target=google_storage_bucket_iam_member.build_staging_reader \
     -target=google_artifact_registry_repository_iam_member.build_writer \
     -target=google_project_iam_member.build_log_writer \
-    -target=google_logging_project_bucket_config.regulated_audit \
     -target=google_logging_project_bucket_config.regulated_audit_cmek \
     -target=google_logging_project_sink.regulated_audit \
+    "${role_targets[@]}" \
     "${tf_common_vars[@]}" \
     -var="worker_image=us-docker.pkg.dev/cloudrun/container/hello" \
     -var="validator_image=us-docker.pkg.dev/cloudrun/container/hello" \
@@ -481,21 +613,16 @@ phase_apis() {
   terraform -chdir=infra apply -input=false "$REVIEWED_PLAN"
   rm -f "$REVIEWED_PLAN"
 
-  # google_logging_project_sink.regulated_audit's auto-provisioned writer_identity
-  # isn't reliably readable back through Terraform (two separate apply passes both
-  # left it empty), so grant its role imperatively instead -- the same "manage
-  # outside Terraform" pattern reconcile-fhir-stores.sh already uses for the R5
-  # FHIR stores. Idempotent: re-adding an existing binding is a no-op.
-  local sink_writer_identity
-  sink_writer_identity="$(gcloud --quiet logging sinks describe "ema-flow-${ENVIRONMENT}-regulated-audit" --project="$PROJECT_ID" --format='value(writerIdentity)')"
-  if [[ -n "$sink_writer_identity" ]]; then
-    gcloud --quiet projects add-iam-policy-binding "$PROJECT_ID" \
-      --member="$sink_writer_identity" \
-      --role="roles/logging.bucketWriter" \
-      --condition=None >/dev/null
-  else
-    echo "::warning::Could not resolve the regulated audit log sink's writer identity; grant roles/logging.bucketWriter to it manually."
-  fi
+  # Nothing is granted to the audit sink. Its destination is a log bucket in this project, and a
+  # sink that writes to a log bucket in its own project has no writer identity and needs no grant
+  # (Cloud Logging: "all sinks have a writer identity unless they write to a log bucket in the
+  # current Google Cloud project"). Until audit I-11 this phase looked one up to grant it
+  # roles/logging.bucketWriter, found none, and warned on every deploy.
+}
+
+# The address of every custom role infra/ declares, one per line, for phase_apis's -target list.
+custom_role_targets() {
+  awk '/^resource "google_project_iam_custom_role" "[^"]+"/ { name = $3; gsub(/"/, "", name); print "google_project_iam_custom_role." name }' infra/*.tf
 }
 
 phase_images() {

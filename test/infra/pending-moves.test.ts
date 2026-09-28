@@ -150,6 +150,28 @@ removed {
     expect(moves(result.calls)).toEqual([]);
   });
 
+  // Audit I-11 gave dev's legacy resources a count, moving X to X[0]. X[0] is where such a move
+  // arrives, so it is pending only while X itself is in the state; read as "an instance of X",
+  // every deploy after the first would have tried to move it again, and failed.
+  it("completes a move onto an instance of the same resource once, and then leaves it", () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), "pending-moves-infra-"));
+    dirs.push(cwd);
+    mkdirSync(path.join(cwd, "infra"));
+    writeFileSync(
+      path.join(cwd, "infra", "x.tf"),
+      "moved {\n  from = google_kms_crypto_key.manifest_signing\n  to   = google_kms_crypto_key.manifest_signing[0]\n}\n",
+    );
+    const pending = run(["google_kms_crypto_key.manifest_signing"], cwd);
+    expect(pending.status).toBe(0);
+    expect(moves(pending.calls)).toEqual([
+      "-chdir=infra state mv google_kms_crypto_key.manifest_signing google_kms_crypto_key.manifest_signing[0]",
+    ]);
+    const done = run(["google_kms_crypto_key.manifest_signing[0]"], cwd);
+    expect([done.status, moves(done.calls)]).toEqual([0, []]);
+    const absent = run(["google_kms_crypto_key.manifest_signing_hsm"], cwd);
+    expect([absent.status, moves(absent.calls)]).toEqual([0, []]);
+  });
+
   it("refuses a moved block with no destination instead of passing over it", () => {
     const cwd = mkdtempSync(path.join(tmpdir(), "pending-moves-infra-"));
     dirs.push(cwd);

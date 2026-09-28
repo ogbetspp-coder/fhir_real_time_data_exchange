@@ -1,6 +1,7 @@
 # Customer-managed keys on the record — rollout plan
 
-Status: **all seven steps done and proven, 2026-09-22.** Revised after independent review. Foundations review
+Status: **all seven steps done and proven in `dev`, 2026-09-22**; a new environment is created on
+the keys from its first deploy ("A new environment", below; audit I-10, 2026-09-28). Revised after independent review. Foundations review
 findings A3 (the record on Google-managed keys), A4 (software signing key), C4 (worker's
 Healthcare role project-wide) and C5 (Terraform state open to project viewers). Owner decision
 2026-09-21: do it in `dev` now, so production copies a setup that has been proven rather than
@@ -101,7 +102,7 @@ names only (`sendFullResource: false`), never content. Stated so it is a decisio
 | Ledger table     | In place, with writers stopped, buffer empty, snapshot taken                                           | Ledger rows: guarded by step 0, a snapshot, and a count-and-hash check                          | Deploys paused         |
 | Analytics tables | In place, same procedure                                                                               | None beyond the ledger's; a projection of the store                                             | Deploys paused         |
 | FHIR dataset     | **New resource block** beside the old; stores reconciled into it; switch; old removed from state, kept | Store contents: synthetic, re-seeded by script; history resets, as on the two earlier rebuilds  | Minutes, at the switch |
-| Audit log bucket | In place: `cmek_settings` on the existing bucket                                                       | None; the key applies to new entries                                                            | None                   |
+| Audit log bucket | **New bucket** created with the key; sink moved to it; old one kept, receiving nothing (step 6)        | None; entries before the switch stay in the old bucket until they age out                       | None                   |
 | Image registry   | **New resource block** beside the old; builds and deploy switched; old deleted after one good deploy   | None; images are rebuilt by every deploy — but rollback to revisions older than the switch ends | None                   |
 | Storage buckets  | Default key set in place; existing objects rewritten                                                   | None                                                                                            | None                   |
 | Signing key      | New HSM key; worker switched                                                                           | None; old key kept for verification                                                             | None                   |
@@ -117,13 +118,16 @@ reading the plan.
 0. **Nothing that holds a record can be destroyed by an apply.** `deletion_protection` on by
    default; `prevent_destroy` on the FHIR dataset, the ledger dataset and table, the audit log
    bucket, and the evidence and submission buckets. _Verified by plan before merge:_ `0 to add, 5
-_Done 2026-09-21 (PR #55); deploy and smoke run green. Proved live during step 3: a plan that would have replaced the ledger table failed with `Instance cannot be destroyed` instead of applying._
-to change, 0 to destroy` — four resources switching deletion protection on, and one pre-existing
-   perpetual difference on the monitoring dashboard (the API reformats its JSON; not introduced
-   here, noted so it does not hide a real change in later plans).
+to change, 0 to destroy` — four resources switching deletion protection on, and one
+   pre-existing perpetual difference on the monitoring dashboard (the API reformats its JSON; not
+   introduced here, noted so it does not hide a real change in later plans).
+   _Done 2026-09-21 (PR #55); deploy and smoke run green. Proved live during step 3: a plan that
+   would have replaced the ledger table failed with `Instance cannot be destroyed` instead of
+   applying._
 1. **Keys, grants, protections.** New ring and five keys at 120-day destruction, the HSM signing
-   key, the service agent grants (each agent created with `google_project_service_identity` where
-   it may not exist yet), the alert. Then the deny policy, applied by the organisation
+   key, the service agent grants, the alert. (As first written, only the Healthcare agent was
+   created before its grant; the others existed in `dev` and would not in a new project. Audit
+   I-10 corrected that: "A new environment", below.) Then the deny policy, applied by the organisation
    administrator. _Verify:_ every key exists with its protection level and destroy duration; each
    agent holds exactly its grant; the deny policy is in force; disabling a version of a throwaway
    key raises the alert (the throwaway key cannot be deleted afterwards — it is named as such).
@@ -142,7 +146,8 @@ to change, 0 to destroy` — four resources switching deletion protection on, an
    hashes; `bq show` reports the key on every table; the plan shows no replacement.
    _Done 2026-09-21. Deploys paused at 19:37; every streaming buffer drained by 20:26 — the ledger's
    four buffered rows among them, which is why the wait mattered. All twelve tables converted by
-   `scripts/gcp/bq-cmek-convert.sh`, each with a snapshot first (expiring after 14 days, and on
+   `scripts/gcp/bq-cmek-convert.sh` (retired once used, by audit I-11; it is in the history at
+   `709e50d`), each with a snapshot first (expiring after 14 days, and on
    Google-managed encryption until then) and identical row count and content fingerprint before
    and after (ledger: 31 rows). Planned before conversion, the change failed with `Instance cannot
 be destroyed` on the ledger table — step 0 refusing the replacement the provider wanted;
@@ -192,7 +197,9 @@ be destroyed` on the ledger table — step 0 refusing the replacement the provid
    documentation does not cover; notifications fired (59 publish operations in the hour). The old
    dataset — holding only the superseded synthetic copy, referenced by nothing — was deleted. The
    project's only FHIR dataset is now on the `fhir-record` key. Lesson recorded: before migrating
-   a resource, diff its live IAM against Terraform._
+   a resource, diff its live IAM against Terraform._ The `removed` block for `epi`, and
+   `HEALTHCARE_DATASET_OVERRIDE`, which pointed the reconcile and bootstrap scripts at the new
+   dataset during (b), were dropped by audit I-11 once nothing needed them.
 6. **Audit log bucket, recreated.** A second bucket, `ema-flow-<env>-regulated-audit-cmek`,
    created with the `audit-logs` key, same retention and lock setting, `prevent_destroy`; the sink
    moved to it. The old bucket stays managed and protected, receiving nothing, keeping its entries
@@ -200,6 +207,13 @@ be destroyed` on the ledger table — step 0 refusing the replacement the provid
    _2026-09-21: first attempted in place (PR #65); the deploy failed at the targeted apply because
    the API refuses a key on an existing bucket, which left every deploy failing at that step until
    this was fixed. No service was affected: the failure precedes the build and the apply._
+   _Done 2026-09-21 (PR #67): `ema-flow-dev-regulated-audit-cmek` created with the `audit-logs`
+   key, 2,555-day retention, `prevent_destroy`; the sink moved to it; the old bucket kept,
+   managed and protected. Planned against live state first: 1 to add, 4 to change, 0 to destroy.
+   Checked 2026-09-28: the new bucket reports the `audit-logs` key and holds entries from that
+   day; the old one holds none written since 2026-09-22. Since audit I-11 the old bucket, like
+   the software signing key, is declared for `dev` alone (`count`, with a `moved` block so `dev`'s
+   is kept, not destroyed): no other environment ever wrote to it._
 7. **Storage.** Default key on the profiles, build-staging and state buckets; existing objects
    rewritten. The state bucket is created by `deploy.sh`, not Terraform, so its key and IAM are set
    by script: the legacy project viewer, editor and owner bindings removed, leaving the deployer
@@ -222,16 +236,49 @@ be destroyed` on the ledger table — step 0 refusing the replacement the provid
    the project is left on a Google-managed key.** The key-guard deny policy was applied by the
    owner the same night and `key-guard.sh --check` reports it matches._
 
-After step 7, with the product folder in place (foundations A1), the organisation policies
-`gcp.restrictNonCmekServices` and `gcp.restrictCmekCryptoKeyProjects` on the folder make a
-Google-managed-key resource impossible to create by accident — the policy form of this plan.
+The policy form of this plan has been in force on the **production** folder since 2026-09-22
+(`scripts/gcp/landing-zone.sh`, foundations A1): `gcp.restrictNonCmekServices` refuses a new
+bucket, BigQuery dataset or image repository without a customer-managed key, and
+`gcp.restrictCmekCryptoKeyProjects` a key from outside production. `dev`, in the non-production
+folder, carries neither.
+
+## A new environment
+
+A new project (production first) is created on the keys from its first deploy, with no manual
+step between (audit I-10, 2026-09-28). Until then three things stopped it:
+
+- **The state bucket.** `deploy.sh init` created it without a key, which the production folder's
+  policy refuses; and the key was Terraform's, which keeps its state in that bucket. `init` now
+  makes the `ema-flow-<env>-record` ring and its `platform-storage` key first, with gcloud and as
+  Terraform declares them (the destruction wait is fixed at creation, so it must match), grants
+  the Cloud Storage service agent the key, and creates the bucket on it, never public, versioned,
+  its old generations expiring. `deploy.sh apis` then imports the ring and the key, so Terraform
+  manages them from its first apply. `init` refuses a state bucket on any other key, or none;
+  `record-readers.sh` removes project viewers' and editors' access to it after every apply.
+- **The service agents.** Google creates most of them on first use, and a key cannot be granted
+  to an agent that does not exist yet. Healthcare's and Artifact Registry's are created by
+  `google_project_service_identity`; Logging's is read from the project's Logging settings,
+  which creates it (and names it, since older projects have `cmek-p<number>@gcp-sa-logging`);
+  BigQuery's is asked for by `deploy.sh apis` before the first apply, which creates it, and must be
+  `bq-<number>@bigquery-encryption`; Cloud Storage's comes from its data source.
+- **Custom roles.** A role created in the apply that binds it is not yet known where the binding
+  is made (the first deploy of #125 failed that way). `deploy.sh apis` creates every custom role,
+  minutes before `apply` binds it.
+
+`dev`'s migration leftovers — the audit bucket from before step 6 and the software signing key
+from before step 2 — are declared for `dev` alone, so a new environment does not create them.
+
+Not yet rehearsed: the first run of all this is to be in a throwaway project under the production
+folder, before the first production deploy (owner action, audit I-10).
 
 ## Rollback
 
-Steps 0, 1, 3, 6 and 7 are additive or in place: revert the pull request, and for step 3 restore
-from the snapshot if a count or hash differs. For steps 2 and 5 the old key or dataset is kept
-until the new one is verified, so rolling back is pointing the configuration at the old one and
-deploying. Step 4's rollback ends when the old repository is deleted, and says so.
+Steps 0, 1, 3 and 7 are additive or in place: revert the pull request, and for step 3 restore
+from the snapshot if a count or hash differs. Step 6 made a new bucket and moved the sink to it;
+the old bucket is kept, so rolling back is pointing the sink at it again. For steps 2 and 5 the
+old key or dataset was kept until the new one was verified, so rolling back was pointing the
+configuration at the old one and deploying; step 5's old dataset has since been deleted. Step 4's
+rollback ended when the old repository was deleted, and said so.
 
 ## Not in scope
 
