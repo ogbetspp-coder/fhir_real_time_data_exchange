@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 
 import { describe, expect, it } from "vitest";
 
@@ -35,6 +36,13 @@ describe("the importer lock", () => {
     expect(files).toContain("src/authority/t/transform.ts");
     expect(files).toContain("src/fidelity/xhtml.ts");
     expect(files).not.toContain(LOCK);
+  });
+
+  it("reads a base that names no commit as absent, and fails on any other git error", () => {
+    expect(resolveBase("refs/heads/no-such-branch-of-the-lock-test")).toBeUndefined();
+    expect(resolveBase("HEAD")).toMatch(/^[0-9a-f]{40}$/u);
+    // Outside a repository git fails otherwise (exit 128): never read as "nothing released".
+    expect(() => resolveBase("HEAD", tmpdir())).toThrow();
   });
 
   it("keeps every entry ever released", () => {

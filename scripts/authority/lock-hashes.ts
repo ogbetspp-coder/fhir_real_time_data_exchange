@@ -14,8 +14,9 @@ export const VECTORS = "test/fixtures/authority/vectors.json";
 const SHARED = ["src/fidelity/normalize.ts", "src/fidelity/xhtml.ts"];
 
 // git's output; any failure throws (the lock fails closed on a git it cannot read).
-function git(args: string[]): string {
+function git(args: string[], cwd?: string): string {
   return execFileSync("git", args, {
+    cwd,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
     maxBuffer: 64 * 1024 * 1024,
@@ -58,12 +59,15 @@ export function lockHashes(): LockEntry {
   };
 }
 
-// The commit `base` names, or undefined where it names none (no such ref here).
-export function resolveBase(base: string): string | undefined {
+// The commit `base` names, or undefined where it names none (no such ref here: `rev-parse
+// --verify --quiet` exits 1 and says nothing). Any other failure throws. `cwd` is for tests.
+export function resolveBase(base: string, cwd?: string): string | undefined {
   try {
-    return git(["rev-parse", "--verify", "--quiet", `${base}^{commit}`]).trim();
-  } catch {
-    return undefined;
+    return git(["rev-parse", "--verify", "--quiet", `${base}^{commit}`], cwd).trim();
+  } catch (error) {
+    const { status, stderr } = error as { status?: unknown; stderr?: unknown };
+    if (status === 1 && (stderr ?? "") === "") return undefined;
+    throw error;
   }
 }
 

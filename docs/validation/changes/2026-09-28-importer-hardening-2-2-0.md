@@ -11,15 +11,18 @@ no accepted section's T(div), normalised text or hash moves.
   `next tuesday` reached the record, and a timestamp that is not a date made a submission that
   failed its own contract.
 - **The gate checks the importer version first** (`src/authority/gate.ts`). A submission whose
-  parser version or extractor is not the gate's own is refused before anything is fetched: "The
-  submission was made by another importer version than the gate runs". Before, it cost two
-  fetches and a full import and was reported as "not what the importer makes".
+  extractor is not the gate's own (`authority-import/2.2.0`) is refused before anything is
+  fetched: "The submission was made by another importer version than the gate runs". The parse has
+  already bound the extractor to the parser's name and version, so a submission whose two disagree
+  never reaches the check. Before, it cost two fetches and a full import and was reported as "not
+  what the importer makes".
 - **Pictures read from T's tree** (`src/authority/import.ts`). The pictures stage reads each
   `img`'s `src` from T's tree of the div, its references decoded, not from the tag's text with a
   regular expression that also matched `data-src` (or a `src=` inside another attribute's
   value). A div T cannot read into a tree names no picture; T refuses it at `narrative`.
 - **Fetch errors** (`src/authority/fetch.ts`). A timeout before the headers arrive is `timeout`,
-  not `unreachable`; a response refused for its status has its body cancelled.
+  not `unreachable`; a response refused for its status has its body cancelled, without waiting
+  for the cancel to settle.
 - **T's font-size rules judged once** (`src/authority/t/transform.ts`). The copies at each text
   node and list marker are gone: they judged the very size the element's own check had judged
   (both are drawn in the element's style), so no input could reach them, and deleting either
@@ -88,7 +91,8 @@ worker (D10), as for every importer version; the gate now says so before fetchin
      with the text node's copies gone, deleting either element font-size check fails
      `text-under-five-points` or `text-under-half-its-block`).
    - `test/authority/lock.test.ts`: "hashes what git tracks, and nothing the importer could load is
-     untracked".
+     untracked"; "reads a base that names no commit as absent, and fails on any other git error"
+     (only `rev-parse --verify --quiet`'s silent exit 1 is an absent base).
    - `test/fidelity-code-points.test.ts`: "hold the importer's invisible-character check to step
      1's list", at every code point.
 5. None.

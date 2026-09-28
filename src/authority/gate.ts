@@ -69,11 +69,10 @@ export async function verifyAuthorityImport(
   const reportUri = submission.provenance.fidelity.reportUri;
   if (reportUri === undefined) return rejected("An authority import names its report's location");
   // The gate recomputes with the importer it runs, so a submission another version made is
-  // refused before anything is fetched (D10).
-  if (
-    submission.provenance.extraction.parser.version !== IMPORTER_VERSION ||
-    source.extractedText.extractorVersion !== IMPORTER_EXTRACTOR
-  ) {
+  // refused before anything is fetched (D10). The parse has already bound the extractor to the
+  // parser (`authority-import/<parser.version>`), so the extractor names both: a submission
+  // whose two disagree never parses.
+  if (source.extractedText.extractorVersion !== IMPORTER_EXTRACTOR) {
     return rejected("The submission was made by another importer version than the gate runs");
   }
 

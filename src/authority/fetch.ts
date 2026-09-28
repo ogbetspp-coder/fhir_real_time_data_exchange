@@ -67,8 +67,9 @@ export function emaFetcher(
       throw new AuthorityFetchError(timedOut(error) ? "timeout" : "unreachable");
     }
     if (response.status !== 200) {
-      // The body is not read, so it is released rather than left holding the connection.
-      await response.body?.cancel().catch(() => undefined);
+      // The body is not read, so it is released rather than left holding the connection; not
+      // awaited, so a cancel that never settles cannot hold the fetch.
+      void response.body?.cancel().catch(() => undefined);
       throw new AuthorityFetchError(`http-${String(response.status)}`);
     }
     const body = response.body;

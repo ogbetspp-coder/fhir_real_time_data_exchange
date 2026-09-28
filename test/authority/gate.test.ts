@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { AuthorityFetchError, type AuthorityFetcher } from "../../src/authority/fetch.js";
 import { copiesFetcher, verifyAuthorityImport } from "../../src/authority/gate.js";
-import { importPublication, sha256Bytes } from "../../src/authority/import.js";
+import { IMPORTER_VERSION, importPublication, sha256Bytes } from "../../src/authority/import.js";
 import { emaShapedPublication, syntheticPublication } from "../../src/authority/synthetic.js";
 import {
   SubmissionRejectedError,
@@ -147,19 +147,31 @@ describe("the authority gate", () => {
   });
 
   it("refuses an import another importer version made, and fetches nothing", async () => {
-    const input = imported();
-    const version = "0.9.0";
-    input.submission.provenance.extraction.parser.version = version;
-    const source = input.submission.provenance.sourceDocument;
-    if (source.kind !== "authority-publication") throw new Error("import");
-    source.extractedText.extractorVersion = `authority-import/${version}`;
-    reseal(input.submission);
     const unreachable: AuthorityFetcher = {
       fetch: () => Promise.reject(new Error("the gate fetched")),
     };
-    expect(await issues(input, unreachable)).toEqual([
+    const made = (parserVersion: string, extractorVersion: string) => {
+      const input = imported();
+      input.submission.provenance.extraction.parser.version = parserVersion;
+      const source = input.submission.provenance.sourceDocument;
+      if (source.kind !== "authority-publication") throw new Error("import");
+      source.extractedText.extractorVersion = extractorVersion;
+      reseal(input.submission);
+      return input;
+    };
+    // Another version, named consistently: the gate's own check.
+    expect(await issues(made("0.9.0", "authority-import/0.9.0"), unreachable)).toEqual([
       "The submission was made by another importer version than the gate runs",
     ]);
+    // Either field alone changed: the parse refuses the disagreement first.
+    const disagreeing =
+      "sourceDocument.extractedText.extractorVersion must be extraction.parser's name/version";
+    expect(
+      await issues(made("0.9.0", `authority-import/${IMPORTER_VERSION}`), unreachable),
+    ).toContain(disagreeing);
+    expect(await issues(made(IMPORTER_VERSION, "authority-import/0.9.0"), unreachable)).toContain(
+      disagreeing,
+    );
   });
 
   it("refuses an import requested after the gate fetched the files", async () => {
