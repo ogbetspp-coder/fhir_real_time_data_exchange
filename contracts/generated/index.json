@@ -52,10 +52,10 @@
     },
     {
       "name": "run-manifest",
-      "version": "3.0.0",
-      "$id": "https://khs.dev/contracts/run-manifest/3.0.0/schema.json",
+      "version": "4.0.0",
+      "$id": "https://khs.dev/contracts/run-manifest/4.0.0/schema.json",
       "file": "run-manifest.schema.json",
-      "sha256": "959445ee4031ccd740c4a1b93cd0a3361cb440e9c1ff2c9950d30bddd7097b54"
+      "sha256": "18d7018c861fa93e86a721677593092cd36e390880deca08f69ebb81aa5c68bf"
     }
   ]
 }

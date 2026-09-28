@@ -11,3 +11,11 @@ export const GLOBAL_EPI_PROFILE_BASE =
   "http://hl7.org/fhir/uv/emedicinal-product-info/StructureDefinition/";
 
 export const GLOBAL_TYPE2_BUNDLE_PROFILE = `${GLOBAL_EPI_PROFILE_BASE}Bundle-uv-epi`;
+
+// The EMA QRD template version the transform stamps on the EMA Composition and the run manifest
+// records: one constant, so the two cannot disagree (audit B07, S-4).
+export const QRD_TEMPLATE_VERSION = "10.4";
+
+// The package ids whose pinned versions (fhir/standards.lock.json) the run manifest names.
+export const GLOBAL_EPI_PACKAGE_ID = "hl7.fhir.uv.emedicinal-product-info";
+export const EMA_EPI_PACKAGE_ID = "EUePI";

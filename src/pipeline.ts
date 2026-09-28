@@ -24,7 +24,13 @@ import { toProvenanceResource } from "./fhir/provenance.js";
 import { sourceIdentifierValue, transformType2ToEma } from "./fhir/transform.js";
 import { mappingReference, type EmaMapping } from "./fhir/mapping.js";
 import type { FhirBundle, FhirResource, OperationOutcome } from "./fhir/types.js";
-import { GLOBAL_TYPE2_BUNDLE_PROFILE } from "./fhir/standards.js";
+import {
+  EMA_EPI_PACKAGE_ID,
+  GLOBAL_EPI_PACKAGE_ID,
+  GLOBAL_TYPE2_BUNDLE_PROFILE,
+  QRD_TEMPLATE_VERSION,
+} from "./fhir/standards.js";
+import { pinnedPackage, pinnedPackages } from "./fhir/standards-lock.js";
 import { GcpEvidenceStore, type RunManifest, type SignedManifest } from "./gcp/evidence.js";
 import {
   HealthcareApiClient,
@@ -243,7 +249,19 @@ export async function runPipeline(
     throw new Error("Source identifier is in the reserved authority-import namespace");
   }
 
-  const transformed = transformType2ToEma(source, mapping);
+  // The standards the manifest names, read from the lock the image ships before anything is
+  // written: a missing or malformed lock fails the run here, not after its side effects.
+  const packages = pinnedPackages();
+  const standards: RunManifest["standards"] = {
+    fhir: "5.0.0",
+    globalEpiPackage: pinnedPackage(packages, GLOBAL_EPI_PACKAGE_ID),
+    emaPackage: pinnedPackage(packages, EMA_EPI_PACKAGE_ID) as "EUePI#1.0.0",
+    qrdTemplate: QRD_TEMPLATE_VERSION,
+    mappingVersion: mapping.mappingVersion,
+    packages,
+  };
+
+  const transformed = transformType2ToEma(source, mapping, QRD_TEMPLATE_VERSION);
   const emaPreflight = validateEmaPreflight(transformed.list, transformed.documentBundle, mapping);
   if (hasValidationErrors(emaPreflight)) {
     log("warning", "EMA preflight rejected", {
@@ -309,14 +327,7 @@ export async function runPipeline(
       resource: input.sourceResource,
       hash: transformed.inputHash,
     },
-    standards: {
-      fhir: "5.0.0",
-      globalEpiPackage:
-        process.env.GLOBAL_EPI_PACKAGE ?? "hl7.fhir.uv.emedicinal-product-info#1.0.0",
-      emaPackage: "EUePI#1.0.0",
-      qrdTemplate: "10.4",
-      mappingVersion: mapping.mappingVersion,
-    },
+    standards,
     validation,
     transformation: {
       inputHash: transformed.inputHash,
@@ -326,6 +337,7 @@ export async function runPipeline(
     runtime: {
       sourceCommit: process.env.GIT_COMMIT ?? "development",
       imageDigest: process.env.IMAGE_DIGEST ?? "development",
+      validatorImageDigest: process.env.VALIDATOR_IMAGE_DIGEST ?? "development",
       workflowRevision: process.env.WORKFLOW_REVISION ?? process.env.K_REVISION ?? "development",
     },
     ...(ingestion === undefined ? {} : { ingestion }),

@@ -4,6 +4,9 @@ locals {
   # records do (infra/query.tf). null when the reference carries no digest; the precondition on
   # the service turns that into a plan-time error.
   worker_image_digest = try(regex("@(sha256:[0-9a-f]{64})$", var.worker_image)[0], null)
+  # And the validator sidecar's, which checked the run (runtime.validatorImageDigest, run manifest
+  # 4.0.0): its packages are named in the manifest, and this digest names the image that held them.
+  validator_image_digest = try(regex("@(sha256:[0-9a-f]{64})$", var.validator_image)[0], null)
 
   # Unset, the run sources follow the synthetic flag, as the worker's own default does
   # (src/config.ts): every source where synthetic content is allowed, otherwise the gated one.
@@ -160,10 +163,6 @@ resource "google_cloud_run_v2_service" "worker" {
         name  = "FHIR_VALIDATOR_URL"
         value = "http://localhost:8090"
       }
-      env {
-        name  = "GLOBAL_EPI_PACKAGE"
-        value = "hl7.fhir.uv.emedicinal-product-info#1.0.0"
-      }
       # Tie every signed run manifest to the code and the image that produced it
       # (runtime.sourceCommit and runtime.imageDigest, src/pipeline.ts). Without these the worker
       # recorded "development" for both. The commit is the value the query service records as
@@ -179,6 +178,13 @@ resource "google_cloud_run_v2_service" "worker" {
         name  = "IMAGE_DIGEST"
         value = local.worker_image_digest
       }
+      # The packages the manifest names come from fhir/standards.lock.json in the worker image
+      # (audit B07, S-4); until run manifest 4.0.0 a free-form GLOBAL_EPI_PACKAGE set here named
+      # one of them, unchecked.
+      env {
+        name  = "VALIDATOR_IMAGE_DIGEST"
+        value = local.validator_image_digest
+      }
     }
   }
 
@@ -186,6 +192,10 @@ resource "google_cloud_run_v2_service" "worker" {
     precondition {
       condition     = local.worker_image_digest != null
       error_message = "worker_image must be an image reference by digest (…@sha256:<64 hex>) so IMAGE_DIGEST can name the exact image in every signed run manifest."
+    }
+    precondition {
+      condition     = local.validator_image_digest != null
+      error_message = "validator_image must be an image reference by digest (…@sha256:<64 hex>) so VALIDATOR_IMAGE_DIGEST can name the validator in every signed run manifest."
     }
   }
 

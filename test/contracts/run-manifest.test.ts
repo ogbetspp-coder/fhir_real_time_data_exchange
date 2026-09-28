@@ -126,8 +126,15 @@ describe("run manifest contract", () => {
 
   // 2.0.0 was signed after the transaction, over its response's hash; its rows stay readable.
   it("still reads a version 2.0.0 persisted manifest", () => {
+    // Up to 3.0.0 the standards were literals and the validator's image was not recorded.
+    const standards: Record<string, unknown> = { ...manifest.standards };
+    delete standards.packages;
+    const runtime: Record<string, unknown> = { ...manifest.runtime };
+    delete runtime.validatorImageDigest;
     const v2 = {
       ...manifest,
+      standards,
+      runtime,
       schemaVersion: "2.0.0",
       status: "persisted",
       dryRun: false,

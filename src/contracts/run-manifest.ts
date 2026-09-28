@@ -6,6 +6,7 @@ import {
   IsoDateTime,
   NonEmptyString,
   NormalizationVersion,
+  PackageRef,
   PrincipalId,
   RecordRef,
   Sha256Hex,
@@ -22,9 +23,10 @@ import {
 } from "./ingestion-provenance.js";
 
 // Evidence schema for the signed run manifest (AGENTS.md: "update the mapping manifest and
-// evidence schema together"). Versions 1.0.0, 1.1.0 and 2.0.0 are kept so ledger rows written
-// before the ingestion block, before authority imports, and before the manifest was signed ahead
-// of persistence remain readable through `AnyRunManifestSchema`.
+// evidence schema together"). Versions 1.0.0, 1.1.0, 2.0.0 and 3.0.0 are kept so ledger rows
+// written before the ingestion block, before authority imports, before the manifest was signed
+// ahead of persistence, and before it named the packages that validated the run remain readable
+// through `AnyRunManifestSchema`.
 //
 // 3.0.0 is signed BEFORE the FHIR transaction, so a persist-mode manifest cannot say the run
 // persisted: its status is `authorised`, and it names the exact transaction it authorises
@@ -41,7 +43,13 @@ import {
 // Schema (and every model generated from it) enforces that an authorised run, and only one,
 // names its transaction and is not a dry run.
 
-export const RUN_MANIFEST_VERSION = "3.0.0";
+// 4.0.0 (audit B07, S-4) names the standards that validated the run instead of literals: every
+// FHIR package of fhir/standards.lock.json by id#version and SHA-256 (`standards.packages`, the
+// Global ePI and EMA packages among them), and the validator sidecar's image digest
+// (`runtime.validatorImageDigest`). Up to 3.0.0 a manifest named the packages by literal, with
+// no hash, so a signed manifest could name a standard other than the one that ran.
+
+export const RUN_MANIFEST_VERSION = "4.0.0";
 
 // `rejected` and `failed` were never written: a refused or failed run leaves no manifest, only
 // its log line. They are kept for the older versions and dropped from 3.0.0, and `persisted`
@@ -50,13 +58,42 @@ const LegacyRunStatus = z
   .enum(["validated", "persisted", "rejected", "failed"])
   .meta({ id: "LegacyRunStatus" });
 
+const legacyStandards = {
+  fhir: z.literal("5.0.0"),
+  globalEpiPackage: NonEmptyString,
+  emaPackage: z.literal("EUePI#1.0.0"),
+  qrdTemplate: NonEmptyString,
+  mappingVersion: NonEmptyString,
+};
+
+// Up to 3.0.0: the standards by literal.
+const LegacyStandardsSchema = z
+  .strictObject(legacyStandards)
+  .meta({ id: "LegacyManifestStandards" });
+
+const ManifestPackageSchema = z
+  .strictObject({ package: PackageRef, sha256: Sha256Hex })
+  .meta({ id: "ManifestPackage" });
+
+// 4.0.0: the same fields, the two named packages among `packages`, which carries every package of
+// the lock with the SHA-256 of its tarball.
 const StandardsSchema = z
   .strictObject({
-    fhir: z.literal("5.0.0"),
-    globalEpiPackage: NonEmptyString,
-    emaPackage: z.literal("EUePI#1.0.0"),
-    qrdTemplate: NonEmptyString,
-    mappingVersion: NonEmptyString,
+    ...legacyStandards,
+    globalEpiPackage: PackageRef,
+    packages: z.array(ManifestPackageSchema).min(1),
+  })
+  .superRefine((standards, context) => {
+    const named = standards.packages.map(({ package: ref }) => ref);
+    for (const field of ["globalEpiPackage", "emaPackage"] as const) {
+      if (!named.includes(standards[field])) {
+        context.addIssue({ code: "custom", message: `${field} is not among the pinned packages` });
+      }
+    }
+    const ids = named.map((ref) => ref.slice(0, ref.indexOf("#")));
+    if (new Set(ids).size !== ids.length) {
+      context.addIssue({ code: "custom", message: "a package is pinned more than once" });
+    }
   })
   .meta({ id: "ManifestStandards" });
 
@@ -84,27 +121,38 @@ const LegacyPersistenceSchema = z
   .strictObject({ targetStore: NonEmptyString, transactionResponseHash: Sha256Hex })
   .meta({ id: "LegacyManifestPersistence" });
 
+const legacyRuntime = {
+  sourceCommit: NonEmptyString,
+  imageDigest: NonEmptyString,
+  workflowRevision: NonEmptyString,
+};
+
+// Up to 3.0.0: no record of the validator that checked the run.
+const LegacyRuntimeSchema = z.strictObject(legacyRuntime).meta({ id: "LegacyManifestRuntime" });
+
+// 4.0.0: the validator sidecar's image digest beside the worker's ("development" off Cloud Run,
+// as for the others).
 const RuntimeSchema = z
-  .strictObject({
-    sourceCommit: NonEmptyString,
-    imageDigest: NonEmptyString,
-    workflowRevision: NonEmptyString,
-  })
+  .strictObject({ ...legacyRuntime, validatorImageDigest: NonEmptyString })
   .meta({ id: "ManifestRuntime" });
 
-// The fields every version shares; status, dryRun and persistence are each version's own.
-const manifestBody = {
+// The fields every version up to 3.0.0 shares; status, dryRun and persistence are each version's
+// own.
+const legacyBody = {
   runId: Uuid,
   startedAt: IsoDateTime,
   completedAt: IsoDateTime,
-  standards: StandardsSchema,
+  standards: LegacyStandardsSchema,
   validation: ValidationSchema,
   transformation: TransformationSchema,
-  runtime: RuntimeSchema,
+  runtime: LegacyRuntimeSchema,
 };
 
+// 4.0.0's: the standards and the runtime name what validated the run.
+const manifestBody = { ...legacyBody, standards: StandardsSchema, runtime: RuntimeSchema };
+
 const legacyManifestBody = {
-  ...manifestBody,
+  ...legacyBody,
   status: LegacyRunStatus,
   dryRun: z.boolean(),
   persistence: LegacyPersistenceSchema.optional(),
@@ -263,6 +311,31 @@ export const RunManifestV2Schema = z
   .superRefine(documentRunsCarryIngestion)
   .meta({ id: "RunManifestV2" });
 
+// 3.0.0, frozen: signed before its transaction, as 4.0.0 is, with the standards by literal.
+const v3ManifestBody = {
+  schemaVersion: z.literal("3.0.0"),
+  source: runSource,
+  ...legacyBody,
+  ingestion: IngestionEvidenceSchema.optional(),
+};
+
+export const RunManifestV3Schema = z
+  .discriminatedUnion("status", [
+    z
+      .strictObject({ ...v3ManifestBody, status: z.literal("validated"), dryRun: z.literal(true) })
+      .meta({ id: "ValidatedRunManifestV3" }),
+    z
+      .strictObject({
+        ...v3ManifestBody,
+        status: z.literal("authorised"),
+        dryRun: z.literal(false),
+        persistence: PersistenceSchema,
+      })
+      .meta({ id: "AuthorisedRunManifestV3" }),
+  ])
+  .superRefine(documentRunsCarryIngestion)
+  .meta({ id: "RunManifestV3" });
+
 const currentManifestBody = {
   schemaVersion: z.literal(RUN_MANIFEST_VERSION),
   source: runSource,
@@ -300,6 +373,7 @@ export const AnyRunManifestSchema = z.union([
   RunManifestV1Schema,
   RunManifestV11Schema,
   RunManifestV2Schema,
+  RunManifestV3Schema,
   RunManifestSchema,
 ]);
 
