@@ -21,3 +21,14 @@ paths = ['''^scripts/gcp/deploy\.sh$''']
 # The rule's captured secret, exactly: the user name and the command substitution, quotes included.
 regexTarget = "secret"
 regexes = ['''^"oauth2accesstoken:\$\(ema_flow_access_token\)"$''']
+
+# test/ci/operator-arguments.test.ts, as committed in c7c96d6 of the B08 follow-up (PR #143): a
+# fake `--token=` argument, base64 of the letters A to Z, proving a refused argument is never
+# echoed. It stays in that commit's history; the test now builds its fakes at run time.
+[[allowlists]]
+description = "operator-arguments.test.ts (c7c96d6): base64 of A-Z as a fake refused token"
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''^test/ci/operator-arguments\.test\.ts$''']
+regexTarget = "secret"
+regexes = ['''^QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo=$''']

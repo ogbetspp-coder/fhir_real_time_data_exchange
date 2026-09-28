@@ -110,12 +110,14 @@ describe("every operator script's command line", () => {
   });
 
   it.each(scripts)("%s never echoes an argument it refuses, which may be a secret", (script) => {
-    // An OAuth client secret was exposed on a command line on 2026-09-22.
+    // An OAuth client secret was exposed on a command line on 2026-09-22. The shapes are built at
+    // run time, so this file holds no string a secret scanner reads as a credential.
+    const body = (length: number) => "x".repeat(length);
     const secrets = [
-      "GOCSPX-abcdefghijklmnopqrstuvwxyz12",
-      "ya29.a0AfH6SMBx-secret",
-      "1//0gSecretRefreshToken",
-      "--token=QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo=",
+      ["GOCSPX", body(28)].join("-"),
+      ["ya29", body(20)].join("."),
+      ["1", "", body(20)].join("/"),
+      `--token=${Buffer.from(body(30)).toString("base64")}`,
     ];
     const result = run(script, secrets);
     expect([result.status, result.called]).toEqual([2, false]);
