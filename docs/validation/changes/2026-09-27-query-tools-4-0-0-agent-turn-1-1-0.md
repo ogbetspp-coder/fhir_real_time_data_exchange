@@ -61,10 +61,11 @@ words (AG-3, AG-7).
   deployed agent failed every Gemini Enterprise turn before writing, audit AG-1).
 
 **Deploy order.** The agent validates the service's answers against its vendored copy. A 4.0.0
-agent reads any answer the service has ever produced as before, so the agent may be redeployed
-before, with or after the service. The service's rollout changes nothing it answers. The agent
-must be redeployed from `main` after this change for its records to be 1.1.0, and before the
-live proof turn (roadmap item 1).
+agent reads any answer the service has ever produced as before, so, for the union change alone,
+the agent may be redeployed before, with or after the service; it must be at 3.0.0 or later no
+later than the service (the 3.0.0 record's deploy order). The service's rollout changes nothing it
+answers. The agent must be redeployed from `main` after this change for its records to be 1.1.0, and
+before the live proof turn (roadmap item 1).
 
 **Steps 1–6.** 1: `QUERY_TOOLS_VERSION` is `4.0.0`, `AGENT_TURN_VERSION` `1.1.0`. 2:
 `contracts/generated/query-tools.schema.json`, `contracts/generated/agent-turn.schema.json` and

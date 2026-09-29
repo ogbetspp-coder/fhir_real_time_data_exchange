@@ -1,6 +1,7 @@
 # A withheld section: importing a publication with an authority's defect recorded in place (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25; twenty-sixth draft, after twenty-five design reviews
+- Status: proposed, 2026-09-25, not implemented (the renderer gate it rests on is frozen for the
+  demo, `docs/roadmap.md`, 3a); twenty-sixth draft, after twenty-five design reviews
 - Owner decisions (2026-09-25): withhold the Imatinib Teva tablets SmPC's 5.1 and import the
   other 31 sections; a section may be withheld only on reviewed, measured evidence of the
   authority's defect, the whole record is marked incomplete everywhere it is read, and the safety
@@ -289,9 +290,9 @@ notice would be refused as narrative without provenance. `fidelity-norm/3.2.0`:
   a withheld section's `emptyReason` and notice and checks `Composition.status` (its precedent: 1.2.0
   to 1.3.0).
 - `fidelity-norm/3.2.0` and the fidelity report's next major (W5: `SectionStatus` `withheld`,
-  `summary.withheld`, `sectionsWithheld`); the run manifest's 3.0.0 (the renderer note's R10: the
-  2.0.0 ingestion block frozen with its literal in `AnyRunManifestSchema`, with deep copies of the
-  2.0.0 `AuthorityFetch`, `IngestionFidelity` and `Approval` schemas, read in a test with an authority
+  `summary.withheld`, `sectionsWithheld`); the run manifest's next major after 5.0.0 (the renderer
+  note's R10: the version it replaces frozen in `AnyRunManifestSchema`, with deep copies of its
+  `AuthorityFetch`, `IngestionFidelity` and `Approval` schemas, read in a test with an authority
   import's dry-run manifest); the ledger's schema; the
   importer's version (D10's lock). Generated schemas and Zone A models are regenerated.
 - `AGENTS.md`: "An authority import may carry a mandatory section as withheld only under

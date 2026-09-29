@@ -172,13 +172,20 @@ reader sees without the check seeing it._
   (`fidelity-norm/1.1.1`) to state every rule the port had to read from the code.
 - NFC (step 3) depends on the Unicode Character Database of the runtime. Zone B pins its
   runtime image (`node:22.22.0`, ICU 77.1, Unicode 16.0; `node:22.14.0`, ICU 76.1, until
-  2026-09-22 — the recorded change in `docs/validation/README.md`) and any re-implementation
-  must pin an equivalent; a runtime with a different Unicode version is a change to the
-  normalisation version even though no code changes.
+  2026-09-22 — the recorded change in `docs/validation/README.md`; the worker and query images
+  run that Node binary on debian-slim) and any re-implementation must pin an equivalent; a
+  runtime with a different Unicode version is a change to the normalisation version even though
+  no code changes. **Open decision (the owner's, before production):** every Node release after
+  22.22.0 is on Unicode 17, so their security fixes cannot be taken as they stand. Either vendor
+  the Unicode 16 composition tables into both twins, making NFC independent of the runtime, or
+  move both twins to Unicode 17 as a new `NORMALIZATION_VERSION` proven by the differential.
 - The verifier is a second, independent narrative gate alongside the existing
   byte-preservation assertion in `src/fhir/transform.ts` (UR-01); the new control is UR-09.
 
 ## Amendment (2026-09-25, a withheld section)
+
+_Decided, not implemented: `NORMALIZATION_VERSION` is still `fidelity-norm/3.1.0` (ADR 0002's
+amendment of the same date)._
 
 The fidelity check covers "every section that carries the code and a `text.div`" except a
 **withheld** section of an authority import (`docs/design/authority-import-withheld.md`), whose

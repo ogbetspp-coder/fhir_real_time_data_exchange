@@ -1,7 +1,8 @@
 # The renderer gate: a pinned browser's evidence for every authority import (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25 (architecture approved by the owner the same day); twenty-eighth draft,
-  after twenty-seven design reviews; R4's thresholds provisional, settled by 3c-C's measured design
+- Status: frozen, see below; proposed 2026-09-25 (architecture approved by the owner the same day);
+  twenty-eighth draft, after twenty-seven design reviews; R4's thresholds provisional, settled by
+  3c-C's measured design
 - Decides: what `docs/design/authority-import-t.md`'s "What waits for PR 3c" left open: who draws,
   what is drawn and measured, the evidence record and its store, and the `rendering` stage
 - Amends: ADR 0003 (the second stated exception, contacts acknowledged; the third, zoomed out); ADR 0005 (decision 1's
@@ -786,11 +787,11 @@ and the attestation names their index (R1).
 
 `AuthorityFetchSchema` gains `authority` and `rendering: { gateVersion, gateSha256, recordSha256,
 contactsAcknowledged }`, the latter required when `authority` is not `synthetic` or something is
-withheld, and absent otherwise. `RUN_MANIFEST_VERSION` moves a major (3.0.0 unless item 2's lands first), with the withheld
-note's fields and the submission's 3.0.0 (`contractVersion` follows it, D13); the 2.0.0 ingestion
-block is frozen with the literal `"2.0.0"` in `AnyRunManifestSchema`, as 1.0.0's was, and a 2.0.0
-manifest fixture is read through it in a test. The FHIR Provenance carries `rendering.recordSha256`, the
-`request` statement's hash and, per section, the number of contacts acknowledged; the attested
+withheld, and absent otherwise. `RUN_MANIFEST_VERSION` moves a major (the next after main's 5.0.0),
+with the withheld note's fields and the submission's 3.0.0 (`contractVersion` follows it, D13); the
+version it replaces is frozen in `AnyRunManifestSchema`, as every earlier one is, and a manifest
+fixture of it is read through it in a test. The FHIR Provenance carries `rendering.recordSha256`,
+the `request` statement's hash and, per section, the number of contacts acknowledged; the attested
 requester is the statement's (`docs/design/approval.md`, recorded as its `enterer`), once per
 request; `get_provenance` returns them; the ledger gains a column for the count. The run's evidence keeps the record's bytes by hash. The
 worker image carries the store (`Dockerfile` copies `src/render/records`); re-verifying an import
@@ -813,6 +814,11 @@ a record or the gate changes, off the deploy's critical path (R1). If a record's
 build's limit, the widths change by an amendment of this note, reviewed, never by sampling silently.
 
 ## Delivery
+
+_Frozen 2026-09-29 for the demo: built through 3c-C1 (#116 to #120, and the required Renderer
+check), and nothing after it is built: the judge, the signed layout record and its Cloud Build (C3
+to C5) are dropped, and the demo uses pinned-browser screenshots side by side with the owner's visual sign-off
+(`docs/roadmap.md`, 3a)._
 
 1. **3c-B**, in three changes (the first code review of 3c-B asked that what waits be named):
    - **3c-B1**: the renderer image (`Dockerfile.renderer`, its pins and fontconfig) built and
@@ -1004,9 +1010,8 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
   could forge both draws of one build (the container has no network and no credentials).
 - Re-verifying an old import needs its worker image, which carries the store, to persist.
 - Nothing binds a deployed image to a checked build unless Binary Authorization is enforced (it is
-  off by default); branch protection (a required `renderer` check bound to the GitHub Actions app,
-  up-to-date branches, enforcement for administrators) and `CODEOWNERS` for `src/render/**`,
-  `.github/workflows/**`, `cloudbuild*.yaml` and `Dockerfile.renderer` are recommended to the owner.
+  off by default). The required `Renderer` check, bound to the GitHub Actions app, is on since
+  2026-09-28; up-to-date branches and enforcement for administrators are still the owner's to apply.
   The trust rule (R1) names its root and does not rest on them.
 
 ## Verification

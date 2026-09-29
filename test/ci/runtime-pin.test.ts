@@ -48,6 +48,13 @@ describe("the Node runtime ADR 0003 pins", () => {
     expect(readFileSync(".nvmrc", "utf8").trim()).toBe(pinned);
   });
 
+  // README.md said "Node.js 22.14 or newer" long after the pin moved (audit B07, for B17).
+  it("is the version README.md requires", () => {
+    expect(readFileSync("README.md", "utf8")).toContain(
+      `Requirements: Node.js ${pinned} exactly, with npm 10.9.4`,
+    );
+  });
+
   // package.json said `>=22.14`, npm@10.9.7 and types for Node 26 (audit B07, S-5): each allowed
   // or type-checked against a runtime other than the one ADR 0003 pins.
   it("is the only Node package.json accepts, with the npm it bundles and its own types", () => {

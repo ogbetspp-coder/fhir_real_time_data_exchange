@@ -1,6 +1,6 @@
 # `fidelity-norm/3.1.0`: ½ and ∞ inside `sub`
 
-- Status: proposed, 2026-09-24 (roadmap 3a, PR 3's first step; ADR 0005 decision 1)
+- Status: in force since #114, 2026-09-24 (roadmap 3a, PR 3's first step; ADR 0005 decision 1)
 - Changes: `docs/fidelity-normalization.md` section 5 (two rules and the error order), section 7
   (one sentence) and section 9
 
