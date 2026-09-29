@@ -274,7 +274,7 @@ def test_a_checked_answer_cannot_be_constructed_outside_post_check() -> None:
 
 def test_every_renderer_accepts_only_a_checked_answer() -> None:
     """The invariant is in the signatures, so it is asserted against the signatures."""
-    renderers: list[Any] = [render.render, render.render_a2ui, render.render_text]
+    renderers: list[Any] = [render.render_text, render.sanitise_assistant]
     for function in renderers:
         first = next(iter(inspect.signature(function, eval_str=True).parameters.values()))
         assert first.annotation is CheckedAnswer, (

@@ -11,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   API_TRIES,
   ApiError,
-  CI_JOBS,
+  AWAITED_JOBS,
   MUTATING_STEPS,
   rateLimitReset,
   retryDelay,
@@ -124,12 +124,18 @@ const run = (fields: Partial<WorkflowRun>): WorkflowRun => ({
   conclusion: "success",
   ...fields,
 });
-const succeeded = CI_JOBS.map((name) => ({ name, status: "completed", conclusion: "success" }));
+const succeeded = [...AWAITED_JOBS, "Renderer"].map((name) => ({
+  name,
+  status: "completed",
+  conclusion: "success",
+}));
+const setJob = (name: string, fields: Partial<WorkflowJob>) =>
+  succeeded.map((job) => (job.name === name ? { ...job, ...fields } : job));
 
 describe("the CI the deploy waits for", () => {
-  it("names every job of ci.yml, by its check's name", () => {
+  it("names every job of ci.yml but Renderer, by its check's name", () => {
     const names = [...jobs(ci).values()].map((job) => /^ {4}name: (.+)$/m.exec(job)?.[1]);
-    expect([...CI_JOBS].sort()).toEqual(names.sort());
+    expect([...AWAITED_JOBS, "Renderer"].sort()).toEqual(names.sort());
   });
 
   it("is waited for in the deploy job before any credential is taken", () => {
@@ -194,22 +200,24 @@ describe("the CI the deploy waits for", () => {
     ).toBe(3);
   });
 
-  it("passes only when the run and every one of its jobs succeeded", () => {
+  it("passes once every job but Renderer succeeded, whether or not the run has finished", () => {
+    const running = run({ status: "in_progress", conclusion: null });
     expect(ciVerdict(undefined, []).state).toBe("wait");
-    expect(ciVerdict(run({ status: "in_progress", conclusion: null }), []).state).toBe("wait");
-    expect(ciVerdict(run({ conclusion: "failure" }), succeeded)).toEqual({
+    expect(ciVerdict(running, []).state).toBe("wait");
+    expect(
+      ciVerdict(running, setJob("Images", { status: "in_progress", conclusion: null })),
+    ).toEqual({ state: "wait", reason: "CI is in_progress; waiting for Images" });
+    // Renderer running or red does not hold the deploy; it is a required pull-request check.
+    const rendering = setJob("Renderer", { status: "in_progress", conclusion: null });
+    expect(ciVerdict(running, rendering).state).toBe("pass");
+    const red = setJob("Renderer", { conclusion: "failure" });
+    expect(ciVerdict(run({ conclusion: "failure" }), red).state).toBe("pass");
+    // A job it awaits that failed fails at once; one skipped is not one passed.
+    expect(ciVerdict(running, setJob("Zone A", { conclusion: "failure" }))).toEqual({
       state: "fail",
-      reason: "CI concluded failure",
+      reason: "CI jobs not successful: Zone A",
     });
-    expect(ciVerdict(run({ conclusion: "cancelled" }), succeeded).state).toBe("fail");
-    // A job skipped is not a job passed, whatever the run concluded.
-    const skipped = succeeded.map((job) =>
-      job.name === "Renderer" ? { ...job, conclusion: "skipped" } : job,
-    );
-    expect(ciVerdict(run({}), skipped)).toEqual({
-      state: "fail",
-      reason: "CI jobs not successful: Renderer",
-    });
+    expect(ciVerdict(run({}), setJob("Agent", { conclusion: "skipped" })).state).toBe("fail");
     expect(
       ciVerdict(
         run({}),
@@ -397,15 +405,15 @@ describe("scripts/ci/workflow-runs.mjs", () => {
     };
     expect(await node(["await-ci"])).toMatchObject({ code: 0 });
 
-    routes["/repos/owner/repo/actions/runs/42/jobs"] = {
-      jobs: succeeded.map((job) =>
-        job.name === "Renderer" ? { ...job, conclusion: "failure" } : job,
-      ),
-    };
+    // Renderer red: not awaited. Official validation red: refused.
+    const jobsRoute = "/repos/owner/repo/actions/runs/42/jobs";
+    routes[jobsRoute] = { jobs: setJob("Renderer", { conclusion: "failure" }) };
+    expect(await node(["await-ci"])).toMatchObject({ code: 0 });
+    routes[jobsRoute] = { jobs: setJob("Official validation", { conclusion: "failure" }) };
     const red = await node(["await-ci"]);
     expect(red.code).toBe(1);
     expect(red.stdout).toContain(
-      "::error::The deploy waits for CI on this commit, and CI jobs not successful: Renderer.",
+      "::error::The deploy waits for CI on this commit, and CI jobs not successful: Official validation.",
     );
 
     // No run for this commit (a dispatch on a commit CI never ran for a push): refused at the

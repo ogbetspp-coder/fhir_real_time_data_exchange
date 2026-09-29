@@ -1,17 +1,14 @@
-"""Both surfaces show the same things: status, quotation, product, citation, assistant part."""
+"""The text surface shows status, quotation, product, citation and the assistant part."""
 
 from __future__ import annotations
 
 import time
-from typing import Any
 
 import pytest
 
 from verifiable_answer_agent.answer import AssistantPart, Citation, DraftAnswer, QuotedBlock
 from verifiable_answer_agent.postcheck import ChunkCheck, post_check
 from verifiable_answer_agent.render import (
-    A2UI_CATALOG_ID,
-    A2UI_VERSION,
     ASSISTANT_END,
     ASSISTANT_LABEL,
     CHECKSUMS_EXPLAINED,
@@ -20,8 +17,6 @@ from verifiable_answer_agent.render import (
     PRODUCT_UNCONFIRMED,
     UNVERIFIED_LABEL,
     VERIFIED_LABEL,
-    render,
-    render_a2ui,
     render_text,
     sanitise_assistant,
 )
@@ -59,74 +54,10 @@ CHECKS = {
 ANSWER = post_check(DRAFT, CHECKS)
 
 
-def components(envelopes: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    update = next(envelope for envelope in envelopes if "updateComponents" in envelope)
-    return {item["id"]: item for item in update["updateComponents"]["components"]}
-
-
 def shown(text: str, *blocks: QuotedBlock) -> str:
     """The assistant's words as ``sanitise_assistant`` shows them beside ``blocks``."""
     draft = DraftAnswer(blocks=blocks, assistant=AssistantPart(text=text))
     return sanitise_assistant(post_check(draft, {})).text
-
-
-def test_the_envelopes_are_the_two_the_specification_defines() -> None:
-    envelopes = render_a2ui(ANSWER)
-    assert [sorted(set(envelope) - {"version"}) for envelope in envelopes] == [
-        ["createSurface"],
-        ["updateComponents"],
-    ]
-    assert {envelope["version"] for envelope in envelopes} == {A2UI_VERSION}
-    create = envelopes[0]["createSurface"]
-    assert create["catalogId"] == A2UI_CATALOG_ID
-    assert create["surfaceId"] == envelopes[1]["updateComponents"]["surfaceId"]
-
-
-def test_the_component_tree_has_a_root_and_every_child_reference_resolves() -> None:
-    by_id = components(render_a2ui(ANSWER))
-    assert "root" in by_id
-    for component in by_id.values():
-        for child in component.get("children", []):
-            assert child in by_id, f"{component['id']} references a component that does not exist"
-        if "child" in component:
-            assert component["child"] in by_id
-
-
-def test_every_block_is_a_card_carrying_its_quote_status_product_and_citation() -> None:
-    by_id = components(render_a2ui(ANSWER))
-    for block in ANSWER.blocks:
-        card = by_id[f"{block.block_id}_card"]
-        assert card["component"] == "Card"
-        body = by_id[card["child"]]
-        assert body["component"] == "Column"
-        assert by_id[f"{block.block_id}_quote"]["text"] == block.text
-        assert by_id[f"{block.block_id}_product"]["text"].startswith(
-            (PRODUCT_NAMED, PRODUCT_UNCONFIRMED)
-        )
-        citation = by_id[f"{block.block_id}_citation"]["text"]
-        for field in (
-            block.citation.bundle_id,
-            block.citation.version_id,
-            block.citation.source_key,
-            block.citation.narrative_div_sha256,
-        ):
-            assert field in citation
-
-
-def test_a_flagged_block_says_so_on_the_card() -> None:
-    by_id = components(render_a2ui(ANSWER))
-    assert by_id["block-01_status"]["text"] == VERIFIED_LABEL
-    flagged = by_id["block-02_status"]["text"]
-    assert flagged.startswith(UNVERIFIED_LABEL)
-    assert "no-match" in flagged
-
-
-def test_the_assistants_words_are_a_separate_labelled_part() -> None:
-    by_id = components(render_a2ui(ANSWER))
-    assert by_id["assistant_label"]["text"] == ASSISTANT_LABEL
-    assert by_id["assistant_text"]["text"] == ANSWER.assistant.text
-    quote_ids = {f"{block.block_id}_quote" for block in ANSWER.blocks}
-    assert "assistant_text" not in quote_ids
 
 
 def test_the_plain_text_surface_carries_the_same_things() -> None:
@@ -135,9 +66,13 @@ def test_the_plain_text_surface_carries_the_same_things() -> None:
     # exactly as stored, its checksum; then the assistant's words, last, in their own box.
     blocks = shown_blocks(text)
     assert [block.status.split(" — ")[0] for block in blocks] == [VERIFIED_LABEL, UNVERIFIED_LABEL]
+    assert "no-match" in blocks[1].status
     for shown_block, block in zip(blocks, ANSWER.blocks, strict=True):
         assert shown_block.text == block.text
-        assert any(block.citation.narrative_div_sha256 in line for line in shown_block.reading)
+        citation = block.citation
+        for field in (citation.bundle_id, citation.version_id, citation.source_key):
+            assert field in shown_block.reading[0]
+        assert any(citation.narrative_div_sha256 in line for line in shown_block.reading)
     assert shown_assistant(text) == ANSWER.assistant.text
     assert ASSISTANT_LABEL in outside_code(text)
     assert text.index(ASSISTANT_LABEL) < text.index(ANSWER.assistant.text)
@@ -256,11 +191,6 @@ def test_the_product_and_language_are_shown_or_said_to_be_unconfirmed() -> None:
     text = render_text(ANSWER)
     assert f"{PRODUCT_NAMED}: Synthetic 10 mg tablets, language en" in text
     assert f"{PRODUCT_UNCONFIRMED}: " in text
-
-
-def test_render_dispatches_on_the_surface() -> None:
-    assert isinstance(render(ANSWER, "a2ui"), list)
-    assert isinstance(render(ANSWER, "text"), str)
 
 
 def test_the_assistant_cannot_write_the_labels_reserved_for_checked_text() -> None:

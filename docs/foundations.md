@@ -208,13 +208,14 @@ Terraform but referenced by nothing else in the repository: Secret Manager, Clou
 Dataplex, BigQuery Data Transfer and Eventarc. Each is surface nothing monitors. Trim both lists
 to what the product uses, and make Terraform the only list.
 
-_Status 2026-09-22: closed._ Fifty-four enabled became forty-five, every one declared, and `scripts/gcp/api-trim.sh --check` reports no drift. Of the fifteen measured unused, eight are disabled; five turned out to be held by a declared service (Google's umbrella service, Binary Authorization, Compute) and one is re-enabled by Cloud Build on every deploy, so those six are declared as dependencies rather than forced off with their holder. The list the deploy enables before Terraform runs is tested to be a subset of Terraform's. 30 days of request counts
+_Status 2026-09-22: closed._ Fifty-four enabled became forty-five, every one declared, and no API was enabled outside `infra/main.tf`. Of the fifteen measured unused, eight are disabled; five turned out to be held by a declared service (Google's umbrella service, Binary Authorization, Compute) and one is re-enabled by Cloud Build on every deploy, so those six are declared as dependencies rather than forced off with their holder. The list the deploy enables before Terraform runs is tested to be a subset of Terraform's. 30 days of request counts
 per API decided it, not a reading of names: an API that served requests, or that Google enables
 as a dependency of one that did, is declared in `infra/main.tf`, which is now the complete list
 (39). Fifteen served no request, hold no resource and are referenced nowhere; they are dropped
-from Terraform (without disabling — `disable_on_destroy` is false) and disabled by
-`scripts/gcp/api-trim.sh`, which never forces past a dependency and whose `--check` reports any
-API enabled outside the list. Kept although idle: Vertex AI, for the agent, and Datastore, a
+from Terraform (without disabling — `disable_on_destroy` is false) and disabled once, without
+forcing past a dependency, by a one-shot script deleted in refactor R1 (in history at `250d8a2`,
+`scripts/gcp/api-trim.sh`); compare `gcloud services list --enabled` with `infra/main.tf` to look
+for drift. Kept although idle: Vertex AI, for the agent, and Datastore, a
 candidate home for the entitlement store.
 
 **C3. No dependency update automation.** No Dependabot or Renovate configuration exists for npm,
@@ -355,13 +356,14 @@ one person; stated so that it is a decision and not a default.
 
 _Status 2026-09-28 (audit B15): still off, the owner's decision._ What the bypass reaches is
 narrower: a push to `main` by an administrator deploys only once CI's run on that commit has
-succeeded in every job (`scripts/ci/workflow-runs.mjs`, in the deploy job before any credential
-is taken), so the bypass skips the pull request and CI's checks do not, but only CI's: `Plan` and
-`Vulnerabilities` are other workflows, and the deploy does not wait for them. `Plan` runs on pull
-requests only, so a direct push has none; the push's own `Vulnerabilities` run may be red while
-its deploy goes on. `Renderer` has
-been required since 2026-09-28. Branch protection still requires no review, does not require a
-branch to be up to date with `main`, and binds the `Agent` check to no app.
+succeeded in every job but `Renderer` (`scripts/ci/workflow-runs.mjs`, in the deploy job before any
+credential is taken), so the bypass skips the pull request and CI's checks do not, but only CI's:
+`Plan` and `Vulnerabilities` are other workflows, and the deploy does not wait for them. `Plan` runs
+on pull requests only, so a direct push has none; the push's own `Vulnerabilities` run may be red
+while its deploy goes on. `Renderer` has been a required pull-request check since 2026-09-28; since
+refactor R1 the deploy no longer waits for it, since nothing the deploy ships reads its verdict.
+Branch protection still requires no review, does not require a branch to be up to date with `main`,
+and binds the `Agent` check to no app.
 
 **D4. Secret scanning and push protection are unavailable** on a private repository without
 GitHub's paid secret protection. Nothing secret is committed today — the repository holds
