@@ -241,17 +241,12 @@ class TurnFinisher:
                     verify_quote=_VerifyQuoteThrough(
                         self.toolset, ToolContext(invocation), self.log, invocation.invocation_id
                     ),
-                    surface="text",
                     products=product_facts(products),
                 )
             except Exception as error:  # noqa: BLE001 - fail safe: a notice, never a draft
                 outcome, shown, error_class = "internal-error", UNVERIFIABLE_NOTICE, _class(error)
             else:
-                rendered = checked.rendered
-                if isinstance(rendered, str):
-                    outcome, shown = "answered", rendered
-                else:
-                    outcome, shown, checked = "internal-error", UNVERIFIABLE_NOTICE, None
+                outcome, shown = "answered", checked.rendered
         self._record(
             principal=principal,
             digest=digest,

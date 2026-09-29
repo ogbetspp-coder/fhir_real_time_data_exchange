@@ -12,7 +12,6 @@ import time
 from collections.abc import AsyncIterator, Sequence
 from typing import Any, cast
 
-import pytest
 from google.adk.agents.readonly_context import ReadonlyContext
 from google.adk.tools.base_tool import BaseTool
 from google.adk.tools.mcp_tool import McpToolset
@@ -32,6 +31,7 @@ from verifiable_answer_agent.turn import answer_turn
 
 from .conftest import config_for, invocation_context
 from .fake_query_service import FakeQueryService, running_query_service
+from .markdown_view import shown_blocks
 
 SECTION_KEYS = ["smpc.4.3", "smpc.4.4"]
 TURN_ID = "0f6b3a2e-4c1d-4e8f-9a7b-1c2d3e4f5a6b"
@@ -100,17 +100,13 @@ async def wired(service: FakeQueryService) -> AsyncIterator[Wiring]:
             await toolset.close()
 
 
-@pytest.mark.parametrize("surface", ["a2ui", "text"])
-async def test_an_honest_turn_verifies_every_block(
-    query_service: FakeQueryService, surface: Any
-) -> None:
+async def test_an_honest_turn_verifies_every_block(query_service: FakeQueryService) -> None:
     async with wired(query_service) as wiring:
         sections = await wiring.get_sections(SECTION_KEYS)
         turn = await answer_turn(
             section_results=sections,
             assistant_text="Two sections are relevant.",
             verify_quote=wiring.verify_quote,
-            surface=surface,
             principal="urn:reviewer:synthetic-01",
             service_version="agent/0.1.0",
             tool_calls=wiring.calls,
@@ -136,7 +132,6 @@ async def test_a_block_the_store_no_longer_contains_is_flagged_on_the_card() -> 
                 section_results=sections,
                 assistant_text="",
                 verify_quote=wiring.verify_quote,
-                surface="a2ui",
                 principal="urn:reviewer:synthetic-01",
                 service_version="agent/0.1.0",
                 turn_id=TURN_ID,
@@ -150,16 +145,9 @@ async def test_a_block_the_store_no_longer_contains_is_flagged_on_the_card() -> 
     assert turn.audit.spans_flagged == 1
     assert "no-match" in turn.audit.flags
 
-    envelopes = turn.rendered
-    assert isinstance(envelopes, list)
-    update = next(item for item in envelopes if "updateComponents" in item)
-    statuses = {
-        item["id"]: item["text"]
-        for item in update["updateComponents"]["components"]
-        if item["id"].endswith("_status")
-    }
-    assert "NOT VERIFIED" in statuses["block-01_status"]
-    assert "NOT VERIFIED" not in statuses["block-02_status"]
+    statuses = [block.status for block in shown_blocks(turn.rendered)]
+    assert "NOT VERIFIED" in statuses[0]
+    assert "NOT VERIFIED" not in statuses[1]
 
 
 async def test_a_section_the_contract_refuses_never_reaches_the_answer() -> None:
@@ -170,7 +158,6 @@ async def test_a_section_the_contract_refuses_never_reaches_the_answer() -> None
                 section_results=sections,
                 assistant_text="",
                 verify_quote=wiring.verify_quote,
-                surface="text",
                 principal="urn:reviewer:synthetic-01",
                 service_version="agent/0.1.0",
                 turn_id=TURN_ID,
@@ -180,7 +167,6 @@ async def test_a_section_the_contract_refuses_never_reaches_the_answer() -> None
     assert [block.citation.source_key for block in turn.answer.blocks] == ["smpc.4.4"]
     assert turn.audit.sections_dropped == 1
     assert "schema-invalid" in {call.outcome for call in turn.audit.tools}
-    assert isinstance(turn.rendered, str)
     assert "smpc.4.3" not in turn.rendered
 
 

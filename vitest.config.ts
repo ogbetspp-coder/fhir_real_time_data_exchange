@@ -1,9 +1,9 @@
 import { configDefaults, defineConfig } from "vitest/config";
 
-// The TypeScript suite is everything under test/ (and the spike tests beside it). Excluded on
-// top of vitest's defaults: agent worktrees that Claude Code checks out under .claude/ (each a
-// full copy of this repository, which would run the suite once per worktree), and the two
-// Python deployables, which carry their own gates.
+// The TypeScript suite is everything under test/. Excluded on top of vitest's defaults: agent
+// worktrees that Claude Code checks out under .claude/ (each a full copy of this repository,
+// which would run the suite once per worktree), and the two Python deployables, which carry
+// their own gates.
 //
 // Coverage runs with `npm run test:coverage` (what `npm run check`, and so CI's Check job and
 // the deploy's quality gate, run), not with a bare `vitest`. The floors are ratchets: each is

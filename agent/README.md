@@ -110,8 +110,6 @@ sentences stand between the fences, each its own paragraph. The verbatim display
 therefore depends on the fence: `tests/test_render.py` renders adversarial label text and the
 reviewer's escape attempts through a CommonMark parser (markdown-it-py, a test-only dependency)
 and checks that each quotation comes back out of its fence exactly and nothing leaks outside one.
-The A2UI renderer gives each part its own `Text` component and does not fence it; A2UI is not
-sent, and before it is the same question has to be settled for that surface.
 
 As defence in depth (`render.sanitise_assistant`), the words are cut at 20,000 characters (with a
 marker saying so), split on every kind of line break (`str.splitlines`: carriage return,
@@ -142,8 +140,9 @@ The thing worth getting right is that a quotation cannot reach a reader without 
 checked. It is not a comment; it is the shape of the code.
 
 - `answer.QuotedBlock` is a candidate. Nothing renders one.
-- `postcheck.CheckedAnswer` is the only type `render`, `render_a2ui` and `render_text` accept,
-  and its `__init__` takes a module-private witness object. Constructing another
+- `postcheck.CheckedAnswer` is the only type `render.render_text` and
+  `render.sanitise_assistant` accept, and its `__init__` takes a module-private witness object.
+  Constructing another
   `_PostCheckWitness` yields a different instance and raises `TypeError`, so the only way to
   obtain a `CheckedAnswer` is `post_check()` — which takes the `verify_quote` results as an
   argument and therefore cannot have skipped them.
@@ -310,12 +309,6 @@ Four places, recorded because each cost time and a second implementer would hit 
    `CallToolResult` — `{"content": [...], "structuredContent": {...}, "isError": false}`. The
    contract describes the `structuredContent`, so `tools.read_tool_result` unwraps before it
    validates. A tool result with `isError` is unavailable, not content.
-4. **A2UI's basic catalog declares a different id from the one the specification's example
-   uses.** The catalog document served from the v0.9.1 path declares
-   `catalogId: https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json` (v0_9), while
-   the v0.9.1 specification's `createSurface` example writes `v0_9_1`. `render.A2UI_CATALOG_ID`
-   uses the catalog document's own value, because that is what a renderer matches against.
-   A2UI v1.0 is a candidate and renames `theme` to `surfaceProperties`; re-check on 1.0.
 
 ## query-tools 2.0.0
 
@@ -512,11 +505,10 @@ default destination.
 - **No agent-side normalisation or fidelity checking.** Those live where the specification
   lives. The one hash the agent computes is SHA-256 over UTF-8, of strings the service returned,
   to compare with the hashes it returned beside them.
-- **No A2UI in the deployed path.** `render_a2ui` is built and tested; the deployed agent renders
-  for the `text` surface, because nothing it is served through advertises the A2UI extension.
-  Its `Text` components carry quotations and the assistant's words unfenced; whether that is
-  safe depends on whether the surface parses Markdown in a `Text`, to be settled before it is
-  sent.
+- **No A2UI.** The agent renders text only, because nothing it is served through advertises
+  the A2UI extension. An A2UI renderer was built and never sent; it was removed in refactor R1
+  (in history at `250d8a2`). Re-adding it means settling, for that surface, whether a `Text`
+  component parses Markdown, and testing it as `render_text` is tested.
 - **No selection of blocks by the model.** Every section the model fetched in the turn is shown
   (at most eight, `compose.MAX_BLOCKS`; the answer says how many more were read), labelled as
   the sections read, not as the answer; the model's own words say which of them answer the

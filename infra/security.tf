@@ -391,8 +391,8 @@ resource "google_healthcare_dataset_iam_member" "deployer_fhir_editor" {
   member     = "serviceAccount:${var.deployer_account}"
 }
 
-# No Document AI role: nothing the worker runs calls Document AI. The extractor spike does, as a
-# person running scripts/spikes/document-ai by hand, not as this identity. Removed in CMEK step 5c.
+# No Document AI role: nothing the worker runs calls Document AI. The extractor spike did, as a
+# person running it by hand, not as this identity. Removed in CMEK step 5c.
 
 resource "google_project_iam_member" "worker_log_writer" {
   project = var.project_id

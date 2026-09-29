@@ -353,5 +353,4 @@ Sources: [ADK MCP tools](https://adk.dev/tools-custom/mcp-tools/),
   and its invoker role (step 4b) by `grant-invoker.sh`, both run by hand; the `query_invokers`
   grant in step 4 is the only change this agent needed in the existing Terraform.
 - No CI deploy step. The agent's CI job lints, type-checks and tests; it does not deploy.
-- No A2A agent card. `render.A2UI_EXTENSION_URI` names the extension a card would advertise,
-  but publishing one belongs with whatever serves the agent over A2A.
+- No A2A agent card. Publishing one belongs with whatever serves the agent over A2A.

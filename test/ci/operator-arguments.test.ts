@@ -46,7 +46,6 @@ describe("every operator script's command line", () => {
   it("covers the scripts it is about", () => {
     expect(scripts).toEqual(
       expect.arrayContaining([
-        "scripts/gcp/api-trim.sh",
         "scripts/gcp/deploy-identity.sh",
         "scripts/gcp/key-guard.sh",
         "scripts/gcp/deploy.sh",
