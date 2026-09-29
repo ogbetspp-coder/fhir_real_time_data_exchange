@@ -1,7 +1,7 @@
 # A withheld section: importing a publication with an authority's defect recorded in place (roadmap 3a, PR 3c)
 
-- Status: proposed, 2026-09-25, not implemented (the renderer gate it rests on is frozen for the
-  demo, `docs/roadmap.md`, 3a); twenty-sixth draft, after twenty-five design reviews
+- Status: proposed, 2026-09-25, not implemented: 3c-W, deferred until after the demo
+  (`docs/roadmap.md`, 3a); twenty-sixth draft, after twenty-five design reviews
 - Owner decisions (2026-09-25): withhold the Imatinib Teva tablets SmPC's 5.1 and import the
   other 31 sections; a section may be withheld only on reviewed, measured evidence of the
   authority's defect, the whole record is marked incomplete everywhere it is read, and the safety

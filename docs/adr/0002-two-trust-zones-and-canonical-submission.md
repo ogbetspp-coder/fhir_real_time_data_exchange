@@ -252,7 +252,7 @@ agent of its source files (each named by the authority's id and by hash), the re
 ## Amendment (2026-09-25, a withheld section)
 
 _Decided, not implemented: `NORMALIZATION_VERSION` is `fidelity-norm/3.1.0` and no contract has a
-withheld status. It was to land with 3a PR 3c, whose remaining steps are dropped for the demo._
+withheld status. It lands with 3c-W, deferred until after the demo (`docs/roadmap.md`, 3a)._
 
 `docs/design/authority-import-withheld.md` (roadmap 3a, PR 3c; owner decisions of 2026-09-25)
 lets an authority import carry a leaf section the renderer gate shows the authority drew unsound

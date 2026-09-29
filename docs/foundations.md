@@ -25,10 +25,9 @@ Stated first, because the gaps below should not obscure it.
   seven-year retention policy, and the encryption key rotates every 90 days.
 - **Every bucket enforces uniform access**, the organisation enforces it, and every container
   image is pinned by digest and checked in CI.
-- **Seven required checks gate every merge** to `main` — `Check`, `Zone A`, `Agent`,
-  `Official validation`, `Plan`, `Vulnerabilities` and `Renderer` — including the official HL7
-  validator and the renderer gate, and the deploy of a commit waits for every job of CI's run on
-  it (`Images` too) to succeed.
+- **Eight required checks gate every merge** to `main` — `Check`, `Official validation`,
+  `Renderer`, `Images`, `Zone A`, `Agent`, `Plan` and `Vulnerabilities` — and the deploy of a
+  commit waits for every job of CI's run on it to succeed.
 - **The FHIR stores keep full version history and enforce referential integrity**, and writes are
   atomic transactions.
 

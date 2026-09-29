@@ -127,19 +127,23 @@ fixture, or client is touched.
 
 Prerequisites: a billing-enabled project in an EU region Cloud Healthcare API supports (default
 `europe-west4`), `gcloud` credentials that can provision it, Terraform 1.16 or newer, and Cloud
-Build permissions. The deploy normally runs from `.github/workflows/deploy.yml` (below); a local
-run of every phase is:
+Build permissions. Deploys run through `.github/workflows/deploy.yml` (below); a local run of
+every phase is for emergencies only:
 
 ```bash
 export GOOGLE_CLOUD_PROJECT="sage-ship-509104-b8" # the EXPECTED_PROJECT_ID of dev.env; any other is refused
 export EMA_FLOW_ENVIRONMENT="dev"                 # no default
-# Also export QUERY_INVOKERS, QUERY_TOKEN_CREATORS, QUERY_ENTITLEMENTS_JSON and QUERY_OAUTH_CLIENT_IDS
-# as the repository variables hold them: unset, the apply leaves the query service no caller.
 bash scripts/gcp/deploy.sh
 ```
 
-An environment's other inputs are in `scripts/gcp/environments/<env>.env`. Every script in
-`scripts/gcp/` takes `--help` (which, for `deploy.sh`, lists the phases) and exits 2 on an
+Export the four `QUERY_*` variables as the repository variables hold them. Against a live
+environment, an unset `QUERY_INVOKERS` or `QUERY_TOKEN_CREATORS` plans destroys of its grants, and
+so does running as a user account rather than the deployer (`deployer_invoker`,
+`deployer_fhir_editor`): the apply refuses them unless `ALLOW_REPLACE_ACK` names them (below). An
+unset entitlement map or client list empties it without a destroy. `smoke` needs
+`WORKER_ID_TOKEN` (see "Re-ingesting with `scripts/demo/seed.ts`"). An environment's other inputs
+are in `scripts/gcp/environments/<env>.env`. Every operator script in `scripts/gcp/` takes
+`--help` (which, for `deploy.sh`, lists the phases) and exits 2 on an
 unknown argument. The phases, in order: `preflight`; `init` (the state bucket, on its key);
 `apis`; `images` (Cloud Build, `cloudbuild.images.yaml`, builds the worker, validator and query
 images; submitted by hand without `phase_images`' `--region`, `--service-account` and

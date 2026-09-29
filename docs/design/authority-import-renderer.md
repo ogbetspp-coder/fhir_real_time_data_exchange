@@ -816,9 +816,9 @@ build's limit, the widths change by an amendment of this note, reviewed, never b
 ## Delivery
 
 _Frozen 2026-09-29 for the demo: built through 3c-C1 (#116 to #120, and the required Renderer
-check), and nothing after it is built: the judge, the signed layout record and its Cloud Build (C3
-to C5) are dropped, and the demo uses pinned-browser screenshots side by side with the owner's visual sign-off
-(`docs/roadmap.md`, 3a)._
+check). The judge, the signed layout record and its Cloud Build (C3 to C5) are dropped; for the
+demo a per-label sign-off record over the screenshots replaces 3c-D's lookup, and 3c-W and 3c-E are
+deferred, not dropped (`docs/roadmap.md`, 3a)._
 
 1. **3c-B**, in three changes (the first code review of 3c-B asked that what waits be named):
    - **3c-B1**: the renderer image (`Dockerfile.renderer`, its pins and fontconfig) built and

@@ -6,13 +6,12 @@ real deploy on 2026-09-22 (below). The agent is live as
 3.14. Its post-check has not yet run in a live Gemini turn. Documentation dates are the dates
 the pages were read, 2026-09-18 to 2026-09-20.
 
-**Which build is live.** The build deployed before 2026-09-27 (from `caa5d9a`) predates that
-day's audit fixes: it fails every turn whose user id is an e-mail address, which is every Gemini
-Enterprise turn, and it records none of the post-check's calls. Redeploy from `main` before the
-live turn. From that redeploy on, the deployed build is named by the `serviceVersion` of its own
-audit records, `agent/<version>+<commit>`, which the deploy script derives and refuses to derive
-from a tree that differs from its commit; record the commit in `docs/roadmap.md` beside `main`'s
-when you deploy.
+**Which build is live.** Redeployed 2026-09-29 00:05 UTC from `main` d2d2d1f
+(`agent/0.1.0+d2d2d1f6c701152974d9b7bfe6f083ebe26035a0`) and registered, with the 2026-09-27
+audit fixes (the earlier `caa5d9a` build failed every Gemini Enterprise turn). The deployed build
+is named by the `serviceVersion` of its own audit records, `agent/<version>+<commit>`, which the
+deploy script derives and refuses to derive from a tree that differs from its commit; record the
+commit in `docs/roadmap.md` beside `main`'s when you deploy.
 
 Six steps. Steps 1 and 4 were done for the MCP connector on 2026-09-21 and are reused; the
 OAuth client is a console decision, the invoker grant a Terraform variable.

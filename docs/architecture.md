@@ -103,9 +103,9 @@ past T is refused at `rendering`, since the renderer gate supplies no evidence y
 a read-only workspace and no credentials), the drawing and measuring code in `src/render/`, and
 CI's required Renderer job (`npm run renderer:image`, then `renderer:smoke`, `record`, `check`,
 `fonts`, `boxes` and `drawings`; skipped on a pull request that changes no renderer input). It is
-frozen at that scope: its judge, signed layout record and Cloud Build (3c C3 to C5) are dropped
-for the demo, which shows pinned-browser screenshots side by side for the owner's visual
-sign-off.
+frozen at that scope: its judge, signed layout record and Cloud Build (3c C3 to C5) are dropped.
+For the demo a per-label sign-off record over side-by-side pinned-browser screenshots will stand
+in for its evidence (`docs/roadmap.md`, 3a).
 
 ## Deterministic data flow
 
@@ -309,9 +309,9 @@ Cloud Run, Workflows, IAM credentials, Resource Manager and Logging are routed t
 regional log bucket (`infra/security.tf`).
 
 After a successful `terraform apply`, `scripts/gcp/deploy.sh` exports the effective IAM
-policies (project and ancestors, the Healthcare dataset and stores, every bucket, key, topic,
-image repository, Cloud Run service, service account and BigQuery dataset and table) and reports
-what each deployed identity holds, into the deploy log and
+policies (project and ancestors, the Healthcare dataset and stores, every bucket, topic, image
+repository, Cloud Run service, service account and BigQuery dataset and table, and the keys in
+the region's key rings) and reports what each deployed identity holds, into the deploy log and
 `gs://<evidence bucket>/deploy-evidence/<YYYY>/<MM>/<DD>/<UTC stamp>-<environment>-<commit>/`
 (the newest folder is the latest deploy). This closes the gap between the role set a test
 asserts and the policy in force (ADR 0004, decision 5), within limits: it counts only literal
