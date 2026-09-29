@@ -296,7 +296,7 @@ def long_section() -> Section:
 def quote_edge_cases() -> Mapping[str, Any]:
     """The query service's own quote-edge answers, as ``test/fixtures/contracts`` holds them.
 
-    ``scripts/contracts/export-quote-edge-cases.ts`` writes them from ``src/query/tools.ts``,
+    ``scripts/contracts/export-quote-edge-cases.ts`` writes them from ``src/query/quote-edge.ts``,
     ``npm run contracts:check`` regenerates them and fails on drift, and
     ``tests/test_quote_edge.py`` holds this fake's ``verify_quote`` to every answer.
     """

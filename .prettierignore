@@ -24,8 +24,8 @@ zone-a/tests/fixtures/differential-smoke.jsonl
 differential.jsonl
 
 # The agent (Python). Same shape as Zone A: two virtualenvs and the tool caches are local
-# build output. The vendored contract is a byte copy of contracts/generated/ written by
-# scripts/sync_contract.py; formatting it would make the --check comparison fail.
+# build output. The vendored contracts and code-point table are written by
+# scripts/sync_contract.py; formatting them would make the --check comparison fail.
 agent/.venv/
 agent/.uv-bootstrap/
 agent/.mypy_cache/
@@ -33,6 +33,7 @@ agent/.pytest_cache/
 agent/.ruff_cache/
 agent/src/verifiable_answer_agent/contracts/query-tools.schema.json
 agent/src/verifiable_answer_agent/contracts/agent-turn.schema.json
+agent/src/verifiable_answer_agent/contracts/code-points.json
 
 # Agent worktrees that Claude Code creates under the repository; each is its own checkout and
 # is never part of this tree's gate or its commits.
