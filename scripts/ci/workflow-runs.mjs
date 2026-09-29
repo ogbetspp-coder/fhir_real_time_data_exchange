@@ -7,8 +7,10 @@ import { fileURLToPath } from "node:url";
 // anything (test/ci/deploy-permissions.test.ts).
 //
 // await-ci: the deploy waits for CI's run on the commit it deploys, and goes on only when every
-// job of it succeeded. Until then the deploy's own gate ran `npm run check` alone, so a push by an
-// administrator, or a merge while Renderer or Official validation was red, deployed unattended.
+// job of it but Renderer succeeded. Until then the deploy's own gate ran `npm run check` alone, so
+// a push by an administrator, or a merge while Official validation was red, deployed unattended.
+// Renderer is not waited for: the renderer gate is CI-only, nothing the deploy ships reads its
+// verdict, and it stays a required check on every pull request.
 // The run must be CI's run for a push to main of exactly this commit: a run for a pull request, a
 // branch or another commit is never taken for it, and a dispatch of the deploy on a commit with no
 // such run is refused.
@@ -25,9 +27,9 @@ import { fileURLToPath } from "node:url";
 //   GH_TOKEN=... GITHUB_REPOSITORY=owner/repo node scripts/ci/workflow-runs.mjs deploy-activity \
 //     --since now|<ISO time> [--wait-minutes N]
 
-// CI's jobs, by the names the checks carry; every one must have succeeded
-// (test/ci/workflow-runs.test.ts holds this list to .github/workflows/ci.yml).
-export const CI_JOBS = ["Check", "Official validation", "Renderer", "Images", "Zone A", "Agent"];
+// CI's jobs the deploy waits for, by the names the checks carry; every one must have succeeded
+// (test/ci/workflow-runs.test.ts holds this list and Renderer to .github/workflows/ci.yml).
+export const AWAITED_JOBS = ["Check", "Official validation", "Images", "Zone A", "Agent"];
 
 // The deploy job's steps that change what a plan reads: from the first to run until the job ends,
 // a plan against live state is unreliable (test/ci/workflow-runs.test.ts holds this list to every
@@ -48,21 +50,22 @@ export function ciRunFor(runs, commit) {
     .sort((a, b) => b.id - a.id)[0];
 }
 
-// "wait" while CI has no run for the commit or has not finished; "pass" only when the run and
-// every job in it succeeded, each of CI_JOBS among them; "fail" otherwise, with the reason.
+// "pass" once each of AWAITED_JOBS has succeeded, whether or not the run has finished; "fail" as
+// soon as one has finished otherwise, or when the run finished without one; "wait" until then.
 export function ciVerdict(run, jobs) {
   if (run === undefined) return { state: "wait", reason: "CI has no run for this commit yet" };
-  if (run.status !== "completed") return { state: "wait", reason: `CI is ${run.status}` };
-  if (run.conclusion !== "success") {
-    return { state: "fail", reason: `CI concluded ${run.conclusion ?? "nothing"}` };
-  }
-  const failed = jobs.filter((job) => job.conclusion !== "success").map((job) => job.name);
+  const job = (name) => jobs.find((found) => found.name === name);
+  const failed = AWAITED_JOBS.filter(
+    (name) => job(name)?.status === "completed" && job(name)?.conclusion !== "success",
+  );
   if (failed.length > 0)
     return { state: "fail", reason: `CI jobs not successful: ${failed.join(", ")}` };
-  const missing = CI_JOBS.filter((name) => !jobs.some((job) => job.name === name));
-  if (missing.length > 0)
-    return { state: "fail", reason: `CI jobs missing: ${missing.join(", ")}` };
-  return { state: "pass", reason: `CI succeeded: ${jobs.map((job) => job.name).join(", ")}` };
+  const pending = AWAITED_JOBS.filter((name) => job(name)?.conclusion !== "success");
+  if (pending.length === 0)
+    return { state: "pass", reason: `CI succeeded: ${AWAITED_JOBS.join(", ")}` };
+  if (run.status === "completed")
+    return { state: "fail", reason: `CI jobs missing: ${pending.join(", ")}` };
+  return { state: "wait", reason: `CI is ${run.status}; waiting for ${pending.join(", ")}` };
 }
 
 // When a deploy job began changing what a plan reads (its first mutating step's start, skipped
@@ -230,7 +233,7 @@ async function awaitCi() {
   }
   const commit = process.env.COMMIT ?? "";
   if (!/^[0-9a-f]{40}$/.test(commit)) throw new Error("COMMIT must be a full commit SHA");
-  const minutes = Number(process.env.AWAIT_CI_MINUTES ?? "75");
+  const minutes = Number(process.env.AWAIT_CI_MINUTES ?? "45");
   const poll = Number(process.env.AWAIT_CI_POLL_SECONDS ?? "30") * 1000;
   const deadline = Date.now() + minutes * 60_000;
   for (;;) {
@@ -246,7 +249,7 @@ async function awaitCi() {
         `/repos/${repo}/actions/workflows/ci.yml/runs?head_sha=${commit}&event=push&branch=main&per_page=20`,
       );
       run = ciRunFor(runs, commit);
-      verdict = ciVerdict(run, run?.status === "completed" ? await jobsOf(repo, run.id) : []);
+      verdict = ciVerdict(run, run ? await jobsOf(repo, run.id) : []);
     } catch (error) {
       if (!(error instanceof ApiError) || !error.transient) throw error;
       run = undefined;

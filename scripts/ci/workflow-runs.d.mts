@@ -30,7 +30,7 @@ export type WorkflowJob = {
 
 export type Verdict = { state: "wait" | "pass" | "fail"; reason: string };
 
-export const CI_JOBS: readonly string[];
+export const AWAITED_JOBS: readonly string[];
 export const DEPLOY_JOB: string;
 export const MUTATING_STEPS: readonly string[];
 export const CLOCK_MARGIN_MS: number;

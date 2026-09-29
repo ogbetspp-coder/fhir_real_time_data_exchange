@@ -22,10 +22,10 @@ data "google_project" "current" {
 }
 
 # The project's APIs, and the only list of them (docs/foundations.md, C2). An API enabled but
-# not listed here is drift, and scripts/gcp/api-trim.sh reports it. Measured 2026-09-22 against
-# 30 days of request counts: each API below either served requests or is a dependency Google
-# enables for one that did. disable_on_destroy is false, so removing a line stops managing an API
-# without disabling it; disabling is a separate, deliberate step in that script.
+# not listed here is drift. Measured 2026-09-22 against 30 days of request counts: each API below
+# either served requests or is a dependency Google enables for one that did. disable_on_destroy is
+# false, so removing a line stops managing an API without disabling it; disabling is a separate,
+# deliberate `gcloud services disable`.
 resource "google_project_service" "required" {
   for_each = toset([
     # The product.

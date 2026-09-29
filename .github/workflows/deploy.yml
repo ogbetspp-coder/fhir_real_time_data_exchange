@@ -152,8 +152,8 @@ jobs:
       contents: read
       id-token: write
       issues: write
-    # 90 for the deploy itself, and up to 75 more waiting for CI's slowest job (Renderer).
-    timeout-minutes: 165
+    # 90 for the deploy itself, and up to 45 more waiting for the slowest CI job it awaits (30).
+    timeout-minutes: 135
     defaults:
       run:
         shell: bash --noprofile --norc -eo pipefail {0}
@@ -237,10 +237,11 @@ jobs:
         with:
           node-version: 22.22.0
           package-manager-cache: false
-      # CI's run for this push to main must succeed, every job of it (Check, Official validation,
-      # Renderer, Images, Zone A, Agent), before anything is changed (audit B15, G-1). The gate job
+      # CI's run for this push to main must succeed in every job but Renderer (Check, Official
+      # validation, Images, Zone A, Agent) before anything is changed (audit B15, G-1). Renderer
+      # stays a required pull-request check; nothing the deploy ships reads it. The gate job
       # runs the Node checks alone, so until then a push by an administrator, or a merge while
-      # Renderer or Official validation was red, deployed unattended. The gate job ran alongside
+      # Official validation was red, deployed unattended. The gate job ran alongside
       # CI, so this waits only for what CI has left. A dispatch on any ref but main is refused at
       # once, and one on a commit with no such run at the deadline; a poll GitHub cannot answer is
       # "not yet" (scripts/ci/workflow-runs.mjs). The job's token is given to this step by name,

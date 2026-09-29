@@ -43,7 +43,7 @@ can put an intended-use statement around. What keeps it honest, as built (2026-0
   citation, checksums — is a fenced code block, in which nothing is parsed, the quotation
   wrapped at spaces so that its lines joined by single spaces are the stored text exactly. A
   test renders adversarial label text through a CommonMark parser and requires each quotation
-  back out of its fence exactly. The A2UI renderer does not fence; it is not sent.
+  back out of its fence exactly.
 - **The model's own words cannot render as anything but its own words.** On the text surface
   they are shown inside a fenced code block, between a label line and an end line; Markdown
   and HTML are not parsed inside a fence, and the fence is longer than any run of backticks in
@@ -131,9 +131,9 @@ Not used: the Conversational Agents (Dialogflow CX) messenger widget — it fron
 playbook, not an Agent Engine agent, so it would add a hop for nothing. Grounding-style
 inline citations do not coexist with strict JSON output, which is why structured display was
 planned through A2UI cards. **Not yet used either:** the deployed agent returns its answer as
-plain structured text, the text of the turn's final event (`finish.py` renders for the `text`
-surface). The A2UI renderer is built and tested (`render.render_a2ui`), but sending it needs an
-A2A surface that advertises the extension, and nothing in the deployed path does.
+plain structured text, the text of the turn's final event (`render.render_text`). Sending A2UI
+needs an A2A surface that advertises the extension, and nothing in the deployed path does; the
+A2UI renderer built for it was never sent and was removed in refactor R1 (history: `250d8a2`).
 
 Sources: Gemini Enterprise custom MCP server set-up and Agent Gallery registration
 (docs.cloud.google.com/gemini/enterprise, 2026-09-18); ADK MCP tools
@@ -236,8 +236,8 @@ else:
    user's token per request.
 2. Composes answers in a fixed shape: verbatim blocks from tool results, each with its
    citation (document, version, `sourceKey`, hash) and the product and language `find_product`
-   named for that document version in the turn, rendered as plain structured text (A2UI is
-   built, not sent — see above); the assistant's own words in a separate, labelled part.
+   named for that document version in the turn, rendered as plain structured text (no A2UI —
+   see above); the assistant's own words in a separate, labelled part.
 3. Runs the post-check: every verbatim block back through `verify_quote`, held to exact
    coverage and matching hashes (layer 2 above); flags anything else on the block.
 4. Emits one structured record per turn — on every way a turn can end, including those that
