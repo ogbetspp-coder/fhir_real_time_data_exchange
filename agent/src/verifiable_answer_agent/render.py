@@ -4,24 +4,15 @@ Every function here takes a ``CheckedAnswer`` and nothing else. A ``DraftAnswer`
 renderer, so there is no expression in this package that puts an unchecked quotation in front
 of a user. That is the invariant, stated in the signatures.
 
-Two surfaces:
+One surface, structured text, which is what the deployed agent returns: Gemini Enterprise
+receives the answer as the text of the turn's final event and renders it as Markdown. Every block
+and the assistant's words are fenced code blocks, so the verbatim display of a quotation depends
+on the fence, not on what the label happens to contain (``render_text``). An A2UI renderer was
+built and never sent anywhere; it was removed in refactor R1 (in history at ``250d8a2``), until a
+surface that renders A2UI is on the roadmap.
 
-- **Structured text**, which is what the deployed agent returns (``finish`` asks for ``text``):
-  Gemini Enterprise receives the answer as the text of the turn's final event and renders it as
-  Markdown. Every block and the assistant's words are fenced code blocks, so the verbatim
-  display of a quotation depends on the fence, not on what the label happens to contain
-  (``render_text``).
-- **A2UI** (v0.9.1), built and tested but not yet sent anywhere: one ``createSurface``
-  envelope followed by one ``updateComponents`` envelope carrying a flat adjacency list,
-  exactly as the specification describes them. Sending it needs an A2A surface that
-  advertises the extension; nothing in the deployed path does yet. Its ``Text`` components carry
-  each quotation and the assistant's words as plain strings, unfenced: if a surface renders a
-  ``Text`` as Markdown, a label's own "<", "*" or "_" would be read as markup there. Before A2UI
-  is sent, that has to be settled for the surface in question — a component that does not parse
-  Markdown, or the same fencing — and tested as ``render_text`` is.
-
-Both put the citation next to the quotation and the verification status on the block itself,
-and both label the assistant's own words as the assistant's own words. The assistant's words are
+The citation stands next to the quotation and the verification status on the block itself, and
+the assistant's own words are labelled as the assistant's own words. The assistant's words are
 never checked, so they are made unable to pass for a checked block (``sanitise_assistant``):
 lines opening with a label reserved for checked text are removed, however they are dressed;
 checksums and document identifiers are removed, because only a checked block may carry them;
@@ -35,41 +26,12 @@ import html
 import re
 import unicodedata
 from dataclasses import dataclass
-from typing import Any, Final, Literal, final
+from typing import Final, Literal, final
 
 from .postcheck import CheckedAnswer, CheckedBlock
 from .quote_edge import is_default_ignorable, is_gap
 
-__all__ = [
-    "A2UI_CATALOG_ID",
-    "A2UI_EXTENSION_URI",
-    "A2UI_VERSION",
-    "AssistantFlag",
-    "AssistantView",
-    "Surface",
-    "render",
-    "render_a2ui",
-    "render_text",
-    "sanitise_assistant",
-]
-
-A2UI_VERSION: Final = "v0.9.1"
-
-A2UI_CATALOG_ID: Final = "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"
-"""The basic catalog's own declared ``catalogId``.
-
-Note it is ``v0_9``, not ``v0_9_1``: the catalog document served from the v0.9.1 path declares
-the v0.9 identifier, while the v0.9.1 specification's ``createSurface`` example writes
-``v0_9_1``. The catalog document is the thing a renderer matches against, so its own value is
-used here. Recorded in ``README.md``; re-check when A2UI reaches 1.0, which also renames
-``theme`` to ``surfaceProperties``.
-"""
-
-A2UI_EXTENSION_URI: Final = "https://a2ui.org/a2a-extension/a2ui/v0.9.1"
-"""Advertised in ``AgentCapabilities.extensions``; A2UI travels as an ``application/a2ui+json``
-DataPart. A surface that does not advertise it gets ``render_text`` instead."""
-
-Surface = Literal["a2ui", "text"]
+__all__ = ["AssistantFlag", "AssistantView", "render_text", "sanitise_assistant"]
 
 AssistantFlag = Literal[
     "reserved-label-removed", "checksum-removed", "identifier-removed", "label-text-repeated"
@@ -102,95 +64,6 @@ _FLAG_TEXT: Final[dict[str, str]] = {
     "table-not-quotable": "part of this block is a table or picture, which cannot be checked yet",
     "empty-block": "the block carried no text to check",
 }
-
-
-def render(answer: CheckedAnswer, surface: Surface) -> list[dict[str, Any]] | str:
-    """A2UI envelopes where the surface renders them, plain structured text where it does not."""
-    if surface == "a2ui":
-        return render_a2ui(answer)
-    return render_text(answer)
-
-
-def render_a2ui(
-    answer: CheckedAnswer, surface_id: str = "verifiable_answer"
-) -> list[dict[str, Any]]:
-    """The two envelopes that make one answer card, per the A2UI v0.9.1 envelope structure."""
-    components: list[dict[str, Any]] = []
-    children: list[str] = []
-
-    for block in answer.blocks:
-        card_id = f"{block.block_id}_card"
-        body_id = f"{block.block_id}_body"
-        components.append({"id": card_id, "component": "Card", "child": body_id})
-        components.append(
-            {
-                "id": body_id,
-                "component": "Column",
-                "children": [
-                    f"{block.block_id}_status",
-                    f"{block.block_id}_quote",
-                    f"{block.block_id}_product",
-                    f"{block.block_id}_citation",
-                ],
-            }
-        )
-        components.append(
-            {
-                "id": f"{block.block_id}_status",
-                "component": "Text",
-                "variant": "h5",
-                "text": _status_line(block),
-            }
-        )
-        # The quotation itself: body text, undecorated, exactly as the tool returned it.
-        components.append(
-            {"id": f"{block.block_id}_quote", "component": "Text", "text": block.text}
-        )
-        components.append(
-            {
-                "id": f"{block.block_id}_product",
-                "component": "Text",
-                "variant": "caption",
-                "text": _product_line(block),
-            }
-        )
-        components.append(
-            {
-                "id": f"{block.block_id}_citation",
-                "component": "Text",
-                "variant": "caption",
-                "text": _citation_line(block),
-            }
-        )
-        children.append(card_id)
-
-    for index, line in enumerate(_after_blocks(answer)):
-        children.append(f"read_note_{index}")
-        components.append({"id": f"read_note_{index}", "component": "Text", "text": line})
-
-    view = sanitise_assistant(answer)
-    children.append("assistant_divider")
-    components.append({"id": "assistant_divider", "component": "Divider", "axis": "horizontal"})
-    children.append("assistant_label")
-    components.append(
-        {"id": "assistant_label", "component": "Text", "variant": "h5", "text": ASSISTANT_LABEL}
-    )
-    children.append("assistant_text")
-    components.append({"id": "assistant_text", "component": "Text", "text": view.text})
-
-    # "One of the components in one of the component lists MUST have an id of root."
-    components.insert(0, {"id": "root", "component": "Column", "children": children})
-
-    return [
-        {
-            "version": A2UI_VERSION,
-            "createSurface": {"surfaceId": surface_id, "catalogId": A2UI_CATALOG_ID},
-        },
-        {
-            "version": A2UI_VERSION,
-            "updateComponents": {"surfaceId": surface_id, "components": components},
-        },
-    ]
 
 
 def render_text(answer: CheckedAnswer) -> str:
@@ -588,15 +461,6 @@ def _product_line(block: CheckedBlock) -> str:
             "Check the document before relying on it."
         )
     return f"{PRODUCT_NAMED}: {citation.product_name}, language {citation.language}"
-
-
-def _citation_line(block: CheckedBlock) -> str:
-    """Where the quotation came from, in the fields a reader needs to check it."""
-    citation = block.citation
-    return (
-        f"bundleId {citation.bundle_id} · versionId {citation.version_id} · "
-        f"sourceKey {citation.source_key} · narrativeDivSha256 {citation.narrative_div_sha256}"
-    )
 
 
 def _reading_lines(block: CheckedBlock) -> list[str]:

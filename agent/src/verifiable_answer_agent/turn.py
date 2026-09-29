@@ -15,13 +15,13 @@ from __future__ import annotations
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, final
+from typing import final
 
 from .audit import ToolCallRecord, TurnAuditRecord, turn_record
 from .compose import ProductFacts, compose
 from .contract import ToolResult
 from .postcheck import CheckedAnswer, VerifyQuote, run_post_check
-from .render import AssistantFlag, Surface, render, sanitise_assistant
+from .render import AssistantFlag, render_text, sanitise_assistant
 
 __all__ = ["CheckedTurn", "TurnResult", "answer_turn", "check_turn"]
 
@@ -32,7 +32,7 @@ class CheckedTurn:
     """The checked answer, its rendering, and the counts its audit record needs."""
 
     answer: CheckedAnswer
-    rendered: list[dict[str, Any]] | str
+    rendered: str
     sections_dropped: int
     assistant_flags: tuple[AssistantFlag, ...]
     duration_ms: int
@@ -44,7 +44,7 @@ class TurnResult:
     """What one turn produced: the checked answer, its rendering and the turn's audit record."""
 
     answer: CheckedAnswer
-    rendered: list[dict[str, Any]] | str
+    rendered: str
     audit: TurnAuditRecord
 
 
@@ -53,14 +53,13 @@ async def check_turn(
     section_results: Sequence[ToolResult],
     assistant_text: str,
     verify_quote: VerifyQuote,
-    surface: Surface,
     products: ProductFacts | None = None,
 ) -> CheckedTurn:
     """Compose deterministically, check mechanically, render. No record."""
     started = time.monotonic()
     composition = compose(section_results, assistant_text, products)
     checked = await run_post_check(composition.draft, verify_quote)
-    rendered = render(checked, surface)
+    rendered = render_text(checked)
     return CheckedTurn(
         answer=checked,
         rendered=rendered,
@@ -75,7 +74,6 @@ async def answer_turn(
     section_results: Sequence[ToolResult],
     assistant_text: str,
     verify_quote: VerifyQuote,
-    surface: Surface,
     principal: str,
     service_version: str,
     turn_id: str,
@@ -96,7 +94,6 @@ async def answer_turn(
         section_results=section_results,
         assistant_text=assistant_text,
         verify_quote=verify_quote,
-        surface=surface,
         products=products,
     )
     record = turn_record(

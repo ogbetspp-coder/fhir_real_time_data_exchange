@@ -62,7 +62,8 @@ Google Cloud Healthcare API and observe their native near-real-time BigQuery str
 5. Run the full local gate before commit. `.github/workflows/ci.yml` is the merge gate on every
    pull request. On `main`, `.github/workflows/deploy.yml`'s `gate` job, which holds no cloud
    token, runs `npm run check` again and makes the deploy's inputs; the `deploy` job installs
-   nothing and waits for CI's run on the commit (every job). A merge touching only the paths in
+   nothing and waits for CI's run on the commit (every job but Renderer, which stays a required
+   pull-request check). A merge touching only the paths in
    its `paths-ignore` does not deploy. Cloud Build only builds images.
 6. Use a separate git worktree for every parallel writing agent.
 7. Merge a pull request with a merge commit (or a squash), never by rebase or fast-forward: the

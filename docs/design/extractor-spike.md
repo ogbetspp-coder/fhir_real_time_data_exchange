@@ -1,7 +1,9 @@
 # Design note: extractor spike
 
 - Status: Complete — verdict below (no-go for Document AI as the character source; go as the
-  structure classifier; the parser is a hybrid)
+  structure classifier; the parser is a hybrid). The spike's code and tests were deleted on
+  2026-09-29 (refactor R1); they are in history at `250d8a2`
+  (`git show 250d8a2:scripts/spikes/document-ai/README.md`), and issue #136 holds the parked plan.
 - Date: 2026-09-20
 - Related: `docs/fidelity-normalization.md` (section 7, the extractor contract),
   `docs/adr/0003-mechanical-narrative-fidelity.md`, `docs/roadmap.md` (was item 0; the spike is

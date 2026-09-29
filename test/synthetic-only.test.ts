@@ -132,19 +132,4 @@ describe("synthetic narrative", () => {
     }
     expect(checked).toBeGreaterThan(0);
   });
-
-  it("marks every page of the recorded extractor response as a synthetic extract", () => {
-    const recorded = JSON.parse(
-      readFileSync("test/fixtures/spikes/document-ai-layout-response.recorded.json", "utf8"),
-    ) as unknown;
-    const headers = strings(recorded)
-      .filter(({ key }) => key === "text")
-      .map(({ text }) => text)
-      .filter((text) => text.includes("synthetic demonstration extract"));
-    const bodies = strings(recorded)
-      .filter(({ key, text }) => key === "text" && text.includes(MARKER))
-      .map(({ text }) => text);
-    expect(headers).toHaveLength(3);
-    expect(bodies.length).toBeGreaterThan(0);
-  });
 });
