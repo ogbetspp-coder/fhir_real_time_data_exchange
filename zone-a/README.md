@@ -98,7 +98,7 @@ cd zone-a
 .uv-bootstrap/bin/uv run --frozen ruff format --check .
 .uv-bootstrap/bin/uv run --frozen mypy --strict
 .uv-bootstrap/bin/uv run --frozen python scripts/generate_models.py --check
-.uv-bootstrap/bin/uv run --frozen pytest
+.uv-bootstrap/bin/uv run --frozen pytest --cov   # fails under the floor in pyproject.toml
 ```
 
 Every line above was run as written. One local caveat that is a toolchain defect rather than a

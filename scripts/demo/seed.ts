@@ -12,7 +12,7 @@ import {
   type DemoSeedDeps,
 } from "./seed-plan.js";
 
-// Seeds the demonstration set (roadmap item 1c) through the real document path: three synthetic
+// Seeds the demonstration set (roadmap, "Needs a person", item 2) through the real document path: three synthetic
 // products at version 1, then the default product at version 2. Each hand-off is written to
 // `gs://$SUBMISSION_BUCKET/demo/<productId>/v<version>/` exactly as Zone A would write it, and
 // then named by URI and hash in a `document` run request to the deployed worker. Nothing here

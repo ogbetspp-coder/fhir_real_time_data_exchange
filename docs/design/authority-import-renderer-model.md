@@ -1,6 +1,6 @@
 # T's model output: what the renderer gate compares (roadmap 3a, PR 3c-B)
 
-- Status: proposed, 2026-09-26; sixth draft, after five design reviews
+- Status: built (3c-B1, #117), 2026-09-26; sixth draft, after five design reviews
 - Decides: the output format the renderer note's R3 leaves to "3c-B's addendum": the entries T
   emits for each section, in R3's index space; each property as T models it; how each is compared
   with Chrome's computed style; the fold and waiver fields, and where the scanner offsets and the

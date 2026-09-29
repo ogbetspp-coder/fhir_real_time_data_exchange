@@ -36,17 +36,21 @@ Google Cloud Healthcare API and observe their native near-real-time BigQuery str
 - Format: `npm run format`
 - Full local gate: `npm run check` (its test step is `npm run test:coverage`: the suite under v8
   coverage with per-directory floors in `vitest.config.ts`; raise a floor when coverage rises)
-- Every CI gate (Node, Zone A, Agent; not the official HL7 validator): `scripts/check-all.sh`.
-  Needs Python 3.14 and uv 0.12.17 (`agent/.uv-bootstrap`, `zone-a/.uv-bootstrap`, `$UV` or
-  `PATH`); `test/ci/check-all.test.ts` keeps it in step with `.github/workflows/ci.yml`.
+- Every CI gate but Official validation, Renderer and Images (Node, Zone A with its `pytest --cov`
+  floor, Agent): `scripts/check-all.sh`. Needs Python 3.14 and uv 0.12.17 (`agent/.uv-bootstrap`,
+  `zone-a/.uv-bootstrap`, `$UV` or `PATH`); `test/ci/check-all.test.ts` holds its commands, job by
+  job, to `.github/workflows/ci.yml`.
+- Renderer: `npm run renderer:image`, then the `renderer:*` checks, each run in that image by
+  `scripts/render/run.mjs` (Docker).
 - Build: `npm run build`
 - Local deterministic demo: `npm run demo`
 - Service: `npm run dev`
 - Terraform: `terraform -chdir=infra fmt -check -recursive && terraform -chdir=infra validate`
 - Contracts and vectors: `npm run contracts:check` (regenerates `contracts/generated`,
   `test/fixtures/fidelity/vectors.json` and the importer's `test/fixtures/authority/vectors.json`
-  and fails on drift). A change to `src/authority/` changes `IMPORTER_VERSION`, then
-  `npm run authority:lock` (ADR 0004's amendment)
+  and fails on drift). A contract version change also needs
+  `npm run contracts:lock -- --record <change record>` (`contracts/versions.lock.json`). A change to
+  `src/authority/` changes `IMPORTER_VERSION`, then `npm run authority:lock` (ADR 0004's amendment)
 
 ## Workflow
 
@@ -56,11 +60,10 @@ Google Cloud Healthcare API and observe their native near-real-time BigQuery str
 4. Update the mapping manifest and the evidence schema (`src/contracts/run-manifest.ts`,
    regenerated into `contracts/generated/`) together.
 5. Run the full local gate before commit. `.github/workflows/ci.yml` is the merge gate on every
-   pull request. On `main`, `npm run check` runs again as its own `gate` job in
-   `.github/workflows/deploy.yml`, which holds no cloud token; the `deploy` job needs it. A merge
-   that touches only documentation, `test/`, `agent/`, `zone-a/`, `.claude/` or `.cursor/` does
-   not deploy. Cloud Build
-   only builds images.
+   pull request. On `main`, `.github/workflows/deploy.yml`'s `gate` job, which holds no cloud
+   token, runs `npm run check` again and makes the deploy's inputs; the `deploy` job installs
+   nothing and waits for CI's run on the commit (every job). A merge touching only the paths in
+   its `paths-ignore` does not deploy. Cloud Build only builds images.
 6. Use a separate git worktree for every parallel writing agent.
 7. Merge a pull request with a merge commit (or a squash), never by rebase or fast-forward: the
    importer lock's test reads main's first-parent history as released

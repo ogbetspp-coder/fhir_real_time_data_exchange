@@ -20,9 +20,11 @@ are the operator interface.
   manufactured/administrable product, ingredient, substance, and organization resources.
 - Fail-closed conversion of supplied canonical SmPC sections to the exact English CAP QRD
   hierarchy.
-- Byte-preservation checks for supplied XHTML; clinical text is never generated or rewritten.
-- `ConceptMap`, `StructureMap`, field-level decisions, input/output hashes, validation
-  `OperationOutcome`s, and KMS-signed run manifests.
+- A mechanical fidelity check of supplied narrative; clinical text is never generated or
+  rewritten, and only an authority import may drop presentation (ADR 0005).
+- A descriptive `ConceptMap` and non-normative `StructureMap` (`src/fhir/transform.ts` executes
+  the crosswalk; the official validator checks both in CI), field-level decisions, input/output
+  hashes, validation `OperationOutcome`s, and KMS-signed run manifests.
 - Validation by both the official HL7 validator and Healthcare API `$validate`.
 - Idempotent FHIR transaction writes only after all required validation gates pass.
 - Direct `ANALYTICS_V2` streaming from the validated R5 FHIR store to BigQuery. Google
@@ -69,20 +71,21 @@ contract, the ingress gate, the reference resolver, the `document` route, and th
 before accepting it (ADR 0005; `docs/design/authority-import-contract.md`; dry run only for
 now). The `fixture` and `healthcare-api` sources are pre-existing trusted inputs guarded by IAM,
 not by this gate. The worker's run-source allowlist (`ENABLED_RUN_SOURCES`, Terraform
-`enabled_run_sources`) follows `ALLOW_SYNTHETIC_SOURCES`, which is off by default: then only
-`document` is enabled and enabling either ungated source fails startup. The `dev` deploy turns
-it on. See
+`enabled_run_sources`), enforced at HTTP and in `runPipeline`, follows `ALLOW_SYNTHETIC_SOURCES`,
+which is off by default: then only `document` is enabled and enabling either ungated source fails
+startup. The `dev` deploy turns it on. See
 [docs/adr/0002-two-trust-zones-and-canonical-submission.md](docs/adr/0002-two-trust-zones-and-canonical-submission.md)
 and
 [docs/adr/0003-mechanical-narrative-fidelity.md](docs/adr/0003-mechanical-narrative-fidelity.md)
 for the trust boundary and the mechanical narrative fidelity check. The contract's Zod schemas
 are the source of truth; generated JSON Schema is checked into `contracts/generated/` and kept
-in sync by `npm run contracts:check`. The golden vectors in `test/fixtures/fidelity/` are the
-executable specification for any re-implementation of the fidelity check.
+in sync by `npm run contracts:check`, their versions by `contracts/versions.lock.json`. The golden
+vectors in `test/fixtures/fidelity/` are the executable specification for any re-implementation of
+the fidelity check.
 
 ## Local deterministic demonstration
 
-Requirements: Node.js 22.14 or newer.
+Requirements: Node.js 22.22.0 exactly, with npm 10.9.4 (ADR 0003 pins the runtime).
 
 ```bash
 npm ci
@@ -122,48 +125,42 @@ fixture, or client is touched.
 
 ## Google Cloud deployment
 
-Prerequisites:
-
-- a billing-enabled Google Cloud project;
-- `gcloud` Application Default Credentials with permission to provision the listed services;
-- Terraform 1.16 or newer;
-- Cloud Build permissions;
-- an EU region supported by Cloud Healthcare API and all selected services.
-
-The default is `europe-west4`.
+Prerequisites: a billing-enabled project in an EU region Cloud Healthcare API supports (default
+`europe-west4`), `gcloud` credentials that can provision it, Terraform 1.16 or newer, and Cloud
+Build permissions. Deploys run through `.github/workflows/deploy.yml` (below); a local run of
+every phase is for emergencies only:
 
 ```bash
-export GOOGLE_CLOUD_PROJECT="your-project-id"
-export EMA_FLOW_ENVIRONMENT="dev"
+export GOOGLE_CLOUD_PROJECT="sage-ship-509104-b8" # the EXPECTED_PROJECT_ID of dev.env; any other is refused
+export EMA_FLOW_ENVIRONMENT="dev"                 # no default
 bash scripts/gcp/deploy.sh
 ```
 
-The deployment:
+Export the four `QUERY_*` variables as the repository variables hold them. Against a live
+environment, an unset `QUERY_INVOKERS` or `QUERY_TOKEN_CREATORS` plans destroys of its grants, and
+so does running as a user account rather than the deployer (`deployer_invoker`,
+`deployer_fhir_editor`): the apply refuses them unless `ALLOW_REPLACE_ACK` names them (below). An
+unset entitlement map or client list empties it without a destroy. `smoke` needs
+`WORKER_ID_TOKEN` (see "Re-ingesting with `scripts/demo/seed.ts`"). An environment's other inputs
+are in `scripts/gcp/environments/<env>.env`. Every operator script in `scripts/gcp/` takes
+`--help` (which, for `deploy.sh`, lists the phases) and exits 2 on an
+unknown argument. The phases, in order: `preflight`; `init` (the state bucket, on its key);
+`apis`; `images` (Cloud Build, `cloudbuild.images.yaml`, builds the worker, validator and query
+images; submitted by hand without `phase_images`' `--region`, `--service-account` and
+`--gcs-source-staging-dir`, the build is refused); `apply` (images by digest; Binary
+Authorization is configurable and off by default); `record-readers`; `bootstrap` (reconciles the
+R5 stores and their BigQuery stream over REST, since the Terraform provider rejects R5, imports
+the pinned profiles and seeds `Bundle/synthetic-type2-smpc`); `smoke` (one fixture run must
+persist); and `query-smoke`. A local run also installs the packages and makes the deploy's
+inputs (`scripts/gcp/deploy-inputs.sh`; a legitimate change to the synthetic fixture updates its
+hash in `fhir/deploy-inputs.lock.json`). In Actions the `gate` job makes them, and the `deploy`
+job, which installs nothing, waits for CI's run on the commit first.
 
-1. creates Artifact Registry and required APIs;
-2. GitHub Actions runs `npm run check` in its own `gate` job of `.github/workflows/deploy.yml`,
-   which holds no cloud token (no `id-token` permission); the `deploy` job needs it and does not
-   start unless it passes. The merge gate is `.github/workflows/ci.yml` on the pull request, and a
-   merge that touches only documentation, `test/`, `agent/`, `zone-a/`, `.claude/` or `.cursor/`
-   does not deploy at all.
-   Cloud Build (`cloudbuild.images.yaml`, the only build configuration) only builds the worker,
-   validator, and query images; the quality gate runs in GitHub Actions before it. Submit it by
-   hand only with the three flags `phase_images` in `scripts/gcp/deploy.sh` uses —
-   `--region`, `--service-account` naming `ema-flow-build-<env>`, and `--gcs-source-staging-dir` on
-   the `-build-staging` bucket. Without them gcloud falls back to a global build, as the default
-   compute service account, staging the source in a US bucket; that account no longer holds a build
-   role, so such a build is refused;
-3. deploys immutable image digests; Binary Authorization is configurable
-   (`enforce_binary_authorization`) and is disabled by default;
-4. reconciles the R5 stores and native BigQuery stream through the Healthcare REST API;
-5. imports checksum-pinned profile cards and profiles; and
-6. seeds `Bundle/synthetic-type2-smpc` in the source store.
-
-The REST reconciliation is intentional: Google’s Healthcare API supports R5, but the current
-Google Terraform provider still rejects `version = "R5"` during provider-side validation.
-The script refuses to substitute R4 and never deletes an existing store. Terraform continues
-to own the dataset, IAM, BigQuery, Pub/Sub, Cloud Run, Workflows, evidence, and observability
-resources.
+Each apply, and the profile prune in `bootstrap`, refuses a plan that destroys or replaces
+anything unless `ALLOW_REPLACE_ACK` names the commit and a digest of exactly those destroys (the
+refusing run prints the value; in Actions it is the workflow's `allow_replace_ack` input). The
+`apis` plan, the full plan and the prune each compute their own digest, so a change that needs
+two of them fails at the second and needs a second run with its value.
 
 ### GitHub Actions deployment
 
@@ -186,19 +183,19 @@ The pull-request plan (`.github/workflows/plan.yml`) takes two more, `GCP_PLAN_S
 and `GCP_PLAN_WORKLOAD_IDENTITY_PROVIDER`, for its own read-only identity
 (`docs/foundations.md`, B4).
 
-Five further Actions variables configure who may call the query service and where its alert
-goes. They are variables, not secrets: an IAM member string, an opaque subject id, a FHIR bundle
-id, an OAuth client id and an e-mail address are identifiers, and holding one grants nothing.
-Each is optional; an unset variable leaves the Terraform default, and a deploy with all of them
-unset succeeds and authorises no caller.
+Four further Actions variables configure who may call the query service. They are variables,
+not secrets: an IAM member string, an opaque subject id, a FHIR bundle id and an OAuth client id
+are identifiers, and holding one grants nothing. Each is optional; an unset variable leaves the
+Terraform default, and a deploy with all of them unset succeeds and authorises no caller. Outside
+`dev`, `ALERT_NOTIFICATION_EMAIL` or `ALERT_NOTIFICATION_CHANNELS` is required and must not be a
+placeholder; `dev` pages no one and is given neither (`infra/README.md`, Inputs).
 
-| Variable                   | Example                                                           | Default when unset |
-| -------------------------- | ----------------------------------------------------------------- | ------------------ |
-| `QUERY_INVOKERS`           | `user:you@example.com,serviceAccount:a@p.iam.gserviceaccount.com` | `[]`               |
-| `QUERY_TOKEN_CREATORS`     | `user:you@example.com`                                            | `[]`               |
-| `QUERY_ENTITLEMENTS_JSON`  | `{"112233445566778899000":{"bundles":["synthetic-type2-smpc"]}}`  | `{}`               |
-| `QUERY_OAUTH_CLIENT_IDS`   | `123456789012-abc.apps.googleusercontent.com` (the connector's)   | `[]`               |
-| `ALERT_NOTIFICATION_EMAIL` | `security@example.com`                                            | `""` (no alert)    |
+| Variable                  | Example                                                           | Default when unset |
+| ------------------------- | ----------------------------------------------------------------- | ------------------ |
+| `QUERY_INVOKERS`          | `user:you@example.com,serviceAccount:a@p.iam.gserviceaccount.com` | `[]`               |
+| `QUERY_TOKEN_CREATORS`    | `user:you@example.com`                                            | `[]`               |
+| `QUERY_ENTITLEMENTS_JSON` | `{"112233445566778899000":{"bundles":["synthetic-type2-smpc"]}}`  | `{}`               |
+| `QUERY_OAUTH_CLIENT_IDS`  | `123456789012-abc.apps.googleusercontent.com` (the connector's)   | `[]`               |
 
 `QUERY_INVOKERS` and `QUERY_TOKEN_CREATORS` are not alternatives to each other: the first
 grants `run.invoker` to a caller that authenticates as itself, the second grants the right to
@@ -212,15 +209,14 @@ the deploy log is attached to a GitHub issue on failure.
 The WIF attribute condition must allow
 `repo:ogbetspp-coder/fhir_real_time_data_exchange:ref:refs/heads/main` (or the whole
 repository). After the four deploy variables are set, start the workflow from the Actions tab.
+If a CI flake refuses a deploy, re-run the failed CI job and then the deploy only while that
+commit is still `main`'s HEAD; otherwise dispatch the workflow on `main`, since re-running an
+older commit's deploy would apply it over newer ones.
 
-The bootstrapped deployer service account needs
-`roles/healthcare.datasetAdmin` for the Healthcare dataset and
-`roles/healthcare.fhirStoreAdmin` for the R5 REST reconciler. Its other provisioning roles
-depend on the resources in this Terraform configuration. The runtime worker remains separate
-and has the narrower `roles/healthcare.fhirResourceEditor` role, bound on the record dataset
-only (`google_healthcare_dataset_iam_member.worker_fhir_editor` in `infra/security.tf`), as the
-query service's reader role is; the project-level binding was removed on 2026-09-21 with the
-CMEK rollout (`docs/foundations.md`, C4).
+The deployer and the planner are bootstrapped outside Terraform (`infra/README.md`). The worker
+reads the source store and edits the validated store, and the query service reads the validated
+store, each granted on the store; their older dataset-wide grants stay, marked TRANSITIONAL,
+until audit B04's phase 2.
 
 Run the real demonstration:
 
@@ -331,8 +327,6 @@ The service accepts two credential kinds on `Authorization: Bearer`, told apart 
   `access-token`) — the end user's token as Gemini Enterprise forwards it. It is verified
   through Google's tokeninfo endpoint and accepted only when its `aud` or `azp` is listed in
   `query_oauth_client_ids`. With that list empty (the default) every access token is rejected.
-  Successful access-token verifications are cached in process memory, keyed by the token's
-  SHA-256, for at most 300 seconds and never past the token's own expiry, at most 1,000 entries.
 
 #### Two hostnames, one audience
 
@@ -368,11 +362,6 @@ AUDIENCE="$(terraform -chdir=infra output -raw query_audience)" || {
   return 1 2>/dev/null || exit 1
 }
 ```
-
-That 401 was first reproduced in review against the service's verification code, and the two
-URL shapes above were first confirmed on the worker in the same project and region. The agent's
-first deploy met it against the live service on 2026-09-22: a token minted for the legacy
-hostname was refused with `401 {"error":"unauthenticated"}` (`agent/deploy/README.md`).
 
 <a id="terraform-output-needs-the-backend"></a>
 **`terraform output` needs the real backend first**, here and everywhere else in this file. A
@@ -452,12 +441,6 @@ which pairs it with a service agent's ID token that satisfies Cloud Run's edge, 
 its client is listed in `query_oauth_client_ids` — in `dev`, the connector's internal OAuth
 client and nothing else.
 
-_History, not a recipe._ Before the connector's client existed, `dev` also accepted gcloud's own
-client id, `32555940559.apps.googleusercontent.com`, read from `tokeninfo` on 2026-09-20. That
-id is built into every gcloud installation worldwide, so it identifies the tool and never the
-caller, leaving `run.invoker` and the per-subject entitlement as the only walls. It was removed
-from `dev` on 2026-09-21 (`docs/roadmap.md`, "Needs a person", item 6).
-
 #### Calling it
 
 `GET /readyz` performs no application-level check: it answers
@@ -497,36 +480,13 @@ curl -s -X POST "$SERVICE_URL/mcp" \
 
 `2025-11-25` is `LATEST_PROTOCOL_VERSION` of the pinned `@modelcontextprotocol/sdk` 1.30.0.
 
-What `/mcp` answers before any protocol message is dispatched, in this order
-(`src/query/app.ts`):
-
-| Condition                                                        | Answer                                  |
-| ---------------------------------------------------------------- | --------------------------------------- |
-| No, malformed, or unverifiable bearer                            | `401 { "error": "unauthenticated" }`    |
-| Verified principal with no entry in `query_entitlements_json`    | `403 { "error": "not-entitled" }`       |
-| Method other than `POST`                                         | `405 { "error": "method-not-allowed" }` |
-| `X-Query-Turn-Id` present but not a UUID                         | `400 { "error": "invalid-request" }`    |
-| Body not JSON, or larger than 4 MiB                              | `400 { "error": "invalid-request" }`    |
-| JSON-RPC batch of more than 8 messages                           | `400 { "error": "invalid-request" }`    |
-| Two entries carrying the same JSON-RPC id                        | `400 { "error": "invalid-request" }`    |
-| A `notifications/cancelled` naming a request id in the same body | `400 { "error": "invalid-request" }`    |
-
-The last two are refused because the transport would not answer those bodies as one response
-per request id, and the request would never finish. Past that point the service waits at most
-30 seconds for the transport, and stops sooner if the client disconnects; on either bounded end
-it answers `503 { "error": "unavailable" }` and writes the outstanding audit records itself.
-
-The `401` line logged carries nothing derived from the credential; the `403` line carries the
-principal (the `sub` an operator would entitle). Inside the protocol, a document outside the
-caller's entitlement is `document-not-found` from every tool — `not-entitled` is an audit
-outcome only, never a returned error code. `find_product` reads at most the first 200 entitled
-Bundle ids (8 reads in flight) and answers `truncated: true` whenever the answer is shorter
-than the caller's entitlement holds — because documents were left unsearched (the horizon cut
-the list, or the request's read budget ran out) or because more documents matched than `limit`
-returns — so an empty `products` with `truncated: true` is not "no such product", and a full
-one is not "that is all there is". One HTTP request may make 400 store reads across
-its whole JSON-RPC batch; past that, `find_product` stops scanning and every other tool answers
-`unavailable` rather than reading. That is a per-request bound and not a per-principal quota.
+What `/mcp` answers before any protocol message is dispatched (`401 unauthenticated`,
+`403 not-entitled`, `405`, `400 invalid-request`, `503 unavailable`), and every limit it applies,
+are stated once, in `docs/design/epi-mcp-query-service.md`, "Phase 1 as built". The `401` line
+logged carries nothing derived from the credential; the `403` line carries the principal (the
+`sub` an operator would entitle). Inside the protocol, a document outside the caller's
+entitlement is `document-not-found` from every tool. An empty `products` with `truncated: true`
+is not "no such product", and a full one is not "that is all there is".
 
 `X-Query-Turn-Id`, when present and a UUID, is copied into every audit record of the request
 as `turnId`; the agent sends it on every request of a turn so its own `AgentTurnRecord` can be
@@ -538,23 +498,16 @@ service exists, so no bootstrap apply is needed; a Terraform postcondition fails
 that URL is not one Cloud Run reports for the service. Every deploy since 2026-09-20 has applied
 it.
 
-Query-service Terraform variables beyond `query_invokers`, `query_token_creators`,
-`query_entitlements_json`, `query_oauth_client_ids` and `alert_notification_email` — those five
-`scripts/gcp/deploy.sh` passes from the Actions variables above; supply the rest through
-`TF_VAR_<name>` or an `infra/*.auto.tfvars` file:
+Query-service Terraform variables beyond the four `scripts/gcp/deploy.sh` passes from the
+Actions variables above; supply the rest through `TF_VAR_<name>` or an `infra/*.auto.tfvars`
+file:
 
-| Variable                          | Default   | Effect                                                                                                                      |
-| --------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `query_oauth_client_ids`          | `[]`      | OAuth 2.0 client ids whose access tokens are accepted (`QUERY_OAUTH_CLIENT_IDS`); the env var is omitted when empty         |
-| `query_audience`                  | `""`      | Empty means the deterministic URL above; set only to front the service with another hostname                                |
-| `service_version`                 | `"local"` | `QUERY_SERVICE_VERSION` in every audit record; `deploy.sh` passes the commit SHA                                            |
-| `query_image`                     | —         | Must be an image reference by digest when the service is planned; the digest part becomes `IMAGE_DIGEST` in every record    |
-| `alert_notification_email`        | `""`      | The entitlement-denial log metric always exists; the e-mail channel and alert policy (> 5 denials in an hour) only when set |
-| `lock_regulated_audit_log_bucket` | `false`   | Locks the retained audit log bucket. Irreversible: retention cannot then change and Terraform will not unlock it            |
-
-The metric, channel and policy have been applied by every deploy since 2026-09-21, when
-`ALERT_NOTIFICATION_EMAIL` was first passed through. Its address is still a placeholder
-(production gate, `docs/roadmap.md`).
+| Variable                          | Default   | Effect                                                                                                                   |
+| --------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `query_audience`                  | `""`      | Empty means the deterministic URL above; set only to front the service with another hostname                             |
+| `service_version`                 | `"local"` | `QUERY_SERVICE_VERSION` in every audit record; `deploy.sh` passes the full commit SHA                                    |
+| `query_image`                     | —         | Must be an image reference by digest when the service is planned; the digest part becomes `IMAGE_DIGEST` in every record |
+| `lock_regulated_audit_log_bucket` | `false`   | Locks the retained audit log bucket. Irreversible: retention cannot then change and Terraform will not unlock it         |
 
 ### The demonstration set, and re-seeding
 
@@ -614,12 +567,12 @@ post-deploy smoke run (`deployer_invoker`). Impersonate the Workflows account:
 # a service account in sage-ship-509104-b8 as the project owner, without it, was refused with
 # "Permission 'iam.serviceAccounts.getAccessToken' denied" on 2026-09-20.
 gcloud iam service-accounts add-iam-policy-binding \
-  "ema-flow-workflow-${EMA_FLOW_ENVIRONMENT:-dev}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
+  "ema-flow-workflow-${EMA_FLOW_ENVIRONMENT:?}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
   --member="user:$(gcloud config get-value account)" \
   --role="roles/iam.serviceAccountTokenCreator"
 
 export WORKER_ID_TOKEN="$(gcloud auth print-identity-token \
-  --impersonate-service-account="ema-flow-workflow-${EMA_FLOW_ENVIRONMENT:-dev}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
+  --impersonate-service-account="ema-flow-workflow-${EMA_FLOW_ENVIRONMENT:?}@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com" \
   --audiences="$WORKER_URL" \
   --include-email)"
 
@@ -667,7 +620,8 @@ nothing has been deployed there.
 Google Cloud operates under shared responsibility. Intended use, risk assessment, procedural
 controls, personnel qualification, electronic signatures, application validation, and final
 release approval remain the regulated organization’s responsibility. Deployment today is an
-unattended `terraform apply` from GitHub Actions after the quality gate; a human promotion
+unattended `terraform apply` from GitHub Actions after the quality gate and CI's run on the
+commit; a human promotion
 gate (GitHub environment approval or Cloud Deploy) is software change control the owning
 organization adds, and it is not a Part 11 or Annex 11 content signature.
 

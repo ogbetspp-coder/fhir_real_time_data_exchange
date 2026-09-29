@@ -3,8 +3,9 @@
 Delivered (was roadmap item 1b); its post-check seen in a live turn is roadmap item 1. A small Agent
 Development Kit agent, its own deployable under ADR 0004 — own `pyproject.toml`, own lock, own
 identity, own CI job — that shares nothing with the worker or with Zone A except two published
-artefacts: `contracts/generated/query-tools.schema.json` (4.0.0, the query service's surface) and
-`contracts/generated/agent-turn.schema.json` (1.1.0, the shape of this agent's own audit record).
+artefacts: `contracts/generated/query-tools.schema.json` (the query service's surface) and
+`contracts/generated/agent-turn.schema.json` (the shape of this agent's own audit record), at the
+versions `src/contracts/` names.
 
 It does four things and refuses to do a fifth.
 
@@ -355,7 +356,15 @@ flagged `no-match`. The splitter now cuts only where the quote-edge rule holds o
 only: `get_provenance` for an earlier version is `unavailable`, which this agent reads as it
 reads any other `unavailable`.
 
-## query-tools 4.0.0
+## query-tools 3.0.0 and later
+
+**Deploy order.** The agent must run a vendored `query-tools` 3.0.0 or later no later than the
+service does: an earlier agent reads a 3.0.0 answer with a `/` in an identifier as unavailable.
+Each change record (`docs/validation/README.md`, Change records) states its own order. 4.1.0 and
+`agent-turn` 1.2.0 add an optional `contractVersion` to both audit records, and the published
+`pattern`s are ECMA-262 expressions over ASCII digits, which the vendored models read as such.
+
+### query-tools 4.0.0
 
 `QuoteVerification` is a union on `result` (audit AG-4). A `match` must carry `match`, must
 have searched at least one section, and its `endOffset` is at least 1; a `no-match` must not
@@ -443,8 +452,8 @@ chunk from making it likely; it is a false failure, never a false pass.
 
 ## Audit
 
-`TurnAuditRecord` is the `AgentTurnRecord` of `contracts/generated/agent-turn.schema.json`
-1.1.0: the same fields, tool names restricted to the four `QueryToolName` values, flags to the
+`TurnAuditRecord` is the `AgentTurnRecord` of `contracts/generated/agent-turn.schema.json`: the
+same fields, tool names restricted to the four `QueryToolName` values, flags to the
 nine `VerificationFlag` values, `outcome` and `assistantFlags` to theirs, and `serviceVersion`,
 `principal`, `principalDigest`, `turnId` and `errorClass` held to the contract's patterns in the
 pydantic model, so a record the contract would refuse cannot be built. An optional field left

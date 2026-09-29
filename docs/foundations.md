@@ -17,18 +17,17 @@ Stated first, because the gaps below should not obscure it.
 - **No service account keys exist or can be created.** Deploys authenticate through Workload
   Identity Federation; the organisation enforces `iam.managed.disableServiceAccountKeyCreation`
   and `iam.disableServiceAccountKeyUpload`.
-- **Data Access audit logs are on** for Cloud Healthcare, Cloud Storage, BigQuery and Cloud KMS,
-  reads and writes.
+- **Data Access audit logs are on** for Cloud Healthcare, Cloud Storage, BigQuery, Cloud KMS,
+  Discovery Engine and IAM, reads and writes.
 - **A regulated audit sink** copies those services' audit logs and the services' own structured
-  logs into `ema-flow-dev-regulated-audit`, in `europe-west4`, retained 2,555 days.
+  logs into `ema-flow-dev-regulated-audit-cmek`, in `europe-west4`, retained 2,555 days.
 - **The evidence and submission buckets are CMEK-encrypted**, the evidence bucket carries a
   seven-year retention policy, and the encryption key rotates every 90 days.
 - **Every bucket enforces uniform access**, the organisation enforces it, and every container
   image is pinned by digest and checked in CI.
-- **Seven required checks gate every merge** to `main` — `Check`, `Zone A`, `Agent`,
-  `Official validation`, `Plan`, `Vulnerabilities` and `Renderer` — including the official HL7
-  validator and the renderer gate, and the deploy of a commit waits for every job of CI's run on
-  it (`Images` too) to succeed.
+- **Eight required checks gate every merge** to `main` — `Check`, `Official validation`,
+  `Renderer`, `Images`, `Zone A`, `Agent`, `Plan` and `Vulnerabilities` — and the deploy of a
+  commit waits for every job of CI's run on it to succeed.
 - **The FHIR stores keep full version history and enforce referential integrity**, and writes are
   atomic transactions.
 
@@ -141,7 +140,7 @@ build or the apply (run `35632866108`).
 new code with those credentials. _Before features:_ pin every action to a full commit SHA, and
 let an update bot propose moves (C3).
 
-_Status 2026-09-21: closed._ All twenty `uses:` lines are pinned to the commit of the latest
+_Status 2026-09-21: closed._ Every `uses:` line is pinned to the commit of the latest
 release in their major version, with that release in a comment; the test fails on any tag.
 
 **B3. Image builds run as the default compute service account** with
@@ -283,8 +282,10 @@ cold starts faster; see E1. Worse than first recorded: the deployed
 sidecar downloaded all nine packages **on every cold start** and validated EMA content under
 United States jurisdiction. The packages are now
 pinned in `fhir/validator-packages.lock`, installed into the image, and the validator runs with
-`-no-http-access`, no route to the network and `-jurisdiction uv -locale en-US` — which also
-closes a request-forgery path from submitted content to internal addresses; the CI gate uses the same list and
+`-no-http-access`, a JVM proxy to nowhere and `-jurisdiction uv -locale en-US` — which also
+closes a request-forgery path from submitted content to internal addresses (in the application
+only: the deployed sidecar keeps Cloud Run's egress and the worker's service account,
+`docs/roadmap.md`, "Open gaps"); the CI gate uses the same list and
 the same JVM properties and fails on any download attempt; every image build proves the
 validator starts with networking disabled. Details in `docs/validation/README.md`, "Official
 validation gate".
@@ -294,7 +295,8 @@ validation gate".
 (adds `targetAxis`, drops zero positions) and Terraform re-applies it. Harmless, but noise in a
 plan is where a real change hides. Write the JSON in the form the API returns.
 
-_Status 2026-09-23: open._
+_Status 2026-09-28: closed (audit B04, #125)._ Terraform ignores the JSON and
+`scripts/ci/dashboard-drift.py` compares its meaning; the deploy replaces a dashboard that drifted.
 
 **C11. Deploy failure issues were never closed.** The deploy workflow opens an issue on every
 failure and nothing closed them: 27 were open on 2026-09-21, the oldest from the first day, each

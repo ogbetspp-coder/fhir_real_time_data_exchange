@@ -16,7 +16,8 @@ acknowledgement within five working days and a plan for remediation once the rep
 ## Scope
 
 - The code in this repository: the transformation pipeline, contracts, fidelity check, query
-  service and agent.
+  service and agent, and the two parts that read untrusted third-party content: the authority
+  importer (`src/authority/`) and the renderer (`src/render/`, Chrome without its sandbox).
 - The infrastructure it declares (`infra/`) and the scripts that manage it (`scripts/gcp/`).
 
 Google Cloud services themselves are out of scope; report those to Google.

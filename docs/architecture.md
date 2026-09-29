@@ -34,9 +34,9 @@ synthetic one, where the deployment sets `ALLOW_SYNTHETIC_SOURCES`.
 
 The `fixture` and `healthcare-api` sources are pre-existing trusted inputs guarded by IAM, not
 by this gate. The worker's run-source allowlist (`ENABLED_RUN_SOURCES`, Terraform
-`enabled_run_sources`; a request for a source outside it answers `422 source-disabled` before
-any reader, fixture, or client is touched) follows `ALLOW_SYNTHETIC_SOURCES` (default false in
-`src/config.ts` and in Terraform): with the flag off, only `document` is enabled and enabling
+`enabled_run_sources`; a source outside it is `source-disabled` at HTTP and in `runPipeline`,
+before any reader, fixture, or client is touched) follows `ALLOW_SYNTHETIC_SOURCES` (default false
+in `src/config.ts` and in Terraform): with the flag off, only `document` is enabled and enabling
 either ungated source fails startup (Terraform refuses the two variables disagreeing); with it
 on, all three are enabled unless the allowlist says otherwise. The `dev` deploy sets the flag.
 Either way the ungated sources cannot write into an authority import's resources: every id a run
@@ -91,9 +91,21 @@ and served only where synthetic sources are allowed.
 
 Until roadmap 3a PR 5 an import runs only as a dry run: the gate refuses an authority import when
 `DRY_RUN` is false, so nothing it makes is persisted, entitled to the query service or seen by
-the agent. PR 2's importer carries no picture and removes no presentation (ADR 0005's
-amendment), so each of the four real labels pinned in `labels/ema-epi/` is refused at a recorded
-stage (`test/fixtures/authority/vectors.json`).
+the agent. The importer's T removes presentation only where it cannot change what a reader sees
+(`docs/design/authority-import-t.md`). Each of the five real labels pinned in `labels/ema-epi/`
+is refused at a recorded stage (`test/fixtures/authority/vectors.json`), and an import that gets
+past T is refused at `rendering`, since the renderer gate supplies no evidence yet.
+
+### Renderer gate
+
+`docs/design/authority-import-renderer.md` designs it. Built: the renderer image
+(`Dockerfile.renderer`, pinned Chrome and fonts, run by `scripts/render/run.mjs` with no network,
+a read-only workspace and no credentials), the drawing and measuring code in `src/render/`, and
+CI's required Renderer job (`npm run renderer:image`, then `renderer:smoke`, `record`, `check`,
+`fonts`, `boxes` and `drawings`; skipped on a pull request that changes no renderer input). It is
+frozen at that scope: its judge, signed layout record and Cloud Build (3c C3 to C5) are dropped.
+For the demo a per-label sign-off record over side-by-side pinned-browser screenshots will stand
+in for its evidence (`docs/roadmap.md`, 3a).
 
 ## Deterministic data flow
 
@@ -258,17 +270,20 @@ Every run receives one UUID propagated as:
 
 Every run writes the following objects under `runs/<runId>/` in the evidence bucket:
 `source-type2`, `ema-list`, `ema-document-bundle`, `mapping-decisions`, `validation-outcomes`,
-`signed-manifest`, `lineage-resources`, and, for document sources,
-`canonical-submission`, `ingestion-provenance`, `fidelity-report`, and `provenance-resource`.
-`source-type2`, `ema-list` (it carries the product name and identifiers, no narrative),
-`ema-document-bundle`, and
-`canonical-submission` contain the narrative XHTML — the evidence bucket, the submission
-bucket, and the FHIR store are the only places narrative rests — while `fidelity-report`,
-`ingestion-provenance`, `provenance-resource`, the signed manifest, and the BigQuery ledger row
-never do. FHIR payloads and narrative are not written to Cloud Logging.
+`signed-manifest`, `lineage-resources`, in persist mode `persist-transaction` and `commit`, and, for
+document sources, `canonical-submission`, `ingestion-provenance`, `fidelity-report`, and
+`provenance-resource`. `source-type2`, `ema-list` (it carries the product name and identifiers,
+no narrative), `ema-document-bundle`, `persist-transaction` and `canonical-submission` contain the
+narrative XHTML — the evidence bucket, the submission bucket, and the FHIR store are the only places
+narrative rests — while `fidelity-report`, `ingestion-provenance`, `provenance-resource`, the signed
+manifest, and the BigQuery ledger row never do. FHIR payloads and narrative are not written to Cloud
+Logging.
 
-The signed manifest is `RunManifest` 2.0.0 (1.0.0 and 1.1.0 stay readable). A `document` run's
-ingestion block records the source kind (`drawn` or `authority-publication`), the graph type,
+The signed manifest is `RunManifest` 5.0.0; every earlier version stays readable, and
+`src/contracts/run-manifest.ts` says what each changed. It is signed before the FHIR transaction,
+names the transaction it authorises (`authorised`), and names every FHIR package the validator
+loaded by hash and the validator's image digest; only the ledger row says `persisted`. A `document`
+run's ingestion block records the source kind (`drawn` or `authority-publication`), the graph type,
 whether the deployment accepted synthetic content (`allowSyntheticSources`), the approval as
 either union member, and, for an authority import, the importer version and each file the gate
 fetched (URL, SHA-256, length, fetch time). The FHIR Provenance's id derives from the source
@@ -282,26 +297,26 @@ from them (`scripts/authority/verify-import.ts`, which reads no network) once im
 The signed manifest's `runtime` block ties a run to what produced it: `sourceCommit` is the
 deployed git commit (`GIT_COMMIT`, the same `service_version` the query service records),
 `imageDigest` is the digest of the worker image (`IMAGE_DIGEST`), both set on the worker by
-`infra/run.tf` since 2026-09-22 (`test/infra/worker-provenance.test.ts`); manifests signed before
-that record `development` for both. `workflowRevision` is the Cloud Run revision (`K_REVISION`):
+`infra/run.tf` (`test/infra/worker-provenance.test.ts`), which refuses a plan whose
+`service_version` is not a full commit id; the worker refuses a malformed value at startup, and
+off Cloud Run it records `development`. `workflowRevision` is the Cloud Run revision (`K_REVISION`):
 the workflow's own revision cannot be passed to the worker without a Terraform dependency cycle.
 
 Cloud Monitoring presents throughput, failures, validation rejections, service latency,
 workflow executions, and architectural guidance. Data Access audit logging is enabled for
-Healthcare API, Storage, BigQuery, and KMS and routed to a retained regional log bucket.
+Healthcare API, Storage, BigQuery, KMS, Discovery Engine and IAM; those logs and the audit logs of
+Cloud Run, Workflows, IAM credentials, Resource Manager and Logging are routed to a retained
+regional log bucket (`infra/security.tf`).
 
-After a successful `terraform apply`, `scripts/gcp/deploy.sh` reads the effective IAM policy
-held by the worker, query and caller service accounts — at project level and on the Healthcare
-dataset — prints it into the deploy log and copies it to
-`gs://<evidence bucket>/deploy-evidence/<YYYY>/<MM>/<DD>/<UTC stamp>-<environment>-<commit>/`.
-This is what closes the gap between the Terraform-declared role set a test asserts and the
-policy actually in force (ADR 0004, decision 5). Every step of it is warning-only: a denied
-`get-iam-policy`, a missing output, or a failed upload prints a `::warning::` naming the
-permission needed and never fails the deploy, so an absent export is visible rather than
-silent. The caller account's two exports are expected to come back empty — its only declared
-binding is `run.invoker` on one Cloud Run service, which neither policy covers — and that
-emptiness is the evidence that it holds nothing else. It runs on every deploy of `dev`; the
-exports are under `gs://…-dev-evidence/deploy-evidence/`, the latest for commit `caa5d9a`.
+After a successful `terraform apply`, `scripts/gcp/deploy.sh` exports the effective IAM
+policies (project and ancestors, the Healthcare dataset and stores, every bucket, topic, image
+repository, Cloud Run service, service account and BigQuery dataset and table, and the keys in
+the region's key rings) and reports what each deployed identity holds, into the deploy log and
+`gs://<evidence bucket>/deploy-evidence/<YYYY>/<MM>/<DD>/<UTC stamp>-<environment>-<commit>/`
+(the newest folder is the latest deploy). This closes the gap between the role set a test
+asserts and the policy in force (ADR 0004, decision 5), within limits: it counts only literal
+`serviceAccount:` members, does not read key rings, Pub/Sub subscriptions, Secret Manager or
+Workflows, and is evidence only: every failed read is a `::warning::`, never a failed deploy.
 
 ## Security boundaries
 
@@ -317,14 +332,16 @@ exports are under `gs://…-dev-evidence/deploy-evidence/`, the latest for commi
   mint tokens as it is the `query_token_creators` variable, bound as
   `roles/iam.serviceAccountTokenCreator` on that one account and empty by default. A deploy
   that sets neither variable authorises no caller: the account exists and nobody can use it.
-- The worker uses a dedicated service account with the narrow
-  `roles/healthcare.fhirResourceEditor` role plus evidence-object, ledger-writer,
-  lineage-editor, logger, and signing permissions. That editor role is bound on the record
-  dataset only (`google_healthcare_dataset_iam_member.worker_fhir_editor`, `infra/security.tf`),
-  as the query service's reader role is; the project-level binding was removed on 2026-09-21
-  (`docs/foundations.md`, C4; `test/infra/worker-identity.test.ts`).
-- The external deployment identity uses `roles/healthcare.datasetAdmin` and
-  `roles/healthcare.fhirStoreAdmin` for Healthcare provisioning; it is not used at runtime.
+- The worker uses a dedicated service account that reads the source store and edits the
+  validated store (store-level grants), appends to the ledger table (a custom role), and holds
+  evidence-object, lineage-editor, logger and signing permissions
+  (`test/infra/worker-identity.test.ts`). Its older dataset-wide FHIR editor and ledger grants,
+  and the query service's dataset-wide reader, stay, marked TRANSITIONAL, until audit B04's
+  phase 2.
+- The deployer and the read-only planner, their Workload Identity pools and their roles are
+  bootstrapped outside Terraform (`scripts/gcp/deploy-identity.sh`, `plan-identity.sh`); neither
+  is used at runtime. Each apply runs only a plan it has read and refuses a destroy the operator
+  has not acknowledged (`README.md`, Google Cloud deployment).
 - Workflows can invoke the worker and query only the FHIR analytics dataset.
 - The Cloud Healthcare service agent can publish change notices and edit only the analytics
   dataset.
@@ -344,19 +361,21 @@ not a mode of the worker. It is tested under `test/query/` and deployed in `dev`
 2026-09-21, and redeployed from `main` by every deploy since.
 
 - **Intended use.** A read-only Model Context Protocol endpoint (four tools: `find_product`,
-  `get_section`, `get_provenance`, `verify_quote`; contract `query-tools` 2.0.1) that lets an
+  `get_section`, `get_provenance`, `verify_quote`; contract `query-tools`, versioned in
+  `src/contracts/query-tools.ts`) that lets an
   AI assistant answer questions about product information with verifiable answers: every
   result names the FHIR resource and version it came from and carries the hashes needed to
   check it against the store without trusting the service.
 - **Identity and image.** Its own service account, `ema-flow-query-<env>`, holds exactly two
-  roles: `roles/healthcare.fhirResourceReader` on the Healthcare dataset (not the project) and
-  `roles/logging.logWriter` on the project. No write role, no bucket, no BigQuery, no KMS
-  access. `test/query/acceptance.test.ts` ("least privilege, proven") reads every `infra/*.tf`
-  and asserts that role set. Its image (`Dockerfile.query`, the `query` path of the shared
-  Artifact Registry repository) pins both stages to the same Node digest as the worker;
-  `npm run images:check` fails any root `Dockerfile*` without a digest or with a digest that
-  differs. `query_image` must be a by-digest reference when the service is planned; the digest
-  part becomes `IMAGE_DIGEST`.
+  roles: `roles/healthcare.fhirResourceReader` on the validated store (and, until B04's phase 2,
+  the dataset) and `roles/logging.logWriter` on the project. No write role, no bucket, no BigQuery,
+  no KMS access. `test/query/acceptance.test.ts` ("least privilege, proven") reads every
+  `infra/*.tf` and asserts that role set. Its image is `Dockerfile --target query` (the `query` path
+  of the shared Artifact Registry repository), the worker's runtime: debian-slim with the pinned
+  Node binary; `npm run images:check` fails a root `Dockerfile*` base without a digest, or two Node
+  bases with different digests.
+  `query_image` must be a by-digest reference when the service is planned; the digest part
+  becomes `IMAGE_DIGEST`.
 - **Authentication.** Cloud Run requires authentication at the edge (no `allUsers` invoker;
   invocation is per caller through `query_invokers` and the caller service account described
   under "Security boundaries"), and the service verifies the credential
@@ -365,39 +384,26 @@ not a mode of the worker. It is tested under `test/query/` and deployed in `dev`
   `QUERY_AUDIENCE` (`credentialType` `id-token`); any other bearer is treated as a Google
   OAuth 2.0 access token, verified through Google's tokeninfo endpoint and accepted only when
   its `aud` or `azp` is in `QUERY_OAUTH_CLIENT_IDS` (`credentialType` `access-token`; with the
-  list empty, which is the default, every access token is rejected). Successful access-token
-  verifications are cached in process memory — keyed by the token's SHA-256, holding principal
-  and expiry only, at most 300 s and never past the token's expiry, at most 1,000 entries,
-  failures never cached. `QUERY_AUDIENCE` defaults to the deterministic Cloud Run URL
-  (`https://ema-flow-<env>-query-<project number>.<region>.run.app`); a Terraform postcondition
-  asserts after apply that the URL is one the service serves. Cloud Run also serves the service
-  on a legacy `https://<service>-<hash>-<region code>.a.run.app` hostname. Both hostnames reach
-  the service and only the audience string is accepted as an ID token's `aud`, so the outputs
-  keep them apart by name: `query_service_url` (where to send requests) and `query_audience`
-  (what to mint tokens for) are the same string unless `var.query_audience` overrides it, while
-  `query_service_urls` lists every hostname and is not an audience.
-- **Answers before the protocol** (`src/query/app.ts`, in this order): `401 unauthenticated`
-  for a missing or unverifiable bearer; `403 not-entitled` for a verified principal with no
-  entry in the entitlement map, so an authenticated stranger never reaches `tools/list`;
-  `405` for a non-`POST`; `400 invalid-request` for an `X-Query-Turn-Id` that is present but
-  not a UUID, for a body that is not JSON or exceeds 4 MiB, for a JSON-RPC batch of more than
-  8 messages, for two entries carrying the same JSON-RPC id, and for a body carrying a
-  `notifications/cancelled` that names a request id in the same body. Nothing is dispatched on
-  any of these paths. The last two shapes are refused because the transport would not answer
-  them as one response per request id. Past that point the service bounds its own wait at 30
-  seconds and on the client's disconnect, answering `503 unavailable` and writing the
-  outstanding audit records itself rather than holding a request slot to the Cloud Run timeout.
+  list empty, which is the default, every access token is rejected), with successes cached
+  briefly in process memory by the token's hash. `QUERY_AUDIENCE` defaults to the deterministic
+  Cloud Run URL (`https://ema-flow-<env>-query-<project number>.<region>.run.app`); a Terraform
+  postcondition asserts after apply that the URL is one the service serves. Cloud Run also serves
+  the service on a legacy `https://<service>-<hash>-<region code>.a.run.app` hostname. Both
+  hostnames reach the service and only the audience string is accepted as an ID token's `aud`, so
+  the outputs keep them apart by name: `query_service_url` (where to send requests) and
+  `query_audience` (what to mint tokens for) are the same string unless `var.query_audience`
+  overrides it, while `query_service_urls` lists every hostname and is not an audience.
+- **Bounds.** Before any protocol message is dispatched (`src/query/app.ts`) the service answers
+  `401 unauthenticated`, `403 not-entitled` (so an authenticated stranger never reaches
+  `tools/list`), `405`, or `400 invalid-request` for a malformed or oversized request, and past
+  that it bounds its own wait, a request's store reads and `find_product`'s scan, reporting
+  `truncated: true` whenever an answer is shorter than the entitlement holds. The exact limits
+  are stated once, in the design note's "Phase 1 as built".
 - **Entitlements.** A Terraform-managed map, `{"<sub>": {"bundles": [...]}}`, parsed once at
   startup with a strict schema (an `organisation` key or an e-mail-shaped principal fails
   startup) and resolved once per request before any store read. Inside the protocol, a document
   outside the caller's entitlement is `document-not-found` from every tool; `not-entitled` is an
-  audit outcome, never a returned error code. `find_product` reads at most the first 200
-  entitled ids in entitlement order through a pool of 8, stops launching reads once `limit`
-  matches are in hand, and reports `truncated: true` whenever the answer is shorter than the
-  entitlement holds — documents left unsearched (the horizon or an exhausted read budget) or
-  matches dropped by the limit — in the result and in the audit record. One HTTP request may make 400 store reads across its
-  whole batch; past that `find_product` stops scanning and every other tool answers
-  `unavailable` without reading. It is a per-request bound, not a per-principal quota.
+  audit outcome, never a returned error code.
 - **What it must never do.** Write, amend, draft, rewrite, or summarise regulated narrative;
   return narrative without its hash; disclose a document outside a caller's entitlement.
 - **`/readyz` (and `/healthz`).** Answers `status`, `service`, and `version` from the process's
@@ -423,13 +429,14 @@ not a mode of the worker. It is tested under `test/query/` and deployed in `dev`
   line is `stage: "query-http", event: "unauthenticated"` with nothing derived from the
   credential; the 403 line adds `principal`. A log-based metric
   (`ema_flow/query_entitlement_denials`) counts lines with `outcome` or `event` equal to
-  `not-entitled`; an e-mail channel and an alert policy (more than 5 denials in a rolling hour)
-  exist only when `alert_notification_email` is set. The retained audit log bucket can be
-  locked with `lock_regulated_audit_log_bucket` (irreversible; default `false`, not set).
+  `not-entitled`; an alert policy (more than 5 denials in a rolling hour) always exists and
+  pages the environment's alert recipient, or, in `dev` only, no one. The retained audit log bucket
+  can be locked with `lock_regulated_audit_log_bucket` (irreversible; default `false`, not set).
 - **Turn correlation.** The ADK agent (`agent/`) generates a UUID when a turn starts, sends it
   as `X-Query-Turn-Id` on every request of the turn, and writes it as `turnId` in its own
-  `AgentTurnRecord` (contract `agent-turn` 1.0.0), so the two records join on that value
-  without either carrying a word of what was asked or answered.
+  `AgentTurnRecord` (contract `agent-turn`, `src/contracts/agent-turn.ts`), so the two records
+  join on that value without either carrying a word of what was asked or answered. Which agent
+  build is live: `agent/deploy/README.md`, and the `serviceVersion` on audit records.
 
 ## Scale and failure behavior
 

@@ -251,6 +251,9 @@ agent of its source files (each named by the authority's id and by hash), the re
 
 ## Amendment (2026-09-25, a withheld section)
 
+_Decided, not implemented: `NORMALIZATION_VERSION` is `fidelity-norm/3.1.0` and no contract has a
+withheld status. It lands with 3c-W, deferred until after the demo (`docs/roadmap.md`, 3a)._
+
 `docs/design/authority-import-withheld.md` (roadmap 3a, PR 3c; owner decisions of 2026-09-25)
 lets an authority import carry a leaf section the renderer gate shows the authority drew unsound
 as **withheld**: its heading and code, none of the authority's content, our own `emptyReason` code
@@ -272,6 +275,10 @@ The human decision that withholds is the import request's, hash-bound in the app
 every request is (invariant 2); before PR 5 lifts the dry run it is bound to an attested identity.
 
 ## Amendment (2026-09-25, the renderer gate's review)
+
+_Decided, not implemented: `CanonicalSubmission` is still 2.0.0. The run manifest has since moved
+to 5.0.0 for other reasons, so the bump below becomes the next major, with the current one
+frozen._
 
 `docs/design/authority-import-renderer.md` (R5) and `docs/design/authority-import-withheld.md`
 (owner decisions of 2026-09-25) change the contract of an authority import:

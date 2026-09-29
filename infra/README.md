@@ -42,7 +42,9 @@ terraform -chdir=infra init -backend=false && terraform -chdir=infra validate
 ```
 
 State is in `gs://<project>-ema-flow-tfstate`, prefix `terraform/state`, on a customer-managed
-key, readable only by the deployer and the owner (the planner reads it through `objectViewer`).
+key, readable only by the deployer and the owner (the planner reads it through `objectViewer`);
+`deploy.sh init` creates the bucket on that key and refuses one off it, and `apis` imports the key
+ring and key.
 Resources that hold the record (keys, the dataset, the ledger) carry `prevent_destroy`.
 
 ## Environments
@@ -55,9 +57,10 @@ Resources that hold the record (keys, the dataset, the ledger) carry `prevent_de
 
 `environment` has no default: every plan, apply and import in `deploy.sh` passes it
 (`EMA_FLOW_ENVIRONMENT`, `dev` in both workflows). `prod` also sets a minimum of one instance on
-each Cloud Run service. An environment's own inputs (`QUERY_LOG_REJECTION_REASON`,
-`ALLOW_SYNTHETIC_SOURCES`) are in `scripts/gcp/environments/<environment>.env`, which `deploy.sh`
-reads for the plan and the deploy alike; a missing file is refused.
+each Cloud Run service. An environment's own inputs (the one project it may deploy to,
+`QUERY_LOG_REJECTION_REASON`, `ALLOW_SYNTHETIC_SOURCES`, `REQUIRE_ALERT_RECIPIENT`) are in
+`scripts/gcp/environments/<environment>.env`, which `deploy.sh` reads for the plan and the deploy
+alike; a missing file is refused.
 
 The operations dashboard's JSON is ignored by Terraform, because the Monitoring API rewrites it
 and every plan showed a change. `scripts/ci/dashboard-drift.py` compares its meaning instead: the
@@ -74,9 +77,9 @@ Set by `deploy.sh` on every plan and apply unless marked "default".
 | `region`                          | `GCP_REGION` (`europe-west4`)                                                             | Region of every regional resource                                                                                          |
 | `environment`                     | `EMA_FLOW_ENVIRONMENT`                                                                    | `dev`, `validation` or `prod`; used in names and labels                                                                    |
 | `worker_image`                    | built image, by digest                                                                    | Worker container; its digest becomes `IMAGE_DIGEST` in every signed run manifest                                           |
-| `validator_image`                 | built image, by digest                                                                    | HL7 validator sidecar container                                                                                            |
+| `validator_image`                 | built image, by digest                                                                    | HL7 validator sidecar container; its digest becomes `VALIDATOR_IMAGE_DIGEST` in every signed run manifest                  |
 | `query_image`                     | built image, by digest                                                                    | Query service container; its digest becomes `IMAGE_DIGEST` in every audit record                                           |
-| `service_version`                 | the deployed commit SHA                                                                   | `QUERY_SERVICE_VERSION` on the query service and `GIT_COMMIT` on the worker                                                |
+| `service_version`                 | the deployed commit's full 40-hex SHA (a plan precondition)                               | `QUERY_SERVICE_VERSION` on the query service and `GIT_COMMIT` on the worker                                                |
 | `deployer_account`                | the active service account                                                                | Granted run.invoker on the worker (smoke run), actAs on the build account, FHIR editor                                     |
 | `query_invokers`                  | `QUERY_INVOKERS`                                                                          | Members granted run.invoker on the query service                                                                           |
 | `query_token_creators`            | `QUERY_TOKEN_CREATORS`                                                                    | Members who may impersonate the caller service account                                                                     |

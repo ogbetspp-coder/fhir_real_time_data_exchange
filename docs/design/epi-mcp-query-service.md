@@ -1,8 +1,7 @@
 # Design note: ePI query service (Model Context Protocol)
 
 - Status: Phase 1 built, reviewed adversarially four times, merged to `main`, and **deployed**
-  to `sage-ship-509104-b8` (`ema-flow-dev-query`, europe-west4) on 2026-09-20. `tools/list` and
-  `find_product` have been answered by the live service through an impersonated caller token.
+  to `sage-ship-509104-b8` (`ema-flow-dev-query`, europe-west4) on 2026-09-20.
   "Phase 1 as built" below describes the code in this tree and each of its acceptance tests
   exists as a named test under `test/query/` (criterion 18 under `test/ci/`). Everything above
   that section — the tool surface, the component table, the phasing — is the original plan and
@@ -226,14 +225,16 @@ identity, and shares only pure libraries with the worker.
   The full surface — inputs, outputs, the closed error codes, the audit record — is a published
   contract: `src/contracts/query-tools.ts` → `contracts/generated/query-tools.schema.json`.
 - **Identity.** The service is its own Cloud Run service (`ema-flow-<env>-query`) with its own
-  service account holding `roles/healthcare.fhirResourceReader` on the dataset and
+  service account holding `roles/healthcare.fhirResourceReader` on the validated store (and,
+  until audit B04's phase 2, the dataset) and
   `roles/logging.logWriter`, and nothing else — no write role anywhere, no BigQuery, no
   buckets. A negative test asserts the role set across every file under `infra/`.
-- **Image.** `cloudbuild.images.yaml` builds `Dockerfile.query` and publishes it as the `query`
-  path of the shared `ema-flow` Artifact Registry repository (`<region>-docker.pkg.dev/<project>/
+- **Image.** `cloudbuild.images.yaml` builds `Dockerfile --target query` and publishes it as the
+  `query` path of the shared `ema-flow` Artifact Registry repository
+  (`<region>-docker.pkg.dev/<project>/
 <repository>/query:<tag>`), following the worker and validator convention; `ema-flow-query`
-  is the service name the audit record carries, not an image name. Both build stages are
-  pinned to the worker's Node image digest, because `verify_quote` depends on the runtime's
+  is the service name the audit record carries, not an image name. It shares the worker's
+  runtime (debian-slim with the pinned Node binary), because `verify_quote` depends on the runtime's
   Unicode database (ADR 0003); `npm run images:check` (`scripts/ci/check-dockerfiles.mjs`, part
   of `npm run check`) fails if any root `Dockerfile*` pulls image bytes from a reference that is
   not pinned by `@sha256` digest, or if two Node-based Dockerfiles pin different digests. It
@@ -896,12 +897,10 @@ so the written line carries every field of the record — a test parses a writte
 validates it against `QueryAuditRecordSchema`. The log-based metric that counts entitlement
 denials (`ema_flow/query_entitlement_denials`) is created on every apply.
 
-**Available, not applied.** The e-mail notification channel and the alert policy on that metric
-(more than five denials in a rolling hour) are created only when `alert_notification_email` is
-set; it is unset. The retained log bucket's lock is a variable
-(`lock_regulated_audit_log_bucket`, default `false`) and setting it is irreversible: retention
-can then never be changed and Terraform will not unlock it. Neither has run against a project;
-both are `terraform validate`-checked only.
+The alert policy on that metric (more than five denials in a rolling hour) always exists and
+pages the environment's alert recipient, or, in `dev` only, no one. **Available, not applied:**
+the retained log bucket's lock (`lock_regulated_audit_log_bucket`, default `false`); setting it is
+irreversible: retention can then never be changed and Terraform will not unlock it.
 
 **Not implemented.** No reader role scoped to the retained log bucket exists — who can read the
 retained audit log today is whoever the project's logging roles let read it. That is a gap, not
@@ -942,7 +941,7 @@ precisely so entitlements can be granted by a role separate from the developer.
   Decided 2026-09-20.
 - `X-Query-Turn-Id`, when present, must be a UUID or the request is `400`; it is never dropped
   silently. Decided 2026-09-20.
-- `Dockerfile.query` pins both stages to the worker's Node image digest, and
+- The query image pins the worker's Node (since audit B07, `Dockerfile --target query`), and
   `npm run images:check` enforces digest pinning and digest agreement across the root
   Dockerfiles as part of `npm run check`. Decided 2026-09-20.
 - The Cloud Run service is `ema-flow-<env>-query`; the image is the `query` path of the shared
