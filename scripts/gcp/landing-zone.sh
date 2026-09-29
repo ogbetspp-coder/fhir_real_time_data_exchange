@@ -17,7 +17,9 @@
 # Production-folder policies:
 #   - gcp.resourceLocations = in:eu-locations. New resources outside the EU are refused.
 #   - gcp.restrictNonCmekServices denies storage, bigquery and artifactregistry: a new bucket,
-#     dataset or repository without a customer-managed key is refused. The Cloud Healthcare API is
+#     dataset or repository without a customer-managed key is refused. That includes the Terraform
+#     state bucket, made before Terraform exists: `deploy.sh init` makes its key first and creates
+#     it on that key (docs/design/cmek-rollout.md, "A new environment"). The Cloud Healthcare API is
 #     not a value this constraint accepts (the API refused it on the first run, 2026-09-22), so the
 #     FHIR dataset's key is held by Terraform instead: the dataset declares it, carries
 #     prevent_destroy, and test/infra/keys.test.ts fails without it. Logging

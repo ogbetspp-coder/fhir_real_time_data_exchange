@@ -55,7 +55,12 @@ resource "google_kms_crypto_key" "evidence_encryption" {
   }
 }
 
+# Dev's software signing key, which signed run manifests until CMEK step 2 (2026-09-21) moved the
+# worker to manifest-signing-hsm (keys.tf). Dev only (audit I-11): it stays enabled there so every
+# manifest it signed stays verifiable against its public key, and no other environment has ever
+# signed with it, so none creates it.
 resource "google_kms_crypto_key" "manifest_signing" {
+  count    = var.environment == "dev" ? 1 : 0
   name     = "manifest-signing"
   key_ring = google_kms_key_ring.evidence.id
   purpose  = "ASYMMETRIC_SIGN"
@@ -68,6 +73,11 @@ resource "google_kms_crypto_key" "manifest_signing" {
   lifecycle {
     prevent_destroy = true
   }
+}
+
+moved {
+  from = google_kms_crypto_key.manifest_signing
+  to   = google_kms_crypto_key.manifest_signing[0]
 }
 
 # The worker signs with a named crypto key VERSION, var.kms_manifest_key_version
@@ -198,7 +208,13 @@ resource "google_storage_bucket_iam_member" "healthcare_profile_reader" {
   depends_on = [google_project_service_identity.healthcare]
 }
 
+# Dev's retained audit log until CMEK step 6 (2026-09-21), on a Google-managed key. A log bucket's
+# key can only be set at creation — the API refuses otherwise ("Cannot add a CMEK key to a non-CMEK
+# bucket. CMEK must be enabled at bucket creation.") — so the sink moved to regulated_audit_cmek
+# below, and this bucket receives nothing and keeps the entries written before the switch until
+# they age out. Dev only (audit I-11): no other environment ever wrote to it, so none creates it.
 resource "google_logging_project_bucket_config" "regulated_audit" {
+  count          = var.environment == "dev" ? 1 : 0
   project        = var.project_id
   location       = var.region
   retention_days = min(var.evidence_retention_days, 3650)
@@ -210,10 +226,6 @@ resource "google_logging_project_bucket_config" "regulated_audit" {
   # if the variable is later set back to false.
   locked = var.lock_regulated_audit_log_bucket
 
-  # Receives nothing since CMEK step 6: the sink below writes to regulated_audit_cmek. A log
-  # bucket's key can only be set at creation — the API refuses otherwise ("Cannot add a CMEK key to
-  # a non-CMEK bucket. CMEK must be enabled at bucket creation.") — so the entries written before
-  # the switch stay here, retained, until they age out.
   depends_on = [google_project_service.required]
 
   # Never destroyed by an apply (docs/foundations.md; docs/design/cmek-rollout.md, step 0).
@@ -221,6 +233,11 @@ resource "google_logging_project_bucket_config" "regulated_audit" {
   lifecycle {
     prevent_destroy = true
   }
+}
+
+moved {
+  from = google_logging_project_bucket_config.regulated_audit
+  to   = google_logging_project_bucket_config.regulated_audit[0]
 }
 
 # The retained audit log on the audit-logs key (CMEK step 6). Created with the key, because a log
@@ -261,12 +278,11 @@ resource "google_logging_project_sink" "regulated_audit" {
   EOT
 }
 
-# The sink's auto-provisioned writer_identity is not reliably readable back through
-# this resource (two separate apply passes both left it empty, so this isn't just
-# an apply-ordering race). scripts/gcp/deploy.sh grants roles/logging.bucketWriter
-# to it directly via `gcloud logging sinks describe`, the same "manage outside
-# Terraform" pattern already used for the R5 FHIR stores (see
-# scripts/gcp/reconcile-fhir-stores.sh).
+# The sink needs no grant. Its destination is a log bucket in this project, and a sink that writes
+# to a log bucket in its own project has no writer identity: Cloud Logging writes the entries
+# itself. That is why writer_identity reads back empty (audit I-11); until then
+# scripts/gcp/deploy.sh looked for one to grant roles/logging.bucketWriter, and warned on every
+# deploy when it found none.
 
 # Create only (foundations C12). The worker writes each artefact once, with a simple upload, and
 # never reads, lists, overwrites or deletes evidence; the retention policy would refuse the last
@@ -291,9 +307,8 @@ resource "google_storage_bucket_iam_member" "worker_submission_reader" {
   member = "serviceAccount:${google_service_account.worker.email}"
 }
 
-# The worker signs with manifest-signing-hsm (keys.tf) since CMEK step 2, 2026-09-21. This
-# software key stays enabled, and protected, so that every manifest it signed stays verifiable
-# against its public key; nothing may sign with it any more, so the worker holds no grant on it.
+# The worker signs with manifest-signing-hsm (keys.tf). Nothing may sign with dev's software key
+# (manifest_signing, above) any more, so the worker holds no grant on it.
 
 # Bound on each store, for what the worker does there (foundations C4): it reads a source bundle
 # from the source store, and validates and writes the EMA package in the validated store. Until

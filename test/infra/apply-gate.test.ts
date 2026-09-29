@@ -176,8 +176,10 @@ describe("the deploy's applies", { timeout: 30_000 }, () => {
     const dashboard = extract("sync_dashboard");
     const start = deploy.split("\n").findIndex((line) => line === "sync_dashboard() {");
     const end = start + dashboard.split("\n").length;
+    // `-destroy` as a flag of its own: a key's `--destroy-scheduled-duration` (ensure_state_bucket,
+    // audit I-10) destroys nothing.
     const destructive =
-      /-auto-approve|-destroy\b|-replace=|\bstate (rm|replace-provider)\b|terraform\b[^\n]*\bdestroy\b/;
+      /-auto-approve|(?<![\w-])-destroy\b|-replace=|\bstate (rm|replace-provider)\b|terraform\b[^\n]*\bdestroy\b/;
     const found = code.filter(({ line }) => destructive.test(line));
     expect(found.length).toBeGreaterThan(0);
     for (const { line, index } of found) {
@@ -191,6 +193,7 @@ describe("the deploy's applies", { timeout: 30_000 }, () => {
     ]) {
       expect([bad, destructive.test(bad)]).toEqual([bad, true]);
     }
+    expect(destructive.test("        --destroy-scheduled-duration=120d \\")).toBe(false);
   });
 
   it("are never unreviewed: no -auto-approve apply in phase_apis or phase_apply", () => {

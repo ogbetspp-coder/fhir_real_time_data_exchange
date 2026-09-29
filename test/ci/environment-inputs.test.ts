@@ -317,14 +317,13 @@ describe("the operator scripts' environment", () => {
   const options: Record<string, string> = {
     "scripts/gcp/plan-identity.sh": "--check",
     "scripts/gcp/storage-keys.sh": "--check",
-    "scripts/gcp/bq-cmek-convert.sh": "--dry-run",
     "scripts/gcp/record-readers.sh": "--check",
   };
   const operatorScripts = Object.keys(options).filter((file) => !file.includes("record-readers"));
   const stub = mkdtempSync(path.join(tmpdir(), "operator-env-"));
   afterAll(() => rmSync(stub, { recursive: true, force: true }));
-  // Every cloud CLI the scripts start (bq-cmek-convert.sh starts with bq), each recording its call,
-  // so a real one on the machine is never reached.
+  // Every cloud CLI the scripts start, each recording its call, so a real one on the machine is
+  // never reached.
   for (const cli of ["gcloud", "bq", "gsutil", "terraform"]) {
     writeFileSync(path.join(stub, cli), `#!/bin/sh\necho "${cli} $*" >>"${stub}/calls"\nexit 3\n`);
     chmodSync(path.join(stub, cli), 0o755);

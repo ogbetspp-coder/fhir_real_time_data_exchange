@@ -106,7 +106,7 @@ describe("who signs run manifests", () => {
     const grantsOnSoftwareKey = blocks.filter(
       ({ type, body }) =>
         type === "google_kms_crypto_key_iam_member" &&
-        /crypto_key_id\s*=\s*google_kms_crypto_key\.manifest_signing\.id/.test(body),
+        /crypto_key_id\s*=\s*google_kms_crypto_key\.manifest_signing(?:\[\w+\])?\.id/.test(body),
     );
     expect(grantsOnSoftwareKey).toEqual([]);
   });
@@ -119,16 +119,6 @@ describe("BigQuery on the ledger-analytics key", () => {
     expect(block("google_bigquery_dataset", "ledger")).toContain(key);
     expect(block("google_bigquery_dataset", "fhir_analytics")).toContain(key);
     expect(block("google_bigquery_table", "transformation_runs")).toContain(key);
-  });
-
-  it("is converted by a script that refuses buffered tables and verifies every row", () => {
-    const convert = readFileSync("scripts/gcp/bq-cmek-convert.sh", "utf8");
-    // Streamed rows may be missing from a copy for up to 90 minutes: refuse, don't hope.
-    expect(convert).toMatch(/Refusing: these tables still have a streaming buffer/);
-    // A snapshot first, a count and fingerprint before and after, and a stop on any difference.
-    expect(convert).toContain("bq cp --snapshot --no_clobber");
-    expect(convert).toContain("BIT_XOR(FARM_FINGERPRINT(TO_JSON_STRING(t)))");
-    expect(convert).toMatch(/if \[\[ "\$after" != "\$before" \|\| "\$now_key" != "\$KEY" \]\]/);
   });
 });
 
@@ -205,8 +195,8 @@ describe("the platform buckets on the platform-storage key", () => {
     expect(script.indexOf("granted storage.admin on the bucket")).toBeLessThan(
       script.indexOf("legacy bindings removed"),
     );
-    // Old state generations expire.
-    expect(script).toContain('"numNewerVersions": 20');
-    expect(script).toContain('"daysSinceNoncurrentTime": 30');
+    // Old state generations expire, by the rules deploy.sh gives a new state bucket (common.sh).
+    expect(script).toContain('ema_flow_state_lifecycle >"$lifecycle"');
+    expect(readFileSync("scripts/gcp/common.sh", "utf8")).toContain('"numNewerVersions": 20');
   });
 });

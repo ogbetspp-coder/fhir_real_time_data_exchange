@@ -157,6 +157,13 @@ describe("the record's readers, run", { timeout: 30_000 }, () => {
     expect(result.out).toContain("p-one-ema-flow-agent-staging");
   });
 
+  // Audit I-10: until then project viewers could read the state until storage-keys.sh was run.
+  it("narrows the Terraform state bucket too, which deploy.sh makes outside Terraform", () => {
+    const result = readers({ GOOGLE_CLOUD_PROJECT: "p-one" });
+    expect(result.status).toBe(0);
+    expect(result.calls).toContain("remove-iam-policy-binding gs://p-one-ema-flow-tfstate");
+  });
+
   it("refuses two variables that name different projects, before touching anything", () => {
     const result = readers({ GOOGLE_CLOUD_PROJECT: "p-two", GCP_PROJECT_ID: "p-one" });
     expect(result.status).not.toBe(0);

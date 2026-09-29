@@ -63,11 +63,11 @@ describe("every bucket", () => {
       "profiles",
       "submissions",
     ]);
-    // The state bucket, created by deploy.sh before Terraform exists, and the agent staging
-    // bucket, created by hand.
+    // The state bucket, created by deploy.sh before Terraform exists (on its key, too: audit
+    // I-10, test/infra/fresh-environment.test.ts), and the agent staging bucket, created by hand.
     const deploy = readFileSync("scripts/gcp/deploy.sh", "utf8");
     expect(deploy).toMatch(
-      /gcloud --quiet storage buckets create "gs:\/\/\$\{state_bucket\}"[^;]*--public-access-prevention/,
+      /gcloud --quiet storage buckets create "gs:\/\/\$\{bucket\}"[^;]*--public-access-prevention[^;]*--default-encryption-key="\$key"/,
     );
     const keys = readFileSync("scripts/gcp/storage-keys.sh", "utf8");
     expect(keys).toContain("--public-access-prevention >/dev/null");

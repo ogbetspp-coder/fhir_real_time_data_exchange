@@ -53,8 +53,9 @@ resource "google_cloud_run_v2_service" "worker" {
         startup_cpu_boost = true
       }
 
-      # The HL7 validator_cli.jar re-fetches its IG packages from the network on
-      # every cold start (observed ~35-40s typically); keep some margin over that.
+      # The validator loads and indexes the IG packages baked into its image, with no network
+      # (Dockerfile.validator): about a minute on a cold start (57 s measured). The probe allows
+      # five, so a slow start is not taken for a failed one.
       startup_probe {
         initial_delay_seconds = 5
         timeout_seconds       = 2

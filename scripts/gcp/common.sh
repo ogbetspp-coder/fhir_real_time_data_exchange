@@ -29,9 +29,9 @@ ema_flow_resolve_project() {
 
 # The environment a script acts in, and the one project it may act on (audit B08, L1): no default
 # environment, and the project must be the one scripts/gcp/environments/<environment>.env names in
-# EXPECTED_PROJECT_ID. Until then deploy.sh, plan-identity.sh, storage-keys.sh and
-# bq-cmek-convert.sh took an unset EMA_FLOW_ENVIRONMENT as dev, on whatever project the shell
-# named. Prints the environment; exits on a refusal, so it is used as a plain assignment:
+# EXPECTED_PROJECT_ID. Until then deploy.sh, plan-identity.sh and storage-keys.sh took an unset
+# EMA_FLOW_ENVIRONMENT as dev, on whatever project the shell named. Prints the environment; exits
+# on a refusal, so it is used as a plain assignment:
 #   ENVIRONMENT="$(ema_flow_require_environment "$PROJECT_ID")"
 ema_flow_require_environment() {
   local project="$1" environment="${EMA_FLOW_ENVIRONMENT:-}" file expected
@@ -148,6 +148,18 @@ exit "$ema_flow_exit_status"' EXIT
 ema_flow_finish() {
   EMA_FLOW_FINISHED=true
   exit 0
+}
+
+# The Terraform state bucket's lifecycle, for deploy.sh (a new bucket) and storage-keys.sh. Old
+# generations of the state expire once 20 newer ones exist or after 30 days: with no rule every
+# generation was kept forever (168 by 2026-09-21), each a copy of the entitlement map.
+ema_flow_state_lifecycle() {
+  cat <<'JSON'
+{"rule": [
+  {"action": {"type": "Delete"}, "condition": {"isLive": false, "numNewerVersions": 20}},
+  {"action": {"type": "Delete"}, "condition": {"isLive": false, "daysSinceNoncurrentTime": 30}}
+]}
+JSON
 }
 
 ema_flow_access_token() {

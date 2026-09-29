@@ -99,14 +99,24 @@ resource "google_project_service_identity" "healthcare" {
   depends_on = [google_project_service.required]
 }
 
+# Created before the artifacts key is granted to it; Google otherwise creates it on first use
+# (keys.tf; audit I-10).
+resource "google_project_service_identity" "artifact_registry" {
+  provider = google-beta
+  project  = var.project_id
+  service  = "artifactregistry.googleapis.com"
+
+  depends_on = [google_project_service.required]
+}
+
 # The image repository on the `artifacts` key (CMEK step 4). A repository's encryption is fixed at
-# creation, so this was created as a second repository beside the Google-managed `ema-flow` one,
-# not a change to it. The old repository was removed in step 5a, after a deploy from this one was
-# verified on 2026-09-21; revisions built before the switch can no longer be rolled back to.
+# creation, so in dev this is a second repository, made beside the Google-managed `ema-flow` one,
+# which was deleted once a deploy from this one was verified (2026-09-21). Nothing signs the images
+# or attaches provenance to them yet.
 resource "google_artifact_registry_repository" "images_cmek" {
   location      = var.region
   repository_id = "ema-flow-images"
-  description   = "Signed and provenance-attached ema-flow containers, encrypted with the artifacts key"
+  description   = "ema-flow container images, encrypted with the artifacts key"
   format        = "DOCKER"
   kms_key_name  = google_kms_crypto_key.record["artifacts"].id
   labels        = local.labels
@@ -123,8 +133,8 @@ resource "google_bigquery_dataset" "fhir_analytics" {
   delete_contents_on_destroy = false
   labels                     = local.labels
 
-  # Every table the stream creates is encrypted with our key (CMEK step 3). Existing tables were
-  # converted in place by scripts/gcp/bq-cmek-convert.sh before this was set.
+  # Every table the stream creates is encrypted with our key (CMEK step 3). In dev, the tables made
+  # before the key existed were converted to it in place, once (docs/design/cmek-rollout.md).
   default_encryption_configuration {
     kms_key_name = google_kms_crypto_key.record["ledger-analytics"].id
   }
@@ -164,10 +174,10 @@ resource "google_bigquery_table" "transformation_runs" {
     field = "completed_at"
   }
 
-  # The provider treats this as forcing replacement. It is set only after the live table was
-  # converted in place to exactly this key (scripts/gcp/bq-cmek-convert.sh), so the plan shows no
-  # change; were the string to differ in form, the plan would show a replacement, and
-  # deletion_protection and prevent_destroy make that plan fail rather than delete the ledger.
+  # The provider treats this as forcing replacement. Dev's table was converted in place to exactly
+  # this key before it was set (docs/design/cmek-rollout.md, step 3), so the plan shows no change;
+  # were the string to differ in form, the plan would show a replacement, and deletion_protection
+  # and prevent_destroy make that plan fail rather than delete the ledger.
   encryption_configuration {
     kms_key_name = google_kms_crypto_key.record["ledger-analytics"].id
   }
@@ -210,24 +220,11 @@ resource "google_pubsub_topic" "fhir_changes" {
   depends_on                 = [google_project_service.required]
 }
 
-# The Google-managed dataset the stores lived in until CMEK step 5c. Released from Terraform's
-# management without being destroyed: the dataset keeps its stores until the switch to `record` is
-# verified, and is then deleted by hand, deliberately, as the plan records. A `removed` block
-# rather than deleting the resource block, because deleting the block would plan its destruction —
-# which prevent_destroy would refuse, and which would take every store inside it with it.
-removed {
-  from = google_healthcare_dataset.epi
-
-  lifecycle {
-    destroy = false
-  }
-}
-
-# The FHIR dataset on the fhir-record key (CMEK step 5). A Healthcare dataset's encryption is
-# fixed at creation, so this is a second dataset beside `epi`, not a change to it; renaming `epi`
-# in place would destroy it and every store inside it. Created empty by step 5a; its stores are
-# reconciled into it by hand (scripts/gcp/reconcile-fhir-stores.sh with
-# HEALTHCARE_DATASET_OVERRIDE) and checked before step 5c switches the services to it.
+# The FHIR dataset on the fhir-record key (CMEK step 5), holding the two stores
+# scripts/gcp/reconcile-fhir-stores.sh creates. A Healthcare dataset's encryption is fixed at
+# creation, so in dev this was made beside the Google-managed `epi` dataset; the stores were
+# reconciled into it, the services switched to it, and `epi` was released from Terraform and then
+# deleted by hand (2026-09-21, docs/design/cmek-rollout.md).
 #
 # Its key must stay available: a dataset whose key is disabled, scheduled for destruction or
 # ungranted is disabled after one hour and deleted, with every store, after 30 days. keys.tf and
