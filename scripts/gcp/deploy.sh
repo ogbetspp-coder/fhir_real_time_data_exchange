@@ -309,10 +309,8 @@ phase_inputs() {
 # with the settings infra/keys.tf declares (the destruction wait cannot change later), and
 # phase_apis imports them. An existing bucket on any other key is refused.
 ensure_state_bucket() {
-  local bucket key ring lifecycle
-  bucket="$(ema_flow_state_bucket "$PROJECT_ID")"
-  key="$(ema_flow_platform_key "$PROJECT_ID" "$REGION" "$ENVIRONMENT")"
-  ring="ema-flow-${ENVIRONMENT}-record"
+  local bucket="${PROJECT_ID}-ema-flow-tfstate" ring="ema-flow-${ENVIRONMENT}-record" key lifecycle
+  key="projects/${PROJECT_ID}/locations/${REGION}/keyRings/${ring}/cryptoKeys/platform-storage"
   if ! gcloud --quiet storage buckets describe "gs://${bucket}" >/dev/null 2>&1; then
     echo "Creating the Terraform state bucket gs://${bucket} on its key"
     gcloud --quiet services enable cloudkms.googleapis.com storage.googleapis.com --project="$PROJECT_ID"
@@ -339,8 +337,7 @@ ensure_state_bucket() {
 
 phase_init() {
   echo "=== terraform init ==="
-  local state_bucket
-  state_bucket="$(ema_flow_state_bucket "$PROJECT_ID")"
+  local state_bucket="${PROJECT_ID}-ema-flow-tfstate"
   ensure_state_bucket
   # -lockfile=readonly: the provider versions and checksums are the committed lock's, and an
   # init that would change the lock fails instead of rewriting it in the checkout it deploys.
@@ -511,7 +508,7 @@ phase_apis() {
     "projects/${PROJECT_ID}/locations/${REGION}/keyRings/${ring}" \
     gcloud --quiet kms keyrings describe "$ring" --location="$REGION" --project="$PROJECT_ID"
   import_unmanaged 'google_kms_crypto_key.record["platform-storage"]' \
-    "$(ema_flow_platform_key "$PROJECT_ID" "$REGION" "$ENVIRONMENT")" \
+    "projects/${PROJECT_ID}/locations/${REGION}/keyRings/${ring}/cryptoKeys/platform-storage" \
     gcloud --quiet kms keys describe platform-storage --keyring="$ring" --location="$REGION" --project="$PROJECT_ID"
   import_unmanaged google_artifact_registry_repository.images_cmek \
     "projects/${PROJECT_ID}/locations/${REGION}/repositories/${REPOSITORY_ID}" \

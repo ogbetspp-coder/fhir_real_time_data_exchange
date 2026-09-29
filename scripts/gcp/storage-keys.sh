@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 # The buckets Terraform does not create, on the platform-storage key (docs/design/cmek-rollout.md,
 # step 7). The Terraform state bucket is created by `deploy.sh init` before Terraform exists to
-# create anything, and the agent staging bucket was created by hand for the Agent Engine deploy.
-# Since audit I-10 `deploy.sh init` creates a new state bucket on the key, with public access
-# prevention and the lifecycle below, and refuses to deploy from one on any other key; this script
-# brings a bucket made before that into line, and checks both.
+# create anything (on this key since audit I-10), and the agent staging bucket was created by hand
+# for the Agent Engine deploy; this script brings a bucket made before that into line.
 #
 # For each bucket: the default key set, public access prevention enforced, then every existing
 # object rewritten under the key — a bucket's default key applies only to objects written after it
@@ -32,8 +30,8 @@ PROJECT_ID="$(ema_flow_resolve_project)"
 REGION="${GCP_REGION:-europe-west4}"
 # No default environment, and only the project its inputs file names (audit B08, L1).
 ENVIRONMENT="$(ema_flow_require_environment "$PROJECT_ID")"
-KEY="$(ema_flow_platform_key "$PROJECT_ID" "$REGION" "$ENVIRONMENT")"
-STATE_BUCKET="$(ema_flow_state_bucket "$PROJECT_ID")"
+KEY="projects/${PROJECT_ID}/locations/${REGION}/keyRings/ema-flow-${ENVIRONMENT}-record/cryptoKeys/platform-storage"
+STATE_BUCKET="${PROJECT_ID}-ema-flow-tfstate"
 STATE_BUCKET_ADMIN="${STATE_BUCKET_ADMIN:-user:khs@khsadvisory.com}"
 BUCKETS=("$STATE_BUCKET" "${PROJECT_ID}-ema-flow-agent-staging")
 CHECK="false"
@@ -93,7 +91,6 @@ for bucket in "${BUCKETS[@]}"; do
   fi
 done
 
-# Old generations of the state expire (common.sh, ema_flow_state_lifecycle, which says why).
 lifecycle="$(mktemp)"
 storage_keys_cleanup() { rm -f "$lifecycle"; }
 ema_flow_on_exit storage_keys_cleanup

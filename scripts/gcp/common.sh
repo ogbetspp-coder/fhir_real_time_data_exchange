@@ -150,23 +150,9 @@ ema_flow_finish() {
   exit 0
 }
 
-# The Terraform state bucket and the key it is encrypted with (docs/design/cmek-rollout.md, step
-# 7), named once: deploy.sh creates both in a new project, before Terraform exists, and refuses a
-# state bucket on any other key; record-readers.sh and storage-keys.sh keep the bucket in line.
-#   ema_flow_state_bucket <project>
-#   ema_flow_platform_key <project> <region> <environment>
-#   ema_flow_state_lifecycle      the bucket's lifecycle rules, as the JSON gcloud reads
-ema_flow_state_bucket() {
-  printf '%s-ema-flow-tfstate' "$1"
-}
-ema_flow_platform_key() {
-  printf 'projects/%s/locations/%s/keyRings/ema-flow-%s-record/cryptoKeys/platform-storage' "$1" "$2" "$3"
-}
-# Old generations of the state. The bucket is versioned so a bad apply can be rolled back, but
-# with no lifecycle rule every generation was kept forever — 168 of the state file by 2026-09-21,
-# each an earlier copy of the entitlement map and configuration. Noncurrent generations are
-# deleted once 20 newer ones exist or after 30 days, whichever comes first; the live state is
-# never touched by the rule.
+# The Terraform state bucket's lifecycle, for deploy.sh (a new bucket) and storage-keys.sh. Old
+# generations of the state expire once 20 newer ones exist or after 30 days: with no rule every
+# generation was kept forever (168 by 2026-09-21), each a copy of the entitlement map.
 ema_flow_state_lifecycle() {
   cat <<'JSON'
 {"rule": [

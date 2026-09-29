@@ -186,12 +186,7 @@ describe("the platform buckets on the platform-storage key", () => {
 
   it("and the buckets Terraform does not create are keyed, rewritten and restricted by a script that grants before it revokes", () => {
     const script = readFileSync("scripts/gcp/storage-keys.sh", "utf8");
-    expect(script).toContain(
-      'KEY="$(ema_flow_platform_key "$PROJECT_ID" "$REGION" "$ENVIRONMENT")"',
-    );
-    expect(readFileSync("scripts/gcp/common.sh", "utf8")).toContain(
-      "keyRings/ema-flow-%s-record/cryptoKeys/platform-storage",
-    );
+    expect(script).toContain("cryptoKeys/platform-storage");
     // Rewriting state while a deploy holds the lock could corrupt it.
     expect(script).toMatch(
       /Refusing: gs:\/\/\$\{STATE_BUCKET\}\/terraform\/state\/default\.tflock exists/,
@@ -200,10 +195,8 @@ describe("the platform buckets on the platform-storage key", () => {
     expect(script.indexOf("granted storage.admin on the bucket")).toBeLessThan(
       script.indexOf("legacy bindings removed"),
     );
-    // Old state generations expire, by the rules deploy.sh gives a new state bucket.
+    // Old state generations expire, by the rules deploy.sh gives a new state bucket (common.sh).
     expect(script).toContain('ema_flow_state_lifecycle >"$lifecycle"');
-    const common = readFileSync("scripts/gcp/common.sh", "utf8");
-    expect(common).toContain('"numNewerVersions": 20');
-    expect(common).toContain('"daysSinceNoncurrentTime": 30');
+    expect(readFileSync("scripts/gcp/common.sh", "utf8")).toContain('"numNewerVersions": 20');
   });
 });

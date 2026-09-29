@@ -72,7 +72,7 @@ for name in "${declared_buckets[@]}"; do
   fi
 done
 # And the Terraform state bucket, made by deploy.sh before Terraform exists (audit I-10).
-declared_buckets+=("$(ema_flow_state_bucket "$PROJECT_ID")")
+declared_buckets+=("${PROJECT_ID}-ema-flow-tfstate")
 
 # Buckets: every binding held through projectViewer or projectEditor goes; projectOwner stays.
 # A read that fails for any reason but "not found" stops the script: a network or permission error
