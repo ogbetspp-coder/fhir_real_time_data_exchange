@@ -88,7 +88,9 @@ for (const name of buildConfigs) {
 
 if (new Set(nodeDigests.values()).size > 1) {
   failures.push(
-    `Dockerfiles that start FROM node pin different digests:\n${[...nodeDigests]
+    `Node images (by FROM, COPY --from, RUN --mount or a Cloud Build step) pin different digests:\n${[
+      ...nodeDigests,
+    ]
       .map(([where, digest]) => `  ${where}: ${digest}`)
       .join("\n")}`,
   );

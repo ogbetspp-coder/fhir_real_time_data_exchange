@@ -54,7 +54,13 @@ describe("the renderer image's pins", () => {
     ["an unpinned base", (text: string) => text.replace(/@sha256:[0-9a-f]{64}/, "")],
     ["a second FROM", (text: string) => `${text}\nFROM scratch\n`],
     ["an apt install outside the snapshot's RUN", inUnpackRun("apt-get install --yes x")],
+    ["an apt install with an option first", inUnpackRun("apt-get -y install x")],
+    ["an apt install with a quiet option first", inUnpackRun("apt-get -qq install x")],
     ["a download without a checksum", inUnpackRun('curl -fsSL "https://example.org/x" -o x')],
+    ["a curl whose first argument is the URL", inUnpackRun('curl "https://example.org/x" -o x')],
+    ["a curl piped to tar", inUnpackRun("curl https://example.org/x.tgz | tar xz")],
+    ["a curl piped to a shell", inUnpackRun("curl https://example.org/install.sh | sh")],
+    ["a curl of an ARG", inUnpackRun("curl ${CHROME_VERSION} -o x")],
     ["a download with wget", inUnpackRun("wget https://example.org/x")],
     ["an ADD", (text: string) => text.replace("USER node", "ADD https://e/x /opt/x\nUSER node")],
     [

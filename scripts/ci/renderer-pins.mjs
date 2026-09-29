@@ -52,13 +52,17 @@ export function readRendererPins(dockerfile = RENDERER_DOCKERFILE) {
     line.includes("snapshot.debian.org/archive/debian/${DEBIAN_SNAPSHOT}"),
   );
   if (snapshot.length !== 1) fail("expected one RUN that installs from the Debian snapshot");
-  if (runs.some((line) => line !== snapshot[0] && /\bapt(?:-get)?\s+install\b/.test(line))) {
+  if (
+    runs.some((line) => line !== snapshot[0] && /\bapt(?:-get)?\s+(?:-\S+\s+)*install\b/.test(line))
+  ) {
     fail("an apt install outside the snapshot's RUN");
   }
 
   // Every download is a checksummed curl over HTTPS: no bare curl, no wget, no ADD.
   const artefacts = checksummedDownloads(lines, declared, name);
-  if ((runs.join("\n").match(/\bcurl\s+[-"']/g) ?? []).length !== artefacts.length) {
+  if (
+    (runs.join("\n").match(/\bcurl\s+(?:[-"'$]|https?:\/\/)/g) ?? []).length !== artefacts.length
+  ) {
     fail("a curl download without a SHA-256 check");
   }
   if (lines.some((line) => /\bwget\b|^\s*ADD\s/i.test(line))) {
