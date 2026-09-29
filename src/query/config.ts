@@ -1,7 +1,6 @@
 import { z } from "zod";
 
-import { Token } from "../contracts/common.js";
-import { ImageDigest } from "../contracts/query-tools.js";
+import { ImageDigest, Token } from "../contracts/common.js";
 
 // Configuration of the read-only query service (ADR 0004: own deployable, own identity, own
 // configuration). It reads none of the worker's variables — no source store, no evidence

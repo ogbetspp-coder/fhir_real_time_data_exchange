@@ -5,7 +5,14 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { CONTRACTS, contractId, type ContractDefinition } from "../../src/contracts/index.js";
-import { asciiDigits, contractJsonSchema } from "../../src/contracts/json-schema.js";
+import {
+  REFINEMENTS,
+  asciiDigits,
+  contractJsonSchema,
+  namedSchemas,
+  publishedSchema,
+  refinedSchemaIds,
+} from "../../src/contracts/json-schema.js";
 import { sha256 } from "../../src/lib/hash.js";
 
 const GENERATED = path.resolve("contracts/generated");
@@ -36,9 +43,9 @@ function generate(contract: ContractDefinition, io: "input" | "output"): JsonObj
   return contractJsonSchema(contract.schema, io);
 }
 
+// What scripts/contracts/generate-schemas.ts writes: the same pure call, not a copy of it.
 function document(contract: ContractDefinition): JsonObject {
-  const { $schema, ...rest } = generate(contract, "input");
-  return { $schema: $schema ?? DRAFT, $id: contractId(contract.name, contract.version), ...rest };
+  return publishedSchema(contract);
 }
 
 function structure(value: JsonObject): JsonObject {
@@ -143,6 +150,89 @@ describe("generated contract JSON Schemas", () => {
     expect(asciiDigits(String.raw`^a\.b\[c\]$`)).toBe(String.raw`^a\.b\[c\]$`);
     for (const shorthand of ["w", "W", "s", "S", "b", "B", "D"]) {
       expect(() => asciiDigits(`^a\\${shorthand}$`)).toThrow(/reads as Unicode/);
+    }
+  });
+
+  // z.toJSONSchema drops every .refine and .superRefine silently (audit C-8). Each is listed, and
+  // the ones JSON Schema can state are published.
+  it("lists every refinement a published contract carries, and no other", () => {
+    const carried = new Set(CONTRACTS.flatMap(({ schema }) => refinedSchemaIds(schema)));
+    expect([...carried].sort()).toEqual(Object.keys(REFINEMENTS).sort());
+  });
+
+  it("refuses to publish a refinement it does not list, or one on a schema without an id", () => {
+    const unlisted = z
+      .strictObject({ a: z.number(), b: z.number() })
+      .refine(({ a, b }) => a < b)
+      .meta({ id: "UnlistedRefinement" });
+    expect(() => contractJsonSchema(unlisted, "input")).toThrow(
+      /UnlistedRefinement carries a refinement/,
+    );
+    const anonymous = z.strictObject({ a: z.number() }).refine(({ a }) => a > 0);
+    expect(() => contractJsonSchema(z.strictObject({ inner: anonymous }), "input")).toThrow(
+      /no id/,
+    );
+  });
+
+  // Review of #148, part A L3: an id names a schema, not a rule. A second refinement on a listed
+  // schema is refused, not taken for the one already described.
+  it("refuses a listed schema whose refinements are more, or fewer, than the list says", () => {
+    const twice = z
+      .strictObject({ a: z.number(), b: z.number() })
+      .refine(({ a, b }) => a < b)
+      .refine(({ a }) => a > 0)
+      .meta({ id: "RefinedTwice" });
+    const described = { RefinedTwice: { checks: 1, unexpressed: "a < b" } };
+    expect(() => contractJsonSchema(twice, "input", described)).toThrow(
+      /RefinedTwice carries 2 refinements and REFINEMENTS describes 1/,
+    );
+    expect(() =>
+      contractJsonSchema(twice, "input", { RefinedTwice: { checks: 2, unexpressed: "both" } }),
+    ).not.toThrow();
+    expect(Object.values(REFINEMENTS).every(({ checks }) => checks >= 1)).toBe(true);
+  });
+
+  // What the contract verdict corpus decides each published definition by
+  // (scripts/contracts/contract-verdicts.ts): the Zod schema it was generated from.
+  it("finds the schema each $defs entry was generated from", () => {
+    for (const contract of CONTRACTS) {
+      const named = namedSchemas(contract.schema);
+      const definitions = Object.keys(publishedSchema(contract).$defs as JsonObject);
+      expect([contract.name, [...named.keys()].sort()]).toEqual([
+        contract.name,
+        [...definitions].sort(),
+      ]);
+    }
+  });
+
+  it("merges an expressed refinement into its definition, and never over a keyword it has", () => {
+    const refined = z
+      .strictObject({ kind: z.enum(["a", "b"]), extra: z.string().optional() })
+      .refine(({ kind, extra }) => (kind === "a") === (extra !== undefined))
+      .meta({ id: "ExpressedRule" });
+    const rule = {
+      if: { properties: { kind: { const: "a" } } },
+      then: { required: ["extra"] },
+    };
+    const published = contractJsonSchema(z.strictObject({ inner: refined }), "input", {
+      ExpressedRule: { checks: 1, expressed: rule },
+    });
+    expect((published.$defs as Record<string, JsonObject>).ExpressedRule).toMatchObject(rule);
+    expect(() =>
+      contractJsonSchema(refined, "input", {
+        ExpressedRule: { checks: 1, expressed: { type: "string" } },
+      }),
+    ).toThrow(/ExpressedRule already has type/);
+  });
+
+  it("publishes the run manifest's two rules between fields", async () => {
+    const manifest = await readJson<JsonObject>("run-manifest.schema.json");
+    const definitions = manifest.$defs as Record<string, JsonObject>;
+    for (const id of ["RunManifest", "IngestionEvidence"]) {
+      const disposition = REFINEMENTS[id];
+      expect(disposition !== undefined && "expressed" in disposition).toBe(true);
+      if (disposition === undefined || !("expressed" in disposition)) continue;
+      expect(definitions[id]).toMatchObject(disposition.expressed);
     }
   });
 

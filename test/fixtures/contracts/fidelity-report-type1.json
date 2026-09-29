@@ -1,0 +1,245 @@
+{
+  "reportVersion": "1.0.0",
+  "normalizationVersion": "fidelity-norm/3.1.0",
+  "extractedTextSha256": "15a5732528c7e1dee29f3eb43b92627724b98ce16f7094b2514b7c081dcdfabf",
+  "narrativeBindingSha256": "dbc8cf153c23e248a34c79d2bb6176030b2b206646e92060ac9c7ce6e7b786dd",
+  "status": "passed",
+  "sections": [
+    {
+      "sourceKey": "smpc",
+      "path": "Composition.section[0]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "ab3372db125a0b0e87b81686c5dd74e2f7e8aa18795b6989ec6026e5799d2cb7"
+    },
+    {
+      "sourceKey": "smpc.1",
+      "path": "Composition.section[0].section[0]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "b1275dd181c1f5a0ffcc619a2a6c8e08728ca1a99ccb4800f42d805eb7df9c04"
+    },
+    {
+      "sourceKey": "smpc.2",
+      "path": "Composition.section[0].section[1]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "270a4b4efbbca89a2a0d41bf14452a0bbb5b35c043b636b4b5b4a7472522adfa"
+    },
+    {
+      "sourceKey": "smpc.3",
+      "path": "Composition.section[0].section[2]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "0a17203a009cfa4cbbb9497809700b515d916ced6893accbe81022a6193c827f"
+    },
+    {
+      "sourceKey": "smpc.4",
+      "path": "Composition.section[0].section[3]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "6b7b02ab00118a100b4d8eca9dfb58087615a596aaa811cb1c41cc0c4d31506c"
+    },
+    {
+      "sourceKey": "smpc.4.1",
+      "path": "Composition.section[0].section[3].section[0]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "fd809f6517ece48bc064771d4e75eaf027ebaf06e9f398c1f9163afd3eb71184"
+    },
+    {
+      "sourceKey": "smpc.4.2",
+      "path": "Composition.section[0].section[3].section[1]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "b064949dfbb6402bb80a02627384b20a8470324e7680936a790bbc22f0eb923a"
+    },
+    {
+      "sourceKey": "smpc.4.2.posology",
+      "path": "Composition.section[0].section[3].section[1].section[0]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "96c7bd940e0919d7c77ae27032b122ff9198fa7fe39bc9a1a41c82e20577989d"
+    },
+    {
+      "sourceKey": "smpc.4.2.administration",
+      "path": "Composition.section[0].section[3].section[1].section[1]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "f299d828692cf5bca437c7fc6f15fed4285d3e6bc3681d224ea5cffc887ef4dd"
+    },
+    {
+      "sourceKey": "smpc.4.3",
+      "path": "Composition.section[0].section[3].section[2]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "6adf8c3f72e6673d252151f6e418fcce882739861720b7a0e11d82f49c50e657"
+    },
+    {
+      "sourceKey": "smpc.4.4",
+      "path": "Composition.section[0].section[3].section[3]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "4f3ad9259211cfe5455ae65bc60f44ab1fe50e9873a0ae93da9fc6f017ec7bff"
+    },
+    {
+      "sourceKey": "smpc.4.5",
+      "path": "Composition.section[0].section[3].section[4]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "c3f159b97702ad72854fb8d04ce5ba580868c859cc21991927c6c630ea90302f"
+    },
+    {
+      "sourceKey": "smpc.4.6",
+      "path": "Composition.section[0].section[3].section[5]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "4acd4cce23b1a1d5974de69b9e99b39c0e5f5e8a32d1645d89a65c056a663f0c"
+    },
+    {
+      "sourceKey": "smpc.4.7",
+      "path": "Composition.section[0].section[3].section[6]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "34f7c6b552077d690eee8f16b8de5dc8de22cd535f6b34d606eb004132bc099d"
+    },
+    {
+      "sourceKey": "smpc.4.8",
+      "path": "Composition.section[0].section[3].section[7]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "acc535a38784ac5e346abbb9ad97c4197c7af6590c9ce99124bee2c48f4b16b8"
+    },
+    {
+      "sourceKey": "smpc.4.8.reporting",
+      "path": "Composition.section[0].section[3].section[7].section[0]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "cea6f3c01eced1a63362a8301523fbf780ae470f3a501ae7e4c5195b9d0f9eac"
+    },
+    {
+      "sourceKey": "smpc.4.9",
+      "path": "Composition.section[0].section[3].section[8]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "adbf9b81eb2086eb40fd07fc95f55ea8461c6594537d84b2c793d41c0359b89e"
+    },
+    {
+      "sourceKey": "smpc.5",
+      "path": "Composition.section[0].section[4]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "63f67d62b6ad3f4bf9b04fca6b1128ef8ae606265e0d432671ab405c943296d7"
+    },
+    {
+      "sourceKey": "smpc.5.1",
+      "path": "Composition.section[0].section[4].section[0]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "724becae096cdce2c3b2593e52dbcf044fdd0de840767aefbca6e8a142f15eeb"
+    },
+    {
+      "sourceKey": "smpc.5.2",
+      "path": "Composition.section[0].section[4].section[1]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "dc0e3102e014e42e56c73e7a12ba7a8f8489fb4f2199c87d558efd70ecf2b727"
+    },
+    {
+      "sourceKey": "smpc.5.3",
+      "path": "Composition.section[0].section[4].section[2]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "367d1feedbf4d0496d9ff2a83049d7337b7e38a45266a25f9628af97e33dcb49"
+    },
+    {
+      "sourceKey": "smpc.6",
+      "path": "Composition.section[0].section[5]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "377325f7217dfb025dfa57fba44c7a42d13e5a84e91be461088d11da5853d52b"
+    },
+    {
+      "sourceKey": "smpc.6.1",
+      "path": "Composition.section[0].section[5].section[0]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "e4b392e1066aeef3156b0e637962529b362cdbb9f7a7a42aa7fc7883ea312677"
+    },
+    {
+      "sourceKey": "smpc.6.2",
+      "path": "Composition.section[0].section[5].section[1]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "d67546696948994973bfbc1a133f9598ac722b623dab6029bd774c13217fcf7f"
+    },
+    {
+      "sourceKey": "smpc.6.3",
+      "path": "Composition.section[0].section[5].section[2]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "8bec7fe8e052e710407261ca36ed743ff5a0454800bfb6a7ce7a0a5c4c14a496"
+    },
+    {
+      "sourceKey": "smpc.6.4",
+      "path": "Composition.section[0].section[5].section[3]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "ac2a3a4aa9fde81b08de48af7d0fbc72b526057f6c78a667e69c162204739c73"
+    },
+    {
+      "sourceKey": "smpc.6.5",
+      "path": "Composition.section[0].section[5].section[4]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "9edc425d74a3ae16fb90e4609264b6e06dc7710e699fd37f1194472714fbab2d"
+    },
+    {
+      "sourceKey": "smpc.6.6",
+      "path": "Composition.section[0].section[5].section[5]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "5bf570ffb249ddca3a7b3f2bbc55700e953852971b392abfe064f5183ce41dec"
+    },
+    {
+      "sourceKey": "smpc.7",
+      "path": "Composition.section[0].section[6]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "8f8ca0eb7981312a8d5ddc20153072c09aaffc8023f51cb5ce160b3559010df6"
+    },
+    {
+      "sourceKey": "smpc.8",
+      "path": "Composition.section[0].section[7]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "276e3f829bf1044e0bc8c232442204a0dd9a8ca9abbc8d9fb222f9879fdfc6be"
+    },
+    {
+      "sourceKey": "smpc.9",
+      "path": "Composition.section[0].section[8]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "f54d075e269e6b840c35cbbed0546468d1f55ea9710b371871a621be604b784a"
+    },
+    {
+      "sourceKey": "smpc.10",
+      "path": "Composition.section[0].section[9]",
+      "status": "verified",
+      "spanCount": 1,
+      "normalizedTextSha256": "b839b07d0b9f0df32a3f4b472669e9bc586d8140edeced98d1cf72a999edc98c"
+    }
+  ],
+  "issues": [],
+  "summary": {
+    "total": 32,
+    "verified": 32
+  },
+  "coverage": {
+    "pageCodePoints": 2283,
+    "bodyCodePoints": 2283,
+    "coveredCodePoints": 2283,
+    "uncoveredGaps": 0
+  },
+  "reportHash": "32aa154decea0edc15f38e46e1279dec03252478537bd5436b01e7de5cd5e84e"
+}

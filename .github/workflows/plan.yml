@@ -39,8 +39,11 @@ jobs:
   plan:
     name: Plan
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    # 20 for the plan, and up to 15 more waiting for a deploy to finish changing live state.
+    timeout-minutes: 35
     permissions:
+      # To read the deploy workflow's runs (the two deploy-activity steps below).
+      actions: read
       contents: read
       id-token: write
       pull-requests: write
@@ -131,6 +134,28 @@ jobs:
         if: steps.scope.outputs.plan == 'true'
         run: bash scripts/gcp/deploy.sh init
 
+      # A plan taken while a deploy changes live state proposes reverting that deploy (#141's plan
+      # proposed the query and worker images of 75e3128). The plan does not join the deploy's
+      # concurrency group, where a queued plan would cancel a queued deploy. Instead, before it
+      # plans, it waits up to 15 minutes for any deploy that is changing live state to finish, and
+      # after it plans, it fails if a deploy began or went on changing live state meanwhile, with
+      # the warning at the top of the summary (scripts/ci/workflow-runs.mjs, deploy-activity).
+      - name: Set up Node.js
+        if: steps.scope.outputs.plan == 'true'
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 22.22.0
+          package-manager-cache: false
+      # If it waits in vain, it writes the summary itself, saying no plan was taken, so the pull
+      # request's plan comment is replaced rather than left showing an older plan as current.
+      - name: Wait for any deploy changing live state
+        id: before
+        if: steps.scope.outputs.plan == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PLAN_SUMMARY: ${{ runner.temp }}/plan-summary.md
+        run: node scripts/ci/workflow-runs.mjs deploy-activity --since now --wait-minutes 15
+
       - name: Plan against live state
         id: plan
         if: steps.scope.outputs.plan == 'true'
@@ -147,6 +172,15 @@ jobs:
           PLAN_OUT: ${{ runner.temp }}/plan.txt
           PLAN_SUMMARY: ${{ runner.temp }}/plan-summary.md
         run: bash scripts/gcp/deploy.sh plan
+
+      # Whether the plan succeeded or not: a destroy it reports may be the overlap's doing.
+      - name: Check no deploy changed live state during the plan
+        if: ${{ !cancelled() && steps.before.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SINCE: ${{ steps.before.outputs.since }}
+          PLAN_SUMMARY: ${{ runner.temp }}/plan-summary.md
+        run: node scripts/ci/workflow-runs.mjs deploy-activity --since "$SINCE"
 
       # The summary holds resource addresses and actions only (scripts/ci/plan-summary.py). The
       # full plan text is never published: it carries attribute values, including account ids.

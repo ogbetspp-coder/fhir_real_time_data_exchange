@@ -6,8 +6,9 @@
 # `renderer:*` checks run in it, with the step that decides whether they run) is left out too: it
 # needs Docker and ~200 MB of downloads, and it is its own CI job. So is the build of the worker,
 # query and validator images (`bash scripts/ci/build-images.sh`, CI's Images job).
-# test/ci/check-all.test.ts fails if a CI step is missing here, so the two cannot drift apart
-# silently.
+# test/ci/check-all.test.ts reads the commands each `# --- ... (job: <id>) ---` section below
+# executes (not its `step` labels) and fails unless they are the commands that job runs in CI, in
+# its order and its working directory, so the two cannot drift apart silently.
 #
 # uv is taken from $UV, then agent/.uv-bootstrap/bin/uv, then zone-a/.uv-bootstrap/bin/uv, then
 # PATH (agent/README.md shows how to make a bootstrap one). Python 3.14 must be installed.
@@ -70,8 +71,8 @@ npx tsx scripts/fidelity/differential.ts --seed 20260920 --count 2000 > differen
 DIFFERENTIAL_RUN_SEED="${DIFFERENTIAL_RUN_SEED:-$(date +%s)}"
 step "Zone A: differential corpus at seed $DIFFERENTIAL_RUN_SEED"
 npx tsx scripts/fidelity/differential.ts --seed "$DIFFERENTIAL_RUN_SEED" --count 2000 >> differential.jsonl
-step "Zone A: uv run --frozen pytest"
-(cd zone-a && DIFFERENTIAL_CORPUS="$ROOT/differential.jsonl" "$UV" run --frozen pytest)
+step "Zone A: uv run --frozen pytest --cov"
+(cd zone-a && DIFFERENTIAL_CORPUS="$ROOT/differential.jsonl" "$UV" run --frozen pytest --cov)
 
 # --- Agent (job: agent) --------------------------------------------------------------------
 step "Agent: uv sync --frozen"
@@ -86,5 +87,7 @@ step "Agent: uv run --frozen python scripts/sync_contract.py --check"
 (cd agent && "$UV" run --frozen python scripts/sync_contract.py --check)
 step "Agent: uv run --frozen pytest --cov"
 (cd agent && "$UV" run --frozen pytest --cov)
+
+# --- End -----------------------------------------------------------------------------------
 
 printf '\ncheck-all: every CI gate passed (official HL7 validation and the renderer image not run; see header).\n'

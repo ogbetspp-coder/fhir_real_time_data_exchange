@@ -14,6 +14,7 @@ dev = [
   "datamodel-code-generator==0.83.0",
   "mypy==2.3.1",
   "pytest==9.1.1",
+  "pytest-cov==7.1.0",
   "ruff==0.16.9",
 ]
 
@@ -121,3 +122,17 @@ minversion = "9.0"
 testpaths = ["tests"]
 addopts = "-ra --strict-markers --strict-config"
 xfail_strict = true
+
+# Line coverage of the package, enforced in CI by `uv run --frozen pytest --cov` (the Zone A job in
+# .github/workflows/ci.yml, and scripts/check-all.sh), as the agent's is. Not in addopts, so
+# running one test file locally does not fail on the floor. Until audit B15 Zone A had none. The
+# floor is the coverage measured on 2026-09-28 (97.88%, over the committed smoke corpus), rounded
+# down: raise it when coverage rises, never lower it to let a change through.
+[tool.coverage.run]
+source = ["zone_a"]
+
+[tool.coverage.report]
+fail_under = 97
+precision = 2
+show_missing = true
+skip_covered = true

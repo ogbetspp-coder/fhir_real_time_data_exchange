@@ -77,10 +77,16 @@ ema_flow_require_environment "$PROJECT_ID" >/dev/null
 #
 # The image build (phase_images) uploads the working tree, not the commit, so a tree that differs
 # from HEAD -- a changed tracked file, or an untracked one .gitignore does not exclude, which the
-# upload honours too -- is not that commit. Both names then carry -dirty-<tree>: the id of the
-# tree the working copy would commit as, so the same edits give the same name and different edits
-# never share one. Without git, GITHUB_SHA names the commit; with neither, nothing is built or applied
-# (require_provenance). In Actions, a checkout whose HEAD is not GITHUB_SHA is refused the same way.
+# upload honours too -- is not that commit. deploy_provenance then names it -dirty-<tree> (the id
+# of the tree the working copy would commit as), and require_provenance refuses it, in Actions and
+# outside it alike: `all` before its first phase, `images` before it builds and `apply` before it
+# applies. A run manifest names the code that ran by a full commit id and nothing else (run
+# manifest 5.0.0; infra/run.tf refuses any other service_version at plan time), so a dirty tree has
+# no name a deploy could give it (review of #148, part B L1 and round 2 L-4; until then it was
+# built and pushed, then refused at plan). The phases before images, run one at a time (preflight,
+# deps, inputs, init, apis, as the deploy workflow runs them), do not check. Without git,
+# GITHUB_SHA names the commit; with neither, nothing is built or applied. In Actions, a checkout
+# whose HEAD is not GITHUB_SHA is refused the same way.
 deploy_provenance() {
   local commit="" suffix="" index tree
   PROVENANCE_ERROR=""
@@ -124,14 +130,15 @@ require_provenance() {
     echo "::error title=Deploy provenance::Not building or applying: ${PROVENANCE_ERROR}." >&2
     exit 1
   fi
-  # In Actions the checkout is the commit, so a tree that differs from it is something this job
-  # changed: refused rather than built and named -dirty.
-  if [[ "$SERVICE_VERSION" == *-dirty-* && "${GITHUB_ACTIONS:-}" == "true" ]]; then
-    echo "::error title=Deploy provenance::The checkout differs from ${SERVICE_VERSION%%-dirty-*}: a step of this job changed it. Not building or applying." >&2
-    exit 1
-  fi
+  # A tree that differs from its commit is no commit: refused before anything is built. In Actions
+  # the checkout is the commit, so the difference is something this job changed.
   if [[ "$SERVICE_VERSION" == *-dirty-* ]]; then
-    echo "::warning title=Uncommitted changes::The working tree differs from ${SERVICE_VERSION%%-dirty-*}; images, audit records and run manifests name ${SERVICE_VERSION}."
+    if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+      echo "::error title=Deploy provenance::The checkout differs from ${SERVICE_VERSION%%-dirty-*}: a step of this job changed it. Not building or applying." >&2
+    else
+      echo "::error title=Uncommitted changes::The working tree differs from ${SERVICE_VERSION%%-dirty-*} (${SERVICE_VERSION}). A run manifest names the code that ran by a full commit id only; commit or stash the changes, then deploy. Not building or applying." >&2
+    fi
+    exit 1
   fi
 }
 
@@ -791,8 +798,8 @@ export_effective_iam() {
     else
       # Dated path, then the timestamp, environment and the deployed version, so one export
       # belongs to exactly one apply.
-      # The full SERVICE_VERSION, -dirty-<tree> included, so a report is never filed under a
-      # commit its code was not.
+      # The full SERVICE_VERSION, the commit the apply deployed (a dirty tree never reaches an
+      # apply: require_provenance refuses it), so a report is never filed under another.
       local destination="gs://${bucket}/deploy-evidence/${date_path}/${stamp}-${ENVIRONMENT}-${SERVICE_VERSION}/"
       if gcloud --quiet storage cp "${out_dir}/reports/"*.json "$destination" >/dev/null 2>&1; then
         echo "Effective IAM export written to ${destination}"
@@ -1459,6 +1466,9 @@ case "$PHASE" in
   smoke) phase_smoke ;;
   query-smoke) phase_query_smoke ;;
   all)
+    # Before the first phase: apis applies (a targeted apply) before images would refuse a tree
+    # that is no commit (require_provenance; review of #148, round 2, L-4).
+    require_provenance
     phase_preflight
     phase_deps
     phase_inputs

@@ -89,8 +89,13 @@ so in practice the only producer is `src/fixtures/synthetic-submission.ts`.
 The `fixture` and `healthcare-api` sources are pre-existing trusted inputs guarded by IAM, not
 by this gate; deployments where Zone A is the only producer should disable them.
 
-**Versioning.** Every contract root carries a `schemaVersion` literal and a `$id` that embeds
-it. Objects are strict (unknown keys reject) so content cannot be smuggled in unnamed fields.
+**Versioning.** Every contract root is published under a `$id` that embeds its version
+(`contracts/generated/index.json`). Four also carry the version in the document, as a literal:
+`schemaVersion` (`CanonicalSubmission`, `RunManifest`), `reportVersion` (`FidelityReport`) and
+`version` (`QueryTools`). `IngestionProvenance`, `SourceDocumentText` and `RunRequest` carry
+none, and `AgentTurnRecord` only an optional `contractVersion`, since agent-turn 1.2.0 (corrected
+2026-09-28: this said every root carried a `schemaVersion` literal). Objects are
+strict (unknown keys reject) so content cannot be smuggled in unnamed fields.
 Patch changes alter descriptions only; minor changes add optional fields and require Zone B to
 deploy before Zone A emits them; anything else is a new major `$id`. Enum additions on fields
 that Zone B branches on are major. `zod` is pinned exactly to keep generated schemas stable.
@@ -285,3 +290,74 @@ every request is (invariant 2); before PR 5 lifts the dry run it is bound to an 
   statement in the `content-reviewer` role (`docs/design/approval.md`, amended 2026-09-25), and since the
   tablets label has contacts (as any label with contacts will), it is not persisted until that
   identity exists.
+
+## Amendment (2026-09-28, versions held to their schemas, and numbers)
+
+Audit batch B14 (C-6 to C-10) and the review of #145. The decision above is otherwise unchanged;
+the change record is `docs/validation/changes/2026-09-28-contract-versions-lock-and-parity.md`.
+
+**A version names one schema.** `contracts/versions.lock.json` records, for every contract version
+`main` has ever published, the structure hash of each schema it was published with: the SHA-256 of
+the published document without its `$id`. Retired versions are in it, with every structure `main`
+published under them, so a retired version number can never be published again with a schema it
+did not have. `test/contracts/versions-lock.test.ts` refuses a schema that differs from the one its
+version is locked to, a structure `main` published that the lock lacks, and a lock that drops or
+rewrites an entry `main` has released; `npm run contracts:lock` adds a new version's entry. Nothing
+held this before: `ingestion-provenance` took a required `kind` and a union (2026-09-24, #113) and
+two earlier tightenings under the `$id` of 1.0.0, and only the index's content hash moved. It is
+2.0.0 now, the provenance of `CanonicalSubmission` 2.0.0; the documents it accepts are unchanged by
+the bump.
+
+**A re-spelling is not a version change** (decided in #145). A change to a schema's text that
+leaves unchanged the set of documents it accepts under the dialect it declares (JSON Schema 2020-12,
+whose `pattern` is an ECMA-262 regular expression) and every description is not a version change:
+`\d` written as `[0-9]` is one. Its `$id` stays, the index's content hash moves, and the lock
+appends the new structure hash to the version's entry (`npm run contracts:lock -- --respelling`),
+naming the change record that records it; nothing recorded is replaced.
+
+What counts as a re-spelling is decided mechanically, not argued (review of #148, round 2). Compared
+with the schema `main` last published under the version, the only difference allowed is in `pattern`
+keywords at schema positions (not a `pattern` member of a `const`, `default` or `examples` value,
+which is data and must be equal), and two patterns are re-spellings of each other only when they are
+equal after a fixed table of rewrites, each known to keep an ECMA-262 pattern's language. The table
+has one entry today: `\d` as `[0-9]` outside a character class and `0-9` inside one
+(`src/contracts/json-schema.ts`, `asciiDigits`). Adding an entry is a change to this ADR. The check
+runs in `npm run contracts:lock` and in `test/contracts/versions-lock.test.ts` against `main`'s
+history, whatever the lock says, so an entry appended to the lock by hand licenses nothing. A change
+that alters an accepted document, or a description, is classified by the rule above.
+
+**Refinements are published or named.** `z.toJSONSchema` drops every `.refine` silently, so a
+generated schema accepted what Zod refuses. Every refinement a published contract carries is listed
+in `src/contracts/json-schema.ts` (`REFINEMENTS`) with how many the schema carries, and generation
+refuses an unlisted one or a count that differs. Those JSON
+Schema can state are published as `if`/`then`/`else` (run manifest 5.0.0: a document run, and only
+one, carries an ingestion block; an authority import, and only one, records what Zone B fetched);
+the others (`startOffset < endOffset`, the manifest's package rules, the gate's recomputed hashes)
+are named with where they are enforced. The conditional fields of a structuring decision could be
+stated too; doing so would change `CanonicalSubmission` 2.0.0's published language, so it waits for
+3.0.0.
+
+**Python readers read the schema's dialect.** A reader of the published schemas in another language
+must reproduce Zod's verdicts, not its own language's defaults. Zone A's models are generated with
+strict types and refuse `null` for an absent field; the agent reads `pattern` as ECMA-262 does
+(`$` is the end of the string, `.` excludes the line terminators, digits are ASCII).
+`test/fixtures/contracts/contract-verdicts.json` carries Zod's verdicts on values and documents, and
+both Python suites reproduce every one.
+
+**Numbers.** A JSON number is its value: an IEEE 754 double, as RFC 8785 (I-JSON) reads it, and
+every hash covers the value. So a FHIR decimal's written precision is not preserved: `2.50`, `2.5`
+and `25e-1` are one value and hash alike, and the pipeline persists the value as JavaScript writes
+it. Decided: precision is not carried, and it is not dropped silently either. A document part
+(submission, fidelity report, page text) whose numbers are not all written as JavaScript writes them
+(RFC 8785 section 3.2.2.3: no trailing zeros, no exponent where JavaScript places the digits, no
+digit beyond a double, no `-0`) is refused by the submission reader (`non-canonical-number`), before
+it is hashed. Zone A's canonical JSON writes a double by the same rule, so a 2.5 mg strength (the
+smoke product's) hashes alike in both languages. An integer beyond `Number.MAX_SAFE_INTEGER` is
+not treated alike (corrected in the review of #148, part A L4). Zone B's reader accepts one written
+as JavaScript writes its nearest double (`9007199254740992`, `1e+21`) and refuses any other
+(`9007199254740993`, whose double JavaScript writes `9007199254740992`). Zone A's canonical JSON
+refuses every integer beyond the bound, since JSON gives Python the exact integer where JavaScript
+holds the double. Every integer field of every contract is capped at the bound, so only the open
+FHIR resources of a Bundle can carry one; a Zone A producer cannot hash, and so must not write, such
+a Bundle. A product-graph value whose precision must survive would need a contract that carries it
+as text; none does today.

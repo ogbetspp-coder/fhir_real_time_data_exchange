@@ -97,6 +97,29 @@ export const AddressableFhirId = z
     description: "FHIR id that begins with a letter or digit, so a single URL path segment.",
   });
 
+// The digest of a container image, as Cloud Run reports it (ADR 0004: a service's evidence names
+// its image).
+export const ImageDigest = z
+  .string()
+  .regex(/^sha256:[0-9a-f]{64}$/)
+  .meta({ id: "ImageDigest" });
+
+// A full git commit id, as `git rev-parse HEAD` writes it (scripts/gcp/deploy.sh).
+export const GitCommit = z
+  .string()
+  .regex(/^[0-9a-f]{40}$/)
+  .meta({ id: "GitCommit", description: "Full lower-case hexadecimal git commit id." });
+
+// The version of a published contract (contracts/generated/index.json), as a record names the
+// contract it was written under.
+export const ContractVersion = z
+  .string()
+  .regex(/^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}$/)
+  .meta({
+    id: "ContractVersion",
+    description: "A published contract's version, major.minor.patch.",
+  });
+
 export const NonEmptyString = z.string().min(1).max(1024);
 
 export const Count = z.number().int().nonnegative();

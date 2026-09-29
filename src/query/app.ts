@@ -20,6 +20,7 @@ import {
   GetProvenanceInputSchema,
   GetSectionInputSchema,
   ProvenanceDetailSchema,
+  QUERY_TOOLS_VERSION,
   QueryAuditRecordSchema,
   QuoteVerificationWireSchema,
   SectionContentSchema,
@@ -185,6 +186,7 @@ function auditRecord(
     const required = {
       service: QUERY_SERVICE_NAME,
       serviceVersion: deps.serviceVersion,
+      contractVersion: QUERY_TOOLS_VERSION,
       at: new Date(startedAt).toISOString(),
       principal: identity.principal,
       credentialType: identity.credentialType,

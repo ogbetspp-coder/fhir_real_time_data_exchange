@@ -20,6 +20,13 @@ import {
 // may carry narrative or other regulated text: these records travel into manifests, the
 // BigQuery ledger, and FHIR Provenance (ADR 0002, UR-16).
 
+// The published version of `IngestionProvenance` on its own (contracts/generated/index.json).
+// 2.0.0 (audit C-6): the provenance of `CanonicalSubmission` 2.0.0, whose `sourceDocument` is a
+// union on a required `kind`. That change, and two tightenings before it, were published under
+// 1.0.0's `$id`; `contracts/versions.lock.json` now refuses a changed schema under a version it
+// has recorded.
+export const INGESTION_PROVENANCE_VERSION = "2.0.0";
+
 export const MediaType = z
   .enum([
     "application/pdf",
@@ -50,9 +57,9 @@ export const ExtractedTextRefSchema = z
       "Reference to the extractor's page text (a SourceDocumentText object). It contains narrative and is never inlined.",
   });
 
-// A document a reader draws (PDF, Word). No extractor of one is qualified under
-// fidelity-norm/3.0.0 (docs/fidelity-normalization.md §7): only a synthetic extractor may produce
-// one, and only where the deployment accepts synthetic sources.
+// A document a reader draws (PDF, Word). No extractor of one is qualified under the current
+// normalisation version (`NORMALIZATION_VERSION`, docs/fidelity-normalization.md §7): only a
+// synthetic extractor may produce one, and only where the deployment accepts synthetic sources.
 export const DrawnSourceDocumentSchema = z
   .strictObject({
     kind: z.literal("drawn"),
@@ -289,10 +296,6 @@ export const AttestationMethod = z.enum(["api-attestation", "manual-record"]).me
   id: "AttestationMethod",
   description: "Attestation placeholders. Electronic signature is a future control boundary.",
 });
-
-export const ApprovalMethod = z
-  .enum(["api-attestation", "manual-record", "authority-publication"])
-  .meta({ id: "ApprovalMethod" });
 
 export const ApprovalMeaning = z
   .enum(["reviewed-fidelity-and-structure"])

@@ -235,10 +235,13 @@ const PLACEBOLOL: SyntheticProduct = {
 // validating it is representative of validating any of them.
 const SMOKETEST: SyntheticProduct = {
   id: "synthetic-smoketest",
-  productName: "Synthetic Smoketest 1 mg tablets",
+  productName: "Synthetic Smoketest 2.5 mg tablets",
   substanceName: "Smoketestium",
-  documentTitle: "Synthetic Smoketest 1 mg tablets SmPC",
-  strengthMg: 1,
+  documentTitle: "Synthetic Smoketest 2.5 mg tablets SmPC",
+  // A decimal, so that a non-integer number travels through the pipeline, both languages'
+  // canonical JSON and the official validator (audit C-10); until 2026-09-28 every synthetic
+  // strength was an integer, and Zone A refused to hash any other number.
+  strengthMg: 2.5,
   organizationId: "synthetic-pharma",
   organizationName: "Synthetic Pharma Ltd",
   organizationIdentifier: "SYN-ORG-0001",

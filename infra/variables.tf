@@ -197,8 +197,8 @@ variable "query_entitlements_json" {
   sensitive = true
 
   # Checks what src/query/entitlements.ts checks at container start (a JSON object; PrincipalId
-  # keys; each value an object whose only key is `bundles`; at most 10,000 FhirId members, each a
-  # JSON string), including the strictObject rule that rejects an unknown key such as a
+  # keys; each value an object whose only key is `bundles`; at most 10,000 AddressableFhirId
+  # members, each a JSON string, so never `.` or `..`), including the strictObject rule that rejects an unknown key such as a
   # carried-forward `organisation`. Each member's type is read from its own JSON encoding, because
   # regex() and tolist() convert a number or a bool to a string, which let `"bundles": [5]` pass
   # here and then stop the service at startup. The decode and each shape check are wrapped in
@@ -214,11 +214,11 @@ variable "query_entitlements_json" {
         && try(length(entitlement.bundles), 10001) <= 10000
         && try(alltrue([
           for bundle in entitlement.bundles :
-          startswith(jsonencode(bundle), "\"") && can(regex("^[A-Za-z0-9.-]{1,64}$", bundle))
+          startswith(jsonencode(bundle), "\"") && can(regex("^[A-Za-z0-9][A-Za-z0-9.-]{0,63}$", bundle))
         ]), false)
       ])
     )
-    error_message = "query_entitlements_json must be a JSON object whose keys match ^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$ and whose values are objects carrying exactly one key, \"bundles\", a list of at most 10,000 FHIR ids, each a JSON string matching ^[A-Za-z0-9.-]{1,64}$. An extra key such as \"organisation\" is rejected here because the service rejects it at startup."
+    error_message = "query_entitlements_json must be a JSON object whose keys match ^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$ and whose values are objects carrying exactly one key, \"bundles\", a list of at most 10,000 FHIR ids, each a JSON string matching ^[A-Za-z0-9][A-Za-z0-9.-]{0,63}$. An extra key such as \"organisation\" is rejected here because the service rejects it at startup."
   }
 }
 

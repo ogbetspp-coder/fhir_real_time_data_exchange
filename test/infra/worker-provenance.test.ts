@@ -29,6 +29,17 @@ describe("the worker's provenance environment", () => {
     expect(envValue(workerContainer(), "GIT_COMMIT")?.trim()).toBe("var.service_version");
   });
 
+  // Run manifest 5.0.0 records the commit as a full commit id, and the worker refuses to start
+  // with any other GIT_COMMIT (src/config.ts), so a plan that would set one is refused first.
+  it("refuses at plan time a deployed commit that is not a full commit id", () => {
+    const worker = terraformBlocks(readInfra()).find(
+      ({ type, name }) => type === "google_cloud_run_v2_service" && name === "worker",
+    );
+    expect(worker?.body).toContain(
+      'condition     = can(regex("^[0-9a-f]{40}$", var.service_version))',
+    );
+  });
+
   it("sets IMAGE_DIGEST from the digest of the worker image reference", () => {
     expect(envValue(workerContainer(), "IMAGE_DIGEST")?.trim()).toBe("local.worker_image_digest");
     const infra = readInfra();

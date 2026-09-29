@@ -18,6 +18,7 @@ import {
   type FidelityReport,
 } from "../src/fidelity/index.js";
 import { canonicalJson, sha256Utf8 } from "../src/lib/hash.js";
+import { growth } from "./support/growth.js";
 import {
   buildSource,
   normalizationCases,
@@ -224,15 +225,25 @@ describe("xhtml scanner", () => {
     expect(tryXhtml(div("<table><tr><td>b</td></tr></table>"))).toEqual({ error: "table-size" });
   });
 
+  // The cost tests below assert growth, not time (test/support/growth.ts): each input a quarter
+  // of the size and then the whole, where linear grows about 4 times and quadratic about 16.
+  // Until audit B15 they were wall-clock bounds, which failed under concurrent runs.
+
   // Review round 3: the grid is kept sparse, so a row costs only the slots it covers. Twenty
-  // thousand empty rows under a 50 000-slot row took 20 s here and 79 s in Python before.
+  // thousand empty rows under a 50 000-slot row took 20 s here and 79 s in Python before. The row
+  // and the rows grow together, so a row that cost the grid's width would grow quadratically.
   it("scans empty rows under a wide row in linear time", () => {
-    const wide = `<tr>${'<td colspan="1000">a</td>'.repeat(50)}</tr>`;
-    const div = `<div xmlns="http://www.w3.org/1999/xhtml"><table>${wide}${"<tr></tr>".repeat(20_000)}</table></div>`;
-    const started = performance.now();
-    expect(tryXhtml(div)).toEqual({ error: "table-shape" });
-    expect(performance.now() - started).toBeLessThan(2_000);
-  });
+    const table = (cells: number): string => {
+      const wide = `<tr>${'<td colspan="1000">a</td>'.repeat(cells)}</tr>`;
+      return `<div xmlns="http://www.w3.org/1999/xhtml"><table>${wide}${"<tr></tr>".repeat(400 * cells)}</table></div>`;
+    };
+    expect(tryXhtml(table(50))).toEqual({ error: "table-shape" });
+    const ratio = growth((cells) => {
+      const div = table(cells);
+      return () => tryXhtml(div);
+    }, 12);
+    expect(ratio).toBeLessThan(10);
+  }, 120_000);
 
   // fidelity-norm/3.1.0 review round 2: the mark rule reads each run of ignorables once, and
   // the lowered-half rule looks only at adjacent pieces. Twenty thousand tags before twenty
@@ -240,14 +251,19 @@ describe("xhtml scanner", () => {
   it("checks marks after many tags and many lowered halves in linear time", () => {
     const root = (body: string): string =>
       `<div xmlns="http://www.w3.org/1999/xhtml"><p>${body}</p></div>`;
-    const started = performance.now();
-    expect(typeof tryXhtml(root(`t${"<b></b>".repeat(20_000)}${"\u2060".repeat(20_000)}x`))).toBe(
-      "string",
-    );
-    expect(typeof tryXhtml(root("t<sub>½</sub> ".repeat(20_000)))).toBe("string");
-    // Well under the quadratic 72 s, with room for coverage instrumentation (about 3 s).
-    expect(performance.now() - started).toBeLessThan(20_000);
-  }, 30_000);
+    const tags = (count: number): string =>
+      root(`t${"<b></b>".repeat(count)}${"\u2060".repeat(count)}x`);
+    const halves = (count: number): string => root("t<sub>\u00bd</sub> ".repeat(count));
+    expect(typeof tryXhtml(tags(20_000))).toBe("string");
+    expect(typeof tryXhtml(halves(20_000))).toBe("string");
+    for (const make of [tags, halves]) {
+      const ratio = growth((count) => {
+        const div = make(count);
+        return () => tryXhtml(div);
+      }, 5_000);
+      expect(ratio).toBeLessThan(10);
+    }
+  }, 120_000);
 
   // Audit 2026-09-27 (F-5): an error's offset is in code points into the div, whatever the code.
   // A supplementary letter before the refused markup counts once, as it does in Python.
@@ -353,51 +369,59 @@ describe("narrative fidelity verification", () => {
   // Twenty thousand one-space spans across one whitespace line, and as many one-word spans on one
   // line of words, took about 50 s here before.
   it("verifies many spans on one long line in linear time", () => {
-    const count = 20_000;
-    const words = Array.from({ length: count }, () => "a").join(" ");
-    const blank = `x\n${" ".repeat(2 * count)}\n`;
-    const cases = [
-      {
-        text: `${words}\n`,
-        div: paragraphs(words),
-        spans: Array.from({ length: count }, (_, position) => [2 * position, 2 * position + 1]),
-      },
-      {
-        text: blank,
-        div: paragraphs("x"),
-        spans: [
-          [0, 1],
-          ...Array.from({ length: count }, (_, position) => [2 + 2 * position, 3 + 2 * position]),
-        ],
-      },
-    ];
-    const started = performance.now();
-    for (const { text, div, spans } of cases) {
-      const report = verifyNarrativeFidelity({
-        normalizationVersion: NORMALIZATION_VERSION,
-        source: {
-          extractorVersion: "synthetic-linear/1.0.0",
-          pages: [{ page: 1, text, bodyStart: 0, bodyEnd: text.length }],
+    // One-word spans on a line of words, and one-space spans on a line of spaces.
+    const cases = (count: number): { text: string; div: string; spans: number[][] }[] => {
+      const words = Array.from({ length: count }, () => "a").join(" ");
+      return [
+        {
+          text: `${words}\n`,
+          div: paragraphs(words),
+          spans: Array.from({ length: count }, (_, position) => [2 * position, 2 * position + 1]),
         },
-        sections: [{ sourceKey: "s", path: "Composition.section[0]", div }],
-        provenance: [
-          {
-            sourceKey: "s",
-            spans: spans.map(([start = 0, end = 0]) => ({
-              page: 1,
-              startOffset: start,
-              endOffset: end,
-              textSha256: sha256Utf8(text.slice(start, end)),
-            })),
-            narrativeDivSha256: sha256Utf8(div),
-            normalizedTextSha256: "0".repeat(64),
-          },
-        ],
-      });
-      expect(report.status).toBe("passed");
+        {
+          text: `x\n${" ".repeat(2 * count)}\n`,
+          div: paragraphs("x"),
+          spans: [
+            [0, 1],
+            ...Array.from({ length: count }, (_, position) => [2 + 2 * position, 3 + 2 * position]),
+          ],
+        },
+      ];
+    };
+    const input = ({ text, div, spans }: { text: string; div: string; spans: number[][] }) => ({
+      normalizationVersion: NORMALIZATION_VERSION,
+      source: {
+        extractorVersion: "synthetic-linear/1.0.0",
+        pages: [{ page: 1, text, bodyStart: 0, bodyEnd: text.length }],
+      },
+      sections: [{ sourceKey: "s", path: "Composition.section[0]", div }],
+      provenance: [
+        {
+          sourceKey: "s",
+          spans: spans.map(([start = 0, end = 0]) => ({
+            page: 1,
+            startOffset: start,
+            endOffset: end,
+            textSha256: sha256Utf8(text.slice(start, end)),
+          })),
+          narrativeDivSha256: sha256Utf8(div),
+          normalizedTextSha256: "0".repeat(64),
+        },
+      ],
+    });
+    for (const which of [0, 1]) {
+      const full = cases(20_000)[which];
+      if (full === undefined) throw new Error("fixture");
+      expect(verifyNarrativeFidelity(input(full)).status).toBe("passed");
+      const ratio = growth((count) => {
+        const one = cases(count)[which];
+        if (one === undefined) throw new Error("fixture");
+        const prepared = input(one);
+        return () => verifyNarrativeFidelity(prepared);
+      }, 5_000);
+      expect(ratio).toBeLessThan(10);
     }
-    expect(performance.now() - started).toBeLessThan(10_000);
-  }, 60_000);
+  }, 120_000);
 
   it("binds the narratives it scanned, as computeNarrativeBinding does", () => {
     for (const testCase of verifyCases) {

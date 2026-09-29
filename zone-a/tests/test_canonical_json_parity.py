@@ -23,11 +23,14 @@ editor, a terminal, or a Git filter treats an invisible character.
 
 from __future__ import annotations
 
+import struct
 from typing import Any
 
 import pytest
 
-from zone_a.canonical_json import canonical_json, sha256_json, sha256_utf8
+from zone_a.canonical_json import canonical_json, ecmascript_number, sha256_json, sha256_utf8
+
+from .conftest import CONTRACT_FIXTURES, load_json
 
 # name -> (value, canonicalJson(value), sha256(value)) as src/lib/hash.ts produces them.
 CANONICAL_CASES: dict[str, tuple[Any, str, str]] = {
@@ -107,3 +110,24 @@ def test_an_unpaired_surrogate_never_raises() -> None:
     # hashes a source containing an unpaired surrogate could not be checked here at all.
     assert len(sha256_json({"pages": [{"text": "\ud800\udbff"}]})) == 64
     assert len(sha256_utf8("\ud800\udbff")) == 64
+
+
+def test_every_double_is_written_as_javascript_writes_it() -> None:
+    """RFC 8785 number serialisation, held to JavaScript's own text (audit C-10).
+
+    ``test/fixtures/contracts/canonical-json-numbers.json`` carries each double by its IEEE 754
+    bits, so no JSON parser rounds it on the way, with ``JSON.stringify``'s text for it: the
+    ranges where JavaScript switches between placed digits and an exponent, the smallest and
+    largest doubles, and a seeded sweep of bit patterns. A mismatch reports the bits only.
+    """
+    cases = load_json(CONTRACT_FIXTURES / "canonical-json-numbers.json")["cases"]
+    assert len(cases) > 1000
+    wrong = [
+        case["bits"]
+        for case in cases
+        if ecmascript_number(struct.unpack(">d", bytes.fromhex(case["bits"]))[0])
+        != case["canonical"]
+    ]
+    assert wrong == []
+    value = struct.unpack(">d", bytes.fromhex(cases[0]["bits"]))[0]
+    assert canonical_json([value]) == f"[{cases[0]['canonical']}]"

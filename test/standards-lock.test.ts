@@ -62,7 +62,7 @@ const validatorLock = readPackageLock(VALIDATOR_PACKAGE_LOCK).map(({ key, sha256
 }));
 const ONE = { url: "https://example.org/p", sha256: "a".repeat(64) };
 
-async function fixtureManifest() {
+async function fixtureManifest(settings: AppConfig = config) {
   const result = await runPipeline(
     {
       runId: "55555555-5555-4555-a555-555555555555",
@@ -71,7 +71,7 @@ async function fixtureManifest() {
       sourceResource: "fixture:standards",
     },
     mapping,
-    config,
+    settings,
   );
   return result.evidence.manifest;
 }
@@ -166,8 +166,10 @@ describe("the pinned standards", () => {
 
 describe("a signed run manifest's standards", () => {
   it("name the pinned packages with their hashes, and the validator's image", async () => {
-    vi.stubEnv("VALIDATOR_IMAGE_DIGEST", `sha256:${"b".repeat(64)}`);
-    const manifest = await fixtureManifest();
+    const manifest = await fixtureManifest({
+      ...config,
+      VALIDATOR_IMAGE_DIGEST: `sha256:${"b".repeat(64)}`,
+    });
     expect(manifest.standards.packages).toEqual(pinnedPackages());
     expect(manifest.standards.globalEpiPackage).toBe("hl7.fhir.uv.emedicinal-product-info#1.0.0");
     expect(manifest.standards.emaPackage).toBe("EUePI#1.0.0");
@@ -209,7 +211,7 @@ describe("a signed run manifest's standards", () => {
     }
   });
 
-  // 3.0.0 rows stay readable, and a 3.0.0 shape is not accepted as 4.0.0.
+  // 3.0.0 rows stay readable, and a 3.0.0 shape is not accepted as a later version.
   it("leave a version 3.0.0 manifest readable", async () => {
     const manifest = await fixtureManifest();
     const standards: Record<string, unknown> = { ...manifest.standards };
@@ -218,7 +220,8 @@ describe("a signed run manifest's standards", () => {
     delete runtime.validatorImageDigest;
     const v3 = { ...manifest, schemaVersion: "3.0.0", standards, runtime };
     expect(AnyRunManifestSchema.parse(v3).schemaVersion).toBe("3.0.0");
-    expect(RunManifestSchema.safeParse({ ...v3, schemaVersion: "4.0.0" }).success).toBe(false);
+    expect(AnyRunManifestSchema.safeParse({ ...v3, schemaVersion: "4.0.0" }).success).toBe(false);
+    expect(RunManifestSchema.safeParse({ ...v3, schemaVersion: "5.0.0" }).success).toBe(false);
     expect(AnyRunManifestSchema.safeParse({ ...manifest, schemaVersion: "3.0.0" }).success).toBe(
       false,
     );

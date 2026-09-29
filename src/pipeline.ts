@@ -4,6 +4,7 @@ import type { AppConfig } from "./config.js";
 import {
   AUTHORITY_IMPORT_PREFIX,
   CANONICAL_SUBMISSION_VERSION,
+  DEVELOPMENT_RUNTIME,
   RUN_MANIFEST_VERSION,
   RunManifestSchema,
   SubmissionRejectedError,
@@ -13,6 +14,7 @@ import {
   type DocumentSubmissionInput,
   type IngestionEvidence,
   type ManifestPersistence,
+  type ManifestRuntime,
 } from "./contracts/index.js";
 import { OfficialFhirValidatorClient } from "./fhir/official-validator.js";
 import {
@@ -21,7 +23,7 @@ import {
   validateCanonicalPreflight,
 } from "./fhir/preflight.js";
 import { toProvenanceResource } from "./fhir/provenance.js";
-import { sourceIdentifierValue, transformType2ToEma } from "./fhir/transform.js";
+import { sourceIdentifierValue, transformType2ToEma, type EmaPackage } from "./fhir/transform.js";
 import { mappingReference, type EmaMapping } from "./fhir/mapping.js";
 import type { FhirBundle, FhirResource, OperationOutcome } from "./fhir/types.js";
 import {
@@ -81,6 +83,36 @@ export type PipelineResult = {
   // absent for a dry run, or when the response did not say.
   persistedBundle?: PersistedVersion;
 };
+
+// What a run sends to the official HL7 validator and to the Cloud Healthcare API's $validate, each
+// resource with the profiles it is validated against, in the order they are sent: the source
+// against the Global ePI Bundle profile, then the EMA List, document Bundle and Composition against
+// the mapping's profiles. CI's "Official validation" job validates exactly this set
+// (scripts/ci/emit-validation-set.ts), so a resource or a profile added here reaches that gate too.
+export type OfficialValidationTarget = {
+  name: "source" | "ema-list" | "ema-bundle" | "ema-composition";
+  resource: FhirResource;
+  profiles: string[];
+};
+
+export function officialValidationTargets(
+  source: FhirBundle,
+  transformed: EmaPackage,
+  mapping: EmaMapping,
+): OfficialValidationTarget[] {
+  const composition = transformed.documentBundle.entry[0]?.resource;
+  if (composition === undefined) throw new Error("Transformed Composition is missing");
+  return [
+    { name: "source", resource: source, profiles: [GLOBAL_TYPE2_PROFILE] },
+    { name: "ema-list", resource: transformed.list, profiles: [mapping.profiles.list] },
+    {
+      name: "ema-bundle",
+      resource: transformed.documentBundle,
+      profiles: [mapping.profiles.bundle],
+    },
+    { name: "ema-composition", resource: composition, profiles: mapping.profiles.composition },
+  ];
+}
 
 function countErrors(outcomes: OperationOutcome[]): number {
   return outcomes.reduce(
@@ -194,6 +226,19 @@ async function documentGate(
 // What a run may be given instead of its production default; tests use it.
 export type PipelineDependencies = { authorityFetcher?: AuthorityFetcher };
 
+// The code and images the manifest names, read through the configuration, which has already
+// refused a value outside its grammar (src/config.ts); `development` where none is set, as off
+// Cloud Run. Cloud Run sets K_REVISION on the container; WORKFLOW_REVISION is never set by the
+// deploy (infra/run.tf).
+export function manifestRuntime(config: AppConfig): ManifestRuntime {
+  return {
+    sourceCommit: config.GIT_COMMIT ?? DEVELOPMENT_RUNTIME,
+    imageDigest: config.IMAGE_DIGEST ?? DEVELOPMENT_RUNTIME,
+    validatorImageDigest: config.VALIDATOR_IMAGE_DIGEST ?? DEVELOPMENT_RUNTIME,
+    workflowRevision: config.WORKFLOW_REVISION ?? config.K_REVISION ?? DEVELOPMENT_RUNTIME,
+  };
+}
+
 export async function runPipeline(
   input: PipelineInput,
   mapping: EmaMapping,
@@ -303,12 +348,8 @@ export async function runPipeline(
     );
   }
 
-  const profiles = [
-    GLOBAL_TYPE2_PROFILE,
-    mapping.profiles.list,
-    mapping.profiles.bundle,
-    ...mapping.profiles.composition,
-  ];
+  const targets = officialValidationTargets(source, transformed, mapping);
+  const profiles = targets.flatMap((target) => target.profiles);
   // A dry run's manifest is `validated`; a persist-mode run's is `authorised`, signed before its
   // transaction and naming it. Only the ledger row, written after the commit, says `persisted`.
   const composeManifest = (
@@ -335,12 +376,7 @@ export async function runPipeline(
       outputHash: transformed.outputHash,
       decisions: transformed.mappingDecisions.length,
     },
-    runtime: {
-      sourceCommit: process.env.GIT_COMMIT ?? "development",
-      imageDigest: process.env.IMAGE_DIGEST ?? "development",
-      validatorImageDigest: process.env.VALIDATOR_IMAGE_DIGEST ?? "development",
-      workflowRevision: process.env.WORKFLOW_REVISION ?? process.env.K_REVISION ?? "development",
-    },
+    runtime: manifestRuntime(config),
     ...(ingestion === undefined ? {} : { ingestion }),
   });
 
@@ -399,30 +435,20 @@ export async function runPipeline(
   const validatorUrl = config.FHIR_VALIDATOR_URL;
   if (validatorUrl === undefined) throw new Error("FHIR_VALIDATOR_URL is required");
   const officialValidator = new OfficialFhirValidatorClient(validatorUrl);
-  officialOutcomes.push(await officialValidator.validate(source, [GLOBAL_TYPE2_PROFILE]));
-  officialOutcomes.push(
-    await officialValidator.validate(transformed.list, [mapping.profiles.list]),
-  );
-  officialOutcomes.push(
-    await officialValidator.validate(transformed.documentBundle, [mapping.profiles.bundle]),
-  );
-  const targetComposition = transformed.documentBundle.entry[0]?.resource;
-  if (targetComposition === undefined) throw new Error("Transformed Composition is missing");
-  officialOutcomes.push(
-    await officialValidator.validate(targetComposition, mapping.profiles.composition),
-  );
+  // One request per resource, with all its profiles: the validator takes several at once.
+  for (const target of targets) {
+    officialOutcomes.push(await officialValidator.validate(target.resource, target.profiles));
+  }
   if (officialOutcomes.some(hasValidationErrors)) {
     throw new Error("Official HL7 FHIR profile validation failed");
   }
 
+  // One request per resource and profile: $validate takes one profile at a time.
   const healthcare = new HealthcareApiClient(config);
-  cloudOutcomes.push(await healthcare.validate(source, GLOBAL_TYPE2_PROFILE, runId));
-  cloudOutcomes.push(await healthcare.validate(transformed.list, mapping.profiles.list, runId));
-  cloudOutcomes.push(
-    await healthcare.validate(transformed.documentBundle, mapping.profiles.bundle, runId),
-  );
-  for (const profile of mapping.profiles.composition) {
-    cloudOutcomes.push(await healthcare.validate(targetComposition, profile, runId));
+  for (const target of targets) {
+    for (const profile of target.profiles) {
+      cloudOutcomes.push(await healthcare.validate(target.resource, profile, runId));
+    }
   }
   if (cloudOutcomes.some(hasValidationErrors)) {
     throw new Error("Cloud Healthcare API profile validation failed");

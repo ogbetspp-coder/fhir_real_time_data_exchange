@@ -9,6 +9,7 @@ import {
   SYNTHETIC_SUBMISSION_BUCKET,
   SYNTHETIC_SUBMISSION_URI,
   createSyntheticSubmission,
+  syntheticSubmissionUris,
   type SyntheticSubmission,
 } from "../src/fixtures/synthetic-submission.js";
 import {
@@ -220,6 +221,61 @@ describe("by-reference submission reader", () => {
         RUN_ID,
       ),
     ).resolves.toBeDefined();
+  });
+
+  // A FHIR decimal's written precision would be lost between the approved bytes and the stored
+  // record: `500.0` parses to 500, hashes as 500 and would be persisted as 500 (ADR 0002,
+  // "Numbers"; audit C-10). Refused, in each part; the value's hash alone cannot tell.
+  it.each([
+    ["500.0", "submission"],
+    ["5e2", "submission"],
+    ["500.00", "fidelity-report"],
+  ] as const)(
+    "refuses a number written %s rather than as JavaScript writes it (%s)",
+    async (written, part) => {
+      const objects = storeFor(fixture.submission);
+      const key = objectKey(
+        part === "submission" ? SYNTHETIC_SUBMISSION_URI : SYNTHETIC_REPORT_URI,
+      );
+      const text = objects.get(key)?.toString("utf8") ?? "";
+      const at = part === "submission" ? '"value": 500,' : '"total": ';
+      expect(text).toContain(at);
+      const changed =
+        part === "submission"
+          ? text.replace(at, `"value": ${written},`)
+          : text.replace(/"total": ([0-9]+)/, (_, total: string) => `"total": ${total}.00`);
+      objects.set(key, Buffer.from(changed, "utf8"));
+      // The value is unchanged, so its hash still matches: only the written form differs.
+      expect(sha256(JSON.parse(changed))).toBe(
+        sha256(part === "submission" ? fixture.submission : fixture.fidelityReport),
+      );
+
+      await rejects(
+        objects,
+        { uri: SYNTHETIC_SUBMISSION_URI, sha256: sha256(fixture.submission) },
+        "non-canonical-number",
+        part,
+      );
+    },
+  );
+
+  it("reads a decimal written as JavaScript writes it", async () => {
+    const product = "synthetic-smoketest";
+    const smoke = createSyntheticSubmission(mapping, { product });
+    const uris = syntheticSubmissionUris({ product, version: 1 });
+    const objects: Objects = new Map([
+      [objectKey(uris.submission), serialise(smoke.submission)],
+      [objectKey(uris.fidelityReport), serialise(smoke.fidelityReport)],
+      [objectKey(uris.sourceText), serialise(smoke.sourceText)],
+    ]);
+    expect(objects.get(objectKey(uris.submission))?.toString("utf8")).toContain('"value": 2.5,');
+
+    const input = await readerFor(objects).read(
+      { uri: uris.submission, sha256: sha256(smoke.submission) },
+      RUN_ID,
+    );
+
+    expect(sha256(input.submission)).toBe(sha256(smoke.submission));
   });
 
   it("reports unparseable bytes as a classified failure", async () => {

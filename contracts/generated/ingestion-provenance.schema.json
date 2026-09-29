@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://khs.dev/contracts/ingestion-provenance/1.0.0/schema.json",
+  "$id": "https://khs.dev/contracts/ingestion-provenance/2.0.0/schema.json",
   "$ref": "#/$defs/IngestionProvenance",
   "$defs": {
     "IngestionProvenance": {

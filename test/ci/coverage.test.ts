@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
@@ -57,7 +57,13 @@ describe("coverage", () => {
     for (const metric of ["lines", "statements", "functions", "branches"]) {
       expect(typeof thresholds[metric]).toBe("number");
     }
-    for (const directory of ["fidelity", "contracts", "query", "fhir", "gcp", "lib"]) {
+    // Every directory of src/, read from the tree: until audit B15 this was a list of six, which
+    // left authority/, render/ and fixtures/ out of the check.
+    const directories = readdirSync("src", { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
+    expect(directories).toEqual(expect.arrayContaining(["authority", "render", "fixtures"]));
+    for (const directory of directories) {
       const floor = thresholds[`src/${directory}/**`] as Record<string, unknown> | undefined;
       expect([directory, floor]).toEqual([
         directory,
@@ -68,6 +74,31 @@ describe("coverage", () => {
           branches: expect.any(Number) as number,
         },
       ]);
+    }
+  });
+
+  // The two Python deployables' floors (audit B15: Zone A had none): each job's test step runs
+  // pytest under coverage, and each project sets a floor it fails under.
+  it("holds Zone A and the agent to a line-coverage floor in CI", () => {
+    const ci = readFileSync(".github/workflows/ci.yml", "utf8");
+    for (const [job, project] of [
+      ["zone-a", "zone-a"],
+      ["agent", "agent"],
+    ] as const) {
+      const body = new RegExp(`\\n {2}${job}:\\n([\\s\\S]*?)(?:\\n {2}[a-z-]+:\\n|$)`).exec(
+        ci,
+      )?.[1];
+      expect([job, body]).toEqual([
+        job,
+        expect.stringMatching(/^ {8}run: uv run --frozen pytest --cov$/m),
+      ]);
+      const pyproject = readFileSync(`${project}/pyproject.toml`, "utf8");
+      const floor = /^\[tool\.coverage\.report\]\n(?:.*\n)*?fail_under = (\d+)$/m.exec(
+        pyproject,
+      )?.[1];
+      expect([project, floor]).toEqual([project, expect.stringMatching(/^\d+$/)]);
+      expect(Number(floor)).toBeGreaterThanOrEqual(97);
+      expect(pyproject).toMatch(/^ {2}"pytest-cov==[\d.]+",$/m);
     }
   });
 

@@ -10,7 +10,8 @@ committed module is out of date with ``contracts/generated/``.
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel
+from pydantic import ConfigDict, Field, RootModel, StrictInt, StrictStr
+from zone_a.contract_model import ContractModel
 
 
 class Status(StrEnum):
@@ -18,27 +19,27 @@ class Status(StrEnum):
     failed = "failed"
 
 
-class Issue(RootModel[str]):
-    root: Annotated[str, Field(max_length=256)]
+class Issue(RootModel[StrictStr]):
+    root: Annotated[StrictStr, Field(max_length=256)]
 
 
-class Summary(BaseModel):
+class Summary(ContractModel):
     model_config = ConfigDict(extra="forbid")
-    total: Annotated[int, Field(ge=0, le=9007199254740991)]
-    verified: Annotated[int, Field(ge=0, le=9007199254740991)]
+    total: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
+    verified: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
 
 
-class Coverage(BaseModel):
+class Coverage(ContractModel):
     model_config = ConfigDict(extra="forbid")
-    pageCodePoints: Annotated[int, Field(ge=0, le=9007199254740991)]
-    bodyCodePoints: Annotated[int, Field(ge=0, le=9007199254740991)]
-    coveredCodePoints: Annotated[int, Field(ge=0, le=9007199254740991)]
-    uncoveredGaps: Annotated[int, Field(ge=0, le=9007199254740991)]
+    pageCodePoints: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
+    bodyCodePoints: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
+    coveredCodePoints: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
+    uncoveredGaps: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
 
 
-class NormalizationVersion(RootModel[str]):
+class NormalizationVersion(RootModel[StrictStr]):
     root: Annotated[
-        str,
+        StrictStr,
         Field(
             description="Version of docs/fidelity-normalization.md the hashes were computed under.",
             pattern="^fidelity-norm\\/[0-9]+\\.[0-9]+\\.[0-9]+$",
@@ -46,15 +47,16 @@ class NormalizationVersion(RootModel[str]):
     ]
 
 
-class Sha256Hex(RootModel[str]):
+class Sha256Hex(RootModel[StrictStr]):
     root: Annotated[
-        str, Field(description="Lower-case hexadecimal SHA-256 digest.", pattern="^[0-9a-f]{64}$")
+        StrictStr,
+        Field(description="Lower-case hexadecimal SHA-256 digest.", pattern="^[0-9a-f]{64}$"),
     ]
 
 
-class SourceKey(RootModel[str]):
+class SourceKey(RootModel[StrictStr]):
     root: Annotated[
-        str,
+        StrictStr,
         Field(
             description="Canonical SmPC section identifier from the mapping manifest, e.g. smpc.4.2.posology.",
             pattern="^[a-z0-9]+(?:\\.[a-z0-9]+)*$",
@@ -71,32 +73,32 @@ class SectionStatus(StrEnum):
     malformed_narrative = "malformed-narrative"
 
 
-class DiffHint(BaseModel):
+class DiffHint(ContractModel):
     model_config = ConfigDict(extra="forbid")
-    expectedLength: Annotated[int, Field(ge=0, le=9007199254740991)]
-    actualLength: Annotated[int, Field(ge=0, le=9007199254740991)]
-    firstDifferingOffset: Annotated[int, Field(ge=0, le=9007199254740991)]
-    commonSuffixLength: Annotated[int, Field(ge=0, le=9007199254740991)]
-    expectedWordCount: Annotated[int, Field(ge=0, le=9007199254740991)]
-    actualWordCount: Annotated[int, Field(ge=0, le=9007199254740991)]
+    expectedLength: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
+    actualLength: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
+    firstDifferingOffset: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
+    commonSuffixLength: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
+    expectedWordCount: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
+    actualWordCount: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
     expectedSha256: Sha256Hex
     actualSha256: Sha256Hex
 
 
-class SectionResult(BaseModel):
+class SectionResult(ContractModel):
     model_config = ConfigDict(extra="forbid")
     sourceKey: SourceKey
     path: Annotated[
-        str, Field(pattern="^Composition\\.section\\[[0-9]+\\](?:\\.section\\[[0-9]+\\])*$")
+        StrictStr, Field(pattern="^Composition\\.section\\[[0-9]+\\](?:\\.section\\[[0-9]+\\])*$")
     ]
     status: SectionStatus
-    spanCount: Annotated[int, Field(ge=0, le=9007199254740991)]
-    reason: Annotated[str | None, Field(pattern="^[a-z][a-z-]{0,40}$")] = None
+    spanCount: Annotated[StrictInt, Field(ge=0, le=9007199254740991)]
+    reason: Annotated[StrictStr | None, Field(pattern="^[a-z][a-z-]{0,40}$")] = None
     details: DiffHint | None = None
     normalizedTextSha256: Sha256Hex | None = None
 
 
-class FidelityReport(BaseModel):
+class FidelityReport(ContractModel):
     model_config = ConfigDict(extra="forbid")
     reportVersion: Literal["1.0.0"]
     normalizationVersion: NormalizationVersion

@@ -10,10 +10,10 @@
     },
     {
       "name": "ingestion-provenance",
-      "version": "1.0.0",
-      "$id": "https://khs.dev/contracts/ingestion-provenance/1.0.0/schema.json",
+      "version": "2.0.0",
+      "$id": "https://khs.dev/contracts/ingestion-provenance/2.0.0/schema.json",
       "file": "ingestion-provenance.schema.json",
-      "sha256": "e95be97c46cff484152dc75bff38a9eaf88e4c19d7fa3e8352df3e56dfd491be"
+      "sha256": "217b28e0c98d9be1b45cd1c6ae681b15867357d1e58199c4ea0b41850c0dc338"
     },
     {
       "name": "fidelity-report",
@@ -38,24 +38,24 @@
     },
     {
       "name": "query-tools",
-      "version": "4.0.0",
-      "$id": "https://khs.dev/contracts/query-tools/4.0.0/schema.json",
+      "version": "4.1.0",
+      "$id": "https://khs.dev/contracts/query-tools/4.1.0/schema.json",
       "file": "query-tools.schema.json",
-      "sha256": "44db03f7d026bde2cd35ab233b18168135be8876dd379ad146628ebb3f5eb15b"
+      "sha256": "7586c361370e0fe65120f7ed08231a0a4e22103bbb16c608cf03d852ee0c3890"
     },
     {
       "name": "agent-turn",
-      "version": "1.1.0",
-      "$id": "https://khs.dev/contracts/agent-turn/1.1.0/schema.json",
+      "version": "1.2.0",
+      "$id": "https://khs.dev/contracts/agent-turn/1.2.0/schema.json",
       "file": "agent-turn.schema.json",
-      "sha256": "4313b7e4857c66747ef28692447190d1c6a449284424f9cf80ba64f7b225638e"
+      "sha256": "fd3609f04676c110fb13f6cd89e39268564e740c1aa5a2a497e723e56cab1caa"
     },
     {
       "name": "run-manifest",
-      "version": "4.0.0",
-      "$id": "https://khs.dev/contracts/run-manifest/4.0.0/schema.json",
+      "version": "5.0.0",
+      "$id": "https://khs.dev/contracts/run-manifest/5.0.0/schema.json",
       "file": "run-manifest.schema.json",
-      "sha256": "4b4de5abe5bd058f63939d64b42d2e2b8e532da457e7e967b0afbd235ddd1cc9"
+      "sha256": "53d05a260c341e8285c4df68bef86507be38e19ab524f740660377f76ebfdcf5"
     }
   ]
 }

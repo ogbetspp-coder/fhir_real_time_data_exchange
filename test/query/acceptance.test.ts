@@ -8,6 +8,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
   FindProductOutputSchema,
   ProvenanceDetailSchema,
+  QUERY_TOOLS_VERSION,
   QueryAuditRecordSchema,
   QuoteVerificationSchema,
   SectionContentSchema,
@@ -121,6 +122,8 @@ describe("ePI query service, phase 1", () => {
       expect(record).toMatchObject({
         service: "ema-flow-query",
         serviceVersion: SERVICE_VERSION,
+        // The contract the service answered under, so a verdict can be read by its own rule.
+        contractVersion: QUERY_TOOLS_VERSION,
         principal: PRINCIPAL_A,
         credentialType: "id-token",
         tool: "get_section",
@@ -356,6 +359,8 @@ describe("ePI query service, phase 1", () => {
   // follow the quote-edge rule (src/query/tools.ts), stricter than the publishing gate's
   // span-edge rule: a quote cut inside a word, or cut at punctuation that still binds what
   // follows or precedes it, is no-match even though its characters are a slice of the section.
+  // A timeout of its own: it stands up one harness per case, which took over vitest's 5 s default
+  // in a loaded full run (review of audit B15).
   it("a quote matches only between the quote-edge boundaries", async () => {
     const seeded = store.documents.get(store.bundleIdTypography);
     if (seeded === undefined) throw new Error("expected a seeded document");
@@ -467,7 +472,7 @@ describe("ePI query service, phase 1", () => {
     } finally {
       await harness.close();
     }
-  });
+  }, 30_000);
 
   // Nothing yet binds a stored version to its own approval: the Provenance names the Bundle
   // without a version, so the newest approval is the only one the store can find. A caller who

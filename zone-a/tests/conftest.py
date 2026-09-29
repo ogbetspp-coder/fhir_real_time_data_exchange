@@ -17,7 +17,10 @@ import pytest
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 VECTORS_PATH = REPOSITORY_ROOT / "test" / "fixtures" / "fidelity" / "vectors.json"
-CONTRACT_FIXTURES = REPOSITORY_ROOT / "test" / "fixtures" / "contracts"
+FIXTURES = REPOSITORY_ROOT / "test" / "fixtures"
+CONTRACT_FIXTURES = FIXTURES / "contracts"
+# Each run-manifest version's manifests, as its own code emitted them; never regenerated.
+RUN_MANIFESTS = FIXTURES / "run-manifest"
 CONTRACT_SCHEMAS = REPOSITORY_ROOT / "contracts" / "generated"
 
 
@@ -50,3 +53,30 @@ def source_document_text() -> Any:
 @pytest.fixture(scope="session")
 def run_request() -> Any:
     return load_json(CONTRACT_FIXTURES / "run-request.json")
+
+
+@pytest.fixture(scope="session")
+def type1_submission() -> Any:
+    """An authority import of the synthetic publication: a Type 1 record (audit C-8)."""
+    return load_json(CONTRACT_FIXTURES / "canonical-submission-type1.json")
+
+
+@pytest.fixture(scope="session")
+def type1_fidelity_report() -> Any:
+    return load_json(CONTRACT_FIXTURES / "fidelity-report-type1.json")
+
+
+@pytest.fixture(scope="session")
+def type1_source_document_text() -> Any:
+    return load_json(CONTRACT_FIXTURES / "source-document-text-type1.json")
+
+
+@pytest.fixture(scope="session")
+def decimal_submission() -> Any:
+    """The smoke product's submission, whose strength is a decimal (audit C-10)."""
+    return load_json(CONTRACT_FIXTURES / "canonical-submission-decimal.json")
+
+
+def run_manifest_fixtures() -> dict[str, Any]:
+    """The manifests each run-manifest version's own code emitted, by file name."""
+    return {path.name: load_json(path) for path in sorted(RUN_MANIFESTS.glob("*.json"))}

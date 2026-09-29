@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { GitCommit, ImageDigest, Token } from "./contracts/common.js";
 import type { RunRequest } from "./contracts/run-request.js";
 
 const optionalNonEmpty = z.string().trim().min(1).optional();
@@ -76,6 +77,16 @@ const ConfigSchema = z
       .regex(KMS_KEY_VERSION, "KMS_MANIFEST_KEY must name a crypto key version")
       .optional(),
     FHIR_VALIDATOR_URL: z.url().optional(),
+    // The code and the images a run manifest names (`runtime`, run manifest 5.0.0), each in its
+    // own grammar: infra/run.tf sets the commit (`service_version`, which scripts/gcp/deploy.sh
+    // passes as the full git SHA) and both image digests; Cloud Run sets K_REVISION. A value in
+    // another shape is a startup failure, never a manifest that cannot be signed. Unset (off
+    // Cloud Run), the manifest records `development`.
+    GIT_COMMIT: GitCommit.optional(),
+    IMAGE_DIGEST: ImageDigest.optional(),
+    VALIDATOR_IMAGE_DIGEST: ImageDigest.optional(),
+    WORKFLOW_REVISION: Token.optional(),
+    K_REVISION: Token.optional(),
     DRY_RUN: z
       .enum(["true", "false"])
       .default("true")
