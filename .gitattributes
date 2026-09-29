@@ -8,6 +8,7 @@ test/fixtures/contracts/** linguist-generated=true
 zone-a/tests/fixtures/differential-smoke.jsonl linguist-generated=true
 zone-a/src/zone_a/contracts/*.py linguist-generated=true
 agent/src/verifiable_answer_agent/contracts/*.schema.json linguist-generated=true
+agent/src/verifiable_answer_agent/contracts/code-points.json linguist-generated=true
 labels/ema-epi/checks/** linguist-generated=true
 # The EMA's bytes, pinned by SHA-256 in labels/ema-epi/sources.lock.json: never end-of-line
 # converted (core.autocrlf, a checkout on Windows), so what is checked out is what was pinned.

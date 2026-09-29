@@ -234,9 +234,13 @@ second hand-maintained copy of a contract would be a second source of truth. So
 `scripts/sync_contract.py`, committed, and checked in CI (`--check` fails on drift in either),
 exactly as Zone A treats its generated pydantic models. `tests/test_contract.py` asserts each
 copy equals the published file and that each tool's output type is the one the query-tools
-contract's own `tools.<name>.output` names. Both vendored files are listed in the repository's
-`.prettierignore` for the same reason Zone A's generated models are: formatting a byte copy
-would make the `--check` comparison fail.
+contract's own `tools.<name>.output` names. The same script writes
+`src/verifiable_answer_agent/contracts/code-points.json` from the fidelity vectors' `codePoints`
+table (`test/fixtures/fidelity/vectors.json`): the gap, Default_Ignorable and word-character
+classes `quote_edge` reads, so the agent holds no hand copy of those lists and `--check` fails
+when they move. All three vendored files are listed in the repository's `.prettierignore` for
+the same reason Zone A's generated models are: formatting them would make the `--check`
+comparison fail.
 
 Every tool result is validated against it before anything reads it. A result that does not
 validate is **unavailable**: dropped from composition, counted in the audit record, never
@@ -268,7 +272,7 @@ design's worked examples (`test/query/quote-edge-cases.ts`, which the service's 
 also drives) and writes `test/fixtures/contracts/quote-edge-cases.json`; `npm run
 contracts:check` regenerates it and fails on drift; `tests/test_quote_edge.py` asserts the port
 and the fake, over the wire, reproduce every answer and offset, and that the port's three
-character sets are the ones in `src/query/tools.ts`.
+character sets are the ones in `src/query/quote-edge.ts`.
 
 Like the service, the fake searches only the section a `verify_quote` call names, and reports
 the section it searched; it also records the JSON-RPC method of each request, so a test can

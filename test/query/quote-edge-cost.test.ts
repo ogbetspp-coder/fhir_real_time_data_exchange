@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { normalizeText, xhtmlToText } from "../../src/fidelity/index.js";
-import { locateQuote } from "../../src/query/tools.js";
+import { locateQuote } from "../../src/query/quote-edge.js";
 import { growth } from "../support/growth.js";
 
 // The quote-edge rule reads a section's table grids once per search, not once per occurrence: a

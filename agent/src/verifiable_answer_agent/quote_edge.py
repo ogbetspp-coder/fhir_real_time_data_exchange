@@ -1,7 +1,7 @@
 r"""The query service's quote-edge rule, so the agent never asks it about a quote it must refuse.
 
 ``verify_quote`` answers ``match`` only when both edges of the quote fall on boundaries
-(``docs/design/epi-mcp-query-service.md``, "The quote-edge rule"; ``src/query/tools.ts``). A
+(``docs/design/epi-mcp-query-service.md``, "The quote-edge rule"; ``src/query/quote-edge.ts``). A
 block longer than the tool's 2,000-unit bound is checked in chunks, and a chunk edge the rule
 calls a cut — inside ``1 000 000``, or between ``≥`` and ``30`` — is ``no-match`` although every
 word of the block is the label's. The splitter in ``contract`` therefore cuts only where this
@@ -14,15 +14,21 @@ contracts:check``), and ``tests/test_quote_edge.py`` holds this module to every 
 answer and offsets. The agent's fake query service decides ``verify_quote`` with it, so the
 tests exercise the rule the real service applies rather than a plain substring search.
 
-Everything is in code points, as the service's offsets are. Python has no ``\p{..}`` classes;
-``unicodedata`` categories are the same Unicode properties, at Python's Unicode version rather
-than Node's ICU — a difference only for characters assigned between the two.
+Everything is in code points, as the service's offsets are. The gap, Default_Ignorable and
+word-character classes are the service's own, read from ``contracts/code-points.json``, which
+``scripts/sync_contract.py`` writes from the fidelity vectors and ``--check`` holds to them.
+Python has no ``\p{..}`` classes; for the rest, ``unicodedata`` categories are the same Unicode
+properties, at Python's Unicode version rather than Node's ICU — a difference only for
+characters assigned between the two.
 """
 
 from __future__ import annotations
 
+import bisect
+import json
 import unicodedata
 from dataclasses import dataclass, field
+from importlib import resources
 from typing import Final
 
 __all__ = [
@@ -50,8 +56,9 @@ trusting it. ``tests/test_quote_edge.py`` holds this to the version the service'
 decisions carry.
 """
 
-# src/query/tools.ts QUOTE_OPENERS, QUOTE_CLOSERS and PLAIN_PUNCTUATION, character for character,
-# by code point: several are look-alikes of the ASCII characters they must not be confused with.
+# src/query/quote-edge.ts QUOTE_OPENERS, QUOTE_CLOSERS and PLAIN_PUNCTUATION, character for
+# character, by code point: several are look-alikes of the ASCII characters they must not be
+# confused with.
 QUOTE_OPENERS: Final = frozenset(
     map(chr, (0x28, 0x5B, 0x7B, 0x22, 0x27, 0x2018, 0x201C, 0x201E, 0xAB, 0x2039, 0xBF, 0xA1))
 )
@@ -73,14 +80,23 @@ POSTFIX_SIGNS: Final = frozenset("%") | frozenset(
     map(chr, (0x2030, 0x2031, 0xB0, 0x2032, 0x2033, 0x2103, 0x2109))
 )
 
-# src/fidelity/normalize.ts: the invisible formatting characters of step 1 (soft hyphen, zero
-# width space, byte order mark, word joiner) and the zero-width (non-)joiners belong to a word.
-_WORD_JOINERS: Final = frozenset(map(chr, (0xAD, 0x200B, 0xFEFF, 0x2060, 0x200C, 0x200D)))
+# The service's ``isGap``, ``isDefaultIgnorable`` and ``isWordCharacter`` at every code point,
+# vendored from the fidelity vectors by scripts/sync_contract.py: per class, the code points where
+# membership flips, starting outside at U+0000.
+_CODE_POINTS: Final[dict[str, list[int]]] = json.loads(
+    resources.files("verifiable_answer_agent.contracts")
+    .joinpath("code-points.json")
+    .read_text(encoding="utf-8")
+)
+
+
+def _in_class(name: str, character: str) -> bool:
+    return bisect.bisect_right(_CODE_POINTS[name], ord(character)) % 2 == 1
 
 
 def is_word_character(character: str) -> bool:
     """``isWordCharacter``: a letter, a number, a combining mark, or an invisible joiner."""
-    return unicodedata.category(character)[0] in "LNM" or character in _WORD_JOINERS
+    return _in_class("wordCharacter", character)
 
 
 def _is_digit(character: str | None) -> bool:
@@ -198,59 +214,14 @@ def _sign_reached(text: str, index: int) -> bool:
     return True if reached is None else reached
 
 
-# src/fidelity/normalize.ts ``isGap`` (fidelity-norm/3.0.0 section 6): section 3 whitespace, the
-# spaces narrower than a quarter of an em, the blank glyphs (U+2800 BRAILLE PATTERN BLANK and the
-# Mongolian and Yi letters Chrome's default serif face draws blank), and
-# Default_Ignorable_Code_Point (Unicode 16.0).
-_WHITESPACE: Final = frozenset(
-    {0x09, 0x0A, 0x0D, 0x20, 0xA0, 0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2007, 0x2008}
-    | {0x2028, 0x2029, 0x3000}
-)
-_THIN_SPACES: Final = frozenset((0x2006, 0x2009, 0x200A, 0x202F, 0x205F))
-_BLANK_GLYPHS: Final = frozenset((0x1878, 0x18AA, 0x2800, 0xA4A2, 0xA4A3, 0xA4B4, 0xA4C1, 0xA4C5))
-_DEFAULT_IGNORABLE: Final = (
-    (0x00AD, 0x00AD),
-    (0x034F, 0x034F),
-    (0x061C, 0x061C),
-    (0x115F, 0x1160),
-    (0x17B4, 0x17B5),
-    (0x180B, 0x180F),
-    (0x200B, 0x200F),
-    (0x202A, 0x202E),
-    (0x2060, 0x206F),
-    (0x3164, 0x3164),
-    (0xFE00, 0xFE0F),
-    (0xFEFF, 0xFEFF),
-    (0xFFA0, 0xFFA0),
-    (0xFFF0, 0xFFF8),
-    (0x1BCA0, 0x1BCA3),
-    (0x1D173, 0x1D17A),
-    (0xE0000, 0xE0FFF),
-)
-
-
-# Every gap, as one set: ``is_gap`` is asked for nearly every code point of a section.
-_GAPS: Final = frozenset(
-    _WHITESPACE
-    | _THIN_SPACES
-    | _BLANK_GLYPHS
-    | {point for low, high in _DEFAULT_IGNORABLE for point in range(low, high + 1)}
-)
-
-
 def is_gap(character: str) -> bool:
     """Whether ``character`` is a gap (section 6): drawn as space or as nothing."""
-    return ord(character) in _GAPS
-
-
-_IGNORABLE: Final = frozenset(
-    point for low, high in _DEFAULT_IGNORABLE for point in range(low, high + 1)
-)
+    return _in_class("gap", character)
 
 
 def is_default_ignorable(character: str) -> bool:
     """Whether ``character`` is a Default_Ignorable_Code_Point (Unicode 16.0): drawn as nothing."""
-    return ord(character) in _IGNORABLE
+    return _in_class("defaultIgnorable", character)
 
 
 def non_gap(text: str, index: int, step: int) -> str | None:
@@ -268,19 +239,19 @@ def _at(text: str, index: int) -> str | None:
 
 # --- across table cells ------------------------------------------------------------------------
 #
-# ``src/query/tools.ts``, "across table cells": a renderer draws a row's cells side by side about a
-# space apart and centres each cell's lines, so any line of a cell can sit level with any line of
-# another cell in the row. A quote beginning at a word boundary inside a cell is held to the digit
-# and sign rules against every word of every cell to its left, and one ending at a word boundary
-# inside a cell against every word of every cell to its right, in each row its cell covers. A word
-# is a run of code points that are not gaps. The grid is read once per search.
+# ``src/query/quote-edge.ts``, "across table cells": a renderer draws a row's cells side by side
+# about a space apart and centres each cell's lines, so any line of a cell can sit level with any
+# line of another cell in the row. A quote beginning at a word boundary inside a cell is held to
+# the digit and sign rules against every word of every cell to its left, and one ending at a word
+# boundary inside a cell against every word of every cell to its right, in each row its cell
+# covers. A word is a run of code points that are not gaps. The grid is read once per search.
 
-_TABLE_START: Final = "﷐"
-_TABLE_END: Final = "﷑"
-_ROW_START: Final = "﷒"
-_CELL_START: Final = "﷓"
-_COVERED_LEFT: Final = "﷔"
-_COVERED_ABOVE: Final = "﷕"
+_TABLE_START: Final = "\ufdd0"
+_TABLE_END: Final = "\ufdd1"
+_ROW_START: Final = "\ufdd2"
+_CELL_START: Final = "\ufdd3"
+_COVERED_LEFT: Final = "\ufdd4"
+_COVERED_ABOVE: Final = "\ufdd5"
 _SLOT_MARKERS: Final = frozenset((_CELL_START, _COVERED_LEFT, _COVERED_ABOVE))
 
 _ENDS_SIGN: Final = 1

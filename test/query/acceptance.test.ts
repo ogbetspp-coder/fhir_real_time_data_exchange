@@ -356,7 +356,7 @@ describe("ePI query service, phase 1", () => {
   });
 
   // A quote is checked against the stored text and nothing checks it afterwards, so its edges
-  // follow the quote-edge rule (src/query/tools.ts), stricter than the publishing gate's
+  // follow the quote-edge rule (src/query/quote-edge.ts), stricter than the publishing gate's
   // span-edge rule: a quote cut inside a word, or cut at punctuation that still binds what
   // follows or precedes it, is no-match even though its characters are a slice of the section.
   // A timeout of its own: it stands up one harness per case, which took over vitest's 5 s default
