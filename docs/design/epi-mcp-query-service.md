@@ -404,7 +404,7 @@ event: "refused-body", principal: <sub>`, plus `reason`, one of `invalid-turn-id
   (`docs/fidelity-normalization.md` section 6), which is left unchanged. The gate only has to
   stop a span cutting a word, because it then requires the whole section to equal the approved
   narrative; a quote has no second check after it, and a quote that stops at punctuation can
-  still say something the label does not. So, in `src/query/tools.ts`:
+  still say something the label does not. So, in `src/query/quote-edge.ts`:
   - **left edge**: the code point before the quote is absent or a space, or it is a run of
     opening punctuation — `(`, `[`, `{`, straight and curly opening quotation marks, `«`, `‹`,
     `¿`, `¡` — that is itself preceded by a space or the start of the text;

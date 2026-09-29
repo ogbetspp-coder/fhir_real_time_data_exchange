@@ -270,7 +270,7 @@ const quoteVerificationFields = {
 // `match`: the normalised quote is a contiguous slice of a section's normalised text under the
 // same normalisation the publishing gate uses — so case, quotation marks, dashes, and
 // superscripts all still have to agree — and both of its edges hold under the quote-edge rule
-// (src/query/tools.ts), which is stricter than the gate's span-edge rule: the slice may not
+// (src/query/quote-edge.ts), which is stricter than the gate's span-edge rule: the slice may not
 // begin or end inside a word, nor stop at punctuation that still binds a number or a word to it
 // ("Take 2" of "Take 2.5 mg", "20 °C" of "-20 °C"). It does not promise that nothing follows:
 // "Take 5" still matches "Take 5 mg daily". Anything else is `no-match`; the service does not
