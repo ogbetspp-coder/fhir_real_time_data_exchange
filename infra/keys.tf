@@ -18,11 +18,10 @@ locals {
   # Service agents, most created by Google only on first use; a key cannot be granted to one that
   # does not exist yet (audit I-10). Healthcare's and Artifact Registry's are created by
   # google_project_service_identity (main.tf), BigQuery's by deploy.sh asking for it before the
-  # first apply; Logging's is read from its settings, which creates it (older projects use
-  # cmek-p<number>@gcp-sa-logging). Spelled-out e-mails: the provider's email attribute has proved
-  # unreliable (healthcare_service_identity_email in main.tf).
+  # first apply. Spelled-out e-mails: the provider's email attribute has proved unreliable
+  # (healthcare_service_identity_email in main.tf).
   bigquery_encryption_agent = "bq-${data.google_project.current.number}@bigquery-encryption.iam.gserviceaccount.com"
-  logging_agent             = data.google_logging_project_settings.current.kms_service_account_id
+  logging_agent             = "service-${data.google_project.current.number}@gcp-sa-logging.iam.gserviceaccount.com"
   artifact_registry_agent   = "service-${data.google_project.current.number}@gcp-sa-artifactregistry.iam.gserviceaccount.com"
 
   # 120 days, the maximum wait between a destruction request and the destruction.
@@ -86,12 +85,6 @@ resource "google_kms_crypto_key_iam_member" "record_agent" {
     google_project_service_identity.healthcare,
     google_project_service_identity.artifact_registry,
   ]
-}
-
-# The project's Logging settings, for the account Cloud Logging encrypts a log bucket with
-# (local.logging_agent). Reading them creates that account if it does not exist yet.
-data "google_logging_project_settings" "current" {
-  project = var.project_id
 }
 
 # Run manifests are signed in an HSM, with this key (run.tf, KMS_MANIFEST_KEY). Its algorithm is

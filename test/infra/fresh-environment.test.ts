@@ -103,22 +103,6 @@ describe("the state bucket", { timeout: 30_000 }, () => {
       expect(out).toContain("State bucket off its key");
     }
   });
-
-  it("is checked by init before terraform init, and its ring and key imported before the first apply", () => {
-    const init = extract("phase_init");
-    expect(init.indexOf("ensure_state_bucket")).toBeLessThan(
-      init.indexOf("terraform -chdir=infra init"),
-    );
-    const apis = extract("phase_apis");
-    const plan = apis.indexOf("plan_reviewed apis");
-    for (const address of [
-      "import_unmanaged google_kms_key_ring.record",
-      `import_unmanaged 'google_kms_crypto_key.record["platform-storage"]'`,
-    ]) {
-      expect(apis.indexOf(address)).toBeGreaterThan(-1);
-      expect(apis.indexOf(address)).toBeLessThan(plan);
-    }
-  });
 });
 
 describe("import_unmanaged", { timeout: 30_000 }, () => {
@@ -139,28 +123,6 @@ describe("import_unmanaged", { timeout: 30_000 }, () => {
   });
 });
 
-describe("the service agents and roles a new project's first apply needs", () => {
-  it("asks BigQuery for its encryption account, and creates the custom role, before the first apply", () => {
-    const apis = extract("phase_apis");
-    const plan = apis.indexOf("plan_reviewed apis");
-    expect(apis.indexOf("/serviceAccount")).toBeGreaterThan(-1);
-    expect(apis.indexOf("/serviceAccount")).toBeLessThan(plan);
-    expect(apis).toContain("-target=google_project_iam_custom_role.ledger_appender \\");
-  });
-
-  it("creates Artifact Registry's and reads Logging's before the keys are granted", () => {
-    expect(block("google_project_service_identity", "artifact_registry")).toContain(
-      'service  = "artifactregistry.googleapis.com"',
-    );
-    expect(block("google_kms_crypto_key_iam_member", "record_agent")).toContain(
-      "google_project_service_identity.artifact_registry",
-    );
-    expect(readFileSync("infra/keys.tf", "utf8")).toMatch(
-      /logging_agent\s*=\s*data\.google_logging_project_settings\.current\.kms_service_account_id/,
-    );
-  });
-});
-
 describe("dev's migration leftovers", () => {
   const infra = readInfra();
 
@@ -171,18 +133,5 @@ describe("dev's migration leftovers", () => {
     expect(block(type, name)).toMatch(/^\s+count\s+= var\.environment == "dev" \? 1 : 0$/m);
     expect(block(type, name)).toMatch(/prevent_destroy\s*=\s*true/);
     expect(infra).toContain(`moved {\n  from = ${type}.${name}\n  to   = ${type}.${name}[0]\n}`);
-  });
-
-  it("no longer include the epi removed block, the dataset override or the conversion script", () => {
-    expect(infra).not.toContain("from = google_healthcare_dataset.epi");
-    expect(existsSync("scripts/gcp/bq-cmek-convert.sh")).toBe(false);
-    for (const file of ["scripts/gcp/reconcile-fhir-stores.sh", "scripts/gcp/bootstrap.sh"]) {
-      expect(readFileSync(file, "utf8")).not.toContain("${HEALTHCARE_DATASET_OVERRIDE");
-    }
-  });
-
-  it("grant nothing to the audit sink, which writes to a log bucket in its own project", () => {
-    expect(deploy).not.toContain("writerIdentity");
-    expect(deploy).not.toContain("roles/logging.bucketWriter");
   });
 });

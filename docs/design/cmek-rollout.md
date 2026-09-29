@@ -247,9 +247,8 @@ folder, carries neither.
 A new project deploys on the keys from its first deploy (audit I-10). `deploy.sh init` makes the
 record ring and `platform-storage` key before the state bucket, which it creates on that key, and
 `apis` imports them; `init` refuses a state bucket on another key. The Artifact Registry agent is
-created by `google_project_service_identity`, Logging's is read from the project's Logging
-settings, and `apis` asks BigQuery for its agent before the first apply; each is created on that
-request. `apis` also creates the custom role before `apply` binds it. `dev`'s pre-step-6 audit
+created by `google_project_service_identity`, and `apis` asks BigQuery for its agent before the
+first apply, which creates it. `apis` also creates the custom role before `apply` binds it. `dev`'s pre-step-6 audit
 bucket and pre-step-2 software key are declared for `dev` alone. Not yet rehearsed in a project
 under the production folder.
 

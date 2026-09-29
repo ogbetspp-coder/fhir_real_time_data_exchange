@@ -72,7 +72,6 @@ PERMISSIONS=(
   cloudkms.cryptoKeys.getIamPolicy
   logging.buckets.get
   logging.logMetrics.get
-  logging.settings.get
   logging.sinks.get
   monitoring.alertPolicies.get
   monitoring.dashboards.get

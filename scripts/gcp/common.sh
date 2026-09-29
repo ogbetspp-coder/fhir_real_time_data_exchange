@@ -29,9 +29,9 @@ ema_flow_resolve_project() {
 
 # The environment a script acts in, and the one project it may act on (audit B08, L1): no default
 # environment, and the project must be the one scripts/gcp/environments/<environment>.env names in
-# EXPECTED_PROJECT_ID. Until then deploy.sh, plan-identity.sh, storage-keys.sh and
-# bq-cmek-convert.sh took an unset EMA_FLOW_ENVIRONMENT as dev, on whatever project the shell
-# named. Prints the environment; exits on a refusal, so it is used as a plain assignment:
+# EXPECTED_PROJECT_ID. Until then deploy.sh, plan-identity.sh and storage-keys.sh took an unset
+# EMA_FLOW_ENVIRONMENT as dev, on whatever project the shell named. Prints the environment; exits
+# on a refusal, so it is used as a plain assignment:
 #   ENVIRONMENT="$(ema_flow_require_environment "$PROJECT_ID")"
 ema_flow_require_environment() {
   local project="$1" environment="${EMA_FLOW_ENVIRONMENT:-}" file expected
