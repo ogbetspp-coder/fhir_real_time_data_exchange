@@ -7,7 +7,8 @@ import { describe, expect, it } from "vitest";
 import { readRendererPins } from "../../scripts/ci/renderer-pins.mjs";
 
 // The renderer image's pins (docs/design/authority-import-renderer.md, R6): read from
-// Dockerfile.renderer alone, and every way that file can drift from the pinned shape refused.
+// Dockerfile.renderer alone, and the plausible mistakes in editing it refused. A disguised edit is
+// for review, not for this reader (owner decision O3).
 
 const original = readFileSync("Dockerfile.renderer", "utf8");
 
@@ -18,25 +19,16 @@ function variant(edit: (text: string) => string): string {
   return file;
 }
 
-// The allowlist refuses each of these before the rule written for it: any of its refusals will do.
-const APT_REFUSED =
-  /an apt, aptitude or dpkg command|does not use apt as pinned|an apt source or configuration is written|before the snapshot's sources are written|not installed over HTTPS as pinned/;
+// A line added to the RUN that unpacks the downloads.
+const inUnpackRun = (line: string) => (text: string) =>
+  text.replace("RUN set -eu; \\\n    unzip", `RUN set -eu; \\\n    ${line}; \\\n    unzip`);
 
 describe("the renderer image's pins", () => {
   it("reads the base, the snapshot, Chrome and every font with its checksum", () => {
     const pins = readRendererPins();
     expect(pins.base).toMatch(/^node:22\.22\.0-bookworm-slim@sha256:[0-9a-f]{64}$/);
     expect(pins.debianSnapshot).toMatch(/^\d{8}T\d{6}Z$/);
-    expect(pins.debianReleases).toEqual({
-      bookworm: "2026-07-11T10:16:37Z",
-      "bookworm-updates": "2026-09-25T20:08:43Z",
-      "bookworm-security": "2026-09-25T22:03:11Z",
-    });
     expect(pins.chromeVersion).toBe("154.0.8037.57");
-    expect(pins.chrome.url).toBe(
-      "https://storage.googleapis.com/chrome-for-testing-public/154.0.8037.57/linux64/chrome-headless-shell-linux64.zip",
-    );
-    expect(pins.liberation.url).toContain("liberation-fonts-ttf-2.1.5.tar.gz");
     expect(pins.fonts.map(({ file }) => file)).toEqual([
       "Carlito-Regular.ttf",
       "Carlito-Bold.ttf",
@@ -61,14 +53,16 @@ describe("the renderer image's pins", () => {
   it.each([
     ["an unpinned base", (text: string) => text.replace(/@sha256:[0-9a-f]{64}/, "")],
     ["a second FROM", (text: string) => `${text}\nFROM scratch\n`],
-    [
-      "a download without a checksum",
-      (text: string) =>
-        text.replace(
-          "RUN set -eu; \\\n    unzip",
-          'RUN curl -fsSL "https://example.org/x" -o x; \\\n    unzip',
-        ),
-    ],
+    ["an apt install outside the snapshot's RUN", inUnpackRun("apt-get install --yes x")],
+    ["an apt install with an option first", inUnpackRun("apt-get -y install x")],
+    ["an apt install with a quiet option first", inUnpackRun("apt-get -qq install x")],
+    ["a download without a checksum", inUnpackRun('curl -fsSL "https://example.org/x" -o x')],
+    ["a curl whose first argument is the URL", inUnpackRun('curl "https://example.org/x" -o x')],
+    ["a curl piped to tar", inUnpackRun("curl https://example.org/x.tgz | tar xz")],
+    ["a curl piped to a shell", inUnpackRun("curl https://example.org/install.sh | sh")],
+    ["a curl of an ARG", inUnpackRun("curl ${CHROME_VERSION} -o x")],
+    ["a download with wget", inUnpackRun("wget https://example.org/x")],
+    ["an ADD", (text: string) => text.replace("USER node", "ADD https://e/x /opt/x\nUSER node")],
     [
       "a checksum of another file",
       (text: string) =>
@@ -124,135 +118,6 @@ describe("the renderer image's pins", () => {
       (text: string) => text.replace("COPY src/render/image/fonts.conf", "COPY other.conf"),
     ],
     [
-      "a curl whose first argument is the URL",
-      (text: string) =>
-        text.replace(
-          "RUN set -eu; \\\n    unzip",
-          'RUN curl "https://example.org/x" -o x; \\\n    unzip',
-        ),
-    ],
-    [
-      "a download with wget",
-      (text: string) =>
-        text.replace("RUN set -eu; \\\n    unzip", "RUN wget https://example.org/x; \\\n    unzip"),
-    ],
-    [
-      "an ADD of a URL",
-      (text: string) => text.replace("USER node", "ADD https://example.org/x /opt/x\nUSER node"),
-    ],
-    [
-      "a checksum failure ignored",
-      (text: string) =>
-        text.replace(
-          'echo "${CHROME_SHA256}  chrome-headless-shell-linux64.zip" | sha256sum --check -',
-          'echo "${CHROME_SHA256}  chrome-headless-shell-linux64.zip" | sha256sum --check - || true',
-        ),
-    ],
-    [
-      "a curl hidden in a command substitution on the install line",
-      (text: string) =>
-        text.replace(
-          "ca-certificates curl unzip fontconfig",
-          'ca-certificates curl unzip fontconfig $(curl -fsSL "https://example.org/x")',
-        ),
-    ],
-    [
-      "a checksum failure swallowed by a later command",
-      (text: string) =>
-        text.replace(
-          'echo "${CHROME_SHA256}  chrome-headless-shell-linux64.zip" | sha256sum --check -',
-          'echo "${CHROME_SHA256}  chrome-headless-shell-linux64.zip" | sha256sum --check - ; true',
-        ),
-    ],
-    [
-      "an apt-get download",
-      (text: string) =>
-        text.replace(
-          "rm -rf /var/lib/apt/lists/*",
-          "apt-get download libfoo; rm -rf /var/lib/apt/lists/*",
-        ),
-    ],
-    [
-      "a COPY from another image",
-      (text: string) =>
-        text.replace(
-          "USER node",
-          `COPY --from=busybox@sha256:${"0".repeat(64)} /bin/sh /bin/sh\nUSER node`,
-        ),
-    ],
-    ["any ADD", (text: string) => text.replace("USER node", "ADD local.tar /opt/\nUSER node")],
-    [
-      "a checksum chain that ends in || true",
-      (text: string) =>
-        text.replace(
-          'echo "${CALADEA_BOLDITALIC_SHA256}  Caladea-BoldItalic.ttf" | sha256sum --check -',
-          'echo "${CALADEA_BOLDITALIC_SHA256}  Caladea-BoldItalic.ttf" | sha256sum --check - || true',
-        ),
-    ],
-    [
-      "a RUN heredoc",
-      (text: string) =>
-        text.replace("USER node", "RUN <<EOT\ncurl https://example.org/x\nEOT\nUSER node"),
-    ],
-    [
-      "a bind mount of another image",
-      (text: string) =>
-        text.replace(
-          "RUN set -eu; \\\n    unzip",
-          "RUN --mount=type=bind,from=busybox,target=/b set -eu; \\\n    unzip",
-        ),
-    ],
-    [
-      "an npm install",
-      (text: string) => text.replace("USER node", "RUN npm install -g something\nUSER node"),
-    ],
-    [
-      "an apt source trusted without a signature",
-      (text: string) =>
-        text.replace(
-          '"Check-Valid-Until: no" \\\n        "" \\',
-          '"Trusted: yes" \\\n        "" \\',
-        ),
-    ],
-    [
-      "a malformed Release date",
-      (text: string) =>
-        text.replace(/ARG DEBIAN_BOOKWORM_DATE=\S+/, "ARG DEBIAN_BOOKWORM_DATE=2026-07-11"),
-    ],
-    [
-      "a Release date the build does not check",
-      (text: string) => text.replace('"bookworm-security ${DEBIAN_BOOKWORM_SECURITY_DATE}"', ""),
-    ],
-    [
-      "apt over HTTP alone (the HTTPS pass reverted)",
-      (text: string) => text.replace("snapshot https; \\", "snapshot http; \\"),
-    ],
-    ["the HTTPS pass dropped", (text: string) => text.replace("    snapshot https; \\\n", "")],
-    [
-      "more than the CA certificates over HTTP",
-      (text: string) =>
-        text.replace(
-          "--no-install-recommends ca-certificates; \\",
-          "--no-install-recommends ca-certificates curl; \\",
-        ),
-    ],
-    [
-      "a snapshot source written for plain HTTP",
-      (text: string) =>
-        text.replace(
-          '"URIs: $1://snapshot.debian.org/archive/debian/${DEBIAN_SNAPSHOT}"',
-          '"URIs: http://snapshot.debian.org/archive/debian/${DEBIAN_SNAPSHOT}"',
-        ),
-    ],
-    [
-      "a third apt install",
-      (text: string) =>
-        text.replace(
-          "    rm -rf /var/lib/apt/lists/*\n",
-          "    apt-get install --yes x; \\\n    rm -rf /var/lib/apt/lists/*\n",
-        ),
-    ],
-    [
       "a malformed snapshot",
       (text: string) => text.replace(/ARG DEBIAN_SNAPSHOT=\S+/, "ARG DEBIAN_SNAPSHOT=latest"),
     ],
@@ -260,343 +125,5 @@ describe("the renderer image's pins", () => {
     const file = variant(edit);
     expect(readFileSync(file, "utf8")).not.toBe(original);
     expect(() => readRendererPins(file)).toThrow(/Dockerfile\.renderer/);
-  });
-
-  // The ways around the HTTPS rule, which constrained only the RUN that writes the sources
-  // (audit B07, carried from B11's review). Each is refused by its own rule, named in the error.
-  it.each<[string, (text: string) => string, RegExp]>([
-    [
-      "apt-get install in another RUN",
-      (text) =>
-        text.replace(
-          "RUN set -eu; \\\n    unzip -q",
-          "RUN set -eu; \\\n    apt-get install --yes x; \\\n    unzip -q",
-        ),
-      /outside the snapshot's RUN/,
-    ],
-    [
-      "apt update in another RUN",
-      (text) =>
-        text.replace(
-          "RUN set -eu; \\\n    unzip -q",
-          "RUN set -eu; \\\n    apt update; \\\n    unzip -q",
-        ),
-      /outside the snapshot's RUN/,
-    ],
-    [
-      "apt-get update before the snapshot's sources are written",
-      (text) =>
-        text.replace("    snapshot http; \\\n", "    apt-get update; \\\n    snapshot http; \\\n"),
-      APT_REFUSED,
-    ],
-    [
-      "a write to /etc/apt/sources.list",
-      (text) =>
-        text.replace(
-          "    snapshot http; \\\n",
-          "    echo 'deb http://deb.debian.org/debian bookworm main' > /etc/apt/sources.list; \\\n    snapshot http; \\\n",
-        ),
-      APT_REFUSED,
-    ],
-    [
-      "a file under /etc/apt/apt.conf.d",
-      (text) =>
-        text.replace(
-          "    snapshot http; \\\n",
-          "    touch /etc/apt/apt.conf.d/99local; \\\n    snapshot http; \\\n",
-        ),
-      APT_REFUSED,
-    ],
-    [
-      "TLS peer verification switched off",
-      (text) =>
-        text.replace(
-          "apt-get install --yes --no-install-recommends \\\n      ca-certificates curl",
-          "apt-get install --yes -o Acquire::https::Verify-Peer=false --no-install-recommends \\\n      ca-certificates curl",
-        ),
-      APT_REFUSED,
-    ],
-    [
-      "host verification switched off",
-      (text) =>
-        text.replace(
-          '"Check-Valid-Until: no" \\\n        "" \\',
-          '"Check-Valid-Until: no" \\\n        "Verify-Host: false" \\\n        "" \\',
-        ),
-      /TLS verification or https transport/,
-    ],
-    [
-      "the scheme argument reassigned inside snapshot()",
-      (text) =>
-        text.replace("    snapshot() { \\\n", "    snapshot() { \\\n      set -- http; \\\n"),
-      /reassigns its scheme argument/,
-    ],
-    [
-      "the scheme argument given a default inside snapshot()",
-      (text) =>
-        text.replace("    snapshot() { \\\n", '    snapshot() { \\\n      : "${1:=http}"; \\\n'),
-      /reassigns its scheme argument/,
-    ],
-    [
-      "the scheme argument shifted away",
-      (text) => text.replace("    snapshot() { \\\n", "    snapshot() { \\\n      shift; \\\n"),
-      /reassigns its scheme argument/,
-    ],
-    // Review round 1 (L-1): each was accepted by the first version of the rules.
-    [
-      "apt-get -o Dir::Etc::SourceList=… update in another RUN",
-      (text) =>
-        text.replace(
-          "RUN set -eu; \\\n    unzip -q",
-          "RUN set -eu; \\\n    apt-get -o Dir::Etc::SourceList=/tmp/evil.list update; \\\n    unzip -q",
-        ),
-      /outside the snapshot's RUN/,
-    ],
-    [
-      "apt-get --option=… install in another RUN",
-      (text) =>
-        text.replace(
-          "RUN set -eu; \\\n    unzip -q",
-          "RUN set -eu; \\\n    apt-get --option=APT::Get::AllowUnauthenticated=1 install x; \\\n    unzip -q",
-        ),
-      /outside the snapshot's RUN/,
-    ],
-    [
-      "a quoted install in another RUN",
-      (text) =>
-        text.replace(
-          "RUN set -eu; \\\n    unzip -q",
-          'RUN set -eu; \\\n    apt-get "install" --yes x; \\\n    unzip -q',
-        ),
-      /outside the snapshot's RUN/,
-    ],
-    [
-      "apt-get by path, with flags before its action, in another RUN",
-      (text) =>
-        text.replace(
-          "RUN set -eu; \\\n    unzip -q",
-          "RUN set -eu; \\\n    /usr/bin/apt-get -y -q install x; \\\n    unzip -q",
-        ),
-      /outside the snapshot's RUN/,
-    ],
-    [
-      "a quoted update with a flag before the snapshot's sources are written",
-      (text) =>
-        text.replace(
-          "    snapshot http; \\\n",
-          "    apt-get -q 'update'; \\\n    snapshot http; \\\n",
-        ),
-      APT_REFUSED,
-    ],
-    [
-      "-o Acquire::Check-Valid-Until=false on the pinned install",
-      (text) =>
-        text.replace(
-          "apt-get install --yes --no-install-recommends \\\n      ca-certificates curl",
-          "apt-get install --yes -o Acquire::Check-Valid-Until=false --no-install-recommends \\\n      ca-certificates curl",
-        ),
-      APT_REFUSED,
-    ],
-    [
-      "--option on the pinned install",
-      (text) =>
-        text.replace(
-          "apt-get install --yes --no-install-recommends \\\n      ca-certificates curl",
-          "apt-get install --yes --option Dir::Etc::SourceParts=/tmp --no-install-recommends \\\n      ca-certificates curl",
-        ),
-      APT_REFUSED,
-    ],
-    [
-      "-c, another configuration file, on the pinned update",
-      (text) =>
-        text.replace("      apt-get update; \\\n", "      apt-get -c /tmp/apt.conf update; \\\n"),
-      APT_REFUSED,
-    ],
-    [
-      "Dir::State written for apt to read later",
-      (text) =>
-        text.replace(
-          "RUN set -eu; \\\n    unzip -q",
-          "RUN set -eu; \\\n    echo 'Dir::State \\\"/tmp\\\";' > /tmp/x; \\\n    unzip -q",
-        ),
-      /configuration or state directory is re-pointed/,
-    ],
-    [
-      "Check-Valid-Until written outside the sources",
-      (text) =>
-        text.replace(
-          "RUN set -eu; \\\n    unzip -q",
-          "RUN set -eu; \\\n    echo 'Acquire::Check-Valid-Until \\\"false\\\";' > /tmp/x; \\\n    unzip -q",
-        ),
-      /Release validity check is configured outside the sources/,
-    ],
-    // Review round 2 (audit B07 follow-up, Low-3): each passed the denylist the allowlist replaced.
-    [
-      "an apt command through a variable",
-      (text) =>
-        text.replace(
-          "RUN set -eu; \\\n    unzip -q",
-          "RUN set -eu; \\\n    CMD=apt-get; $CMD install x; \\\n    unzip -q",
-        ),
-      APT_REFUSED,
-    ],
-    [
-      "an apt command through xargs",
-      (text) =>
-        text.replace(
-          "RUN set -eu; \\\n    unzip -q",
-          "RUN set -eu; \\\n    echo x | xargs apt-get install; \\\n    unzip -q",
-        ),
-      APT_REFUSED,
-    ],
-    [
-      "an apt command inside a function",
-      (text) =>
-        text.replace(
-          "RUN set -eu; \\\n    unzip -q",
-          'RUN set -eu; \\\n    f() { apt-get "$@"; }; f install x; \\\n    unzip -q',
-        ),
-      APT_REFUSED,
-    ],
-    [
-      "an apt command through eval",
-      (text) =>
-        text.replace(
-          "RUN set -eu; \\\n    unzip -q",
-          'RUN set -eu; \\\n    eval "apt-get install x"; \\\n    unzip -q',
-        ),
-      APT_REFUSED,
-    ],
-    [
-      "an apt name split across quotes in sh -c",
-      (text) =>
-        text.replace(
-          "RUN set -eu; \\\n    unzip -q",
-          'RUN set -eu; \\\n    sh -c "ap""t-get install x"; \\\n    unzip -q',
-        ),
-      APT_REFUSED,
-    ],
-    [
-      "an apt name split by single quotes",
-      (text) =>
-        text.replace(
-          "RUN set -eu; \\\n    unzip -q",
-          "RUN set -eu; \\\n    a'p't-get install x; \\\n    unzip -q",
-        ),
-      APT_REFUSED,
-    ],
-    [
-      "aptitude",
-      (text) =>
-        text.replace(
-          "RUN set -eu; \\\n    unzip -q",
-          "RUN set -eu; \\\n    aptitude install x; \\\n    unzip -q",
-        ),
-      APT_REFUSED,
-    ],
-    [
-      "apt-get reinstall",
-      (text) =>
-        text.replace(
-          "RUN set -eu; \\\n    unzip -q",
-          "RUN set -eu; \\\n    apt-get reinstall x; \\\n    unzip -q",
-        ),
-      APT_REFUSED,
-    ],
-    [
-      "apt-get satisfy",
-      (text) =>
-        text.replace(
-          "RUN set -eu; \\\n    unzip -q",
-          "RUN set -eu; \\\n    apt-get satisfy x; \\\n    unzip -q",
-        ),
-      APT_REFUSED,
-    ],
-    [
-      "apt-get build-dep",
-      (text) =>
-        text.replace(
-          "RUN set -eu; \\\n    unzip -q",
-          "RUN set -eu; \\\n    apt-get build-dep x; \\\n    unzip -q",
-        ),
-      APT_REFUSED,
-    ],
-    [
-      "dpkg",
-      (text) =>
-        text.replace(
-          "RUN set -eu; \\\n    unzip -q",
-          "RUN set -eu; \\\n    dpkg -i x.deb; \\\n    unzip -q",
-        ),
-      APT_REFUSED,
-    ],
-    [
-      "apt-helper",
-      (text) =>
-        text.replace(
-          "RUN set -eu; \\\n    unzip -q",
-          "RUN set -eu; \\\n    /usr/lib/apt/apt-helper download-file https://e/x /x; \\\n    unzip -q",
-        ),
-      APT_REFUSED,
-    ],
-    [
-      "a relative sources.list write",
-      (text) =>
-        text.replace(
-          "RUN set -eu; \\\n    unzip -q",
-          "RUN set -eu; \\\n    echo deb http://e/d bookworm main > sources.list; \\\n    unzip -q",
-        ),
-      /an apt source or configuration is written/,
-    ],
-    // Review L3-b: the reader joins lines as the builder does, with no space added.
-    [
-      "an apt name split across two lines",
-      (text) =>
-        text.replace(
-          "RUN set -eu; \\\n    unzip -q",
-          "RUN set -eu; \\\n    ap\\\nt-get install x; \\\n    unzip -q",
-        ),
-      APT_REFUSED,
-    ],
-    [
-      "a curl split across two lines",
-      (text) =>
-        text.replace(
-          "RUN set -eu; \\\n    unzip -q",
-          "RUN set -eu; \\\n    cu\\\nrl -fsSL https://e/x -o x; \\\n    unzip -q",
-        ),
-      /downloads with curl without a SHA-256 check/,
-    ],
-    [
-      "an apt command after a comment inside a continuation",
-      (text) =>
-        text.replace(
-          "RUN set -eu; \\\n    unzip -q",
-          "RUN set -eu; \\\n# a comment\n    apt-get install x; \\\n    unzip -q",
-        ),
-      APT_REFUSED,
-    ],
-    [
-      "apt-get reinstall in place of the pinned install",
-      (text) =>
-        text.replace(
-          "apt-get install --yes --no-install-recommends \\\n      ca-certificates curl",
-          "apt-get reinstall --yes --no-install-recommends \\\n      ca-certificates curl",
-        ),
-      APT_REFUSED,
-    ],
-    [
-      "a third Check-Valid-Until in the snapshot's RUN",
-      (text) =>
-        text.replace(
-          '"Suites: bookworm-security" \\\n',
-          '"Suites: bookworm-security" \\\n        "Check-Valid-Until: no" \\\n',
-        ),
-      /do not set Check-Valid-Until as pinned/,
-    ],
-  ])("refuses %s", (_, edit, reason) => {
-    const file = variant(edit);
-    expect(readFileSync(file, "utf8")).not.toBe(original);
-    expect(() => readRendererPins(file)).toThrow(reason);
   });
 });

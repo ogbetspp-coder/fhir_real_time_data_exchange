@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { instructions as readInstructions } from "../../scripts/ci/validator-pins.mjs";
+import { instructions } from "../../scripts/ci/dockerfile.mjs";
 
 // The worker's and the query service's image (audit B07, S-1 and S-5): one Dockerfile with a
 // target for each; the pinned Node binary on a Debian base Dependabot refreshes; the runtime ADR
@@ -48,48 +48,22 @@ function cloudbuildDockerfiles(): string[] {
   return [...files].sort();
 }
 
-// What BuildKit accepts and the legacy builder does not: the syntax directive, RUN flags, heredocs,
-// the newer COPY and ADD flags, and the automatic platform arguments. Continuation lines are joined
-// first, as the builder joins them.
+// The BuildKit-only constructs a contributor is likely to copy in from current Docker examples,
+// which the held legacy builder refuses or misreads. A short list of plausible mistakes, read
+// through the shared reader (scripts/ci/dockerfile.mjs); anything rarer is for review (O3).
+const BUILDKIT_ONLY: [string, RegExp][] = [
+  ["RUN --mount or --network", /^\s*RUN\s+(?:--\S+\s+)*--(?:mount|network)\b/i],
+  ["a heredoc", /^\s*(?:RUN|COPY)\b.*<<-?\s*["']?\w+/i],
+  ["COPY or ADD --chmod or --link", /^\s*(?:COPY|ADD)\b.*\s--(?:chmod|link)\b/i],
+  ["ADD --checksum", /^\s*ADD\b.*\s--checksum\b/i],
+  ["an automatic platform argument", /\$\{?(?:BUILD|TARGET)PLATFORM\b/],
+];
 function buildkitOnly(text: string): string[] {
-  // Directives are read from the raw file; instructions are joined by the shared reader, as the
-  // builder joins them (comment and blank lines inside a continuation skipped, no space added;
-  // review L3-b), and an ONBUILD trigger is judged as the instruction it defers.
-  const directives = text.split(/\r?\n/).filter((line) => /^\s*#/.test(line));
-  const instructions = readInstructions(text).map((line) => line.replace(/^\s*ONBUILD\s+/i, ""));
-  const directiveRules: [string, RegExp][] = [
-    ["# syntax= directive", /^\s*#\s*syntax\s*=/i],
-    // The legacy builder reads it; it is refused because it changes the line continuation this
-    // guard, the pin readers and check-dockerfiles.mjs assume.
-    ["# escape= directive", /^\s*#\s*escape\s*=/i],
-  ];
-  const rules: [string, RegExp][] = [
-    [
-      "RUN --mount, --network, --security or --device",
-      /^\s*RUN\s+(?:--\S+\s+)*--(?:mount|network|security|device)\b/i,
-    ],
-    ["a heredoc", /^\s*(?:RUN|COPY|ADD)\b.*<<-?\s*["']?\w+/i],
-    [
-      "COPY or ADD --chmod, --link, --parents or --exclude",
-      /^\s*(?:COPY|ADD)\b.*\s--(?:chmod|link|parents|exclude)\b/i,
-    ],
-    [
-      "ADD --checksum, --keep-git-dir or --unpack",
-      /^\s*ADD\b.*\s--(?:checksum|keep-git-dir|unpack)\b/i,
-    ],
-    ["HEALTHCHECK --start-interval", /^\s*HEALTHCHECK\b.*\s--start-interval\b/i],
-    ["an automatic platform argument", /\$\{?(?:BUILD|TARGET)(?:PLATFORM|OS|ARCH|VARIANT)\b/],
-    // ${V#…}, ${V%…} and ${V/…} are BuildKit's; the legacy builder substitutes only $V, ${V},
-    // ${V:-…} and ${V:+…}. RUN, CMD and ENTRYPOINT are left to the shell, which has its own.
-    [
-      "a pattern expansion in an instruction the builder substitutes",
-      /^\s*(?!RUN\b|CMD\b|ENTRYPOINT\b|HEALTHCHECK\b)[A-Z]+\b.*\$\{\w+(?:#|%|\/)/i,
-    ],
-  ];
+  const lines = instructions(text).map((instruction) => instruction.text);
   return [
-    ...directiveRules.filter(([, rule]) => directives.some((line) => rule.test(line))),
-    ...rules.filter(([, rule]) => instructions.some((line) => rule.test(line))),
-  ].map(([name]) => name);
+    ...(/^\s*#\s*syntax\s*=/im.test(text) ? ["a syntax directive"] : []),
+    ...BUILDKIT_ONLY.filter(([, rule]) => lines.some((line) => rule.test(line))).map(([n]) => n),
+  ];
 }
 
 describe("the worker and query image", () => {
@@ -229,41 +203,16 @@ describe("the Cloud Build configuration", () => {
     ["a cache mount", "FROM x\nRUN --mount=type=cache,target=/root/.npm npm ci\n"],
     ["a RUN network flag", "FROM x\nRUN --network=none true\n"],
     ["a heredoc", "FROM x\nRUN <<EOF\ntrue\nEOF\n"],
-    ["a heredoc COPY", "FROM x\nCOPY <<-EOT /a\nx\nEOT\n"],
     ["COPY --chmod", "FROM x\nCOPY --chmod=755 a /a\n"],
     ["COPY --link", "FROM x\nCOPY --link a /a\n"],
-    ["COPY --parents", "FROM x\nCOPY --parents a/b /c\n"],
-    ["COPY --exclude", "FROM x\nCOPY --exclude=*.md . /c\n"],
     ["ADD --checksum", "FROM x\nADD --checksum=sha256:00 https://e/x /x\n"],
     ["an automatic platform argument", "FROM --platform=$BUILDPLATFORM x\n"],
     ["a line continued into a mount", "FROM x\nRUN \\\n    --mount=type=secret,id=a true\n"],
-    // Review L3-b/L4-a: continuations joined as the builder joins them.
-    [
-      "a mount after a comment inside a continuation",
-      "FROM x\nRUN \\\n# a comment\n    --mount=type=secret,id=a true\n",
-    ],
-    [
-      "a mount after a blank line inside a continuation",
-      "FROM x\nRUN \\\n\n    --mount=type=secret,id=a true\n",
-    ],
-    ["a flag split across lines", "FROM x\nRUN --mo\\\nunt=type=secret,id=a true\n"],
-    // Review round 2 (audit B07 follow-up, Low-4).
-    ["an ONBUILD RUN --mount", "FROM x\nONBUILD RUN --mount=type=cache,target=/c true\n"],
-    ["an ONBUILD COPY --chmod", "FROM x\nONBUILD COPY --chmod=755 a /a\n"],
-    ["ADD --unpack", "FROM x\nADD --unpack=true https://e/x.tgz /x\n"],
-    ["RUN --device", "FROM x\nRUN --device=/dev/fuse true\n"],
-    ["HEALTHCHECK --start-interval", "FROM x\nHEALTHCHECK --start-interval=1s CMD true\n"],
-    ["a suffix-removing expansion", "FROM x\nARG V=a.tgz\nCOPY ${V%.tgz} /a\n"],
-    ["a prefix-removing expansion", "FROM x\nARG V=a/b\nENV W=${V#a/}\n"],
-    ["a replacing expansion", "FROM x\nARG V=a\nWORKDIR /${V/a/b}\n"],
-    ["an escape directive", "# escape=`\nFROM x\n"],
   ])("refuses %s while the builder is legacy", (_, text) => {
     expect(buildkitOnly(text)).not.toEqual([]);
   });
 
   it.each([
-    ["a shell expansion inside RUN", 'FROM x\nRUN v=a.tgz; echo "${v%.tgz}"\n'],
-    ["the legacy default forms", "FROM x\nARG V\nENV W=${V:-a} X=${V:+b}\nCOPY $V ${V} /a\n"],
     ["COPY --chown and --from", "FROM x AS b\nFROM x\nCOPY --chown=a:a --from=b /a /a\n"],
     ["an ordinary comment", "# the base\nFROM x\n"],
   ])("accepts %s, which the legacy builder builds", (_, text) => {

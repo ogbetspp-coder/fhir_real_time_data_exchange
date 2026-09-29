@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import { args, checksummedDownloads, instructions, SHA256_HEX } from "./dockerfile.mjs";
+
 // Reading the official validator's pins from the files that define them, so that the CI gate
 // (scripts/ci/official-validate.mjs) and the deployed sidecar (Dockerfile.validator) cannot
 // disagree: one Dockerfile and one package list, read by both. Every reader here throws on a
@@ -9,71 +11,16 @@ import path from "node:path";
 export const PACKAGE_LOCK = "fhir/validator-packages.lock";
 const REGISTRY = "https://packages2.fhir.org/packages";
 
-// The instructions, joined as the builder joins them (moby's parser; audit B07 follow-up, review
-// L3-b): a trailing backslash, and the spaces or tabs after it, are removed and the next line is
-// appended as it stands, with no space added, so `ap\` then `t-get` is `apt-get`; comment lines
-// and blank lines are dropped, inside a continuation too, where neither ends the instruction.
-// Until then this joined with a space, and a blank line ended the instruction, so a name split
-// across lines, or a flag after a blank line, was not the text the builder ran.
-export function instructions(text) {
-  const joined = [];
-  let open = null;
-  for (const line of text.split(/\r?\n/)) {
-    if (/^\s*#/.test(line) || /^\s*$/.test(line)) continue;
-    const continued = /\\[ \t]*$/.test(line);
-    const body = continued ? line.replace(/\\[ \t]*$/, "") : line;
-    if (open === null) open = body;
-    else open += body;
-    if (!continued) {
-      joined.push(open);
-      open = null;
-    }
-  }
-  if (open !== null) joined.push(open);
-  return joined;
-}
-
-export const SHA256_HEX = /^[0-9a-f]{64}$/;
-
-// The pins: ARG name=value lines, the `curl ... "<url>" -o <file> && echo "${SHA} <file>" |
-// sha256sum --check` pairs of the RUN instruction with ${ARG} substituted, and the sidecar's
-// validator flags from the CMD line. Each is required; a Dockerfile that has drifted from this
-// shape fails here rather than being silently half-read.
+// The pins: the ARGs, the checksummed downloads of the RUN instruction (scripts/ci/dockerfile.mjs)
+// and the sidecar's validator flags from the CMD line. Each is required; a Dockerfile that has
+// drifted from this shape fails here rather than being silently half-read.
 export function readSidecarPins(dockerfile) {
-  const lines = instructions(readFileSync(dockerfile, "utf8"));
+  const lines = instructions(readFileSync(dockerfile, "utf8")).map(({ text }) => text);
   const name = path.basename(dockerfile);
 
-  const args = new Map();
-  for (const line of lines) {
-    const match = /^\s*ARG\s+([A-Z0-9_]+)=(\S+)\s*$/.exec(line);
-    if (match !== null) args.set(match[1], match[2]);
-  }
-  if (args.size === 0) throw new Error(`${name}: no ARG name=value line could be parsed`);
-
-  const substitute = (text) =>
-    text.replace(/\$\{([A-Z0-9_]+)\}/g, (_, key) => {
-      const value = args.get(key);
-      if (value === undefined) throw new Error(`${name}: \${${key}} is not declared by an ARG`);
-      return value;
-    });
-
-  const artefacts = [];
-  const download =
-    /curl\s+(?:-\S+\s+)*"([^"]+)"\s+-o\s+(\S+)\s+&&\s+echo\s+"\$\{([A-Z0-9_]+)\}\s+(\S+)"\s+\|\s+sha256sum\s+--check/g;
-  for (const line of lines) {
-    if (!/^\s*RUN\b/.test(line)) continue;
-    for (const match of line.matchAll(download)) {
-      const [, url, file, checksumArg, checkedFile] = match;
-      if (file !== checkedFile) {
-        throw new Error(`${name}: ${file} is downloaded but ${checkedFile} is checksummed`);
-      }
-      const sha256 = args.get(checksumArg);
-      if (sha256 === undefined || !SHA256_HEX.test(sha256)) {
-        throw new Error(`${name}: ARG ${checksumArg} is missing or is not a SHA-256 hex digest`);
-      }
-      artefacts.push({ file, url: substitute(url), sha256 });
-    }
-  }
+  const declared = args(lines, name);
+  if (declared.size === 0) throw new Error(`${name}: no ARG name=value line could be parsed`);
+  const artefacts = checksummedDownloads(lines, declared, name);
   const jar = artefacts.find(({ file }) => file === "validator_cli.jar");
   if (jar === undefined) throw new Error(`${name}: no checksummed validator_cli.jar download`);
 
@@ -175,7 +122,7 @@ export function readSidecarPins(dockerfile) {
   }
 
   return {
-    version: args.get("VALIDATOR_VERSION") ?? "unknown",
+    version: declared.get("VALIDATOR_VERSION") ?? "unknown",
     artefacts,
     flags,
     packages,

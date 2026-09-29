@@ -9,12 +9,7 @@ export type RendererArtefact = { file: string; url: string; sha256: string };
 export type RendererPins = {
   base: string;
   debianSnapshot: string;
-  // Each suite's pinned Release date, by suite.
-  debianReleases: Record<"bookworm" | "bookworm-updates" | "bookworm-security", string>;
   chromeVersion: string;
-  googleFontsCommit: string;
-  chrome: RendererArtefact;
-  liberation: RendererArtefact;
   fonts: RendererArtefact[];
   artefacts: RendererArtefact[];
 };
