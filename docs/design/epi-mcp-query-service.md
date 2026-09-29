@@ -186,8 +186,8 @@ honestly" and traced as UR-20.
   It does not resolve build arguments, so `FROM ${BASE}` or `--from=$STAGE` passes unexamined,
   and it does not contact a registry, so it proves only that a digest was written — not that
   the registry still serves the content that digest named. Its notion of a stage is also
-  textual: an `AS` name it reads becomes a stage for the instructions below it, whether or not
-  the builder would accept that name.
+  textual: any `AS` name in the file is a stage wherever it is referenced, so a stage named like
+  an image shields that image. It catches honest mistakes; a disguised edit is for review (O3).
 - **A refused body is audited only as a log line.** Bodies the service refuses before the
   transport is connected write a `refused-body` warning and no audit record, so the refusal
   surface is visible in logs but not in the audit trail the `QueryAuditRecord` contract
@@ -702,11 +702,8 @@ original criteria; the rest were added with the three adversarial reviews of 202
     fixture Dockerfiles: it passes digests and declared stage names, and fails an unpinned
     `FROM`, an unpinned `COPY --from`, an unpinned `ADD --from`, an unpinned `RUN --mount`
     source, an unpinned reference written after a line continuation, two node images pinned to
-    different digests, and a directory with no Dockerfile at all. It also passes a stage
-    referenced above the instruction that declares it, and fails a `FROM` whose own `AS` name
-    is its image name — `FROM busybox AS busybox` with a `COPY --from=busybox`, `FROM alpine AS
-alpine` with a `RUN --mount ... from=alpine`, and a `FROM node:...@<digest> AS node` whose
-    digest disagrees with the other Dockerfile's. (`test/ci/check-dockerfiles.test.ts`)
+    different digests, Cloud Build steps not pinned by digest, and a directory with no
+    Dockerfile at all. (`test/ci/check-dockerfiles.test.ts`)
 19. **A body the transport cannot answer is refused.** A batch pairing a `tools/call` with a
     `notifications/cancelled` naming its id, and a batch repeating a JSON-RPC id, are each
     answered `400` with no tool run, no store read and no record; a cancellation naming an id

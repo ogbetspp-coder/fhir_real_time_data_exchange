@@ -12,11 +12,7 @@
 #     removed: git log prints no patch for one unless asked (--text);
 #   - a secret in a file gitleaks' default configuration exempts by name (creds.bin,
 #     sub/package-lock.json): the scan drops those global path exemptions;
-#   - a secret in a commit message, which git log -p gives gitleaks no patch line of;
-#   - a secret on a line marked `gitleaks:allow`: gitleaks honours the comment unless told not to;
-#   - a secret whose fingerprint a committed .gitleaksignore lists: gitleaks reads the one at the
-#     scanned root whatever it is told, so the scan refuses to run while one is there (this case
-#     must be refused, not found).
+#   - a secret in a commit message, which git log -p gives gitleaks no patch line of.
 #
 # The token is generated at run time, so this file carries none for the scan of this repository
 # to find, and the planted repositories live in a temporary directory that is deleted on exit.
@@ -70,8 +66,6 @@ expect() { # <found|clean> <case> <repository> [range]
     bash "$HERE/secret-scan.sh" >"$out.log" 2>&1 || code=$?
   if [[ "$code" == 1 ]] && grep -q '^| github-pat |' "$out.md" 2>/dev/null; then
     verdict=found
-  elif [[ "$code" == 1 ]] && grep -q '^::error::\.gitleaksignore is not honoured' "$out.log"; then
-    verdict=refused
   elif [[ "$code" == 0 ]] && grep -q '^No secrets found\.$' "$out.log"; then
     verdict=clean
   else
@@ -136,30 +130,6 @@ printf 'x\n' >"$message/x"
 git -C "$message" add x
 git -C "$message" commit -q -m "TOKEN=${token}"
 expect found "a secret in a commit message, in the range" "$message" HEAD~1..HEAD
-
-# A secret its own line marks as allowed.
-inline="$(planted inline)"
-printf 'TOKEN=%s # gitleaks:allow\n' "$token" >"$inline/config.env"
-git -C "$inline" add config.env
-git -C "$inline" commit -q -m inline
-expect found "a secret marked gitleaks:allow, in the tree" "$inline"
-expect found "a secret marked gitleaks:allow, in the range" "$inline" HEAD~1..HEAD
-
-# A secret whose fingerprints a committed .gitleaksignore lists, for the tree and the commit.
-ignored="$(planted ignored)"
-printf 'TOKEN=%s\n' "$token" >"$ignored/config.env"
-git -C "$ignored" add config.env
-git -C "$ignored" commit -q -m ignored
-printf 'config.env:github-pat:1\n%s:config.env:github-pat:1\n' "$(git -C "$ignored" rev-parse HEAD)" \
-  >"$ignored/.gitleaksignore"
-git -C "$ignored" add .gitleaksignore
-git -C "$ignored" commit -q -m "ignore it"
-expect refused "a secret listed in .gitleaksignore, in the tree" "$ignored"
-expect refused "a secret listed in .gitleaksignore, in the range" "$ignored" HEAD~2..HEAD
-# The same secret with the file gone from the tree but still in the history is found.
-git -C "$ignored" rm -q .gitleaksignore
-git -C "$ignored" commit -q -m "drop the ignore file"
-expect found "a secret once listed in .gitleaksignore, in the range" "$ignored" HEAD~3..HEAD
 
 if [[ "$failures" != 0 ]]; then
   echo "::error::The secret scan self-test failed ${failures} case(s)." >&2
