@@ -244,32 +244,14 @@ folder, carries neither.
 
 ## A new environment
 
-A new project (production first) is created on the keys from its first deploy, with no manual
-step between (audit I-10, 2026-09-28). Until then three things stopped it:
-
-- **The state bucket.** `deploy.sh init` created it without a key, which the production folder's
-  policy refuses; and the key was Terraform's, which keeps its state in that bucket. `init` now
-  makes the `ema-flow-<env>-record` ring and its `platform-storage` key first, with gcloud and as
-  Terraform declares them (the destruction wait is fixed at creation, so it must match), grants
-  the Cloud Storage service agent the key, and creates the bucket on it, never public, versioned,
-  its old generations expiring. `deploy.sh apis` then imports the ring and the key, so Terraform
-  manages them from its first apply. `init` refuses a state bucket on any other key, or none;
-  `record-readers.sh` removes project viewers' and editors' access to it after every apply.
-- **The service agents.** Google creates most of them on first use, and a key cannot be granted
-  to an agent that does not exist yet. Healthcare's and Artifact Registry's are created by
-  `google_project_service_identity`; Logging's is read from the project's Logging settings,
-  which creates it (and names it, since older projects have `cmek-p<number>@gcp-sa-logging`);
-  BigQuery's is asked for by `deploy.sh apis` before the first apply, which creates it, and must be
-  `bq-<number>@bigquery-encryption`; Cloud Storage's comes from its data source.
-- **Custom roles.** A role created in the apply that binds it is not yet known where the binding
-  is made (the first deploy of #125 failed that way). `deploy.sh apis` creates every custom role,
-  minutes before `apply` binds it.
-
-`dev`'s migration leftovers — the audit bucket from before step 6 and the software signing key
-from before step 2 — are declared for `dev` alone, so a new environment does not create them.
-
-Not yet rehearsed: the first run of all this is to be in a throwaway project under the production
-folder, before the first production deploy (owner action, audit I-10).
+A new project deploys on the keys from its first deploy (audit I-10). `deploy.sh init` makes the
+record ring and `platform-storage` key before the state bucket, which it creates on that key, and
+`apis` imports them; `init` refuses a state bucket on another key. The Artifact Registry agent is
+created by `google_project_service_identity`, Logging's is read from the project's Logging
+settings, and `apis` asks BigQuery for its agent before the first apply; each is created on that
+request. `apis` also creates the custom role before `apply` binds it. `dev`'s pre-step-6 audit
+bucket and pre-step-2 software key are declared for `dev` alone. Not yet rehearsed in a project
+under the production folder.
 
 ## Rollback
 

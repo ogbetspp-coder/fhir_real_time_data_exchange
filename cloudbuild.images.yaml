@@ -12,39 +12,36 @@ substitutions:
 
 # Every builder is pinned by digest, like every base image (npm run images:check covers both):
 # the builder runs with the build identity's token and pushes the images that deploy. The digest
-# is gcr.io/cloud-builders/docker:29 (Docker 29 on Ubuntu 24.04), the multi-arch index as resolved
-# from the registry on 2026-09-28. Dependabot does not read this file; move it by hand
-# (scripts/ci/pin-freshness.mjs reports a newer :29). The node image is the one the Dockerfiles
-# start FROM, at the same digest (images:check holds them equal).
+# is gcr.io/cloud-builders/docker:latest (Docker 20.10.24, single-arch linux/amd64) as resolved
+# from the registry on 2026-09-22. Dependabot does not read this file; move it by hand. The node
+# image is the one the Dockerfiles start FROM, at the same digest (images:check holds them equal).
 #
-# Until audit B13 this was docker:20.10.24, the legacy builder on Ubuntu 20.04, both past their end
-# of life (audit B07, review round 1, M-1). docker:29 builds with BuildKit, which attaches
-# provenance and SBOM attestations by default, and those would make each pushed tag an OCI index
-# rather than one image. Every build here passes --provenance=false and --sbom=false, so a tag
-# stays a single image; scripts/gcp/deploy.sh's digest lookup accepts an index as well, and pins
-# whatever digest the registry names for the tag. Each build step says DOCKER_BUILDKIT=1 by name
-# rather than relying on the builder's default (as the held builder's steps said =0; audit B07
-# follow-up, Low-1), and CI's Images job builds the same way.
+# Held deliberately (audit B07, review round 1, M-1). Docker 20.10.24 and its Ubuntu 20.04 are past
+# their end of life, and Google tags the image "no-new-use"; its replacement, docker:29, builds
+# with BuildKit, which has never run here: its provenance attestations would make each pushed tag
+# an OCI index that scripts/gcp/deploy.sh's digest lookup does not ask for. The move is its own
+# rehearsed change (audit batch B13). Until then this builder builds with the legacy builder, so
+# the Dockerfiles it builds use nothing BuildKit alone accepts (test/ci/images.test.ts), each
+# build step says DOCKER_BUILDKIT=0 rather than relying on the builder's default, CI's
+# Images job builds them the same way (DOCKER_BUILDKIT=0), and scripts/ci/pin-freshness.mjs
+# reports the pin as held, with this reason, rather than as behind.
 #
 # The three images build at once (waitFor: ["-"]): none reads another. The worker and the query
 # service are two targets of one Dockerfile (audit B07, S-5). The validator image starts from the
 # layers of its previous build (--cache-from its buildcache tag), so an unchanged
 # Dockerfile.validator does not download the ~210 MB of validator and packages again; a changed
 # line rebuilds from that line on, and a first build, with no cache to pull, builds everything.
-# Under BuildKit an image is a cache source only if it was built with its cache metadata inline
-# (BUILDKIT_INLINE_CACHE=1, on the build that pushes buildcache); without it --cache-from does
-# nothing. Inline cache records the pushed stage's layers only (mode=min): the fetch stage, where
-# the downloads are, is not in the pushed image, so it may still be rebuilt when an earlier line
-# changes. Measured on the rehearsal and the first deploy.
+# With two stages (audit B07, S-5) the legacy builder can reuse only the pushed runtime stage's
+# layers: the fetch stage, where the downloads are, is not in the pushed image, so it is likely
+# rebuilt every time. To be measured on the first deploy; the B13 move (BuildKit, inline cache
+# with mode=max or a cache export) is where that is fixed.
 steps:
   - id: build-app-image
-    name: gcr.io/cloud-builders/docker@sha256:b7e5a7271b51a9fe4ee29ebaa98a06ecef86a5f0c51fd7a4bfab8e6a57294d94
+    name: gcr.io/cloud-builders/docker@sha256:001fb4a870a84485cf198c80002f7af42f6456f2dbc261d70a0b5f0111470df4
     waitFor: ["-"]
-    env: ["DOCKER_BUILDKIT=1"]
+    env: ["DOCKER_BUILDKIT=0"]
     args:
       - build
-      - --provenance=false
-      - --sbom=false
       - --target
       - worker
       - --label
@@ -54,7 +51,7 @@ steps:
       - .
 
   - id: pull-validator-cache
-    name: gcr.io/cloud-builders/docker@sha256:b7e5a7271b51a9fe4ee29ebaa98a06ecef86a5f0c51fd7a4bfab8e6a57294d94
+    name: gcr.io/cloud-builders/docker@sha256:001fb4a870a84485cf198c80002f7af42f6456f2dbc261d70a0b5f0111470df4
     waitFor: ["-"]
     entrypoint: bash
     args:
@@ -62,19 +59,15 @@ steps:
       - docker pull "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/validator:buildcache" || echo "No validator build cache yet; building without one."
 
   - id: build-validator-image
-    name: gcr.io/cloud-builders/docker@sha256:b7e5a7271b51a9fe4ee29ebaa98a06ecef86a5f0c51fd7a4bfab8e6a57294d94
+    name: gcr.io/cloud-builders/docker@sha256:001fb4a870a84485cf198c80002f7af42f6456f2dbc261d70a0b5f0111470df4
     waitFor: ["pull-validator-cache"]
-    env: ["DOCKER_BUILDKIT=1"]
+    env: ["DOCKER_BUILDKIT=0"]
     args:
       - build
-      - --provenance=false
-      - --sbom=false
       - --file
       - Dockerfile.validator
       - --cache-from
       - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/validator:buildcache
-      - --build-arg
-      - BUILDKIT_INLINE_CACHE=1
       - --label
       - org.opencontainers.image.revision=${_REVISION}
       - --tag
@@ -89,7 +82,7 @@ steps:
   # only starts it and keeps its log; the next one judges the log. Bash variables are written
   # $$name so Cloud Build does not read them as substitutions.
   - id: validator-starts-offline
-    name: gcr.io/cloud-builders/docker@sha256:b7e5a7271b51a9fe4ee29ebaa98a06ecef86a5f0c51fd7a4bfab8e6a57294d94
+    name: gcr.io/cloud-builders/docker@sha256:001fb4a870a84485cf198c80002f7af42f6456f2dbc261d70a0b5f0111470df4
     waitFor: ["build-validator-image"]
     entrypoint: bash
     args:
@@ -124,13 +117,11 @@ steps:
       - offline.log
 
   - id: build-query-image
-    name: gcr.io/cloud-builders/docker@sha256:b7e5a7271b51a9fe4ee29ebaa98a06ecef86a5f0c51fd7a4bfab8e6a57294d94
+    name: gcr.io/cloud-builders/docker@sha256:001fb4a870a84485cf198c80002f7af42f6456f2dbc261d70a0b5f0111470df4
     waitFor: ["-"]
-    env: ["DOCKER_BUILDKIT=1"]
+    env: ["DOCKER_BUILDKIT=0"]
     args:
       - build
-      - --provenance=false
-      - --sbom=false
       - --target
       - query
       - --label

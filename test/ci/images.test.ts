@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { instructions as readInstructions } from "../../scripts/ci/validator-pins.mjs";
+
 // The worker's and the query service's image (audit B07, S-1 and S-5): one Dockerfile with a
 // target for each; the pinned Node binary on a Debian base Dependabot refreshes; the runtime ADR
 // 0003 pins asserted inside the image; no install scripts at build; and the standards lock the
@@ -15,8 +17,8 @@ const stages = [...dockerfile.matchAll(/^FROM (\S+)(?: AS (\S+))?$/gm)].map(([, 
   name,
 }));
 
-// The builder cloudbuild.images.yaml holds: docker:29, which builds with BuildKit (audit B13).
-const DOCKER_29 = "sha256:b7e5a7271b51a9fe4ee29ebaa98a06ecef86a5f0c51fd7a4bfab8e6a57294d94";
+// The builder cloudbuild.images.yaml holds (Docker 20.10.24), and the Dockerfiles it builds.
+const LEGACY_BUILDER = "sha256:001fb4a870a84485cf198c80002f7af42f6456f2dbc261d70a0b5f0111470df4";
 
 // Each step of cloudbuild.images.yaml: its id, image, env list and argument list.
 function cloudbuildSteps(): { id: string; name: string; env: string[]; args: string[] }[] {
@@ -35,15 +37,59 @@ function cloudbuildSteps(): { id: string; name: string; env: string[]; args: str
     });
 }
 
-const builds = () => cloudbuildSteps().filter((step) => step.args[0] === "build");
-
 function cloudbuildDockerfiles(): string[] {
   const files = new Set<string>();
-  for (const { args } of builds()) {
-    const at = args.indexOf("--file");
-    files.add(at === -1 ? "Dockerfile" : (args[at + 1] ?? ""));
+  for (const [, args] of cloudbuild.matchAll(/args:\n((?:\s+- [^\n]*\n)+)/g)) {
+    const list = [...(args ?? "").matchAll(/- (\S+)/g)].map((match) => match[1]);
+    if (list[0] !== "build") continue;
+    const at = list.indexOf("--file");
+    files.add(at === -1 ? "Dockerfile" : (list[at + 1] ?? ""));
   }
   return [...files].sort();
+}
+
+// What BuildKit accepts and the legacy builder does not: the syntax directive, RUN flags, heredocs,
+// the newer COPY and ADD flags, and the automatic platform arguments. Continuation lines are joined
+// first, as the builder joins them.
+function buildkitOnly(text: string): string[] {
+  // Directives are read from the raw file; instructions are joined by the shared reader, as the
+  // builder joins them (comment and blank lines inside a continuation skipped, no space added;
+  // review L3-b), and an ONBUILD trigger is judged as the instruction it defers.
+  const directives = text.split(/\r?\n/).filter((line) => /^\s*#/.test(line));
+  const instructions = readInstructions(text).map((line) => line.replace(/^\s*ONBUILD\s+/i, ""));
+  const directiveRules: [string, RegExp][] = [
+    ["# syntax= directive", /^\s*#\s*syntax\s*=/i],
+    // The legacy builder reads it; it is refused because it changes the line continuation this
+    // guard, the pin readers and check-dockerfiles.mjs assume.
+    ["# escape= directive", /^\s*#\s*escape\s*=/i],
+  ];
+  const rules: [string, RegExp][] = [
+    [
+      "RUN --mount, --network, --security or --device",
+      /^\s*RUN\s+(?:--\S+\s+)*--(?:mount|network|security|device)\b/i,
+    ],
+    ["a heredoc", /^\s*(?:RUN|COPY|ADD)\b.*<<-?\s*["']?\w+/i],
+    [
+      "COPY or ADD --chmod, --link, --parents or --exclude",
+      /^\s*(?:COPY|ADD)\b.*\s--(?:chmod|link|parents|exclude)\b/i,
+    ],
+    [
+      "ADD --checksum, --keep-git-dir or --unpack",
+      /^\s*ADD\b.*\s--(?:checksum|keep-git-dir|unpack)\b/i,
+    ],
+    ["HEALTHCHECK --start-interval", /^\s*HEALTHCHECK\b.*\s--start-interval\b/i],
+    ["an automatic platform argument", /\$\{?(?:BUILD|TARGET)(?:PLATFORM|OS|ARCH|VARIANT)\b/],
+    // ${V#…}, ${V%…} and ${V/…} are BuildKit's; the legacy builder substitutes only $V, ${V},
+    // ${V:-…} and ${V:+…}. RUN, CMD and ENTRYPOINT are left to the shell, which has its own.
+    [
+      "a pattern expansion in an instruction the builder substitutes",
+      /^\s*(?!RUN\b|CMD\b|ENTRYPOINT\b|HEALTHCHECK\b)[A-Z]+\b.*\$\{\w+(?:#|%|\/)/i,
+    ],
+  ];
+  return [
+    ...directiveRules.filter(([, rule]) => directives.some((line) => rule.test(line))),
+    ...rules.filter(([, rule]) => instructions.some((line) => rule.test(line))),
+  ].map(([name]) => name);
 }
 
 describe("the worker and query image", () => {
@@ -103,90 +149,61 @@ describe("the worker and query image", () => {
 
 describe("the Cloud Build configuration", () => {
   it("builds the worker and the query service from their targets", () => {
-    const targets = builds().map(({ args }) => args[args.indexOf("--target") + 1]);
-    expect(targets).toContain("worker");
-    expect(targets).toContain("query");
+    expect(cloudbuild).toMatch(/- build\n\s+- --target\n\s+- worker\n/);
+    expect(cloudbuild).toMatch(/- build\n\s+- --target\n\s+- query\n/);
     expect(cloudbuild).not.toContain("Dockerfile.query");
   });
 
-  // docker:29 since audit B13; until then the legacy docker:20.10.24, held until the move was
-  // rehearsed on Cloud Build (audit B07, review round 1, M-1).
-  it("builds with the one docker:29 builder, pinned by digest", () => {
+  // Held on the legacy builder until its move is rehearsed (audit B07, review round 1, M-1; B13).
+  it("builds with the one held, known-good docker builder", () => {
     const builders = new Set(
       [...cloudbuild.matchAll(/gcr\.io\/cloud-builders\/docker@(sha256:[0-9a-f]{64})/g)].map(
         (match) => match[1],
       ),
     );
-    expect([...builders]).toEqual([DOCKER_29]);
+    expect([...builders]).toEqual([LEGACY_BUILDER]);
   });
 
-  // Every step runs one of two pinned images, and every build runs docker:29 with BuildKit on by
-  // name, not by the builder's default (as audit B07 follow-up, Low-1, named it off for the held
-  // builder). What it reads, and so what it holds: the text of cloudbuild.images.yaml, split at
-  // each top-level `- id:`; in each step its `name:`, a one-line flow-style `env: [...]` and the
-  // `- ` items of its `args:`. A build is a step whose first argument is `build`. It does not
-  // parse YAML (an anchor, a block-style env list or a quoted key is not read), and it does not
-  // read a docker build run from inside another step's script (`entrypoint: bash` with `-c`):
-  // images:check pins every step's image, and review holds the rest.
-  it("runs every step in docker:29 or the pinned node image, and builds with BuildKit named", () => {
+  // Every step runs one of two pinned images, and every build runs the held builder with BuildKit
+  // off by name, not by the builder's default (audit B07 follow-up, Low-1). What it reads, and so
+  // what it holds: the text of cloudbuild.images.yaml, split at each top-level `- id:`; in each
+  // step its `name:`, a one-line flow-style `env: [...]` and the `- ` items of its `args:`. A
+  // build is a step whose first argument is `build`. It does not parse YAML (an anchor, a
+  // block-style env list or a quoted key is not read), and it does not read a docker build run
+  // from inside another step's script (`entrypoint: bash` with `-c`): images:check pins every
+  // step's image, and review holds the rest.
+  it("runs every step in the held builder or the pinned node image, and builds with BuildKit off", () => {
     const nodeImage = /^FROM (node:\S+@sha256:[0-9a-f]{64}) AS build$/m.exec(dockerfile)?.[1];
     const steps = cloudbuildSteps();
     expect(steps.length).toBeGreaterThanOrEqual(6);
     for (const step of steps) {
-      expect([step.id, [`gcr.io/cloud-builders/docker@${DOCKER_29}`, nodeImage]]).toEqual([
+      expect([step.id, [`gcr.io/cloud-builders/docker@${LEGACY_BUILDER}`, nodeImage]]).toEqual([
         step.id,
         expect.arrayContaining([step.name]),
       ]);
+      if (step.args[0] === "build") {
+        expect([step.id, step.name, step.env]).toEqual([
+          step.id,
+          `gcr.io/cloud-builders/docker@${LEGACY_BUILDER}`,
+          ["DOCKER_BUILDKIT=0"],
+        ]);
+      }
     }
-    for (const step of builds()) {
-      expect([step.id, step.name, step.env]).toEqual([
-        step.id,
-        `gcr.io/cloud-builders/docker@${DOCKER_29}`,
-        ["DOCKER_BUILDKIT=1"],
-      ]);
-    }
-    expect(builds().map(({ id }) => id)).toEqual([
+    expect(steps.filter((step) => step.args[0] === "build").map(({ id }) => id)).toEqual([
       "build-app-image",
       "build-validator-image",
       "build-query-image",
     ]);
   });
 
-  // BuildKit attaches provenance and SBOM attestations by default, which make a pushed tag an OCI
-  // index; the deploy pins each tag's digest (scripts/gcp/deploy.sh, resolve_image_digest).
-  it("builds every image as one image, with no attestation, in Cloud Build and in CI", () => {
-    expect(cloudbuildDockerfiles()).toEqual(["Dockerfile", "Dockerfile.validator"]);
-    for (const { id, args } of builds()) {
-      expect([id, args.slice(1, 3)]).toEqual([id, ["--provenance=false", "--sbom=false"]]);
-    }
-    const script = readFileSync("scripts/ci/build-images.sh", "utf8");
-    expect(script).toMatch(/^export DOCKER_BUILDKIT=1$/m);
-    const ciBuilds = script.match(/^docker build .*$/gm) ?? [];
-    expect(ciBuilds).toHaveLength(3);
-    for (const line of ciBuilds) {
-      expect(line).toMatch(/^docker build --provenance=false --sbom=false /);
-    }
-  });
-
-  // Under BuildKit, --cache-from reads only an image built with its cache metadata inline.
-  it("pushes the validator's cache with its cache metadata inline, and builds from it", () => {
-    const validator = (
-      builds().find(({ args }) => args.includes("Dockerfile.validator"))?.args ?? []
-    ).join(" ");
-    expect(validator).toContain("--build-arg BUILDKIT_INLINE_CACHE=1");
-    expect(validator).toMatch(/--cache-from \S+\/validator:buildcache /);
-    expect(validator).toMatch(/--tag \S+\/validator:buildcache /);
-  });
-
-  // An escape directive changes the line continuation the pin readers and check-dockerfiles.mjs
-  // assume (audit B07 follow-up); BuildKit reads it as the legacy builder did.
-  it("builds Dockerfiles with no escape directive", () => {
-    for (const file of cloudbuildDockerfiles()) {
-      expect([file, /^\s*#\s*escape\s*=/im.test(readFileSync(file, "utf8"))]).toEqual([
-        file,
-        false,
-      ]);
-    }
+  it("builds only what the legacy builder can build, and CI builds it the same way", () => {
+    const built = cloudbuildDockerfiles();
+    expect(built).toEqual(["Dockerfile", "Dockerfile.validator"]);
+    for (const file of built)
+      expect([file, buildkitOnly(readFileSync(file, "utf8"))]).toEqual([file, []]);
+    expect(readFileSync("scripts/ci/build-images.sh", "utf8")).toMatch(
+      /^export DOCKER_BUILDKIT=0$/m,
+    );
   });
 
   // One judgement of the validator's offline start, in CI and in the image build (audit B08's
@@ -201,9 +218,55 @@ describe("the Cloud Build configuration", () => {
     for (const target of ["worker", "query"]) {
       expect(cloudbuild).toMatch(
         new RegExp(
-          `- build\\n(?:\\s+- --(?:provenance|sbom)=false\\n)*\\s+- --target\\n\\s+- ${target}\\n\\s+- --label\\n\\s+- org\\.opencontainers\\.image\\.revision=\\$\\{_REVISION\\}\\n`,
+          `- build\\n\\s+- --target\\n\\s+- ${target}\\n\\s+- --label\\n\\s+- org\\.opencontainers\\.image\\.revision=\\$\\{_REVISION\\}\\n`,
         ),
       );
     }
+  });
+
+  it.each([
+    ["a syntax directive", "# syntax=docker/dockerfile:1\nFROM x\n"],
+    ["a cache mount", "FROM x\nRUN --mount=type=cache,target=/root/.npm npm ci\n"],
+    ["a RUN network flag", "FROM x\nRUN --network=none true\n"],
+    ["a heredoc", "FROM x\nRUN <<EOF\ntrue\nEOF\n"],
+    ["a heredoc COPY", "FROM x\nCOPY <<-EOT /a\nx\nEOT\n"],
+    ["COPY --chmod", "FROM x\nCOPY --chmod=755 a /a\n"],
+    ["COPY --link", "FROM x\nCOPY --link a /a\n"],
+    ["COPY --parents", "FROM x\nCOPY --parents a/b /c\n"],
+    ["COPY --exclude", "FROM x\nCOPY --exclude=*.md . /c\n"],
+    ["ADD --checksum", "FROM x\nADD --checksum=sha256:00 https://e/x /x\n"],
+    ["an automatic platform argument", "FROM --platform=$BUILDPLATFORM x\n"],
+    ["a line continued into a mount", "FROM x\nRUN \\\n    --mount=type=secret,id=a true\n"],
+    // Review L3-b/L4-a: continuations joined as the builder joins them.
+    [
+      "a mount after a comment inside a continuation",
+      "FROM x\nRUN \\\n# a comment\n    --mount=type=secret,id=a true\n",
+    ],
+    [
+      "a mount after a blank line inside a continuation",
+      "FROM x\nRUN \\\n\n    --mount=type=secret,id=a true\n",
+    ],
+    ["a flag split across lines", "FROM x\nRUN --mo\\\nunt=type=secret,id=a true\n"],
+    // Review round 2 (audit B07 follow-up, Low-4).
+    ["an ONBUILD RUN --mount", "FROM x\nONBUILD RUN --mount=type=cache,target=/c true\n"],
+    ["an ONBUILD COPY --chmod", "FROM x\nONBUILD COPY --chmod=755 a /a\n"],
+    ["ADD --unpack", "FROM x\nADD --unpack=true https://e/x.tgz /x\n"],
+    ["RUN --device", "FROM x\nRUN --device=/dev/fuse true\n"],
+    ["HEALTHCHECK --start-interval", "FROM x\nHEALTHCHECK --start-interval=1s CMD true\n"],
+    ["a suffix-removing expansion", "FROM x\nARG V=a.tgz\nCOPY ${V%.tgz} /a\n"],
+    ["a prefix-removing expansion", "FROM x\nARG V=a/b\nENV W=${V#a/}\n"],
+    ["a replacing expansion", "FROM x\nARG V=a\nWORKDIR /${V/a/b}\n"],
+    ["an escape directive", "# escape=`\nFROM x\n"],
+  ])("refuses %s while the builder is legacy", (_, text) => {
+    expect(buildkitOnly(text)).not.toEqual([]);
+  });
+
+  it.each([
+    ["a shell expansion inside RUN", 'FROM x\nRUN v=a.tgz; echo "${v%.tgz}"\n'],
+    ["the legacy default forms", "FROM x\nARG V\nENV W=${V:-a} X=${V:+b}\nCOPY $V ${V} /a\n"],
+    ["COPY --chown and --from", "FROM x AS b\nFROM x\nCOPY --chown=a:a --from=b /a /a\n"],
+    ["an ordinary comment", "# the base\nFROM x\n"],
+  ])("accepts %s, which the legacy builder builds", (_, text) => {
+    expect(buildkitOnly(text)).toEqual([]);
   });
 });

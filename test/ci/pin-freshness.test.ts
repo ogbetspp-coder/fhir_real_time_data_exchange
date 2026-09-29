@@ -164,29 +164,18 @@ describe("pin freshness", () => {
     }
   });
 
-  // The builder was held on docker:20.10.24 until its move to docker:29 (audit B07, review round
-  // 1, M-1; moved in B13). It is judged against docker:29 again, and a held pin is still reported
-  // as held, with its reason, while it stays at the held value.
-  it("judges the builder against docker:29, and reports a held pin as held, not behind", () => {
+  // Held on the legacy builder until docker:29 is rehearsed (audit B07, review round 1, M-1).
+  it("reports the held builder as held, with its reason, not as behind; a moved one is judged", () => {
     const builder = pins().find(({ name }) => name === "Cloud Build docker builder");
     if (builder === undefined) throw new Error("no builder pin");
-    expect(builder.upstream).toEqual({
-      gcrTag: { repository: "cloud-builders/docker", tag: "29" },
-    });
-    expect(HELD["Cloud Build docker builder"]).toBeUndefined();
-    expect(verdict(builder, builder.read(), builder.read()).status).toBe("current");
+    const held = HELD["Cloud Build docker builder"];
+    expect(builder.read()).toBe(held?.value);
     const upstream = `sha256:${"b".repeat(64)}`;
-    expect(verdict(builder, builder.read(), upstream).status).toBe("behind");
-    HELD["Cloud Build docker builder"] = { value: builder.read(), reason: "a test's reason" };
-    try {
-      const row = verdict(builder, builder.read(), upstream);
-      expect(row.status).toBe("held");
-      expect(row.detail).toContain("a test's reason");
-      expect(report([{ pin: builder, pinned: builder.read(), ...row }]).behind).toBe(0);
-      expect(verdict(builder, `sha256:${"c".repeat(64)}`, upstream).status).toBe("behind");
-    } finally {
-      delete HELD["Cloud Build docker builder"];
-    }
+    const row = verdict(builder, builder.read(), upstream);
+    expect(row.status).toBe("held");
+    expect(row.detail).toContain("B13");
+    expect(report([{ pin: builder, pinned: builder.read(), ...row }]).behind).toBe(0);
+    expect(verdict(builder, `sha256:${"c".repeat(64)}`, upstream).status).toBe("behind");
   });
 
   it("is reported weekly and opens an issue from a job that checks nothing out", () => {

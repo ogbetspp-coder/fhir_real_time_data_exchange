@@ -99,9 +99,8 @@ resource "google_project_service_identity" "healthcare" {
   depends_on = [google_project_service.required]
 }
 
-# The Artifact Registry service agent, which Google otherwise creates only when the service is
-# first used: the artifacts key is granted to it before the repository exists (keys.tf; audit
-# I-10). Asking for an identity that exists already changes nothing.
+# Created before the artifacts key is granted to it; Google otherwise creates it on first use
+# (keys.tf; audit I-10).
 resource "google_project_service_identity" "artifact_registry" {
   provider = google-beta
   project  = var.project_id

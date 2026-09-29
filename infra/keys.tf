@@ -15,19 +15,12 @@
 # Rotation never re-encrypts existing data, so no version is ever destroyed either.
 
 locals {
-  # The service agent each key is granted to. Google creates most of them only on first use, and a
-  # grant to an agent that does not exist yet is refused, so in a new project each is brought into
-  # being before its grant (audit I-10):
-  #   - Healthcare and Artifact Registry: google_project_service_identity (main.tf) creates them.
-  #     Their e-mails follow Google's fixed service-<number>@gcp-sa-<service> form and are spelled
-  #     out, because the provider's email attribute has proved unreliable (see
-  #     healthcare_service_identity_email in main.tf).
-  #   - BigQuery's encryption account, always bq-<number>@bigquery-encryption:
-  #     scripts/gcp/deploy.sh (ensure_bigquery_agent) asks BigQuery for it before the first apply,
-  #     which creates it, and stops unless BigQuery names this account.
-  #   - Logging's: read from the project's Logging settings, which creates it. Not spelled out,
-  #     because a project older than Logging's current form has cmek-p<number>@gcp-sa-logging.
-  #   - Cloud Storage's: the data source in security.tf, which creates it.
+  # Service agents, most created by Google only on first use; a key cannot be granted to one that
+  # does not exist yet (audit I-10). Healthcare's and Artifact Registry's are created by
+  # google_project_service_identity (main.tf), BigQuery's by deploy.sh asking for it before the
+  # first apply; Logging's is read from its settings, which creates it (older projects use
+  # cmek-p<number>@gcp-sa-logging). Spelled-out e-mails: the provider's email attribute has proved
+  # unreliable (healthcare_service_identity_email in main.tf).
   bigquery_encryption_agent = "bq-${data.google_project.current.number}@bigquery-encryption.iam.gserviceaccount.com"
   logging_agent             = data.google_logging_project_settings.current.kms_service_account_id
   artifact_registry_agent   = "service-${data.google_project.current.number}@gcp-sa-artifactregistry.iam.gserviceaccount.com"

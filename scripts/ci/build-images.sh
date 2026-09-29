@@ -19,14 +19,14 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 
-# BuildKit, as Cloud Build's docker:29 builder uses (cloudbuild.images.yaml; audit B13), with the
-# same flags: no attestations, so each image is one image, as the deploy pins it. Named, not left
-# to the runner's default.
-export DOCKER_BUILDKIT=1
+# The legacy builder, as Cloud Build's held docker:20.10.24 builder uses (cloudbuild.images.yaml;
+# audit B07, review round 1, M-1): a Dockerfile that only BuildKit could build fails here, before
+# the deploy, rather than there. Docker 28 on the runner still has it, with a deprecation notice.
+export DOCKER_BUILDKIT=0
 
-docker build --provenance=false --sbom=false --target worker --tag ema-flow/worker:ci .
-docker build --provenance=false --sbom=false --target query --tag ema-flow/query:ci .
-docker build --provenance=false --sbom=false --file Dockerfile.validator --tag ema-flow/validator:ci .
+docker build --target worker --tag ema-flow/worker:ci .
+docker build --target query --tag ema-flow/query:ci .
+docker build --file Dockerfile.validator --tag ema-flow/validator:ci .
 
 expect_config() { # <image> <user> <cmd as JSON>
   local actual

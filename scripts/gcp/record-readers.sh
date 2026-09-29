@@ -24,13 +24,10 @@
 #
 # Which buckets and datasets: every one infra/ declares, as the Terraform output
 # record_readers_targets lists them (test/infra/record-readers.test.ts keeps that output equal to
-# infra/'s resources); the Terraform state bucket, which deploy.sh creates before Terraform exists
-# and which holds the entitlement map and every resource's configuration (audit I-10: until then
-# it stayed readable by project viewers until storage-keys.sh was run by hand); and the agent's
-# staging bucket, made by hand outside Terraform. Each one Terraform declares must exist, and so
-# must the state bucket: the apply that runs before this created them and wrote to it, so a
-# missing one means this is looking at another project or a stale state, and that fails rather
-# than passing with nothing enforced (audit B08, D-5). Only the hand-made bucket may be absent.
+# infra/'s resources), plus the agent's staging bucket, made by hand outside Terraform. Each one
+# Terraform declares must exist: the apply that runs before this created it, so a missing one
+# means this is looking at another project or a stale state, and that fails rather than passing
+# with nothing enforced (audit B08, D-5). Only the hand-made bucket may be absent.
 #
 #   bash scripts/gcp/record-readers.sh
 #   bash scripts/gcp/record-readers.sh --check
@@ -44,8 +41,6 @@ cd "$ROOT"
 # GOOGLE_CLOUD_PROJECT or GCP_PROJECT_ID (refused when the two differ), else the gcloud
 # configuration; no project at all fails rather than falling back to a hard-coded one.
 PROJECT_ID="$(ema_flow_resolve_project)"
-# Created by deploy.sh before Terraform exists, so not in Terraform's list; it must exist.
-STATE_BUCKETS=("$(ema_flow_state_bucket "$PROJECT_ID")")
 # Created by hand for the agent's deploy, outside Terraform and without the environment in its name.
 EXTRA_BUCKETS=("${PROJECT_ID}-ema-flow-agent-staging")
 CHECK="false"
@@ -76,12 +71,14 @@ for name in "${declared_buckets[@]}"; do
     exit 1
   fi
 done
+# And the Terraform state bucket, made by deploy.sh before Terraform exists (audit I-10).
+declared_buckets+=("$(ema_flow_state_bucket "$PROJECT_ID")")
 
 # Buckets: every binding held through projectViewer or projectEditor goes; projectOwner stays.
 # A read that fails for any reason but "not found" stops the script: a network or permission error
 # must fail the deploy, not pass it with nothing enforced. "Not found" passes only for the
 # hand-made bucket.
-for bucket in "${declared_buckets[@]}" "${STATE_BUCKETS[@]}" "${EXTRA_BUCKETS[@]}"; do
+for bucket in "${declared_buckets[@]}" "${EXTRA_BUCKETS[@]}"; do
   err="$(mktemp)"
   if ! policy="$(gcloud --quiet storage buckets get-iam-policy "gs://${bucket}" --format=json 2>"$err")"; then
     if grep -qiE "not found|404" "$err"; then
@@ -90,11 +87,7 @@ for bucket in "${declared_buckets[@]}" "${STATE_BUCKETS[@]}" "${EXTRA_BUCKETS[@]
         echo "${bucket}: does not exist; skipped (made by hand, outside Terraform)"
         continue
       fi
-      if [[ " ${STATE_BUCKETS[*]} " == *" ${bucket} "* ]]; then
-        echo "${bucket}: the Terraform state bucket does not exist in ${PROJECT_ID}." >&2
-      else
-        echo "${bucket}: declared in infra/ but does not exist in ${PROJECT_ID}." >&2
-      fi
+      echo "${bucket}: declared in infra/ but does not exist in ${PROJECT_ID}." >&2
       exit 1
     fi
     echo "${bucket}: cannot read its IAM policy: $(head -c 300 "$err")" >&2
