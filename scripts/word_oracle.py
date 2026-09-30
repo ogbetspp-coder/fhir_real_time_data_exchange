@@ -107,6 +107,9 @@ def word_labels(path: Path) -> list[str]:
     # The two texts can end in different numbers of empty lines, which are no paragraph's. Word
     # adds no paragraph, so the rest pair line for line; matching them by content instead goes
     # wrong where empty list items gain a label.
+    # U+0007 is Word's end-of-cell and end-of-row mark, which follows a paragraph mark and would
+    # otherwise stand at the start of the paragraph after a table, ahead of its label.
+    stored, drawn = stored.replace("\x07", ""), drawn.replace("\x07", "")
     before, after = stored.rstrip("\n").split("\n"), drawn.rstrip("\n").split("\n")
     if len(before) != len(after) or not all(
         a.endswith(b) for b, a in zip(before, after, strict=True)

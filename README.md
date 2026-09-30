@@ -109,11 +109,36 @@ uv run --frozen python scripts/word_oracle.py compare path/*.docx  # list labels
   (Word reports a label but not whether or where it is drawn); a label showing a level that only
   a level override defines.
 
+## Public documents checked
+
+On 2026-09-30 the reader (1.5.0) and Microsoft Word 16.113.3 were run over 348 public Word
+documents: EMA's product-information templates in 24 languages (336, from the
+[QRD templates page](https://www.ema.europa.eu/en/human-regulatory-overview/marketing-authorisation/product-information-requirements/product-information-qrd-templates-human)),
+the WHO prequalification QOS and QIS templates (10, Module 2.3 summaries in the Module 3
+outline, from [WHO PQ](https://extranet.who.int/prequal/key-resources/documents/medicines/q)),
+and SAHPRA's Module 2.3 QOS template (1). Approved SmPCs themselves are published as PDF (EMA's
+product information; 7,507 of the 7,510 in the Czech regulator's open-data set), and Module 3
+dossiers are not published at all.
+
+| Outcome                                                              | Documents |
+| -------------------------------------------------------------------- | --------: |
+| Read, every list label the one Word draws                            |       324 |
+| Refused: footnotes (WHO, SAHPRA, two EMA appendices)                 |         9 |
+| Refused: mail-merge fields (EMA Annex IV templates)                  |         8 |
+| Refused: EMA's stray U+F02D (SmPC template: es, fr, ro, sv)          |         4 |
+| Refused: an unaccepted tracked insertion (EMA Appendix I, is)        |         1 |
+| Refused: a .doc under a .docx name (EMA Annex IV, lv)                |         1 |
+| Refused: a list item run on after a hidden mark (EMA ATMP, no)       |         1 |
+
+No document was read with a list label other than Word's. Five EMA files could not be
+downloaded (HTTP errors after rate limiting); Health Canada and the TGA refuse scripted
+downloads.
+
 ## What it does not read
 
 - **Headers, footers, footnotes, endnotes, comments.** Separate parts, not read. A footnote
   *reference* in the body is refused, so no footnote is lost silently. Footnotes are the most
-  common reason public regulator templates are refused (9 of 140, the WHO and SAHPRA Module 2.3
+  common reason public regulator templates are refused (9 of 348, the WHO and SAHPRA Module 2.3
   templates among them), so they are the next piece of work.
 - **Word 97-2003 documents (.doc)** are refused, including under a .docx name: EMA's site
   serves one. Save them as .docx in Word first.
@@ -183,7 +208,7 @@ public or synthetic documents go here:
 - `numbering-cases/`: synthetic, written by `scripts/numbering_cases.py`.
 
 EMA's files are reproduced with acknowledgement as the EMA permits. The WHO and SAHPRA Module 2.3
-templates were checked (below) but are not reproduced, their terms of reuse being unclear. To
+templates were checked (above) but are not reproduced, their terms of reuse being unclear. To
 add a set: the files, a `sources.json` in the same shape, then `scripts/lock.py` and
 `scripts/word_oracle.py record`.
 
