@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from label_docx.output import canonical, paragraphs, read
-from label_docx.reader import read_docx
+from label_docx.reader import DocxRefusedError, read_docx
 
 CORPUS = sorted((Path(__file__).resolve().parents[1] / "corpus").glob("*/*.docx"))
 ENVIRONMENTS = [
@@ -36,12 +36,20 @@ def test_fresh_processes_under_other_hash_seeds_and_locales_write_the_same_bytes
             capture_output=True,
             check=False,
         )
-        assert done.returncode == 0, done.stderr.decode()
+        # Read or refused (corpus/numbering-cases holds one refusal), never an error.
+        assert done.returncode in (0, 2), done.stderr.decode()
         outputs.add(done.stdout)
     assert outputs == {read(path.read_bytes())[0]}
 
 
 type Date = tuple[int, int, int, int, int, int]
+
+
+def _result(data: bytes) -> bytes | str:
+    try:
+        return canonical(paragraphs(read_docx(data)))
+    except DocxRefusedError as refused:
+        return refused.code
 
 
 def _repack(data: bytes, reverse: bool, compression: int, date: Date) -> bytes:
@@ -61,7 +69,7 @@ def _repack(data: bytes, reverse: bool, compression: int, date: Date) -> bytes:
 @pytest.mark.parametrize("path", CORPUS, ids=lambda path: path.stem[:48])
 def test_the_result_depends_on_the_parts_not_on_how_they_are_zipped(path: Path) -> None:
     data = path.read_bytes()
-    expected = canonical(paragraphs(read_docx(data)))
+    expected = _result(data)
     cases: list[tuple[bool, int, Date]] = [
         (True, zipfile.ZIP_STORED, (1980, 1, 1, 0, 0, 0)),
         (False, zipfile.ZIP_DEFLATED, (2099, 12, 31, 23, 59, 58)),
@@ -70,4 +78,4 @@ def test_the_result_depends_on_the_parts_not_on_how_they_are_zipped(path: Path) 
     for reverse, compression, date in cases:
         repacked = _repack(data, reverse, compression, date)
         assert repacked != data
-        assert canonical(paragraphs(read_docx(repacked))) == expected
+        assert _result(repacked) == expected

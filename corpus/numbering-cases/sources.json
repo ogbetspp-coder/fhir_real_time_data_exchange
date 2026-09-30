@@ -1,0 +1,174 @@
+{
+  "schemaVersion": "1.0.0",
+  "note": "Synthetic list-numbering cases written by scripts/numbering_cases.py.",
+  "sources": [
+    {
+      "name": "Levels count and restart the deeper levels.",
+      "file": "multilevel.docx",
+      "sha256": "4190a564d1cc563a180fc6db24a5fa14ddf95902e65fd51872c13cd35b6447a5",
+      "bytes": 3762
+    },
+    {
+      "name": "Each number format at the edges of its range.",
+      "file": "formats.docx",
+      "sha256": "494ff88e90f40d1f4216752a2f4bf44c85b6f019a6e6471e139d2f53eab325e4",
+      "bytes": 5799
+    },
+    {
+      "name": "isLgl shows every level in decimal.",
+      "file": "legal.docx",
+      "sha256": "be5983db03b9e8a1781f8b837617ba2798a07153b37cb3a6e645e30fd04b65fd",
+      "bytes": 3112
+    },
+    {
+      "name": "lvlRestart 0: the level never restarts.",
+      "file": "restart-never.docx",
+      "sha256": "04b6b2a16e3313a51e521195aaefc5605eb517cef49b2a6066c5a51b37603c22",
+      "bytes": 3457
+    },
+    {
+      "name": "lvlRestart 1 on level 2: it restarts after level 0 only.",
+      "file": "restart-after-first.docx",
+      "sha256": "aa48a48f3a8dca6613701ef7af8c0c88c40c514dcb15fd6d358e4f2cfe5fabfe",
+      "bytes": 3665
+    },
+    {
+      "name": "Lists of different abstractNums count apart.",
+      "file": "two-definitions.docx",
+      "sha256": "a1c97b8fdf82d03e15f35ec89a2a88a129f35035c6af7088b64ae1ad73c68627",
+      "bytes": 3316
+    },
+    {
+      "name": "Two lists of one abstractNum that override nothing continue each other.",
+      "file": "shared-continue.docx",
+      "sha256": "a408beea90ff48a64c408ef33b2587f2cd8d6d6e5c9d00eb9ccf0ed2cefcf462",
+      "bytes": 3425
+    },
+    {
+      "name": "A new list with a startOverride restarts the shared count.",
+      "file": "start-override-restart.docx",
+      "sha256": "00d5a7e5d691662c597f023d491b903fba6cdd3b9ef2e6f1844ecddaa791cd07",
+      "bytes": 3538
+    },
+    {
+      "name": "A startOverride on the first list sets its start.",
+      "file": "start-override-first.docx",
+      "sha256": "c1d3b8a65704c41c3faa573cf97432eca280fb06f39a14029080182141b23c71",
+      "bytes": 3312
+    },
+    {
+      "name": "Back to the first list after a second restarted the count (the reader refuses).",
+      "file": "return-after-restart.docx",
+      "sha256": "20a86c73e2af321d272d2bfa0a49ac70485b8afad9fe6fe3eb06337b3419f730",
+      "bytes": 3425
+    },
+    {
+      "name": "A list that overrides nothing after one that restarted (the reader refuses).",
+      "file": "plain-after-restart.docx",
+      "sha256": "a0842636db8d397723bb68625e1b6f1609253af03e73d4d217ff656efe7ab9de",
+      "bytes": 3312
+    },
+    {
+      "name": "A new list restarts level 1 at 5 under a level 0 counted by another list.",
+      "file": "override-deeper-level.docx",
+      "sha256": "11d58b08f224a041fbbce024fac1a5d03234294c19f196c74acdb073ece1e221",
+      "bytes": 3551
+    },
+    {
+      "name": "A level shown before its parent level was counted (the reader refuses).",
+      "file": "ancestor-never-counted.docx",
+      "sha256": "617e136f80bd10bd5c208c4431e43acb31bbe05864cb6a3f4e8fc54efbfb7837",
+      "bytes": 3426
+    },
+    {
+      "name": "A decimal level with no w:start (the reader refuses).",
+      "file": "missing-start.docx",
+      "sha256": "f4b020efcd8da3cec4d6d41cbd3538d5b310c3e8b10ddc5e9aec12078e8a49bc",
+      "bytes": 2981
+    },
+    {
+      "name": "A style names numId 1 but no level; level 1 names the style (the reader refuses).",
+      "file": "style-tied-deeper-level.docx",
+      "sha256": "73f18d5ea4c000816683ea221ec26d49664f6119af4def1308ff3c79f34adf33",
+      "bytes": 3289
+    },
+    {
+      "name": "A style names numId 1 but no level; level 0 names the style.",
+      "file": "style-tied-level-zero.docx",
+      "sha256": "11653d3f9bc4b19e5deac3399388b666050afa5c12e47424e37a13ae1ed8fece",
+      "bytes": 3177
+    },
+    {
+      "name": "A list linked through a numbering style shares the linked list's count.",
+      "file": "numbering-style-link.docx",
+      "sha256": "b4c87364de3fb2c67610fc2dac0ad0e9fd0ba1c19f188af37ce9717bb49ea021",
+      "bytes": 3436
+    },
+    {
+      "name": "A numStyleLink whose target abstractNum has no styleLink back.",
+      "file": "numbering-style-link-one-way.docx",
+      "sha256": "04ef975df766eebdbff187c73fe89bde80804c79438ffc6bf8986b236b3644ac",
+      "bytes": 3406
+    },
+    {
+      "name": "Back to a list with a startOverride after another list: does it restart again?",
+      "file": "override-return.docx",
+      "sha256": "eb5f8c7b32b9764e6082aaf139160dfc79715edee6c84d5fea84e3aab27d513b",
+      "bytes": 3538
+    },
+    {
+      "name": "A list that restarts level 1 at 5, then restarts level 1 itself after its level 0.",
+      "file": "override-restart-within.docx",
+      "sha256": "3612d10fe863e0f3486c9127efa08463052c4fdd0c8ef52be5c25e6f93c3d2fe",
+      "bytes": 3551
+    },
+    {
+      "name": "A new list with a startOverride on level 0, first used at level 1.",
+      "file": "override-ancestor.docx",
+      "sha256": "0600d4876dc95c1b4aa8f01df4550a8f9c8a7581e8e2c6f31ce81bd9910fb224",
+      "bytes": 3551
+    },
+    {
+      "name": "A list that redefines level 0 (w:lvl, start 1) after a list of the same abstractNum.",
+      "file": "level-override-shared.docx",
+      "sha256": "b886c90c0ca7f51dbf1a26cdfbf257c51fc6ca0e8f70b8de61a9e5f942d4e551",
+      "bytes": 3428
+    },
+    {
+      "name": "A list that redefines level 0 with start 7, after a list of the same abstractNum.",
+      "file": "level-override-start.docx",
+      "sha256": "46aa4382142654524821092aaf461a7f62df62cc25b7afdb6aa6eb783dc63ee3",
+      "bytes": 3428
+    },
+    {
+      "name": "A list that redefines level 0 with start 7, as the first list of its abstractNum.",
+      "file": "level-override-first.docx",
+      "sha256": "112a6938b56f6b3f93c30cd27869cc05cb0be1ca092e0de360bf8cfe5689385a",
+      "bytes": 3315
+    },
+    {
+      "name": "A startOverride on level 0 of a list first used at level 1, nothing counted before.",
+      "file": "override-implicit-ancestor.docx",
+      "sha256": "e55961207231b8972fabbedfed9594e0eef2a7b2dce397c30e6d95ccbafd43e3",
+      "bytes": 3439
+    },
+    {
+      "name": "A level 2 item before levels 0 and 1 were counted, then levels 1 and 0.",
+      "file": "ancestor-two-levels.docx",
+      "sha256": "b9dc3744b284c81a68ab252f2050e17fcb331003cd10e5e9be8dbfa984f5d9a7",
+      "bytes": 3538
+    },
+    {
+      "name": "A level override replaces the level whole (the EMA template's Word 6 dash).",
+      "file": "level-override.docx",
+      "sha256": "9a345eee6dbd4ae92fca25235e2ec006f2fab5f3b82d806cc03608a188c4015e",
+      "bytes": 3200
+    },
+    {
+      "name": "Bullets in Symbol, in Courier New, and in the paragraph mark's font.",
+      "file": "bullets.docx",
+      "sha256": "62a355d1e912cb232cc60eacbd917ff31642219a2e0e428a88cb0cec3071b14b",
+      "bytes": 3721
+    }
+  ]
+}

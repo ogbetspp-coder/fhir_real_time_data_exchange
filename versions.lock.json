@@ -6,6 +6,7 @@
   "reader": {
     "docx-reader/1.1.0": "5e84e792f32e6425dc78046d4eea0afe58a6a3a12babafcab2b2f0d27bb36f1a",
     "docx-reader/1.2.0": "30afaa0572818196075e4e720c9cefd642c7008b014637fa1b19b2d51e730b9a",
-    "docx-reader/1.3.0": "2fb96f3f5c5eb998d8f2de35ba9669b14a335f68d6119f6f1dcfcac01c380c6f"
+    "docx-reader/1.3.0": "2fb96f3f5c5eb998d8f2de35ba9669b14a335f68d6119f6f1dcfcac01c380c6f",
+    "docx-reader/1.4.0": "61a7b3ee186589dae63fa6c08da961d420aafba9291cdb14dc4a319c3e7cf84e"
   }
 }

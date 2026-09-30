@@ -11,9 +11,9 @@ normalises, trims or repairs.
   subscript, underline, strike, caps, highlight, shading, hidden paragraph marks, faint text...)
   is reported as ranges over the text, never folded into it: `10` with a superscript `9` is
   `"109"` plus a superscript mark on the `9`.
-- **List labels as Word draws them.** "4.8", "b)", "•" are computed from the numbering part the
-  way Word computes them, and reported beside the text (never inserted into it). A label whose
-  number Word's behaviour does not pin down is refused, not guessed.
+- **List labels as Word draws them.** "4.8", "b)", "•" are computed from the numbering part by
+  Word's rules, and reported beside the text (never inserted into it). The rules are held to
+  Microsoft Word's own answers for every corpus document (`corpus/*/word.json`).
 - **Nothing passed over.** Every run in the main document part is read exactly once, run content
   stands only inside runs, and there is no character data outside `<w:t>` and `<w:instrText>`.
   A document where any of that fails is refused (`stray-text`, `unread-content`).
@@ -66,21 +66,44 @@ or, refused, `"refusal":{"code":"tracked-change","detail":"ins"}` in place of `p
 ## List labels
 
 Word does not store "4.8" in the paragraph; it computes it from `numbering.xml` each time it
-draws the page. The reader computes it the same way (the rules are in the module docstring,
-"List labels"): counters per list definition, shared by the lists that use it; deeper levels
-restarting after a higher one (`lvlRestart`); `startOverride` and level overrides; numbering-style
-links; legal numbering; decimal, zero-padded, roman, letter, bullet and no-number formats; and the
-label's own font, so a Symbol bullet (U+F0B7) is "•".
+draws the page. The reader computes it by Word's rules (the module docstring, "List labels"), and
+every rule is Word's own answer, not a reading of the specification:
 
-It refuses where the answer is not certain:
+- Lists that name the same `abstractNum` share one count, so a second list continues the first
+  unless it has a `startOverride`, which applies the first time that list reaches the level.
+- A level counted before its higher level counts that level as started: a first item at level
+  2 is `1.1.1`.
+- A level with no `w:start` starts at 0. A full level override (`w:lvl` in `lvlOverride`) changes
+  how the number looks, never where it starts.
+- A list linked through a numbering style takes that style's levels but keeps its own count.
+
+### Word as the reference
+
+`scripts/numbering_cases.py` writes `corpus/numbering-cases/`, one small .docx per rule (and per
+question the rules had to answer). `scripts/word_oracle.py record <set>` opens each document in
+Microsoft Word (macOS), reads the label Word draws for every list item (`listString`), and writes
+`word.json`; `tests/test_word_oracle.py` then holds the reader to those answers in CI, without
+Word. Recorded with Microsoft Word 16.113.3 for macOS: the reader agrees on 27 of 28 cases and on
+the four EMA files, and refuses the 28th on purpose (a numbering-style link with no link back,
+where Word draws an empty label).
+
+To check a label of your own against Word without it entering the repository:
+
+```bash
+uv run --frozen python scripts/word_oracle.py compare path/to/label.docx
+```
+
+It prints, per file, `agrees`, `differs at list item n` or the reader's refusal with Word's
+labels, and never the document's text.
+
+### What is refused
 
 - `unsupported-numbering`: a format that depends on the language (ordinal, cardinal text) or is
-  custom, a picture bullet, a Wingdings bullet (no closed mapping yet), a missing definition.
-- `ambiguous-numbering`: a label that shows a count Word's documented behaviour does not fix,
-  such as returning to a list after another list restarted the shared count, or a level shown
-  before it was ever counted; a hidden label; a numbered paragraph run on after a hidden mark.
-
-A bullet shows no count, so bullets are never refused for one.
+  custom, a picture bullet, a Wingdings bullet (no closed mapping yet), a missing definition, a
+  numbering-style link without its link back.
+- `ambiguous-numbering`: a hidden label, or a numbered paragraph run on after a hidden mark
+  (Word reports a label but not whether or where it is drawn); a label showing a level that only
+  a level override defines.
 
 ## What it does not read
 
@@ -100,6 +123,8 @@ A bullet shows no count, so bullets are never refused for one.
 | No text passed over: the 13 cases 1.1.0 lost silently            | `tests/test_reader.py`       |
 | The EMA QRD files keep their ≥, °, Symbol braces and pictures    | `tests/test_reader.py`       |
 | List labels counted and drawn as Word does, or refused           | `tests/test_reader.py`       |
+| Every corpus list label is the one Microsoft Word draws          | `tests/test_word_oracle.py`  |
+| The numbering cases are what their script writes, byte for byte  | `tests/test_corpus.py`       |
 | The EMA template's 7 Symbol bullets and 9 Word 6 dashes          | `tests/test_reader.py`       |
 | Same bytes across processes, hash seeds and locales              | `tests/test_determinism.py`  |
 | Same result however the parts are zipped                         | `tests/test_determinism.py`  |
@@ -149,4 +174,6 @@ Extracted from the EMA Flow repository at commit `d2d2d1f` (`zone-a/src/zone_a/d
 1.2.0 adds the `stray-text` and `unread-content` refusals and changes nothing else: it reads the
 four EMA files to the same paragraphs, marks and structure as 1.1.0. 1.3.0 draws list labels
 (`label-docx-json/1.1.0` adds `numbering.text` and `numbering.suffix`) and accepts the font hint
-`default`, which sends ambiguous characters to the `hAnsi` font.
+`default`, which sends ambiguous characters to the `hAnsi` font. 1.4.0 replaces the reader's
+assumptions about counting with Word's answers: it reads the cases 1.3.0 refused as ambiguous,
+and draws the one label 1.3.0 got wrong (a level counted after a deeper one) as Word does.

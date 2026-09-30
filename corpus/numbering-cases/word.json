@@ -1,0 +1,166 @@
+{
+  "application": "Microsoft Word 16.113.3 (macOS)",
+  "labels": {
+    "ancestor-never-counted.docx": [
+      "1.1",
+      "1.2",
+      "2.",
+      "2.1"
+    ],
+    "ancestor-two-levels.docx": [
+      "1.1.1",
+      "1.2",
+      "1.2.1",
+      "2.",
+      "2.1.1"
+    ],
+    "bullets.docx": [
+      "\uf0b7",
+      "o",
+      "\uf0b7"
+    ],
+    "formats.docx": [
+      "0.",
+      "07.",
+      "12.",
+      "MCMXCIV.",
+      "iv.",
+      "A.",
+      "z.",
+      "aa.",
+      "aaa.",
+      "."
+    ],
+    "legal.docx": [
+      "I",
+      "1.1"
+    ],
+    "level-override-first.docx": [
+      "1)",
+      "2)",
+      "3."
+    ],
+    "level-override-shared.docx": [
+      "1.",
+      "2.",
+      "3)",
+      "4."
+    ],
+    "level-override-start.docx": [
+      "1.",
+      "2)",
+      "3)",
+      "4."
+    ],
+    "level-override.docx": [
+      "-",
+      "-"
+    ],
+    "missing-start.docx": [
+      "0.",
+      "1."
+    ],
+    "multilevel.docx": [
+      "1.",
+      "1.1",
+      "1.2",
+      "2.",
+      "2.1",
+      "2.1.1",
+      "2.2"
+    ],
+    "numbering-style-link-one-way.docx": [
+      "",
+      "Section 1",
+      ""
+    ],
+    "numbering-style-link.docx": [
+      "Section 1",
+      "Section 1",
+      "Section 2"
+    ],
+    "override-ancestor.docx": [
+      "1.",
+      "1.1",
+      "1.2",
+      "5."
+    ],
+    "override-deeper-level.docx": [
+      "1.",
+      "1.1",
+      "1.5",
+      "1.6"
+    ],
+    "override-implicit-ancestor.docx": [
+      "1.1",
+      "5.",
+      "6."
+    ],
+    "override-restart-within.docx": [
+      "1.",
+      "1.5",
+      "2.",
+      "2.5"
+    ],
+    "override-return.docx": [
+      "1.",
+      "2.",
+      "3.",
+      "4."
+    ],
+    "plain-after-restart.docx": [
+      "1.",
+      "2."
+    ],
+    "restart-after-first.docx": [
+      "1",
+      "1",
+      "2",
+      "2",
+      "2",
+      "1"
+    ],
+    "restart-never.docx": [
+      "1",
+      "1",
+      "2",
+      "2",
+      "3"
+    ],
+    "return-after-restart.docx": [
+      "1.",
+      "1.",
+      "2."
+    ],
+    "shared-continue.docx": [
+      "1.",
+      "2.",
+      "3."
+    ],
+    "start-override-first.docx": [
+      "5.",
+      "6."
+    ],
+    "start-override-restart.docx": [
+      "1.",
+      "2.",
+      "1.",
+      "2."
+    ],
+    "style-tied-deeper-level.docx": [
+      "1.",
+      "2.",
+      "3."
+    ],
+    "style-tied-level-zero.docx": [
+      "1.",
+      "2."
+    ],
+    "two-definitions.docx": [
+      "1.",
+      "1.",
+      "2."
+    ]
+  },
+  "recorded": "2026-09-30"
+}

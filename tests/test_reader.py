@@ -1198,8 +1198,10 @@ def test_lvl_restart_zero_never_restarts_and_n_restarts_after_level_n_minus_1() 
         lvl(1, text="%2"),
         lvl(2, text="%3", extra='<w:lvlRestart w:val="1"/>'),
     )
+    # The level 2 item counts level 1 as started, so the level 1 item after it is 2 (Word,
+    # corpus/numbering-cases restart-after-first).
     body = li(1) + li(1, 2) + li(1, 1) + li(1, 2) + li(1) + li(1, 2)
-    assert labels(body, after_first + num(1, 1)) == ["1", "1", "1", "2", "2", "1"]
+    assert labels(body, after_first + num(1, 1)) == ["1", "1", "2", "2", "2", "1"]
 
 
 @pytest.mark.parametrize(
@@ -1270,18 +1272,22 @@ def test_lists_that_share_a_definition_continue_and_a_start_override_restarts() 
 
 
 @pytest.mark.parametrize(
-    "body",
+    ("body", "drawn"),
     [
-        # Back to a list after another restarted the count.
-        li(10) + li(12) + li(10),
-        # A list that restarts nothing after one that did.
-        li(12) + li(11),
-        # A level first counted below a level never counted.
-        li(1, 1),
+        # Back to a list after another restarted the shared count: it continues.
+        (li(10) + li(12) + li(10), ["1.", "1.", "2."]),
+        # A startOverride applies once, the first time its list reaches the level.
+        (li(12) + li(10) + li(12) + li(10), ["1.", "2.", "3.", "4."]),
+        # A list that restarts nothing after one that did continues the count.
+        (li(12) + li(11), ["1.", "2."]),
+        # A level counted before its higher level counts that level as started.
+        (li(1, 1) + li(1, 1) + li(1) + li(1, 1), ["1.1", "1.2", "2.", "2.1"]),
     ],
 )
-def test_a_label_whose_count_is_not_certain_is_refused(body: str) -> None:
-    assert refusal(body, numbering=SHARED + SECTIONS) == "ambiguous-numbering"
+def test_counts_across_lists_and_levels_follow_word(body: str, drawn: list[str]) -> None:
+    # Word's answers for corpus/numbering-cases return-after-restart, override-return,
+    # plain-after-restart and ancestor-never-counted.
+    assert labels(body, SHARED + SECTIONS) == drawn
 
 
 def test_a_bullet_shows_no_count_and_is_never_ambiguous() -> None:
@@ -1289,10 +1295,16 @@ def test_a_bullet_shows_no_count_and_is_never_ambiguous() -> None:
     assert labels(li(20) + li(21) + li(20), bullets) == ["-", "-", "-"]
 
 
-def test_a_level_with_no_start_is_counted_only_when_it_is_not_shown() -> None:
-    assert labels(li(1), abstract(1, lvl(0, "bullet", "-", start=None)) + num(1, 1)) == ["-"]
-    numbering = abstract(1, lvl(0, start=None)) + num(1, 1)
-    assert refusal(li(1), numbering=numbering) == "ambiguous-numbering"
+def test_a_level_with_no_start_starts_at_zero() -> None:
+    assert labels(li(1) + li(1), abstract(1, lvl(0, start=None)) + num(1, 1)) == ["0.", "1."]
+
+
+def test_a_level_only_a_level_override_defines_has_no_start_to_show() -> None:
+    numbering = abstract(1, lvl(0)) + num(1, 1, override(1, lvl(1, text="%1.%2")))
+    assert refusal(li(1) + li(1, 1), numbering=numbering) == "ambiguous-numbering"
+    # Not shown, it is not refused.
+    bullet = abstract(1, lvl(0)) + num(1, 1, override(1, lvl(1, "bullet", "-")))
+    assert labels(li(1) + li(1, 1), bullet) == ["1.", "-"]
 
 
 @pytest.mark.parametrize(
@@ -1364,23 +1376,29 @@ LINKED_STYLES = (
     "</w:numPr></w:pPr></w:style>"
 )
 LINKED = (
-    abstract(30, lvl(0, text="Section %1"))
+    '<w:abstractNum w:abstractNumId="30"><w:styleLink w:val="Outline"/>'
+    + lvl(0, text="Section %1")
+    + "</w:abstractNum>"
     + '<w:abstractNum w:abstractNumId="32"><w:numStyleLink w:val="Outline"/></w:abstractNum>'
     + num(31, 30)
     + num(33, 32)
 )
 
 
-def test_a_numbering_style_link_is_followed_and_shares_the_count() -> None:
+def test_a_numbering_style_link_takes_the_levels_but_not_the_count() -> None:
+    # Lists 33 and 31 count apart: 33 names abstractNum 32, which only borrows 30's levels.
     assert labels(li(33) + li(31) + li(33), LINKED, LINKED_STYLES) == [
         "Section 1",
+        "Section 1",
         "Section 2",
-        "Section 3",
     ]
     assert refusal(li(33), numbering=LINKED) == "unsupported-numbering"
+    # With no styleLink back, Word draws an empty label; the reader refuses.
+    one_way = LINKED.replace('<w:styleLink w:val="Outline"/>', "")
+    assert refusal(li(33), LINKED_STYLES, one_way) == "unsupported-numbering"
 
 
-def test_a_style_tied_to_a_deeper_level_than_the_paragraph_sets_is_refused() -> None:
+def test_a_paragraph_that_sets_no_level_is_at_level_zero_whatever_level_names_its_style() -> None:
     style = (
         '<w:style w:type="paragraph" w:styleId="H2"><w:pPr><w:numPr><w:numId w:val="1"/>'
         "</w:numPr></w:pPr></w:style>"
@@ -1388,7 +1406,7 @@ def test_a_style_tied_to_a_deeper_level_than_the_paragraph_sets_is_refused() -> 
     body = p(r("<w:t>x</w:t>"), '<w:pStyle w:val="H2"/>')
     tied = '<w:pStyle w:val="H2"/>'
     at_one = abstract(1, lvl(0), lvl(1, text="%2)", extra=tied)) + num(1, 1)
-    assert refusal(body, style, at_one) == "ambiguous-numbering"
+    assert labels(body, at_one, style) == ["1."]
     at_zero = abstract(1, lvl(0, extra=tied), lvl(1, text="%2)")) + num(1, 1)
     assert labels(body, at_zero, style) == ["1."]
 

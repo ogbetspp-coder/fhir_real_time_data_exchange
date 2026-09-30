@@ -12,6 +12,10 @@ refuse. Every rule below serves that.
 - **Every rule has a test.** A new rule or refusal comes with a minimal in-memory .docx in
   `tests/test_reader.py` that fails without it. A new Symbol-font mapping is a reviewed change
   with a test.
+- **List numbering follows Word, not the specification.** A change to how labels are counted or
+  drawn starts with a case in `scripts/numbering_cases.py` and Word's answer to it
+  (`scripts/word_oracle.py record corpus/numbering-cases`, macOS with Word). Where Word's answer
+  is not on record, refuse.
 - **Version every change.** Changing `src/label_docx/reader.py` means bumping `READER_VERSION`;
   changing `src/label_docx/output.py` means bumping `FORMAT_VERSION`. Then run
   `scripts/lock.py` and review the diff of `corpus/*/expected.json`. Never re-lock a version to

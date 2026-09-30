@@ -70,25 +70,25 @@ or an empty ``fldSimple``), a form field, a field marked for update, any field i
 whose settings ask Word to update fields on open, and field code outside an instruction.
 
 List labels. Word draws "4.8", "b)" or a bullet before a numbered paragraph from the numbering
-part; the reader computes that label the way Word does and refuses where the result is not
-certain. A paragraph's ``numId`` names a ``w:num``, which names an ``abstractNum`` (through one
-numbering-style link, ``numStyleLink``, if it has one); a level of the ``w:num``'s
-``lvlOverride`` replaces the abstract level whole, and its ``startOverride`` replaces the start.
-Counters belong to the ``abstractNum``: lists that share one continue each other's numbers, which
-is why Word writes a ``startOverride`` to restart one. A paragraph at level ``L`` restarts every
-deeper level (``lvlRestart`` 0 never restarts it; ``lvlRestart`` ``n`` restarts it only after a
-level up to ``n - 1``) and then counts its own: the level's start the first time, one more after.
-``lvlText`` is copied, with ``%1`` to ``%9`` replaced by the counter of that level in that
-level's format (all decimal under ``isLgl``): decimal, decimalZero, upper and lower roman
-(1 to 3999), upper and lower letter (a to z, then aa, bb...), or none; a bullet level's text is
-its bullet. The label is drawn in the level's run properties over the paragraph mark's, so its
-fonts are placed as a run's are: a Symbol bullet (U+F0B7) is mapped to "•", a Wingdings one is
-refused. ``suffix`` is ``tab``, ``space`` or ``nothing`` (``w:suff``), or ``legacy`` for a
-Word 6 level, where the gap is layout and not a character. A counter is certain when the
-paragraphs of one ``abstractNum`` stay in one ``w:num``, move between ``w:num`` elements that
-override nothing, or move to a new ``w:num`` that restarts the level (``startOverride``); after any
-other move, and before a level is first counted, it is unknown, and a label that shows it is
-refused. A bullet shows no counter and is never refused for one.
+part; the reader computes that label by Word's rules, each of which is Word's own answer to a case
+in ``corpus/numbering-cases`` (``word.json``; ``tests/test_word_oracle.py``). A paragraph's
+``numId`` names a ``w:num``, which names an ``abstractNum``; a level of the ``w:num``'s
+``lvlOverride`` replaces the abstract level's look (format, text, font), not its start. An
+``abstractNum`` with a ``numStyleLink`` takes its levels from the one the numbering style names,
+which must name the style back (``styleLink``). Counters belong to the ``abstractNum`` the
+``w:num`` names: every list naming it shares them, so a second list continues the first. A
+paragraph at level ``L`` restarts every deeper level (``lvlRestart`` 0 never restarts it;
+``lvlRestart`` ``n`` restarts it only after a level up to ``n - 1``), counts every higher level
+not yet counted as that level's start, and counts its own level: its list's ``startOverride``
+the first time that list reaches the level, else one more than the shared count, else (after a
+restart) the list's ``startOverride`` or the ``abstractNum`` level's ``w:start``, 0 when there is
+none. ``lvlText`` is copied, with ``%1`` to ``%9`` replaced by the counter of that level in that
+level's format (all decimal under ``isLgl``): decimal, decimalZero, upper and lower roman (1 to
+3999), upper and lower letter (a to z, then aa, bb...), or none; a bullet level's text is its
+bullet. The label is drawn in the level's run properties over the paragraph mark's, so its fonts
+are placed as a run's are: a Symbol bullet (U+F0B7) is mapped to "•", a Wingdings one is
+refused. ``suffix`` is ``tab``, ``space`` or ``nothing`` (``w:suff``), or ``legacy`` for a Word 6
+level, where the gap is layout and not a character.
 
 What it refuses (``DocxRefusedError.code``):
 
@@ -128,12 +128,13 @@ What it refuses (``DocxRefusedError.code``):
   with no definition (or no numbering part), a level outside 0 to 8, a format other than those
   above (ordinal and text formats depend on the language), a custom format, a picture bullet, a
   level holding anything else the reader does not know (alternate content, say), a ``%n`` for a
-  deeper level, a bullet level that shows a counter, a number past a format's range, or a label in
-  capitals or small capitals with letters in it.
-- ``ambiguous-numbering``: a list label that shows a counter the reader cannot be sure of (above),
-  a label drawn hidden (the paragraph mark or the level is hidden), a numbered paragraph run on
-  after a hidden paragraph mark, or a paragraph style that names a list level other than 0 for a
-  paragraph that sets no level.
+  deeper level, a bullet level that shows a counter, a number past a format's range, a label in
+  capitals or small capitals with letters in it, or a numbering-style link the reader cannot
+  follow (no ``styleLink`` back, or to a list with overrides).
+- ``ambiguous-numbering``: a label drawn hidden (the paragraph mark or the level is hidden) or a
+  numbered paragraph run on after a hidden paragraph mark, for which Word's list API reports a
+  label but not whether or where it is drawn; or a label that shows a level whose start the
+  reader cannot find (only a ``lvlOverride`` defines it).
 
 Headers, footers, footnotes, comments and the glossary are separate parts and are not read.
 """
@@ -150,8 +151,9 @@ from dataclasses import dataclass, field, replace
 # The version of the rules above. A change to this file changes its hash in versions.lock.json,
 # and tests/test_locks.py then requires a new version here. 1.1.0 is the reader as imported
 # (README, "Origin"); 1.2.0 adds stray-text and unread-content; 1.3.0 draws list labels and
-# accepts the font hint "default".
-READER_VERSION = "docx-reader/1.3.0"
+# accepts the font hint "default"; 1.4.0 counts lists by the rules Word showed
+# (corpus/numbering-cases/word.json).
+READER_VERSION = "docx-reader/1.4.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -971,10 +973,11 @@ def _int(value: str, where: str) -> int:
     return int(value)
 
 
-def _numbering(levels: list[ET.Element | None]) -> tuple[Numbering | None, bool]:
+def _numbering(levels: list[ET.Element | None]) -> Numbering | None:
     """The numId and ilvl, each from the nearest paragraph-properties level that sets it.
 
-    The flag says whether any level set ilvl, rather than it defaulting to 0.
+    An ilvl set nowhere is 0, even where a list level names the paragraph's style (``w:pStyle``):
+    Word draws such a paragraph at level 0 (corpus/numbering-cases, style-tied-deeper-level).
     """
     found: dict[str, int] = {}
     for source in levels:
@@ -986,8 +989,8 @@ def _numbering(levels: list[ET.Element | None]) -> tuple[Numbering | None, bool]
             if name not in found and element is not None:
                 found[name] = _int(element.get(_w("val"), "0"), name)
     if not found:
-        return None, False
-    return Numbering(num_id=found.get("numId", 0), level=found.get("ilvl", 0)), "ilvl" in found
+        return None
+    return Numbering(num_id=found.get("numId", 0), level=found.get("ilvl", 0))
 
 
 @dataclass(frozen=True)
@@ -999,7 +1002,6 @@ class _ListContext:
     style: str | None
     table_style: str | None
     mark: ET.Element | None
-    level_set: bool
 
 
 def _paragraph(
@@ -1021,7 +1023,7 @@ def _paragraph(
     reader.container(element)
     if reader.in_instruction():
         raise DocxRefusedError("unbalanced-field", "a paragraph ends inside a field instruction")
-    numbering, level_set = _numbering(
+    numbering = _numbering(
         [
             ppr,
             *(s.ppr for s in styles.resolve(style, "paragraph")),
@@ -1030,10 +1032,7 @@ def _paragraph(
         ]
     )
     context = _ListContext(
-        style=styles.effective(style, "paragraph"),
-        table_style=table_style,
-        mark=mark_rpr,
-        level_set=level_set,
+        style=styles.effective(style, "paragraph"), table_style=table_style, mark=mark_rpr
     )
     return Paragraph(
         text="".join(reader.parts),
@@ -1195,25 +1194,25 @@ class _Num:
     starts: dict[int, int]
     levels: dict[int, _Level]
 
-    @property
-    def overrides(self) -> bool:
-        return bool(self.starts or self.levels)
-
 
 @dataclass(frozen=True)
 class _Abstract:
     levels: dict[int, _Level]
+    # numStyleLink: this abstractNum takes its levels from the one a numbering style names.
     link: str | None
+    # styleLink: this abstractNum is the one that numbering style names.
+    linked_from: str | None
 
 
 @dataclass
 class _Counters:
-    """The counters of one abstractNum, and which list (numId) is counting in it."""
+    """The counters of one abstractNum, shared by every list (numId) that names it."""
 
     values: list[int | None] = field(default_factory=lambda: [None] * len(_LEVELS))
+    # A level whose start the reader cannot find (its abstractNum does not define it).
     unknown: list[bool] = field(default_factory=lambda: [False] * len(_LEVELS))
-    current: int | None = None
-    used: set[int] = field(default_factory=set)
+    # The (numId, level) pairs whose startOverride has been applied.
+    applied: set[tuple[int, int]] = field(default_factory=set)
 
 
 def _refuse_numbering(detail: str) -> DocxRefusedError:
@@ -1240,7 +1239,12 @@ class _Lists:
                     raise DocxRefusedError("invalid-package", f"list level {level} twice")
                 levels[level] = _level(lvl)
             link = element.find(_w("numStyleLink"))
-            self.abstracts[key] = _Abstract(levels, None if link is None else link.get(_w("val")))
+            linked_from = element.find(_w("styleLink"))
+            self.abstracts[key] = _Abstract(
+                levels,
+                link=None if link is None else link.get(_w("val")),
+                linked_from=None if linked_from is None else linked_from.get(_w("val")),
+            )
         for element in root.findall(_w("num")):
             key = _int(element.get(_w("numId"), ""), "numId")
             if key in self.nums:
@@ -1268,33 +1272,42 @@ class _Lists:
                 levels=overridden,
             )
 
-    def definitions(self, num_id: int) -> tuple[int, _Num, dict[int, _Level]]:
-        """The abstractNum counting for ``num_id``, the num, and its levels after overrides."""
+    def definitions(self, num_id: int) -> tuple[int, _Num, dict[int, _Level], dict[int, _Level]]:
+        """What counts and draws ``num_id``'s labels.
+
+        The abstractNum whose counters it shares (the one it names, even when that one links to
+        another), the num, the abstractNum's levels (through the link), and those levels with the
+        num's level overrides over them.
+        """
         if not self.present:
             raise _refuse_numbering("a list with no numbering part")
         num = self.nums.get(num_id)
         if num is None or num.abstract is None or num.abstract not in self.abstracts:
             raise _refuse_numbering(f"numId {num_id} is not defined")
-        abstract_id = num.abstract
-        abstract = self.abstracts[abstract_id]
+        abstract = self.abstracts[num.abstract]
         if abstract.link is not None:
-            abstract_id = self._linked(abstract.link)
-            abstract = self.abstracts[abstract_id]
-        return abstract_id, num, {**abstract.levels, **num.levels}
+            abstract = self.abstracts[self._linked(abstract.link)]
+        return num.abstract, num, abstract.levels, {**abstract.levels, **num.levels}
 
     def _linked(self, name: str) -> int:
-        """The abstractNum a numbering style names: one link, to a list that overrides nothing."""
+        """The abstractNum a numbering style names, which must name the style back.
+
+        Word draws an empty label for a link with no ``styleLink`` back (corpus/numbering-cases,
+        numbering-style-link-one-way); the reader refuses it.
+        """
         style = self.styles.styles.get(name)
         if style is None or style.kind != "numbering":
             raise _refuse_numbering(f"numbering style {name!r} is not defined")
-        numbering, _ = _numbering([style.ppr])
+        numbering = _numbering([style.ppr])
         linked = self.nums.get(numbering.num_id) if numbering is not None else None
         if (
             linked is None
             or linked.abstract is None
-            or linked.overrides
+            or linked.starts
+            or linked.levels
             or linked.abstract not in self.abstracts
             or self.abstracts[linked.abstract].link is not None
+            or self.abstracts[linked.abstract].linked_from != name
         ):
             raise _refuse_numbering(f"numbering style {name!r} names no list the reader can use")
         return linked.abstract
@@ -1304,60 +1317,73 @@ class _Lists:
         level = numbering.level
         if level not in _LEVELS:
             raise _refuse_numbering(f"list level {level}")
-        abstract_id, num, levels = self.definitions(numbering.num_id)
-        if not context.level_set and any(
-            k != 0 and d.style is not None and d.style == context.style for k, d in levels.items()
-        ):
-            # The paragraph sets no level and its style is tied to a deeper one; which of the two
-            # Word uses is not documented.
-            raise DocxRefusedError("ambiguous-numbering", "a style tied to a list level not set")
-        counters = self.counters.setdefault(abstract_id, _Counters())
-        self._move(counters, numbering.num_id, num)
+        key, num, base, levels = self.definitions(numbering.num_id)
         definition = levels.get(level)
         if definition is None:
             raise _refuse_numbering(f"level {level} of numId {numbering.num_id} is not defined")
-        self._count(counters, level, levels, num)
+        counters = self.counters.setdefault(key, _Counters())
+        self._count(counters, numbering.num_id, num, level, base, levels)
         text = self._draw(counters, level, levels, definition, context)
         return replace(numbering, text=text, suffix=definition.suffix)
 
-    def _move(self, counters: _Counters, num_id: int, num: _Num) -> None:
-        """Carry the counters over to ``num_id`` where Word's behaviour is certain; else unknown."""
-        if counters.current == num_id:
-            return
-        first = counters.current is None
-        new = num_id not in counters.used
-        plain_before = not any(self.nums[n].overrides for n in counters.used)
-        counters.current = num_id
-        counters.used.add(num_id)
-        if first or (plain_before and not num.overrides):
-            # A fresh set of counters, or lists that share one and override nothing.
-            return
-        for level in _LEVELS:
-            if new and level in num.starts:
-                counters.values[level] = None
-                counters.unknown[level] = False
-            elif not (new and plain_before and level not in num.levels):
-                counters.unknown[level] = True
+    @staticmethod
+    def _base_start(counters: _Counters, base: dict[int, _Level], level: int) -> None:
+        """Start ``level`` at its abstractNum's start (0 when it sets none), or mark it unknown."""
+        definition = base.get(level)
+        if definition is None:
+            counters.unknown[level] = True
+        else:
+            counters.values[level] = 0 if definition.start is None else definition.start
 
-    def _count(self, counters: _Counters, level: int, levels: dict[int, _Level], num: _Num) -> None:
+    def _count(
+        self,
+        counters: _Counters,
+        num_id: int,
+        num: _Num,
+        level: int,
+        base: dict[int, _Level],
+        levels: dict[int, _Level],
+    ) -> None:
+        """Count a paragraph of list ``num_id`` at ``level``, as Word does.
+
+        Each rule is Word's answer to a case in corpus/numbering-cases, named in brackets.
+        """
         for deeper in range(level + 1, len(_LEVELS)):
             definition = levels.get(deeper)
             restart = definition.restart if definition is not None else None
             # lvlRestart n restarts the level after a paragraph at a level up to n - 1; 0 never.
-            # A value that is not a higher level is ignored, and then any higher level restarts.
+            # A value that is not a higher level is ignored, and then any higher level restarts
+            # [restart-never, restart-after-first].
             if restart is None or level < restart or restart - 1 >= deeper:
                 counters.values[deeper] = None
                 counters.unknown[deeper] = False
-        if counters.unknown[level]:
-            return
+        for higher in range(level):
+            # A higher level not counted yet counts as its abstractNum's start, not a list's
+            # startOverride [ancestor-never-counted, ancestor-two-levels,
+            # override-implicit-ancestor].
+            if counters.values[higher] is None and not counters.unknown[higher]:
+                self._base_start(counters, base, higher)
         current = counters.values[level]
-        if current is not None:
-            counters.values[level] = current + 1
+        if level in num.starts and (num_id, level) not in counters.applied:
+            # A startOverride sets the count the first time its list reaches the level, whatever
+            # the shared count was [start-override-restart, override-ancestor, override-return].
+            counters.applied.add((num_id, level))
+            counters.values[level] = num.starts[level]
+            counters.unknown[level] = False
+        elif counters.unknown[level]:
             return
-        start = num.starts.get(level, levels[level].start)
-        if start is None:
-            counters.unknown[level] = True
-        counters.values[level] = start
+        elif current is not None:
+            # Lists of one abstractNum share its count [shared-continue, return-after-restart,
+            # plain-after-restart, level-override-shared].
+            counters.values[level] = current + 1
+        elif level in num.starts:
+            # Restarted inside a list with a startOverride: its override again
+            # [override-restart-within].
+            counters.values[level] = num.starts[level]
+        else:
+            # A level override's own w:start is not used [level-override-first,
+            # level-override-start]; a level with no w:start starts at 0 [missing-start].
+            self._base_start(counters, base, level)
 
     def _draw(
         self,
