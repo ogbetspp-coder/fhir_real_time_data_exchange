@@ -3,18 +3,28 @@
     uv run --frozen python scripts/word_oracle.py record corpus/numbering-cases
     uv run --frozen python scripts/word_oracle.py compare path/to/label.docx [...]
 
-Word is the reference for list labels: a paragraph's ``listString`` is the label Word draws
-before it. ``record`` asks Word for every .docx in a corpus set and writes the answers to the
-set's ``word.json``, which ``tests/test_word_oracle.py`` holds the reader to without Word.
-``compare`` prints Word's labels beside the reader's for any files and writes nothing, so a
-confidential label can be checked on one machine and never enter the repository. Both print, for
-each file, whether the reader agrees with Word, differs, or refuses; never the paragraphs' text.
+Word is the reference for list labels. For each document it reads the text, runs its own
+"convert numbers to text" (which writes every list label into the paragraph, followed by the tab
+or space after it), reads the text again, and closes the document without saving. What each list
+item gained is what Word draws before it; three requests a document, where asking paragraph by
+paragraph took Word over a minute for a long template.
 
-Word runs sandboxed: each file is copied into Word's container, where it opens without a
-permission prompt, and removed after. Word reports a Symbol-font character as the code it stores
+``record`` asks Word about every .docx in a corpus set and writes the answers to the set's
+``word.json``, which ``tests/test_word_oracle.py`` holds the reader to without Word. ``compare``
+prints the verdict for any files and writes nothing, so a confidential label can be checked on one
+machine and never enter the repository. Both print, for each file, whether the reader agrees with
+Word, differs (at which list item), or refuses; never the paragraphs' text.
+
+The reader's side is its label followed by the character its suffix names: a tab for ``tab`` and
+for ``legacy`` (Word converts a Word 6 level's gap to a tab), a space for ``space``, nothing for
+``nothing``. A list item whose label and suffix are both empty gains nothing in Word and cannot be
+seen, so it is left out on both sides. Word writes a Symbol-font character as the code it stores
 (a bullet as U+F0B7); ``as_drawn`` maps it through the reader's Symbol table before comparing. A
 private-use code in any other font is one the reader refuses, so the mapping cannot hide a
 difference.
+
+Word runs sandboxed: each file is copied into Word's container, where it opens without a
+permission prompt, and removed after.
 """
 
 from __future__ import annotations
@@ -33,9 +43,9 @@ from label_docx.reader import SYMBOL_FONT, DocxRefusedError, read_docx
 
 WORD = Path("/Applications/Microsoft Word.app")
 CONTAINER = Path.home() / "Library/Containers/com.microsoft.Word/Data"
-RECORD, UNIT = "\x1e", "\x1f"
+SEPARATOR = "\x1d"
 
-# The label of every paragraph Word counts as a list item, in document order, and their number.
+# The document's text before and after Word writes its list labels into it.
 SCRIPT = """
 on run argv
   -- Resolved here: inside the tell block, Word would be asked to make the file reference.
@@ -50,17 +60,16 @@ on run argv
       delay 0.1
     end repeat
     set d to document (item 2 of argv)
-    set out to {}
-    repeat with i from 1 to (count of paragraphs of d)
-      set f to list format of (text object of paragraph i of d)
-      if list type of f is not list no numbering then set end of out to (list string of f)
-    end repeat
+    set stored to content of text object of d
+    convert numbers to text d
+    set drawn to content of text object of d
     close d saving no
   end tell
-  set AppleScript's text item delimiters to (character id 30)
-  return ((count of out) as text) & (character id 31) & (out as text)
+  return stored & (character id 29) & drawn
 end run
 """
+
+SUFFIXES = {"tab": "\t", "legacy": "\t", "space": " ", "nothing": ""}
 
 
 def word_version() -> str:
@@ -69,8 +78,7 @@ def word_version() -> str:
         return f"Microsoft Word {plistlib.load(info)['CFBundleShortVersionString']} (macOS)"
 
 
-def word_labels(path: Path) -> list[str]:
-    """The labels Word draws for ``path``'s list items, in document order."""
+def _ask_word(path: Path) -> str:
     CONTAINER.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=CONTAINER) as folder:
         copy = Path(folder) / path.name
@@ -86,23 +94,39 @@ def word_labels(path: Path) -> list[str]:
                 check=False,
             )
             if done.returncode == 0:
-                break
+                return done.stdout
             if attempt == 2:
                 raise SystemExit(f"{path.name}: Word failed: {done.stderr.strip()}")
-    count, _, joined = done.stdout.rstrip("\n").partition(UNIT)
-    labels = joined.split(RECORD) if int(count) else []
-    if len(labels) != int(count):
-        raise SystemExit(f"{path.name}: Word's answer did not parse")
-    return labels
+    raise AssertionError  # pragma: no cover
 
 
-def reader_labels(path: Path) -> list[str | None] | str:
-    """The reader's labels for ``path``'s list items, or its refusal code."""
+def word_labels(path: Path) -> list[str]:
+    """What Word draws before each of ``path``'s list items, in document order."""
+    stored, _, drawn = _ask_word(path).rstrip("\n").partition(SEPARATOR)
+    # osascript turns Word's paragraph marks into line feeds; a manual line break stays U+000B.
+    # The two texts can end in different numbers of empty lines, which are no paragraph's. Word
+    # adds no paragraph, so the rest pair line for line; matching them by content instead goes
+    # wrong where empty list items gain a label.
+    before, after = stored.rstrip("\n").split("\n"), drawn.rstrip("\n").split("\n")
+    if len(before) != len(after) or not all(
+        a.endswith(b) for b, a in zip(before, after, strict=True)
+    ):
+        raise SystemExit(f"{path.name}: Word changed a paragraph other than by a list label")
+    return [a[: len(a) - len(b)] for b, a in zip(before, after, strict=True) if a != b]
+
+
+def reader_labels(path: Path) -> list[str] | str:
+    """What the reader draws before each of ``path``'s list items, or its refusal code."""
     try:
         paragraphs = read_docx(path.read_bytes())
     except DocxRefusedError as refused:
         return refused.code
-    return [p.numbering.text for p in paragraphs if p.numbering is not None and p.numbering.num_id]
+    drawn = [
+        (p.numbering.text or "") + SUFFIXES[p.numbering.suffix or "nothing"]
+        for p in paragraphs
+        if p.numbering is not None and p.numbering.num_id
+    ]
+    return [item for item in drawn if item]
 
 
 def as_drawn(label: str) -> str:
@@ -112,14 +136,14 @@ def as_drawn(label: str) -> str:
     )
 
 
-def verdict(word: list[str], reader: list[str | None] | str) -> str:
+def verdict(word: list[str], reader: list[str] | str) -> str:
     """Whether the reader agrees with Word: agrees, refuses (code) or differs (where)."""
     if isinstance(reader, str):
         return f"reader refuses: {reader}"
     if len(reader) != len(word):
         return f"differs: Word has {len(word)} list items, the reader {len(reader)}"
     for index, (ours, theirs) in enumerate(zip(reader, word, strict=True)):
-        if ours is None or ours != as_drawn(theirs):
+        if ours != as_drawn(theirs):
             return f"differs at list item {index + 1}: Word {theirs!r}, reader {ours!r}"
     return "agrees"
 
@@ -139,18 +163,33 @@ def main() -> int:
     answers: dict[str, list[str]] = {}
     differs = False
     for path in paths:
-        word = word_labels(path)
+        if not path.read_bytes().startswith(b"PK\x03\x04"):
+            # A .doc under a .docx name makes Word convert it, and can leave a dialog open.
+            if args.command == "record":
+                raise SystemExit(f"{path.name}: not a .docx")
+            sys.stdout.write(f"{path.name}: not a .docx; not sent to Word\n")
+            continue
+        try:
+            word = word_labels(path)
+        except SystemExit as failed:
+            if args.command == "record":
+                raise
+            # One file Word cannot open or answer for does not stop a comparison of many.
+            sys.stdout.write(f"{failed}\n")
+            continue
         answers[path.name] = word
         result = verdict(word, reader_labels(path))
         differs = differs or result.startswith("differs")
         sys.stdout.write(f"{path.name}: {result}\n")
         if result.startswith("reader refuses"):
             sys.stdout.write(f"  Word draws: {json.dumps(word)}\n")
+        sys.stdout.flush()
     if args.command == "record":
         record = {
             "application": word_version(),
+            "method": "convert numbers to text; what each list item gained",
             "recorded": datetime.date.today().isoformat(),
-            "labels": answers,
+            "drawn": answers,
         }
         target = args.folder / "word.json"
         target.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", "utf-8")

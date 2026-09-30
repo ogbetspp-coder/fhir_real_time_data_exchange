@@ -1459,3 +1459,110 @@ def test_a_link_to_a_list_that_overrides_a_level_is_refused() -> None:
 )
 def test_a_shown_level_the_reader_cannot_draw_is_refused(numbering: str) -> None:
     assert refusal(li(1, 1), numbering=numbering) == "unsupported-numbering"
+
+
+# --- found in public regulator templates (docx-reader/1.5.0) ---------------------------------
+
+
+def _banded(conditional: str) -> str:
+    return (
+        '<w:style w:type="table" w:styleId="Banded"><w:tblStylePr w:type="firstRow">'
+        f"{conditional}</w:tblStylePr></w:style>"
+    )
+
+
+def _in_banded(run: str) -> str:
+    return (
+        '<w:tbl><w:tblPr><w:tblStyle w:val="Banded"/></w:tblPr><w:tr><w:tc>'
+        + p(run)
+        + "</w:tc></w:tr></w:tbl>"
+    )
+
+
+def test_conditional_table_formatting_that_cannot_change_the_text_is_read() -> None:
+    # What the WHO, SAHPRA and EMA ATMP templates set: bold, italic, fonts, sizes, colours.
+    harmless = _banded(
+        '<w:pPr><w:spacing w:after="0"/><w:jc w:val="center"/></w:pPr><w:rPr><w:b/><w:i/>'
+        '<w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="18"/><w:color w:val="1F497D"/>'
+        '</w:rPr><w:tcPr><w:shd w:val="clear" w:fill="D9D9D9"/></w:tcPr>'
+    )
+    assert text_of(_in_banded(r("<w:t>10</w:t>")), harmless) == ["10"]
+
+
+@pytest.mark.parametrize(
+    "conditional",
+    [
+        '<w:rPr><w:color w:val="FFFFFF"/></w:rPr>',
+        '<w:rPr><w:sz w:val="2"/></w:rPr>',
+        '<w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/></w:rPr>',
+        '<w:rPr><w:rFonts w:ascii="Wingdings" w:hAnsi="Wingdings"/></w:rPr>',
+        "<w:rPr><w:caps/></w:rPr>",
+        '<w:pPr><w:shd w:val="clear" w:fill="FFFF00"/></w:pPr>',
+    ],
+)
+def test_conditional_table_formatting_that_could_change_the_text_is_refused(
+    conditional: str,
+) -> None:
+    assert refusal(_in_banded(r("<w:t>10</w:t>")), _banded(conditional)) == "unsupported-element"
+
+
+def test_symbol_text_under_conditional_table_fonts_is_refused() -> None:
+    # The conditional font, which the reader does not apply, could replace the Symbol font.
+    fonts = _banded('<w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/></w:rPr>')
+    assert refusal(_in_banded(r("<w:t>b</w:t>", SYMBOL)), fonts) == "symbol-font"
+
+
+VML_PICTURE = (
+    '<w:pict><v:shape xmlns:v="urn:schemas-microsoft-com:vml" style="width:16pt;height:13pt">'
+    '<v:imagedata xmlns:r="urn:r" r:id="rId8"/></v:shape></w:pict>'
+)
+
+
+def test_a_vml_picture_is_an_object_replacement_character() -> None:
+    # The Estonian EMA templates draw the black triangle this way.
+    assert text_of(p(r("<w:t>a</w:t>") + r(VML_PICTURE) + r("<w:t>b</w:t>"))) == ["a￼b"]
+
+
+@pytest.mark.parametrize(
+    "pict",
+    [
+        VML_PICTURE.replace("<v:imagedata", "<v:textbox><w:txbxContent/></v:textbox><v:imagedata"),
+        '<w:pict><v:rect xmlns:v="urn:schemas-microsoft-com:vml"/></w:pict>',
+        '<w:pict><o:OLEObject xmlns:o="urn:schemas-microsoft-com:office:office"/></w:pict>',
+    ],
+)
+def test_vml_that_holds_text_or_is_not_a_picture_is_refused(pict: str) -> None:
+    assert refusal(p(r(pict))) == "unsupported-element"
+
+
+def test_smart_tag_and_custom_xml_properties_are_not_text() -> None:
+    body = p(
+        '<w:smartTag w:element="place"><w:smartTagPr><w:attr w:name="x" w:val="y"/>'
+        "</w:smartTagPr>" + r("<w:t>Oslo</w:t>") + "</w:smartTag>"
+        '<w:customXml w:element="z"><w:customXmlPr/>' + r("<w:t>!</w:t>") + "</w:customXml>"
+    )
+    assert text_of(body) == ["Oslo!"]
+
+
+def test_a_word_97_2003_document_under_a_docx_name_is_refused() -> None:
+    # EMA serves qrd-annex-iv-standard-positive-template_lv.docx as a .doc. A .doc holds zips
+    # of its own; one holding a .docx must not be read as the document.
+    inner = docx(p(r("<w:t>not this document</w:t>")))
+    ole = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\x00" * 504 + inner
+    with pytest.raises(DocxRefusedError) as caught:
+        read_docx(ole)
+    assert caught.value.code == "invalid-package"
+    assert ".doc" in caught.value.detail
+
+
+@pytest.mark.parametrize(
+    "data",
+    [b"junk before" + docx(p(r("<w:t>x</w:t>"))), docx(p(r("<w:t>x</w:t>"))) + b"junk after"],
+)
+def test_a_zip_archive_that_is_not_the_whole_file_is_refused(data: bytes) -> None:
+    # zipfile itself would read both.
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        assert "word/document.xml" in archive.namelist()
+    with pytest.raises(DocxRefusedError) as caught:
+        read_docx(data)
+    assert caught.value.code == "invalid-package"

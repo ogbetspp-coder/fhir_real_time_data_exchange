@@ -20,7 +20,8 @@ What a paragraph carries:
   straightened or trimmed. ``<w:tab/>`` and ``<w:ptab/>`` are U+0009; ``<w:br/>`` and
   ``<w:cr/>`` are U+000A, except a page or column break, which is layout and emits nothing;
   ``<w:noBreakHyphen/>`` is U+2011, ``<w:softHyphen/>`` U+00AD, and a picture is U+FFFC OBJECT
-  REPLACEMENT CHARACTER at the place it stands.
+  REPLACEMENT CHARACTER at the place it stands, whether it is DrawingML (``w:drawing``) or VML
+  (``w:pict``, as documents from before Word 2007 hold it).
 - ``marks``: ranges of ``text`` whose appearance changes what a reader sees or means, set on
   the run, its styles or the document defaults (``Mark`` lists the kinds): superscript,
   subscript, raised or lowered text, capitals and small capitals, single and double
@@ -45,9 +46,12 @@ style, its table style (inside a table only) and the document defaults, each sty
 ``basedOn`` chain. An absent or unknown style id falls back to the document's default style of
 that kind (the last one marked default), as Word does; a reference to a style of another kind
 is refused. Paragraph shading and right-to-left are looked up the same way through the
-paragraph properties. A table whose effective table style has conditional formatting
-(``tblStylePr`` for the first row, banded rows and so on) is refused, because the reader does
-not apply it.
+paragraph properties. The reader does not apply a table style's conditional formatting
+(``tblStylePr`` for the first row, banded rows and so on), so it refuses a table whose style's
+conditional formatting could change what it produces, and reads one whose conditional formatting
+sets only what it cannot change: properties the reader does not report (bold, italic, spacing,
+borders, cell shading) and fonts, sizes and colours that are ordinary text. Under such
+formatting, Symbol text is refused, since a conditional font could replace the Symbol font.
 
 Symbol fonts. A run whose effective ``ascii`` and ``hAnsi`` fonts (set directly, by a style, by
 the document defaults or through the theme) are both Symbol, with no complex-script or
@@ -113,8 +117,9 @@ What it refuses (``DocxRefusedError.code``):
 - ``unsupported-element``: anything that can carry text and is not read above, and any element
   the reader does not know: text boxes, footnote and endnote references, embedded objects,
   charts and other non-picture drawings, alternate content, math, ``altChunk``, form fields,
-  content controls bound to data (in any namespace), conditional table formatting, text in a
-  vertically merged-away cell, and a style reference that names a style of another kind.
+  content controls bound to data (in any namespace), VML that is not a picture, conditional
+  table formatting that could change the text, text in a vertically merged-away cell, and a
+  style reference that names a style of another kind.
 - ``invalid-package``: not a readable .docx, no main document relationship, a part name that
   occurs twice (ignoring case), a related part that is missing or duplicated, a part that
   cannot be read (bad checksum, truncated, encrypted), a part that is not UTF-8 or declares
@@ -152,8 +157,10 @@ from dataclasses import dataclass, field, replace
 # and tests/test_locks.py then requires a new version here. 1.1.0 is the reader as imported
 # (README, "Origin"); 1.2.0 adds stray-text and unread-content; 1.3.0 draws list labels and
 # accepts the font hint "default"; 1.4.0 counts lists by the rules Word showed
-# (corpus/numbering-cases/word.json).
-READER_VERSION = "docx-reader/1.4.0"
+# (corpus/numbering-cases/word.json); 1.5.0 reads what public regulator templates hold and
+# 1.4.0 refused: VML pictures, smart-tag and custom-XML properties, and conditional table
+# formatting that cannot change the text.
+READER_VERSION = "docx-reader/1.5.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -272,6 +279,8 @@ _RUN_SILENT = {_w(name) for name in ("rPr", "lastRenderedPageBreak", "commentRef
 # Paragraph-level containers whose children are read as the paragraph's own. fldSimple's
 # children are the field's displayed result; its instruction is an attribute and is dropped.
 _INLINE_TRANSPARENT = {_w(name) for name in ("hyperlink", "smartTag", "customXml")}
+# Properties of a paragraph, a content control, a smart tag or custom XML: no text of their own.
+_PROPERTIES = {_w(name) for name in ("pPr", "sdtPr", "smartTagPr", "customXmlPr")}
 # The elements whose character data is read. Character data in any other element of the main
 # document part is refused rather than passed over.
 _TEXT_ELEMENTS = {_w("t"), _w("instrText")}
@@ -383,12 +392,39 @@ def _decode(name: str, data: bytes) -> bytes:
     return text.encode("utf-8")
 
 
+_OLE = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
+_LOCAL_HEADER = b"PK\x03\x04"
+_END_RECORD = b"PK\x05\x06"
+
+
+def _whole_archive(data: bytes) -> None:
+    """Refuse data that is not one zip archive from its first byte to its last.
+
+    zipfile opens an archive found anywhere in the data: it skips bytes before it and does not
+    look past its end record. A Word 97-2003 document (.doc, an OLE compound file) holds a small
+    zip of its theme, and one holding an embedded .docx would be read as that other document.
+    EMA's own site serves a .doc under a .docx name.
+    """
+    if data.startswith(_OLE):
+        raise DocxRefusedError("invalid-package", "a Word 97-2003 document (.doc), not a .docx")
+    if not data.startswith(_LOCAL_HEADER):
+        raise DocxRefusedError("invalid-package", "not a zip archive from its first byte")
+    end = data.rfind(_END_RECORD)
+    comment = int.from_bytes(data[end + 20 : end + 22], "little") if end >= 0 else 0
+    if end < 0 or len(data) != end + 22 + comment:
+        raise DocxRefusedError("invalid-package", "bytes after the zip archive's end record")
+
+
 class _Package:
     def __init__(self, data: bytes) -> None:
+        _whole_archive(data)
         try:
             self.zip = zipfile.ZipFile(io.BytesIO(data))
         except Exception as error:  # zipfile raises many types for a damaged archive
             raise DocxRefusedError("invalid-package", "not a readable zip archive") from error
+        if min((info.header_offset for info in self.zip.infolist()), default=0) != 0:
+            # The central directory places the first part after the start of the data.
+            raise DocxRefusedError("invalid-package", "bytes before the zip archive")
         names = self.zip.namelist()
         # Part names in a package are compared without regard to case (ECMA-376 Part 2).
         if len({name.lower() for name in names}) != len(names):
@@ -437,8 +473,11 @@ class _Style:
     based_on: str | None
     rpr: ET.Element | None
     ppr: ET.Element | None
-    # A table style with formatting for its first row, banded rows and the like.
-    conditional: bool = False
+    # Why the style's formatting for its first row, banded rows and the like could change what
+    # the reader produces (the reader does not apply it), or None if it cannot.
+    conditional: str | None = None
+    # Whether that formatting sets fonts, which could override a Symbol font beneath it.
+    conditional_fonts: bool = False
 
 
 @dataclass
@@ -453,6 +492,18 @@ class _Styles:
     has_theme: bool = False
     # Fonts the font table declares symbol-encoded (charset 02), other than Symbol itself.
     symbol_encoded: set[str] = field(default_factory=set)
+
+    def theme_font(self, theme: str) -> str:
+        """The typeface a theme font reference (``minorHAnsi``...) names; refused if none."""
+        if not self.has_theme:
+            raise DocxRefusedError("symbol-font", f"theme font {theme} without a theme")
+        for prefix in ("major", "minor"):
+            if theme.startswith(prefix):
+                script = {"HAnsi": "Latin", "Ascii": "Latin"}.get(theme[len(prefix) :])
+                key = prefix + (script or theme[len(prefix) :])
+                if key in self.theme_fonts:
+                    return self.theme_fonts[key]
+        raise DocxRefusedError("symbol-font", f"theme font {theme} is not in the theme")
 
     def effective(self, style_id: str | None, kind: str) -> str | None:
         """``style_id``, or the default style of ``kind`` when it is absent or unknown.
@@ -516,8 +567,9 @@ def _styles(root: ET.Element | None, theme: ET.Element | None, fonts: ET.Element
             based_on=based.get(_w("val")) if based is not None else None,
             rpr=style.find(_w("rPr")),
             ppr=style.find(_w("pPr")),
-            conditional=any(
-                part.find(_w("rPr")) is not None or part.find(_w("pPr")) is not None
+            conditional=_conditional(style, styles),
+            conditional_fonts=any(
+                part.find(f"{_w('rPr')}/{_w('rFonts')}") is not None
                 for part in style.findall(_w("tblStylePr"))
             ),
         )
@@ -525,6 +577,75 @@ def _styles(root: ET.Element | None, theme: ET.Element | None, fonts: ET.Element
             # With more than one default of a kind, the last one is used (ECMA-376 17.7.4.17).
             styles.defaults[kind] = style_id
     return styles
+
+
+# What a table style's conditional formatting may set, since the reader does not apply it: run
+# and paragraph properties it does not report, and fonts, sizes and colours checked below to be
+# ordinary text. Cell, row and table properties (shading, borders) are not reported either.
+_CONDITIONAL_RUN = {
+    _w(name)
+    for name in (
+        "b",
+        "bCs",
+        "i",
+        "iCs",
+        "rFonts",
+        "sz",
+        "szCs",
+        "color",
+        "kern",
+        "spacing",
+        "lang",
+        "noProof",
+    )
+}
+_CONDITIONAL_PARAGRAPH = {
+    _w(name)
+    for name in (
+        "spacing",
+        "jc",
+        "ind",
+        "keepNext",
+        "keepLines",
+        "contextualSpacing",
+        "widowControl",
+        "tabs",
+        "suppressAutoHyphens",
+        "pBdr",
+        "snapToGrid",
+    )
+}
+
+
+def _conditional(style: ET.Element, styles: _Styles) -> str | None:
+    """Why a table style's conditional formatting could change what the reader produces.
+
+    None when every property it sets is one the reader does not report, or a font, size or
+    colour that cannot make text faint or Symbol. Such formatting changes nothing the reader
+    produces except where it would override a faint size or colour beneath it, which the reader
+    then over-reports as faint; a Symbol font beneath it is refused (``_in_symbol``).
+    """
+    for part in style.findall(_w("tblStylePr")):
+        kind = part.get(_w("type"), "")
+        rpr = part.find(_w("rPr"))
+        for child in [] if rpr is None else list(rpr):
+            if child.tag not in _CONDITIONAL_RUN:
+                return f"conditional table formatting ({kind}) sets {_local(child.tag)}"
+            if child.tag == _w("rFonts"):
+                for slot, theme in _THEME_ATTRIBUTE.items():
+                    name = child.get(_w(theme))
+                    name = styles.theme_font(name) if name else child.get(_w(slot))
+                    if _font_kind(styles, name) != "text":
+                        return f"conditional table formatting ({kind}) sets the font {name}"
+            elif child.tag in (_w("sz"), _w("szCs")) and _tiny(child.get(_w("val"))):
+                return f"conditional table formatting ({kind}) sets a tiny size"
+            elif child.tag == _w("color") and _faint_color(child):
+                return f"conditional table formatting ({kind}) sets a faint colour"
+        ppr = part.find(_w("pPr"))
+        for child in [] if ppr is None else list(ppr):
+            if child.tag not in _CONDITIONAL_PARAGRAPH:
+                return f"conditional table formatting ({kind}) sets {_local(child.tag)}"
+    return None
 
 
 def _on(element: ET.Element | None) -> bool | None:
@@ -596,23 +717,11 @@ class _Properties:
                 continue
             theme = fonts.get(_w(_THEME_ATTRIBUTE[slot]))
             if theme is not None:
-                return self._theme_font(theme)
+                return self.styles.theme_font(theme)
             name = fonts.get(_w(slot))
             if name is not None:
                 return name
         return None
-
-    def _theme_font(self, theme: str) -> str:
-        if not self.styles.has_theme:
-            raise DocxRefusedError("symbol-font", f"theme font {theme} without a theme")
-        for prefix in ("major", "minor"):
-            if theme.startswith(prefix):
-                script = {"HAnsi": "Latin", "Ascii": "Latin"}.get(theme[len(prefix) :])
-                script = script or theme[len(prefix) :]
-                key = prefix + script
-                if key in self.styles.theme_fonts:
-                    return self.styles.theme_fonts[key]
-        raise DocxRefusedError("symbol-font", f"theme font {theme} is not in the theme")
 
 
 _THEME_ATTRIBUTE = {
@@ -641,7 +750,7 @@ def _font_kind(styles: _Styles, name: str | None) -> str:
     return font
 
 
-def _in_symbol(styles: _Styles, properties: _Properties) -> bool:
+def _in_symbol(styles: _Styles, properties: _Properties, table_style: str | None) -> bool:
     """Whether every character with these properties is drawn in Symbol; refused if unsure."""
     kinds = {
         slot: _font_kind(styles, properties.font(slot))
@@ -660,6 +769,10 @@ def _in_symbol(styles: _Styles, properties: _Properties) -> bool:
         # Word chooses the font per character from these slots; the reader maps a run only
         # when every Latin character is certain to be drawn in Symbol.
         raise DocxRefusedError("symbol-font", "Symbol set for only some characters")
+    if symbol and any(s.conditional_fonts for s in styles.chain(table_style)):
+        # The table style's conditional formatting, which the reader does not apply, may set
+        # another font over it.
+        raise DocxRefusedError("symbol-font", "Symbol under conditional table fonts")
     return symbol
 
 
@@ -703,6 +816,21 @@ def _drawing(element: ET.Element) -> str:
             raise DocxRefusedError("unsupported-element", "drawing with text")
         if local == "graphicData" and node.get("uri") != PICTURE_URI:
             raise DocxRefusedError("unsupported-element", f"drawing of {node.get('uri')}")
+    return OBJECT
+
+
+def _vml_picture(element: ET.Element) -> str:
+    """A VML picture (``w:pict`` of an image) is one U+FFFC; any other VML is refused.
+
+    Word writes pictures this way in documents from before Word 2007 and when saving for them.
+    A text box, WordArt, an embedded object or a drawn shape is refused: it holds text, or it is
+    not a picture.
+    """
+    locals_ = {_local(node.tag) for node in element.iter()}
+    if locals_ & {"textbox", "txbxContent", "textpath", "t", "OLEObject"}:
+        raise DocxRefusedError("unsupported-element", "pict with text or an embedded object")
+    if "imagedata" not in locals_:
+        raise DocxRefusedError("unsupported-element", "pict that is not a picture")
     return OBJECT
 
 
@@ -759,7 +887,7 @@ class _ParagraphReader:
                 content = child.find(_w("sdtContent"))
                 if content is not None:
                     self.container(content)
-            elif tag in (_w("pPr"), _w("sdtPr")) or tag in _MARKERS:
+            elif tag in _PROPERTIES or tag in _MARKERS:
                 continue
             else:
                 raise DocxRefusedError("unsupported-element", _local(tag))
@@ -769,7 +897,7 @@ class _ParagraphReader:
         properties = _Properties(
             self.styles, run.find(_w("rPr")), self.paragraph_style, self.table_style
         )
-        symbol = _in_symbol(self.styles, properties)
+        symbol = _in_symbol(self.styles, properties, self.table_style)
         emitted: list[str] = []
         for child in run:
             tag = child.tag
@@ -853,6 +981,8 @@ class _ParagraphReader:
             return _symbol(int(char, 16), "w:sym")
         if tag == _w("drawing"):
             return _drawing(child)
+        if tag == _w("pict"):
+            return _vml_picture(child)
         raise DocxRefusedError("unsupported-element", _local(tag))
 
     def _mark(self, properties: _Properties, start: int, end: int) -> None:
@@ -904,34 +1034,40 @@ def _shading(element: ET.Element | None) -> str | None:
 _POINTS = {"pt": 1.0, "pc": 12.0, "pi": 12.0, "in": 72.0, "cm": 72 / 2.54, "mm": 72 / 25.4}
 
 
+def _faint_color(color: ET.Element | None) -> bool:
+    """Whether a colour is white or a light theme colour."""
+    if color is None:
+        return False
+    theme = (color.get(_w("themeColor")) or "").lower()
+    return theme.startswith(("background", "light", "bg")) or (
+        (color.get(_w("val")) or "").lower() in ("ffffff", "white")
+    )
+
+
+def _tiny(size: str | None) -> bool:
+    """Whether a font size is under two points; one the reader cannot parse counts as tiny."""
+    if size is None:
+        return False
+    match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)(pt|pc|pi|in|cm|mm)?", size)
+    if match is None:
+        return True
+    unit = match.group(2)
+    points = float(match.group(1)) * _POINTS[unit] if unit else float(match.group(1)) / 2
+    return points < 2
+
+
 def _faint(properties: _Properties) -> bool:
     """Whether text with these properties is easy not to see.
 
     White text (or a light theme colour), text under two points, or text scaled under a fifth
     is. A size or scale the reader cannot parse counts as faint.
     """
-    color = properties.element("color")
-    if color is not None:
-        theme = (color.get(_w("themeColor")) or "").lower()
-        if theme.startswith(("background", "light", "bg")):
-            return True
-        if (color.get(_w("val")) or "").lower() in ("ffffff", "white"):
-            return True
+    if _faint_color(properties.element("color")):
+        return True
     # szCs sizes complex-script text; the reader does not know which script a character is
     # drawn as, so either size being tiny counts.
-    for size in (properties.value("sz"), properties.value("szCs")):
-        if size is None:
-            continue
-        match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)(pt|pc|pi|in|cm|mm)?", size)
-        if match is None:
-            return True
-        points = (
-            float(match.group(1)) * _POINTS[match.group(2)]
-            if match.group(2)
-            else float(match.group(1)) / 2
-        )
-        if points < 2:
-            return True
+    if any(_tiny(size) for size in (properties.value("sz"), properties.value("szCs"))):
+        return True
     scale = properties.value("w")
     if scale is not None:
         match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)%?", scale)
@@ -1423,7 +1559,9 @@ class _Lists:
         )
         if properties.toggle("vanish") or properties.toggle("specVanish"):
             raise DocxRefusedError("ambiguous-numbering", "a hidden list label")
-        label = _characters("".join(pieces), _in_symbol(self.styles, properties))
+        label = _characters(
+            "".join(pieces), _in_symbol(self.styles, properties, context.table_style)
+        )
         if (properties.toggle("caps") or properties.toggle("smallCaps")) and label.upper() != label:
             raise _refuse_numbering("a list label in capitals")
         return label
@@ -1503,7 +1641,7 @@ class _Body:
                     self.blocks(content, table, table_style)
             elif tag == _w("customXml"):
                 self.blocks(child, table, table_style)
-            elif tag in (_w("sectPr"), _w("tcPr"), _w("sdtPr")) or tag in _MARKERS:
+            elif tag in (_w("sectPr"), _w("tcPr")) or tag in _PROPERTIES or tag in _MARKERS:
                 continue
             else:
                 raise DocxRefusedError("unsupported-element", _local(tag))
@@ -1515,10 +1653,13 @@ class _Body:
         table_style = self.styles.effective(
             style_element.get(_w("val")) if style_element is not None else None, "table"
         )
-        if any(style.conditional for style in self.styles.chain(table_style)):
+        problem = next(
+            (s.conditional for s in self.styles.chain(table_style) if s.conditional), None
+        )
+        if problem is not None:
             # Formatting for the first row, banded rows and the like; the reader does not apply
-            # it, so it could hide or change text unseen.
-            raise DocxRefusedError("unsupported-element", "conditional table formatting")
+            # it, so formatting that could hide or change text is refused.
+            raise DocxRefusedError("unsupported-element", problem)
         rows: list[ET.Element] = []
         _collect(element, _w("tr"), rows, {_w("tblPr"), _w("tblGrid")})
         for row_index, row in enumerate(rows):
@@ -1546,7 +1687,7 @@ def _collect(element: ET.Element, wanted: str, out: list[ET.Element], silent: se
                 _collect(content, wanted, out, silent)
         elif tag == _w("customXml"):
             _collect(child, wanted, out, silent)
-        elif tag in silent or tag == _w("sdtPr") or tag in _MARKERS:
+        elif tag in silent or tag in _PROPERTIES or tag in _MARKERS:
             continue
         else:
             raise DocxRefusedError("unsupported-element", _local(tag))

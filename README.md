@@ -81,20 +81,24 @@ every rule is Word's own answer, not a reading of the specification:
 
 `scripts/numbering_cases.py` writes `corpus/numbering-cases/`, one small .docx per rule (and per
 question the rules had to answer). `scripts/word_oracle.py record <set>` opens each document in
-Microsoft Word (macOS), reads the label Word draws for every list item (`listString`), and writes
-`word.json`; `tests/test_word_oracle.py` then holds the reader to those answers in CI, without
-Word. Recorded with Microsoft Word 16.113.3 for macOS: the reader agrees on 27 of 28 cases and on
-the four EMA files, and refuses the 28th on purpose (a numbering-style link with no link back,
-where Word draws an empty label).
+Microsoft Word (macOS), has Word write every list label into the text ("convert numbers to
+text"), and records what each list item gained: the label and the tab or space after it. That is
+`word.json`; `tests/test_word_oracle.py` holds the reader to it in CI, without Word.
 
-To check a label of your own against Word without it entering the repository:
+Recorded with Microsoft Word 16.113.3 for macOS, over every corpus set: the reader agrees with
+Word on every list label of every document it reads, and each document it refuses is listed in
+the test with its reason (footnotes, EMA's stray private-use character in its Spanish template,
+a numbering-style link with no link back).
+
+## Checking your own documents
+
+Neither command writes anything, or prints a document's text, so confidential labels can be
+checked on one machine and never enter the repository:
 
 ```bash
-uv run --frozen python scripts/word_oracle.py compare path/to/label.docx
+uv run --frozen python scripts/survey.py path/to/folder            # read or refused, and why
+uv run --frozen python scripts/word_oracle.py compare path/*.docx  # list labels against Word
 ```
-
-It prints, per file, `agrees`, `differs at list item n` or the reader's refusal with Word's
-labels, and never the document's text.
 
 ### What is refused
 
@@ -108,7 +112,11 @@ labels, and never the document's text.
 ## What it does not read
 
 - **Headers, footers, footnotes, endnotes, comments.** Separate parts, not read. A footnote
-  *reference* in the body is refused, so no footnote is lost silently.
+  *reference* in the body is refused, so no footnote is lost silently. Footnotes are the most
+  common reason public regulator templates are refused (9 of 140, the WHO and SAHPRA Module 2.3
+  templates among them), so they are the next piece of work.
+- **Word 97-2003 documents (.doc)** are refused, including under a .docx name: EMA's site
+  serves one. Save them as .docx in Word first.
 - **Documents with tracked changes** are refused, not resolved. Accept or reject all changes in
   Word first; which text is "the label" is a decision the reader will not make.
 - Some marks are conservative: a toggle property (caps, strike) set at any level of the style
@@ -126,6 +134,7 @@ labels, and never the document's text.
 | Every corpus list label is the one Microsoft Word draws          | `tests/test_word_oracle.py`  |
 | The numbering cases are what their script writes, byte for byte  | `tests/test_corpus.py`       |
 | The EMA template's 7 Symbol bullets and 9 Word 6 dashes          | `tests/test_reader.py`       |
+| A .doc, or a zip that is not the whole file, is never read        | `tests/test_reader.py`       |
 | Same bytes across processes, hash seeds and locales              | `tests/test_determinism.py`  |
 | Same result however the parts are zipped                         | `tests/test_determinism.py`  |
 | The output is canonical (RFC 8785 form); the CLI's exit codes    | `tests/test_output.py`       |
@@ -162,10 +171,21 @@ diff in `expected.json` to review. A locked version is never re-locked to other 
 
 ## Corpus
 
-`corpus/<set>/` holds real documents with a `sources.json` recording where each came from and
-its hash. Only public or synthetic documents go here: the four EMA QRD templates
-(`corpus/ema-qrd/`) are EMA's published files, reproduced with acknowledgement as the EMA
-permits. To add a set: the files, a `sources.json` in the same shape, then `scripts/lock.py`.
+`corpus/<set>/` holds documents with a `sources.json` recording where each came from and its
+hash, the reader's locked digests (`expected.json`) and Word's list labels (`word.json`). Only
+public or synthetic documents go here:
+
+- `ema-qrd/`: the four EMA QRD files the reader's rules were first written from.
+- `ema-templates/`: the other English EMA product-information templates (ATMP, MRP/DCP
+  referral, PSUSA, Annex IV, appendix cover pages, Appendix V), and five kept for what they
+  hold: a VML picture (Estonian), smart-tag properties and a stray private-use character
+  (Spanish), and Cyrillic and Greek text (Bulgarian, Greek ATMP).
+- `numbering-cases/`: synthetic, written by `scripts/numbering_cases.py`.
+
+EMA's files are reproduced with acknowledgement as the EMA permits. The WHO and SAHPRA Module 2.3
+templates were checked (below) but are not reproduced, their terms of reuse being unclear. To
+add a set: the files, a `sources.json` in the same shape, then `scripts/lock.py` and
+`scripts/word_oracle.py record`.
 
 ## Origin
 
@@ -177,3 +197,6 @@ four EMA files to the same paragraphs, marks and structure as 1.1.0. 1.3.0 draws
 `default`, which sends ambiguous characters to the `hAnsi` font. 1.4.0 replaces the reader's
 assumptions about counting with Word's answers: it reads the cases 1.3.0 refused as ambiguous,
 and draws the one label 1.3.0 got wrong (a level counted after a deeper one) as Word does.
+1.5.0 reads what public regulator templates hold and 1.4.0 refused without cause (VML pictures,
+smart-tag and custom-XML properties, conditional table formatting that cannot change the text),
+and refuses a .doc under a .docx name, which 1.4.0 opened as the zip of its theme.

@@ -1,166 +1,167 @@
 {
   "application": "Microsoft Word 16.113.3 (macOS)",
-  "labels": {
+  "drawn": {
     "ancestor-never-counted.docx": [
-      "1.1",
-      "1.2",
-      "2.",
-      "2.1"
+      "1.1\t",
+      "1.2\t",
+      "2.\t",
+      "2.1\t"
     ],
     "ancestor-two-levels.docx": [
-      "1.1.1",
-      "1.2",
-      "1.2.1",
-      "2.",
-      "2.1.1"
+      "1.1.1\t",
+      "1.2\t",
+      "1.2.1\t",
+      "2.\t",
+      "2.1.1\t"
     ],
     "bullets.docx": [
-      "\uf0b7",
-      "o",
-      "\uf0b7"
+      "\uf0b7\t",
+      "o\t",
+      "\uf0b7\t"
     ],
     "formats.docx": [
-      "0.",
-      "07.",
-      "12.",
-      "MCMXCIV.",
-      "iv.",
-      "A.",
-      "z.",
-      "aa.",
-      "aaa.",
-      "."
+      "0.\t",
+      "07.\t",
+      "12.\t",
+      "MCMXCIV.\t",
+      "iv.\t",
+      "A.\t",
+      "z.\t",
+      "aa.\t",
+      "aaa.\t",
+      ".\t"
     ],
     "legal.docx": [
-      "I",
-      "1.1"
+      "I\t",
+      "1.1\t"
     ],
     "level-override-first.docx": [
-      "1)",
-      "2)",
-      "3."
+      "1)\t",
+      "2)\t",
+      "3.\t"
     ],
     "level-override-shared.docx": [
-      "1.",
-      "2.",
-      "3)",
-      "4."
+      "1.\t",
+      "2.\t",
+      "3)\t",
+      "4.\t"
     ],
     "level-override-start.docx": [
-      "1.",
-      "2)",
-      "3)",
-      "4."
+      "1.\t",
+      "2)\t",
+      "3)\t",
+      "4.\t"
     ],
     "level-override.docx": [
-      "-",
-      "-"
+      "-\t",
+      "-\t"
     ],
     "missing-start.docx": [
-      "0.",
-      "1."
+      "0.\t",
+      "1.\t"
     ],
     "multilevel.docx": [
-      "1.",
-      "1.1",
-      "1.2",
-      "2.",
-      "2.1",
-      "2.1.1",
-      "2.2"
+      "1.\t",
+      "1.1\t",
+      "1.2\t",
+      "2.\t",
+      "2.1\t",
+      "2.1.1\t",
+      "2.2\t"
     ],
     "numbering-style-link-one-way.docx": [
-      "",
-      "Section 1",
-      ""
+      "\t",
+      "Section 1\t",
+      "\t"
     ],
     "numbering-style-link.docx": [
-      "Section 1",
-      "Section 1",
-      "Section 2"
+      "Section 1\t",
+      "Section 1\t",
+      "Section 2\t"
     ],
     "override-ancestor.docx": [
-      "1.",
-      "1.1",
-      "1.2",
-      "5."
+      "1.\t",
+      "1.1\t",
+      "1.2\t",
+      "5.\t"
     ],
     "override-deeper-level.docx": [
-      "1.",
-      "1.1",
-      "1.5",
-      "1.6"
+      "1.\t",
+      "1.1\t",
+      "1.5\t",
+      "1.6\t"
     ],
     "override-implicit-ancestor.docx": [
-      "1.1",
-      "5.",
-      "6."
+      "1.1\t",
+      "5.\t",
+      "6.\t"
     ],
     "override-restart-within.docx": [
-      "1.",
-      "1.5",
-      "2.",
-      "2.5"
+      "1.\t",
+      "1.5\t",
+      "2.\t",
+      "2.5\t"
     ],
     "override-return.docx": [
-      "1.",
-      "2.",
-      "3.",
-      "4."
+      "1.\t",
+      "2.\t",
+      "3.\t",
+      "4.\t"
     ],
     "plain-after-restart.docx": [
-      "1.",
-      "2."
+      "1.\t",
+      "2.\t"
     ],
     "restart-after-first.docx": [
-      "1",
-      "1",
-      "2",
-      "2",
-      "2",
-      "1"
+      "1\t",
+      "1\t",
+      "2\t",
+      "2\t",
+      "2\t",
+      "1\t"
     ],
     "restart-never.docx": [
-      "1",
-      "1",
-      "2",
-      "2",
-      "3"
+      "1\t",
+      "1\t",
+      "2\t",
+      "2\t",
+      "3\t"
     ],
     "return-after-restart.docx": [
-      "1.",
-      "1.",
-      "2."
+      "1.\t",
+      "1.\t",
+      "2.\t"
     ],
     "shared-continue.docx": [
-      "1.",
-      "2.",
-      "3."
+      "1.\t",
+      "2.\t",
+      "3.\t"
     ],
     "start-override-first.docx": [
-      "5.",
-      "6."
+      "5.\t",
+      "6.\t"
     ],
     "start-override-restart.docx": [
-      "1.",
-      "2.",
-      "1.",
-      "2."
+      "1.\t",
+      "2.\t",
+      "1.\t",
+      "2.\t"
     ],
     "style-tied-deeper-level.docx": [
-      "1.",
-      "2.",
-      "3."
+      "1.\t",
+      "2.\t",
+      "3.\t"
     ],
     "style-tied-level-zero.docx": [
-      "1.",
-      "2."
+      "1.\t",
+      "2.\t"
     ],
     "two-definitions.docx": [
-      "1.",
-      "1.",
-      "2."
+      "1.\t",
+      "1.\t",
+      "2.\t"
     ]
   },
+  "method": "convert numbers to text; what each list item gained",
   "recorded": "2026-09-30"
 }
