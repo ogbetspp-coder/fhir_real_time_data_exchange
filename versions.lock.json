@@ -1,0 +1,9 @@
+{
+  "format": {
+    "label-docx-json/1.0.0": "5f1aa016f095c2975f647d1c0e03eb547b25ae493571e21b7a171a8c86f320ab"
+  },
+  "reader": {
+    "docx-reader/1.1.0": "5e84e792f32e6425dc78046d4eea0afe58a6a3a12babafcab2b2f0d27bb36f1a",
+    "docx-reader/1.2.0": "30afaa0572818196075e4e720c9cefd642c7008b014637fa1b19b2d51e730b9a"
+  }
+}
