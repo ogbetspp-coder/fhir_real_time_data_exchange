@@ -32,8 +32,10 @@ What a paragraph carries:
   appearance (other colours, font size, bold, italic, borders) is not reported.
 - ``mark_hidden``: the paragraph mark is hidden (``vanish`` or ``specVanish``, directly or
   through the paragraph's styles), so Word shows this paragraph run on into the next one.
-- ``numbering``: the list the paragraph belongs to, directly or through its style. The number
-  Word shows is computed, not stored, and is never rendered into ``text``.
+- ``numbering``: the list the paragraph belongs to, directly or through its style, and the list
+  label Word draws before it (``Numbering.text``, with ``suffix`` naming what separates it from
+  the paragraph). The label is computed, not stored, so it is never put into ``text``; see
+  "List labels" below.
 - ``table``: ``(table, row, cell)`` counted from zero in document order, else ``None``. A nested
   table's paragraphs carry the outermost cell; cells are counted as ``<w:tc>`` elements, not
   grid columns.
@@ -49,7 +51,8 @@ not apply it.
 
 Symbol fonts. A run whose effective ``ascii`` and ``hAnsi`` fonts (set directly, by a style, by
 the document defaults or through the theme) are both Symbol, with no complex-script or
-right-to-left property and no font hint, has every character mapped through ``SYMBOL_FONT``; a
+right-to-left property and no font hint other than ``default`` (which sends ambiguous characters
+to the ``hAnsi`` font, Symbol here), has every character mapped through ``SYMBOL_FONT``; a
 character the table does not hold is refused. ``<w:sym>`` in the Symbol font is mapped the same
 way. Any other run with Symbol in one of its four font slots is refused, because Word picks the
 font per character and the reader cannot be sure which characters it draws in Symbol. A dingbat
@@ -65,6 +68,27 @@ instruction ahead of or inside that word makes the code unknown, and the field i
 are a field with no stored result (no ``separate``, such as a form checkbox or a SYMBOL field,
 or an empty ``fldSimple``), a form field, a field marked for update, any field in a document
 whose settings ask Word to update fields on open, and field code outside an instruction.
+
+List labels. Word draws "4.8", "b)" or a bullet before a numbered paragraph from the numbering
+part; the reader computes that label the way Word does and refuses where the result is not
+certain. A paragraph's ``numId`` names a ``w:num``, which names an ``abstractNum`` (through one
+numbering-style link, ``numStyleLink``, if it has one); a level of the ``w:num``'s
+``lvlOverride`` replaces the abstract level whole, and its ``startOverride`` replaces the start.
+Counters belong to the ``abstractNum``: lists that share one continue each other's numbers, which
+is why Word writes a ``startOverride`` to restart one. A paragraph at level ``L`` restarts every
+deeper level (``lvlRestart`` 0 never restarts it; ``lvlRestart`` ``n`` restarts it only after a
+level up to ``n - 1``) and then counts its own: the level's start the first time, one more after.
+``lvlText`` is copied, with ``%1`` to ``%9`` replaced by the counter of that level in that
+level's format (all decimal under ``isLgl``): decimal, decimalZero, upper and lower roman
+(1 to 3999), upper and lower letter (a to z, then aa, bb...), or none; a bullet level's text is
+its bullet. The label is drawn in the level's run properties over the paragraph mark's, so its
+fonts are placed as a run's are: a Symbol bullet (U+F0B7) is mapped to "•", a Wingdings one is
+refused. ``suffix`` is ``tab``, ``space`` or ``nothing`` (``w:suff``), or ``legacy`` for a
+Word 6 level, where the gap is layout and not a character. A counter is certain when the
+paragraphs of one ``abstractNum`` stay in one ``w:num``, move between ``w:num`` elements that
+override nothing, or move to a new ``w:num`` that restarts the level (``startOverride``); after any
+other move, and before a level is first counted, it is unknown, and a label that shows it is
+refused. A bullet shows no counter and is never refused for one.
 
 What it refuses (``DocxRefusedError.code``):
 
@@ -100,6 +124,16 @@ What it refuses (``DocxRefusedError.code``):
   ``<w:instrText>`` (whitespace between elements aside), or an element inside either of them.
 - ``unread-content``: a run the reader did not reach (inside section, paragraph or cell
   properties, say), or run content standing outside a run.
+- ``unsupported-numbering``: a list label the reader cannot draw exactly: a ``numId`` or level
+  with no definition (or no numbering part), a level outside 0 to 8, a format other than those
+  above (ordinal and text formats depend on the language), a custom format, a picture bullet, a
+  level holding anything else the reader does not know (alternate content, say), a ``%n`` for a
+  deeper level, a bullet level that shows a counter, a number past a format's range, or a label in
+  capitals or small capitals with letters in it.
+- ``ambiguous-numbering``: a list label that shows a counter the reader cannot be sure of (above),
+  a label drawn hidden (the paragraph mark or the level is hidden), a numbered paragraph run on
+  after a hidden paragraph mark, or a paragraph style that names a list level other than 0 for a
+  paragraph that sets no level.
 
 Headers, footers, footnotes, comments and the glossary are separate parts and are not read.
 """
@@ -111,12 +145,13 @@ import posixpath
 import re
 import xml.etree.ElementTree as ET
 import zipfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 # The version of the rules above. A change to this file changes its hash in versions.lock.json,
-# and tests/test_versions_lock.py then requires a new version here. 1.1.0 is the reader as
-# imported (README, "Origin"); 1.2.0 adds stray-text and unread-content.
-READER_VERSION = "docx-reader/1.2.0"
+# and tests/test_locks.py then requires a new version here. 1.1.0 is the reader as imported
+# (README, "Origin"); 1.2.0 adds stray-text and unread-content; 1.3.0 draws list labels and
+# accepts the font hint "default".
+READER_VERSION = "docx-reader/1.3.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -272,10 +307,17 @@ class DocxRefusedError(Exception):
 
 @dataclass(frozen=True)
 class Numbering:
-    """The list a paragraph belongs to. ``num_id`` 0 means "not in a list"."""
+    """The list a paragraph belongs to. ``num_id`` 0 means "not in a list".
+
+    ``text`` is the label Word draws before the paragraph ("4.8.", "b)", "•", or "" for a level
+    that shows nothing) and ``suffix`` what follows it: ``tab``, ``space``, ``nothing`` or
+    ``legacy``. Both are None when ``num_id`` is 0.
+    """
 
     num_id: int
     level: int
+    text: str | None = None
+    suffix: str | None = None
 
 
 @dataclass(frozen=True)
@@ -491,7 +533,11 @@ def _on(element: ET.Element | None) -> bool | None:
 
 
 class _Properties:
-    """The run properties in force for one run, from the run outwards."""
+    """The run properties in force for one run, from the run outwards.
+
+    ``mark``, for a list label, is the paragraph mark's run properties, which the label's level
+    properties (``direct``) sit over.
+    """
 
     def __init__(
         self,
@@ -499,6 +545,7 @@ class _Properties:
         direct: ET.Element | None,
         paragraph_style: str | None,
         table_style: str | None,
+        mark: ET.Element | None = None,
     ) -> None:
         self.styles = styles
         self.direct = direct
@@ -506,7 +553,7 @@ class _Properties:
         if direct is not None:
             element = direct.find(_w("rStyle"))
             run_style = element.get(_w("val")) if element is not None else None
-        levels: list[ET.Element | None] = []
+        levels: list[ET.Element | None] = [mark]
         levels += [style.rpr for style in styles.resolve(run_style, "character")]
         levels += [style.rpr for style in styles.resolve(paragraph_style, "paragraph")]
         # ``table_style`` is already resolved: None outside a table, where no table style applies.
@@ -585,6 +632,53 @@ def _font_class(name: str | None) -> str:
     return "text"
 
 
+def _font_kind(styles: _Styles, name: str | None) -> str:
+    font = _font_class(name)
+    if font == "text" and name is not None and name.lower() in styles.symbol_encoded:
+        return "dingbat"
+    return font
+
+
+def _in_symbol(styles: _Styles, properties: _Properties) -> bool:
+    """Whether every character with these properties is drawn in Symbol; refused if unsure."""
+    kinds = {
+        slot: _font_kind(styles, properties.font(slot))
+        for slot in ("ascii", "hAnsi", "eastAsia", "cs")
+    }
+    if "dingbat" in kinds.values():
+        raise DocxRefusedError("symbol-font", "a run in a dingbat or symbol-encoded font")
+    symbol = "symbol" in kinds.values()
+    if symbol and (
+        kinds["ascii"] != "symbol"
+        or kinds["hAnsi"] != "symbol"
+        or properties.toggle("cs")
+        or properties.toggle("rtl")
+        or properties.value("rFonts", "hint") not in (None, "default")
+    ):
+        # Word chooses the font per character from these slots; the reader maps a run only
+        # when every Latin character is certain to be drawn in Symbol.
+        raise DocxRefusedError("symbol-font", "Symbol set for only some characters")
+    return symbol
+
+
+def _characters(text: str, symbol: bool) -> str:
+    """``text`` as drawn: mapped through the Symbol table in a Symbol run, else as stored."""
+    out: list[str] = []
+    for character in text:
+        code = ord(character)
+        if symbol:
+            if code > 0xFF and not 0xF000 <= code <= 0xF0FF:
+                raise DocxRefusedError("unmapped-symbol", f"U+{code:04X} in a Symbol run")
+            out.append(_symbol(code, "w:t"))
+        elif _private_use(code):
+            raise DocxRefusedError("private-use-character", f"U+{code:04X}")
+        elif character == OBJECT:
+            raise DocxRefusedError("reserved-character", "U+FFFC stands for a picture")
+        else:
+            out.append(character)
+    return "".join(out)
+
+
 def _symbol(code: int, where: str) -> str:
     low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code
     if low not in SYMBOL_FONT:
@@ -632,12 +726,6 @@ class _ParagraphReader:
         self.instructions: list[list[str]] = []
         self.rtl = 0
 
-    def _font(self, name: str | None) -> str:
-        font = _font_class(name)
-        if font == "text" and name is not None and name.lower() in self.styles.symbol_encoded:
-            return "dingbat"
-        return font
-
     def in_instruction(self) -> bool:
         return True in self.fields
 
@@ -679,21 +767,7 @@ class _ParagraphReader:
         properties = _Properties(
             self.styles, run.find(_w("rPr")), self.paragraph_style, self.table_style
         )
-        names = {slot: properties.font(slot) for slot in ("ascii", "hAnsi", "eastAsia", "cs")}
-        classes = {slot: self._font(name) for slot, name in names.items()}
-        if "dingbat" in classes.values():
-            raise DocxRefusedError("symbol-font", "a run in a dingbat or symbol-encoded font")
-        symbol = "symbol" in classes.values()
-        if symbol and (
-            classes["ascii"] != "symbol"
-            or classes["hAnsi"] != "symbol"
-            or properties.toggle("cs")
-            or properties.toggle("rtl")
-            or properties.value("rFonts", "hint") is not None
-        ):
-            # Word chooses the font per character from these slots; the reader maps a run
-            # only when every Latin character is certain to be drawn in Symbol.
-            raise DocxRefusedError("symbol-font", "Symbol set for only some characters")
+        symbol = _in_symbol(self.styles, properties)
         emitted: list[str] = []
         for child in run:
             tag = child.tag
@@ -710,7 +784,7 @@ class _ParagraphReader:
             if tag == _w("t"):
                 text = child.text or ""
                 _check_whitespace(child, text)
-                produced = self._text(text, symbol)
+                produced = _characters(text, symbol)
             else:
                 produced = self._special(child)
             if not self.in_instruction():
@@ -778,22 +852,6 @@ class _ParagraphReader:
         if tag == _w("drawing"):
             return _drawing(child)
         raise DocxRefusedError("unsupported-element", _local(tag))
-
-    def _text(self, text: str, symbol: bool) -> str:
-        out: list[str] = []
-        for character in text:
-            code = ord(character)
-            if symbol:
-                if code > 0xFF and not 0xF000 <= code <= 0xF0FF:
-                    raise DocxRefusedError("unmapped-symbol", f"U+{code:04X} in a Symbol run")
-                out.append(_symbol(code, "w:t"))
-            elif _private_use(code):
-                raise DocxRefusedError("private-use-character", f"U+{code:04X}")
-            elif character == OBJECT:
-                raise DocxRefusedError("reserved-character", "U+FFFC stands for a picture")
-            else:
-                out.append(character)
-        return "".join(out)
 
     def _mark(self, properties: _Properties, start: int, end: int) -> None:
         kinds: list[str] = []
@@ -913,8 +971,11 @@ def _int(value: str, where: str) -> int:
     return int(value)
 
 
-def _numbering(levels: list[ET.Element | None]) -> Numbering | None:
-    """The numId and ilvl, each from the nearest paragraph-properties level that sets it."""
+def _numbering(levels: list[ET.Element | None]) -> tuple[Numbering | None, bool]:
+    """The numId and ilvl, each from the nearest paragraph-properties level that sets it.
+
+    The flag says whether any level set ilvl, rather than it defaulting to 0.
+    """
     found: dict[str, int] = {}
     for source in levels:
         numpr = source.find(_w("numPr")) if source is not None else None
@@ -925,8 +986,20 @@ def _numbering(levels: list[ET.Element | None]) -> Numbering | None:
             if name not in found and element is not None:
                 found[name] = _int(element.get(_w("val"), "0"), name)
     if not found:
-        return None
-    return Numbering(num_id=found.get("numId", 0), level=found.get("ilvl", 0))
+        return None, False
+    return Numbering(num_id=found.get("numId", 0), level=found.get("ilvl", 0)), "ilvl" in found
+
+
+@dataclass(frozen=True)
+class _ListContext:
+    """What the list-label pass needs of a paragraph besides the paragraph itself."""
+
+    # The paragraph style in force (after falling back to the default), its table's style, and
+    # the paragraph mark's run properties, which a list label is drawn over.
+    style: str | None
+    table_style: str | None
+    mark: ET.Element | None
+    level_set: bool
 
 
 def _paragraph(
@@ -935,29 +1008,37 @@ def _paragraph(
     table: tuple[int, int, int] | None,
     table_style: str | None,
     runs: set[ET.Element],
-) -> Paragraph:
+) -> tuple[Paragraph, _ListContext]:
     ppr = element.find(_w("pPr"))
     style = None
     if ppr is not None:
         style_element = ppr.find(_w("pStyle"))
         style = style_element.get(_w("val")) if style_element is not None else None
-    mark = _Properties(styles, ppr.find(_w("rPr")) if ppr is not None else None, style, table_style)
+    mark_rpr = ppr.find(_w("rPr")) if ppr is not None else None
+    mark = _Properties(styles, mark_rpr, style, table_style)
     mark_hidden = mark.toggle("vanish") or mark.toggle("specVanish")
     reader = _ParagraphReader(styles, style, table_style, runs)
     reader.container(element)
     if reader.in_instruction():
         raise DocxRefusedError("unbalanced-field", "a paragraph ends inside a field instruction")
+    numbering, level_set = _numbering(
+        [
+            ppr,
+            *(s.ppr for s in styles.resolve(style, "paragraph")),
+            *(s.ppr for s in styles.chain(table_style)),
+            styles.default_ppr,
+        ]
+    )
+    context = _ListContext(
+        style=styles.effective(style, "paragraph"),
+        table_style=table_style,
+        mark=mark_rpr,
+        level_set=level_set,
+    )
     return Paragraph(
         text="".join(reader.parts),
         style=style,
-        numbering=_numbering(
-            [
-                ppr,
-                *(s.ppr for s in styles.resolve(style, "paragraph")),
-                *(s.ppr for s in styles.chain(table_style)),
-                styles.default_ppr,
-            ]
-        ),
+        numbering=numbering,
         table=table,
         marks=_paragraph_marks(
             reader,
@@ -969,7 +1050,7 @@ def _paragraph(
             ],
         ),
         mark_hidden=mark_hidden,
-    )
+    ), context
 
 
 def _paragraph_marks(reader: _ParagraphReader, levels: list[ET.Element | None]) -> tuple[Mark, ...]:
@@ -997,6 +1078,376 @@ def _paragraph_marks(reader: _ParagraphReader, levels: list[ET.Element | None]) 
     return tuple(sorted(set(marks), key=lambda m: (m.start, m.end, m.kind)))
 
 
+# --- list labels ---------------------------------------------------------------------------
+
+_LEVELS = range(9)
+_FORMATS = {
+    "decimal",
+    "decimalZero",
+    "upperRoman",
+    "lowerRoman",
+    "upperLetter",
+    "lowerLetter",
+    "none",
+    "bullet",
+}
+# What a list level may hold. Anything else (a picture bullet, alternate content carrying a
+# custom format...) makes the level one the reader cannot draw.
+_LEVEL_CHILDREN = {
+    _w(name)
+    for name in (
+        "start",
+        "numFmt",
+        "lvlRestart",
+        "pStyle",
+        "isLgl",
+        "suff",
+        "lvlText",
+        "lvlJc",
+        "pPr",
+        "rPr",
+        "legacy",
+    )
+}
+_PLACEHOLDER = re.compile(r"(%[1-9])")
+_ROMAN = (
+    (1000, "M"),
+    (900, "CM"),
+    (500, "D"),
+    (400, "CD"),
+    (100, "C"),
+    (90, "XC"),
+    (50, "L"),
+    (40, "XL"),
+    (10, "X"),
+    (9, "IX"),
+    (5, "V"),
+    (4, "IV"),
+    (1, "I"),
+)
+
+
+@dataclass(frozen=True)
+class _Level:
+    start: int | None
+    format: str
+    text: str | None
+    restart: int | None
+    legal: bool
+    suffix: str
+    rpr: ET.Element | None
+    style: str | None
+    # Why the level cannot be drawn, if it cannot; refused only when a paragraph uses it.
+    unsupported: str | None
+
+
+def _level(element: ET.Element) -> _Level:
+    def value(name: str) -> str | None:
+        found = element.find(_w(name))
+        return None if found is None else found.get(_w("val"))
+
+    unsupported = next(
+        (f"{_local(c.tag)} in a list level" for c in element if c.tag not in _LEVEL_CHILDREN), None
+    )
+    number_format = element.find(_w("numFmt"))
+    fmt = value("numFmt") or "decimal"
+    if number_format is not None and number_format.get(_w("format")) is not None:
+        unsupported = unsupported or "a custom number format"
+    elif fmt not in _FORMATS:
+        unsupported = unsupported or f"the number format {fmt}"
+    text_element = element.find(_w("lvlText"))
+    text = None
+    if text_element is not None:
+        null = text_element.get(_w("null")) in ("1", "true", "on")
+        text = "" if null else text_element.get(_w("val"), "")
+    legacy = element.find(_w("legacy"))
+    suffix = value("suff") or "tab"
+    if legacy is not None and legacy.get(_w("legacy")) not in ("0", "false", "off"):
+        # A Word 6 level: the gap after the label is set by legacySpace and legacyIndent.
+        suffix = "legacy"
+    elif suffix not in ("tab", "space", "nothing"):
+        unsupported = unsupported or f"the suffix {suffix}"
+    start = value("start")
+    restart = value("lvlRestart")
+    return _Level(
+        start=None if start is None else _int(start, "start"),
+        format=fmt,
+        text=text,
+        restart=None if restart is None else _int(restart, "lvlRestart"),
+        legal=bool(_on(element.find(_w("isLgl")))),
+        suffix=suffix,
+        rpr=element.find(_w("rPr")),
+        style=value("pStyle"),
+        unsupported=unsupported,
+    )
+
+
+def _ilvl(element: ET.Element) -> int:
+    level = _int(element.get(_w("ilvl"), ""), "ilvl")
+    if level not in _LEVELS:
+        raise DocxRefusedError("invalid-package", f"list level {level}")
+    return level
+
+
+@dataclass(frozen=True)
+class _Num:
+    abstract: int | None
+    starts: dict[int, int]
+    levels: dict[int, _Level]
+
+    @property
+    def overrides(self) -> bool:
+        return bool(self.starts or self.levels)
+
+
+@dataclass(frozen=True)
+class _Abstract:
+    levels: dict[int, _Level]
+    link: str | None
+
+
+@dataclass
+class _Counters:
+    """The counters of one abstractNum, and which list (numId) is counting in it."""
+
+    values: list[int | None] = field(default_factory=lambda: [None] * len(_LEVELS))
+    unknown: list[bool] = field(default_factory=lambda: [False] * len(_LEVELS))
+    current: int | None = None
+    used: set[int] = field(default_factory=set)
+
+
+def _refuse_numbering(detail: str) -> DocxRefusedError:
+    return DocxRefusedError("unsupported-numbering", detail)
+
+
+class _Lists:
+    def __init__(self, root: ET.Element | None, styles: _Styles) -> None:
+        self.styles = styles
+        self.present = root is not None
+        self.abstracts: dict[int, _Abstract] = {}
+        self.nums: dict[int, _Num] = {}
+        self.counters: dict[int, _Counters] = {}
+        if root is None:
+            return
+        for element in root.findall(_w("abstractNum")):
+            key = _int(element.get(_w("abstractNumId"), ""), "abstractNumId")
+            if key in self.abstracts:
+                raise DocxRefusedError("invalid-package", f"abstractNum {key} is defined twice")
+            levels: dict[int, _Level] = {}
+            for lvl in element.findall(_w("lvl")):
+                level = _ilvl(lvl)
+                if level in levels:
+                    raise DocxRefusedError("invalid-package", f"list level {level} twice")
+                levels[level] = _level(lvl)
+            link = element.find(_w("numStyleLink"))
+            self.abstracts[key] = _Abstract(levels, None if link is None else link.get(_w("val")))
+        for element in root.findall(_w("num")):
+            key = _int(element.get(_w("numId"), ""), "numId")
+            if key in self.nums:
+                raise DocxRefusedError("invalid-package", f"numId {key} is defined twice")
+            abstract = element.find(_w("abstractNumId"))
+            starts: dict[int, int] = {}
+            overridden: dict[int, _Level] = {}
+            seen: set[int] = set()
+            for override in element.findall(_w("lvlOverride")):
+                level = _ilvl(override)
+                if level in seen:
+                    raise DocxRefusedError("invalid-package", f"list level {level} twice")
+                seen.add(level)
+                start = override.find(_w("startOverride"))
+                if start is not None:
+                    starts[level] = _int(start.get(_w("val"), ""), "startOverride")
+                redefined = override.find(_w("lvl"))
+                if redefined is not None:
+                    overridden[level] = _level(redefined)
+            self.nums[key] = _Num(
+                abstract=None
+                if abstract is None
+                else _int(abstract.get(_w("val"), ""), "abstractNumId"),
+                starts=starts,
+                levels=overridden,
+            )
+
+    def definitions(self, num_id: int) -> tuple[int, _Num, dict[int, _Level]]:
+        """The abstractNum counting for ``num_id``, the num, and its levels after overrides."""
+        if not self.present:
+            raise _refuse_numbering("a list with no numbering part")
+        num = self.nums.get(num_id)
+        if num is None or num.abstract is None or num.abstract not in self.abstracts:
+            raise _refuse_numbering(f"numId {num_id} is not defined")
+        abstract_id = num.abstract
+        abstract = self.abstracts[abstract_id]
+        if abstract.link is not None:
+            abstract_id = self._linked(abstract.link)
+            abstract = self.abstracts[abstract_id]
+        return abstract_id, num, {**abstract.levels, **num.levels}
+
+    def _linked(self, name: str) -> int:
+        """The abstractNum a numbering style names: one link, to a list that overrides nothing."""
+        style = self.styles.styles.get(name)
+        if style is None or style.kind != "numbering":
+            raise _refuse_numbering(f"numbering style {name!r} is not defined")
+        numbering, _ = _numbering([style.ppr])
+        linked = self.nums.get(numbering.num_id) if numbering is not None else None
+        if (
+            linked is None
+            or linked.abstract is None
+            or linked.overrides
+            or linked.abstract not in self.abstracts
+            or self.abstracts[linked.abstract].link is not None
+        ):
+            raise _refuse_numbering(f"numbering style {name!r} names no list the reader can use")
+        return linked.abstract
+
+    def label(self, numbering: Numbering, context: _ListContext) -> Numbering:
+        """``numbering`` with the label Word draws, counted in document order."""
+        level = numbering.level
+        if level not in _LEVELS:
+            raise _refuse_numbering(f"list level {level}")
+        abstract_id, num, levels = self.definitions(numbering.num_id)
+        if not context.level_set and any(
+            k != 0 and d.style is not None and d.style == context.style for k, d in levels.items()
+        ):
+            # The paragraph sets no level and its style is tied to a deeper one; which of the two
+            # Word uses is not documented.
+            raise DocxRefusedError("ambiguous-numbering", "a style tied to a list level not set")
+        counters = self.counters.setdefault(abstract_id, _Counters())
+        self._move(counters, numbering.num_id, num)
+        definition = levels.get(level)
+        if definition is None:
+            raise _refuse_numbering(f"level {level} of numId {numbering.num_id} is not defined")
+        self._count(counters, level, levels, num)
+        text = self._draw(counters, level, levels, definition, context)
+        return replace(numbering, text=text, suffix=definition.suffix)
+
+    def _move(self, counters: _Counters, num_id: int, num: _Num) -> None:
+        """Carry the counters over to ``num_id`` where Word's behaviour is certain; else unknown."""
+        if counters.current == num_id:
+            return
+        first = counters.current is None
+        new = num_id not in counters.used
+        plain_before = not any(self.nums[n].overrides for n in counters.used)
+        counters.current = num_id
+        counters.used.add(num_id)
+        if first or (plain_before and not num.overrides):
+            # A fresh set of counters, or lists that share one and override nothing.
+            return
+        for level in _LEVELS:
+            if new and level in num.starts:
+                counters.values[level] = None
+                counters.unknown[level] = False
+            elif not (new and plain_before and level not in num.levels):
+                counters.unknown[level] = True
+
+    def _count(self, counters: _Counters, level: int, levels: dict[int, _Level], num: _Num) -> None:
+        for deeper in range(level + 1, len(_LEVELS)):
+            definition = levels.get(deeper)
+            restart = definition.restart if definition is not None else None
+            # lvlRestart n restarts the level after a paragraph at a level up to n - 1; 0 never.
+            # A value that is not a higher level is ignored, and then any higher level restarts.
+            if restart is None or level < restart or restart - 1 >= deeper:
+                counters.values[deeper] = None
+                counters.unknown[deeper] = False
+        if counters.unknown[level]:
+            return
+        current = counters.values[level]
+        if current is not None:
+            counters.values[level] = current + 1
+            return
+        start = num.starts.get(level, levels[level].start)
+        if start is None:
+            counters.unknown[level] = True
+        counters.values[level] = start
+
+    def _draw(
+        self,
+        counters: _Counters,
+        level: int,
+        levels: dict[int, _Level],
+        definition: _Level,
+        context: _ListContext,
+    ) -> str:
+        if definition.unsupported is not None:
+            raise _refuse_numbering(definition.unsupported)
+        if definition.text is None:
+            raise _refuse_numbering("a list level with no lvlText")
+        pieces: list[str] = []
+        for piece in _PLACEHOLDER.split(definition.text):
+            if not _PLACEHOLDER.fullmatch(piece):
+                if "%" in piece:
+                    raise _refuse_numbering("a % in lvlText that names no level")
+                pieces.append(piece)
+                continue
+            shown = int(piece[1]) - 1
+            source = levels.get(shown)
+            if shown > level or source is None:
+                raise _refuse_numbering(f"lvlText shows level {shown} from level {level}")
+            if definition.format == "bullet" or source.format == "bullet":
+                raise _refuse_numbering("a bullet level in a list label's number")
+            if source.unsupported is not None:
+                raise _refuse_numbering(source.unsupported)
+            if definition.legal and source.format == "none":
+                raise _refuse_numbering("legal numbering of a level that shows no number")
+            value = counters.values[shown]
+            if counters.unknown[shown] or value is None:
+                raise DocxRefusedError("ambiguous-numbering", f"the count of list level {shown}")
+            pieces.append(_number(value, "decimal" if definition.legal else source.format))
+        properties = _Properties(
+            self.styles, definition.rpr, context.style, context.table_style, context.mark
+        )
+        if properties.toggle("vanish") or properties.toggle("specVanish"):
+            raise DocxRefusedError("ambiguous-numbering", "a hidden list label")
+        label = _characters("".join(pieces), _in_symbol(self.styles, properties))
+        if (properties.toggle("caps") or properties.toggle("smallCaps")) and label.upper() != label:
+            raise _refuse_numbering("a list label in capitals")
+        return label
+
+
+def _number(value: int, fmt: str) -> str:
+    """``value`` in the number format ``fmt``."""
+    if fmt == "none":
+        return ""
+    if fmt in ("decimal", "decimalZero"):
+        if value < 0:
+            raise _refuse_numbering(f"the number {value}")
+        return f"{value:02d}" if fmt == "decimalZero" else str(value)
+    if fmt in ("upperRoman", "lowerRoman"):
+        if not 1 <= value <= 3999:
+            raise _refuse_numbering(f"the number {value} in roman")
+        out: list[str] = []
+        rest = value
+        for amount, numeral in _ROMAN:
+            count, rest = divmod(rest, amount)
+            out.append(numeral * count)
+        roman = "".join(out)
+        return roman if fmt == "upperRoman" else roman.lower()
+    # upperLetter or lowerLetter: a to z, then aa to zz, and so on, each letter repeated.
+    if not 1 <= value <= 780:
+        raise _refuse_numbering(f"the number {value} in letters")
+    letter = chr(ord("A") + (value - 1) % 26) * ((value - 1) // 26 + 1)
+    return letter if fmt == "upperLetter" else letter.lower()
+
+
+def _labelled(
+    paragraphs: list[Paragraph], contexts: list[_ListContext], lists: _Lists
+) -> list[Paragraph]:
+    """``paragraphs`` with the label of every numbered one, counted in document order."""
+    out: list[Paragraph] = []
+    hidden_before = False
+    for paragraph, context in zip(paragraphs, contexts, strict=True):
+        numbering = paragraph.numbering
+        if numbering is None or numbering.num_id == 0:
+            out.append(paragraph)
+        elif hidden_before:
+            # Word runs this paragraph on after the previous one; where it draws the label, if
+            # it draws one, is not documented.
+            raise DocxRefusedError("ambiguous-numbering", "a list item run on after a hidden mark")
+        else:
+            out.append(replace(paragraph, numbering=lists.label(numbering, context)))
+        hidden_before = paragraph.mark_hidden
+    return out
+
+
 # --- blocks and tables ---------------------------------------------------------------------
 
 
@@ -1004,6 +1455,7 @@ class _Body:
     def __init__(self, styles: _Styles) -> None:
         self.styles = styles
         self.out: list[Paragraph] = []
+        self.contexts: list[_ListContext] = []
         self.tables = 0
         self.runs: set[ET.Element] = set()
 
@@ -1013,7 +1465,9 @@ class _Body:
         for child in element:
             tag = child.tag
             if tag == _w("p"):
-                self.out.append(_paragraph(child, self.styles, table, table_style, self.runs))
+                paragraph, context = _paragraph(child, self.styles, table, table_style, self.runs)
+                self.out.append(paragraph)
+                self.contexts.append(context)
             elif tag == _w("tbl"):
                 self.table(child, table)
             elif tag == _w("sdt"):
@@ -1083,7 +1537,7 @@ def read_docx(data: bytes) -> list[Paragraph]:
         if document is None:
             raise DocxRefusedError("invalid-package", f"no {mains[0]}")
         parts: list[ET.Element | None] = []
-        for kind in ("styles", "theme", "fontTable", "settings"):
+        for kind in ("styles", "theme", "fontTable", "settings", "numbering"):
             targets = package.related(mains[0], kind)
             if len(targets) > 1:
                 raise DocxRefusedError("invalid-package", f"more than one {kind} part")
@@ -1094,6 +1548,7 @@ def read_docx(data: bytes) -> list[Paragraph]:
         styles = _styles(*parts[:3])
         if parts[3] is not None:
             styles.update_fields = bool(_on(parts[3].find(_w("updateFields"))))
+        lists = _Lists(parts[4], styles)
     for element in document.iter():
         if element.tag in _TRACKED:
             raise DocxRefusedError("tracked-change", _local(element.tag))
@@ -1106,7 +1561,7 @@ def read_docx(data: bytes) -> list[Paragraph]:
     reader = _Body(styles)
     reader.blocks(body, None, None)
     _check_accounted(document, reader.runs)
-    return reader.out
+    return _labelled(reader.out, reader.contexts, lists)
 
 
 def _check_character_data(document: ET.Element) -> None:

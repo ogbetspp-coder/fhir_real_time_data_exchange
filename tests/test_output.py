@@ -31,6 +31,8 @@ def test_a_read_is_canonical_and_names_its_source_and_versions() -> None:
     assert value["source"] == {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
     first = value["paragraphs"][0]
     assert sorted(first) == ["markHidden", "marks", "numbering", "style", "table", "text"]
+    listed = next(x for x in value["paragraphs"] if x["numbering"] and x["numbering"]["numId"])
+    assert listed["numbering"] == {"level": 0, "numId": 21, "suffix": "tab", "text": "\u2022"}
 
 
 def test_a_refusal_names_its_code_and_carries_no_paragraphs() -> None:

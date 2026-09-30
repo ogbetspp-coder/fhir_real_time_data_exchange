@@ -51,8 +51,14 @@ def docx(
     doctype: bool = False,
     minor_font: str | None = None,
     fonts: str | None = None,
+    numbering: str | None = None,
 ) -> bytes:
     parts: dict[str, tuple[str, str]] = {}
+    if numbering is not None:
+        parts["numbering"] = (
+            "numbering.xml",
+            f'<w:numbering xmlns:w="{W}">{numbering}</w:numbering>',
+        )
     if styles is not None:
         parts["styles"] = ("styles.xml", f'<w:styles xmlns:w="{W}">{styles}</w:styles>')
     if minor_font is not None:
@@ -81,10 +87,39 @@ def text_of(body: str, styles: str | None = None) -> list[str]:
     return [paragraph.text for paragraph in read_docx(docx(body, styles))]
 
 
-def refusal(body: str, styles: str | None = None) -> str:
+def refusal(body: str, styles: str | None = None, numbering: str | None = None) -> str:
     with pytest.raises(DocxRefusedError) as caught:
-        read_docx(docx(body, styles))
+        read_docx(docx(body, styles, numbering=numbering))
     return caught.value.code
+
+
+def lvl(
+    level: int,
+    fmt: str = "decimal",
+    text: str | None = None,
+    extra: str = "",
+    start: int | None = 1,
+) -> str:
+    shown = f"%{level + 1}." if text is None else text
+    first = "" if start is None else f'<w:start w:val="{start}"/>'
+    return (
+        f'<w:lvl w:ilvl="{level}">{first}<w:numFmt w:val="{fmt}"/>'
+        f'<w:lvlText w:val="{shown}"/>{extra}</w:lvl>'
+    )
+
+
+def abstract(key: int, *levels: str) -> str:
+    return f'<w:abstractNum w:abstractNumId="{key}">{"".join(levels)}</w:abstractNum>'
+
+
+def num(key: int, abstract_id: int, overrides: str = "") -> str:
+    return f'<w:num w:numId="{key}"><w:abstractNumId w:val="{abstract_id}"/>{overrides}</w:num>'
+
+
+# Lists 3, 4 and 7 share one definition: "1.", then "1)", then "1]" a level down.
+NUMBERING = (
+    abstract(0, lvl(0), lvl(1, text="%2)"), lvl(2, text="%3]")) + num(3, 0) + num(4, 0) + num(7, 0)
+)
 
 
 def r(inner: str, props: str = "") -> str:
@@ -522,9 +557,9 @@ def test_numbering_inherited_from_a_style_is_reported() -> None:
         '<w:style w:type="paragraph" w:styleId="List"><w:pPr><w:numPr><w:ilvl w:val="0"/>'
         '<w:numId w:val="7"/></w:numPr></w:pPr></w:style>'
     )
-    paragraph = read_docx(docx(p(r("<w:t>x</w:t>"), '<w:pStyle w:val="List"/>'), styles))[0]
-    assert paragraph.numbering is not None
-    assert paragraph.numbering.num_id == 7
+    body = p(r("<w:t>x</w:t>"), '<w:pStyle w:val="List"/>')
+    paragraph = read_docx(docx(body, styles, numbering=NUMBERING))[0]
+    assert paragraph.numbering == Numbering(7, 0, "1.", "tab")
 
 
 def test_tables_carry_their_position_and_numbering_is_metadata() -> None:
@@ -538,16 +573,14 @@ def test_tables_carry_their_position_and_numbering_is_metadata() -> None:
         + cell.format(p(r("<w:t>c</w:t>")))
         + "</w:tr></w:tbl>"
     )
-    paragraphs = read_docx(docx(body))
+    paragraphs = read_docx(docx(body, numbering=NUMBERING))
     assert [(x.text, x.table) for x in paragraphs] == [
         ("before", None),
         ("a", (0, 0, 0)),
         ("b", (0, 0, 1)),
         ("c", (0, 1, 0)),
     ]
-    numbering = paragraphs[0].numbering
-    assert numbering is not None
-    assert (numbering.num_id, numbering.level) == (3, 1)
+    assert paragraphs[0].numbering == Numbering(3, 1, "1)", "tab")
 
 
 # --- second review: styles Word falls back to ----------------------------------------------
@@ -762,9 +795,8 @@ def test_numbering_takes_each_of_list_and_level_from_the_nearest_level_setting_i
         '<w:numId w:val="7"/></w:numPr></w:pPr></w:style>'
     )
     body = p(r("<w:t>x</w:t>"), '<w:pStyle w:val="List"/><w:numPr><w:ilvl w:val="1"/></w:numPr>')
-    numbering = read_docx(docx(body, styles))[0].numbering
-    assert numbering is not None
-    assert (numbering.num_id, numbering.level) == (7, 1)
+    numbering = read_docx(docx(body, styles, numbering=NUMBERING))[0].numbering
+    assert numbering == Numbering(7, 1, "1)", "tab")
 
 
 def test_part_names_that_differ_only_in_case_are_refused() -> None:
@@ -927,15 +959,16 @@ def test_a_style_defined_twice_is_refused() -> None:
 def test_numbering_from_the_paragraph_defaults_or_a_table_style_is_reported() -> None:
     numbered = '<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="4"/></w:numPr></w:pPr>'
     defaults = f"<w:docDefaults><w:pPrDefault>{numbered}</w:pPrDefault></w:docDefaults>"
-    paragraph = read_docx(docx(p(r("<w:t>x</w:t>")), defaults))[0]
-    assert paragraph.numbering == Numbering(4, 0)
+    paragraph = read_docx(docx(p(r("<w:t>x</w:t>")), defaults, numbering=NUMBERING))[0]
+    assert paragraph.numbering == Numbering(4, 0, "1.", "tab")
     table_style = f'<w:style w:type="table" w:styleId="T">{numbered}</w:style>'
     table = (
         '<w:tbl><w:tblPr><w:tblStyle w:val="T"/></w:tblPr><w:tr><w:tc>'
         + p(r("<w:t>x</w:t>"))
         + "</w:tc></w:tr></w:tbl>"
     )
-    assert read_docx(docx(table, table_style))[0].numbering == Numbering(4, 0)
+    labelled = read_docx(docx(table, table_style, numbering=NUMBERING))[0]
+    assert labelled.numbering == Numbering(4, 0, "1.", "tab")
 
 
 def test_fields_in_a_document_that_updates_them_on_open_are_refused() -> None:
@@ -1081,3 +1114,330 @@ def test_mark_offsets_count_code_points() -> None:
     # U+1D400 is two UTF-16 code units and one code point; the mark starts at 1, not 2.
     body = p(r("<w:t>\U0001d400</w:t>") + r("<w:t>2</w:t>", '<w:vertAlign w:val="superscript"/>'))
     assert _kinds(body) == [(1, 2, "superscript")]
+
+
+# --- list labels (docx-reader/1.3.0) --------------------------------------------------------
+
+
+def li(num_id: int, level: int = 0, props: str = "") -> str:
+    numbered = f'<w:numPr><w:ilvl w:val="{level}"/><w:numId w:val="{num_id}"/></w:numPr>'
+    return p(r("<w:t>x</w:t>"), props + numbered)
+
+
+def labels(body: str, numbering: str, styles: str | None = None) -> list[str | None]:
+    paragraphs = read_docx(docx(body, styles, numbering=numbering))
+    return [x.numbering.text if x.numbering is not None else None for x in paragraphs]
+
+
+def override(level: int, inner: str) -> str:
+    return f'<w:lvlOverride w:ilvl="{level}">{inner}</w:lvlOverride>'
+
+
+RESTART = override(0, '<w:startOverride w:val="1"/>')
+SECTIONS = abstract(1, lvl(0, text="%1."), lvl(1, text="%1.%2"), lvl(2, text="%1.%2.%3")) + num(
+    1, 1
+)
+SYMBOL_BULLET = '<w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol" w:hint="default"/></w:rPr>'
+
+
+def test_a_multilevel_list_counts_and_restarts_deeper_levels() -> None:
+    body = li(1) + li(1, 1) + li(1, 1) + li(1) + li(1, 1) + li(1, 2) + li(1, 1)
+    assert labels(body, SECTIONS) == ["1.", "1.1", "1.2", "2.", "2.1", "2.1.1", "2.2"]
+
+
+@pytest.mark.parametrize(
+    ("fmt", "start", "label"),
+    [
+        ("decimal", 0, "0."),
+        ("decimalZero", 7, "07."),
+        ("decimalZero", 12, "12."),
+        ("upperRoman", 1994, "MCMXCIV."),
+        ("lowerRoman", 4, "iv."),
+        ("upperLetter", 1, "A."),
+        ("lowerLetter", 26, "z."),
+        ("lowerLetter", 27, "aa."),
+        ("lowerLetter", 53, "aaa."),
+        ("none", 5, "."),
+    ],
+)
+def test_number_formats(fmt: str, start: int, label: str) -> None:
+    assert labels(li(1), abstract(1, lvl(0, fmt, start=start)) + num(1, 1)) == [label]
+
+
+@pytest.mark.parametrize(
+    ("fmt", "start"),
+    [
+        ("upperRoman", 0),
+        ("upperRoman", 4000),
+        ("lowerLetter", 781),
+        ("decimal", -1),
+        ("ordinal", 1),
+        ("cardinalText", 1),
+        ("chicago", 1),
+    ],
+)
+def test_numbers_and_formats_the_reader_cannot_draw_are_refused(fmt: str, start: int) -> None:
+    numbering = abstract(1, lvl(0, fmt, start=start)) + num(1, 1)
+    assert refusal(li(1), numbering=numbering) == "unsupported-numbering"
+
+
+def test_legal_numbering_shows_every_level_in_decimal() -> None:
+    numbering = abstract(
+        1, lvl(0, "upperRoman", "%1"), lvl(1, text="%1.%2", extra="<w:isLgl/>")
+    ) + num(1, 1)
+    assert labels(li(1) + li(1, 1), numbering) == ["I", "1.1"]
+
+
+def test_lvl_restart_zero_never_restarts_and_n_restarts_after_level_n_minus_1() -> None:
+    never = abstract(1, lvl(0, text="%1"), lvl(1, text="%2", extra='<w:lvlRestart w:val="0"/>'))
+    body = li(1) + li(1, 1) + li(1, 1) + li(1) + li(1, 1)
+    assert labels(body, never + num(1, 1)) == ["1", "1", "2", "2", "3"]
+    after_first = abstract(
+        1,
+        lvl(0, text="%1"),
+        lvl(1, text="%2"),
+        lvl(2, text="%3", extra='<w:lvlRestart w:val="1"/>'),
+    )
+    body = li(1) + li(1, 2) + li(1, 1) + li(1, 2) + li(1) + li(1, 2)
+    assert labels(body, after_first + num(1, 1)) == ["1", "1", "1", "2", "2", "1"]
+
+
+@pytest.mark.parametrize(
+    ("extra", "suffix"),
+    [
+        ("", "tab"),
+        ('<w:suff w:val="space"/>', "space"),
+        ('<w:suff w:val="nothing"/>', "nothing"),
+        ('<w:legacy w:legacy="1" w:legacySpace="0" w:legacyIndent="360"/>', "legacy"),
+    ],
+)
+def test_the_suffix_is_reported(extra: str, suffix: str) -> None:
+    numbering = abstract(1, lvl(0, extra=extra)) + num(1, 1)
+    assert read_docx(docx(li(1), numbering=numbering))[0].numbering == Numbering(1, 0, "1.", suffix)
+
+
+def test_bullets_are_drawn_in_their_font() -> None:
+    symbol = abstract(1, lvl(0, "bullet", "", extra=SYMBOL_BULLET)) + num(1, 1)
+    assert labels(li(1), symbol) == ["•"]
+    courier = '<w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New"/></w:rPr>'
+    assert labels(li(1), abstract(1, lvl(0, "bullet", "o", extra=courier)) + num(1, 1)) == ["o"]
+    # With no font of its own, the label is drawn in the paragraph mark's.
+    mark = '<w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/></w:rPr>'
+    plain = abstract(1, lvl(0, "bullet", "")) + num(1, 1)
+    assert labels(li(1, props=mark), plain) == ["•"]
+
+
+@pytest.mark.parametrize(
+    ("extra", "code"),
+    [
+        ('<w:rPr><w:rFonts w:ascii="Wingdings" w:hAnsi="Wingdings"/></w:rPr>', "symbol-font"),
+        ("", "private-use-character"),
+        (
+            '<w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol" w:hint="eastAsia"/></w:rPr>',
+            "symbol-font",
+        ),
+    ],
+)
+def test_bullets_in_fonts_the_reader_cannot_place_are_refused(extra: str, code: str) -> None:
+    numbering = abstract(1, lvl(0, "bullet", "", extra=extra)) + num(1, 1)
+    assert refusal(li(1), numbering=numbering) == code
+
+
+def test_a_level_override_replaces_the_level_whole() -> None:
+    # The EMA template's shape: a Word 6 dash bullet over a decimal level.
+    legacy = override(
+        0,
+        '<w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="-"/>'
+        '<w:legacy w:legacy="1" w:legacySpace="0" w:legacyIndent="360"/></w:lvl>',
+    )
+    paragraph = read_docx(docx(li(6), numbering=NUMBERING + num(6, 0, legacy)))[0]
+    assert paragraph.numbering == Numbering(6, 0, "-", "legacy")
+
+
+SHARED = (
+    abstract(7, lvl(0))
+    + num(10, 7)
+    + num(11, 7)
+    + num(12, 7, RESTART)
+    + num(13, 7, override(0, '<w:startOverride w:val="5"/>'))
+)
+
+
+def test_lists_that_share_a_definition_continue_and_a_start_override_restarts() -> None:
+    assert labels(li(10) + li(11) + li(10), SHARED) == ["1.", "2.", "3."]
+    assert labels(li(10) + li(10) + li(12) + li(12), SHARED) == ["1.", "2.", "1.", "2."]
+    assert labels(li(13) + li(13), SHARED) == ["5.", "6."]
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        # Back to a list after another restarted the count.
+        li(10) + li(12) + li(10),
+        # A list that restarts nothing after one that did.
+        li(12) + li(11),
+        # A level first counted below a level never counted.
+        li(1, 1),
+    ],
+)
+def test_a_label_whose_count_is_not_certain_is_refused(body: str) -> None:
+    assert refusal(body, numbering=SHARED + SECTIONS) == "ambiguous-numbering"
+
+
+def test_a_bullet_shows_no_count_and_is_never_ambiguous() -> None:
+    bullets = abstract(8, lvl(0, "bullet", "-")) + num(20, 8) + num(21, 8, RESTART)
+    assert labels(li(20) + li(21) + li(20), bullets) == ["-", "-", "-"]
+
+
+def test_a_level_with_no_start_is_counted_only_when_it_is_not_shown() -> None:
+    assert labels(li(1), abstract(1, lvl(0, "bullet", "-", start=None)) + num(1, 1)) == ["-"]
+    numbering = abstract(1, lvl(0, start=None)) + num(1, 1)
+    assert refusal(li(1), numbering=numbering) == "ambiguous-numbering"
+
+
+@pytest.mark.parametrize(
+    ("body", "numbering"),
+    [
+        (li(99), SECTIONS),
+        (li(1), None),
+        (li(1, 5), SECTIONS),
+        (li(1, 9), SECTIONS),
+        (li(1), abstract(1, lvl(0, extra='<w:lvlPicBulletId w:val="0"/>')) + num(1, 1)),
+        (
+            li(1),
+            abstract(
+                1,
+                '<w:lvl w:ilvl="0"><w:start w:val="1"/>'
+                '<w:numFmt w:val="custom" w:format="001, 002, 003, ..."/>'
+                '<w:lvlText w:val="%1"/></w:lvl>',
+            )
+            + num(1, 1),
+        ),
+        (
+            li(1),
+            abstract(
+                1,
+                lvl(
+                    0,
+                    extra='<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/'
+                    'markup-compatibility/2006"/>',
+                ),
+            )
+            + num(1, 1),
+        ),
+        (li(1), abstract(1, '<w:lvl w:ilvl="0"><w:start w:val="1"/></w:lvl>') + num(1, 1)),
+        (li(1), abstract(1, lvl(0, text="%2")) + num(1, 1)),
+        (li(1), abstract(1, lvl(0, "bullet", "%1")) + num(1, 1)),
+        (li(1), abstract(1, lvl(0, text="%1%")) + num(1, 1)),
+        (li(1), abstract(1, lvl(0, extra='<w:suff w:val="dots"/>')) + num(1, 1)),
+        (
+            li(1),
+            abstract(1, lvl(0, "lowerLetter", "%1)", extra="<w:rPr><w:caps/></w:rPr>")) + num(1, 1),
+        ),
+    ],
+)
+def test_labels_the_reader_cannot_draw_are_refused(body: str, numbering: str | None) -> None:
+    assert refusal(body, numbering=numbering) == "unsupported-numbering"
+
+
+def test_capitals_do_not_matter_to_a_label_without_letters() -> None:
+    numbering = abstract(1, lvl(0, text="%1)", extra="<w:rPr><w:caps/></w:rPr>")) + num(1, 1)
+    assert labels(li(1), numbering) == ["1)"]
+
+
+@pytest.mark.parametrize(
+    ("body", "numbering"),
+    [
+        (li(1, props="<w:rPr><w:vanish/></w:rPr>"), SECTIONS),
+        (p(r("<w:t>a</w:t>"), "<w:rPr><w:vanish/></w:rPr>") + li(1), SECTIONS),
+        (li(1), abstract(1, lvl(0, extra="<w:rPr><w:vanish/></w:rPr>")) + num(1, 1)),
+    ],
+)
+def test_hidden_labels_and_items_run_on_after_a_hidden_mark_are_refused(
+    body: str, numbering: str
+) -> None:
+    assert refusal(body, numbering=numbering) == "ambiguous-numbering"
+
+
+LINKED_STYLES = (
+    '<w:style w:type="numbering" w:styleId="Outline"><w:pPr><w:numPr><w:numId w:val="31"/>'
+    "</w:numPr></w:pPr></w:style>"
+)
+LINKED = (
+    abstract(30, lvl(0, text="Section %1"))
+    + '<w:abstractNum w:abstractNumId="32"><w:numStyleLink w:val="Outline"/></w:abstractNum>'
+    + num(31, 30)
+    + num(33, 32)
+)
+
+
+def test_a_numbering_style_link_is_followed_and_shares_the_count() -> None:
+    assert labels(li(33) + li(31) + li(33), LINKED, LINKED_STYLES) == [
+        "Section 1",
+        "Section 2",
+        "Section 3",
+    ]
+    assert refusal(li(33), numbering=LINKED) == "unsupported-numbering"
+
+
+def test_a_style_tied_to_a_deeper_level_than_the_paragraph_sets_is_refused() -> None:
+    style = (
+        '<w:style w:type="paragraph" w:styleId="H2"><w:pPr><w:numPr><w:numId w:val="1"/>'
+        "</w:numPr></w:pPr></w:style>"
+    )
+    body = p(r("<w:t>x</w:t>"), '<w:pStyle w:val="H2"/>')
+    tied = '<w:pStyle w:val="H2"/>'
+    at_one = abstract(1, lvl(0), lvl(1, text="%2)", extra=tied)) + num(1, 1)
+    assert refusal(body, style, at_one) == "ambiguous-numbering"
+    at_zero = abstract(1, lvl(0, extra=tied), lvl(1, text="%2)")) + num(1, 1)
+    assert labels(body, at_zero, style) == ["1."]
+
+
+def test_a_symbol_run_with_the_default_font_hint_is_mapped() -> None:
+    run = r("<w:t>b</w:t>", '<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol" w:hint="default"/>')
+    assert text_of(p(run)) == ["β"]
+
+
+def test_the_template_draws_its_bullets_and_dashes() -> None:
+    data = (SOURCES / "qrd-product-information-template-version-104_en.docx").read_bytes()
+    drawn = [
+        (x.numbering.text, x.numbering.suffix)
+        for x in read_docx(data)
+        if x.numbering is not None and x.numbering.num_id
+    ]
+    # Symbol U+F0B7 bullets, and Word 6 dash bullets from the lists that override a level.
+    assert sorted(set(drawn)) == [("-", "legacy"), ("•", "tab")]
+    assert (drawn.count(("•", "tab")), drawn.count(("-", "legacy"))) == (7, 9)
+
+
+@pytest.mark.parametrize(
+    "numbering",
+    [
+        abstract(1, lvl(0)) + abstract(1, lvl(0)) + num(1, 1),
+        abstract(1, lvl(0), lvl(0)) + num(1, 1),
+        abstract(1, lvl(0)) + num(1, 1) + num(1, 1),
+        abstract(1, lvl(0)) + num(1, 1, RESTART + RESTART),
+        abstract(1, lvl(9)) + num(1, 1),
+    ],
+)
+def test_a_numbering_part_that_defines_something_twice_is_refused(numbering: str) -> None:
+    # Refused even when no paragraph is in the list, as a style defined twice is.
+    assert refusal(p(r("<w:t>x</w:t>")), numbering=numbering) == "invalid-package"
+
+
+def test_a_link_to_a_list_that_overrides_a_level_is_refused() -> None:
+    restarted = LINKED.replace(num(31, 30), num(31, 30, RESTART))
+    assert refusal(li(33), LINKED_STYLES, restarted) == "unsupported-numbering"
+
+
+@pytest.mark.parametrize(
+    "numbering",
+    [
+        # A level the reader cannot draw, shown in a deeper level's label.
+        abstract(1, lvl(0, "chicago"), lvl(1, text="%1.%2")) + num(1, 1),
+        # Legal numbering of a level that shows no number.
+        abstract(1, lvl(0, "none"), lvl(1, text="%1.%2", extra="<w:isLgl/>")) + num(1, 1),
+    ],
+)
+def test_a_shown_level_the_reader_cannot_draw_is_refused(numbering: str) -> None:
+    assert refusal(li(1, 1), numbering=numbering) == "unsupported-numbering"

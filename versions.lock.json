@@ -1,9 +1,11 @@
 {
   "format": {
-    "label-docx-json/1.0.0": "5f1aa016f095c2975f647d1c0e03eb547b25ae493571e21b7a171a8c86f320ab"
+    "label-docx-json/1.0.0": "5f1aa016f095c2975f647d1c0e03eb547b25ae493571e21b7a171a8c86f320ab",
+    "label-docx-json/1.1.0": "7d2945eed4cd74998fd4bc9346787a1152d1b846fc351db4bcaec979d8643d28"
   },
   "reader": {
     "docx-reader/1.1.0": "5e84e792f32e6425dc78046d4eea0afe58a6a3a12babafcab2b2f0d27bb36f1a",
-    "docx-reader/1.2.0": "30afaa0572818196075e4e720c9cefd642c7008b014637fa1b19b2d51e730b9a"
+    "docx-reader/1.2.0": "30afaa0572818196075e4e720c9cefd642c7008b014637fa1b19b2d51e730b9a",
+    "docx-reader/1.3.0": "2fb96f3f5c5eb998d8f2de35ba9669b14a335f68d6119f6f1dcfcac01c380c6f"
   }
 }

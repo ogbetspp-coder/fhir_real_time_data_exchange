@@ -11,6 +11,9 @@ normalises, trims or repairs.
   subscript, underline, strike, caps, highlight, shading, hidden paragraph marks, faint text...)
   is reported as ranges over the text, never folded into it: `10` with a superscript `9` is
   `"109"` plus a superscript mark on the `9`.
+- **List labels as Word draws them.** "4.8", "b)", "•" are computed from the numbering part the
+  way Word computes them, and reported beside the text (never inserted into it). A label whose
+  number Word's behaviour does not pin down is refused, not guessed.
 - **Nothing passed over.** Every run in the main document part is read exactly once, run content
   stands only inside runs, and there is no character data outside `<w:t>` and `<w:instrText>`.
   A document where any of that fails is refused (`stray-text`, `unread-content`).
@@ -44,7 +47,7 @@ except DocxRefusedError as refused:
 ### Output
 
 ```json
-{"format":"label-docx-json/1.0.0","paragraphs":[{"markHidden":false,"marks":[{"end":5,"kind":"superscript","start":4}],"numbering":null,"style":"Normal","table":null,"text":"x 109/l"}],"reader":"docx-reader/1.2.0","source":{"bytes":18342,"sha256":"…"}}
+{"format":"label-docx-json/1.1.0","paragraphs":[{"markHidden":false,"marks":[{"end":5,"kind":"superscript","start":4}],"numbering":{"level":1,"numId":2,"suffix":"tab","text":"4.8"},"style":"Heading2","table":null,"text":"x 109/l"}],"reader":"docx-reader/1.3.0","source":{"bytes":18342,"sha256":"…"}}
 ```
 
 or, refused, `"refusal":{"code":"tracked-change","detail":"ins"}` in place of `paragraphs`.
@@ -52,17 +55,35 @@ or, refused, `"refusal":{"code":"tracked-change","detail":"ins"}` in place of `p
 - `marks[].start`/`end` count **Unicode code points** of `text` (not UTF-16 units, not bytes).
 - `table` is `[table, row, cell]` counted from zero in document order; a nested table's
   paragraphs carry the outermost cell.
-- `numbering` is `{numId, level}`: the list the paragraph is in. The number Word draws is not in
-  `text` (see "Not yet").
+- `numbering` is the list the paragraph is in (`numId`, `level`) and the label Word draws before
+  it: `text` ("4.8", "b)", "•", or "" for a level that shows nothing) and `suffix` (`tab`,
+  `space`, `nothing`, or `legacy` for a Word 6 level, where the gap is layout, not a character).
+  `text` and `suffix` are null when `numId` is 0 (not in a list). A consumer that wants the line
+  as Word shows it puts `numbering.text` before the paragraph's `text`.
 - `source.sha256` ties the result to the exact input bytes; `reader` and `format` tie it to the
   exact code (see "Versions").
 
-## What it does not read (yet)
+## List labels
 
-- **List numbers.** Word computes "4.8" or "•" from `numbering.xml` when it draws the page; it is
-  not stored in the paragraph. The reader reports which list and level a paragraph is in, not
-  the rendered number. SmPC section numbers are often typed, but where they are automatic they
-  are not in `text`. Rendering them exactly is the next piece of work.
+Word does not store "4.8" in the paragraph; it computes it from `numbering.xml` each time it
+draws the page. The reader computes it the same way (the rules are in the module docstring,
+"List labels"): counters per list definition, shared by the lists that use it; deeper levels
+restarting after a higher one (`lvlRestart`); `startOverride` and level overrides; numbering-style
+links; legal numbering; decimal, zero-padded, roman, letter, bullet and no-number formats; and the
+label's own font, so a Symbol bullet (U+F0B7) is "•".
+
+It refuses where the answer is not certain:
+
+- `unsupported-numbering`: a format that depends on the language (ordinal, cardinal text) or is
+  custom, a picture bullet, a Wingdings bullet (no closed mapping yet), a missing definition.
+- `ambiguous-numbering`: a label that shows a count Word's documented behaviour does not fix,
+  such as returning to a list after another list restarted the shared count, or a level shown
+  before it was ever counted; a hidden label; a numbered paragraph run on after a hidden mark.
+
+A bullet shows no count, so bullets are never refused for one.
+
+## What it does not read
+
 - **Headers, footers, footnotes, endnotes, comments.** Separate parts, not read. A footnote
   *reference* in the body is refused, so no footnote is lost silently.
 - **Documents with tracked changes** are refused, not resolved. Accept or reject all changes in
@@ -78,6 +99,8 @@ or, refused, `"refusal":{"code":"tracked-change","detail":"ins"}` in place of `p
 | Each rule, read exactly or refused, in isolation                 | `tests/test_reader.py`       |
 | No text passed over: the 13 cases 1.1.0 lost silently            | `tests/test_reader.py`       |
 | The EMA QRD files keep their ≥, °, Symbol braces and pictures    | `tests/test_reader.py`       |
+| List labels counted and drawn as Word does, or refused           | `tests/test_reader.py`       |
+| The EMA template's 7 Symbol bullets and 9 Word 6 dashes          | `tests/test_reader.py`       |
 | Same bytes across processes, hash seeds and locales              | `tests/test_determinism.py`  |
 | Same result however the parts are zipped                         | `tests/test_determinism.py`  |
 | The output is canonical (RFC 8785 form); the CLI's exit codes    | `tests/test_output.py`       |
@@ -124,4 +147,6 @@ permits. To add a set: the files, a `sources.json` in the same shape, then `scri
 Extracted from the EMA Flow repository at commit `d2d2d1f` (`zone-a/src/zone_a/docx/reader.py`,
 `docx-reader/1.1.0`, SHA-256 `5e84e792…6f1a`, and its tests `zone-a/tests/test_docx_reader.py`).
 1.2.0 adds the `stray-text` and `unread-content` refusals and changes nothing else: it reads the
-four EMA files to the same paragraphs, marks and structure as 1.1.0.
+four EMA files to the same paragraphs, marks and structure as 1.1.0. 1.3.0 draws list labels
+(`label-docx-json/1.1.0` adds `numbering.text` and `numbering.suffix`) and accepts the font hint
+`default`, which sends ambiguous characters to the `hAnsi` font.

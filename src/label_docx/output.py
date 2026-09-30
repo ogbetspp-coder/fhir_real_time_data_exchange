@@ -29,7 +29,8 @@ import json
 from label_docx.reader import READER_VERSION, DocxRefusedError, Paragraph, read_docx
 
 # The version of the shape above. A change to this file changes its hash in versions.lock.json.
-FORMAT_VERSION = "label-docx-json/1.0.0"
+# 1.1.0 adds numbering.text and numbering.suffix, the list label.
+FORMAT_VERSION = "label-docx-json/1.1.0"
 
 type Json = str | int | bool | list[Json] | dict[str, Json] | None
 
@@ -48,7 +49,12 @@ def paragraph(item: Paragraph) -> dict[str, Json]:
         "numbering": (
             None
             if item.numbering is None
-            else {"level": item.numbering.level, "numId": item.numbering.num_id}
+            else {
+                "level": item.numbering.level,
+                "numId": item.numbering.num_id,
+                "suffix": item.numbering.suffix,
+                "text": item.numbering.text,
+            }
         ),
         "style": item.style,
         "table": None if item.table is None else list(item.table),
