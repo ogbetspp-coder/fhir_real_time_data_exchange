@@ -30,6 +30,12 @@ what Word wrote between them. Text runs take no part in note numbering, so the m
 of the document itself. Word saves text in Mac OS Roman, which holds every mark the reader draws
 (digits, letters, roman numerals, *, †, ‡, §).
 
+Computed fields (SEQ captions, STYLEREF) are the third. Word shows a field's stored result on
+screen and recomputes SEQ and STYLEREF when it prints or saves as PDF, so the oracle writes a copy
+with markers around every field, reads the text Word shows, saves it as PDF, and reads the text
+again. The reader must read a document only where every field shows what Word prints, and refuse
+one (``stale-field``) where any does not.
+
 Word runs sandboxed: each file is copied into Word's container, where it opens without a
 permission prompt, and removed after.
 """
@@ -100,6 +106,39 @@ on run argv
   end tell
 end run
 """
+
+# The text Word shows, then the text after it saves the document as PDF.
+PRINT = """
+on run argv
+  set target to (POSIX file (item 1 of argv)) as string
+  set pdfOut to (POSIX file (item 2 of argv)) as string
+  with timeout of 120 seconds
+    tell application "Microsoft Word"
+      open file name target
+      repeat 600 times
+        try
+          if (name of every document) contains {item 3 of argv} then exit repeat
+        end try
+        delay 0.1
+      end repeat
+      set shown to content of text object of document (item 3 of argv)
+      save as document (item 3 of argv) file name pdfOut file format format PDF
+      set printed to content of text object of document (item 3 of argv)
+      close document (item 3 of argv) saving no
+    end tell
+  end timeout
+  return shown & (character id 29) & printed
+end run
+"""
+
+# A complex field (from the run that begins it to the run that ends it; fields here are not
+# nested) or a simple one, which the markers go around.
+_FIELD = re.compile(
+    r"<w:r(?:\s[^>]*)?>(?:(?!</w:r>).)*?w:fldCharType=\"begin\".*?"
+    r"w:fldCharType=\"end\"(?:(?!</w:r>).)*?</w:r>|<w:fldSimple\b.*?</w:fldSimple>",
+    re.S,
+)
+_COMPUTED = re.compile(r"(?:instr=\"|<w:instrText[^>]*>)\s*(?:SEQ|STYLEREF)\b")
 
 # A run holding a note reference (in the body) or a note's echo of its mark (in a note).
 _NOTE_RUN = {
@@ -188,6 +227,57 @@ def _probe(data: bytes) -> bytes | None:
                 written = xml.encode("utf-8")
             target.writestr(info.filename, written)
     return out.getvalue() if references else None
+
+
+def word_fields(path: Path) -> dict[str, list[str]] | None:
+    """The results Word shows and prints for the document's fields.
+
+    None if the document has no SEQ or STYLEREF field.
+    """
+    with zipfile.ZipFile(path) as source:
+        parts = [(info, source.read(info)) for info in source.infolist()]
+    xml = {info.filename: content for info, content in parts}["word/document.xml"]
+    if not _COMPUTED.search(xml.decode("utf-8")):
+        return None
+    marked = _FIELD.sub(
+        lambda f: f"<w:r><w:t>@@F@@</w:t></w:r>{f.group(0)}<w:r><w:t>@@/@@</w:t></w:r>",
+        xml.decode("utf-8"),
+    )
+    CONTAINER.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=CONTAINER) as folder:
+        copy = Path(folder) / path.name
+        with zipfile.ZipFile(copy, "w", zipfile.ZIP_DEFLATED) as target:
+            for info, content in parts:
+                target.writestr(
+                    info.filename,
+                    marked.encode("utf-8") if info.filename == "word/document.xml" else content,
+                )
+        done = subprocess.run(
+            ["osascript", "-", str(copy), str(copy.with_suffix(".pdf")), copy.name],
+            input=PRINT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
+        )
+    if done.returncode != 0:
+        raise SystemExit(f"{path.name}: Word failed: {done.stderr.strip()}")
+    shown, _, printed = done.stdout.rstrip("\n").partition(SEPARATOR)
+    between = re.compile(r"@@F@@(.*?)@@/@@", re.S)
+    return {"shown": between.findall(shown), "printed": between.findall(printed)}
+
+
+def field_verdict(word: dict[str, list[str]], path: Path) -> str:
+    """Whether the reader reads exactly when every field shows what Word prints."""
+    try:
+        read_docx(path.read_bytes())
+    except DocxRefusedError as refused:
+        if refused.code == "stale-field" and word["shown"] != word["printed"]:
+            return "agrees"
+        return f"reader refuses: {refused.code}"
+    if word["shown"] != word["printed"]:
+        return "differs: the reader reads fields Word reprints"
+    return "agrees"
 
 
 def word_note_marks(path: Path) -> dict[str, list[str]] | None:
@@ -288,6 +378,7 @@ def main() -> int:
     paths = sorted(args.folder.glob("*.docx")) if args.command == "record" else args.files
     answers: dict[str, list[str]] = {}
     note_answers: dict[str, dict[str, list[str]]] = {}
+    field_answers: dict[str, dict[str, list[str]]] = {}
     differs = False
     for path in paths:
         if not path.read_bytes().startswith(b"PK\x03\x04"):
@@ -299,6 +390,7 @@ def main() -> int:
         try:
             word = word_labels(path)
             marks = word_note_marks(path)
+            fields = word_fields(path)
         except SystemExit as failed:
             if args.command == "record":
                 raise
@@ -311,6 +403,11 @@ def main() -> int:
             note_answers[path.name] = marks
             if result == "agrees":
                 result = note_verdict(marks, reader_note_marks(path))
+        if fields is not None:
+            field_answers[path.name] = fields
+            # A refusal for a stale field is the right answer for the labels too.
+            if result in ("agrees", "reader refuses: stale-field"):
+                result = field_verdict(fields, path)
         differs = differs or result.startswith("differs")
         sys.stdout.write(f"{path.name}: {result}\n")
         if result.startswith("reader refuses"):
@@ -321,11 +418,13 @@ def main() -> int:
             "application": word_version(),
             "method": (
                 "list labels: convert numbers to text, what each list item gained; note marks: "
-                "saved as text, what Word wrote between markers around each mark"
+                "saved as text, what Word wrote between markers around each mark; fields: the "
+                "text between markers around each, as shown and after saving as PDF"
             ),
             "recorded": datetime.date.today().isoformat(),
             "drawn": answers,
             "notes": note_answers,
+            "fields": field_answers,
         }
         target = args.folder / "word.json"
         target.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", "utf-8")

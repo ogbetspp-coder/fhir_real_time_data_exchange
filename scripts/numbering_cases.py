@@ -132,6 +132,41 @@ def section(footnote_pr: str = "") -> str:
 
 EACH_SECTION = '<w:numRestart w:val="eachSect"/>'
 
+BACKSLASH = chr(92)
+
+
+def field(code: str, stored: str) -> str:
+    """A complex field showing ``stored``, as Word writes one."""
+    return (
+        '<w:r><w:fldChar w:fldCharType="begin"/></w:r>'
+        f'<w:r><w:instrText xml:space="preserve"> {code} </w:instrText></w:r>'
+        f'<w:r><w:fldChar w:fldCharType="separate"/></w:r>{words(stored) if stored else ""}'
+        '<w:r><w:fldChar w:fldCharType="end"/></w:r>'
+    )
+
+
+def seq(stored: str, switches: str = "", identifier: str = "Table") -> str:
+    """A caption: "Table " and a SEQ field."""
+    code = f"SEQ {identifier} {switches}".strip().replace("\\", BACKSLASH)
+    return para(words(f"{identifier} "), field(code, stored))
+
+
+def heading(level: int, text: str) -> str:
+    """A paragraph in the built-in style "heading <level>"."""
+    return para(words(text), props=f'<w:pStyle w:val="Heading{level}"/>')
+
+
+# Built-in heading styles, numbered 1, 1.1 by list 1 (OUTLINE), as Word's outline numbering is.
+HEADINGS = "".join(
+    f'<w:style w:type="paragraph" w:styleId="Heading{n}"><w:name w:val="heading {n}"/>'
+    f"<w:pPr><w:numPr>{f'<w:ilvl w:val={chr(34)}{n - 1}{chr(34)}/>' if n > 1 else ''}"
+    f'<w:numId w:val="1"/></w:numPr><w:outlineLvl w:val="{n - 1}"/></w:pPr></w:style>'
+    for n in (1, 2)
+)
+
+OUTLINE_NUMBERING = abstract(1, lvl(0, text="%1"), lvl(1, text="%1.%2")) + num(1, 1)
+DOTTED_NUMBERING = abstract(1, lvl(0, text="%1."), lvl(1, text="%1.%2.")) + num(1, 1)
+
 SECTIONS = abstract(1, lvl(0, text="%1."), lvl(1, text="%1.%2"), lvl(2, text="%1.%2.%3"))
 SHARED = (
     abstract(7, lvl(0))
@@ -345,6 +380,120 @@ CASES: dict[str, Case] = {
         items(
             (1, 0), (2, 0), (3, 0, '<w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/></w:rPr>')
         ),
+    ),
+    "fields-seq": Case(
+        "SEQ captions count 1, 2, 3, stored as Word prints them.",
+        "",
+        seq("1") + seq("2") + seq("3"),
+    ),
+    "fields-seq-formats": Case(
+        "One SEQ count shown in each number format.",
+        "",
+        "".join(
+            seq(stored, f"\\* {fmt}")
+            for fmt, stored in (
+                ("ARABIC", "1"),
+                ("ROMAN", "II"),
+                ("roman", "iii"),
+                ("ALPHABETIC", "D"),
+                ("alphabetic", "e"),
+                ("ARABIC \\* MERGEFORMAT", "6"),
+            )
+        ),
+    ),
+    "fields-seq-identifiers": Case(
+        "Tables and figures count apart.",
+        "",
+        seq("1") + seq("1", identifier="Figure") + seq("2") + seq("2", identifier="Figure"),
+    ),
+    "fields-seq-switches": Case(
+        "SEQ \\r sets, \\c repeats, \\n counts on, \\h counts and shows nothing.",
+        "",
+        seq("1")
+        + seq("5", "\\r 5")
+        + seq("5", "\\c")
+        + seq("6", "\\n")
+        + seq("", "\\h")
+        + seq("8"),
+    ),
+    "fields-chapter-reset": Case(
+        "SEQ \\s 1 restarts after each heading 1, not after a heading 2.",
+        OUTLINE_NUMBERING,
+        heading(1, "Intro")
+        + seq("1", "\\s 1")
+        + seq("2", "\\s 1")
+        + heading(2, "Sub")
+        + seq("3", "\\s 1")
+        + heading(1, "Next")
+        + seq("1", "\\s 1"),
+        HEADINGS,
+    ),
+    "fields-chapter-reset-level-2": Case(
+        "SEQ \\s 2 restarts after a heading 2 and after a heading 1.",
+        OUTLINE_NUMBERING,
+        heading(1, "A")
+        + heading(2, "A.1")
+        + seq("1", "\\s 2")
+        + seq("2", "\\s 2")
+        + heading(1, "B")
+        + seq("1", "\\s 2")
+        + heading(2, "B.1")
+        + seq("1", "\\s 2"),
+        HEADINGS,
+    ),
+    "fields-chapter-captions": Case(
+        "Captions by chapter: STYLEREF 1 \\s, a hyphen, SEQ \\s 1; and the heading's text.",
+        OUTLINE_NUMBERING,
+        heading(1, "Intro")
+        + para(
+            words("Table "),
+            field(f"STYLEREF 1 {BACKSLASH}s", "1"),
+            words("-"),
+            field(f"SEQ Table {BACKSLASH}s 1", "1"),
+        )
+        + heading(1, "Next")
+        + para(
+            words("Table "),
+            field(f"STYLEREF 1 {BACKSLASH}s", "2"),
+            words("-"),
+            field(f"SEQ Table {BACKSLASH}s 1", "1"),
+        )
+        + para(field("STYLEREF 1", "Next"))
+        + para(field('STYLEREF "heading 1"', "Next")),
+        HEADINGS,
+    ),
+    "fields-chapter-dotted": Case(
+        "STYLEREF \\s of headings numbered 1. and 1.1. drops the final period.",
+        DOTTED_NUMBERING,
+        heading(1, "A")
+        + heading(2, "A.1")
+        + para(field(f"STYLEREF 1 {BACKSLASH}s", "1"))
+        + para(field(f"STYLEREF 2 {BACKSLASH}s", "1.1")),
+        HEADINGS,
+    ),
+    "fields-heading-by-name": Case(
+        "Word's heading levels go by the style's name, not its outline level.",
+        "",
+        seq("1", "\\s 1")
+        + para(words("custom outline 0"), props='<w:pStyle w:val="Chapter"/>')
+        + seq("2", "\\s 1")
+        + para(words("named heading 1"), props='<w:pStyle w:val="Heading1"/>')
+        + seq("1", "\\s 1")
+        + para(field("STYLEREF 1", "named heading 1")),
+        '<w:style w:type="paragraph" w:styleId="Chapter"><w:name w:val="Chapter"/>'
+        '<w:pPr><w:outlineLvl w:val="0"/></w:pPr></w:style>'
+        '<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/></w:style>',
+    ),
+    "fields-styleref-forward": Case(
+        "STYLEREF before any paragraph of its style takes the next one.",
+        OUTLINE_NUMBERING,
+        para(field("STYLEREF 1", "Late")) + heading(1, "Late"),
+        HEADINGS,
+    ),
+    "fields-stale": Case(
+        "Captions stored as 7 and 7, which Word prints as 1 and 2 (the reader refuses).",
+        "",
+        seq("7") + seq("7"),
     ),
     "notes-continuous": Case(
         "Footnotes number 1, 2, 3 through the document.",

@@ -19,6 +19,34 @@
       "o\t",
       "\uf0b7\t"
     ],
+    "fields-chapter-captions.docx": [
+      "1\t",
+      "2\t"
+    ],
+    "fields-chapter-dotted.docx": [
+      "1.\t",
+      "1.1.\t"
+    ],
+    "fields-chapter-reset-level-2.docx": [
+      "1\t",
+      "1.1\t",
+      "2\t",
+      "2.1\t"
+    ],
+    "fields-chapter-reset.docx": [
+      "1\t",
+      "1.1\t",
+      "2\t"
+    ],
+    "fields-heading-by-name.docx": [],
+    "fields-seq-formats.docx": [],
+    "fields-seq-identifiers.docx": [],
+    "fields-seq-switches.docx": [],
+    "fields-seq.docx": [],
+    "fields-stale.docx": [],
+    "fields-styleref-forward.docx": [
+      "1\t"
+    ],
     "formats.docx": [
       "0.\t",
       "07.\t",
@@ -175,7 +203,159 @@
       "2.\t"
     ]
   },
-  "method": "list labels: convert numbers to text, what each list item gained; note marks: saved as text, what Word wrote between markers around each mark",
+  "fields": {
+    "fields-chapter-captions.docx": {
+      "printed": [
+        "1",
+        "1",
+        "2",
+        "1",
+        "Next",
+        "Next"
+      ],
+      "shown": [
+        "1",
+        "1",
+        "2",
+        "1",
+        "Next",
+        "Next"
+      ]
+    },
+    "fields-chapter-dotted.docx": {
+      "printed": [
+        "1",
+        "1.1"
+      ],
+      "shown": [
+        "1",
+        "1.1"
+      ]
+    },
+    "fields-chapter-reset-level-2.docx": {
+      "printed": [
+        "1",
+        "2",
+        "1",
+        "1"
+      ],
+      "shown": [
+        "1",
+        "2",
+        "1",
+        "1"
+      ]
+    },
+    "fields-chapter-reset.docx": {
+      "printed": [
+        "1",
+        "2",
+        "3",
+        "1"
+      ],
+      "shown": [
+        "1",
+        "2",
+        "3",
+        "1"
+      ]
+    },
+    "fields-heading-by-name.docx": {
+      "printed": [
+        "1",
+        "2",
+        "1",
+        "named heading 1"
+      ],
+      "shown": [
+        "1",
+        "2",
+        "1",
+        "named heading 1"
+      ]
+    },
+    "fields-seq-formats.docx": {
+      "printed": [
+        "1",
+        "II",
+        "iii",
+        "D",
+        "e",
+        "6"
+      ],
+      "shown": [
+        "1",
+        "II",
+        "iii",
+        "D",
+        "e",
+        "6"
+      ]
+    },
+    "fields-seq-identifiers.docx": {
+      "printed": [
+        "1",
+        "1",
+        "2",
+        "2"
+      ],
+      "shown": [
+        "1",
+        "1",
+        "2",
+        "2"
+      ]
+    },
+    "fields-seq-switches.docx": {
+      "printed": [
+        "1",
+        "5",
+        "5",
+        "6",
+        "",
+        "8"
+      ],
+      "shown": [
+        "1",
+        "5",
+        "5",
+        "6",
+        "",
+        "8"
+      ]
+    },
+    "fields-seq.docx": {
+      "printed": [
+        "1",
+        "2",
+        "3"
+      ],
+      "shown": [
+        "1",
+        "2",
+        "3"
+      ]
+    },
+    "fields-stale.docx": {
+      "printed": [
+        "1",
+        "2"
+      ],
+      "shown": [
+        "7",
+        "7"
+      ]
+    },
+    "fields-styleref-forward.docx": {
+      "printed": [
+        "Late"
+      ],
+      "shown": [
+        "Late"
+      ]
+    }
+  },
+  "method": "list labels: convert numbers to text, what each list item gained; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF",
   "notes": {
     "notes-chicago.docx": {
       "body": [

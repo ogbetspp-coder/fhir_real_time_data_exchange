@@ -1,4 +1,4 @@
-"""A fail-closed reader for the text of a Word (.docx) body.
+r"""A fail-closed reader for the text of a Word (.docx) body.
 
 The reader turns the main document part into paragraphs of text, and it refuses a document whose
 text it cannot produce exactly. Refusing is the point: a reader that keeps going when it meets
@@ -67,11 +67,23 @@ font (Wingdings, Webdings, Zapf Dingbats, Marlett, MT Extra), or any font the do
 table declares symbol-encoded (charset 02), is refused.
 
 Fields keep their stored result and drop their instruction, however deeply nested, so
-``DOCPROPERTY ... MERGEFORMAT`` never reaches the text. Only fields whose stored result is what
-Word shows are read: HYPERLINK, REF, NOTEREF and DOCPROPERTY. Any other field whose result
-would be shown (PAGE, DATE, SEQ, IF, a formula...) is refused, because Word recomputes it on
-display or print. The code is the first word of the instruction; a field nested in the
-instruction ahead of or inside that word makes the code unknown, and the field is refused. So
+``DOCPROPERTY ... MERGEFORMAT`` never reaches the text. Fields whose stored result is what Word
+shows and prints are read: HYPERLINK, REF, NOTEREF and DOCPROPERTY. SEQ (caption numbers) and
+STYLEREF (a heading's number or text) Word shows as stored but recomputes when it prints or saves
+as PDF, so the reader computes them as Word does and reads them only where the stored result is
+the computed one; otherwise screen and print disagree, and the document is refused
+(``stale-field``). SEQ counts each identifier in document order: one more than the last, ``\r``
+n sets the count, ``\c`` repeats it, ``\h`` counts and shows nothing, ``\s`` n restarts it
+after any paragraph in a built-in style "heading 1" to "heading n" (Word goes by the style's
+name, not its outline level), and ``\*`` shows it in ARABIC, ROMAN, roman, ALPHABETIC or
+alphabetic. STYLEREF finds the nearest paragraph of the style (a number n is "heading n") before
+the field, else after it, and shows its text, or with ``\s`` its list label without the final
+period. Each rule is Word's answer to a case in ``corpus/numbering-cases``. Other switches, a SEQ
+or STYLEREF in a note or nested in another field's code, and a result that runs past its paragraph
+are refused. Any other field whose result would be shown (PAGE, DATE, TOC, IF, a formula...) is
+refused, because Word recomputes it on display or print. The code is the first word of the
+instruction; a field nested in the instruction ahead of or inside that word makes the code
+unknown, and the field is refused. So
 are a field with no stored result (no ``separate``, such as a form checkbox or a SYMBOL field,
 or an empty ``fldSimple``), a form field, a field marked for update, any field in a document
 whose settings ask Word to update fields on open, and field code outside an instruction.
@@ -128,11 +140,12 @@ What it refuses (``DocxRefusedError.code``):
 - ``field-without-result``: a field with no stored result.
 - ``computed-field``: a shown field whose value Word computes rather than stores, or any field
   in a document set to update fields on open.
-- ``stale-field``: a field marked for update.
+- ``stale-field``: a field marked for update, or a SEQ or STYLEREF field whose stored result is
+  not what Word prints.
 - ``unsupported-element``: anything that can carry text and is not read above, and any element
   the reader does not know: text boxes, a note mark in a field code or inside a note, a note's
-  echo of its mark outside that note, embedded objects,
-  charts and other non-picture drawings, alternate content, math, ``altChunk``, form fields,
+  echo of its mark outside that note, embedded objects, charts and other non-picture drawings,
+  alternate content, math, ``altChunk``, form fields,
   content controls bound to data (in any namespace), VML that is not a picture, conditional
   table formatting that could change the text, text in a vertically merged-away cell, and a
   style reference that names a style of another kind.
@@ -180,8 +193,9 @@ from dataclasses import dataclass, field, replace
 # (corpus/numbering-cases/word.json); 1.5.0 reads what public regulator templates hold and
 # 1.4.0 refused: VML pictures, smart-tag and custom-XML properties, and conditional table
 # formatting that cannot change the text; 1.6.0 reads footnotes and endnotes, with their marks
-# by the rules Word showed.
-READER_VERSION = "docx-reader/1.6.0"
+# by the rules Word showed; 1.7.0 reads SEQ and STYLEREF fields whose stored result is what Word
+# prints.
+READER_VERSION = "docx-reader/1.7.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -545,6 +559,8 @@ class _Style:
     conditional: str | None = None
     # Whether that formatting sets fonts, which could override a Symbol font beneath it.
     conditional_fonts: bool = False
+    # The style's name (w:name), which Word's heading levels and STYLEREF go by.
+    name: str | None = None
 
 
 @dataclass
@@ -628,10 +644,12 @@ def _styles(root: ET.Element | None, theme: ET.Element | None, fonts: ET.Element
         if style_id in styles.styles:
             raise DocxRefusedError("invalid-package", f"style {style_id!r} is defined twice")
         based = style.find(_w("basedOn"))
+        named = style.find(_w("name"))
         kind = style.get(_w("type"), "paragraph")
         styles.styles[style_id] = _Style(
             kind=kind,
             based_on=based.get(_w("val")) if based is not None else None,
+            name=named.get(_w("val")) if named is not None else None,
             rpr=style.find(_w("rPr")),
             ppr=style.find(_w("pPr")),
             conditional=_conditional(style, styles),
@@ -919,6 +937,11 @@ class _ParagraphReader:
         self.story = story
         self.notes: list[NoteReference] = []
         self.custom: set[tuple[str, int]] = set()
+        # Fields whose result the reader checks against its own computation: the instruction and
+        # where the stored result stands in the text. ``results`` follows ``fields``: the start
+        # of each open field's result if it is one of those, else None.
+        self.computed: list[tuple[str, int, int]] = []
+        self.results: list[int | None] = []
         self.parts: list[str] = []
         self.length = 0
         self.marks: list[Mark] = []
@@ -941,12 +964,14 @@ class _ParagraphReader:
                     raise DocxRefusedError("computed-field", "the document updates fields on open")
                 if child.get(_w("dirty")) in ("1", "true", "on"):
                     raise DocxRefusedError("stale-field", "a field marked for update")
-                if not self.in_instruction():
-                    _check_field(child.get(_w("instr"), ""))
+                instruction = child.get(_w("instr"), "")
+                code = None if self.in_instruction() else _check_field(instruction)
                 before = self.length
                 self.container(child)
                 if self.length == before:
                     raise DocxRefusedError("field-without-result", "a simple field shows nothing")
+                if code in _COMPUTED_FIELDS:
+                    self.computed.append((instruction, before, self.length))
             elif tag in (_w("bdo"), _w("dir")):
                 rtl = child.get(_w("val")) == "rtl"
                 self.rtl += rtl
@@ -981,7 +1006,7 @@ class _ParagraphReader:
                 references.append(self._note(child, offset))
                 continue
             if tag == _w("fldChar"):
-                self._field(child)
+                self._field(child, self.length + sum(len(part) for part in emitted))
                 continue
             if tag == _w("instrText"):
                 if not (self.fields and self.fields[-1]):
@@ -1031,7 +1056,7 @@ class _ParagraphReader:
             self.custom.add((kind, note))
         return NoteReference(offset, kind, note)
 
-    def _field(self, child: ET.Element) -> None:
+    def _field(self, child: ET.Element, offset: int) -> None:
         if len(child):
             raise DocxRefusedError("unsupported-element", "form field")
         if child.get(_w("dirty")) in ("1", "true", "on"):
@@ -1046,15 +1071,22 @@ class _ParagraphReader:
                 self.instructions[-1].append("\x00")
             self.fields.append(True)
             self.instructions.append([])
+            self.results.append(None)
         elif kind == "separate" and self.fields:
-            if not any(self.fields[:-1]):
-                # The result is shown, so it must be one Word shows as stored.
-                _check_field("".join(self.instructions[-1]))
+            # The result is shown, so it must be one Word shows as stored, or one the reader
+            # computes and checks.
+            if not any(self.fields[:-1]) and (
+                _check_field("".join(self.instructions[-1])) in _COMPUTED_FIELDS
+            ):
+                self.results[-1] = offset
             self.fields[-1] = False
         elif kind == "end" and self.fields:
             if self.fields[-1]:
                 # No separate: the field stores no result, and what Word shows is computed.
                 raise DocxRefusedError("field-without-result", "a field with no stored result")
+            start = self.results.pop()
+            if start is not None:
+                self.computed.append(("".join(self.instructions[-1]), start, offset))
             self.fields.pop()
             self.instructions.pop()
 
@@ -1177,13 +1209,18 @@ def _faint(properties: _Properties) -> bool:
 # recomputes others when it lays out or prints the page (PAGE, NUMPAGES, DATE, TIME, SEQ,
 # AUTONUM, LISTNUM, IF, formulas...), so their stored result may not be what a reader sees.
 _STORED_FIELDS = {"HYPERLINK", "REF", "NOTEREF", "DOCPROPERTY"}
+# Fields Word computes, which the reader computes too and reads only where the stored result is
+# what Word computes (see "Fields" in the module docstring).
+_COMPUTED_FIELDS = {"SEQ", "STYLEREF"}
 
 
-def _check_field(instruction: str) -> None:
+def _check_field(instruction: str) -> str:
+    """The field's code, if its result is one the reader can vouch for; refused otherwise."""
     words = instruction.split()
     code = words[0].upper() if words else ""
-    if code not in _STORED_FIELDS:
+    if code not in _STORED_FIELDS | _COMPUTED_FIELDS:
         raise DocxRefusedError("computed-field", f"a {code or 'blank'} field")
+    return code
 
 
 def _check_whitespace(element: ET.Element, text: str) -> None:
@@ -1240,6 +1277,8 @@ class _Context:
     # notes whose marks are custom.
     section: int = 0
     custom: frozenset[tuple[str, int]] = frozenset()
+    # The SEQ and STYLEREF fields: instruction, and the stored result's start and end in text.
+    fields: tuple[tuple[str, int, int], ...] = ()
 
 
 def _paragraph(
@@ -1263,6 +1302,10 @@ def _paragraph(
     reader.container(element)
     if reader.in_instruction():
         raise DocxRefusedError("unbalanced-field", "a paragraph ends inside a field instruction")
+    if any(start is not None for start in reader.results):
+        raise DocxRefusedError(
+            "unbalanced-field", "a SEQ or STYLEREF result runs past its paragraph"
+        )
     numbering = _numbering(
         [
             ppr,
@@ -1277,6 +1320,7 @@ def _paragraph(
         mark=mark_rpr,
         section=section,
         custom=frozenset(reader.custom),
+        fields=tuple(reader.computed),
     )
     return Paragraph(
         text="".join(reader.parts),
@@ -1837,6 +1881,9 @@ def _read_notes(
         reader = _Body(styles, runs, (kind, note))
         reader.blocks(element, None, None)
         _check_accounted(element, runs)
+        if any(c.fields for c in reader.contexts):
+            # Whether Word counts a SEQ in a note with the body's is not yet on record.
+            raise DocxRefusedError("computed-field", f"a SEQ or STYLEREF field in a {kind}")
         if any(p.numbering is not None and p.numbering.num_id for p in reader.out):
             # Whether a list in a note counts with the body's lists is not yet on record.
             raise _refuse_numbering(f"a list in a {kind}")
@@ -1850,6 +1897,154 @@ def _with_marks(paragraph: Paragraph, marks: dict[tuple[str, int], str | None]) 
     return replace(
         paragraph, notes=tuple(replace(n, mark=marks[(n.kind, n.id)]) for n in paragraph.notes)
     )
+
+
+# --- computed fields -----------------------------------------------------------------------
+
+# SEQ's number formats (\\*), as list formats; ARABIC is matched without regard to case.
+_SEQ_FORMATS = {
+    "ARABIC": "decimal",
+    "ROMAN": "upperRoman",
+    "roman": "lowerRoman",
+    "ALPHABETIC": "upperLetter",
+    "alphabetic": "lowerLetter",
+}
+# \\* switches that change how the result is formatted, not what it says.
+_FORMATTING = {"MERGEFORMAT", "CHARFORMAT"}
+_HEADING = re.compile(r"heading ([1-9])")
+_FIELD_TOKENS = re.compile(r'"([^"]*)"|(\S+)')
+
+
+def _tokens(instruction: str) -> list[str]:
+    return [quoted or bare for quoted, bare in _FIELD_TOKENS.findall(instruction)]
+
+
+def _switches(
+    tokens: list[str], with_argument: set[str], flags: set[str]
+) -> tuple[list[str], dict[str, str]]:
+    """The arguments and the switches of a field after its code; refused if unknown."""
+    arguments: list[str] = []
+    switches: dict[str, str] = {}
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+        if not token.startswith("\\"):
+            arguments.append(token)
+        elif token[1:] == "*":
+            index += 1
+            value = tokens[index] if index < len(tokens) else ""
+            if value.upper() not in _FORMATTING:
+                if "*" in switches:
+                    raise DocxRefusedError("computed-field", "a field with two number formats")
+                switches["*"] = value
+        elif token[1:] in with_argument:
+            index += 1
+            switches[token[1:]] = tokens[index] if index < len(tokens) else ""
+        elif token[1:] in flags:
+            switches[token[1:]] = ""
+        else:
+            raise DocxRefusedError("computed-field", f"a field switch {token}")
+        index += 1
+    return arguments, switches
+
+
+def _heading_level(style: str | None, styles: _Styles) -> int | None:
+    """The level of a built-in heading style: Word goes by the name, not the outline level."""
+    name = styles.styles[style].name if style in styles.styles else None
+    match = _HEADING.fullmatch((name or "").lower())
+    return int(match.group(1)) if match else None
+
+
+def _verify_fields(paragraphs: list[Paragraph], contexts: list[_Context], styles: _Styles) -> None:
+    """Refuse a SEQ or STYLEREF field whose stored result is not what Word prints.
+
+    Word shows a field's stored result on screen and recomputes SEQ and STYLEREF when it prints
+    or saves as PDF (corpus/numbering-cases, fields-stale); a stored result that differs is a
+    document whose screen and print disagree. Each rule is Word's answer to a case there, named
+    in brackets.
+    """
+    names = [
+        (styles.styles[c.style].name or "").lower() if c.style in styles.styles else ""
+        for c in contexts
+    ]
+    levels = [_heading_level(c.style, styles) for c in contexts]
+    # Per SEQ identifier: its value, and the paragraph of its last field.
+    counted: dict[str, tuple[int, int]] = {}
+    for index, (paragraph, context) in enumerate(zip(paragraphs, contexts, strict=True)):
+        for instruction, start, end in context.fields:
+            tokens = _tokens(instruction)
+            code = tokens[0].upper()
+            if code == "SEQ":
+                shown = _seq(tokens[1:], index, counted, levels)
+            else:
+                shown = _styleref(tokens[1:], index, paragraphs, names)
+            stored = paragraph.text[start:end]
+            if stored != shown:
+                raise DocxRefusedError(
+                    "stale-field", f"a {code} field shows {stored!r}; Word prints {shown!r}"
+                )
+
+
+def _seq(
+    tokens: list[str], index: int, counted: dict[str, tuple[int, int]], levels: list[int | None]
+) -> str:
+    arguments, switches = _switches(tokens, {"r", "s"}, {"c", "n", "h"})
+    if len(arguments) != 1:
+        raise DocxRefusedError("computed-field", "a SEQ field without one identifier")
+    identifier = arguments[0]
+    value, last = counted.get(identifier, (0, -1))
+    if "s" in switches:
+        level = _int(switches["s"], "SEQ \\s")
+        # A heading of that level or higher since the last field restarts the count
+        # [seq-chapter-reset, seq-s2-reset-by-h1].
+        if any(lv is not None and lv <= level for lv in levels[last + 1 : index + 1]):
+            value = 0
+    if "r" in switches:
+        value = _int(switches["r"], "SEQ \\r")
+    elif "c" in switches:
+        if identifier not in counted:
+            raise DocxRefusedError("computed-field", "a SEQ \\c field before any count")
+    else:
+        # \\n, or no switch: the next number [seq-basic, seq-reset-repeat-next].
+        value += 1
+    counted[identifier] = (value, index)
+    if "h" in switches:
+        # Counted, and shown as nothing [seq-reset-repeat-next].
+        return ""
+    fmt = switches.get("*", "ARABIC")
+    key = "ARABIC" if fmt.upper() == "ARABIC" else fmt
+    if key not in _SEQ_FORMATS:
+        raise DocxRefusedError("computed-field", f"a SEQ number format {fmt}")
+    return _number(value, _SEQ_FORMATS[key])
+
+
+def _styleref(tokens: list[str], index: int, paragraphs: list[Paragraph], names: list[str]) -> str:
+    arguments, switches = _switches(tokens, set(), {"s"})
+    if len(arguments) != 1:
+        raise DocxRefusedError("computed-field", "a STYLEREF field without one style")
+    wanted = arguments[0].lower()
+    if wanted.isdigit() and len(wanted) == 1 and wanted != "0":
+        wanted = f"heading {wanted}"
+    if names[index] == wanted:
+        raise DocxRefusedError("computed-field", "a STYLEREF field in a paragraph of its style")
+    # The nearest paragraph of the style before the field, else the nearest after
+    # [styleref-caption, styleref-none-before].
+    before = [i for i in range(index - 1, -1, -1) if names[i] == wanted]
+    after = [i for i in range(index + 1, len(names)) if names[i] == wanted]
+    if not before and not after:
+        raise DocxRefusedError(
+            "computed-field", f"a STYLEREF to {wanted!r}, which no paragraph has"
+        )
+    target = paragraphs[(before or after)[0]]
+    if target.notes:
+        raise DocxRefusedError("computed-field", "a STYLEREF to a paragraph with a note mark")
+    if "s" not in switches:
+        return target.text
+    label = target.numbering.text if target.numbering is not None else None
+    if label is None or not re.fullmatch(r"[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*\.?", label):
+        raise DocxRefusedError("computed-field", "a STYLEREF \\s to a label it cannot read")
+    # The label without its final period [styleref-dotted].
+    return label.removesuffix(".")
 
 
 # --- blocks and tables ---------------------------------------------------------------------
@@ -1988,6 +2183,7 @@ def read_document(data: bytes) -> Document:
     reader.blocks(body, None, None)
     _check_accounted(document, runs)
     paragraphs = _labelled(reader.out, reader.contexts, lists)
+    _verify_fields(paragraphs, reader.contexts, styles)
     sections: list[ET.Element | None] = [*reader.sections, body.find(_w("sectPr"))]
     marks = _note_marks(paragraphs, reader.contexts, sections)
     notes = {

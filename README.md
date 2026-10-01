@@ -16,6 +16,9 @@ normalises, trims or repairs.
   Microsoft Word's own answers for every corpus document (`corpus/*/word.json`).
 - **Footnotes and endnotes**, with the marks Word draws ("1", "iv", "*") beside the text, and
   each note's own paragraphs read by the same rules.
+- **Caption numbers and chapter references** (`SEQ`, `STYLEREF`: "Table 3-1"), computed as
+  Word prints them and read only where the stored result is that number. Word shows a stale
+  caption on screen and prints a different one, so such a document is refused (`stale-field`).
 - **Nothing passed over.** Every run in the main document part is read exactly once, run content
   stands only inside runs, and there is no character data outside `<w:t>` and `<w:instrText>`.
   A document where any of that fails is refused (`stray-text`, `unread-content`).
@@ -147,9 +150,10 @@ downloads.
 ## What it does not read
 
 - **Headers, footers, comments.** Separate parts, not read.
-- **Fields Word computes** (`SEQ` caption numbers such as "Table 1", `PAGE`, `DATE`) and
-  **equations** are refused. Automatic caption numbering is common in Module 3 documents (three
-  WHO Module 2.3 templates hold it), so it is a candidate for the next piece of work.
+- **Fields Word computes from the layout or the clock** (`PAGE`, `DATE`, tables of contents,
+  whose page numbers depend on layout) and **equations** are refused, as are `SEQ` captions with
+  no stored result (three WHO Module 2.3 templates: Word shows nothing there and prints a
+  number).
 - **Word 97-2003 documents (.doc)** are refused, including under a .docx name: EMA's site
   serves one. Save them as .docx in Word first.
 - **Documents with tracked changes** are refused, not resolved. Accept or reject all changes in
@@ -167,6 +171,7 @@ downloads.
 | The EMA QRD files keep their ≥, °, Symbol braces and pictures    | `tests/test_reader.py`       |
 | List labels counted and drawn as Word does, or refused           | `tests/test_reader.py`       |
 | Every corpus list label and note mark is the one Word draws      | `tests/test_word_oracle.py`  |
+| Fields are read only where Word prints what it shows            | `tests/test_word_oracle.py`  |
 | The numbering cases are what their script writes, byte for byte  | `tests/test_corpus.py`       |
 | The EMA template's 7 Symbol bullets and 9 Word 6 dashes          | `tests/test_reader.py`       |
 | A .doc, or a zip that is not the whole file, is never read        | `tests/test_reader.py`       |
@@ -236,4 +241,5 @@ and draws the one label 1.3.0 got wrong (a level counted after a deeper one) as 
 smart-tag and custom-XML properties, conditional table formatting that cannot change the text),
 and refuses a .doc under a .docx name, which 1.4.0 opened as the zip of its theme. 1.6.0 reads
 footnotes and endnotes (`label-docx-json/1.2.0`), their marks numbered by the rules Word showed:
-the section's settings, not the document's, and start plus the notes before.
+the section's settings, not the document's, and start plus the notes before. 1.7.0 reads SEQ and
+STYLEREF fields whose stored result is what Word prints, by rules Word answered in 11 cases.

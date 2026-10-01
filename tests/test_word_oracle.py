@@ -1,4 +1,6 @@
-"""The reader draws the list labels and note marks Microsoft Word draws (corpus/*/word.json).
+"""The reader draws the labels and marks, and reads the fields, as Microsoft Word does.
+
+The answers are in corpus/*/word.json.
 
 Word's answers were recorded by ``scripts/word_oracle.py record``; this holds the reader to them
 without Word. Where the reader reads a document, every list label and every footnote and endnote
@@ -14,7 +16,7 @@ from typing import Any
 
 import pytest
 
-from word_oracle import note_verdict, reader_labels, reader_note_marks, verdict
+from word_oracle import field_verdict, note_verdict, reader_labels, reader_note_marks, verdict
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
 RECORDS = sorted(CORPUS.glob("*/word.json"))
@@ -26,6 +28,8 @@ REFUSED = {
     # A custom-marked footnote whose text holds footnoteRef: Word draws there the number the
     # next footnote will take, which no reference shows.
     "numbering-cases/notes-custom-mark.docx": "ambiguous-numbering",
+    # Captions stored as 7 and 7, which Word shows on screen and prints as 1 and 2.
+    "numbering-cases/fields-stale.docx": "stale-field",
     # EMA's stray U+F02D in Times New Roman, a code no font draws as the template means it.
     "ema-templates/qrd-product-information-template-version-104_es.docx": "private-use-character",
 }
@@ -84,6 +88,35 @@ def test_the_reader_draws_words_note_marks_or_refuses_as_listed(
     key = f"{path.parent.name}/{path.name}"
     result = note_verdict(word, reader_note_marks(path))
     if key in REFUSED:
+        assert result == f"reader refuses: {REFUSED[key]}"
+    else:
+        assert result == "agrees"
+
+
+def _field_cases() -> list[tuple[Path, dict[str, list[str]]]]:
+    out: list[tuple[Path, dict[str, list[str]]]] = []
+    for record in RECORDS:
+        fields = _record(record)["fields"]
+        out += [(record.parent / name, word) for name, word in sorted(fields.items())]
+    return out
+
+
+def test_words_field_results_are_on_record() -> None:
+    # The field cases, the stale one among them.
+    assert len(_field_cases()) >= 11
+    assert any(word["shown"] != word["printed"] for _, word in _field_cases())
+
+
+@pytest.mark.parametrize(
+    ("path", "word"), _field_cases(), ids=lambda value: getattr(value, "stem", "")
+)
+def test_the_reader_reads_fields_only_where_word_prints_what_it_shows(
+    path: Path, word: dict[str, list[str]]
+) -> None:
+    key = f"{path.parent.name}/{path.name}"
+    result = field_verdict(word, path)
+    # A stale-field refusal agrees with Word when Word prints other than it shows.
+    if key in REFUSED and REFUSED[key] != "stale-field":
         assert result == f"reader refuses: {REFUSED[key]}"
     else:
         assert result == "agrees"

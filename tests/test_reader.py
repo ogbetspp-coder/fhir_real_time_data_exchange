@@ -341,7 +341,9 @@ def test_a_field_nested_in_an_instruction_does_not_leak_its_result() -> None:
     assert refusal(body.replace("HYPERLINK", "IF")) == "computed-field"
 
 
-@pytest.mark.parametrize("code", ["PAGE", ' DATE \\@ "d MMMM yyyy"', "SEQ Table", "NUMPAGES", ""])
+@pytest.mark.parametrize(
+    "code", ["PAGE", ' DATE \\@ "d MMMM yyyy"', "SEQ Table \\# 00", "NUMPAGES", "TOC", ""]
+)
 def test_fields_word_recomputes_are_refused(code: str) -> None:
     complex_field = p(
         r('<w:fldChar w:fldCharType="begin"/>')

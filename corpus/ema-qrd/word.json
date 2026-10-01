@@ -23,7 +23,8 @@
       "-\t"
     ]
   },
-  "method": "list labels: convert numbers to text, what each list item gained; note marks: saved as text, what Word wrote between markers around each mark",
+  "fields": {},
+  "method": "list labels: convert numbers to text, what each list item gained; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF",
   "notes": {},
   "recorded": "2026-09-30"
 }

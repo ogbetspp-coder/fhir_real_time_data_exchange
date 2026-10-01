@@ -171,6 +171,72 @@
       "bytes": 3721
     },
     {
+      "name": "SEQ captions count 1, 2, 3, stored as Word prints them.",
+      "file": "fields-seq.docx",
+      "sha256": "fb03611eb720cb2673f7f88bacffdb92d38df0e0a1f440269ed11d0ba4918eed",
+      "bytes": 3504
+    },
+    {
+      "name": "One SEQ count shown in each number format.",
+      "file": "fields-seq-formats.docx",
+      "sha256": "09e3ebda048ab49e2a6b3bd947bc25c883a6768fa85a0ccfa0af2523ec048e05",
+      "bytes": 4518
+    },
+    {
+      "name": "Tables and figures count apart.",
+      "file": "fields-seq-identifiers.docx",
+      "sha256": "e19103afde4d87129ccbec4e508bb4213c4968bc10f17f8672d4201cd2299847",
+      "bytes": 3818
+    },
+    {
+      "name": "SEQ \\r sets, \\c repeats, \\n counts on, \\h counts and shows nothing.",
+      "file": "fields-seq-switches.docx",
+      "sha256": "3abf1d1951c0d83197eee8b6281befb3791d16e5ac6944f21b09455d75195259",
+      "bytes": 4404
+    },
+    {
+      "name": "SEQ \\s 1 restarts after each heading 1, not after a heading 2.",
+      "file": "fields-chapter-reset.docx",
+      "sha256": "6ac7a96f4521a6fd75259153a96d75647750fdc9571079f073beb177ea79950e",
+      "bytes": 4787
+    },
+    {
+      "name": "SEQ \\s 2 restarts after a heading 2 and after a heading 1.",
+      "file": "fields-chapter-reset-level-2.docx",
+      "sha256": "3bb60d3a0b7bfcfe0ed52e22bd767051a481e38cc6c001ba2e3deac38156a83b",
+      "bytes": 4880
+    },
+    {
+      "name": "Captions by chapter: STYLEREF 1 \\s, a hyphen, SEQ \\s 1; and the heading's text.",
+      "file": "fields-chapter-captions.docx",
+      "sha256": "7ef7e7939ed5b8f081515b30657c59b4d5af685309507a994f23d5fa5c199ad5",
+      "bytes": 5193
+    },
+    {
+      "name": "STYLEREF \\s of headings numbered 1. and 1.1. drops the final period.",
+      "file": "fields-chapter-dotted.docx",
+      "sha256": "adea78c1b9715abdeccbfc3fd8e373dae6cf8ac7661ce152a9d6d0ded933432c",
+      "bytes": 3956
+    },
+    {
+      "name": "Word's heading levels go by the style's name, not its outline level.",
+      "file": "fields-heading-by-name.docx",
+      "sha256": "ee0a173064750f01fd51479ca2ff822123dd230fd1e118a466cfd345464ab2ec",
+      "bytes": 4228
+    },
+    {
+      "name": "STYLEREF before any paragraph of its style takes the next one.",
+      "file": "fields-styleref-forward.docx",
+      "sha256": "9ace8ecefeaf3e37c11eebe462c49eaffc068396ed8ed47512b126f4b1bf32e5",
+      "bytes": 3590
+    },
+    {
+      "name": "Captions stored as 7 and 7, which Word prints as 1 and 2 (the reader refuses).",
+      "file": "fields-stale.docx",
+      "sha256": "22e42c8c0532dd985bb4a9df1848490495a1e6c1269ef09a0aab605032878861",
+      "bytes": 3194
+    },
+    {
       "name": "Footnotes number 1, 2, 3 through the document.",
       "file": "notes-continuous.docx",
       "sha256": "cefb0cc55bb723e6a71b6857618a833487bdbd7ae8eb581dea40498f8bdcec31",

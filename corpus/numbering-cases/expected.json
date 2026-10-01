@@ -11,6 +11,50 @@
     "paragraphsSha256": "bb5f56651b17094ef662b58607188de0952acffbda80f3c5b8c319f1be02bc63",
     "sha256": "62a355d1e912cb232cc60eacbd917ff31642219a2e0e428a88cb0cec3071b14b"
   },
+  "fields-chapter-captions.docx": {
+    "paragraphsSha256": "9d3a811b0fadacc8a4a074c0df542c8745a2942cad6974488b37d8c3eba6b708",
+    "sha256": "7ef7e7939ed5b8f081515b30657c59b4d5af685309507a994f23d5fa5c199ad5"
+  },
+  "fields-chapter-dotted.docx": {
+    "paragraphsSha256": "649a1bd06cf79bd7857fb60cf708efabda26ad1a2453a248e603be34e58f8946",
+    "sha256": "adea78c1b9715abdeccbfc3fd8e373dae6cf8ac7661ce152a9d6d0ded933432c"
+  },
+  "fields-chapter-reset-level-2.docx": {
+    "paragraphsSha256": "36fee93ec64dd44d8e168c851c9d761dabb721d31f9c123291e2da9b4ccffe62",
+    "sha256": "3bb60d3a0b7bfcfe0ed52e22bd767051a481e38cc6c001ba2e3deac38156a83b"
+  },
+  "fields-chapter-reset.docx": {
+    "paragraphsSha256": "7e4e967dbebd94d4589a003d588914be05707592f266dec1688ce52b6851cd2b",
+    "sha256": "6ac7a96f4521a6fd75259153a96d75647750fdc9571079f073beb177ea79950e"
+  },
+  "fields-heading-by-name.docx": {
+    "paragraphsSha256": "22dae2a38c2319d35f55b69fd155a76eb45c34fb589218899ff1ae9368b3ae66",
+    "sha256": "ee0a173064750f01fd51479ca2ff822123dd230fd1e118a466cfd345464ab2ec"
+  },
+  "fields-seq-formats.docx": {
+    "paragraphsSha256": "3adf30f763860965fd8ecdfda618d2535e4d674d7245bd85181e5d43d2035799",
+    "sha256": "09e3ebda048ab49e2a6b3bd947bc25c883a6768fa85a0ccfa0af2523ec048e05"
+  },
+  "fields-seq-identifiers.docx": {
+    "paragraphsSha256": "affd0448341d6a18487bae03e0241e0c99faeaac9013c87ce3542ef7bbdd9df4",
+    "sha256": "e19103afde4d87129ccbec4e508bb4213c4968bc10f17f8672d4201cd2299847"
+  },
+  "fields-seq-switches.docx": {
+    "paragraphsSha256": "66ce1c922f4a979af4252017c30b298d415f906d9c501b23376ff703a40fdc25",
+    "sha256": "3abf1d1951c0d83197eee8b6281befb3791d16e5ac6944f21b09455d75195259"
+  },
+  "fields-seq.docx": {
+    "paragraphsSha256": "b6fe21c484635adc876060dd78c78320fd545b1067d1b1800d41457b01059884",
+    "sha256": "fb03611eb720cb2673f7f88bacffdb92d38df0e0a1f440269ed11d0ba4918eed"
+  },
+  "fields-stale.docx": {
+    "refusal": "stale-field",
+    "sha256": "22e42c8c0532dd985bb4a9df1848490495a1e6c1269ef09a0aab605032878861"
+  },
+  "fields-styleref-forward.docx": {
+    "paragraphsSha256": "665154b8d8027e3893f643f4c00b831604cd7c492dfdcdfcda1d919471f77003",
+    "sha256": "9ace8ecefeaf3e37c11eebe462c49eaffc068396ed8ed47512b126f4b1bf32e5"
+  },
   "formats.docx": {
     "paragraphsSha256": "6ca6579b6dcf75e9b33e7801c40a71fb70b5c2b56efda4ee74053341ff352720",
     "sha256": "494ff88e90f40d1f4216752a2f4bf44c85b6f019a6e6471e139d2f53eab325e4"
