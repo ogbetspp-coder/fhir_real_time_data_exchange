@@ -214,6 +214,7 @@ downloads.
 | The numbering cases are what their script writes, byte for byte  | `tests/test_corpus.py`       |
 | The EMA template's 7 Symbol bullets and 9 Word 6 dashes          | `tests/test_reader.py`       |
 | A .doc, or a zip that is not the whole file, is never read        | `tests/test_reader.py`       |
+| Every change to what Word shows is noticed; nothing else is      | `tests/test_mutations.py`    |
 | Same bytes across processes, hash seeds and locales              | `tests/test_determinism.py`  |
 | Same result however the parts are zipped                         | `tests/test_determinism.py`  |
 | The output is canonical (RFC 8785 form); the CLI's exit codes    | `tests/test_output.py`       |
