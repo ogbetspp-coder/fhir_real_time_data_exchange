@@ -10,7 +10,8 @@ and nothing stored is ever replaced.
     <root>/documents/<id[:2]>/<id>/source
     <root>/documents/<id[:2]>/<id>/<reader>/<format>/result.json      (reader@1.8.0, ...)
     <root>/documents/<id[:2]>/<id>/<reader>/<format>/receipt.json     (the result's SHA-256)
-    <root>/documents/<id[:2]>/<id>/<reader>/<format>/browser/<version>.json  (an ePI's verdict)
+    <root>/documents/<id[:2]>/<id>/<reader>/<format>/browser/<version>.json  (an ePI's)
+    <root>/documents/<id[:2]>/<id>/<reader>/<format>/word/<version>.json     (a .docx's)
 
 Every write creates a file that did not exist (a hard link from a written, synced temporary
 file), so two ingestions of the same document at once cannot interleave. Every write and every
@@ -21,10 +22,11 @@ kept source again and requires the kept result byte for byte, which no edit to t
 consistent, can pass.
 
 An ePI read is also held to a browser where one is given (``browser``; the service gives
-``label_docx.browser.verify_epi`` where Chrome is installed): the verdict is kept beside the
-result, once per browser version, and the same browser must give the same verdict byte for
-byte. ``disagreement`` names a kept verdict that found a section shown otherwise; the service
-does not serve that result.
+``label_docx.browser.verify_epi`` where Chrome is installed), and a .docx read to Word where it
+is given (``word``: ``label_docx.word.verify_docx``, macOS with Word): the verdict is kept
+beside the result, once per application version, and the same application must give the same
+verdict byte for byte. ``disagreement`` names a kept verdict that found the document shown
+otherwise than the result reads; the service does not serve that result.
 """
 
 from __future__ import annotations
@@ -39,8 +41,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from label_docx.browser import BrowserError
 from label_docx.documents import EPI, Kind, kind
 from label_docx.output import Json, canonical
+from label_docx.word import WordError
 
 _ID = re.compile(r"[0-9a-f]{64}")
 
@@ -102,9 +106,12 @@ def _same(path: Path, data: bytes) -> None:
 class Store:
     """Documents and results under ``root``."""
 
-    def __init__(self, root: Path, browser: Verifier | None = None) -> None:
+    def __init__(
+        self, root: Path, browser: Verifier | None = None, word: Verifier | None = None
+    ) -> None:
         self.root = root
         self.browser = browser
+        self.word = word
 
     def _folder(self, document: str) -> Path:
         if not _ID.fullmatch(document):
@@ -135,20 +142,32 @@ class Store:
         receipt = _receipt(document, result, value, reading)
         created = _write_once(path.with_name("receipt.json"), receipt) or created
         verification = None
-        if self.browser is not None and reading is EPI and "refusal" not in value:
-            verdict = canonical(self.browser(data, value))
-            name = re.sub(r"[^A-Za-z0-9.]+", "-", json.loads(verdict)["application"]).strip("-")
-            _write_once(path.parent / "browser" / f"{name}.json", verdict)
-            verification = verdict
+        # An ePI is held to the browser, a .docx to Word, where each is given.
+        folder, verifier = ("browser", self.browser) if reading is EPI else ("word", self.word)
+        if verifier is not None and "refusal" not in value:
+            try:
+                verdict = canonical(verifier(data, value))
+            except BrowserError, WordError:
+                # The application could not be asked: nothing is verified, and nothing kept.
+                verdict = None
+            if verdict is not None:
+                application = json.loads(verdict)["application"]
+                name = re.sub(r"[^A-Za-z0-9.]+", "-", application).strip("-")
+                _write_once(path.parent / folder / f"{name}.json", verdict)
+                verification = verdict
         return Ingested(document, receipt, result, "refusal" not in value, created, verification)
 
     def verifications(self, document: str) -> list[Json]:
-        """Every browser verdict kept for the current reader's result, by browser version."""
+        """Every verdict kept for the current reader's result: Chrome's or Word's, by version."""
         source = self.source(document)
         if source is None:
             return []
-        folder = self._result_path(document, kind(source)).parent / "browser"
-        return [json.loads(p.read_bytes()) for p in sorted(folder.glob("*.json"))]
+        folder = self._result_path(document, kind(source)).parent
+        found = [
+            *sorted((folder / "browser").glob("*.json")),
+            *sorted((folder / "word").glob("*.json")),
+        ]
+        return [json.loads(p.read_bytes()) for p in found]
 
     def disagreement(self, document: str) -> dict[str, Json] | None:
         """A kept verdict that found a section shown otherwise than the result reads, or None."""
@@ -210,11 +229,12 @@ class Store:
 def _receipt(document: str, result: bytes, value: dict[str, Json], reading: Kind) -> bytes:
     """What ingesting a document answers: the same bytes every time for the same document.
 
-    The outcome is ``read``, ``refused``, or for an ePI with sections the reader refused,
-    ``read-in-part``: those sections hold no text, and their refusals say why.
+    The outcome is ``read``, ``refused``, or ``read-in-part``: an ePI with sections, or a .docx
+    with headers, footers or comments, the reader refused on their own. Those hold no text, and
+    their refusals say why.
     """
     outcome = "refused" if "refusal" in value else "read"
-    if value.get("refusedSections"):
+    if value.get("refusedSections") or value.get("refusedParts"):
         outcome = "read-in-part"
     receipt: dict[str, Json] = {
         "document": document,

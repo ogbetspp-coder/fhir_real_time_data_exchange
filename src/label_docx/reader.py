@@ -183,7 +183,16 @@ What it refuses (``DocxRefusedError.code``):
   which depends on layout; or the echo of a custom mark inside its note, where Word draws the
   number the next note will take.
 
-Headers, footers, comments and the glossary are separate parts and are not read.
+Headers, footers and comments. ``read_document`` also reads every header and footer part the
+sections refer to (``Story``: each part once, in the order referred to, with the (section,
+type) uses that name it; which one Word shows on a page is layout) and every comment of the
+comments part (``Comment``: its author, initials and date as stored), each paragraph by every
+rule above. A comment's mark in a paragraph is placed in ``comments`` (``CommentReference``),
+never in ``text``; every comment must be anchored exactly once. Fields the reader computes
+(SEQ, STYLEREF, REF, NOTEREF) and lists are refused there, since how Word counts them outside
+the body is not on record; page numbers are placed. A header, footer or comment the reader
+cannot read exactly is refused on its own (``Story.refusal``, ``Comment.refusal``): the body
+is read all the same. The glossary (building blocks) is not read.
 """
 
 from __future__ import annotations
@@ -208,13 +217,15 @@ from dataclasses import dataclass, field, replace
 # contents, which Word prints as stored, and places page numbers, which it sets from the layout;
 # 1.11.0 reports bold and italic, and every toggle as Word shows it (two styles cancel); 1.12.0
 # reads only a whole package: every part, read or not, must be intact (its checksum), and the
-# parts together under a size cap.
-READER_VERSION = "docx-reader/1.12.0"
+# parts together under a size cap; 1.13.0 reads headers, footers and comments, and where each
+# comment is anchored.
+READER_VERSION = "docx-reader/1.13.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
 MC = "http://schemas.openxmlformats.org/markup-compatibility/2006"
 PR = "http://schemas.openxmlformats.org/package/2006/relationships"
+R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 XML_SPACE = "{http://www.w3.org/XML/1998/namespace}space"
 PICTURE_URI = "http://schemas.openxmlformats.org/drawingml/2006/picture"
 OBJECT = "\ufffc"
@@ -324,9 +335,8 @@ _MARKERS = {
         "proofErr",
     )
 }
-# Run children that carry no text of their own. A comment reference points at a comment, which
-# is not part of the body text Word lays out.
-_RUN_SILENT = {_w(name) for name in ("rPr", "lastRenderedPageBreak", "commentReference")}
+# Run children that carry no text of their own.
+_RUN_SILENT = {_w(name) for name in ("rPr", "lastRenderedPageBreak")}
 # A note's mark in the body, and its echo at the start of the note's text.
 _NOTE_REFERENCES = {
     _w(name) for name in ("footnoteReference", "endnoteReference", "footnoteRef", "endnoteRef")
@@ -450,11 +460,50 @@ class Paragraph:
     notes: tuple[NoteReference, ...] = ()
     # Where Word draws a page number (PAGEREF, PAGE...): set by the layout, so never in ``text``.
     pages: tuple[int, ...] = ()
+    # Where a comment's mark stands, and which comment it is.
+    comments: tuple[CommentReference, ...] = ()
 
     @property
     def has_drawing(self) -> bool:
         """Whether the text holds a picture (U+FFFC OBJECT REPLACEMENT CHARACTER)."""
         return OBJECT in self.text
+
+
+@dataclass(frozen=True)
+class CommentReference:
+    """A comment's mark in a paragraph: the comment ``id`` is anchored before ``text[offset]``."""
+
+    offset: int
+    id: int
+
+
+@dataclass(frozen=True)
+class Comment:
+    """A comment: its id, author, initials and date as stored, and its paragraphs."""
+
+    id: int
+    author: str | None
+    initials: str | None
+    date: str | None
+    paragraphs: tuple[Paragraph, ...]
+    # Why the reader would not read the comment's text (code, detail), which is then empty.
+    refusal: tuple[str, str] | None = None
+
+
+@dataclass(frozen=True)
+class Story:
+    """A header or footer part: its name, the sections that use it and how, its paragraphs.
+
+    ``uses`` lists each (section, type) whose reference names this part, sections counted from
+    0 in document order, the type ``default``, ``first`` or ``even``.
+    """
+
+    kind: str
+    part: str
+    uses: tuple[tuple[int, str], ...]
+    paragraphs: tuple[Paragraph, ...]
+    # Why the reader would not read the part's text (code, detail), which is then empty.
+    refusal: tuple[str, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -469,11 +518,18 @@ class Note:
 
 @dataclass(frozen=True)
 class Document:
-    """The body's paragraphs, and the footnotes and endnotes in the order they are referenced."""
+    """A document's text: its body, notes, headers, footers and comments.
+
+    The footnotes and endnotes are in the order the body refers to them, the headers and footers
+    in the order the sections refer to them, and the comments as stored.
+    """
 
     body: tuple[Paragraph, ...]
     footnotes: tuple[Note, ...] = ()
     endnotes: tuple[Note, ...] = ()
+    headers: tuple[Story, ...] = ()
+    footers: tuple[Story, ...] = ()
+    comments: tuple[Comment, ...] = ()
 
 
 # --- package -------------------------------------------------------------------------------
@@ -575,6 +631,20 @@ class _Package:
             return ET.fromstring(_decode(name, data))
         except ET.ParseError as error:
             raise DocxRefusedError("invalid-package", f"{name} is not well-formed") from error
+
+    def target(self, source: str, relationship: str | None, kind: str) -> str:
+        """The part ``source``'s relationship ``relationship`` names; refused unless a ``kind``."""
+        folder, base = posixpath.split(source)
+        rels = self.part(posixpath.join(folder, "_rels", base + ".rels"))
+        for rel in [] if rels is None else rels.findall(f"{{{PR}}}Relationship"):
+            if rel.get("Id") != relationship:
+                continue
+            if rel.get("TargetMode") == "External" or not rel.get("Type", "").endswith("/" + kind):
+                raise DocxRefusedError("invalid-package", f"{relationship} is not a {kind} part")
+            target = rel.get("Target", "")
+            resolved = target[1:] if target.startswith("/") else posixpath.join(folder, target)
+            return posixpath.normpath(resolved)
+        raise DocxRefusedError("invalid-package", f"no relationship {relationship}")
 
     def related(self, source: str, kind: str) -> list[str]:
         """Target part names of ``source``'s internal relationships whose type ends in ``kind``."""
@@ -1020,6 +1090,8 @@ class _ParagraphReader:
         self.story = story
         self.notes: list[NoteReference] = []
         self.custom: set[tuple[str, int]] = set()
+        # Where each comment's mark stands, and which comment it is.
+        self.comments: list[CommentReference] = []
         # Fields whose result the reader checks against its own computation: the instruction and
         # where the stored result stands in the text. ``results`` follows ``fields``: the start
         # of each open field's result if it is one of those, else None.
@@ -1102,8 +1174,22 @@ class _ParagraphReader:
         # Page-number text, left out of the text but still drawn: it must not be hidden.
         placed: list[str] = []
         references: list[NoteReference] = []
+        comments: list[CommentReference] = []
         for child in run:
             tag = child.tag
+            if tag == _w("commentReference"):
+                if self.story is not None and self.story[0] == "comment":
+                    raise DocxRefusedError("unsupported-element", "a comment mark in a comment")
+                offset = self.length + sum(len(part) for part in emitted)
+                comments.append(
+                    CommentReference(offset, _int(child.get(_w("id"), ""), "comment id"))
+                )
+                continue
+            if tag == _w("annotationRef"):
+                # A comment's echo of its own mark: drawn by Word, no text.
+                if self.story is None or self.story[0] != "comment":
+                    raise DocxRefusedError("unsupported-element", "annotationRef outside a comment")
+                continue
             if tag in _NOTE_REFERENCES:
                 if self.in_instruction():
                     raise DocxRefusedError("unsupported-element", "a note mark in a field code")
@@ -1136,6 +1222,7 @@ class _ParagraphReader:
         if "".join(placed).strip() and properties.toggle("vanish"):
             raise DocxRefusedError("hidden-text", "a hidden page number")
         self.notes += references
+        self.comments += comments
         if not text:
             return
         if properties.toggle("vanish"):
@@ -1157,7 +1244,7 @@ class _ParagraphReader:
                 raise DocxRefusedError("unsupported-element", f"{tag} outside a {kind}")
             return NoteReference(offset, kind, self.story[1])
         if self.story is not None:
-            raise DocxRefusedError("unsupported-element", f"{tag} inside a note")
+            raise DocxRefusedError("unsupported-element", f"{tag} inside a {self.story[0]}")
         note = _int(child.get(_w("id"), ""), f"{tag} id")
         if child.get(_w("customMarkFollows")) in ("1", "true", "on"):
             self.custom.add((kind, note))
@@ -1464,6 +1551,7 @@ def _paragraph(
         mark_hidden=mark_hidden,
         notes=tuple(reader.notes),
         pages=tuple(reader.pages),
+        comments=tuple(reader.comments),
     ), context
 
 
@@ -2361,6 +2449,13 @@ def read_document(data: bytes) -> Document:
         if parts[3] is not None:
             styles.update_fields = bool(_on(parts[3].find(_w("updateFields"))))
         lists = _Lists(parts[4], styles)
+        stories = _story_parts(package, mains[0], document)
+        comment_parts = package.related(mains[0], "comments")
+        if len(comment_parts) > 1:
+            raise DocxRefusedError("invalid-package", "more than one comments part")
+        comments_root = package.part(comment_parts[0]) if comment_parts else None
+        if comment_parts and comments_root is None:
+            raise DocxRefusedError("invalid-package", f"no {comment_parts[0]}")
     _check_part(document)
     body = document.find(_w("body"))
     if body is None:
@@ -2407,11 +2502,135 @@ def read_document(data: bytes) -> Document:
             if k == kind
         )
 
+    footnotes, endnotes = in_order("footnote"), in_order("endnote")
+    read_stories = {
+        kind: tuple(
+            _story(kind, name, tuple(uses), root, index, styles)
+            for index, (name, uses, root) in enumerate(found)
+        )
+        for kind, found in stories.items()
+    }
+    comments = _read_comments(comments_root, styles)
+    # Every comment is anchored exactly once, in the body, a note, a header or a footer.
+    anchored = [
+        reference.id
+        for paragraph in (
+            *paragraphs,
+            *(p for note in (*footnotes, *endnotes) for p in note.paragraphs),
+            *(
+                p
+                for story in (*read_stories["header"], *read_stories["footer"])
+                for p in story.paragraphs
+            ),
+        )
+        for reference in paragraph.comments
+    ]
+    known = {comment.id for comment in comments}
+    for comment_id in anchored:
+        if comment_id not in known:
+            raise DocxRefusedError(
+                "invalid-package", f"a mark of comment {comment_id}, not defined"
+            )
+    if len(set(anchored)) != len(anchored):
+        raise DocxRefusedError("invalid-package", "a comment's mark stands twice")
+    unanchored = sorted(known - set(anchored))
+    if unanchored:
+        # Word shows no comment nothing anchors; its text is in the file all the same.
+        raise DocxRefusedError("unread-content", f"comment {unanchored[0]}, anchored nowhere")
     return Document(
         body=tuple(_with_marks(p, marks) for p in paragraphs),
-        footnotes=in_order("footnote"),
-        endnotes=in_order("endnote"),
+        footnotes=footnotes,
+        endnotes=endnotes,
+        headers=read_stories["header"],
+        footers=read_stories["footer"],
+        comments=comments,
     )
+
+
+def _story_parts(
+    package: _Package, main: str, document: ET.Element
+) -> dict[str, list[tuple[str, list[tuple[int, str]], ET.Element]]]:
+    """The header and footer parts the sections refer to, each once, in the order referred to.
+
+    Each with the (section, type) uses that name it; sections are counted in document order.
+    """
+    found: dict[str, list[tuple[str, list[tuple[int, str]], ET.Element]]] = {
+        "header": [],
+        "footer": [],
+    }
+    for section, properties in enumerate(document.iter(_w("sectPr"))):
+        for reference in properties:
+            kind = next((k for k in found if reference.tag == _w(f"{k}Reference")), None)
+            if kind is None:
+                continue
+            name = package.target(main, reference.get(f"{{{R}}}id"), kind)
+            use = (section, reference.get(_w("type"), "default"))
+            entry = next((e for e in found[kind] if e[0] == name), None)
+            if entry is None:
+                root = package.part(name)
+                if root is None:
+                    raise DocxRefusedError("invalid-package", f"no {name}")
+                found[kind].append((name, [use], root))
+            else:
+                entry[1].append(use)
+    return found
+
+
+def _story(
+    kind: str,
+    name: str,
+    uses: tuple[tuple[int, str], ...],
+    root: ET.Element,
+    index: int,
+    styles: _Styles,
+) -> Story:
+    """A header or footer read, or refused on its own: the body is read all the same."""
+    try:
+        return Story(kind, name, uses, _read_blocks(root, (kind, index), styles))
+    except DocxRefusedError as refused:
+        return Story(kind, name, uses, (), (refused.code, refused.detail))
+
+
+def _read_blocks(
+    root: ET.Element, story: tuple[str, int], styles: _Styles
+) -> tuple[Paragraph, ...]:
+    """The paragraphs of a header, a footer or a comment, by every rule of the body.
+
+    Fields the reader computes and lists are refused there: how Word counts them outside the
+    body is not on record. A page number is placed, as in the body.
+    """
+    _check_part(root)
+    runs: set[ET.Element] = set()
+    reader = _Body(styles, runs, story)
+    reader.blocks(root, None, None)
+    _check_accounted(root, runs)
+    if any(c.fields for c in reader.contexts):
+        raise DocxRefusedError("computed-field", f"a SEQ, STYLEREF or REF field in a {story[0]}")
+    if any(p.numbering is not None and p.numbering.num_id for p in reader.out):
+        raise _refuse_numbering(f"a list in a {story[0]}")
+    return tuple(reader.out)
+
+
+def _read_comments(root: ET.Element | None, styles: _Styles) -> tuple[Comment, ...]:
+    """Every comment of the comments part, in the order stored."""
+    if root is None:
+        return ()
+    comments: list[Comment] = []
+    for element in root:
+        if element.tag != _w("comment"):
+            raise DocxRefusedError("unsupported-element", f"{_local(element.tag)} in comments")
+        comment_id = _int(element.get(_w("id"), ""), "comment id")
+        if any(c.id == comment_id for c in comments):
+            raise DocxRefusedError("invalid-package", f"comment {comment_id} is defined twice")
+        stored = (element.get(_w("author")), element.get(_w("initials")), element.get(_w("date")))
+        try:
+            text = _read_blocks(element, ("comment", comment_id), styles)
+        except DocxRefusedError as refused:
+            # Refused on its own: the body is read all the same.
+            comments.append(Comment(comment_id, *stored, (), (refused.code, refused.detail)))
+            continue
+        comments.append(Comment(comment_id, *stored, text))
+    return tuple(comments)
 
 
 def _check_part(root: ET.Element) -> None:

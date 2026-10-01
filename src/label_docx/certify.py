@@ -55,13 +55,13 @@ import json
 import posixpath
 import xml.etree.ElementTree as ET
 import zipfile
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from typing import Any
 
 from label_docx.reader import SYMBOL_FONT
 
-CHECKER_VERSION = "conservation-check/1.1.0"
+CHECKER_VERSION = "conservation-check/1.2.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _RELS = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -69,7 +69,8 @@ _OBJECT = "\ufffc"
 _LAYOUT_CODES = {"PAGEREF", "PAGE", "NUMPAGES", "SECTIONPAGES"}
 _NOTE_LAYOUT = {"separator", "continuationSeparator", "continuationNotice"}
 # Run children that hold no text and stand for none.
-_RUN_SILENT = {"rPr", "lastRenderedPageBreak", "commentReference"}
+_RUN_SILENT = {"rPr", "lastRenderedPageBreak"}
+_R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 _NOTE_MARKS = {"footnoteReference", "endnoteReference", "footnoteRef", "endnoteRef"}
 
 type Json = Any
@@ -353,6 +354,18 @@ class _Story:
             local = _local(child.tag)
             if local in _RUN_SILENT:
                 continue
+            if local == "annotationRef":
+                # A comment's echo of its own mark, at the start of its text: no character.
+                if self.story is None or self.story[0] != "comment":
+                    raise CertificationError("annotationRef outside a comment")
+                continue
+            if local == "commentReference":
+                if self.story is not None and self.story[0] == "comment":
+                    raise CertificationError("a comment's mark in a comment")
+                self.flush_run(shown, hidden)
+                shown = []
+                self.mark("comment", int(child.get(_w("id"), "")))
+                continue
             if local in _NOTE_MARKS:
                 kind = "footnote" if local.startswith("footnote") else "endnote"
                 self.flush_run(shown, hidden)
@@ -498,12 +511,13 @@ def _code(instruction: str) -> str | None:
 # --- .docx: matching the result -----------------------------------------------------------
 
 
-def _match(paragraph: _Paragraph, value: dict[str, Json], ledger: _Ledger, where: str) -> None:
+def _match(paragraph: _Paragraph, value: dict[str, Json], where: str) -> None:
     """The output paragraph must be exactly the tokens the check read, and its marks placed."""
     text: str = value["text"]
     expected: list[str] = []
     pages: list[int] = []
     notes: list[tuple[int, tuple[str, int]]] = []
+    comments: list[tuple[int, int]] = []
     position = 0
     for segment in paragraph.segments:
         if segment.marker is None:
@@ -511,6 +525,8 @@ def _match(paragraph: _Paragraph, value: dict[str, Json], ledger: _Ledger, where
             position += len(segment.text)
         elif segment.marker[0] == "page":
             pages.append(position)
+        elif segment.marker[0] == "comment":
+            comments.append((position, segment.marker[1]))
         else:
             notes.append((position, segment.marker[1]))
     if text != "".join(expected):
@@ -519,10 +535,11 @@ def _match(paragraph: _Paragraph, value: dict[str, Json], ledger: _Ledger, where
         raise CertificationError(f"{where}: the page numbers are not where the document has them")
     if notes != [(n["offset"], (n["kind"], n["id"])) for n in value["notes"]]:
         raise CertificationError(f"{where}: the note marks are not where the document has them")
+    if comments != [(c["offset"], c["id"]) for c in value["comments"]]:
+        raise CertificationError(f"{where}: the comment marks are not where the document has them")
     table = value["table"]
     if (None if table is None else tuple(table)) != paragraph.table:
         raise CertificationError(f"{where}: the paragraph is not in the document's table cell")
-    ledger.output += len(text)
 
 
 def _docx_parts(data: bytes) -> tuple[zipfile.ZipFile, str, dict[str, str]]:
@@ -532,10 +549,26 @@ def _docx_parts(data: bytes) -> tuple[zipfile.ZipFile, str, dict[str, str]]:
         raise CertificationError("not one main document part")
     related = {
         kind: targets[0]
-        for kind in ("styles", "theme", "footnotes", "endnotes")
+        for kind in ("styles", "theme", "footnotes", "endnotes", "comments")
         if (targets := _relations(archive, main[0], kind))
     }
     return archive, main[0], related
+
+
+def _relation(archive: zipfile.ZipFile, source: str, relationship: str | None, kind: str) -> str:
+    """The part ``source``'s relationship ``relationship`` names, which must be a ``kind``."""
+    folder, base = posixpath.split(source)
+    name = posixpath.join(folder, "_rels", base + ".rels")
+    for rel in ET.fromstring(archive.read(name)).iter(f"{{{_RELS}}}Relationship"):
+        if rel.get("Id") != relationship:
+            continue
+        if rel.get("TargetMode") == "External" or not rel.get("Type", "").endswith("/" + kind):
+            raise CertificationError(f"{relationship} is not a {kind} part")
+        target = rel.get("Target", "")
+        return posixpath.normpath(
+            target[1:] if target.startswith("/") else posixpath.join(folder, target)
+        )
+    raise CertificationError(f"no relationship {relationship}")
 
 
 def _relations(archive: zipfile.ZipFile, source: str, kind: str) -> list[str]:
@@ -556,24 +589,42 @@ def _relations(archive: zipfile.ZipFile, source: str, kind: str) -> list[str]:
     return out
 
 
+@dataclass
+class _Part:
+    """One story's paragraphs as the check reads them, with its own ledger, or why it cannot."""
+
+    paragraphs: list[_Paragraph]
+    ledger: _Ledger
+    error: str | None = None
+
+
+def _total(ledgers: list[_Ledger]) -> _Ledger:
+    total = _Ledger()
+    for ledger in ledgers:
+        for name in total.__dataclass_fields__:
+            setattr(total, name, getattr(total, name) + getattr(ledger, name))
+    return total
+
+
 class DocxSource:
-    """A .docx's text tokens, read once by this module's own walk, to hold results to."""
+    """A .docx's text tokens, read once by this module's own walk, to hold results to.
+
+    The body and the notes must be read; a header, a footer or a comment the reader may refuse
+    on its own, and then its text must be empty in the result and its name is listed as refused.
+    """
 
     def __init__(self, data: bytes) -> None:
         archive, main, related = _docx_parts(data)
         with archive:
             parse = {name: ET.fromstring(archive.read(name)) for name in {main, *related.values()}}
-            fonts = _Fonts(
+            self.fonts = _Fonts(
                 parse.get(related.get("styles", "")), parse.get(related.get("theme", ""))
             )
-            self.ledger = _Ledger()
             body = parse[main].find(_w("body"))
             if body is None:
                 raise CertificationError("no body")
-            story = _Story(fonts, self.ledger)
-            story.blocks(body, None, None)
-            self.body = story.paragraphs
-            self.notes: dict[str, dict[int, list[_Paragraph]]] = {}
+            self.body = self._part(body, None)
+            self.notes: dict[str, dict[int, _Part]] = {}
             self.not_read: dict[str, int] = {}
             for kind in ("footnote", "endnote"):
                 self.notes[kind] = {}
@@ -586,14 +637,48 @@ class DocxSource:
                             self.not_read[key] = self.not_read.get(key, 0) + size
                         continue
                     note_id = int(note.get(_w("id"), ""))
-                    story = _Story(fonts, self.ledger, (kind, note_id))
-                    story.blocks(note, None, None)
-                    self.notes[kind][note_id] = story.paragraphs
-            self.scope = sorted(
-                {main, *(related[k] for k in ("footnotes", "endnotes") if k in related)}
-            )
+                    self.notes[kind][note_id] = self._part(note, (kind, note_id))
+            # Headers and footers: each part once, in the order the sections refer to them.
+            self.stories: dict[str, list[tuple[str, list[dict[str, Json]], _Part]]] = {
+                "header": [],
+                "footer": [],
+            }
+            for section, properties in enumerate(parse[main].iter(_w("sectPr"))):
+                for reference in properties:
+                    story_kind = next(
+                        (k for k in self.stories if reference.tag == _w(f"{k}Reference")), None
+                    )
+                    if story_kind is None:
+                        continue
+                    kind = story_kind
+                    name = _relation(archive, main, reference.get(f"{{{_R}}}id"), kind)
+                    use = {"section": section, "type": reference.get(_w("type"), "default")}
+                    found = next((e for e in self.stories[kind] if e[0] == name), None)
+                    if found is not None:
+                        found[1].append(use)
+                        continue
+                    root = ET.fromstring(archive.read(name))
+                    index = len(self.stories[kind])
+                    self.stories[kind].append((name, [use], self._optional(root, (kind, index))))
+            # Comments, as stored, each with what the part says of it.
+            self.comments: list[tuple[dict[str, Json], _Part]] = []
+            comments_part = related.get("comments")
+            for comment in parse[comments_part] if comments_part is not None else []:
+                comment_id = int(comment.get(_w("id"), ""))
+                stored = {
+                    "author": comment.get(_w("author")),
+                    "date": comment.get(_w("date")),
+                    "id": comment_id,
+                    "initials": comment.get(_w("initials")),
+                }
+                self.comments.append((stored, self._optional(comment, ("comment", comment_id))))
+            self.parts = {
+                main,
+                *(related[k] for k in ("footnotes", "endnotes", "comments") if k in related),
+                *(name for found in self.stories.values() for name, _, _ in found),
+            }
             for name in sorted(archive.namelist()):
-                if name in self.scope or not name.endswith(".xml"):
+                if name in self.parts or not name.endswith(".xml"):
                     continue
                 try:
                     size = _text_size(ET.fromstring(archive.read(name)))
@@ -602,34 +687,66 @@ class DocxSource:
                     raise CertificationError(f"{name} cannot be read") from error
                 if size:
                     self.not_read[name] = size
+            self.comments_part = comments_part
+
+    def _part(self, element: ET.Element, story: tuple[str, int] | None) -> _Part:
+        ledger = _Ledger()
+        walk = _Story(self.fonts, ledger, story)
+        walk.blocks(element, None, None)
+        return _Part(walk.paragraphs, ledger)
+
+    def _optional(self, element: ET.Element, story: tuple[str, int]) -> _Part:
+        """A part the reader may refuse on its own: what the check cannot read is kept as such."""
+        try:
+            return self._part(element, story)
+        except CertificationError as error:
+            return _Part([], _Ledger(), str(error))
 
     def certify(self, value: dict[str, Json]) -> dict[str, Json]:
         """The certificate for ``value``, a .docx result, or ``CertificationError``."""
-        ledger = replace(self.ledger)
-        paragraphs = value["paragraphs"]
-        if len(paragraphs) != len(self.body):
-            raise CertificationError(
-                f"{len(paragraphs)} paragraphs, where the document has {len(self.body)}"
-            )
-        for index, (mine, theirs) in enumerate(zip(self.body, paragraphs, strict=True)):
-            _match(mine, theirs, ledger, f"paragraph {index + 1}")
+        read = [self.body]
+        refused: list[str] = []
+        _paragraphs(self.body, value["paragraphs"], "paragraph")
         for kind, notes in self.notes.items():
             theirs_by_id = {n["id"]: n for n in value[kind + "s"]}
             if set(theirs_by_id) != set(notes) or len(theirs_by_id) != len(value[kind + "s"]):
                 raise CertificationError(f"the {kind}s are not the document's")
-            for note_id, mine_paragraphs in notes.items():
-                theirs = theirs_by_id[note_id]["paragraphs"]
-                if len(theirs) != len(mine_paragraphs):
-                    raise CertificationError(f"{kind} {note_id}: not the document's paragraphs")
-                for index, (mine, paragraph) in enumerate(
-                    zip(mine_paragraphs, theirs, strict=True)
-                ):
-                    _match(mine, paragraph, ledger, f"{kind} {note_id} paragraph {index + 1}")
+            for note_id, part in notes.items():
+                _paragraphs(
+                    part, theirs_by_id[note_id]["paragraphs"], f"{kind} {note_id} paragraph"
+                )
+                read.append(part)
+        for kind, found in self.stories.items():
+            theirs = value[kind + "s"]
+            if [(t["part"], t["uses"]) for t in theirs] != [(n, u) for n, u, _ in found]:
+                raise CertificationError(f"the {kind}s are not the ones the sections refer to")
+            for (name, _, part), story in zip(found, theirs, strict=True):
+                if _refused(part, story, name):
+                    refused.append(name)
+                else:
+                    read.append(part)
+        stored = [c for c, _ in self.comments]
+        if [{k: c[k] for k in ("author", "date", "id", "initials")} for c in value["comments"]] != (
+            stored
+        ):
+            raise CertificationError("the comments are not the document's")
+        for (comment, part), theirs in zip(self.comments, value["comments"], strict=True):
+            where = f"{self.comments_part}#{comment['id']}"
+            if _refused(part, theirs, where):
+                refused.append(where)
+            else:
+                read.append(part)
+        if value["refusedParts"] != len(refused):
+            raise CertificationError("the refused parts are not the ones counted")
+        ledger = _total([part.ledger for part in read])
+        for _part, theirs in self._pairs(value, refused):
+            ledger.output += sum(len(p["text"]) for p in theirs)
         if not ledger.balanced():  # pragma: no cover - implied by the sequences; checked apart
             raise CertificationError("the ledger does not balance")
         return {
             "checker": CHECKER_VERSION,
-            "scope": self.scope,
+            "scope": sorted(self.parts),
+            "refused": refused,
             "source": {
                 "elements": ledger.elements,
                 "instructionCharacters": ledger.instruction,
@@ -645,6 +762,45 @@ class DocxSource:
             "symbolMapped": ledger.symbol,
             "notRead": dict(self.not_read),
         }
+
+    def _pairs(
+        self, value: dict[str, Json], refused: list[str]
+    ) -> list[tuple[_Part, list[dict[str, Json]]]]:
+        """Each read part with the result's paragraphs for it, to count the output."""
+        out = [(self.body, value["paragraphs"])]
+        for kind, notes in self.notes.items():
+            theirs_by_id = {n["id"]: n for n in value[kind + "s"]}
+            out += [(part, theirs_by_id[i]["paragraphs"]) for i, part in notes.items()]
+        for kind, found in self.stories.items():
+            for (name, _, part), story in zip(found, value[kind + "s"], strict=True):
+                if name not in refused:
+                    out.append((part, story["paragraphs"]))
+        for (comment, part), theirs in zip(self.comments, value["comments"], strict=True):
+            if f"{self.comments_part}#{comment['id']}" not in refused:
+                out.append((part, theirs["paragraphs"]))
+        return out
+
+
+def _paragraphs(part: _Part, theirs: list[dict[str, Json]], where: str) -> None:
+    """The result's paragraphs for a part must be the part's, one by one."""
+    if len(theirs) != len(part.paragraphs):
+        raise CertificationError(
+            f"{len(theirs)} {where}s, where the document has {len(part.paragraphs)}"
+        )
+    for index, (mine, paragraph) in enumerate(zip(part.paragraphs, theirs, strict=True)):
+        _match(mine, paragraph, f"{where} {index + 1}")
+
+
+def _refused(part: _Part, theirs: dict[str, Json], where: str) -> bool:
+    """Whether the result refuses a part (then it holds no text), else holds it to the part."""
+    if theirs["refusal"] is not None:
+        if theirs["paragraphs"]:
+            raise CertificationError(f"{where}: refused, yet with paragraphs")
+        return True
+    if part.error is not None:
+        raise CertificationError(f"{where}: {part.error}")
+    _paragraphs(part, theirs["paragraphs"], f"{where} paragraph")
+    return False
 
 
 def certify_docx(data: bytes, value: dict[str, Json]) -> dict[str, Json]:

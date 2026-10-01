@@ -37,7 +37,12 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 TARGET = ROOT / "src" / "label_docx" / "certify.py"
 RECORD = ROOT / "docs" / "checker-mutants.json"
-TESTS = ["tests/test_certify.py", "tests/test_robustness.py", "tests/test_output.py"]
+TESTS = [
+    "tests/test_certify.py",
+    "tests/test_headers_comments.py",
+    "tests/test_robustness.py",
+    "tests/test_output.py",
+]
 
 _SYMBOL_RANGE = "low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code"
 _TABLE_EDGE = (
@@ -99,12 +104,6 @@ EQUIVALENT: dict[tuple[str, str, str], str] = {
     ),
     (
         "DocxSource.certify",
-        "for index, (mine, theirs) in enumerate(zip(self.body, paragraphs, strict=True)):",
-        "bool",
-    ): _STRICT,
-    ("DocxSource.certify", "zip(mine_paragraphs, theirs, strict=True)", "bool"): _STRICT,
-    (
-        "DocxSource.certify",
         'raise CertificationError("the ledger does not balance")',
         "statement",
     ): (_LEDGER),
@@ -130,6 +129,39 @@ EQUIVALENT: dict[tuple[str, str, str], str] = {
         _STRICT
     ),
     ("EpiSource.certify", _SECTIONS_ZIP, "bool"): _STRICT,
+    ("_refused", "return False", "statement"): (
+        "a function that ends without a return gives None, which is as false as False here"
+    ),
+    (
+        "DocxSource.certify",
+        '_paragraphs(self.body, value["paragraphs"], "paragraph")',
+        "str:'paragraph'",
+    ): "the word only names the place in a refusal's detail",
+    (
+        "DocxSource.certify",
+        'for (comment, part), theirs in zip(self.comments, value["comments"], strict=True):',
+        "bool",
+    ): "the comments' metadata lists are compared just before, so the lengths are equal",
+    (
+        "DocxSource.certify",
+        "for (name, _, part), story in zip(found, theirs, strict=True):",
+        "bool",
+    ): "the parts and their uses are compared just before, so the lengths are equal",
+    (
+        "DocxSource._pairs",
+        'for (comment, part), theirs in zip(self.comments, value["comments"], strict=True):',
+        "bool",
+    ): "called only after certify has compared the lengths",
+    (
+        "DocxSource._pairs",
+        'for (name, _, part), story in zip(found, value[kind + "s"], strict=True):',
+        "bool",
+    ): "called only after certify has compared the lengths",
+    (
+        "_paragraphs",
+        "for index, (mine, paragraph) in enumerate(zip(part.paragraphs, theirs, strict=True)):",
+        "bool",
+    ): _STRICT,
     ("EpiSource.certify", 'raise CertificationError("the ledger does not balance")', "statement"): (
         _LEDGER
     ),

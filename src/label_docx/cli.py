@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 from label_docx.documents import kind
-from label_docx.service import browser_verifier, check_environment, serve
+from label_docx.service import browser_verifier, check_environment, serve, word_verifier
 from label_docx.store import Store, StoreError
 
 
@@ -59,15 +59,32 @@ def service_main(argv: list[str] | None = None) -> int:
     ingesting = commands.add_parser("ingest", help="ingest files; print one receipt each")
     ingesting.add_argument("--store", type=Path, required=True)
     ingesting.add_argument("--browser", choices=("auto", "on", "off"), default="auto")
+    for command in (serving, ingesting):
+        command.add_argument(
+            "--word",
+            choices=("auto", "on", "off"),
+            default="off",
+            help="hold every .docx to Microsoft Word (macOS; about a minute a document)",
+        )
     ingesting.add_argument("files", type=Path, nargs="+")
     verifying = commands.add_parser("verify", help="read every kept document again and compare")
     verifying.add_argument("--store", type=Path, required=True)
     args = parser.parse_args(argv)
     if args.command == "serve":
-        serve(args.store, args.host, args.port, browser_verifier(args.browser))
+        serve(
+            args.store,
+            args.host,
+            args.port,
+            browser_verifier(args.browser),
+            word_verifier(args.word),
+        )
         return 0
     check_environment()
-    store = Store(args.store, browser=browser_verifier(getattr(args, "browser", "off")))
+    store = Store(
+        args.store,
+        browser=browser_verifier(getattr(args, "browser", "off")),
+        word=word_verifier(getattr(args, "word", "off")),
+    )
     if args.command == "verify":
         failed = 0
         documents = store.documents()

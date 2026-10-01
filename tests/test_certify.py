@@ -99,9 +99,8 @@ Change = Callable[[dict[str, Any], random.Random], bool]
 def _paragraphs(value: dict[str, Any]) -> list[dict[str, Any]]:
     """Every paragraph of a result: the body and notes of a .docx, or every ePI section's."""
     if "sections" not in value:
-        notes = [
-            p for kind in ("footnotes", "endnotes") for n in value[kind] for p in n["paragraphs"]
-        ]
+        parts = ("footnotes", "endnotes", "headers", "footers", "comments")
+        notes = [p for kind in parts for n in value[kind] for p in n["paragraphs"]]
         return [*value["paragraphs"], *notes]
 
     def walk(sections: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -113,7 +112,8 @@ def _paragraphs(value: dict[str, Any]) -> list[dict[str, Any]]:
 def _lists(value: dict[str, Any]) -> list[list[dict[str, Any]]]:
     """The lists paragraphs stand in, so a paragraph can be dropped, repeated or moved."""
     if "sections" not in value:
-        notes = [n["paragraphs"] for kind in ("footnotes", "endnotes") for n in value[kind]]
+        parts = ("footnotes", "endnotes", "headers", "footers", "comments")
+        notes = [n["paragraphs"] for kind in parts for n in value[kind]]
         return [value["paragraphs"], *notes]
 
     def walk(sections: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
@@ -281,10 +281,15 @@ def _change_title(value: dict[str, Any], rng: random.Random) -> bool:
 
 
 def _hide_a_refusal(value: dict[str, Any], rng: random.Random) -> bool:
-    # A section emptied and called refused, with the count left as it was: a loss the receipt
-    # would not show.
+    # A section, header or footer emptied and called refused, with the count left as it was: a
+    # loss the receipt would not show.
     if "sections" not in value:
-        return False
+        parts = [s for kind in ("headers", "footers") for s in value[kind] if s["paragraphs"]]
+        if not parts:
+            return False
+        part = rng.choice(parts)
+        part["paragraphs"], part["refusal"] = [], {"code": "x", "detail": "x"}
+        return True
     found = [s for s in value["sections"] if s["paragraphs"]]
     if not found:
         return False
@@ -708,11 +713,19 @@ def _value(*paragraphs: str | dict[str, Any], **notes: list[dict[str, Any]]) -> 
     """A result of the given paragraphs: text alone, or text with its pages, notes or cell."""
     out = []
     for paragraph in paragraphs:
-        base: dict[str, Any] = {"pages": [], "notes": [], "table": None}
+        base: dict[str, Any] = {"comments": [], "pages": [], "notes": [], "table": None}
         out.append(
             {**base, "text": paragraph} if isinstance(paragraph, str) else {**base, **paragraph}
         )
-    return {"paragraphs": out, "footnotes": notes.get("footnotes", []), "endnotes": []}
+    return {
+        "paragraphs": out,
+        "footnotes": notes.get("footnotes", []),
+        "endnotes": [],
+        "headers": [],
+        "footers": [],
+        "comments": [],
+        "refusedParts": 0,
+    }
 
 
 def _field(code: str, result: str) -> str:
@@ -783,7 +796,7 @@ def test_text_before_a_mark_in_the_same_run_stands_before_it() -> None:
     note = {
         "id": 1,
         "mark": "1",
-        "paragraphs": [{"text": "n", "pages": [], "notes": [], "table": None}],
+        "paragraphs": [{"text": "n", "pages": [], "notes": [], "table": None, "comments": []}],
     }
     marked = {"text": "ab", "pages": [2], "notes": [{"offset": 1, "kind": "footnote", "id": 1}]}
     source.certify(_value(marked, footnotes=[note]))
@@ -801,7 +814,7 @@ def test_every_character_element_stands_for_its_character() -> None:
     body = _p(
         "<w:r><w:t>a</w:t><w:ptab/><w:tab/><w:noBreakHyphen/><w:softHyphen/>"
         '<w:br w:type="column"/><w:br w:type="page"/><w:br/><w:cr/>'
-        "<w:lastRenderedPageBreak/><w:commentReference/>"
+        "<w:lastRenderedPageBreak/>"
         '<w:sym w:font="Symbol" w:char="F0B3"/><w:t>b</w:t></w:r>'
     )
     certificate = DocxSource(docx(body)).certify(_value("a\t\t\u2011\u00ad\n\n\u2265b"))

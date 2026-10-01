@@ -113,6 +113,7 @@ function render(paragraph) {
   for (const m of paragraph.marks) { cuts.add(m.start); cuts.add(m.end); }
   for (const n of paragraph.notes) cuts.add(n.offset);
   for (const p of paragraph.pages) cuts.add(p);
+  for (const c of paragraph.comments || []) cuts.add(c.offset);
   const points = [...cuts].sort((a, b) => a - b);
   const node = el("p");
   if (paragraph.numbering && paragraph.numbering.text !== null && paragraph.numbering.numId) {
@@ -122,6 +123,9 @@ function render(paragraph) {
     const at = points[i];
     for (const n of paragraph.notes) {
       if (n.offset === at && n.mark !== null) node.append(el("span", { class: "note", title: `${n.kind} ${n.id}` }, n.mark));
+    }
+    for (const c of paragraph.comments || []) {
+      if (c.offset === at) node.append(el("span", { class: "note comment", title: `comment ${c.id}` }, `c${c.id}`));
     }
     for (const p of paragraph.pages) {
       if (p === at) node.append(el("span", { class: "page", title: "Word sets this page number from the layout" }, "page #"));
@@ -171,12 +175,22 @@ function proof(c, isEpi) {
       `${n(src)} in the source = ${n(c.output.characters)} in the output + ${n(aside.fieldCode)} field code + ${n(aside.pageNumbers)} page numbers + ${n(aside.pageBreaks)} page breaks + ${n(aside.hiddenWhitespace)} hidden spaces`));
     if (c.symbolMapped) box.append(el("div", {}, `${n(c.symbolMapped)} Symbol-font characters drawn as their Unicode characters (such as ≥).`));
   }
+  if ((c.refused || []).length) {
+    box.append(el("div", {}, "Refused on their own, so not in the result (the reason is shown with each):"),
+      el("ul", {}, ...c.refused.map(name => el("li", {}, name))));
+  }
   const notRead = Object.entries(c.notRead).filter(([, v]) => v);
   if (notRead.length) {
     box.append(el("div", {}, "Not read, and so not in the result (listed so nothing is left out unseen):"),
       el("ul", {}, ...notRead.map(([k, v]) => el("li", {}, `${k}: ${n(v)} ${k === "narratives" ? "narrative(s)" : "characters"}`))));
   }
   return box;
+}
+
+// A header, footer or comment the reader refused on its own.
+function partRefusal(refusal) {
+  return el("div", { class: "refusal" }, el("code", {}, refusal.code), " — ", refusal.detail,
+    el("div", { class: "legend" }, "Not read: nothing is returned for this part; the rest is read."));
 }
 
 // An ePI section: its title, its paragraphs or why it was refused, then the sections inside it.
@@ -206,12 +220,20 @@ async function ingest(file) {
   show(file.name, receipt, receiptText, result, resultText, answer.status, verdicts);
 }
 
+// What Word said about a .docx read.
+function wordLine(verdicts) {
+  if (!verdicts.length) return el("div", { class: "again" }, "Not checked against Microsoft Word (start the service with --word on, on a Mac with Word).");
+  const v = verdicts[verdicts.length - 1];
+  return el("div", { class: "again same" },
+    `Checked against ${v.application}: list numbers, note marks, fields, print and bold/italic ${v.verdict}.`);
+}
+
 // The browser showed a section otherwise than the result reads: the result is not shown.
 function disagreed(name, receipt, verdict) {
   const card = el("div", { class: "card" },
     el("div", { class: "verdict" }, el("span", { class: "badge refused" }, "Not served"), el("strong", {}, name)),
-    el("div", { class: "refusal" }, `${verdict.application} shows ${verdict.differs.length} section(s) otherwise than the reader read them: `,
-      verdict.differs.map(d => `section ${d.section} (${d.where})`).join("; "),
+    el("div", { class: "refusal" }, `${verdict.application} shows this document otherwise than the reader read it: `,
+      verdict.differs.map(d => (d.section ? `section ${d.section} (${d.where})` : d.where)).join("; "),
       el("div", { class: "legend" }, "Kept for review; never served while the browser disagrees.")));
   out.replaceChildren(card);
 }
@@ -228,9 +250,10 @@ function show(name, receipt, receiptText, result, resultText, status, verdicts) 
   const card = el("div", { class: "card" });
   const read = receipt.outcome !== "refused";
   const part = receipt.outcome === "read-in-part";
+  const partsRefused = result.refusedSections ?? result.refusedParts;
   card.append(el("div", { class: "verdict" },
     el("span", { class: "badge " + (part ? "part" : read ? "read" : "refused") },
-      part ? `Read exactly, ${result.refusedSections} section(s) refused` : read ? "Read exactly" : "Refused"),
+      part ? `Read exactly, ${partsRefused} ${result.sections ? "section(s)" : "header, footer or comment part(s)"} refused` : read ? "Read exactly" : "Refused"),
     el("strong", {}, name)));
   const facts = el("dl", { class: "facts" });
   const add = (term, value) => facts.append(el("dt", {}, term), el("dd", {}, value));
@@ -253,6 +276,7 @@ function show(name, receipt, receiptText, result, resultText, status, verdicts) 
   }
   if (result.certificate) card.append(proof(result.certificate, result.sections !== undefined));
   if (result.sections !== undefined && read) card.append(browserLine(verdicts));
+  if (result.sections === undefined && read) card.append(wordLine(verdicts));
   out.replaceChildren(card);
   if (read) {
     const doc = el("div", { class: "card" });
@@ -262,6 +286,25 @@ function show(name, receipt, receiptText, result, resultText, status, verdicts) 
       el("span", { class: "page" }, "page #"), el("span", {}, "page number (set by layout)")));
     if (result.sections) for (const item of result.sections) doc.append(section(item));
     else doc.append(body(result.paragraphs));
+    for (const [kind, parts] of [["Headers", result.headers || []], ["Footers", result.footers || []]]) {
+      const shown = parts.filter(part => part.refusal || part.paragraphs.some(x => x.text || x.pages.length));
+      if (!shown.length) continue;
+      const section = el("div", { class: "notes" }, el("h3", {}, kind));
+      for (const part of shown) {
+        const uses = part.uses.map(u => `section ${u.section + 1}, ${u.type}`).join("; ");
+        section.append(el("div", { class: "legend" }, `${part.part} (${uses})`));
+        section.append(part.refusal ? partRefusal(part.refusal) : body(part.paragraphs));
+      }
+      doc.append(section);
+    }
+    if ((result.comments || []).length) {
+      const section = el("div", { class: "notes" }, el("h3", {}, "Comments"));
+      for (const c of result.comments) {
+        section.append(el("div", { class: "legend" }, `c${c.id}: ${c.author || "no author"}${c.date ? ", " + c.date : ""}`));
+        section.append(c.refusal ? partRefusal(c.refusal) : body(c.paragraphs));
+      }
+      doc.append(section);
+    }
     for (const [kind, notes] of [["Footnotes", result.footnotes || []], ["Endnotes", result.endnotes || []]]) {
       if (!notes.length) continue;
       const section = el("div", { class: "notes" }, el("h3", {}, kind));

@@ -1,12 +1,12 @@
 {
   "table-of-contents-stale.docx": {
-    "certificateSha256": "c17e829e790c8dd7350fb9643f7167b82685c7426385475c2da35035a4d640e8",
-    "paragraphsSha256": "17b4d4420e6c5c23f93a53617db60b84818a7ff06bab29e55a787935fef84e25",
+    "certificateSha256": "a061a9b66c0acc4bd2b4657dd121e7985ed6594fa826ec9ead18253be7404430",
+    "paragraphsSha256": "6ee40b943e2f0084251f25fe38ed46bc223435414d63c5bc2a2002c92658bc0c",
     "sha256": "46415f5c5f5441fe1a614797a67c71cdc46bca7fd5410e7ae67c2176ecb9ba48"
   },
   "table-of-contents.docx": {
-    "certificateSha256": "29a70ca1dc38c9d5082df583347bc8526c9a186db688380fe1ed4b46c26c4b9a",
-    "paragraphsSha256": "4109b8e9e6b93236b476d1df8f5808c686bf10e8de15aec921211b746fc82d2c",
+    "certificateSha256": "2ddc2bc59d169f39ebf6920bdc56253e3026701957ae6f489f1589d8ee4aefb0",
+    "paragraphsSha256": "a559868b5b6de112eeb6c34e2ff300a6d0be7ea85a5a0dc5a819806e59e138fe",
     "sha256": "d819dcff034ab633389ddb759dccc1b952c6e40874bd15f4fa5b5d70101db395"
   }
 }

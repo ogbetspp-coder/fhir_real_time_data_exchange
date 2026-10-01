@@ -11,8 +11,20 @@ units or bytes: a consumer in JavaScript must index by code point.
 
 A read::
 
-    {"endnotes": [...], "footnotes": [...], "format": ..., "paragraphs": [...], "reader": ...,
-     "source": {"bytes": n, "sha256": hex}}
+    {"certificate": {...}, "comments": [...], "endnotes": [...], "footers": [...],
+     "footnotes": [...], "format": ..., "headers": [...], "paragraphs": [...], "reader": ...,
+     "refusedParts": n, "source": {"bytes": n, "sha256": hex}}
+
+``headers`` and ``footers`` list each header or footer part the sections refer to, once, in the
+order referred to: its ``part`` name, its ``uses`` (each ``section``, counted from 0, and the
+reference's ``type``: ``default``, ``first`` or ``even``; which one Word shows on a page is
+layout) and its ``paragraphs``. ``comments`` lists each comment as stored, with its ``id``,
+``author``, ``initials`` and ``date`` as written (null where absent) and its ``paragraphs``. A
+header, footer or comment the reader cannot read exactly is refused on its own: its ``refusal``
+gives the code and detail and it has no paragraphs, the rest is read, and ``refusedParts``
+counts them (the receipt then says ``read-in-part``);
+each paragraph's ``comments`` gives where a comment's mark stands (``offset``) and which comment
+it is (``id``).
 
 Each paragraph's ``notes`` lists its footnote and endnote marks (``offset``, ``kind``, ``id``,
 ``mark``); ``footnotes`` and ``endnotes`` list the notes in the order the body refers to them,
@@ -42,14 +54,24 @@ import json
 from collections.abc import Callable
 
 from label_docx.certify import DocxSource
-from label_docx.reader import READER_VERSION, DocxRefusedError, Note, Paragraph, read_document
+from label_docx.reader import (
+    READER_VERSION,
+    Comment,
+    DocxRefusedError,
+    Note,
+    Paragraph,
+    Story,
+    read_document,
+)
 
 # The version of the shape above. A change to this file changes its hash in versions.lock.json.
 # 1.1.0 adds numbering.text and numbering.suffix, the list label; 1.2.0 adds paragraphs' notes
 # and the footnotes and endnotes; 1.3.0 adds paragraphs' pages, where Word draws a page number;
 # 1.4.0 adds the certificate, and refuses a read the conservation check cannot account for;
-# 1.5.0 certifies with conservation-check/1.1.0, which leaves the reader no choice of reading.
-FORMAT_VERSION = "label-docx-json/1.5.0"
+# 1.5.0 certifies with conservation-check/1.1.0, which leaves the reader no choice of reading;
+# 1.6.0 adds the headers, footers and comments, and each paragraph's comment marks, certified
+# by conservation-check/1.2.0.
+FORMAT_VERSION = "label-docx-json/1.6.0"
 
 type Json = str | int | bool | list[Json] | dict[str, Json] | None
 
@@ -63,6 +85,7 @@ def canonical(value: Json) -> bytes:
 def paragraph(item: Paragraph) -> dict[str, Json]:
     """One paragraph as JSON."""
     return {
+        "comments": [{"id": c.id, "offset": c.offset} for c in item.comments],
         "markHidden": item.mark_hidden,
         "marks": [{"end": m.end, "kind": m.kind, "start": m.start} for m in item.marks],
         "notes": [
@@ -97,6 +120,38 @@ def notes(items: tuple[Note, ...]) -> list[Json]:
     ]
 
 
+def _refusal(refusal: tuple[str, str] | None) -> Json:
+    return None if refusal is None else {"code": refusal[0], "detail": refusal[1]}
+
+
+def stories(items: tuple[Story, ...]) -> list[Json]:
+    """Headers or footers as JSON, in the order the sections refer to them."""
+    return [
+        {
+            "part": s.part,
+            "uses": [{"section": section, "type": kind} for section, kind in s.uses],
+            "paragraphs": paragraphs(list(s.paragraphs)),
+            "refusal": _refusal(s.refusal),
+        }
+        for s in items
+    ]
+
+
+def comments(items: tuple[Comment, ...]) -> list[Json]:
+    """Comments as JSON, in the order stored."""
+    return [
+        {
+            "author": c.author,
+            "date": c.date,
+            "id": c.id,
+            "initials": c.initials,
+            "paragraphs": paragraphs(list(c.paragraphs)),
+            "refusal": _refusal(c.refusal),
+        }
+        for c in items
+    ]
+
+
 def read(data: bytes) -> tuple[bytes, bool]:
     """The canonical JSON result of reading ``data``, and whether it was read (not refused)."""
     source: dict[str, Json] = {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
@@ -113,6 +168,12 @@ def read(data: bytes) -> tuple[bytes, bool]:
     envelope["paragraphs"] = paragraphs(list(document.body))
     envelope["footnotes"] = notes(document.footnotes)
     envelope["endnotes"] = notes(document.endnotes)
+    envelope["headers"] = stories(document.headers)
+    envelope["footers"] = stories(document.footers)
+    envelope["comments"] = comments(document.comments)
+    envelope["refusedParts"] = sum(
+        1 for item in (*document.headers, *document.footers, *document.comments) if item.refusal
+    )
     return certified(envelope, lambda: DocxSource(data).certify(envelope))
 
 

@@ -16,7 +16,7 @@ from typing import Any
 
 import pytest
 
-from word_oracle import (
+from label_docx.word import (
     emphasis_verdict,
     field_verdict,
     note_verdict,

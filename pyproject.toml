@@ -102,7 +102,9 @@ xfail_strict = true
 [tool.coverage.run]
 source = ["label_docx"]
 # Run only as `python -m label_docx`, in a subprocess (tests/test_determinism.py).
-omit = ["src/label_docx/__main__.py"]
+# word.py drives Microsoft Word through AppleScript (macOS with Word): its answers are held by
+# the recorded corpus runs (tests/test_word_oracle.py), and a live run by LABEL_TEST_WORD=1.
+omit = ["src/label_docx/__main__.py", "src/label_docx/word.py"]
 
 [tool.coverage.report]
 fail_under = 97

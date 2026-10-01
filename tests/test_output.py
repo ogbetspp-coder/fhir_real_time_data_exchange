@@ -29,17 +29,22 @@ def test_a_read_is_canonical_and_names_its_source_and_versions() -> None:
     assert result == canonical(value)
     assert sorted(value) == [
         "certificate",
+        "comments",
         "endnotes",
+        "footers",
         "footnotes",
         "format",
+        "headers",
         "paragraphs",
         "reader",
+        "refusedParts",
         "source",
     ]
     assert (value["format"], value["reader"]) == (FORMAT_VERSION, READER_VERSION)
     assert value["source"] == {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
     first = value["paragraphs"][0]
     assert sorted(first) == [
+        "comments",
         "markHidden",
         "marks",
         "notes",
@@ -133,8 +138,9 @@ def test_a_read_the_check_cannot_account_for_is_refused_not_served(
 
     def faulty(items: list[Paragraph]) -> list[Json]:
         out = original(items)
-        first = next(p for p in out if isinstance(p, dict) and p["text"])
-        first["text"] = first["text"][1:]  # type: ignore[index]
+        first = next((p for p in out if isinstance(p, dict) and p["text"]), None)
+        if first is not None:
+            first["text"] = first["text"][1:]  # type: ignore[index]
         return out
 
     monkeypatch.setattr(output, "paragraphs", faulty)

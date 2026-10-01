@@ -38,7 +38,8 @@ def test_the_same_bytes_get_the_same_receipt_and_result(tmp_path: Path) -> None:
     document = hashlib.sha256(TEMPLATE).hexdigest()
     assert first.document == document
     receipt = json.loads(first.receipt)
-    assert receipt["outcome"] == "read"
+    # Its footers' EQ fields are computed by Word, so those footers are refused on their own.
+    assert receipt["outcome"] == "read-in-part"
     assert receipt["result"]["sha256"] == hashlib.sha256(first.result).hexdigest()
     assert kept.source(document) == TEMPLATE
     assert kept.result(document) == first.result

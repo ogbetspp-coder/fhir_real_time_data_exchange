@@ -29,7 +29,7 @@ from pathlib import Path
 from socketserver import ThreadingMixIn
 from wsgiref.simple_server import WSGIRequestHandler, WSGIServer, make_server
 
-from label_docx import browser, documents
+from label_docx import browser, documents, word
 from label_docx.output import FORMAT_VERSION, Json, canonical
 from label_docx.reader import READER_VERSION
 from label_docx.store import Store, StoreError, Verifier
@@ -182,16 +182,36 @@ def browser_verifier(choice: str) -> Verifier | None:
     return lambda data, result: browser.verify_epi(data, result, chrome)
 
 
+def word_verifier(choice: str) -> Verifier | None:
+    """Word to hold .docx reads to: where installed (``auto``), always (``on``), never (``off``)."""
+    if choice == "off":
+        return None
+    if word.find_word() is None:
+        if choice == "on":
+            raise SystemExit("label-docx: --word on, but Microsoft Word is not installed")
+        return None
+    return word.verify_docx
+
+
 def serve(
-    root: Path, host: str = "127.0.0.1", port: int = 8080, verifier: Verifier | None = None
+    root: Path,
+    host: str = "127.0.0.1",
+    port: int = 8080,
+    verifier: Verifier | None = None,
+    word_check: Verifier | None = None,
 ) -> None:
     """Serve the store at ``root`` until interrupted."""
     check_environment()
-    service = Service(Store(root, browser=verifier))
+    service = Service(Store(root, browser=verifier, word=word_check))
     with make_server(
         host, port, service, server_class=_ThreadingServer, handler_class=_QuietHandler
     ) as server:
-        held = "every ePI held to Chrome" if verifier else "ePIs not held to a browser"
+        held = ", ".join(
+            [
+                "every ePI held to Chrome" if verifier else "ePIs not held to a browser",
+                "every .docx held to Word" if word_check else ".docx not held to Word",
+            ]
+        )
         sys.stderr.write(
             f"label-docx {READER_VERSION} serving {root} on http://{host}:{port} ({held})\n"
         )

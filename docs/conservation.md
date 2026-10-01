@@ -130,20 +130,23 @@ applications themselves:
   otherwise is never served (R-29, `tests/test_browser_verify.py`). Every corpus ePI is held
   to Chrome as well (`tests/test_browser_oracle.py`).
 - **A Word document's marks, list labels and note marks**: held to Microsoft Word for every
-  corpus document (`tests/test_word_oracle.py`), and for any document on a Mac with Word
-  (`scripts/word_oracle.py compare`). Word's rules are not published, so this is evidence by
+  corpus document (`tests/test_word_oracle.py`), and for **every document ingested** on a Mac
+  with Word when the service runs with `--word on`. A result Word shows otherwise is never
+  served (R-31, `tests/test_word_verify.py`). Word's rules are not published, so this is evidence by
   example, the strongest available, not a proof.
 - **An ePI's list numbers and bullets**: drawn by the browser outside the text, not yet
   compared.
 
 The scope is what the reader reads:
 
-- a .docx's body, footnotes and endnotes;
+- a .docx's body, footnotes, endnotes, headers, footers and comments (a header, footer or
+  comment the reader refuses on its own is listed in the certificate under `refused`; the
+  result then says so, and holds no text for it);
 - an ePI's section titles and divs.
 
-Text elsewhere (headers, footers, comments, footnote continuation notices, other narratives in
-an ePI Bundle) is not read. The certificate lists it under `notRead` with its size, so nothing
-is left out without being named.
+Text elsewhere (the glossary, footnote continuation notices, other narratives in an ePI Bundle)
+is not read. The certificate lists it under `notRead` with its size, so nothing is left out
+without being named.
 
 ## Who checks the checker
 
@@ -159,10 +162,10 @@ change that cannot alter what the check does, recorded with the reason in `EQUIV
 - every survivor must have its reason;
 - more than 90% of all faults must be killed outright.
 
-The current run made 763 faults. The tests killed 732 of them (96%). The other 31 cannot change
-what the check does, and each is recorded with its reason. For example, an edge of the Symbol
-range at which the table holds no entry, or a length compared just before. None is
-unexplained.
+The current run made 906 faults. The check now also covers headers, footers and comments. The
+tests killed 870 of the faults (96%). The other 36 cannot change what the check does, and each
+is recorded with its reason: for example, an edge of the Symbol range at which the table holds
+no entry, or a length compared just before. None is unexplained.
 
 The first run, before these tests were written, killed 629 of 766. The survivors showed what
 was missing:

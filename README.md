@@ -123,6 +123,11 @@ What it guarantees:
 - **Every read is certified.** The independent conservation check accounts for every character
   of every read (see [docs/conservation.md](docs/conservation.md)); its certificate is in the
   result and the receipt.
+- **Every .docx can be held to Word.** With `--word on` (a Mac with Microsoft Word), the service
+  has Word check each Word document it reads: list numbers, note marks, fields, that print
+  shows what the screen shows, and bold and italic. The verdict is kept and answered like
+  Chrome's, and a result Word shows otherwise is never served. Word takes about a minute a
+  document, so this is off unless asked for.
 - **Every ePI is held to a browser.** Where Chrome is installed (`--browser auto`, the default;
   `on` to require it, `off` to skip), the service has Chrome show each ePI it reads and compares
   every section, text and formatting, with the result. The verdict is kept beside the result,
@@ -235,7 +240,10 @@ downloads.
 
 ## What it does not read
 
-- **Headers, footers, comments.** Separate parts, not read.
+- **The glossary** (Word's building blocks): not part of the document Word shows, not read. Its
+  size is listed in each certificate (`notRead`). Headers, footers and comments are read (each
+  with where it is used or anchored), or refused on their own with the reason, the body read
+  all the same: a footer that prints today's date, say, or a watermark.
 - **Page numbers** are placed, not read: Word sets them from the page layout when it prints. A
   table of contents is read as stored (Word prints it so until someone updates it), its page
   numbers placed.
@@ -251,7 +259,7 @@ downloads.
 
 ## How the claims are held
 
-`docs/requirements.md` lists the requirements (R-01 to R-29) with the tests that prove each; the
+`docs/requirements.md` lists the requirements (R-01 to R-31) with the tests that prove each; the
 table below is the short form.
 
 | Claim                                                            | Where                        |
