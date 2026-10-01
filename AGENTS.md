@@ -16,6 +16,9 @@ refuse. Every rule below serves that.
   drawn starts with a case in `scripts/numbering_cases.py` and Word's answer to it
   (`scripts/word_oracle.py record corpus/numbering-cases`, macOS with Word). Where Word's answer
   is not on record, refuse.
+- **Trace every test.** `docs/requirements.md` names, for each requirement, the tests that prove
+  it; a new test goes there, and `tests/test_traceability.py` fails on a test that proves nothing
+  or a requirement that names a test that is gone.
 - **Version every change.** Changing `src/label_docx/reader.py` means bumping `READER_VERSION`;
   changing `src/label_docx/output.py` means bumping `FORMAT_VERSION`. Then run
   `scripts/lock.py` and review the diff of `corpus/*/expected.json`. Never re-lock a version to

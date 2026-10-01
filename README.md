@@ -203,6 +203,9 @@ downloads.
 
 ## How the claims are held
 
+`docs/requirements.md` lists the requirements (R-01 to R-17) with the tests that prove each; the
+table below is the short form.
+
 | Claim                                                            | Where                        |
 | ---------------------------------------------------------------- | ---------------------------- |
 | Each rule, read exactly or refused, in isolation                 | `tests/test_reader.py`       |
