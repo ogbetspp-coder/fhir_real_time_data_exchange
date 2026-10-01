@@ -134,8 +134,10 @@ applications themselves:
   with Word when the service runs with `--word on`. A result Word shows otherwise is never
   served (R-31, `tests/test_word_verify.py`). Word's rules are not published, so this is evidence by
   example, the strongest available, not a proof.
-- **An ePI's list numbers and bullets**: drawn by the browser outside the text, not yet
-  compared.
+- **An ePI's list numbers and bullets**: the reader draws each item's marker by the
+  browser's rules, and every one is held to the marker Chrome draws, read from its
+  accessibility tree: for every corpus ePI, and for every ePI ingested where Chrome is
+  installed.
 
 The scope is what the reader reads:
 

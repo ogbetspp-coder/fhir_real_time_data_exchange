@@ -29,8 +29,11 @@ What a section's text is:
 - Block elements (``div``, ``p``, ``li``, ``td``, ``th``, ``table``, ``tr``, ``ul``, ``ol``,
   ``thead``, ``tbody``, ``hr``) end one paragraph and start the next. A paragraph with no text
   is dropped. A list item carries ``numbering``: ``num_id`` 1 in a ``ul`` (a bullet), 2 in an
-  ``ol`` (a number the browser computes); like the Word reader, the bullet or number is never
-  in the text.
+  ``ol`` (a number); its first paragraph's ``numbering.text`` is the marker a browser draws
+  before it ("1.", "b.", "iv.", "\u2022", "\u25e6", "\u25a0"), with ``suffix`` ``space``, by the
+  list's ``type`` and ``start`` and, for bullets, its depth (``_list_state``). Like the Word
+  reader's labels, a marker is never in the text. A list item without text, or one that begins
+  with a list, is refused: its marker would stand beside nothing the reader reads.
 - Whitespace is collapsed as a browser does under ``white-space: normal``: a run of space, tab,
   line feed, carriage return or form feed is one space, and none is kept at the start or end of
   a paragraph. No-break space (U+00A0) is text and is kept. ``<br/>`` is U+000A.
@@ -129,14 +132,15 @@ import json
 import re
 import unicodedata
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Final
 
 from label_docx.reader import Mark, Numbering, Paragraph
 
 # The version of the rules above. A change to this file changes its hash in versions.lock.json,
 # and tests/test_versions_lock.py then requires a new version here.
-READER_VERSION = "epi-reader/1.0.0"
+# 1.1.0 draws list markers as the browser does.
+READER_VERSION = "epi-reader/1.1.0"
 XHTML = "http://www.w3.org/1999/xhtml"
 OBJECT = "\ufffc"
 _COLLAPSIBLE = " \t\n\r\f"
@@ -919,6 +923,12 @@ class _Builder:
     pending: frozenset[str] | None = None
     table: tuple[int, int, int] | None = None
     numbering: Numbering | None = None
+    # The list the walk is in (its kind, marker format and next number), and the marker of the
+    # list item whose first line is yet to come.
+    list_state: list[Any] | None = None
+    label: str | None = None
+    # The element being walked is a child of a ul or ol.
+    in_list: bool = False
     # 1 inside ``ul`` (a bullet), 2 inside ``ol`` (a number the browser computes).
     list_kind: int = 1
     tables: int = 0
@@ -1023,11 +1033,16 @@ class _Builder:
             self.kinds.pop()
         if self.characters:
             text = "".join(self.characters)
+            numbering = self.numbering
+            if numbering is not None and self.label is not None:
+                # The item's marker stands before its first line, followed by a space.
+                numbering = replace(numbering, text=self.label, suffix="space")
+                self.label = None
             self.paragraphs.append(
                 Paragraph(
                     text=text,
                     style=None,
-                    numbering=self.numbering,
+                    numbering=numbering,
                     table=self.table,
                     marks=_marks(self.kinds),
                 )
@@ -1242,6 +1257,7 @@ def _walk_element(
     if builder.nesting > _MAX_NESTING:
         raise _RefusedError("malformed-xhtml", f"elements nested deeper than {_MAX_NESTING}")
     name = _local(element)
+    in_list, builder.in_list = builder.in_list, False
     if name in ("ins", "del"):
         raise _RefusedError("unsupported-element", name)
     if name not in _BLOCKS and name not in _INLINE and name not in ("img", "br"):
@@ -1264,6 +1280,11 @@ def _walk_element(
         raise _RefusedError("malformed-xhtml", "li in an li, which an HTML parser closes")
     if name == "a" and builder.open_a:
         raise _RefusedError("malformed-xhtml", "a in an a, which an HTML parser closes")
+    if name == "li" and not in_list:
+        # Not in a list, a browser draws it with the marker of whatever list is around it.
+        raise _RefusedError("unsupported-element", "li outside a ul or ol")
+    if name == "li" and builder.label is not None:
+        raise _RefusedError("unsupported-element", "a list item that begins with a list item")
     if name in ("td", "th"):
         builder.open_p = builder.open_li = builder.open_a = builder.open_h = False
     elif name == "p":
@@ -1326,19 +1347,105 @@ def _walk_element(
     if block:
         builder.flush()
     saved = builder.numbering
+    saved_list = builder.list_state
     if name == "li":
         builder.numbering = Numbering(num_id=builder.list_kind, level=depth)
+        builder.label = _marker(builder)
     saved_kind = builder.list_kind
     if name in ("ul", "ol"):
+        if builder.label is not None:
+            # Its marker would stand beside the nested list's first line, with that one's.
+            raise _RefusedError("unsupported-element", "a list item that begins with a list")
         builder.list_kind = 1 if name == "ul" else 2
+        builder.list_state = _list_state(element, name, depth)
     builder.text(element.text or "", here)
     for child in element:
+        builder.in_list = name in ("ul", "ol")
         _walk(child, builder, here, depth + (name in ("ul", "ol")))
     if block:
         builder.flush()
+    if name == "li" and builder.label is not None:
+        # A browser draws the marker all the same, beside nothing the reader reads.
+        raise _RefusedError("unsupported-element", "a list item without text")
     builder.numbering = saved
+    builder.list_state = saved_list
     builder.list_kind = saved_kind
     builder.text(element.tail or "", marks)
+
+
+# The bullets a browser draws by its default style sheet: a list nested in no list, in one, in
+# two or more (CSS Lists 3, the HTML rendering section); as Chrome draws them.
+_BULLETS: Final = ("\u2022", "\u25e6", "\u25a0")
+_UL_TYPES: Final = {"disc": 0, "circle": 1, "square": 2}
+_OL_TYPES: Final = frozenset({"1", "a", "A", "i", "I"})
+
+
+def _list_state(element: ET.Element, name: str, depth: int) -> list[Any]:
+    """How a list's markers are drawn: [kind, format, next number] from its attributes.
+
+    ``ol``: ``type`` (``1``, ``a``, ``A``, ``i``, ``I``) and ``start`` (an integer); ``ul``:
+    ``type`` (``disc``, ``circle``, ``square``, in any case), else the bullet for its depth. Any
+    other value is refused: a browser would read it by rules the reader does not follow.
+    """
+    kind = element.get("type")
+    if name == "ul":
+        if kind is None:
+            return ["ul", _BULLETS[min(depth, 2)], 0]
+        if kind.lower() not in _UL_TYPES:
+            raise _RefusedError("unsupported-attribute", f"ul@type {kind!r}")
+        return ["ul", _BULLETS[_UL_TYPES[kind.lower()]], 0]
+    if kind is not None and kind not in _OL_TYPES:
+        raise _RefusedError("unsupported-attribute", f"ol@type {kind!r}")
+    start = element.get("start", "1")
+    if not re.fullmatch(r"-?[0-9]{1,9}", start):
+        raise _RefusedError("unsupported-attribute", f"ol@start {start!r}")
+    return ["ol", kind or "1", int(start)]
+
+
+def _marker(builder: _Builder) -> str:
+    """The marker a browser draws for the next item of the list the walk is in."""
+    if builder.list_state is None:  # pragma: no cover - an li is walked only inside a list
+        raise _RefusedError("malformed-xhtml", "li outside a list")
+    kind, fmt, number = builder.list_state
+    if kind == "ul":
+        return str(fmt)
+    builder.list_state[2] = number + 1
+    return _ordinal(int(number), str(fmt)) + "."
+
+
+def _ordinal(number: int, fmt: str) -> str:
+    """``number`` in a list's format, as CSS counter styles write it.
+
+    Letters are alphabetic (a ... z, aa, ab ...) from 1; roman numerals are 1 to 3999; outside
+    its range a style falls back to decimal.
+    """
+    if fmt in ("a", "A") and number >= 1:
+        letters = ""
+        while number:
+            number, digit = divmod(number - 1, 26)
+            letters = chr(ord("a") + digit) + letters
+        return letters if fmt == "a" else letters.upper()
+    if fmt in ("i", "I") and 1 <= number <= 3999:
+        numerals = ""
+        for value, symbol in (
+            (1000, "m"),
+            (900, "cm"),
+            (500, "d"),
+            (400, "cd"),
+            (100, "c"),
+            (90, "xc"),
+            (50, "l"),
+            (40, "xl"),
+            (10, "x"),
+            (9, "ix"),
+            (5, "v"),
+            (4, "iv"),
+            (1, "i"),
+        ):
+            count, number = divmod(number, value)
+            numerals += symbol * count
+        return numerals if fmt == "i" else numerals.upper()
+    return str(number)
 
 
 def _table(element: ET.Element, builder: _Builder, marks: frozenset[str], depth: int) -> None:

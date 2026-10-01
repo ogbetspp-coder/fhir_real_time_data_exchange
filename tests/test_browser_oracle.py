@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 
 from browser_oracle import sections
-from label_docx.browser import digest, reader_lines
+from label_docx.browser import digest, markers_digest, reader_lines, reader_markers
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
 _MANIFESTS = {"sources", "expected", "word", "browser"}
@@ -42,7 +42,11 @@ def test_every_section_the_reader_reads_is_what_the_browser_shows() -> None:
                     continue
                 # The browser placed every piece of text the reader reads.
                 assert answer is not None, f"{name} section {index + 1}"
-                assert digest(reader_lines(section.paragraphs)) == answer, (
+                read_now = {
+                    **digest(reader_lines(section.paragraphs)),
+                    "markers": markers_digest(reader_markers(section.paragraphs)),
+                }
+                assert read_now == answer, (
                     f"{name} section {index + 1}: compare with scripts/browser_oracle.py"
                 )
                 read += 1

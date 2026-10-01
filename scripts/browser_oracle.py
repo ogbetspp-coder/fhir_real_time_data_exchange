@@ -28,8 +28,9 @@ order ``walk`` gives), a SHA-256 of the browser's lines and of their marks, whic
 ``tests/test_browser_oracle.py`` holds the reader to without a browser. ``compare`` prints the
 verdict for any files and writes nothing, never the text itself.
 
-Not yet compared: list numbers and bullets (drawn by the browser outside the text) and the
-layout the reader refuses or states as a residual.
+Each list item's marker ("1.", "\u2022"...) is read from Chrome's accessibility tree, the
+marker it draws, and compared with the reader's. Not compared: the layout the reader refuses
+or states as a residual.
 """
 
 from __future__ import annotations
@@ -44,11 +45,14 @@ from typing import Any
 from label_docx import epi
 from label_docx.browser import (
     browser_lines,
+    browser_markers,
     browser_sections,
     chrome_version,
     digest,
     first_difference,
+    markers_digest,
     reader_lines,
+    reader_markers,
 )
 
 
@@ -83,20 +87,26 @@ def check(path: Path) -> tuple[list[dict[str, str] | None], list[str]]:
     """The browser's digest of each section, and a verdict for each."""
     read = sections(path)
     shown = browser_sections(divs(path))
+    drawn = browser_markers(divs(path))
     digests: list[dict[str, str] | None] = []
     verdicts: list[str] = []
-    for section, browser in zip(read, shown, strict=True):
+    for section, browser, markers in zip(read, shown, drawn, strict=True):
         if browser["error"] is not None:
             digests.append(None)
             verdicts.append(f"browser text not placed: {browser['error']}")
             continue
         lines = browser_lines(browser)
-        digests.append(digest(lines))
+        digests.append({**digest(lines), "markers": markers_digest(markers)})
         if section.refusal is not None:
             verdicts.append(f"reader refuses: {section.refusal.code}")
             continue
         mine = reader_lines(section.paragraphs)
-        verdicts.append("agrees" if mine == lines else "differs: " + first_difference(lines, mine))
+        if mine != lines:
+            verdicts.append("differs: " + first_difference(lines, mine))
+        elif reader_markers(section.paragraphs) != markers:
+            verdicts.append("differs: a list marker")
+        else:
+            verdicts.append("agrees")
     return digests, verdicts
 
 

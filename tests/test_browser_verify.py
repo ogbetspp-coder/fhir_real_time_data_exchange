@@ -128,3 +128,26 @@ def test_chrome_agrees_with_an_epi_result_and_sees_a_changed_mark() -> None:
     )
     paragraph["marks"].append({"start": 0, "end": 1, "kind": "italic"})
     assert browser.verify_epi(EPI, changed, CHROME)["differs"]
+
+
+@pytest.mark.skipif(CHROME is None, reason="Chrome is not installed")
+def test_chrome_draws_the_list_markers_the_reader_reads_and_sees_a_changed_one() -> None:
+    assert CHROME is not None
+    result = json.loads(epi_output.read(EPI)[0])
+
+    def items(sections: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [
+            p
+            for s in sections
+            for p in [*s["paragraphs"], *items(s["sections"])]
+            if p["numbering"] is not None and p["numbering"]["text"] is not None
+        ]
+
+    assert len(items(result["sections"])) > 10
+    assert browser.verify_epi(EPI, result, CHROME)["differs"] == []
+    changed = copy.deepcopy(result)
+    first = items(changed["sections"])[0]
+    first["numbering"]["text"] = "\u25e6" if first["numbering"]["text"] != "\u25e6" else "\u2022"
+    assert any(
+        "list marker" in d["where"] for d in browser.verify_epi(EPI, changed, CHROME)["differs"]
+    )

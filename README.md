@@ -189,8 +189,8 @@ labelling, Annex II; English, Swedish, Danish, Spanish, Dutch), 3,347 sections.
 | Refused (a Symbol font, malformed markup in EMA's data, capitals the viewer's language decides, layout that draws text over text...) | 125 |
 
 `uv run --frozen python scripts/browser_oracle.py compare FILE.json` checks any ePI and prints
-only verdicts. List numbers and bullets, which a browser draws outside the text, are not yet
-compared.
+only verdicts. List numbers and bullets are drawn by the reader as the browser draws them, and
+each is held to the marker Chrome draws, read from its accessibility tree.
 
 ## Checking your own documents
 

@@ -25,6 +25,7 @@ import shutil
 import subprocess
 import tempfile
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -342,12 +343,177 @@ def result_lines(paragraphs: list[dict[str, Any]]) -> list[Line]:
     return _split(characters, "\n")
 
 
+# The markers page: each div in its own element, every list item numbered in document order.
+_MARKERS_PAGE = """<!doctype html>
+<html><head><meta charset="utf-8"><title>markers</title></head><body>
+<script type="application/json" id="divs">{divs}</script>
+<script>
+"use strict";
+const divs = JSON.parse(document.getElementById("divs").textContent);
+divs.forEach((div, section) => {{
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  host.innerHTML = div;
+  host.querySelectorAll("li").forEach((item, index) => {{
+    item.setAttribute("data-oracle-item", section + ":" + index);
+  }});
+}});
+document.title = "ready";
+</script>
+</body></html>
+"""
+
+
+class _DevTools:
+    """Chrome driven over its DevTools pipe (file descriptors 3 and 4): no dependency."""
+
+    def __init__(self, chrome: Path, folder: str) -> None:
+        to_chrome, self._write = os.pipe()
+        self._read, from_chrome = os.pipe()
+        # Chrome reads its DevTools pipe on fd 3 and writes on fd 4; a shell puts them there,
+        # so nothing runs between fork and exec in this (threaded) process.
+        self.process = subprocess.Popen(
+            [
+                "/bin/sh",
+                "-c",
+                f'exec "$0" "$@" 3<&{to_chrome} 4>&{from_chrome}',
+                str(chrome),
+                "--headless",
+                "--disable-gpu",
+                "--disable-extensions",
+                "--no-first-run",
+                "--no-default-browser-check",
+                f"--user-data-dir={folder}/profile",
+                "--remote-debugging-pipe",
+                "about:blank",
+            ],
+            pass_fds=(to_chrome, from_chrome),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        for fd in (to_chrome, from_chrome):
+            os.close(fd)
+        self._timer = threading.Timer(TIMEOUT_SECONDS, self.process.kill)
+        self._timer.start()
+        self._buffer = b""
+        self._next = 0
+        self.session: str | None = None
+
+    def call(self, method: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        self._next += 1
+        message: dict[str, Any] = {"id": self._next, "method": method, "params": params or {}}
+        if self.session is not None:
+            message["sessionId"] = self.session
+        os.write(self._write, json.dumps(message).encode() + b"\0")
+        while True:
+            while b"\0" in self._buffer:
+                raw, self._buffer = self._buffer.split(b"\0", 1)
+                answer: dict[str, Any] = json.loads(raw)
+                if answer.get("id") == self._next:
+                    if "error" in answer:
+                        raise BrowserError(f"{method}: {answer['error']}")
+                    result: dict[str, Any] = answer["result"]
+                    return result
+            chunk = os.read(self._read, 1 << 20)
+            if not chunk:
+                raise BrowserError("Chrome closed its DevTools pipe")
+            self._buffer += chunk
+
+    def close(self) -> None:
+        self._timer.cancel()
+        self.process.kill()
+        self.process.wait()
+        os.close(self._write)
+        os.close(self._read)
+
+
+def browser_markers(divs: list[str], chrome: Path = CHROME) -> list[list[str]]:
+    """The marker Chrome draws before each list item of each div, in document order.
+
+    Read from Chrome's accessibility tree (each item's ListMarker, what a screen reader
+    announces), so it is the marker drawn, not one worked out here.
+    """
+    payload = json.dumps(divs).replace("<", "\\u003c")
+    with tempfile.TemporaryDirectory() as folder:
+        page = Path(folder) / "markers.html"
+        page.write_text(_MARKERS_PAGE.format(divs=payload), "utf-8")
+        tools = _DevTools(chrome, folder)
+        try:
+            target = tools.call("Target.createTarget", {"url": page.as_uri()})["targetId"]
+            tools.session = tools.call(
+                "Target.attachToTarget", {"targetId": target, "flatten": True}
+            )["sessionId"]
+            for _ in range(600):
+                title = tools.call("Runtime.evaluate", {"expression": "document.title"})
+                if title["result"].get("value") == "ready":
+                    break
+                time.sleep(0.05)
+            else:
+                raise BrowserError("the markers page did not load")
+            tree = tools.call("DOM.getDocument", {"depth": -1})["root"]
+            tools.call("Accessibility.enable")
+            nodes = tools.call("Accessibility.getFullAXTree")["nodes"]
+        finally:
+            tools.close()
+    items: dict[int, str] = {}
+
+    def visit(node: dict[str, Any]) -> None:
+        attributes = node.get("attributes", [])
+        for name, value in zip(attributes[::2], attributes[1::2], strict=True):
+            if name == "data-oracle-item":
+                items[node["backendNodeId"]] = value
+        for child in node.get("children", []):
+            visit(child)
+
+    visit(tree)
+    by_id = {node["nodeId"]: node for node in nodes}
+    found: dict[str, str] = {}
+    for node in nodes:
+        if node.get("role", {}).get("value") != "ListMarker":
+            continue
+        parent = by_id.get(node.get("parentId", ""), {})
+        item = items.get(parent.get("backendDOMNodeId", -1))
+        if item is not None:
+            found[item] = node.get("name", {}).get("value", "")
+    out: list[list[str]] = []
+    for section in range(len(divs)):
+        keys = sorted(
+            (k for k in found if k.startswith(f"{section}:")), key=lambda k: int(k.split(":")[1])
+        )
+        out.append([found[k] for k in keys])
+    return out
+
+
+def reader_markers(paragraphs: tuple[Paragraph, ...]) -> list[str]:
+    """The markers the reader's paragraphs draw, each with the space after it, in order."""
+    return [
+        p.numbering.text + " "
+        for p in paragraphs
+        if p.numbering is not None and p.numbering.text is not None
+    ]
+
+
+def markers_digest(markers: list[str]) -> str:
+    """SHA-256 of a section's list markers, in canonical JSON."""
+    return hashlib.sha256(json.dumps(markers, ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
+def result_markers(paragraphs: list[dict[str, Any]]) -> list[str]:
+    """The markers a result draws, each with the space after it, in order."""
+    return [
+        p["numbering"]["text"] + " "
+        for p in paragraphs
+        if p["numbering"] is not None and p["numbering"]["text"] is not None
+    ]
+
+
 def verify_epi(data: bytes, result: dict[str, Any], chrome: Path = CHROME) -> dict[str, Any]:
     """Chrome's verdict on an ePI result: every section read, held to what Chrome shows.
 
-    ``result`` is the result as served (``epi_output``). The verdict names Chrome's version,
-    counts the sections that agree and the ones the reader refused, and lists each section that
-    differs with where (a line and character, never the text).
+    ``result`` is the result as served (``epi_output``): its text and marks, and the marker
+    before each list item. The verdict names Chrome's version, counts the sections that agree and
+    the ones the reader refused, and lists each section that differs with where (a line and
+    character, or a list marker, never the text).
     """
     bundle = json.loads(data.decode("utf-8"))
     composition = next(
@@ -370,14 +536,22 @@ def verify_epi(data: bytes, result: dict[str, Any], chrome: Path = CHROME) -> di
 
     visit(composition["section"], result["sections"])
     shown = browser_sections([div for div, _ in pairs], chrome) if pairs else []
+    markers = browser_markers([div for div, _ in pairs], chrome) if pairs else []
     differs: list[dict[str, Any]] = []
-    for index, ((_, section), browser) in enumerate(zip(pairs, shown, strict=True)):
+    for index, ((_, section), browser, drawn) in enumerate(zip(pairs, shown, markers, strict=True)):
         if browser["error"] is not None:
             differs.append({"section": index + 1, "where": browser["error"]})
             continue
         mine, theirs = result_lines(section["paragraphs"]), browser_lines(browser)
         if mine != theirs:
             differs.append({"section": index + 1, "where": first_difference(theirs, mine)})
+        elif result_markers(section["paragraphs"]) != drawn:
+            ours = result_markers(section["paragraphs"])
+            at = next(
+                (i for i, (a, b) in enumerate(zip(ours, drawn, strict=False)) if a != b),
+                min(len(ours), len(drawn)),
+            )
+            differs.append({"section": index + 1, "where": f"list marker {at + 1} differs"})
     return {
         "application": chrome_version(chrome),
         "agrees": len(pairs) - len(differs),

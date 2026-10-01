@@ -900,15 +900,6 @@ def test_each_rule_refuses_alone(inner: str, code: str) -> None:
 @pytest.mark.parametrize(
     ("inner", "expected"),
     [
-        # A cell closes the li around its table, so a list in it is not an li in an li.
-        (
-            "<ul><li><table><tr><td><ul><li>x</li></ul></td></tr></table></li></ul>",
-            [("x", (0, 0, 0), 2, [])],
-        ),
-        (
-            "<ul><li><table><tr><td><li>x</li></td></tr></table></li></ul>",
-            [("x", (0, 0, 0), 1, [])],
-        ),
         # A nested table's text belongs to the outer cell.
         (
             "<table><tr><td>o</td><td><table><tr><td>i</td></tr></table></td></tr></table>",
@@ -1215,3 +1206,49 @@ def test_a_change_a_browser_does_not_show_leaves_the_reading_unchanged() -> None
     respelled = json.dumps(bundle, indent=1, sort_keys=True, ensure_ascii=True).encode()
     assert respelled != data
     assert _sections_of(respelled) == _sections_of(data)
+
+
+@pytest.mark.parametrize(
+    "inner",
+    [
+        # Two markers on one line: the outer item's, then the nested list's first.
+        "<ul><li><table><tr><td><ul><li>x</li></ul></td></tr></table></li></ul>",
+        "<ul><li><ol><li>x</li></ol></li></ul>",
+        # An li in a cell, not in a list: drawn with the marker of the list around it.
+        "<ul><li><table><tr><td><li>x</li></td></tr></table></li></ul>",
+        "<div><li>x</li></div>",
+        # A marker beside nothing.
+        "<ul><li> </li></ul>",
+        '<ol type="x"><li>x</li></ol>',
+        '<ol start="2.5"><li>x</li></ol>',
+        '<ul type="triangle"><li>x</li></ul>',
+    ],
+)
+def test_a_list_marker_the_reader_cannot_place_refuses_the_section(inner: str) -> None:
+    assert refusal(inner) in ("unsupported-element", "unsupported-attribute", "malformed-xhtml")
+
+
+def test_list_markers_are_the_ones_a_browser_draws() -> None:
+    body = (
+        "<ul><li>a<ul><li>b<ul><li>c</li></ul></li></ul></li></ul>"
+        '<ol start="4" type="a"><li>d</li><li>e</li></ol><ol type="I"><li>f</li>'
+        '<li><p>g</p><p>more</p></li></ol><ol start="0" type="i"><li>h</li></ol>'
+        '<ul type="SQUARE"><li>s</li></ul><ol start="26" type="A"><li>z</li><li>aa</li></ol>'
+    )
+    paragraphs, refused, _ = read_div(div(body))
+    assert refused is None, refused
+    assert [(p.text, p.numbering.text if p.numbering else None) for p in paragraphs] == [
+        ("a", "\u2022"),
+        ("b", "\u25e6"),
+        ("c", "\u25a0"),
+        ("d", "d."),
+        ("e", "e."),
+        ("f", "I."),
+        ("g", "II."),
+        ("more", None),
+        ("h", "0."),
+        ("s", "\u25a0"),
+        ("z", "Z."),
+        ("aa", "AA."),
+    ]
+    assert {p.numbering.suffix for p in paragraphs if p.numbering and p.numbering.text} == {"space"}

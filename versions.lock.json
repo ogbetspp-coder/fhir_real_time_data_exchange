@@ -6,7 +6,8 @@
     "label-epi-json/1.3.0": "26adc7f56e2f9f8e029c50acc1fcc6035e91d5a94439cdf46d2b6596cabbe363"
   },
   "epi-reader": {
-    "epi-reader/1.0.0": "ff99976f4c23101d29b0c038837222bc0cfc0139831fffcbca63d6e045c7e25b"
+    "epi-reader/1.0.0": "ff99976f4c23101d29b0c038837222bc0cfc0139831fffcbca63d6e045c7e25b",
+    "epi-reader/1.1.0": "f337c648a32711d25f07630df5c2a00c84b02f12337e2e5bde7649d3c88e24cc"
   },
   "format": {
     "label-docx-json/1.0.0": "5f1aa016f095c2975f647d1c0e03eb547b25ae493571e21b7a171a8c86f320ab",
