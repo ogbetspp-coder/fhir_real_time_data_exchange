@@ -172,6 +172,86 @@ HEADINGS = "".join(
     for n in (1, 2)
 )
 
+TOGGLES_ON = "<w:b/><w:i/><w:caps/><w:strike/>"
+TOGGLES_OFF = '<w:b w:val="0"/><w:i w:val="0"/><w:caps w:val="0"/><w:strike w:val="0"/>'
+
+
+def _style(kind: str, key: str, rpr: str = "", based: str = "") -> str:
+    parent = f'<w:basedOn w:val="{based}"/>' if based else ""
+    return (
+        f'<w:style w:type="{kind}" w:styleId="{key}"><w:name w:val="{key}"/>{parent}'
+        f"<w:rPr>{rpr}</w:rPr></w:style>"
+    )
+
+
+TOGGLE_STYLES = (
+    _style("paragraph", "PB", TOGGLES_ON)
+    + _style("paragraph", "PB2", TOGGLES_ON, "PB")
+    + _style("paragraph", "PBchild", "", "PB")
+    + _style("paragraph", "POff", TOGGLES_OFF)
+    + _style("character", "CB", TOGGLES_ON)
+    + _style("character", "CB2", TOGGLES_ON, "CB")
+    + _style("character", "CBchild", "", "CB")
+    + _style("table", "TB", TOGGLES_ON)
+)
+
+
+class Toggles(NamedTuple):
+    """Where a toggle case sets its toggles: paragraph style, character style, run, table."""
+
+    pst: str = ""
+    cst: str = ""
+    direct: str = ""
+    table: bool = False
+
+
+def _toggle_paragraph(pst: str = "", cst: str = "", direct: str = "", table: bool = False) -> str:
+    props = f'<w:pStyle w:val="{pst}"/>' if pst else ""
+    rpr = (f'<w:rStyle w:val="{cst}"/>' if cst else "") + direct
+    run = f"<w:r>{f'<w:rPr>{rpr}</w:rPr>' if rpr else ''}<w:t>x</w:t></w:r>"
+    paragraph = para(run, props=props)
+    if table:
+        paragraph = (
+            '<w:tbl><w:tblPr><w:tblStyle w:val="TB"/></w:tblPr><w:tr><w:tc>'
+            + paragraph
+            + "</w:tc></w:tr></w:tbl>"
+        )
+    return paragraph
+
+
+TOGGLE_CASES: list[Toggles] = [
+    Toggles(),
+    Toggles(direct=TOGGLES_ON),
+    Toggles(direct=TOGGLES_OFF),
+    Toggles(pst="PB"),
+    Toggles(cst="CB"),
+    Toggles(pst="PB", cst="CB"),
+    Toggles(pst="PB", direct=TOGGLES_ON),
+    Toggles(pst="PB", direct=TOGGLES_OFF),
+    Toggles(cst="CB", direct=TOGGLES_OFF),
+    Toggles(pst="PBchild"),
+    Toggles(pst="PB2"),
+    Toggles(pst="PB2", cst="CB"),
+    Toggles(pst="POff", cst="CB"),
+    Toggles(cst="CB2"),
+    Toggles(cst="CBchild"),
+    Toggles(pst="PB", cst="CBchild"),
+    Toggles(table=True),
+    Toggles(table=True, pst="PB"),
+    Toggles(table=True, cst="CB"),
+    Toggles(table=True, pst="PB", cst="CB"),
+    Toggles(table=True, direct=TOGGLES_ON),
+]
+TOGGLE_DEFAULT_CASES: list[Toggles] = [
+    Toggles(),
+    Toggles(pst="PB"),
+    Toggles(cst="CB"),
+    Toggles(pst="PB", cst="CB"),
+    Toggles(direct=TOGGLES_ON),
+    Toggles(direct=TOGGLES_OFF),
+    Toggles(table=True),
+]
+
 OUTLINE_NUMBERING = abstract(1, lvl(0, text="%1"), lvl(1, text="%1.%2")) + num(1, 1)
 DOTTED_NUMBERING = abstract(1, lvl(0, text="%1."), lvl(1, text="%1.%2.")) + num(1, 1)
 
@@ -546,6 +626,19 @@ CASES: dict[str, Case] = {
         "Captions stored as 7 and 7, which Word prints as 1 and 2 (the reader refuses).",
         "",
         seq("7") + seq("7"),
+    ),
+    "emphasis-toggles": Case(
+        "Bold, italic, caps and strike set every way a style can set them (one 'x' each).",
+        "",
+        "".join(_toggle_paragraph(*case) for case in TOGGLE_CASES),
+        TOGGLE_STYLES,
+    ),
+    "emphasis-defaults": Case(
+        "The same toggles with the document defaults turning them on.",
+        "",
+        "".join(_toggle_paragraph(*case) for case in TOGGLE_DEFAULT_CASES),
+        "<w:docDefaults><w:rPrDefault><w:rPr>" + TOGGLES_ON + "</w:rPr></w:rPrDefault>"
+        "</w:docDefaults>" + TOGGLE_STYLES,
     ),
     "notes-continuous": Case(
         "Footnotes number 1, 2, 3 through the document.",

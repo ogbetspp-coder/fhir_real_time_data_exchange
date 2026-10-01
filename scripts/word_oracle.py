@@ -41,6 +41,13 @@ the text after it saves as PDF, with the page numbers (PAGEREF, PAGE...) set asi
 sets those from the layout. The reader may read a document only where the two are the same: any
 field, known to the reader or not, that Word reprints differently is caught here.
 
+The fifth is emphasis. For every body paragraph the oracle asks Word whether its text is bold,
+italic, in capitals and struck through (a copy marks each paragraph's start so its text range is
+known): every paragraph of a document up to 150 paragraphs, and about 150 evenly spaced ones of a
+longer one, since each takes Word several requests. Word answers false for a paragraph that is
+partly so, so a paragraph is held to Word's answer only where the reader finds it wholly so or
+wholly not; one with a note mark or a page number, whose text Word holds differently, is left out.
+
 Word runs sandboxed: each file is copied into Word's container, where it opens without a
 permission prompt, and removed after.
 """
@@ -58,8 +65,10 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import zipfile
 from pathlib import Path
+from typing import Any
 
 from label_docx.reader import SYMBOL_FONT, DocxRefusedError, read_document, read_docx
 
@@ -160,6 +169,50 @@ _NOTE_RUN = {
 }
 
 
+def _osascript(
+    command: list[str],
+    *,
+    input: str,  # noqa: A002 - subprocess.run's name for it
+    capture_output: bool,
+    text: bool,
+    check: bool,
+    **_: object,
+) -> subprocess.CompletedProcess[str]:
+    """Run an AppleScript for Word, failing after 15 minutes rather than waiting on a hung Word.
+
+    Word quits now and then in a long recording ("Connection is invalid", -609; "not running",
+    -600): it is started again and the script run again, twice at most.
+    """
+    for attempt in (1, 2, 3):
+        try:
+            done = subprocess.run(
+                command,
+                input=input,
+                capture_output=capture_output,
+                text=text,
+                encoding="utf-8",
+                check=check,
+                timeout=900,
+            )
+        except subprocess.TimeoutExpired as hung:
+            raise SystemExit(f"Word did not answer within 15 minutes ({command[2]})") from hung
+        if attempt == 3 or not re.search(r"\((-609|-600)\)", done.stderr or ""):
+            return done
+        subprocess.run(["open", "-g", "-a", str(WORD)], check=False)
+        for _second in range(120):
+            alive = subprocess.run(
+                ["osascript", "-e", 'tell application "Microsoft Word" to name'],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if alive.returncode == 0:
+                break
+            time.sleep(1)
+        time.sleep(5)
+    raise AssertionError  # pragma: no cover
+
+
 def word_version() -> str:
     """Word's version, from its bundle."""
     with (WORD / "Contents/Info.plist").open("rb") as info:
@@ -173,7 +226,7 @@ def _ask_word(path: Path) -> str:
         shutil.copyfile(path, copy)
         # Word's scripting fails now and then while it is still loading; one retry is enough.
         for attempt in (1, 2):
-            done = subprocess.run(
+            done = _osascript(
                 ["osascript", "-", str(copy), path.name],
                 input=SCRIPT,
                 capture_output=True,
@@ -260,7 +313,7 @@ def word_fields(path: Path) -> dict[str, list[str]] | None:
                     info.filename,
                     marked.encode("utf-8") if info.filename == "word/document.xml" else content,
                 )
-        done = subprocess.run(
+        done = _osascript(
             ["osascript", "-", str(copy), str(copy.with_suffix(".pdf")), copy.name],
             input=PRINT,
             capture_output=True,
@@ -358,7 +411,7 @@ def word_prints_what_it_shows(path: Path) -> bool:
                 if info.filename == "word/document.xml":
                     written = _set_page_numbers_aside(content.decode("utf-8")).encode("utf-8")
                 target.writestr(info.filename, written)
-        done = subprocess.run(
+        done = _osascript(
             ["osascript", "-", str(copy), str(copy.with_suffix(".pdf")), copy.name],
             input=PRINT,
             capture_output=True,
@@ -385,6 +438,108 @@ def print_verdict(same: bool, path: Path) -> str:
     return "agrees" if same else "differs: the reader reads a document Word prints differently"
 
 
+# Each paragraph marked ``@@Q<n>@@`` (n counting from 0): Word's toggles over the rest of its text.
+EMPHASIS = """
+on run argv
+  set target to (POSIX file (item 1 of argv)) as string
+  set out to ""
+  with timeout of 3600 seconds
+    tell application "Microsoft Word"
+      open file name target
+      repeat 600 times
+        try
+          if (name of every document) contains {item 2 of argv} then exit repeat
+        end try
+        delay 0.1
+      end repeat
+      set d to document (item 2 of argv)
+      -- Every paragraph of a short document; about 150, evenly spaced, of a long one, since
+      -- each takes Word several requests.
+      set total to count of paragraphs of d
+      set stepBy to (total div 150) + 1
+      repeat with i from 1 to total by stepBy
+        set r to text object of paragraph i of d
+        set t to content of r
+        if t starts with "@@Q" then
+          set AppleScript's text item delimiters to "@@"
+          set n to text item 2 of t
+          set AppleScript's text item delimiters to ""
+          set fromHere to (start of content of r) + (length of n) + 4
+          set toHere to (end of content of r) - 1
+          if toHere > fromHere then
+            set f to font object of (create range d start fromHere end toHere)
+            set out to out & (text 2 thru -1 of n) & "," & (bold of f) & "," & (italic of f) ¬
+              & "," & (all caps of f) & "," & (strike through of f) & linefeed
+          end if
+        end if
+      end repeat
+      close d saving no
+    end tell
+  end timeout
+  return out
+end run
+"""
+_PARAGRAPH_START = re.compile(r"<w:p(?:\s[^>]*)?/>|<w:p(?:\s[^>]*)?>(?:<w:pPr>.*?</w:pPr>)?", re.S)
+TOGGLES = ("bold", "italic", "caps", "strike")
+
+
+def word_emphasis(path: Path) -> dict[str, list[bool]]:
+    """Word's bold, italic, caps and strike for each body paragraph, by the reader's index."""
+    with zipfile.ZipFile(path) as source:
+        parts = [(info, source.read(info)) for info in source.infolist()]
+    count = itertools.count()
+
+    def mark(start: re.Match[str]) -> str:
+        marker = f"<w:r><w:t>@@Q{next(count)}@@</w:t></w:r>"
+        tag = start.group(0)
+        if tag.endswith("/>"):
+            return tag[:-2] + ">" + marker + "</w:p>"
+        return tag + marker
+
+    CONTAINER.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=CONTAINER) as folder:
+        copy = Path(folder) / path.name
+        with zipfile.ZipFile(copy, "w", zipfile.ZIP_DEFLATED) as target:
+            for info, content in parts:
+                written = content
+                if info.filename == "word/document.xml":
+                    written = _PARAGRAPH_START.sub(mark, content.decode("utf-8")).encode("utf-8")
+                target.writestr(info.filename, written)
+        done = _osascript(
+            ["osascript", "-", str(copy), copy.name],
+            input=EMPHASIS,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
+        )
+    if done.returncode != 0:
+        raise SystemExit(f"{path.name}: Word failed: {done.stderr.strip()}")
+    answers: dict[str, list[bool]] = {}
+    for line in done.stdout.splitlines():
+        index, *values = line.split(",")
+        answers[index] = [value == "true" for value in values]
+    return answers
+
+
+def emphasis_verdict(word: dict[str, list[bool]], path: Path) -> str:
+    """Whether the reader's toggles are Word's, where the reader finds a paragraph wholly so."""
+    try:
+        paragraphs = read_docx(path.read_bytes())
+    except DocxRefusedError as refused:
+        return f"reader refuses: {refused.code}"
+    for index, paragraph in enumerate(paragraphs):
+        answer = word.get(str(index))
+        if answer is None or not paragraph.text.strip() or paragraph.notes or paragraph.pages:
+            continue
+        for kind, shown in zip(TOGGLES, answer, strict=True):
+            covered = [m for m in paragraph.marks if m.kind == kind]
+            whole = any(m.start == 0 and m.end == len(paragraph.text) for m in covered)
+            if (whole or not covered) and whole != shown:
+                return f"differs at paragraph {index + 1}: Word {kind} {shown}, reader {whole}"
+    return "agrees"
+
+
 def word_note_marks(path: Path) -> dict[str, list[str]] | None:
     """The marks Word draws at the body's note references and in the notes, or None if none."""
     probe = _probe(path.read_bytes())
@@ -395,7 +550,7 @@ def word_note_marks(path: Path) -> dict[str, list[str]] | None:
         copy = Path(folder) / path.name
         text = copy.with_suffix(".txt")
         copy.write_bytes(probe)
-        done = subprocess.run(
+        done = _osascript(
             ["osascript", "-", str(copy), str(text), copy.name, text.name],
             input=EXPORT,
             capture_output=True,
@@ -485,6 +640,12 @@ def main() -> int:
     note_answers: dict[str, dict[str, list[str]]] = {}
     field_answers: dict[str, dict[str, list[str]]] = {}
     print_answers: dict[str, bool] = {}
+    emphasis_answers: dict[str, dict[str, list[bool]]] = {}
+    # A recording keeps each file's answers as it goes, so one stopped part way resumes there.
+    progress = args.folder / ".word-progress.json" if args.command == "record" else None
+    recorded: dict[str, dict[str, Any]] = (
+        json.loads(progress.read_text("utf-8")) if progress and progress.exists() else {}
+    )
     differs = False
     for path in paths:
         if not path.read_bytes().startswith(b"PK\x03\x04"):
@@ -494,10 +655,28 @@ def main() -> int:
             sys.stdout.write(f"{path.name}: not a .docx; not sent to Word\n")
             continue
         try:
-            word = word_labels(path)
-            marks = word_note_marks(path)
-            fields = word_fields(path)
-            same = word_prints_what_it_shows(path)
+            if path.name in recorded:
+                kept = recorded[path.name]
+                word = kept["drawn"]
+                marks = kept["notes"]
+                fields = kept["fields"]
+                same = kept["prints"]
+                emphasis = kept["emphasis"]
+            else:
+                word = word_labels(path)
+                marks = word_note_marks(path)
+                fields = word_fields(path)
+                same = word_prints_what_it_shows(path)
+                emphasis = word_emphasis(path)
+            if progress:
+                recorded[path.name] = {
+                    "drawn": word,
+                    "notes": marks,
+                    "fields": fields,
+                    "prints": same,
+                    "emphasis": emphasis,
+                }
+                progress.write_text(json.dumps(recorded), "utf-8")
         except SystemExit as failed:
             if args.command == "record":
                 raise
@@ -511,6 +690,9 @@ def main() -> int:
             if result == "agrees":
                 result = note_verdict(marks, reader_note_marks(path))
         print_answers[path.name] = same
+        emphasis_answers[path.name] = emphasis
+        if result == "agrees":
+            result = emphasis_verdict(emphasis, path)
         if result in ("agrees", "reader refuses: stale-field"):
             result = print_verdict(same, path)
         if fields is not None:
@@ -530,17 +712,21 @@ def main() -> int:
                 "list labels: convert numbers to text, what each list item gained; note marks: "
                 "saved as text, what Word wrote between markers around each mark; fields: the "
                 "text between markers around each, as shown and after saving as PDF; prints: the "
-                "whole text as shown and after saving as PDF, page numbers aside"
+                "whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, "
+                "italic, caps and strike of each body paragraph's text"
             ),
             "recorded": datetime.date.today().isoformat(),
             "drawn": answers,
             "notes": note_answers,
             "fields": field_answers,
             "prints": print_answers,
+            "emphasis": emphasis_answers,
         }
         target = args.folder / "word.json"
         target.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", "utf-8")
         sys.stdout.write(f"wrote {target}\n")
+        if progress:
+            progress.unlink(missing_ok=True)
     return 1 if differs else 0
 
 

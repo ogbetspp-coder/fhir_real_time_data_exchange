@@ -1826,3 +1826,45 @@ def test_page_fields_are_placed_not_read() -> None:
         + r("<w:t>7</w:t>")
     )
     assert refusal(across + p(r('<w:fldChar w:fldCharType="end"/>'))) == "unbalanced-field"
+
+
+# --- emphasis (docx-reader/1.11.0) -------------------------------------------------------------
+
+
+TOGGLE_STYLES = (
+    '<w:style w:type="paragraph" w:styleId="PB"><w:rPr><w:b/><w:i/></w:rPr></w:style>'
+    '<w:style w:type="character" w:styleId="CB"><w:rPr><w:b/><w:i/></w:rPr></w:style>'
+    '<w:style w:type="paragraph" w:styleId="PBchild"><w:basedOn w:val="PB"/></w:style>'
+)
+
+
+@pytest.mark.parametrize(
+    ("body", "shown"),
+    [
+        (p(r("<w:t>x</w:t>", "<w:b/><w:i/>")), True),
+        (p(r("<w:t>x</w:t>"), '<w:pStyle w:val="PB"/>'), True),
+        (p(r("<w:t>x</w:t>", '<w:rStyle w:val="CB"/>')), True),
+        # Two kinds of style that both set it cancel; the run's own setting wins.
+        (p(r("<w:t>x</w:t>", '<w:rStyle w:val="CB"/>'), '<w:pStyle w:val="PB"/>'), False),
+        (p(r("<w:t>x</w:t>", '<w:b w:val="0"/><w:i w:val="0"/>'), '<w:pStyle w:val="PB"/>'), False),
+        (
+            p(r("<w:t>x</w:t>", '<w:rStyle w:val="CB"/><w:b/><w:i/>'), '<w:pStyle w:val="PB"/>'),
+            True,
+        ),
+        # Inherited through basedOn, not cancelled.
+        (p(r("<w:t>x</w:t>"), '<w:pStyle w:val="PBchild"/>'), True),
+    ],
+)
+def test_bold_and_italic_are_marked_as_word_shows_them(body: str, shown: bool) -> None:
+    kinds = {m.kind for m in read_docx(docx(body, TOGGLE_STYLES))[0].marks}
+    assert ({"bold", "italic"} <= kinds) is shown
+    assert ({"bold", "italic"} & kinds == set()) is not shown
+
+
+def test_document_defaults_turn_a_toggle_on_whatever_the_styles_give() -> None:
+    defaults = "<w:docDefaults><w:rPrDefault><w:rPr><w:b/></w:rPr></w:rPrDefault></w:docDefaults>"
+    styles = defaults + TOGGLE_STYLES
+    cancelled = p(r("<w:t>x</w:t>", '<w:rStyle w:val="CB"/>'), '<w:pStyle w:val="PB"/>')
+    assert "bold" in {m.kind for m in read_docx(docx(cancelled, styles))[0].marks}
+    off = p(r("<w:t>x</w:t>", '<w:b w:val="0"/>'))
+    assert "bold" not in {m.kind for m in read_docx(docx(off, styles))[0].marks}

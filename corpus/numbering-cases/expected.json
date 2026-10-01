@@ -11,6 +11,14 @@
     "paragraphsSha256": "09c7e8822d129595aeaa6b541f2611b314f449dec71d4fcb7e714055c8742919",
     "sha256": "62a355d1e912cb232cc60eacbd917ff31642219a2e0e428a88cb0cec3071b14b"
   },
+  "emphasis-defaults.docx": {
+    "paragraphsSha256": "9baffc564847e0a05d4021b2ef40d4f836ae43906c12af4bc4dccbd841fe913b",
+    "sha256": "21c882458608d310f474348508cddaea519e01862017a6fd5d92ba24af8c7d68"
+  },
+  "emphasis-toggles.docx": {
+    "paragraphsSha256": "6320bc235e9ec14e7a7696cd38963728bbd786746bf6d1dab7da5864b6c1cb50",
+    "sha256": "28b1f3f2e06c075a73097e4c17828214940f2edb65b8dd924afe9773ea4f427d"
+  },
   "fields-chapter-captions.docx": {
     "paragraphsSha256": "83d52c7b3bda5bb37d16609df501f4d2fcd2a25a6dd9f02b294e4465480e3091",
     "sha256": "7ef7e7939ed5b8f081515b30657c59b4d5af685309507a994f23d5fa5c199ad5"

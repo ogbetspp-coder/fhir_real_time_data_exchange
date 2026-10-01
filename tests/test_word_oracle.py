@@ -17,6 +17,7 @@ from typing import Any
 import pytest
 
 from word_oracle import (
+    emphasis_verdict,
     field_verdict,
     note_verdict,
     print_verdict,
@@ -159,6 +160,35 @@ def test_the_reader_reads_only_documents_word_prints_as_it_shows_them(
     key = f"{path.parent.name}/{path.name}"
     result = print_verdict(same, path)
     if key in REFUSED and REFUSED[key] != "stale-field":
+        assert result == f"reader refuses: {REFUSED[key]}"
+    else:
+        assert result == "agrees"
+
+
+def _emphasis_cases() -> list[tuple[Path, dict[str, list[bool]]]]:
+    out: list[tuple[Path, dict[str, list[bool]]]] = []
+    for record in RECORDS:
+        emphasis = _record(record)["emphasis"]
+        out += [(record.parent / name, word) for name, word in sorted(emphasis.items())]
+    return out
+
+
+def test_words_emphasis_is_on_record_for_every_document() -> None:
+    for record in RECORDS:
+        emphasis = _record(record)["emphasis"]
+        present = {path.name for path in record.parent.glob("*.docx")}
+        assert set(emphasis) == present, f"{record.parent.name}: run scripts/word_oracle.py record"
+
+
+@pytest.mark.parametrize(
+    ("path", "word"), _emphasis_cases(), ids=lambda value: getattr(value, "stem", "")
+)
+def test_the_reader_marks_bold_italic_caps_and_strike_as_word_shows_them(
+    path: Path, word: dict[str, list[bool]]
+) -> None:
+    key = f"{path.parent.name}/{path.name}"
+    result = emphasis_verdict(word, path)
+    if key in REFUSED:
         assert result == f"reader refuses: {REFUSED[key]}"
     else:
         assert result == "agrees"

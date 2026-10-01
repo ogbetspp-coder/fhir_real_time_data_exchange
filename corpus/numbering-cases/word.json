@@ -19,6 +19,8 @@
       "o\t",
       "\uf0b7\t"
     ],
+    "emphasis-defaults.docx": [],
+    "emphasis-toggles.docx": [],
     "fields-chapter-captions.docx": [
       "1\t",
       "2\t"
@@ -209,6 +211,1565 @@
       "1.\t",
       "2.\t"
     ]
+  },
+  "emphasis": {
+    "ancestor-never-counted.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "ancestor-two-levels.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "4": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "bullets.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "emphasis-defaults.docx": {
+      "": [],
+      "0": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "1": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "2": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "3": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "4": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "5": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "6": [
+        true,
+        true,
+        true,
+        true
+      ]
+    },
+    "emphasis-toggles.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "10": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "11": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "12": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "13": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "14": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "15": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "16": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "17": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "18": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "19": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "20": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "3": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "4": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "5": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "6": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "7": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "8": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "9": [
+        true,
+        true,
+        true,
+        true
+      ]
+    },
+    "fields-chapter-captions.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "4": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "5": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "fields-chapter-dotted.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "fields-chapter-reset-level-2.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "4": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "5": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "6": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "7": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "fields-chapter-reset.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "4": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "5": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "6": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "fields-heading-by-name.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "4": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "5": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "fields-noteref-stale.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "fields-noteref.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "fields-ref-caption.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "fields-ref-missing.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "fields-ref-stale.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "fields-ref.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "fields-seq-formats.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "4": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "5": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "fields-seq-identifiers.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "fields-seq-switches.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "4": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "5": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "fields-seq.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "fields-stale.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "fields-stored.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "fields-styleref-forward.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "formats.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "4": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "5": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "6": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "7": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "8": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "9": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "legal.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "level-override-first.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "level-override-shared.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "level-override-start.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "level-override.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "missing-start.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "multilevel.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "4": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "5": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "6": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "notes-chicago.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "notes-continuous.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "notes-custom-mark.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "notes-document-format.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "notes-each-section.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "notes-endnotes.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "notes-in-table.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "notes-mixed.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "notes-section-chicago.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "notes-section-format.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "notes-section-rules.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "notes-section-start-continuous.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "notes-start-format.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "numbering-style-link-one-way.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "numbering-style-link.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "override-ancestor.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "override-deeper-level.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "override-implicit-ancestor.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "override-restart-within.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "override-return.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "plain-after-restart.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "restart-after-first.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "4": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "5": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "restart-never.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "4": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "return-after-restart.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "shared-continue.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "start-override-first.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "start-override-restart.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "3": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "style-tied-deeper-level.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "style-tied-level-zero.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "two-definitions.docx": {
+      "": [],
+      "0": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "1": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "2": [
+        false,
+        false,
+        false,
+        false
+      ]
+    }
   },
   "fields": {
     "fields-chapter-captions.docx": {
@@ -424,7 +1985,7 @@
       ]
     }
   },
-  "method": "list labels: convert numbers to text, what each list item gained; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside",
+  "method": "list labels: convert numbers to text, what each list item gained; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside; emphasis: bold, italic, caps and strike of each body paragraph's text",
   "notes": {
     "fields-noteref-stale.docx": {
       "body": [
@@ -609,6 +2170,8 @@
     "ancestor-never-counted.docx": true,
     "ancestor-two-levels.docx": true,
     "bullets.docx": true,
+    "emphasis-defaults.docx": true,
+    "emphasis-toggles.docx": true,
     "fields-chapter-captions.docx": true,
     "fields-chapter-dotted.docx": true,
     "fields-chapter-reset-level-2.docx": true,

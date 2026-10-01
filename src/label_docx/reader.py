@@ -22,15 +22,16 @@ What a paragraph carries:
   ``<w:noBreakHyphen/>`` is U+2011, ``<w:softHyphen/>`` U+00AD, and a picture is U+FFFC OBJECT
   REPLACEMENT CHARACTER at the place it stands, whether it is DrawingML (``w:drawing``) or VML
   (``w:pict``, as documents from before Word 2007 hold it).
-- ``marks``: ranges of ``text`` whose appearance changes what a reader sees or means, set on
-  the run, its styles or the document defaults (``Mark`` lists the kinds): superscript,
-  subscript, raised or lowered text, capitals and small capitals, single and double
-  strike-through, highlight with its colour, shading with its fill (or its pattern, colour and
-  fill) on the run or the paragraph, right-to-left, and faint text (white or a light theme
-  colour, under two points in any unit, or scaled under a fifth), and underline of any style
-  (an underlined "<" is how "≤" is often typed). ``text`` alone flattens "10" with a
-  superscript "9" to "109"; a caller that uses ``text`` must look at ``marks``. Other
-  appearance (other colours, font size, bold, italic, borders) is not reported.
+- ``marks``: ranges of ``text`` whose appearance changes what a reader sees or means, set on the
+  run, its styles or the document defaults (``Mark`` lists the kinds): bold, italic, superscript,
+  subscript, raised or lowered text, capitals and small capitals, single and double strike-through,
+  highlight with its colour, shading with its fill (or its pattern, colour and fill) on the run or
+  the paragraph, right-to-left, and faint text (white or a light theme colour, under two points in
+  any unit, or scaled under a fifth), and underline of any style (an underlined "<" is how "≤" is
+  often typed). ``text`` alone flattens "10" with a superscript "9" to "109"; a caller that uses
+  ``text`` must look at ``marks``. Bold, italic, capitals and strike-through are toggles, and
+  reported as Word shows them: two kinds of style that both set one cancel (see
+  ``_Properties.shown``). Other appearance (other colours, font size, borders) is not reported.
 - ``mark_hidden``: the paragraph mark is hidden (``vanish`` or ``specVanish``, directly or
   through the paragraph's styles), so Word shows this paragraph run on into the next one.
 - ``numbering``: the list the paragraph belongs to, directly or through its style, and the list
@@ -203,8 +204,9 @@ from dataclasses import dataclass, field, replace
 # by the rules Word showed; 1.7.0 reads SEQ and STYLEREF fields whose stored result is what Word
 # prints; 1.8.0 names a PDF in its refusal; 1.9.0 computes REF and NOTEREF, which Word reprints,
 # and refuses them where the stored result is not what it prints; 1.10.0 reads tables of
-# contents, which Word prints as stored, and places page numbers, which it sets from the layout.
-READER_VERSION = "docx-reader/1.10.0"
+# contents, which Word prints as stored, and places page numbers, which it sets from the layout;
+# 1.11.0 reports bold and italic, and every toggle as Word shows it (two styles cancel).
+READER_VERSION = "docx-reader/1.11.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -356,7 +358,15 @@ _RUN_CONTENT = {
     )
 }
 
-_TOGGLE_MARKS = ("caps", "smallCaps", "strike", "dstrike")
+# Toggle properties reported as marks, by the mark kind each is reported as.
+_TOGGLE_MARKS = {
+    "b": "bold",
+    "i": "italic",
+    "caps": "caps",
+    "smallCaps": "smallCaps",
+    "strike": "strike",
+    "dstrike": "dstrike",
+}
 
 
 class DocxRefusedError(Exception):
@@ -387,7 +397,7 @@ class Numbering:
 class Mark:
     """``text[start:end]`` is shown as ``kind``.
 
-    One of superscript, subscript, position, caps, smallCaps, strike, dstrike,
+    One of bold, italic, superscript, subscript, position, caps, smallCaps, strike, dstrike,
     ``highlight-<colour>`` (Word's colour name, e.g. ``highlight-lightGray``),
     ``shading-<FILL>`` (e.g. ``shading-D9D9D9``) or ``shading-<pattern>-<COLOUR>-<FILL>``, rtl
     (right-to-left), faint (white or a light theme colour, under two points, or scaled
@@ -778,20 +788,56 @@ class _Properties:
         if direct is not None:
             element = direct.find(_w("rStyle"))
             run_style = element.get(_w("val")) if element is not None else None
-        levels: list[ET.Element | None] = [mark]
-        levels += [style.rpr for style in styles.resolve(run_style, "character")]
-        levels += [style.rpr for style in styles.resolve(paragraph_style, "paragraph")]
-        # ``table_style`` is already resolved: None outside a table, where no table style applies.
-        levels += [style.rpr for style in styles.chain(table_style)]
+        # Each kind of style with its basedOn chain, nearest first: the character, paragraph and
+        # (inside a table only; ``table_style`` is already resolved) table style.
+        self.chains = [
+            [style.rpr for style in styles.resolve(run_style, "character")],
+            [style.rpr for style in styles.resolve(paragraph_style, "paragraph")],
+            [style.rpr for style in styles.chain(table_style)],
+        ]
+        self.mark = mark
+        levels: list[ET.Element | None] = [mark, *(rpr for chain in self.chains for rpr in chain)]
         levels.append(styles.default_rpr)
         self.inherited = [level for level in levels if level is not None]
 
     def toggle(self, name: str) -> bool:
-        """True when the run asserts it, or when it is silent and any level asserts it."""
+        """True when the run asserts it, or when it is silent and any level asserts it.
+
+        The cautious reading, for hiding: it may find a property where Word's rules cancel it
+        (``shown``), never miss one.
+        """
         direct = _on(self.direct.find(_w(name))) if self.direct is not None else None
         if direct is not None:
             return direct
         return any(_on(level.find(_w(name))) for level in self.inherited)
+
+    def shown(self, name: str) -> bool:
+        """Whether Word shows a toggle property (bold, italic, caps, strike...) on this run.
+
+        Word's rules, each its answer to a case in corpus/numbering-cases (emphasis-toggles,
+        emphasis-defaults): the run's own setting wins, on or off; otherwise each kind of style
+        (character, paragraph, table) gives the nearest setting in its basedOn chain, and the
+        kinds cancel in pairs (on with on is off, three on are on); the document defaults turn it
+        on whatever the styles give. A list label (``mark``) is read the cautious way.
+        """
+        if self.mark is not None:
+            return self.toggle(name)
+        direct = _on(self.direct.find(_w(name))) if self.direct is not None else None
+        if direct is not None:
+            return direct
+        shown = False
+        for chain in self.chains:
+            setting = next(
+                (
+                    v
+                    for rpr in chain
+                    if rpr is not None and (v := _on(rpr.find(_w(name)))) is not None
+                ),
+                False,
+            )
+            shown ^= setting
+        default = self.styles.default_rpr
+        return shown or bool(default is not None and _on(default.find(_w(name))))
 
     def value(self, name: str, attribute: str = "val") -> str | None:
         for level in [self.direct, *self.inherited]:
@@ -1169,7 +1215,7 @@ class _ParagraphReader:
             kinds.append(vertical)
         if properties.value("position") not in (None, "0"):
             kinds.append("position")
-        kinds += [name for name in _TOGGLE_MARKS if properties.toggle(name)]
+        kinds += [kind for name, kind in _TOGGLE_MARKS.items() if properties.shown(name)]
         highlight = properties.value("highlight")
         if highlight not in (None, "none"):
             kinds.append(f"highlight-{highlight}")

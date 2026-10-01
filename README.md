@@ -7,10 +7,11 @@ normalises, trims or repairs.
 - **True to the source.** Characters are copied as stored. Tabs, breaks, non-breaking and soft
   hyphens become their characters; Symbol-font glyphs (the "≥" and "°" Word stores as
   `<w:sym w:font="Symbol" w:char="F0B3"/>`) become their Unicode characters through a closed
-  table; a picture is U+FFFC where it stands. Formatting that changes meaning (superscript,
-  subscript, underline, strike, caps, highlight, shading, hidden paragraph marks, faint text...)
-  is reported as ranges over the text, never folded into it: `10` with a superscript `9` is
-  `"109"` plus a superscript mark on the `9`.
+  table; a picture is U+FFFC where it stands. Formatting that changes meaning (bold, italic,
+  superscript, subscript, underline, strike, caps, highlight, shading, hidden paragraph marks,
+  faint text...) is reported as ranges over the text, never folded into it: `10` with a
+  superscript `9` is `"109"` plus a superscript mark on the `9`. Bold, italic, capitals and
+  strike-through follow Word's own rules, where two styles that both set one cancel out.
 - **List labels as Word draws them.** "4.8", "b)", "•" are computed from the numbering part by
   Word's rules, and reported beside the text (never inserted into it). The rules are held to
   Microsoft Word's own answers for every corpus document (`corpus/*/word.json`).
@@ -201,9 +202,8 @@ downloads.
   serves one. Save them as .docx in Word first.
 - **Documents with tracked changes** are refused, not resolved. Accept or reject all changes in
   Word first; which text is "the label" is a decision the reader will not make.
-- Some marks are conservative: a toggle property (caps, strike) set at any level of the style
-  hierarchy is reported even where Word's toggle rules would cancel it. It can over-report a
-  mark; it never under-reports one.
+- **Font size, colour, font and alignment** are not reported (faint text aside: white, tiny or
+  squeezed text is marked).
 
 ## How the claims are held
 
@@ -219,6 +219,7 @@ table below is the short form.
 | Every corpus list label and note mark is the one Word draws      | `tests/test_word_oracle.py`  |
 | Fields are read only where Word prints what it shows            | `tests/test_word_oracle.py`  |
 | Every document read is one Word prints as it shows it            | `tests/test_word_oracle.py`  |
+| Bold, italic, caps and strike are what Word shows, paragraph by paragraph | `tests/test_word_oracle.py` |
 | The numbering cases are what their script writes, byte for byte  | `tests/test_corpus.py`       |
 | The EMA template's 7 Symbol bullets and 9 Word 6 dashes          | `tests/test_reader.py`       |
 | A .doc, or a zip that is not the whole file, is never read        | `tests/test_reader.py`       |
@@ -293,4 +294,7 @@ and refuses a .doc under a .docx name, which 1.4.0 opened as the zip of its them
 footnotes and endnotes (`label-docx-json/1.2.0`), their marks numbered by the rules Word showed:
 the section's settings, not the document's, and start plus the notes before. 1.7.0 reads SEQ and
 STYLEREF fields whose stored result is what Word prints, by rules Word answered in 11 cases.
-1.8.0 names a PDF in its refusal, for the ingestion service.
+1.8.0 names a PDF in its refusal, for the ingestion service. 1.9.0 verifies cross-references
+(REF, NOTEREF), which Word reprints. 1.10.0 reads tables of contents and places page numbers.
+1.11.0 reports bold and italic, and every toggle by Word's rules (two styles cancel), held to
+Word's answer for every corpus paragraph.

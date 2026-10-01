@@ -1,54 +1,54 @@
 {
   "atmp-product-information-template-version-11_bg.docx": {
-    "paragraphsSha256": "8a34977da13cd8167e5c3addc5daa9ef8a9cef0fa4170ed87e0c17db47841d9e",
+    "paragraphsSha256": "837e9fa78353a19cae1008f5176b5639afe0ed0ca14281110e2daeff0feafd66",
     "sha256": "b99d4fec71cfcc28a6923c6062f82d7468011a36e20d9bb9942e3a1d1b50e842"
   },
   "atmp-product-information-template-version-11_el.docx": {
-    "paragraphsSha256": "dc3d4314a4d670902efa539002c984ad44a00d0471fb7de7a798887dc0bb2169",
+    "paragraphsSha256": "c0bc1d3cd5ef525ebfe25b488acd9fc2d9b2c74dc9756060c0b903e65fb6cdb4",
     "sha256": "abc62efb3273c38074dc8a1a5c71458603aaeca3fabdbfbde6a65ca34cb2acfa"
   },
   "atmp-product-information-template-version-11_en.docx": {
-    "paragraphsSha256": "c7406abbc36172440235b631339a9d2575197a2bff4b98a64616011638601158",
+    "paragraphsSha256": "f75aaf275da836a7b0c9a72eb890121a98aa77960f0c1d45c47f813e9cf2bf86",
     "sha256": "82314e8c204360c836f2a8cca35fd625f3b88d99a3678dcdd2514695acdf941d"
   },
   "mutual-recognition-decentralised-referral-product-information-template-version-42_en.docx": {
-    "paragraphsSha256": "3cfd2dc6bfadbc66c0927a587c1f9fbb140066556a91aa4d09fe9e291341ef66",
+    "paragraphsSha256": "f3d6dc7ebcc7201326a6eda7c1c9066d5b71a281db71dc7ed0c77300d0bcba36",
     "sha256": "12af462b1f204731ebc191fe674b549b2b56690742863c7544943709701f432b"
   },
   "mutual-recognition-decentralised-referral-product-information-template-version-42_et.docx": {
-    "paragraphsSha256": "94d8d70691db3734cb88ee89c48674bdda8a9607bad7be1c1ff5d278af8a6a67",
+    "paragraphsSha256": "b3f3e1bb2492c5aab873127b15eacbe4dc1cf1708c6d850c579da2a723f14c37",
     "sha256": "c71142ece1273c5002050c8639a9023bbef04d29153271deadfc86b913039c1a"
   },
   "psusa-nationally-authorised-products-template_en.docx": {
-    "paragraphsSha256": "33e6c1c4d0c900fe53d607526e69041a4734fda94830cc4e5e15ddf4ce972e5d",
+    "paragraphsSha256": "1541b55aece38fea0e0dd27b89c56fc59a3f026eac7cd83194834e34f544880b",
     "sha256": "b91a3f2258687a08e53ea6a351d5fe22ac8a1198baeabf6782fb56e2c51889d6"
   },
   "qrd-annex-iv-conditional-positive-template_en.docx": {
-    "paragraphsSha256": "07d14552f1da5566c9f9208309d15c016407ce909ca9546f51485ea61a371567",
+    "paragraphsSha256": "3af1855e56fc30a334877814ad57d2812023244a984979b05c6695dc4a0b0159",
     "sha256": "336bb1d2fd0b7982d4caf2947d21152b338a5c078eb7a13f640511409a3e044b"
   },
   "qrd-annex-iv-exceptional-circumstances-positive-template_en.docx": {
-    "paragraphsSha256": "0014ade0444d9f3d7dc3a2d6e3ed955ece33d61a179cbae16d72a7d3783d3acb",
+    "paragraphsSha256": "f38a0ed2e77338e754d11900ad57baca6e88a1bca3356a24d638ac7ec7f90e63",
     "sha256": "e1ede3cde3f46e81a8646df0dd6abebc09b9d2b38ee11fd10ab145c33d399629"
   },
   "qrd-annex-iv-standard-positive-template_en.docx": {
-    "paragraphsSha256": "32f8a6ec2e3ab5ed448199bd5ce5faf218fdd50e3c190514a5d0f0de26215012",
+    "paragraphsSha256": "90597941f446941d6f122dcf6f26f7762c72c4d0961f56b7ca1b57b7ebec536e",
     "sha256": "6c5c80ba204ca0e7504a343f572cdad287ae6f6effe15c614791024c89d5bfc8"
   },
   "qrd-annex-related-article-127a-template_en.docx": {
-    "paragraphsSha256": "bf5e0351d4416c22e6a620ee3e7b0062f9145012f7b58348d5cec16e7185c98f",
+    "paragraphsSha256": "87ff62c1989dd50bae7cd461daddd5ed8dc0ea17c73a4fdfcbec6b25642da6bc",
     "sha256": "758769ff386c7893373c428bb197a2d30f917329e38ac49e87a9d350d441fd4c"
   },
   "qrd-annex-template_en.docx": {
-    "paragraphsSha256": "6e77a1429025349217710ad16cf1339e270490a6d8dbc05c2b61e7122ccf903f",
+    "paragraphsSha256": "5b086e44e8235de3bcf2a1f8eb1ecb80680545293362f1bb39c7662abed73b5c",
     "sha256": "7c2abdee2313fda45c8fc1e87d1d9ee9251954b79c9c9c3de1d46913377e2bf4"
   },
   "qrd-annex-template_es.docx": {
-    "paragraphsSha256": "8e563fb27463a9059de340eb54a1872a4df114c4a8fc8e502fabf7fced0ccbce",
+    "paragraphsSha256": "cce905aed3178a565b47eba33f1d89ac6d755e5f3acd52a626994cae1455a683",
     "sha256": "b72a6e90971d35c0c6a27815e7558805127c208062f79b4aae7cd2a861ac56ad"
   },
   "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics-cover-page_en.docx": {
-    "paragraphsSha256": "8753e2263df27caad59c1b7e4ddd7cca4a44f7e6e05ac40e214b70c9c3a0e074",
+    "paragraphsSha256": "a716af10606b633834e443e1db80d49dc30c4d01e87c56e0d2cc1d266ae6140d",
     "sha256": "116d6fdba94491658865b984f7ba0d9ca686cfc166d14034c309502ae5de7746"
   },
   "qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48-undesirable-effects-summary-product-characteristics-cover-page_en.docx": {
@@ -56,11 +56,11 @@
     "sha256": "b88d0a6bc5ecf4817de10e1ecfb310f68ada720499742e214332dd2d55c4cc51"
   },
   "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products-cover-page_en.docx": {
-    "paragraphsSha256": "fd21967d0521c843193311e760ade9a578feac7c24cbf2b6d34d9bcb7206bbe0",
+    "paragraphsSha256": "5019ff9b6f201a9cd73229070bf469c7df1316fe21e226c3a9858fc7fb6cf7d3",
     "sha256": "a9a5a12650d3552697aa9ae8604c4067bd7f7969c5a47df025b92e59ad90f5d0"
   },
   "qrd-appendix-v-adverse-drug-reaction-reporting-details_en.docx": {
-    "paragraphsSha256": "e60b627e2fe8cd6be05d60ac7c96013f91b09e9d0ab90b06b3547c22ae4c0ef8",
+    "paragraphsSha256": "f95267fedc83222c59e578b669ad6b58f2e9493aa4bd5a5e517415e4b3223048",
     "sha256": "819865682208fc41a0105f6ee20b98d637693065dc232a3bb20a02d8273e41a0"
   },
   "qrd-product-information-template-version-104_es.docx": {
@@ -68,7 +68,7 @@
     "sha256": "ec5001be6de714288fc1b89d85fb882cc4773eb25ca1cce60ea558d6016b85c5"
   },
   "qrd-psur-annex-iv-template_en.docx": {
-    "paragraphsSha256": "77ec212aec90f78b524d626b908eb743418176de884a65dc430ca889f0007c01",
+    "paragraphsSha256": "7469d7dfbd17b15cad5706e339811704cd25a7ab14fed79dc1e04d403ea8d6a1",
     "sha256": "34a0e572d1894939df0bbe9989a601c6d7fb860f7277b43d25e29a7fec9b2e43"
   }
 }

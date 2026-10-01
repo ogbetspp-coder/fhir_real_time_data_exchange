@@ -1,5 +1,6 @@
 """The ingestion service: an HTTP API over the store, as a WSGI application.
 
+    GET  /                             a page to read a document by hand (a demonstration)
     POST /v1/documents                 the .docx bytes; answers the receipt (201 first, 200 after)
     GET  /v1/documents/<id>            the reader's result (canonical JSON), read or refused
     GET  /v1/documents/<id>/source     the document's bytes as ingested
@@ -16,6 +17,7 @@ whitespace comes from its Unicode database (``check_environment``).
 
 from __future__ import annotations
 
+import importlib.resources
 import re
 import sys
 import unicodedata
@@ -87,6 +89,11 @@ class Service:
 
     def _route(self, environ: Environ) -> tuple[str, str, bytes, list[tuple[str, str]]]:
         method, path = str(environ.get("REQUEST_METHOD", "")), str(environ.get("PATH_INFO", ""))
+        if path == "/":
+            if method != "GET":
+                return (*_error("405 Method Not Allowed", "use GET"), [("Allow", "GET")])
+            page = importlib.resources.files("label_docx").joinpath("demo.html").read_bytes()
+            return "200 OK", "text/html; charset=utf-8", page, []
         if path == "/v1/health":
             if method != "GET":
                 return (*_error("405 Method Not Allowed", "use GET"), [("Allow", "GET")])

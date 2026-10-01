@@ -279,6 +279,18 @@
       "bytes": 3194
     },
     {
+      "name": "Bold, italic, caps and strike set every way a style can set them (one 'x' each).",
+      "file": "emphasis-toggles.docx",
+      "sha256": "28b1f3f2e06c075a73097e4c17828214940f2edb65b8dd924afe9773ea4f427d",
+      "bytes": 5944
+    },
+    {
+      "name": "The same toggles with the document defaults turning them on.",
+      "file": "emphasis-defaults.docx",
+      "sha256": "21c882458608d310f474348508cddaea519e01862017a6fd5d92ba24af8c7d68",
+      "bytes": 4337
+    },
+    {
       "name": "Footnotes number 1, 2, 3 through the document.",
       "file": "notes-continuous.docx",
       "sha256": "cefb0cc55bb723e6a71b6857618a833487bdbd7ae8eb581dea40498f8bdcec31",

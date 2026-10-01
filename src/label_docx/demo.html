@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Label Reader</title>
+<style>
+  :root {
+    --ink: #1c2430; --muted: #5b6676; --line: #dfe4ea; --page: #f6f8fa; --card: #ffffff;
+    --accent: #1f5fae; --ok: #1e7a46; --ok-bg: #e8f5ee; --stop: #a12a2a; --stop-bg: #fbecec;
+    --mark: #fff4c2; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #e6ebf1; --muted: #9aa6b5; --line: #2c3540; --page: #12171d; --card: #1a2129;
+      --accent: #6aa6ef; --ok: #5fd193; --ok-bg: #16301f; --stop: #f08a8a; --stop-bg: #3a1c1c;
+      --mark: #4a4220;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink);
+         font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+  header { padding: 28px 16px 8px; max-width: 980px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  header p { margin: 0; color: var(--muted); }
+  main { max-width: 980px; margin: 0 auto; padding: 16px; }
+  .drop { display: block; border: 2px dashed var(--line); border-radius: 12px; background: var(--card);
+          padding: 28px 16px; text-align: center; cursor: pointer; transition: border-color .15s; }
+  .drop.over, .drop:hover { border-color: var(--accent); }
+  .drop strong { color: var(--accent); }
+  .drop small { display: block; color: var(--muted); margin-top: 6px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+          padding: 18px 20px; margin-top: 16px; }
+  .verdict { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .badge { font-weight: 600; padding: 4px 10px; border-radius: 999px; font-size: 13px; }
+  .badge.read { color: var(--ok); background: var(--ok-bg); }
+  .badge.refused { color: var(--stop); background: var(--stop-bg); }
+  .facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 12px 0 0;
+           font-size: 13px; }
+  .facts dt { color: var(--muted); }
+  .facts dd { margin: 0; font-family: var(--mono); overflow-wrap: anywhere; }
+  .again { font-size: 13px; color: var(--muted); margin-top: 10px; }
+  .again.same { color: var(--ok); }
+  .refusal { background: var(--stop-bg); color: var(--stop); border-radius: 8px; padding: 12px 14px;
+             margin-top: 12px; }
+  .refusal code { font-family: var(--mono); font-weight: 600; }
+  .doc p { margin: 0 0 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .doc .label { color: var(--accent); font-weight: 600; margin-right: 6px; white-space: pre; }
+  .doc .hidden-mark::after { content: "¶"; color: var(--muted); font-size: 11px; }
+  .doc table { border-collapse: collapse; width: 100%; margin: 4px 0 12px; font-size: 14px; }
+  .doc td { border: 1px solid var(--line); padding: 6px 8px; vertical-align: top; }
+  .doc td p { margin: 0 0 4px; }
+  .note { color: var(--accent); font-size: 11px; vertical-align: super; font-weight: 600; }
+  .page { font-family: var(--mono); font-size: 11px; color: var(--muted); border: 1px dashed var(--line);
+          border-radius: 4px; padding: 0 4px; margin-left: 2px; }
+  .m-bold { font-weight: 700; } .m-italic { font-style: italic; }
+  .m-underline { text-decoration: underline; } .m-strike, .m-dstrike { text-decoration: line-through; }
+  .m-superscript { vertical-align: super; font-size: 0.75em; }
+  .m-subscript { vertical-align: sub; font-size: 0.75em; }
+  .m-caps { text-transform: uppercase; } .m-smallCaps { font-variant: small-caps; }
+  .m-highlight, .m-shading { background: var(--mark); }
+  .m-faint { outline: 1px dotted var(--stop); }
+  .notes h3 { font-size: 14px; margin: 16px 0 6px; color: var(--muted); }
+  details { margin-top: 12px; } summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  pre { font-family: var(--mono); font-size: 12px; background: var(--page); padding: 12px;
+        border-radius: 8px; overflow: auto; max-height: 360px; }
+  .legend { color: var(--muted); font-size: 12px; margin-top: 8px; }
+  .legend span { margin-right: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Label Reader</h1>
+  <p>Exact text from a Word SmPC or Module 3 document, or a refusal with the reason. The same file
+     always gets the same answer, byte for byte.</p>
+</header>
+<main>
+  <label class="drop" id="drop">
+    <input type="file" id="file" accept=".docx" hidden>
+    <strong>Choose a .docx</strong> or drop it here
+    <small>Read on this machine by the local service; nothing leaves it.</small>
+  </label>
+  <section id="out"></section>
+</main>
+<script>
+"use strict";
+const out = document.getElementById("out");
+const drop = document.getElementById("drop");
+const input = document.getElementById("file");
+const receipts = new Map();
+
+function el(tag, attrs = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(attrs)) {
+    if (key === "class") node.className = value; else node.setAttribute(key, value);
+  }
+  for (const child of children) node.append(child);
+  return node;
+}
+
+// The paragraph's text with its marks, note marks and page-number places, as elements.
+function render(paragraph) {
+  const text = Array.from(paragraph.text);  // marks count code points
+  const cuts = new Set([0, text.length]);
+  for (const m of paragraph.marks) { cuts.add(m.start); cuts.add(m.end); }
+  for (const n of paragraph.notes) cuts.add(n.offset);
+  for (const p of paragraph.pages) cuts.add(p);
+  const points = [...cuts].sort((a, b) => a - b);
+  const node = el("p");
+  if (paragraph.numbering && paragraph.numbering.text !== null && paragraph.numbering.numId) {
+    node.append(el("span", { class: "label" }, paragraph.numbering.text));
+  }
+  for (let i = 0; i < points.length; i++) {
+    const at = points[i];
+    for (const n of paragraph.notes) {
+      if (n.offset === at && n.mark !== null) node.append(el("span", { class: "note", title: `${n.kind} ${n.id}` }, n.mark));
+    }
+    for (const p of paragraph.pages) {
+      if (p === at) node.append(el("span", { class: "page", title: "Word sets this page number from the layout" }, "page #"));
+    }
+    if (i + 1 >= points.length) break;
+    const piece = text.slice(at, points[i + 1]).join("");
+    if (!piece) continue;
+    const kinds = paragraph.marks.filter(m => m.start <= at && m.end >= points[i + 1]).map(m => m.kind);
+    const classes = kinds.map(k => "m-" + (k.startsWith("highlight") ? "highlight" : k.startsWith("shading") ? "shading" : k));
+    node.append(classes.length ? el("span", { class: classes.join(" "), title: kinds.join(", ") }, piece) : piece);
+  }
+  if (paragraph.markHidden) node.classList.add("hidden-mark");
+  return node;
+}
+
+// Paragraphs in order, with table cells gathered into tables.
+function body(paragraphs) {
+  const wrap = el("div", { class: "doc" });
+  let table = null, key = null;
+  for (const paragraph of paragraphs) {
+    if (!paragraph.table) { table = null; wrap.append(render(paragraph)); continue; }
+    const [t, row, cell] = paragraph.table;
+    if (!table || key !== t) { table = el("table"); key = t; wrap.append(table); }
+    while (table.rows.length <= row) table.insertRow();
+    const tr = table.rows[row];
+    while (tr.cells.length <= cell) tr.insertCell();
+    tr.cells[cell].append(render(paragraph));
+  }
+  return wrap;
+}
+
+async function ingest(file) {
+  out.replaceChildren(el("div", { class: "card" }, `Reading ${file.name}…`));
+  const bytes = await file.arrayBuffer();
+  const answer = await fetch("/v1/documents", { method: "POST", body: bytes });
+  const receiptText = await answer.text();
+  const receipt = JSON.parse(receiptText);
+  const resultText = await (await fetch(`/v1/documents/${receipt.document}`)).text();
+  const result = JSON.parse(resultText);
+  show(file.name, receipt, receiptText, result, resultText, answer.status);
+}
+
+function show(name, receipt, receiptText, result, resultText, status) {
+  const card = el("div", { class: "card" });
+  const read = receipt.outcome === "read";
+  card.append(el("div", { class: "verdict" },
+    el("span", { class: "badge " + (read ? "read" : "refused") }, read ? "Read exactly" : "Refused"),
+    el("strong", {}, name)));
+  const facts = el("dl", { class: "facts" });
+  const add = (term, value) => facts.append(el("dt", {}, term), el("dd", {}, value));
+  add("Document SHA-256", receipt.document);
+  add("Result SHA-256", receipt.result.sha256);
+  add("Reader", receipt.reader);
+  add("Format", receipt.format);
+  card.append(facts);
+  const seen = receipts.get(receipt.document);
+  const again = el("div", { class: "again" + (seen !== undefined && seen === receiptText ? " same" : "") },
+    seen === undefined
+      ? (status === 201 ? "First time this document was ingested." : "Already kept: this is the stored answer.")
+      : (seen === receiptText ? "Same document again: the receipt is identical, byte for byte." : "Receipt differs from the earlier one."));
+  receipts.set(receipt.document, receiptText);
+  card.append(again);
+  if (!read) {
+    card.append(el("div", { class: "refusal" },
+      el("code", {}, receipt.refusal.code), " — ", receipt.refusal.detail,
+      el("div", { class: "legend" }, "The reader will not guess: nothing is returned for a document it cannot read exactly.")));
+  }
+  out.replaceChildren(card);
+  if (read) {
+    const doc = el("div", { class: "card" });
+    doc.append(el("div", { class: "legend" },
+      el("span", { class: "label" }, "1.2"), el("span", {}, "list label (computed)"),
+      el("span", { class: "note" }, "1"), el("span", {}, "note mark"),
+      el("span", { class: "page" }, "page #"), el("span", {}, "page number (set by layout)")));
+    doc.append(body(result.paragraphs));
+    for (const [kind, notes] of [["Footnotes", result.footnotes], ["Endnotes", result.endnotes]]) {
+      if (!notes.length) continue;
+      const section = el("div", { class: "notes" }, el("h3", {}, kind));
+      for (const note of notes) section.append(body(note.paragraphs));
+      doc.append(section);
+    }
+    out.append(doc);
+  }
+  out.append(el("div", { class: "card" },
+    el("details", {}, el("summary", {}, "Receipt (canonical JSON)"), el("pre", {}, receiptText)),
+    el("details", {}, el("summary", {}, `Result (canonical JSON, ${resultText.length.toLocaleString()} characters)`),
+       el("pre", {}, resultText))));
+}
+
+input.addEventListener("change", () => input.files[0] && ingest(input.files[0]));
+drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+drop.addEventListener("drop", e => {
+  e.preventDefault(); drop.classList.remove("over");
+  if (e.dataTransfer.files[0]) ingest(e.dataTransfer.files[0]);
+});
+</script>
+</body>
+</html>

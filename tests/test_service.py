@@ -265,3 +265,11 @@ def test_a_result_kept_without_its_receipt_is_served_only_after_it_is_read_again
     result.write_bytes(result.read_bytes().replace(b'"text":"', b'"text":"X', 1))
     with pytest.raises(StoreError):
         kept.ingest(TEMPLATE)
+
+
+def test_the_demonstration_page_is_served(tmp_path: Path) -> None:
+    status, headers, page = _call(Service(Store(tmp_path)), "GET", "/")
+    assert status.startswith("200")
+    assert headers["Content-Type"].startswith("text/html")
+    assert b"/v1/documents" in page
+    assert _call(Service(Store(tmp_path)), "POST", "/", b"x")[0].startswith("405")

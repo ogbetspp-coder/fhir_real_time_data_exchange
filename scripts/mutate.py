@@ -8,8 +8,9 @@ the reader's result or make it refuse: if the result is the same, a change went 
 ``miss``). A mutation that changes nothing Word shows (bookkeeping attributes, a run split in two,
 a proofing mark) must leave the result byte-identical: otherwise the reader is not stable (an
 ``unstable``). Some mutations change appearance the reader does not report (bold, italic, size,
-colour, alignment); they are counted as ``unreported`` and must leave the result identical, so
-what the reader is blind to is known and stays the same.
+colour); they are counted as ``unreported`` and must leave the result identical, so what the
+reader is blind to is known and stays the same. Bold and italic, reported since docx-reader
+1.11.0, are changes.
 
 The result compared is the reader's canonical JSON without its ``source`` (which names the bytes
 and so always differs). Mutants are chosen by a generator seeded with the document's SHA-256, so a
@@ -42,6 +43,9 @@ _ILVL = re.compile(r'<w:ilvl w:val="(\d)"/>')
 _SYM = re.compile(r'(<w:sym\b[^>]*w:char=")([0-9A-Fa-f]{2,4})(")')
 
 type Mutator = Callable[[str, random.Random], str | None]
+
+# The document's styles part, for the toggle mutations (set by ``outcomes`` for each document).
+_STYLES = {"xml": ""}
 
 
 class Mutation(NamedTuple):
@@ -172,9 +176,43 @@ def superscript(xml: str, rng: random.Random) -> str | None:
     return _with_property(xml, rng, '<w:vertAlign w:val="superscript"/>', "vertAlign")
 
 
+def _flip(xml: str, rng: random.Random, tag: str) -> str | None:
+    """A run's toggle ``tag`` turned the other way, so that Word shows a change.
+
+    A run's own setting wins in Word, so flipping one always shows. A run without one is given
+    one only where no style or default in the document sets the toggle, so it was off.
+    """
+    # Word writes both <w:b/> and <w:b /> (and never matches <w:bCs/> here).
+    setting = re.compile(rf'<w:{tag}(?:\s+w:val="(\w+)")?\s*/>')
+    styled = bool(setting.search(_STYLES["xml"]))
+    aside = _page_numbers(xml)
+    runs = []
+    for m in _RUN.finditer(xml):
+        properties = re.search(r"<w:rPr>.*?</w:rPr>", m.group(0), re.S)
+        direct = setting.search(properties.group(0)) if properties else None
+        if _visible_texts(m.group(0)) and _outside(aside, m.start()) and (direct or not styled):
+            runs.append(m)
+    match = _pick(runs, rng)
+    if match is None:
+        return None
+    run = match.group(0)
+    properties = re.search(r"<w:rPr>.*?</w:rPr>", run, re.S)
+    direct = setting.search(properties.group(0)) if properties else None
+    if properties and direct:
+        on = direct.group(1) not in ("0", "false", "off")
+        flipped = f'<w:{tag} w:val="{"0" if on else "1"}"/>'
+        start = properties.start() + direct.start()
+        changed = run[:start] + flipped + run[properties.start() + direct.end() :]
+    elif properties:
+        changed = run.replace("<w:rPr>", f"<w:rPr><w:{tag}/>", 1)
+    else:
+        changed = re.sub(r"(<w:r(?:\s[^>]*)?>)", rf"\1<w:rPr><w:{tag}/></w:rPr>", run, count=1)
+    return xml[: match.start()] + changed + xml[match.end() :]
+
+
 def strike(xml: str, rng: random.Random) -> str | None:
-    """A run of text is struck through."""
-    return _with_property(xml, rng, "<w:strike/>", "strike")
+    """A run of text is struck through, or no longer."""
+    return _flip(xml, rng, "strike")
 
 
 def hide(xml: str, rng: random.Random) -> str | None:
@@ -255,13 +293,13 @@ def language(xml: str, rng: random.Random) -> str | None:
 
 
 def bold(xml: str, rng: random.Random) -> str | None:
-    """A run of text is made bold."""
-    return _with_property(xml, rng, "<w:b/>", "<w:b")
+    """A run of text is made bold, or no longer."""
+    return _flip(xml, rng, "b")
 
 
 def italic(xml: str, rng: random.Random) -> str | None:
-    """A run of text is made italic."""
-    return _with_property(xml, rng, "<w:i/>", "<w:i")
+    """A run of text is made italic, or no longer."""
+    return _flip(xml, rng, "i")
 
 
 def size(xml: str, rng: random.Random) -> str | None:
@@ -283,8 +321,8 @@ MUTATIONS = [
     Mutation("split a run", "same", split_run),
     Mutation("proofing mark", "same", proofing),
     Mutation("proofing language", "same", language),
-    Mutation("bold", "unreported", bold),
-    Mutation("italic", "unreported", italic),
+    Mutation("bold", "change", bold),
+    Mutation("italic", "change", italic),
     Mutation("font size", "unreported", size),
 ]
 
@@ -315,6 +353,10 @@ def outcomes(data: bytes, per: int) -> list[tuple[str, str, str]]:
         return []
     with zipfile.ZipFile(io.BytesIO(data)) as source:
         xml = source.read(DOCUMENT).decode("utf-8")
+        names = source.namelist()
+        _STYLES["xml"] = (
+            source.read("word/styles.xml").decode("utf-8") if "word/styles.xml" in names else ""
+        )
     rng = random.Random(hashlib.sha256(data).hexdigest())
     out: list[tuple[str, str, str]] = []
     for mutation in MUTATIONS:
