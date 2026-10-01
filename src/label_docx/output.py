@@ -20,6 +20,13 @@ each with its ``id``, ``mark`` and ``paragraphs``. Each paragraph's ``pages`` li
 where Word draws a page number (a table of contents' PAGEREF, a PAGE field): Word sets it from
 the page layout when it prints, so its value is never in ``text`` and never known.
 
+``certificate`` is the independent conservation check's account of the read
+(``label_docx.certify``): how many characters the source's text holds, how many the output
+holds, and how many were set aside and why (field code, page numbers, page breaks, hidden
+whitespace), with the parts holding text the reader does not read. The check found every
+character of the output in the source, in order, and every source character in the output or
+set aside; a read it cannot account for is refused as ``uncertified``.
+
 A refusal::
 
     {"format": ..., "reader": ..., "refusal": {"code": ..., "detail": ...}, "source": {...}}
@@ -32,13 +39,16 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable
 
+from label_docx.certify import DocxSource
 from label_docx.reader import READER_VERSION, DocxRefusedError, Note, Paragraph, read_document
 
 # The version of the shape above. A change to this file changes its hash in versions.lock.json.
 # 1.1.0 adds numbering.text and numbering.suffix, the list label; 1.2.0 adds paragraphs' notes
-# and the footnotes and endnotes; 1.3.0 adds paragraphs' pages, where Word draws a page number.
-FORMAT_VERSION = "label-docx-json/1.3.0"
+# and the footnotes and endnotes; 1.3.0 adds paragraphs' pages, where Word draws a page number;
+# 1.4.0 adds the certificate, and refuses a read the conservation check cannot account for.
+FORMAT_VERSION = "label-docx-json/1.4.0"
 
 type Json = str | int | bool | list[Json] | dict[str, Json] | None
 
@@ -102,4 +112,21 @@ def read(data: bytes) -> tuple[bytes, bool]:
     envelope["paragraphs"] = paragraphs(list(document.body))
     envelope["footnotes"] = notes(document.footnotes)
     envelope["endnotes"] = notes(document.endnotes)
+    return certified(envelope, lambda: DocxSource(data).certify(envelope))
+
+
+def certified(
+    envelope: dict[str, Json], certify: Callable[[], dict[str, Json]]
+) -> tuple[bytes, bool]:
+    """``envelope`` with its certificate, or refused as ``uncertified`` if the check fails.
+
+    The check (``label_docx.certify``) reads the source again on its own; a result it cannot
+    account for character by character is never served, whatever the reason.
+    """
+    try:
+        envelope["certificate"] = certify()
+    except Exception as error:  # noqa: BLE001 - any failure of the check is a refusal
+        refused = {k: envelope[k] for k in ("format", "reader", "source")}
+        refused["refusal"] = {"code": "uncertified", "detail": str(error) or type(error).__name__}
+        return canonical(refused), False
     return canonical(envelope), True

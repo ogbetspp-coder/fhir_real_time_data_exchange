@@ -189,4 +189,8 @@ def _receipt(document: str, result: bytes, value: dict[str, Json], reading: Kind
     }
     if "refusal" in value:
         receipt["refusal"] = value["refusal"]
+    if "certificate" in value:
+        # The independent check's account of the read: what the source held, what the output
+        # holds, and what was set aside and why.
+        receipt["certificate"] = value["certificate"]
     return canonical(receipt)

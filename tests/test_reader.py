@@ -942,6 +942,34 @@ def test_a_damaged_zip_directory_is_refused_not_raised() -> None:
         assert caught.value.code == "invalid-package"
 
 
+def test_a_damaged_part_the_reader_does_not_read_refuses_the_package() -> None:
+    # A header the reader never opens, its bytes changed after its checksum was written.
+    good = docx(p(r("<w:t>hello</w:t>")))
+    out = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(good)) as source, zipfile.ZipFile(out, "w") as target:
+        for info in source.infolist():
+            target.writestr(info, source.read(info))
+        target.writestr("word/header1.xml", f'<w:hdr xmlns:w="{W}"/>')
+    data = out.getvalue()
+    at = data.index(b"<w:hdr")
+    damaged = data[:at] + b"<w:hdX" + data[at + 6 :]
+    with pytest.raises(DocxRefusedError) as caught:
+        read_docx(damaged)
+    assert caught.value.code == "invalid-package"
+    assert "header1.xml" in caught.value.detail
+
+
+def test_parts_over_the_package_cap_are_refused_before_unpacking(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import label_docx.reader as module
+
+    monkeypatch.setattr(module, "MAX_PACKAGE_BYTES", 100)
+    with pytest.raises(DocxRefusedError) as caught:
+        read_docx(docx(p(r("<w:t>hello</w:t>"))))
+    assert caught.value.code == "invalid-package"
+
+
 def test_a_field_nested_before_the_code_hides_the_code_and_is_refused() -> None:
     begin = r('<w:fldChar w:fldCharType="begin"/>')
     separate = r('<w:fldChar w:fldCharType="separate"/>')

@@ -29,6 +29,12 @@ normalises, trims or repairs.
   module docstring of [`src/label_docx/reader.py`](src/label_docx/reader.py).
 - **Deterministic.** Canonical JSON output (RFC 8785 form for these values); byte-identical
   across processes, hash seeds and locales, and however the .docx is zipped.
+- **Proved for every document.** An independent check (`label_docx.certify`) reads the source
+  again with its own parser and certifies each read: every output character is the source's,
+  in order, and every source character is in the output or set aside for a stated reason
+  (field code, page numbers...). A read it cannot account for is refused (`uncertified`), never
+  served. The certificate is in the result and the receipt; see
+  [docs/conservation.md](docs/conservation.md).
 - **No runtime dependencies.** The standard library only (`zipfile`, `xml.etree`).
 
 It also reads **EMA electronic product information (ePI)**, the FHIR document Bundles the EMA
@@ -236,7 +242,7 @@ downloads.
 
 ## How the claims are held
 
-`docs/requirements.md` lists the requirements (R-01 to R-23) with the tests that prove each; the
+`docs/requirements.md` lists the requirements (R-01 to R-27) with the tests that prove each; the
 table below is the short form.
 
 | Claim                                                            | Where                        |
@@ -262,6 +268,9 @@ table below is the short form.
 | The interpreter's Unicode database is the pinned one (16.0.0)    | `tests/test_environment.py`  |
 | Each ePI rule, read as a browser shows it or refused             | `tests/test_epi.py`          |
 | Every ePI section read is what Chrome shows, text and marks      | `tests/test_browser_oracle.py` |
+| Every read is certified character by character by an independent check | `tests/test_certify.py` |
+| The check refuses all 9,192 changed results tried, of 16 kinds    | `tests/test_certify.py`      |
+| Damaged files are refused or certified, never an error           | `tests/test_robustness.py`   |
 
 ## Set-up and checks
 

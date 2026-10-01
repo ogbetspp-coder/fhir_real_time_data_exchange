@@ -19,12 +19,16 @@ refuse. Every rule below serves that.
 - **ePI follows the browser.** A change to how an ePI section is read is held to headless
   Chrome (`scripts/browser_oracle.py record corpus/ema-epi`); where the browser's answer is not
   on record, refuse the section.
+- **Never serve an uncertified read.** Every result passes `label_docx.certify`, which reads
+  the source on its own; never make it share logic with the readers, and never widen what it
+  lets the reader choose (Symbol table, hidden whitespace) without a test and a line in
+  `docs/conservation.md`. A change it does not catch is a missing check, not a flaky test.
 - **Trace every test.** `docs/requirements.md` names, for each requirement, the tests that prove
   it; a new test goes there, and `tests/test_traceability.py` fails on a test that proves nothing
   or a requirement that names a test that is gone.
 - **Version every change.** Changing `src/label_docx/reader.py` means bumping `READER_VERSION`;
-  changing `src/label_docx/output.py` means bumping `FORMAT_VERSION`; the same for `epi.py`
-  and `epi_output.py`. Then run `scripts/lock.py` and review the diff of
+  changing `src/label_docx/output.py` or `certify.py` means bumping `FORMAT_VERSION`; the same
+  for `epi.py` and `epi_output.py`. Then run `scripts/lock.py` and review the diff of
   `corpus/*/expected.json`. Never re-lock a version to other code.
 - **Public or synthetic documents only** in `corpus/` and in tests, each set with a
   `sources.json`. No client or confidential labels in the repository.

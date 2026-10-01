@@ -39,6 +39,10 @@
   .section h3 { font-size: 15px; margin: 18px 0 8px; padding-top: 10px; border-top: 1px solid var(--line); }
   .section .section h3 { font-size: 14px; border-top: 0; padding-top: 0; }
   .section .refusal { margin: 4px 0 12px; }
+  .proof { background: var(--ok-bg); color: var(--ink); border-radius: 8px; padding: 12px 14px; margin-top: 12px; font-size: 13px; }
+  .proof strong { color: var(--ok); }
+  .proof .sum { font-family: var(--mono); margin: 6px 0; overflow-wrap: anywhere; }
+  .proof ul { margin: 6px 0 0; padding-left: 18px; }
   .facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 12px 0 0;
            font-size: 13px; }
   .facts dt { color: var(--muted); }
@@ -149,6 +153,32 @@ function body(paragraphs) {
   return wrap;
 }
 
+// The independent check's account: every source character in the output or set aside.
+function proof(c, isEpi) {
+  const n = x => Number(x).toLocaleString();
+  const box = el("div", { class: "proof" },
+    el("strong", {}, "Certified: every character accounted for. "),
+    "A separate checker read the original file again by itself and matched the result to it, character by character, in order.");
+  if (isEpi) {
+    const kept = c.source.characters - c.source.whitespace;
+    box.append(el("div", { class: "sum" },
+      `${n(kept)} characters of text + ${n(c.output.spaces)} spaces + ${n(c.source.breaks - c.setAside.closingBreaks)} line breaks + ${n(c.source.pictures)} pictures = ${n(c.output.characters)} characters out`),
+      el("div", {}, `${n(c.setAside.collapsedWhitespace)} extra whitespace characters drawn as one space, as a browser draws them; ${n(c.setAside.closingBreaks)} breaks ending a paragraph draw nothing.`));
+  } else {
+    const src = c.source.textCharacters + c.source.instructionCharacters + c.source.elements;
+    const aside = c.setAside;
+    box.append(el("div", { class: "sum" },
+      `${n(src)} in the source = ${n(c.output.characters)} in the output + ${n(aside.fieldCode)} field code + ${n(aside.pageNumbers)} page numbers + ${n(aside.pageBreaks)} page breaks + ${n(aside.hiddenWhitespace)} hidden spaces`));
+    if (c.symbolMapped) box.append(el("div", {}, `${n(c.symbolMapped)} Symbol-font characters drawn as their Unicode characters (such as ≥).`));
+  }
+  const notRead = Object.entries(c.notRead).filter(([, v]) => v);
+  if (notRead.length) {
+    box.append(el("div", {}, "Not read, and so not in the result (listed so nothing is left out unseen):"),
+      el("ul", {}, ...notRead.map(([k, v]) => el("li", {}, `${k}: ${n(v)} ${k === "narratives" ? "narrative(s)" : "characters"}`))));
+  }
+  return box;
+}
+
 // An ePI section: its title, its paragraphs or why it was refused, then the sections inside it.
 function section(item) {
   const wrap = el("div", { class: "section" }, el("h3", {}, item.title));
@@ -200,6 +230,7 @@ function show(name, receipt, receiptText, result, resultText, status) {
       el("code", {}, receipt.refusal.code), " — ", receipt.refusal.detail,
       el("div", { class: "legend" }, "The reader will not guess: nothing is returned for a document it cannot read exactly.")));
   }
+  if (result.certificate) card.append(proof(result.certificate, result.sections !== undefined));
   out.replaceChildren(card);
   if (read) {
     const doc = el("div", { class: "card" });

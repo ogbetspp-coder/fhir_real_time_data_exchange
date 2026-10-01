@@ -16,6 +16,10 @@ Each section, in the Composition's order, carries its ``code``, ``title``, ``par
 ``sections``. A section the reader refuses does not stop the others: a consumer must look at
 every section's ``refusal``, which ``refusedSections`` counts.
 
+``certificate`` is the independent conservation check's account (``label_docx.certify``):
+every character of every section read is the div's, in order, with each run of whitespace drawn
+as at most one space; a read it cannot account for is refused as ``uncertified``.
+
 A refusal of the whole document::
 
     {"format": ..., "reader": ..., "refusal": {"code": ..., "detail": ...}, "source": {...}}
@@ -25,11 +29,13 @@ from __future__ import annotations
 
 import hashlib
 
+from label_docx.certify import EpiSource
 from label_docx.epi import READER_VERSION, EpiRefusedError, Section, read_epi, walk
-from label_docx.output import Json, canonical, paragraphs
+from label_docx.output import Json, canonical, certified, paragraphs
 
 # The version of the shape above. A change to this file changes its hash in versions.lock.json.
-FORMAT_VERSION = "label-epi-json/1.0.0"
+# 1.1.0 adds the certificate, and refuses a read the conservation check cannot account for.
+FORMAT_VERSION = "label-epi-json/1.1.0"
 
 
 def section(item: Section) -> dict[str, Json]:
@@ -67,4 +73,4 @@ def read(data: bytes) -> tuple[bytes, bool]:
     envelope["quirks"] = list(document.quirks)
     envelope["sections"] = [section(item) for item in document.sections]
     envelope["refusedSections"] = sum(1 for s in walk(document.sections) if s.refusal)
-    return canonical(envelope), True
+    return certified(envelope, lambda: EpiSource(data).certify(envelope))

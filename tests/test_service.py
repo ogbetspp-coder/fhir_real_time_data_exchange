@@ -330,3 +330,13 @@ def test_an_epi_over_http_names_its_reader_and_its_source_type(tmp_path: Path) -
     assert headers["Content-Type"].endswith("wordprocessingml.document")
     readers = json.loads(health())["readers"]
     assert readers["epi"] == {"format": documents.EPI.format, "reader": documents.EPI.reader}
+
+
+def test_the_receipt_carries_the_certificate_of_the_read(tmp_path: Path) -> None:
+    for data in (TEMPLATE, EPI):
+        ingested = Store(tmp_path).ingest(data)
+        receipt, result = json.loads(ingested.receipt), json.loads(ingested.result)
+        assert receipt["certificate"] == result["certificate"]
+        assert receipt["certificate"]["output"]["characters"] > 0
+    refused = json.loads(Store(tmp_path).ingest(REFUSED).receipt)
+    assert "certificate" not in refused

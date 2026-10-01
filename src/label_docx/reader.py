@@ -159,7 +159,8 @@ What it refuses (``DocxRefusedError.code``):
 - ``invalid-package``: not a readable .docx (a PDF or a Word 97-2003 document is named as one),
   no main document relationship, a part name that
   occurs twice (ignoring case), a related part that is missing or duplicated, a part that
-  cannot be read (bad checksum, truncated, encrypted), a part that is not UTF-8 or declares
+  cannot be read (bad checksum, truncated, encrypted), any part damaged, read or not, parts over
+  ``MAX_PACKAGE_BYTES`` together, an XML part, read or not, that is not UTF-8 or declares
   another encoding, a DTD, a part over the size cap, a style id defined twice, a list number
   that is not a number, a note defined twice, referred to twice, or referred to and not there.
 - ``stray-text``: character data in the main document part outside ``<w:t>`` and
@@ -205,8 +206,10 @@ from dataclasses import dataclass, field, replace
 # prints; 1.8.0 names a PDF in its refusal; 1.9.0 computes REF and NOTEREF, which Word reprints,
 # and refuses them where the stored result is not what it prints; 1.10.0 reads tables of
 # contents, which Word prints as stored, and places page numbers, which it sets from the layout;
-# 1.11.0 reports bold and italic, and every toggle as Word shows it (two styles cancel).
-READER_VERSION = "docx-reader/1.11.0"
+# 1.11.0 reports bold and italic, and every toggle as Word shows it (two styles cancel); 1.12.0
+# reads only a whole package: every part, read or not, must be intact (its checksum), and the
+# parts together under a size cap.
+READER_VERSION = "docx-reader/1.12.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -217,6 +220,8 @@ PICTURE_URI = "http://schemas.openxmlformats.org/drawingml/2006/picture"
 OBJECT = "\ufffc"
 
 MAX_PART_BYTES = 20 * 1024 * 1024
+# The parts of one package together, as their headers declare them, before any is unpacked.
+MAX_PACKAGE_BYTES = 256 * 1024 * 1024
 
 
 def _w(tag: str) -> str:
@@ -533,11 +538,26 @@ class _Package:
         if min((info.header_offset for info in self.zip.infolist()), default=0) != 0:
             # The central directory places the first part after the start of the data.
             raise DocxRefusedError("invalid-package", "bytes before the zip archive")
+        if sum(info.file_size for info in self.zip.infolist()) > MAX_PACKAGE_BYTES:
+            raise DocxRefusedError("invalid-package", f"parts over {MAX_PACKAGE_BYTES} bytes")
+        try:
+            # Every part unpacked and its checksum compared, the ones the reader reads and the
+            # ones it does not: a damaged package is not the document its author saved.
+            damaged = self.zip.testzip()
+        except Exception as error:  # zipfile raises many types for a damaged entry
+            raise DocxRefusedError("invalid-package", "a part cannot be unpacked") from error
+        if damaged is not None:
+            raise DocxRefusedError("invalid-package", f"{damaged} is damaged (bad checksum)")
         names = self.zip.namelist()
         # Part names in a package are compared without regard to case (ECMA-376 Part 2).
         if len({name.lower() for name in names}) != len(names):
             raise DocxRefusedError("invalid-package", "a part name occurs twice")
         self.names = set(names)
+        # Every XML part, read or not, must be one the reader could read: UTF-8, no DTD,
+        # well-formed. A part Word could not open is not the document its author saved.
+        for name in sorted(names):
+            if name.endswith((".xml", ".rels")):
+                self.part(name)
 
     def part(self, name: str) -> ET.Element | None:
         if name not in self.names:

@@ -23,7 +23,7 @@ import json
 import sys
 from pathlib import Path
 
-from label_docx import documents, epi, epi_output, output, reader
+from label_docx import certify, documents, epi, epi_output, output, reader
 from label_docx.epi import EpiRefusedError, read_epi
 from label_docx.output import FORMAT_VERSION, canonical
 from label_docx.reader import READER_VERSION, DocxRefusedError, read_docx
@@ -43,13 +43,14 @@ def current_versions() -> dict[str, tuple[str, str]]:
     """Each component's current version and the hash of the file that decides it."""
     return {
         "reader": (READER_VERSION, _sha256(Path(reader.__file__))),
-        "format": (FORMAT_VERSION, _sha256(Path(output.__file__))),
+        # From label-docx-json/1.4.0 the format is also decided by the check that certifies it.
+        "format": (FORMAT_VERSION, _sha256(Path(output.__file__), Path(str(certify.__file__)))),
         "epi-reader": (epi.READER_VERSION, _sha256(Path(epi.__file__))),
         # The ePI format is written by epi_output with output's paragraphs, for the documents
         # documents.kind sends it.
         "epi-format": (
             epi_output.FORMAT_VERSION,
-            _sha256(*(Path(str(m.__file__)) for m in (epi_output, output, documents))),
+            _sha256(*(Path(str(m.__file__)) for m in (epi_output, output, documents, certify))),
         ),
     }
 

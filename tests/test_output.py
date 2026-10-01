@@ -8,10 +8,10 @@ from pathlib import Path
 
 import pytest
 
-from label_docx import epi, epi_output
+from label_docx import epi, epi_output, output
 from label_docx.cli import main
 from label_docx.output import FORMAT_VERSION, Json, canonical, read
-from label_docx.reader import READER_VERSION
+from label_docx.reader import READER_VERSION, Paragraph
 
 TEMPLATE = (
     Path(__file__).resolve().parents[1]
@@ -27,7 +27,15 @@ def test_a_read_is_canonical_and_names_its_source_and_versions() -> None:
     assert ok
     value = json.loads(result)
     assert result == canonical(value)
-    assert sorted(value) == ["endnotes", "footnotes", "format", "paragraphs", "reader", "source"]
+    assert sorted(value) == [
+        "certificate",
+        "endnotes",
+        "footnotes",
+        "format",
+        "paragraphs",
+        "reader",
+        "source",
+    ]
     assert (value["format"], value["reader"]) == (FORMAT_VERSION, READER_VERSION)
     assert value["source"] == {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
     first = value["paragraphs"][0]
@@ -114,3 +122,35 @@ def test_an_epi_result_is_canonical_and_names_its_source_and_versions() -> None:
     refused, ok = epi_output.read(b"{}")
     assert not ok
     assert json.loads(refused)["refusal"]["code"] == "invalid-bundle"
+
+
+def test_a_read_the_check_cannot_account_for_is_refused_not_served(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A reader fault, simulated: one character of the template's text dropped on its way out.
+    data = TEMPLATE.read_bytes()
+    original = output.paragraphs
+
+    def faulty(items: list[Paragraph]) -> list[Json]:
+        out = original(items)
+        first = next(p for p in out if isinstance(p, dict) and p["text"])
+        first["text"] = first["text"][1:]  # type: ignore[index]
+        return out
+
+    monkeypatch.setattr(output, "paragraphs", faulty)
+    result, ok = output.read(data)
+    value = json.loads(result)
+    assert not ok
+    assert value["refusal"]["code"] == "uncertified"
+    assert sorted(value) == ["format", "reader", "refusal", "source"]
+
+
+def test_any_failure_of_the_check_is_a_refusal() -> None:
+    envelope: dict[str, Json] = {"format": "f", "reader": "r", "source": {}}
+
+    def broken() -> dict[str, Json]:
+        raise KeyError
+
+    result, ok = output.certified(envelope, broken)
+    assert not ok
+    assert json.loads(result)["refusal"] == {"code": "uncertified", "detail": "KeyError"}
