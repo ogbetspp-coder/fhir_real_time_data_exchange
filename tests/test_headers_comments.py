@@ -339,6 +339,7 @@ def test_the_check_never_reads_a_comment_mark_inside_a_comment() -> None:
     value["comments"][0]["paragraphs"] = [
         {
             "comments": [{"id": 0, "offset": 0}],
+            "marks": [],
             "notes": [],
             "pages": [],
             "table": None,

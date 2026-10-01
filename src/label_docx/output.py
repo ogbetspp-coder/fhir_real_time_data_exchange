@@ -70,8 +70,8 @@ from label_docx.reader import (
 # 1.4.0 adds the certificate, and refuses a read the conservation check cannot account for;
 # 1.5.0 certifies with conservation-check/1.1.0, which leaves the reader no choice of reading;
 # 1.6.0 adds the headers, footers and comments, and each paragraph's comment marks, certified
-# by conservation-check/1.2.0.
-FORMAT_VERSION = "label-docx-json/1.6.0"
+# by conservation-check/1.2.0; 1.7.0 certified by 1.3.0, which also works out the key marks.
+FORMAT_VERSION = "label-docx-json/1.7.0"
 
 type Json = str | int | bool | list[Json] | dict[str, Json] | None
 

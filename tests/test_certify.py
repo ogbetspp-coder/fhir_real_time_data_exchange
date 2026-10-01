@@ -23,7 +23,14 @@ from typing import Any
 import pytest
 
 from label_docx import epi_output, output
-from label_docx.certify import CertificationError, DocxSource, EpiSource, certify_docx, certify_epi
+from label_docx.certify import (
+    CHECKED_MARKS,
+    CertificationError,
+    DocxSource,
+    EpiSource,
+    certify_docx,
+    certify_epi,
+)
 from label_docx.output import canonical
 from test_reader import W, docx
 
@@ -298,6 +305,35 @@ def _hide_a_refusal(value: dict[str, Any], rng: random.Random) -> bool:
     return True
 
 
+def _change_a_mark(value: dict[str, Any], rng: random.Random) -> bool:
+    # A Word document's bold, italic, capitals, strike, super- or subscript or underline added
+    # where Word shows none, or taken away where it shows one, or moved by a character.
+    if "sections" in value:
+        return False
+    paragraph = _texted(value, rng)
+    if paragraph is None:
+        return False
+    checked = sorted(CHECKED_MARKS)
+    own = [m for m in paragraph["marks"] if m["kind"] in checked]
+    roll = rng.random()
+    if own and roll < 0.4:
+        paragraph["marks"].remove(rng.choice(own))
+    elif own and roll < 0.6:
+        mark = rng.choice(own)
+        if mark["end"] < len(paragraph["text"]):
+            mark["end"] += 1
+        else:
+            mark["start"] = max(0, mark["start"] - 1) if mark["start"] else mark["start"] + 1
+            if mark["start"] >= mark["end"]:
+                paragraph["marks"].remove(mark)
+    else:
+        at = rng.randrange(len(paragraph["text"]))
+        present = {m["kind"] for m in own if m["start"] <= at < m["end"]}
+        missing = [k for k in checked if k not in present]
+        paragraph["marks"].append({"start": at, "end": at + 1, "kind": rng.choice(missing)})
+    return True
+
+
 CHANGES: list[Change] = [
     _drop_character,
     _add_character,
@@ -315,6 +351,7 @@ CHANGES: list[Change] = [
     _move_table_cell,
     _change_title,
     _hide_a_refusal,
+    _change_a_mark,
 ]
 
 
@@ -713,7 +750,13 @@ def _value(*paragraphs: str | dict[str, Any], **notes: list[dict[str, Any]]) -> 
     """A result of the given paragraphs: text alone, or text with its pages, notes or cell."""
     out = []
     for paragraph in paragraphs:
-        base: dict[str, Any] = {"comments": [], "pages": [], "notes": [], "table": None}
+        base: dict[str, Any] = {
+            "comments": [],
+            "marks": [],
+            "pages": [],
+            "notes": [],
+            "table": None,
+        }
         out.append(
             {**base, "text": paragraph} if isinstance(paragraph, str) else {**base, **paragraph}
         )
@@ -796,7 +839,9 @@ def test_text_before_a_mark_in_the_same_run_stands_before_it() -> None:
     note = {
         "id": 1,
         "mark": "1",
-        "paragraphs": [{"text": "n", "pages": [], "notes": [], "table": None, "comments": []}],
+        "paragraphs": [
+            {"text": "n", "pages": [], "notes": [], "table": None, "comments": [], "marks": []}
+        ],
     }
     marked = {"text": "ab", "pages": [2], "notes": [{"offset": 1, "kind": "footnote", "id": 1}]}
     source.certify(_value(marked, footnotes=[note]))
@@ -1171,3 +1216,146 @@ def test_a_style_without_an_id_is_not_a_default() -> None:
 def test_table_parts_outside_their_place_are_never_passed_over(body: str) -> None:
     with pytest.raises(CertificationError):
         DocxSource(docx(body))
+
+
+# --- the second reading of the text, without an XML parser -------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("xml", "texts"),
+    [
+        (
+            f'<w:p xmlns:w="{W}"><w:t>a &lt;b&gt; &amp; &#8805; &#x2265;</w:t></w:p>',
+            [("t", "a <b> & \u2265 \u2265")],
+        ),
+        (f'<x:p xmlns:x="{W}"><x:t>other prefix</x:t></x:p>', [("t", "other prefix")]),
+        (
+            f'<p xmlns="{W}"><t>default namespace</t><instrText> PAGE </instrText></p>',
+            [("t", "default namespace"), ("instrText", " PAGE ")],
+        ),
+        (f'<w:p xmlns:w="{W}"><w:t>a<![CDATA[<b>&]]>c</w:t></w:p>', [("t", "a<b>&c")]),
+        (f'<w:p xmlns:w="{W}"><w:t>a<!-- not text -->b<?pi x?></w:t></w:p>', [("t", "ab")]),
+        (
+            f'<w:p xmlns:w="{W}"><w:t>one\r\ntwo\rthree&#13;</w:t></w:p>',
+            [("t", "one\ntwo\nthree\r")],
+        ),
+        (f'<w:p xmlns:w="{W}" a="x>y"><w:t a=\'>\'>q</w:t><w:t/></w:p>', [("t", "q"), ("t", "")]),
+        (
+            f'<w:p xmlns:w="{W}"><o:t xmlns:o="urn:other">not w</o:t><w:t>w</w:t></w:p>',
+            [("t", "w")],
+        ),
+        (
+            f'<?xml version="1.0"?><w:p xmlns:w="{W}"><w:r><w:t>nested</w:t></w:r></w:p>',
+            [("t", "nested")],
+        ),
+        (
+            f'<w:p xmlns:w="{W}"><w:t>&quot;quoted&quot; &apos;one&apos;</w:t></w:p>',
+            [("t", "\"quoted\" 'one'")],
+        ),
+    ],
+    ids=[
+        "references",
+        "prefix",
+        "default-namespace",
+        "cdata",
+        "comment-and-pi",
+        "line-ends",
+        "quoted-gt",
+        "other-namespace",
+        "declaration",
+        "quotes",
+    ],
+)
+def test_the_second_reading_of_the_text_matches_the_xml_parser(
+    xml: str, texts: list[tuple[str, str]]
+) -> None:
+    import xml.etree.ElementTree as ET
+
+    from label_docx.certify import _raw_texts
+
+    assert _raw_texts(xml.encode()) == texts
+    parsed = [
+        (node.tag.rsplit("}", 1)[-1], node.text or "")
+        for node in ET.fromstring(xml.encode()).iter()
+        if node.tag in (f"{{{W}}}t", f"{{{W}}}instrText")
+    ]
+    assert parsed == texts
+
+
+@pytest.mark.parametrize(
+    "xml",
+    [
+        f'<w:p xmlns:w="{W}"><w:t>a & b</w:t></w:p>',
+        f'<!DOCTYPE p><w:p xmlns:w="{W}"/>',
+        f'<w:p xmlns:w="{W}"><w:t>open',
+        f'<w:p xmlns:w="{W}"><w:t a="unterminated>x</w:t></w:p>',
+        f'<w:p xmlns:w="{W}"><w:r>',
+        f'<!DOCTYPE x><w:p xmlns:w="{W}"><w:t>a</w:t></w:p></x>',
+        f'<w:p xmlns:w="{W}"/><x a=\'q/',
+    ],
+    ids=[
+        "bare-ampersand",
+        "doctype",
+        "unclosed",
+        "tag-without-end",
+        "unclosed-without-text",
+        "declaration-closed-as-a-tag",
+        "tag-cut-off-at-the-end",
+    ],
+)
+def test_the_second_reading_stops_at_what_it_does_not_read(xml: str) -> None:
+    from label_docx.certify import _raw_texts
+
+    with pytest.raises(CertificationError):
+        _raw_texts(xml.encode())
+
+
+def test_a_part_whose_two_readings_differ_is_never_certified(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import label_docx.certify as module
+
+    data = docx(_p("<w:r><w:t>abc</w:t></w:r>"))
+    real = module._raw_texts
+    monkeypatch.setattr(
+        module, "_raw_texts", lambda raw: [(k, t.replace("b", "x")) for k, t in real(raw)]
+    )
+    with pytest.raises(CertificationError):
+        DocxSource(data)
+
+
+def test_the_key_marks_from_every_level_are_worked_out_alike() -> None:
+    styles = (
+        "<w:docDefaults><w:rPrDefault><w:rPr><w:caps/></w:rPr></w:rPrDefault></w:docDefaults>"
+        '<w:style w:type="paragraph" w:default="1" w:styleId="N"><w:rPr><w:i/></w:rPr></w:style>'
+        '<w:style w:type="character" w:default="1" w:styleId="D"><w:rPr><w:b/></w:rPr></w:style>'
+        '<w:style w:type="character" w:styleId="S"><w:rPr><w:vertAlign w:val="subscript"/>'
+        '<w:u w:val="single"/></w:rPr></w:style>'
+        '<w:style w:type="table" w:default="1" w:styleId="T"><w:rPr><w:strike/></w:rPr></w:style>'
+    )
+    body = (
+        _p(
+            '<w:r><w:rPr><w:smallCaps/><w:dstrike/><w:vertAlign w:val="superscript"/></w:rPr>'
+            "<w:t>a</w:t></w:r>"
+            '<w:r><w:rPr><w:rStyle w:val="S"/></w:rPr><w:t>b</w:t></w:r>'
+            '<w:r><w:rPr><w:rStyle w:val="S"/><w:u w:val="none"/></w:rPr><w:t>c</w:t></w:r>'
+        )
+        + "<w:tbl><w:tr><w:tc>"
+        + _p("<w:r><w:t>d</w:t></w:r>")
+        + "</w:tc></w:tr></w:tbl>"
+    )
+    value = json.loads(output.read(docx(body, styles=styles))[0])
+    assert "refusal" not in value, value.get("refusal")
+
+    def at(paragraph: int, offset: int) -> set[str]:
+        return {
+            m["kind"]
+            for m in value["paragraphs"][paragraph]["marks"]
+            if m["start"] <= offset < m["end"] and m["kind"] in CHECKED_MARKS
+        }
+
+    assert at(0, 0) == {"bold", "italic", "caps", "smallCaps", "dstrike", "superscript"}
+    # A run that names its character style does not take the default one's bold.
+    assert at(0, 1) == {"italic", "caps", "subscript", "underline"}
+    assert at(0, 2) == {"italic", "caps", "subscript"}
+    assert at(1, 0) == {"bold", "italic", "caps", "strike"}

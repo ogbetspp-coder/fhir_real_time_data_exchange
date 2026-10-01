@@ -80,9 +80,12 @@ The check is independent of the reader:
 
 What has to be right for the proof to hold:
 
-- the check's own parse of the source (`certify.py`, about 860 lines with its comments, small
-  enough to review line by line);
-- Python's `zipfile`, `xml.etree` and `html.parser`.
+- the check's own walk of the source (`certify.py`, small enough to review line by line);
+- Python's `zipfile` and `html.parser`. Python's XML parser is no longer a single point: the
+  text of every part the check reads is read a second time by a tokenizer written in the check,
+  without any XML library (`_raw_texts`: line ends, references, CDATA, comments, namespace
+  prefixes as XML defines them). The two readings must agree element by element, or the read
+  is not certified (R-34).
 
 A common-mode error would need both the reader and the check to skip the same text in the same
 place. The check guards against that in four ways:
@@ -118,6 +121,49 @@ held to Word itself (`tests/test_word_oracle.py`).
 Up to conservation-check/1.0.0 the check allowed both readings of these two cases and counted
 which was taken. Since 1.1.0 there is one reading, and so no choice at all: **for every
 certified document, the output text is a function of the source alone.**
+
+## The key marks, worked out twice
+
+For a Word document, the check also works out on its own, run by run, the marks that most
+change what a label says: bold, italic, capitals, small capitals, strike, double strike,
+superscript, subscript and underline (`CHECKED_MARKS`). It uses Word's rules, written in the
+check apart from the reader's:
+
+- a run's own setting wins;
+- otherwise each kind of style gives its nearest setting, and the kinds cancel in pairs;
+- the document defaults then switch a mark on.
+
+Each output character's marks of these kinds must be the check's, or the read is not certified
+(R-35). So two separate implementations agree on every document, and the rules they share were
+Word's own answers to test cases. On the corpus and on 3,000 generated documents built to mix
+every rule (`scripts/fuzz_docx.py`), the two never disagreed. The certificate names the marks it
+checked (`marksChecked`). Highlight, shading, faint and raised text are held to Word alone.
+
+## Beyond the corpus: generated documents
+
+A corpus holds what authors happened to write. Generated documents explore what they could
+write:
+
+- **ePI.** `scripts/fuzz_epi.py` builds sections at random from every element, attribute and
+  style the reader accepts, with every kind of whitespace and the signs labels hold. Chrome
+  shows each one the reader reads, and the two are compared.
+  - The first 2,000 found four classes of mark drawn otherwise than Chrome draws them. None was
+    in the text and none was in the real ePIs.
+  - All four were fixed. Since then, more than 30,000 generated sections have shown no
+    difference.
+  - 3,000 of them, with Chrome's answers, are held in the tests without a browser (R-33).
+- **Word.** `scripts/fuzz_docx.py` builds documents mixing style chains, toggles, lists and
+  notes.
+  - Every one the reader reads must be certified, key marks included (R-35).
+  - Word's own judgment of them (`word_oracle.py compare`) runs in batches on a Mac with Word,
+    since Word takes up to a minute a document.
+
+## Strict serving
+
+With `--browser require` or `--word require`, the service serves no read until Chrome or Word has
+checked that very document and agrees (R-32). Every answer it then gives has been held, for
+that document, to the application that displays it. Without them, every answer is still
+certified (R-24), and the marks above are cross-checked.
 
 ## What it does not cover
 
@@ -158,16 +204,20 @@ comparison turned round, `and` made `or`, a number one off, a string changed, a 
 refusal removed. It then runs the check's tests against each faulty copy. A fault the tests
 catch is "killed". A fault that survives is either a missing test, which is then added, or a
 change that cannot alter what the check does, recorded with the reason in `EQUIVALENT`.
+The tests are first run on the check as it is, and must pass. One run showed why: after a change
+to a test, a test failed on the unaltered check, so every fault looked caught (1,091 of 1,091).
+The script now stops rather than record such a run.
 `tests/test_checker_mutants.py` holds the record (`docs/checker-mutants.json`) to the code:
 
 - the record must be the run of the current `certify.py`;
 - every survivor must have its reason;
 - more than 90% of all faults must be killed outright.
 
-The current run made 906 faults. The check now also covers headers, footers and comments. The
-tests killed 870 of the faults (96%). The other 36 cannot change what the check does, and each
-is recorded with its reason: for example, an edge of the Symbol range at which the table holds
-no entry, or a length compared just before. None is unexplained.
+The current run made 1,091 faults. The check now also covers headers, footers and comments,
+works out the key marks, and reads the text a second time. The tests killed 1,046 of the faults
+(96%). The other 45 cannot change what the check does, and each is recorded with its reason:
+for example, the `xml` prefix, which can never name Word's namespace, or a length compared just
+before. None is unexplained.
 
 The first run, before these tests were written, killed 629 of 766. The survivors showed what
 was missing:

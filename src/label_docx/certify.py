@@ -53,6 +53,7 @@ from __future__ import annotations
 import io
 import json
 import posixpath
+import re
 import xml.etree.ElementTree as ET
 import zipfile
 from dataclasses import dataclass, field
@@ -61,7 +62,7 @@ from typing import Any
 
 from label_docx.reader import SYMBOL_FONT
 
-CHECKER_VERSION = "conservation-check/1.2.0"
+CHECKER_VERSION = "conservation-check/1.3.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _RELS = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -118,6 +119,8 @@ class _Segment:
 
     text: str = ""
     marker: tuple[str, Any] | None = None
+    # The marks the check works out for the run's text (``CHECKED_MARKS``).
+    kinds: frozenset[str] = frozenset()
 
 
 @dataclass
@@ -125,6 +128,18 @@ class _Paragraph:
     segments: list[_Segment] = field(default_factory=list)
     table: tuple[int, int, int] | None = None
 
+
+# The marks the check works out itself and holds every result to; the others (highlight,
+# shading, faint, raised text, right-to-left) are held to Word (tests/test_word_oracle.py).
+_CHECKED_TOGGLES = {
+    "b": "bold",
+    "i": "italic",
+    "caps": "caps",
+    "smallCaps": "smallCaps",
+    "strike": "strike",
+    "dstrike": "dstrike",
+}
+CHECKED_MARKS = frozenset({*_CHECKED_TOGGLES.values(), "superscript", "subscript", "underline"})
 
 _THEME_SLOT = {
     "ascii": "asciiTheme",
@@ -212,6 +227,55 @@ class _Fonts:
         if self.doc_rpr is not None:
             found.append(self.doc_rpr)
         return found
+
+    def marks(
+        self, run: ET.Element, paragraph_style: str | None, table_style: str | None, in_table: bool
+    ) -> frozenset[str]:
+        """The marks of ``CHECKED_MARKS`` Word shows on the run, by Word's rules, worked out here.
+
+        Toggles (bold, italic, capitals, small capitals, strike, double strike): the run's own
+        setting wins, on or off; else each kind of style (character, paragraph, table, each with
+        its ``basedOn`` chain) gives its nearest setting and the kinds cancel in pairs; the
+        document defaults then turn it on whatever the styles give. Superscript, subscript and
+        underline: the nearest level that sets a value, the run first. Each rule is Word's answer
+        to a case in ``corpus/numbering-cases``.
+        """
+        own = run.find(_w("rPr"))
+        style = None if own is None else own.find(_w("rStyle"))
+        chains = [
+            self.chain(None if style is None else style.get(_w("val")), "character"),
+            self.chain(paragraph_style, "paragraph"),
+            self.chain(table_style, "table") if in_table else [],
+        ]
+        kinds: set[str] = set()
+        for name, kind in _CHECKED_TOGGLES.items():
+            direct = None if own is None else _on(own.find(_w(name)))
+            if direct is not None:
+                shown = direct
+            else:
+                shown = False
+                for chain in chains:
+                    settings = (_on(rpr.find(_w(name))) for rpr in chain)
+                    shown ^= next((v for v in settings if v is not None), False)
+                if self.doc_rpr is not None and _on(self.doc_rpr.find(_w(name))):
+                    shown = True
+            if shown:
+                kinds.add(kind)
+        levels = [own, *(rpr for chain in chains for rpr in chain), self.doc_rpr]
+
+        def nearest(name: str) -> str | None:
+            for level in levels:
+                found = None if level is None else level.find(_w(name))
+                if found is not None and found.get(_w("val")) is not None:
+                    return found.get(_w("val"))
+            return None
+
+        align = nearest("vertAlign")
+        if align in ("superscript", "subscript"):
+            kinds.add(str(align))
+        if nearest("u") not in (None, "none"):
+            kinds.add("underline")
+        return frozenset(kinds)
 
     def font(self, levels: list[ET.Element], slot: str) -> str | None:
         for level in levels:
@@ -349,6 +413,7 @@ class _Story:
         levels = self.fonts.levels(run, self.paragraph_style, self.table_style, self.in_table)
         symbol = self.fonts.symbol(levels)
         hidden = self.fonts.hidden(levels, run.find(_w("rPr")))
+        kinds = self.fonts.marks(run, self.paragraph_style, self.table_style, self.in_table)
         shown: list[str] = []
         for child in run:
             local = _local(child.tag)
@@ -362,13 +427,13 @@ class _Story:
             if local == "commentReference":
                 if self.story is not None and self.story[0] == "comment":
                     raise CertificationError("a comment's mark in a comment")
-                self.flush_run(shown, hidden)
+                self.flush_run(shown, hidden, kinds)
                 shown = []
                 self.mark("comment", int(child.get(_w("id"), "")))
                 continue
             if local in _NOTE_MARKS:
                 kind = "footnote" if local.startswith("footnote") else "endnote"
-                self.flush_run(shown, hidden)
+                self.flush_run(shown, hidden, kinds)
                 shown = []
                 if local.endswith("Ref"):
                     # A note's echo of its own mark, at the start of its text.
@@ -379,7 +444,7 @@ class _Story:
                     self.mark("note", (kind, int(child.get(_w("id"), ""))))
                 continue
             if local == "fldChar":
-                self.flush_run(shown, hidden)
+                self.flush_run(shown, hidden, kinds)
                 shown = []
                 self.field(child)
                 continue
@@ -405,7 +470,7 @@ class _Story:
                 self.ledger.page_breaks += 1
             else:
                 shown.append(token)
-        self.flush_run(shown, hidden)
+        self.flush_run(shown, hidden, kinds)
 
     def token(self, child: ET.Element, local: str, symbol: bool) -> str:
         """What one run child stands for, as the check reads it."""
@@ -468,7 +533,7 @@ class _Story:
         else:
             raise CertificationError(f"a field character {kind!r} out of place")
 
-    def flush_run(self, shown: list[str], hidden: bool) -> None:
+    def flush_run(self, shown: list[str], hidden: bool, kinds: frozenset[str]) -> None:
         text = "".join(shown)
         if not text:
             return
@@ -478,7 +543,7 @@ class _Story:
                 raise CertificationError("hidden text with characters to show")
             self.ledger.hidden += len(text)
             return
-        self.current.segments.append(_Segment(text=text))
+        self.current.segments.append(_Segment(text=text, kinds=kinds))
 
 
 def _owned(element: ET.Element, wanted: str, stop: str) -> list[ET.Element]:
@@ -531,6 +596,18 @@ def _match(paragraph: _Paragraph, value: dict[str, Json], where: str) -> None:
             notes.append((position, segment.marker[1]))
     if text != "".join(expected):
         raise CertificationError(f"{where}: the text is not the document's")
+    # The marks this check works out, character by character.
+    shown = [
+        kinds for segment in paragraph.segments for kinds in [segment.kinds] * len(segment.text)
+    ]
+    claimed: list[set[str]] = [set() for _ in text]
+    for mark in value["marks"]:
+        if mark["kind"] in CHECKED_MARKS:
+            for index in range(mark["start"], mark["end"]):
+                claimed[index].add(mark["kind"])
+    if [set(k) for k in shown] != claimed:
+        at = next(i for i, (a, b) in enumerate(zip(shown, claimed, strict=True)) if set(a) != b)
+        raise CertificationError(f"{where}: the marks at character {at + 1} are not Word's")
     if pages != list(value["pages"]):
         raise CertificationError(f"{where}: the page numbers are not where the document has them")
     if notes != [(n["offset"], (n["kind"], n["id"])) for n in value["notes"]]:
@@ -606,6 +683,113 @@ def _total(ledgers: list[_Ledger]) -> _Ledger:
     return total
 
 
+# --- the text read a second time, without an XML parser --------------------------------------
+
+_XML_NS = "http://www.w3.org/XML/1998/namespace"
+_REFERENCE = re.compile(r"&(?:(lt|gt|amp|quot|apos)|#([0-9]+)|#x([0-9a-fA-F]+));|&")
+_PREDEFINED = {"lt": "<", "gt": ">", "amp": "&", "quot": '"', "apos": "'"}
+_ATTRIBUTE = re.compile(r"""([^\s=/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)')""")
+_TEXT_LOCALS = ("t", "instrText")
+
+
+def _unescape(text: str) -> str:
+    def one(found: re.Match[str]) -> str:
+        if found.group(1):
+            return _PREDEFINED[found.group(1)]
+        if found.group(2) or found.group(3):
+            return chr(int(found.group(2) or found.group(3), 10 if found.group(2) else 16))
+        raise CertificationError("an '&' that is not a reference")
+
+    return _REFERENCE.sub(one, text)
+
+
+def _raw_texts(data: bytes) -> list[tuple[str, str]]:
+    """Every ``w:t`` and ``w:instrText`` of a part, with its text, read by a tokenizer here.
+
+    Written apart from Python's XML parser, so that the text of a part rests on two readings
+    that must agree (``_parse``): line ends as XML normalises them, the five predefined and the
+    numeric references, CDATA sections, comments and processing instructions passed over,
+    namespace prefixes bound where they are declared. Anything else (a DTD, an unclosed tag)
+    stops it.
+    """
+    text = data.decode("utf-8-sig").replace("\r\n", "\n").replace("\r", "\n")
+    out: list[tuple[str, str]] = []
+    scopes: list[dict[str, str]] = [{"xml": _XML_NS}]
+    capture: list[str] | None = None
+    captured = ""
+    depth_of_capture = -1
+    at = 0
+    while True:
+        less = text.find("<", at)
+        chunk = text[at:] if less < 0 else text[at:less]
+        if capture is not None:
+            capture.append(_unescape(chunk))
+        if less < 0:
+            break
+        if text.startswith("<!--", less):
+            at = text.index("-->", less) + 3
+        elif text.startswith("<![CDATA[", less):
+            end = text.index("]]>", less)
+            if capture is not None:
+                capture.append(text[less + 9 : end])
+            at = end + 3
+        elif text.startswith("<?", less):
+            at = text.index("?>", less) + 2
+        elif text.startswith("<!", less):
+            raise CertificationError("a declaration the check does not read")
+        else:
+            end, quote = less + 1, ""
+            while end < len(text) and (quote or text[end] != ">"):
+                if text[end] in "\"'":
+                    quote = "" if quote == text[end] else quote or text[end]
+                end += 1
+            if end >= len(text):
+                raise CertificationError("a tag that does not end")
+            tag = text[less + 1 : end]
+            at = end + 1
+            if tag.startswith("/"):
+                scopes.pop()
+                if capture is not None and len(scopes) == depth_of_capture:
+                    out.append((captured, "".join(capture)))
+                    capture = None
+                continue
+            closed = tag.endswith("/")
+            body = tag[:-1] if closed else tag
+            name = body.split(None, 1)[0] if body.strip() else ""
+            scope = dict(scopes[-1])
+            for key, double, single in _ATTRIBUTE.findall(body[len(name) :]):
+                value = _unescape(double or single)
+                if key == "xmlns":
+                    scope[""] = value
+                elif key.startswith("xmlns:"):
+                    scope[key[6:]] = value
+            prefix, _, local = name.rpartition(":")
+            if scope.get(prefix) == W and local in _TEXT_LOCALS and capture is None:
+                if closed:
+                    out.append((local, ""))
+                else:
+                    capture, captured, depth_of_capture = [], local, len(scopes)
+            if not closed:
+                scopes.append(scope)
+    if capture is not None or len(scopes) != 1:
+        raise CertificationError("elements that do not close")
+    return out
+
+
+def _parse(archive: zipfile.ZipFile, name: str) -> ET.Element:
+    """A part parsed, its text read twice, by Python's XML parser and by ``_raw_texts``."""
+    data = archive.read(name)
+    root = ET.fromstring(data)
+    parsed = [
+        (_local(node.tag), node.text or "")
+        for node in root.iter()
+        if node.tag in (_w("t"), _w("instrText"))
+    ]
+    if _raw_texts(data) != parsed:
+        raise CertificationError(f"{name}: two readings of its text do not agree")
+    return root
+
+
 class DocxSource:
     """A .docx's text tokens, read once by this module's own walk, to hold results to.
 
@@ -616,7 +800,7 @@ class DocxSource:
     def __init__(self, data: bytes) -> None:
         archive, main, related = _docx_parts(data)
         with archive:
-            parse = {name: ET.fromstring(archive.read(name)) for name in {main, *related.values()}}
+            parse = {name: _parse(archive, name) for name in {main, *related.values()}}
             self.fonts = _Fonts(
                 parse.get(related.get("styles", "")), parse.get(related.get("theme", ""))
             )
@@ -657,7 +841,7 @@ class DocxSource:
                     if found is not None:
                         found[1].append(use)
                         continue
-                    root = ET.fromstring(archive.read(name))
+                    root = _parse(archive, name)
                     index = len(self.stories[kind])
                     self.stories[kind].append((name, [use], self._optional(root, (kind, index))))
             # Comments, as stored, each with what the part says of it.
@@ -760,6 +944,7 @@ class DocxSource:
                 "pageNumbers": ledger.page_numbers,
             },
             "symbolMapped": ledger.symbol,
+            "marksChecked": sorted(CHECKED_MARKS),
             "notRead": dict(self.not_read),
         }
 

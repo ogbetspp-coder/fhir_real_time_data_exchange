@@ -40,6 +40,7 @@ RECORD = ROOT / "docs" / "checker-mutants.json"
 TESTS = [
     "tests/test_certify.py",
     "tests/test_headers_comments.py",
+    "tests/test_generated_docx.py",
     "tests/test_robustness.py",
     "tests/test_output.py",
 ]
@@ -49,6 +50,9 @@ _TABLE_EDGE = (
     "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the "
     "U+F000 range, or just past it, is refused before and after"
 )
+_XML_LINE = '_XML_NS = "http://www.w3.org/XML/1998/namespace"'
+_XML_PREFIX = "the xml prefix can never name Word's namespace, the only one the tokenizer looks for"
+_FIRST_LESS = "a '<' at the very start finds no capture open, so the chunk is never used there"
 _STRICT = "the lengths are compared just before, so zip(strict=True) never raises"
 _LEDGER = (
     "the counts follow from the sequences, which are equal by then: the ledger is a second "
@@ -157,6 +161,28 @@ EQUIVALENT: dict[tuple[str, str, str], str] = {
         'for (name, _, part), story in zip(found, value[kind + "s"], strict=True):',
         "bool",
     ): "called only after certify has compared the lengths",
+    ("_Fonts.marks.nearest", "return None", "statement"): (
+        "the function returns None at its end anyway"
+    ),
+    (
+        "_match",
+        "at = next(i for i, (a, b) in enumerate(zip(shown, claimed, strict=True)) if set(a) != b)",
+        "bool",
+    ): "both lists have one entry per character of the text, which was compared just before",
+    ("<module>", _XML_LINE, "str:'http://www.w3.org/XML/1998/namespace'"): _XML_PREFIX,
+    ("_raw_texts", 'scopes: list[dict[str, str]] = [{"xml": _XML_NS}]', "str:'xml'"): _XML_PREFIX,
+    ("_raw_texts", "depth_of_capture = -1", "int:1"): (
+        "the depth is set whenever a capture begins, before it is read"
+    ),
+    ("_raw_texts", "chunk = text[at:] if less < 0 else text[at:less]", "compare:0"): _FIRST_LESS,
+    ("_raw_texts", "chunk = text[at:] if less < 0 else text[at:less]", "int:0"): _FIRST_LESS,
+    ("_raw_texts", 'end, quote = less + 1, ""', "int:1"): (
+        "a tag's first character is its name's, never '>' or a quote, so starting the scan one "
+        "later finds the same end"
+    ),
+    ("_raw_texts", 'name = body.split(None, 1)[0] if body.strip() else ""', "int:1"): (
+        "splitting once more leaves the first word, the name, the same"
+    ),
     (
         "_paragraphs",
         "for index, (mine, paragraph) in enumerate(zip(part.paragraphs, theirs, strict=True)):",
@@ -382,6 +408,10 @@ def main() -> int:
         RECORD.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", "utf-8")
         return _report(record["survivors"], record["killed"], record["mutants"])
     lines = TARGET.read_text("utf-8").splitlines()
+    # The tests must pass on the check as it is; else every fault would look caught.
+    unaltered = Mutant(-1, 0, "none", TARGET.read_text("utf-8"))
+    if _run(unaltered, TARGET.parent):
+        raise SystemExit("the tests fail on the check as it is: fix them before mutating it")
     every = mutants()
     sys.stdout.write(f"{len(every)} mutants of {TARGET.relative_to(ROOT)}\n")
     package = TARGET.parent

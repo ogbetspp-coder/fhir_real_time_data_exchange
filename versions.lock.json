@@ -3,7 +3,8 @@
     "label-epi-json/1.0.0": "04a1a22d95b7570feebe380292650de5983c44f4e6da7d0616d234ca68a891f6",
     "label-epi-json/1.1.0": "772c266a695a6511512e0057103b203a461a3531432ca4d10a894c9b7e2806e3",
     "label-epi-json/1.2.0": "9ca56ae701d6b7a34354347a7ffa37cc71ac61d8fa9267d96fafab062bee1c7b",
-    "label-epi-json/1.3.0": "26adc7f56e2f9f8e029c50acc1fcc6035e91d5a94439cdf46d2b6596cabbe363"
+    "label-epi-json/1.3.0": "26adc7f56e2f9f8e029c50acc1fcc6035e91d5a94439cdf46d2b6596cabbe363",
+    "label-epi-json/1.4.0": "b10698f27f841948381165801702ceffafa6984613b7aa56cd686a0510674d6c"
   },
   "epi-reader": {
     "epi-reader/1.0.0": "ff99976f4c23101d29b0c038837222bc0cfc0139831fffcbca63d6e045c7e25b",
@@ -17,7 +18,8 @@
     "label-docx-json/1.3.0": "a56e25eb39a051df80b9661f2fcc7ff1c7240f96f9862a6dc23d707dc8407de8",
     "label-docx-json/1.4.0": "266c709e28a4814eb78248a2dd818f67881b8f9af7155730c760c9aad6716e92",
     "label-docx-json/1.5.0": "503978cada595a6dbb3980d77d9b37172fe0988a8cc07791cbfba8dca34009c9",
-    "label-docx-json/1.6.0": "d9bed3b3cf4b58f096be4e743fe356ebd5769cba277b8a0ad78db743cd17abee"
+    "label-docx-json/1.6.0": "d9bed3b3cf4b58f096be4e743fe356ebd5769cba277b8a0ad78db743cd17abee",
+    "label-docx-json/1.7.0": "f28a75659f58c981c327abf8fb0914edbb60459b10d718c9ac672f5aeb641a15"
   },
   "reader": {
     "docx-reader/1.1.0": "5e84e792f32e6425dc78046d4eea0afe58a6a3a12babafcab2b2f0d27bb36f1a",
