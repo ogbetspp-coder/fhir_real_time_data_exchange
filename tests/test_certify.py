@@ -13,6 +13,7 @@ other than the document's does.
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import random
 from collections.abc import Callable
@@ -23,6 +24,7 @@ import pytest
 
 from label_docx import epi_output, output
 from label_docx.certify import CertificationError, DocxSource, EpiSource, certify_docx, certify_epi
+from label_docx.output import canonical
 from test_reader import W, docx
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
@@ -83,6 +85,10 @@ def test_every_result_the_readers_make_is_certified(
         )
     # The same result, checked again, gets the same certificate.
     assert source.certify(value) == certificate
+    # And every count in it is the one locked for this document (scripts/lock.py).
+    locked = json.loads((path.parent / "expected.json").read_text("utf-8"))[path.name]
+    digest = hashlib.sha256(canonical(certificate)).hexdigest()
+    assert digest == locked["certificateSha256"], f"{path.name}: run scripts/lock.py and review"
 
 
 # --- the check's own test: every change is refused ----------------------------------------
@@ -374,31 +380,70 @@ def test_a_page_break_is_set_aside_and_a_line_break_kept() -> None:
     assert certificate["output"]["characters"] == len("ab\nc")
 
 
-def test_a_symbol_run_may_be_read_through_the_symbol_table_and_is_counted() -> None:
-    body = _p(
-        '<w:r><w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/></w:rPr><w:t>\u00b3</w:t></w:r>'
+def _symbol_case(run_properties: str, styles: str | None = None, theme: str | None = None) -> bytes:
+    body = _p(f"<w:r><w:rPr>{run_properties}</w:rPr><w:t>\u00b3</w:t></w:r>")
+    return docx(body, styles=styles, minor_font=theme)
+
+
+def _only(data: bytes, text: str) -> int:
+    """The Symbol count when ``text`` is the one reading the check takes; every other refused."""
+    source, value = DocxSource(data), _docx_value(data)
+    assert value["paragraphs"][0]["text"] == text
+    count: int = source.certify(value)["symbolMapped"]
+    for other in {"\u00b3", "\u2265"} - {text}:
+        value["paragraphs"][0]["text"] = other
+        with pytest.raises(CertificationError):
+            source.certify(value)
+    return count
+
+
+def test_a_symbol_run_is_read_through_the_symbol_table_and_only_so() -> None:
+    data = _symbol_case('<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/>')
+    assert _only(data, "\u2265") == 1
+
+
+def test_text_in_another_font_is_read_as_stored_and_only_so() -> None:
+    assert _only(docx(_p("<w:r><w:t>\u00b3</w:t></w:r>")), "\u00b3") == 0
+
+
+def test_the_font_is_the_nearest_levels_by_word_precedence() -> None:
+    symbol_style = (
+        '<w:style w:type="paragraph" w:styleId="Sym"><w:rPr>'
+        '<w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/></w:rPr></w:style>'
     )
-    data = docx(body)
-    source, value = DocxSource(data), _docx_value(data)
-    assert value["paragraphs"][0]["text"] == "\u2265"
-    assert source.certify(value)["symbolMapped"] == 1
-    # Read as stored is the other reading the check allows; anything else is refused.
-    value["paragraphs"][0]["text"] = "\u00b3"
-    assert source.certify(value)["symbolMapped"] == 0
-    value["paragraphs"][0]["text"] = "\u2264"
+    # From the paragraph's style.
+    styled = docx(
+        _p('<w:pPr><w:pStyle w:val="Sym"/></w:pPr><w:r><w:t>\u00b3</w:t></w:r>'),
+        styles=symbol_style,
+    )
+    assert _only(styled, "\u2265") == 1
+    # The run's own font is nearer than its paragraph style's.
+    overridden = docx(
+        _p(
+            '<w:pPr><w:pStyle w:val="Sym"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Arial" '
+            'w:hAnsi="Arial"/></w:rPr><w:t>\u00b3</w:t></w:r>'
+        ),
+        styles=symbol_style,
+    )
+    assert _only(overridden, "\u00b3") == 0
+    # Through the theme: the run names the theme's minor font, which is Symbol.
+    themed = _symbol_case(
+        '<w:rFonts w:asciiTheme="minorHAnsi" w:hAnsiTheme="minorHAnsi"/>', theme="Symbol"
+    )
+    assert _only(themed, "\u2265") == 1
+
+
+def test_symbol_in_only_some_slots_or_outside_the_table_is_never_certified() -> None:
     with pytest.raises(CertificationError):
-        source.certify(value)
-
-
-def test_text_in_another_font_may_not_be_read_through_the_symbol_table() -> None:
-    data = docx(_p("<w:r><w:t>\u00b3</w:t></w:r>"))
-    source, value = DocxSource(data), _docx_value(data)
-    value["paragraphs"][0]["text"] = "\u2265"
+        DocxSource(_symbol_case('<w:rFonts w:ascii="Symbol" w:hAnsi="Arial"/>'))
+    unmapped = _p(
+        '<w:r><w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/></w:rPr><w:t>\u4e00</w:t></w:r>'
+    )
     with pytest.raises(CertificationError):
-        source.certify(value)
+        DocxSource(docx(unmapped))
 
 
-def test_hidden_whitespace_may_be_left_out_and_is_counted_and_nothing_else_may() -> None:
+def test_hidden_whitespace_is_left_out_and_counted_and_nothing_else() -> None:
     body = _p(
         '<w:r><w:t xml:space="preserve">a</w:t></w:r>'
         '<w:r><w:rPr><w:vanish/></w:rPr><w:t xml:space="preserve">  </w:t></w:r>'
@@ -408,15 +453,48 @@ def test_hidden_whitespace_may_be_left_out_and_is_counted_and_nothing_else_may()
     source, value = DocxSource(data), _docx_value(data)
     assert value["paragraphs"][0]["text"] == "ab"
     assert source.certify(value)["setAside"]["hiddenWhitespace"] == 2
-    value["paragraphs"][0]["text"] = "a b"
-    with pytest.raises(CertificationError):
-        source.certify(value)
+    for kept in ("a b", "a  b"):
+        value["paragraphs"][0]["text"] = kept
+        with pytest.raises(CertificationError):
+            source.certify(value)
     # Visible whitespace may never be left out.
     plain = docx(_p('<w:r><w:t xml:space="preserve">a  b</w:t></w:r>'))
     plain_value = _docx_value(plain)
     plain_value["paragraphs"][0]["text"] = "ab"
     with pytest.raises(CertificationError):
         DocxSource(plain).certify(plain_value)
+
+
+def test_hidden_is_the_runs_own_setting_first_then_any_style() -> None:
+    hiding = '<w:style w:type="character" w:styleId="H"><w:rPr><w:vanish/></w:rPr></w:style>'
+    # Hidden by its character style.
+    styled = docx(
+        _p(
+            '<w:r><w:t>a</w:t></w:r><w:r><w:rPr><w:rStyle w:val="H"/></w:rPr>'
+            '<w:t xml:space="preserve"> </w:t></w:r>'
+        ),
+        styles=hiding,
+    )
+    source, value = DocxSource(styled), _docx_value(styled)
+    assert value["paragraphs"][0]["text"] == "a"
+    assert source.certify(value)["setAside"]["hiddenWhitespace"] == 1
+    # The run says it is shown: the space must be kept.
+    shown = docx(
+        _p(
+            '<w:r><w:t>a</w:t></w:r><w:r><w:rPr><w:rStyle w:val="H"/><w:vanish w:val="0"/>'
+            '</w:rPr><w:t xml:space="preserve"> </w:t></w:r>'
+        ),
+        styles=hiding,
+    )
+    shown_value = _docx_value(shown)
+    assert shown_value["paragraphs"][0]["text"] == "a "
+    DocxSource(shown).certify(shown_value)
+    shown_value["paragraphs"][0]["text"] = "a"
+    with pytest.raises(CertificationError):
+        DocxSource(shown).certify(shown_value)
+    # Hidden text with characters to show is never certified (the reader refuses it).
+    with pytest.raises(CertificationError):
+        DocxSource(docx(_p("<w:r><w:rPr><w:vanish/></w:rPr><w:t>secret</w:t></w:r>")))
 
 
 def test_note_marks_and_notes_must_be_the_documents() -> None:
@@ -566,18 +644,6 @@ def test_every_token_kind_and_simple_fields_are_accounted_for() -> None:
     assert certificate["setAside"]["fieldCode"] == len(" PAGE ")
 
 
-def test_a_symbol_run_with_a_code_outside_the_table_has_one_reading() -> None:
-    body = _p(
-        '<w:r><w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/></w:rPr><w:t>\u4e00</w:t></w:r>'
-    )
-    source = DocxSource(docx(body))
-    value: dict[str, Any] = {
-        "paragraphs": [{"text": "\u4e00", "pages": [], "notes": [], "table": None}]
-    }
-    value |= {"footnotes": [], "endnotes": []}
-    assert source.certify(value)["symbolMapped"] == 0
-
-
 def test_a_package_the_check_cannot_open_is_never_certified() -> None:
     import io
     import zipfile
@@ -633,3 +699,462 @@ def test_an_epi_result_of_another_shape_is_never_certified() -> None:
             source.certify(changed)
     with pytest.raises(CertificationError):
         EpiSource(json.dumps({"entry": []}).encode())
+
+
+# --- each rule of the check, held so that a fault in it shows (scripts/mutate_checker.py) ------
+
+
+def _value(*paragraphs: str | dict[str, Any], **notes: list[dict[str, Any]]) -> dict[str, Any]:
+    """A result of the given paragraphs: text alone, or text with its pages, notes or cell."""
+    out = []
+    for paragraph in paragraphs:
+        base: dict[str, Any] = {"pages": [], "notes": [], "table": None}
+        out.append(
+            {**base, "text": paragraph} if isinstance(paragraph, str) else {**base, **paragraph}
+        )
+    return {"paragraphs": out, "footnotes": notes.get("footnotes", []), "endnotes": []}
+
+
+def _field(code: str, result: str) -> str:
+    return (
+        '<w:r><w:fldChar w:fldCharType="begin"/></w:r>'
+        f'<w:r><w:instrText xml:space="preserve"> {code} </w:instrText></w:r>'
+        '<w:r><w:fldChar w:fldCharType="separate"/></w:r>'
+        f"<w:r><w:t>{result}</w:t></w:r>"
+        '<w:r><w:fldChar w:fldCharType="end"/></w:r>'
+    )
+
+
+@pytest.mark.parametrize("code", ["PAGEREF _Toc1 \\h", "PAGE", "NUMPAGES", "SECTIONPAGES"])
+def test_each_page_number_field_is_set_aside_and_placed(code: str) -> None:
+    data = docx(_p("<w:r><w:t>p</w:t></w:r>" + _field(code, "12")))
+    certificate = DocxSource(data).certify(_value({"text": "p", "pages": [1]}))
+    assert certificate["setAside"]["pageNumbers"] == 2
+    with pytest.raises(CertificationError):
+        DocxSource(data).certify(_value("p12"))
+
+
+def test_a_field_in_another_fields_code_is_code() -> None:
+    nested = (
+        '<w:r><w:fldChar w:fldCharType="begin"/></w:r>'
+        '<w:r><w:instrText xml:space="preserve"> IF </w:instrText></w:r>'
+        + _field("PAGE", "3")
+        + '<w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>x</w:t></w:r>'
+        '<w:r><w:fldChar w:fldCharType="end"/></w:r>'
+    )
+    certificate = DocxSource(docx(_p(nested))).certify(_value("x"))
+    assert certificate["setAside"] == {
+        "fieldCode": len(" IF ") + len(" PAGE ") + 1,
+        "hiddenWhitespace": 0,
+        "pageBreaks": 0,
+        "pageNumbers": 0,
+    }
+
+
+@pytest.mark.parametrize(
+    "run",
+    [
+        '<w:instrText xml:space="preserve"> PAGE </w:instrText>',
+        '<w:fldChar w:fldCharType="end"/>',
+        '<w:fldChar w:fldCharType="begin"/><w:fldChar w:fldCharType="other"/>',
+        '<w:fldChar w:fldCharType="begin"/><w:fldChar w:fldCharType="separate"/>'
+        "<w:instrText>X</w:instrText>",
+        '<w:sym w:font="Symbol"/>',
+    ],
+    ids=[
+        "code-outside-a-field",
+        "end-alone",
+        "unknown-kind",
+        "code-in-a-result",
+        "sym-without-code",
+    ],
+)
+def test_field_characters_out_of_place_are_never_certified(run: str) -> None:
+    with pytest.raises(CertificationError):
+        DocxSource(docx(_p(f"<w:r>{run}</w:r>")))
+
+
+def test_text_before_a_mark_in_the_same_run_stands_before_it() -> None:
+    body = _p(
+        '<w:r><w:t>a</w:t><w:footnoteReference w:id="1"/><w:t>b</w:t></w:r>' + _field("PAGE", "4")
+    )
+    notes = '<w:footnote w:id="1"><w:p><w:r><w:t>n</w:t></w:r></w:p></w:footnote>'
+    source = DocxSource(docx(body, footnotes=notes))
+    note = {
+        "id": 1,
+        "mark": "1",
+        "paragraphs": [{"text": "n", "pages": [], "notes": [], "table": None}],
+    }
+    marked = {"text": "ab", "pages": [2], "notes": [{"offset": 1, "kind": "footnote", "id": 1}]}
+    source.certify(_value(marked, footnotes=[note]))
+    moved = {**marked, "notes": [{"offset": 0, "kind": "footnote", "id": 1}]}
+    with pytest.raises(CertificationError):
+        source.certify(_value(moved, footnotes=[note]))
+    run_with_field = _p(
+        '<w:r><w:t>a</w:t><w:fldChar w:fldCharType="begin"/><w:instrText> PAGE </w:instrText>'
+        '<w:fldChar w:fldCharType="separate"/><w:t>9</w:t><w:fldChar w:fldCharType="end"/></w:r>'
+    )
+    DocxSource(docx(run_with_field)).certify(_value({"text": "a", "pages": [1]}))
+
+
+def test_every_character_element_stands_for_its_character() -> None:
+    body = _p(
+        "<w:r><w:t>a</w:t><w:ptab/><w:tab/><w:noBreakHyphen/><w:softHyphen/>"
+        '<w:br w:type="column"/><w:br w:type="page"/><w:br/><w:cr/>'
+        "<w:lastRenderedPageBreak/><w:commentReference/>"
+        '<w:sym w:font="Symbol" w:char="F0B3"/><w:t>b</w:t></w:r>'
+    )
+    certificate = DocxSource(docx(body)).certify(_value("a\t\t\u2011\u00ad\n\n\u2265b"))
+    assert certificate["setAside"]["pageBreaks"] == 2
+    assert certificate["source"] == {"elements": 9, "instructionCharacters": 0, "textCharacters": 2}
+    assert certificate["symbolMapped"] == 1
+    # A tab element in a field's code is code: one token set aside.
+    tab_in_code = _p(
+        '<w:r><w:fldChar w:fldCharType="begin"/><w:instrText xml:space="preserve"> PAGE '
+        '</w:instrText><w:tab/><w:fldChar w:fldCharType="separate"/><w:t>1</w:t>'
+        '<w:fldChar w:fldCharType="end"/></w:r>'
+    )
+    certificate = DocxSource(docx(tab_in_code)).certify(_value({"text": "", "pages": [0]}))
+    assert certificate["setAside"]["fieldCode"] == len(" PAGE ") + 1
+    assert certificate["setAside"]["pageNumbers"] == 1
+
+
+_DRAWING = (
+    '<w:drawing><wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/'
+    'wordprocessingDrawing">{inner}</wp:inline></w:drawing>'
+)
+
+
+@pytest.mark.parametrize("inner", ["", "<w:t>x</w:t>", "<w:txbx/>", "<w:txbxContent/>"])
+def test_a_drawing_is_one_character_unless_it_holds_text(inner: str) -> None:
+    data = docx(_p("<w:r>" + _DRAWING.format(inner=inner) + "</w:r>"))
+    if not inner:
+        assert DocxSource(data).certify(_value("\ufffc"))["source"]["elements"] == 1
+        return
+    with pytest.raises(CertificationError):
+        DocxSource(data)
+
+
+@pytest.mark.parametrize("inner", ["", "<v:textbox/>", '<v:textpath string="x"/>'])
+def test_a_vml_picture_is_one_character_unless_it_holds_text(inner: str) -> None:
+    data = docx(_p(f"<w:r><w:pict><v:shape {_VML}>{inner}</v:shape></w:pict></w:r>"))
+    if not inner:
+        DocxSource(data).certify(_value("\ufffc"))
+        return
+    with pytest.raises(CertificationError):
+        DocxSource(data)
+
+
+def test_paragraphs_in_block_containers_are_read_and_one_in_a_paragraph_is_not() -> None:
+    body = (
+        "<w:sdt><w:sdtContent>" + _p("<w:r><w:t>a</w:t></w:r>") + "</w:sdtContent></w:sdt>"
+        "<w:customXml>" + _p("<w:r><w:t>b</w:t></w:r>") + "</w:customXml>"
+    )
+    DocxSource(docx(body)).certify(_value("a", "b"))
+    inside = _p("<w:sdt><w:sdtContent>" + _p("<w:r><w:t>x</w:t></w:r>") + "</w:sdtContent></w:sdt>")
+    with pytest.raises(CertificationError):
+        DocxSource(docx(inside))
+
+
+def _cell(inner: str) -> str:
+    return f"<w:tc>{inner}</w:tc>"
+
+
+def test_cells_are_counted_in_their_own_table_and_row() -> None:
+    nested = (
+        "<w:tbl><w:tr>" + _cell(_p("<w:r><w:t>n</w:t></w:r>")) + _cell(_p("")) + "</w:tr></w:tbl>"
+    )
+    body = (
+        "<w:tbl><w:tr>"
+        + _cell(_p("<w:r><w:t>a</w:t></w:r>") + nested + _p(""))
+        + "<w:customXml>"
+        + _cell(_p("<w:r><w:t>b</w:t></w:r>"))
+        + "</w:customXml>"
+        + "</w:tr><w:sdt><w:sdtContent><w:tr>"
+        + _cell(_p("<w:r><w:t>c</w:t></w:r>"))
+        + "</w:tr></w:sdtContent></w:sdt></w:tbl>"
+        + _p("<w:r><w:t>d</w:t></w:r>")
+    )
+    cells = [
+        ("a", [0, 0, 0]),
+        ("n", [0, 0, 0]),
+        ("", [0, 0, 0]),
+        ("", [0, 0, 0]),
+        ("b", [0, 0, 1]),
+        ("c", [0, 1, 0]),
+        ("d", None),
+    ]
+    source = DocxSource(docx(body))
+    source.certify(_value(*({"text": t, "table": c} for t, c in cells)))
+    for index in (1, 4, 5):
+        moved = [list(c) if c else c for _, c in cells]
+        moved[index][2 if index != 5 else 1] += 1  # type: ignore[index]
+        with pytest.raises(CertificationError):
+            source.certify(
+                _value(*({"text": t, "table": c} for (t, _), c in zip(cells, moved, strict=True)))
+            )
+
+
+# Fonts and hidden text: each level and setting on its own.
+
+_SYMBOL = '<w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/></w:rPr>'
+
+
+def _styles(*styles: str, defaults: str = "") -> str:
+    return (
+        f"<w:docDefaults><w:rPrDefault>{defaults}</w:rPrDefault></w:docDefaults>"
+        if defaults
+        else ""
+    ) + "".join(styles)
+
+
+def _mapped(data: bytes) -> bool:
+    """Whether the check reads the paragraph's "\u00b3" through the Symbol table, not as stored."""
+    source = DocxSource(data)
+    try:
+        source.certify(_value("\u2265"))
+    except CertificationError:
+        source.certify(_value("\u00b3"))
+        return False
+    return True
+
+
+def _plain(paragraph_properties: str = "", run_properties: str = "") -> str:
+    return _p(
+        f"<w:pPr>{paragraph_properties}</w:pPr><w:r><w:rPr>{run_properties}</w:rPr><w:t>\u00b3</w:t></w:r>"
+    )
+
+
+@pytest.mark.parametrize("flag", ["1", "true", "on"])
+def test_a_style_marked_default_in_any_spelling_is_the_default(flag: str) -> None:
+    style = f'<w:style w:type="paragraph" w:default="{flag}" w:styleId="D">{_SYMBOL}</w:style>'
+    assert _mapped(docx(_plain(), styles=style))
+    not_default = style.replace(f'w:default="{flag}"', 'w:default="0"')
+    assert not _mapped(docx(_plain(), styles=not_default))
+
+
+def test_each_kind_of_style_and_the_defaults_give_the_font() -> None:
+    # A style with no type is a paragraph style; one based on another takes its font.
+    untyped = f'<w:style w:default="1" w:styleId="U">{_SYMBOL}</w:style>'
+    assert _mapped(docx(_plain(), styles=untyped))
+    based = (
+        f'<w:style w:type="paragraph" w:styleId="A">{_SYMBOL}</w:style>'
+        '<w:style w:type="paragraph" w:styleId="B"><w:basedOn w:val="A"/></w:style>'
+    )
+    assert _mapped(docx(_plain('<w:pStyle w:val="B"/>'), styles=based))
+    # An unknown paragraph style is the default one.
+    default = f'<w:style w:type="paragraph" w:default="1" w:styleId="D">{_SYMBOL}</w:style>'
+    assert _mapped(docx(_plain('<w:pStyle w:val="Missing"/>'), styles=default))
+    # The default character style, and the document defaults.
+    character = f'<w:style w:type="character" w:default="1" w:styleId="C">{_SYMBOL}</w:style>'
+    assert _mapped(docx(_plain(), styles=character))
+    defaults = '<w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/></w:rPr>'
+    assert _mapped(docx(_plain(), styles=_styles(defaults=defaults)))
+    # A basedOn loop ends.
+    loop = (
+        '<w:style w:type="paragraph" w:styleId="A"><w:basedOn w:val="B"/></w:style>'
+        '<w:style w:type="paragraph" w:styleId="B"><w:basedOn w:val="A"/></w:style>'
+    )
+    assert not _mapped(docx(_plain('<w:pStyle w:val="A"/>'), styles=loop))
+
+
+def test_a_table_style_gives_its_font_inside_its_table_only() -> None:
+    table_style = f'<w:style w:type="table" w:default="1" w:styleId="T">{_SYMBOL}</w:style>'
+    run = "<w:r><w:t>\u00b3</w:t></w:r>"
+    body = "<w:tbl><w:tr>" + _cell(_p(run)) + "</w:tr></w:tbl>" + _p(run)
+    source = DocxSource(docx(body, styles=table_style))
+    source.certify(_value({"text": "\u2265", "table": [0, 0, 0]}, "\u00b3"))
+    named = table_style.replace('w:default="1" ', "")
+    body = (
+        '<w:tbl><w:tblPr><w:tblStyle w:val="T"/></w:tblPr><w:tr>'
+        + _cell(_p(run))
+        + "</w:tr></w:tbl>"
+    )
+    DocxSource(docx(body, styles=named)).certify(_value({"text": "\u2265", "table": [0, 0, 0]}))
+
+
+@pytest.mark.parametrize("name", ["Symbol", "symbol", "SymbolMT", "Symbol MT"])
+def test_the_symbol_font_by_any_of_its_names(name: str) -> None:
+    assert _mapped(docx(_plain(run_properties=f'<w:rFonts w:ascii="{name}" w:hAnsi="{name}"/>')))
+
+
+def test_symbol_text_stored_in_the_private_range_is_mapped() -> None:
+    run = f"<w:r>{_SYMBOL}<w:t>\uf0b3</w:t></w:r>"
+    DocxSource(docx(_p(run))).certify(_value("\u2265"))
+
+
+_FULL_THEME = (
+    '<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:themeElements>'
+    "<a:fontScheme><a:majorFont>{major}</a:majorFont><a:minorFont>{minor}</a:minorFont>"
+    "</a:fontScheme></a:themeElements></a:theme>"
+)
+
+
+def _themed(rfonts: str, major: str = "", minor: str = "") -> bytes:
+    data = docx(_plain(run_properties=rfonts), minor_font="Calibri")
+    return _with_part(data, "word/theme/theme1.xml", _FULL_THEME.format(major=major, minor=minor))
+
+
+def test_theme_fonts_by_slot_script_and_major_or_minor() -> None:
+    symbol = '<a:latin typeface="Symbol"/>'
+    plain = '<a:latin typeface="Arial"/><a:ea typeface="Arial"/><a:cs typeface="Arial"/>'
+    for theme in ("majorHAnsi", "majorAscii"):
+        both = f'<w:rFonts w:asciiTheme="{theme}" w:hAnsiTheme="{theme}"/>'
+        assert _mapped(_themed(both, major=symbol, minor=plain))
+        assert not _mapped(_themed(both, major=plain, minor=symbol))
+    for slot, theme, script in (("eastAsia", "minorEastAsia", "ea"), ("cs", "minorBidi", "cs")):
+        attribute = "cstheme" if slot == "cs" else f"{slot}Theme"
+        one = f'<w:rFonts w:{attribute}="{theme}"/>'
+        with pytest.raises(CertificationError):
+            DocxSource(_themed(one, minor=f'<a:{script} typeface="Symbol"/>'))
+        assert not _mapped(_themed(one, minor=f'<a:{script} typeface="Arial"/>'))
+    with pytest.raises(CertificationError):
+        DocxSource(_themed('<w:rFonts w:asciiTheme="minorHAnsi"/>'))
+
+
+@pytest.mark.parametrize(
+    ("value", "hidden"),
+    [("1", True), ("true", True), ("on", True), ("0", False), ("false", False), ("off", False)],
+)
+def test_hidden_by_every_spelling_of_on_and_off(value: str, hidden: bool) -> None:
+    body = _p(
+        f'<w:r><w:t>a</w:t></w:r><w:r><w:rPr><w:vanish w:val="{value}"/></w:rPr>'
+        '<w:t xml:space="preserve"> </w:t></w:r>'
+    )
+    DocxSource(docx(body)).certify(_value("a" if hidden else "a "))
+
+
+# The package: relationships as a package writes them.
+
+
+def _relationships(data: bytes, name: str, extra: str, first: bool = True) -> bytes:
+    import io
+    import zipfile
+
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        rels = archive.read(name).decode()
+    at = (
+        rels.index(">", rels.index("<Relationships")) + 1
+        if first
+        else rels.index("</Relationships>")
+    )
+    return _with_part(data, name, rels[:at] + extra + rels[at:])
+
+
+def test_external_relationships_are_not_parts_and_absolute_targets_are() -> None:
+    styles = f'<w:style w:type="paragraph" w:default="1" w:styleId="D">{_SYMBOL}</w:style>'
+    data = docx(_plain(), styles=styles)
+    external = (
+        '<Relationship Id="x" TargetMode="External" Type="http://schemas.openxmlformats.org/'
+        'officeDocument/2006/relationships/styles" Target="http://example.org/styles.xml"/>'
+    )
+    assert _mapped(_relationships(data, "word/_rels/document.xml.rels", external))
+    root = (
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="r1" Type="http://schemas.openxmlformats.org/officeDocument/2006/'
+        'relationships/officeDocument" Target="/word/document.xml"/></Relationships>'
+    )
+    assert _mapped(_with_part(data, "_rels/.rels", root))
+
+
+# The ePI: HTML's blocks, breaks and the Bundle around them.
+
+
+def _epi(*divs: str, entries: list[dict[str, Any]] | None = None, text: str | None = None) -> bytes:
+    composition: dict[str, Any] = {"resourceType": "Composition", "title": "T"}
+    composition["section"] = [
+        {"title": f"S{i}", "text": {"div": f'<div xmlns="http://www.w3.org/1999/xhtml">{d}</div>'}}
+        for i, d in enumerate(divs)
+    ]
+    if text is not None:
+        composition["text"] = {"div": text}
+    bundle = {
+        "resourceType": "Bundle",
+        "type": "document",
+        "entry": [*(entries or []), {"resource": composition}],
+    }
+    return json.dumps(bundle).encode()
+
+
+def test_every_block_element_ends_a_paragraph() -> None:
+    headings = "".join(f'<h{n} style="font-size: 12pt">h{n}</h{n}>x{n}' for n in range(1, 7))
+    div = (
+        "a<div>b</div>c<ul>u<li>l</li></ul>o<ol>v<li>m</li></ol>"
+        "<table><thead><tr><th>t</th></tr></thead><tbody><tr><td>d</td></tr></tbody></table>"
+        f"e<hr/>f{headings}<p>g<br/> h</p>"
+    )
+    data = _epi(div)
+    value = json.loads(epi_output.read(data)[0])
+    assert "refusal" not in value
+    assert value["sections"][0]["refusal"] is None
+    texts = [p["text"] for p in value["sections"][0]["paragraphs"]]
+    assert texts == [
+        "a",
+        "b",
+        "c",
+        "u",
+        "l",
+        "o",
+        "v",
+        "m",
+        "t",
+        "d",
+        "e",
+        "f",
+        "h1",
+        "x1",
+        "h2",
+        "x2",
+        "h3",
+        "x3",
+        "h4",
+        "x4",
+        "h5",
+        "x5",
+        "h6",
+        "x6",
+        "g\nh",
+    ]
+    assert [p["table"] for p in value["sections"][0]["paragraphs"]][8:10] == [[0, 0, 0], [0, 1, 0]]
+    EpiSource(data).certify(value)
+
+
+def test_the_composition_is_found_among_the_entries_and_other_narratives_are_listed() -> None:
+    other = {"resource": {"resourceType": "Organization", "text": {"div": "<div>EMA</div>"}}}
+    data = _epi(
+        "<p>a</p>", entries=[{"resource": "not a resource"}, other], text="<div>summary</div>"
+    )
+    value = json.loads(epi_output.read(data)[0])
+    assert EpiSource(data).certify(value)["notRead"] == {"narratives": 2}
+
+
+def test_east_asian_and_complex_script_fonts_set_directly_count() -> None:
+    for slot in ("eastAsia", "cs"):
+        with pytest.raises(CertificationError):
+            DocxSource(docx(_plain(run_properties=f'<w:rFonts w:{slot}="Symbol"/>')))
+
+
+def test_a_style_without_an_id_is_not_a_default() -> None:
+    styles = (
+        f'<w:style w:type="paragraph" w:default="1" w:styleId="D">{_SYMBOL}</w:style>'
+        '<w:style w:type="paragraph" w:default="1"><w:name w:val="no id"/></w:style>'
+    )
+    assert _mapped(docx(_plain(), styles=styles))
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "<w:tbl><w:customXml><w:tbl><w:tr>"
+        + "<w:tc>"
+        + _p("<w:r><w:t>x</w:t></w:r>")
+        + "</w:tc></w:tr></w:tbl></w:customXml></w:tbl>",
+        "<w:tbl><w:tr><w:customXml><w:tr><w:tc>"
+        + _p("<w:r><w:t>x</w:t></w:r>")
+        + "</w:tc></w:tr></w:customXml></w:tr></w:tbl>",
+    ],
+    ids=["table-in-a-table-outside-its-cells", "row-in-a-row"],
+)
+def test_table_parts_outside_their_place_are_never_passed_over(body: str) -> None:
+    with pytest.raises(CertificationError):
+        DocxSource(docx(body))

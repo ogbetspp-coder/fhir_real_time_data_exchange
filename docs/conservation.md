@@ -28,8 +28,8 @@ Written out:
   - for an ePI, whitespace beyond the one space CSS draws for a run of it, and a line break
     ending its paragraph.
 - Let `φ` map a token to its character: a text character to itself (or through the closed
-  Symbol table, see "What the reader may choose" below), `w:tab` to U+0009, `w:br` to U+000A,
-  a picture to U+FFFC, and so on.
+  Symbol table where the run is in the Symbol font; see "Nothing is left to the reader's
+  choice" below), `w:tab` to U+0009, `w:br` to U+000A, a picture to U+FFFC, and so on.
 
 Then the check verifies:
 
@@ -93,28 +93,48 @@ place. The check guards against that in four ways:
   attribute).
 - It lists every other part of the package that holds text.
 
-## What the reader may choose, and is counted
+## Nothing is left to the reader's choice
 
-The check allows exactly two choices, both closed, both counted in the certificate:
+Every token has exactly one reading, and the check works it out from the document alone. Two
+readings depend on a run's formatting:
 
-| Choice                                                                                   | Certificate field  | Held by                       |
-| ---------------------------------------------------------------------------------------- | ------------------ | ----------------------------- |
-| A run whose formatting names the Symbol font: read through the Symbol table, or as stored | `symbolMapped`     | Word (`test_word_oracle.py`)  |
-| Whitespace in a run whose formatting includes hidden: left out                            | `hiddenWhitespace` | Word                          |
+- **Symbol font.** A run whose `ascii` and `hAnsi` fonts are both Symbol has its text read
+  through the Symbol table (`symbolMapped` counts the characters). A run with Symbol in only
+  some of its font slots is never certified, because Word chooses the font character by
+  character.
+- **Hidden.** Hidden whitespace is left out (`hiddenWhitespace`). Hidden text with characters to
+  show is never certified.
 
-In the corpus neither choice arises: no run's fonts include Symbol (the corpus's Symbol glyphs
-are `w:sym` elements, whose mapping is fixed), and no hidden whitespace occurs. So for every
-corpus document, the output is fully determined by the source under the check's own rules.
+The check decides both itself, by Word's precedence, written in `certify.py` and not shared
+with the reader. The levels are taken in order: the run's own properties, its character style,
+its paragraph style, the innermost table's style (each with its `basedOn` chain, and a missing
+style meaning the default one), then the document defaults. A font is set by the first level
+that names it, and a theme reference resolves to the theme's typeface. A run is hidden if it
+says so itself, or, if it is silent, if any level says so. The tests hold each rule
+(`test_the_font_is_the_nearest_levels_by_word_precedence`,
+`test_hidden_is_the_runs_own_setting_first_then_any_style`). That these rules are Word's is
+held to Word itself (`tests/test_word_oracle.py`).
+
+Up to conservation-check/1.0.0 the check allowed both readings of these two cases and counted
+which was taken. Since 1.1.0 there is one reading, and so no choice at all: **for every
+certified document, the output text is a function of the source alone.**
 
 ## What it does not cover
 
-The proof covers the text, not how it is interpreted. These are held to the applications
-themselves, empirically, document by document:
+The proof covers the text, not how it is interpreted. The interpretation is held to the
+applications themselves:
 
-- **Marks** (bold, italic, superscript...): held to Word (`tests/test_word_oracle.py`) and
-  Chrome (`tests/test_browser_oracle.py`).
-- **List labels** (computed, never in the text): held to Word.
-- **Note marks** (computed, never in the text): held to Word.
+- **An ePI's marks** (bold, italic, superscript, colour...): held to Chrome for **every ePI
+  ingested**, where Chrome is installed. The service has Chrome show the document and compares
+  every section, character by character and mark by mark, with the result; a result Chrome shows
+  otherwise is never served (R-29, `tests/test_browser_verify.py`). Every corpus ePI is held
+  to Chrome as well (`tests/test_browser_oracle.py`).
+- **A Word document's marks, list labels and note marks**: held to Microsoft Word for every
+  corpus document (`tests/test_word_oracle.py`), and for any document on a Mac with Word
+  (`scripts/word_oracle.py compare`). Word's rules are not published, so this is evidence by
+  example, the strongest available, not a proof.
+- **An ePI's list numbers and bullets**: drawn by the browser outside the text, not yet
+  compared.
 
 The scope is what the reader reads:
 
@@ -124,6 +144,37 @@ The scope is what the reader reads:
 Text elsewhere (headers, footers, comments, footnote continuation notices, other narratives in
 an ePI Bundle) is not read. The certificate lists it under `notRead` with its size, so nothing
 is left out without being named.
+
+## Who checks the checker
+
+The proof is only as good as the check, so the check's tests are themselves tested.
+`scripts/mutate_checker.py` makes one small fault at a time in a copy of `certify.py`: a
+comparison turned round, `and` made `or`, a number one off, a string changed, a statement or a
+refusal removed. It then runs the check's tests against each faulty copy. A fault the tests
+catch is "killed". A fault that survives is either a missing test, which is then added, or a
+change that cannot alter what the check does, recorded with the reason in `EQUIVALENT`.
+`tests/test_checker_mutants.py` holds the record (`docs/checker-mutants.json`) to the code:
+
+- the record must be the run of the current `certify.py`;
+- every survivor must have its reason;
+- more than 90% of all faults must be killed outright.
+
+The current run made 763 faults. The tests killed 732 of them (96%). The other 31 cannot change
+what the check does, and each is recorded with its reason. For example, an edge of the Symbol
+range at which the table holds no entry, or a length compared just before. None is
+unexplained.
+
+The first run, before these tests were written, killed 629 of 766. The survivors showed what
+was missing:
+
+- tests of rare cases (nested tables, East Asian and complex-script fonts, column breaks, `th`
+  cells, every way of writing "on" and "off");
+- a check on every count in each certificate (now locked per corpus document, beside its
+  reading);
+- one gap in the check itself: a table standing inside another table but outside its cells was
+  passed over, where it must be refused. The reader already refused it.
+
+All three are fixed.
 
 ## "Every time"
 

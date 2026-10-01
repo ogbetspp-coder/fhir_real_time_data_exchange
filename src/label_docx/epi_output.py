@@ -34,8 +34,9 @@ from label_docx.epi import READER_VERSION, EpiRefusedError, Section, read_epi, w
 from label_docx.output import Json, canonical, certified, paragraphs
 
 # The version of the shape above. A change to this file changes its hash in versions.lock.json.
-# 1.1.0 adds the certificate, and refuses a read the conservation check cannot account for.
-FORMAT_VERSION = "label-epi-json/1.1.0"
+# 1.1.0 adds the certificate, and refuses a read the conservation check cannot account for;
+# 1.2.0 certifies with conservation-check/1.1.0.
+FORMAT_VERSION = "label-epi-json/1.2.0"
 
 
 def section(item: Section) -> dict[str, Json]:

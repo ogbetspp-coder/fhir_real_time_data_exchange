@@ -10,6 +10,7 @@ and nothing stored is ever replaced.
     <root>/documents/<id[:2]>/<id>/source
     <root>/documents/<id[:2]>/<id>/<reader>/<format>/result.json      (reader@1.8.0, ...)
     <root>/documents/<id[:2]>/<id>/<reader>/<format>/receipt.json     (the result's SHA-256)
+    <root>/documents/<id[:2]>/<id>/<reader>/<format>/browser/<version>.json  (an ePI's verdict)
 
 Every write creates a file that did not exist (a hard link from a written, synced temporary
 file), so two ingestions of the same document at once cannot interleave. Every write and every
@@ -18,6 +19,12 @@ reader has changed under the same name, and raises ``StoreError`` rather than se
 result is served only if it hashes to the SHA-256 its receipt records, and ``verify`` reads every
 kept source again and requires the kept result byte for byte, which no edit to the store, however
 consistent, can pass.
+
+An ePI read is also held to a browser where one is given (``browser``; the service gives
+``label_docx.browser.verify_epi`` where Chrome is installed): the verdict is kept beside the
+result, once per browser version, and the same browser must give the same verdict byte for
+byte. ``disagreement`` names a kept verdict that found a section shown otherwise; the service
+does not serve that result.
 """
 
 from __future__ import annotations
@@ -27,10 +34,12 @@ import json
 import os
 import re
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
-from label_docx.documents import Kind, kind
+from label_docx.documents import EPI, Kind, kind
 from label_docx.output import Json, canonical
 
 _ID = re.compile(r"[0-9a-f]{64}")
@@ -49,6 +58,13 @@ class Ingested:
     result: bytes
     read: bool
     created: bool
+    # The browser's verdict on an ePI read (canonical JSON), or None where none was asked.
+    verification: bytes | None = None
+
+
+# Asked about an ePI and its result (JSON), it answers its verdict: application, agrees,
+# differs (each section shown otherwise), refused, sections.
+type Verifier = Callable[[bytes, dict[str, Any]], dict[str, Any]]
 
 
 def _version(version: str) -> str:
@@ -86,8 +102,9 @@ def _same(path: Path, data: bytes) -> None:
 class Store:
     """Documents and results under ``root``."""
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, browser: Verifier | None = None) -> None:
         self.root = root
+        self.browser = browser
 
     def _folder(self, document: str) -> Path:
         if not _ID.fullmatch(document):
@@ -117,7 +134,26 @@ class Store:
         value = json.loads(result)
         receipt = _receipt(document, result, value, reading)
         created = _write_once(path.with_name("receipt.json"), receipt) or created
-        return Ingested(document, receipt, result, "refusal" not in value, created)
+        verification = None
+        if self.browser is not None and reading is EPI and "refusal" not in value:
+            verdict = canonical(self.browser(data, value))
+            name = re.sub(r"[^A-Za-z0-9.]+", "-", json.loads(verdict)["application"]).strip("-")
+            _write_once(path.parent / "browser" / f"{name}.json", verdict)
+            verification = verdict
+        return Ingested(document, receipt, result, "refusal" not in value, created, verification)
+
+    def verifications(self, document: str) -> list[Json]:
+        """Every browser verdict kept for the current reader's result, by browser version."""
+        source = self.source(document)
+        if source is None:
+            return []
+        folder = self._result_path(document, kind(source)).parent / "browser"
+        return [json.loads(p.read_bytes()) for p in sorted(folder.glob("*.json"))]
+
+    def disagreement(self, document: str) -> dict[str, Json] | None:
+        """A kept verdict that found a section shown otherwise than the result reads, or None."""
+        found = [v for v in self.verifications(document) if isinstance(v, dict) and v["differs"]]
+        return found[0] if found else None
 
     def documents(self) -> list[str]:
         """Every kept document's id, in order."""

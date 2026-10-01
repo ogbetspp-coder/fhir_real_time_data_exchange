@@ -10,7 +10,8 @@ already in the lock is never re-locked to other code: bump it instead.
 
 ``corpus/*/expected.json`` records, for every .docx in the corpus, its SHA-256 and the SHA-256 of
 its canonical paragraphs (or its refusal code), and for every ePI its SHA-256, the SHA-256 of its
-canonical sections and how many sections the reader refused (or the document's refusal code).
+canonical sections and how many sections the reader refused (or the document's refusal code);
+for each certified read, the SHA-256 of its certificate, so every count in it is held too.
 A change to what the reader produces for any of them fails the tests until this script is run
 and the change reviewed in the diff.
 """
@@ -70,6 +71,14 @@ def locked_versions(lock: Lock) -> Lock:
 MANIFESTS = {"sources", "expected", "word", "browser"}
 
 
+def _certificate(result: bytes) -> dict[str, str]:
+    """The SHA-256 of a result's certificate (canonical JSON), where it was certified."""
+    certificate = json.loads(result).get("certificate")
+    if certificate is None:
+        return {}
+    return {"certificateSha256": hashlib.sha256(canonical(certificate)).hexdigest()}
+
+
 def expected(folder: Path) -> dict[str, dict[str, str]]:
     """What the readers produce for every .docx and every ePI (.json) in ``folder``."""
     out: dict[str, dict[str, str]] = {}
@@ -84,6 +93,7 @@ def expected(folder: Path) -> dict[str, dict[str, str]]:
             entry["sectionsSha256"] = hashlib.sha256(body).hexdigest()
             refused = sum(1 for s in epi.walk(document.sections) if s.refusal)
             entry["refusedSections"] = str(refused)
+            entry |= _certificate(epi_output.read(data)[0])
         except EpiRefusedError as refused_document:
             entry["refusal"] = refused_document.code
         out[path.name] = entry
@@ -93,6 +103,7 @@ def expected(folder: Path) -> dict[str, dict[str, str]]:
         try:
             body = canonical(output.paragraphs(read_docx(data)))
             entry["paragraphsSha256"] = hashlib.sha256(body).hexdigest()
+            entry |= _certificate(output.read(data)[0])
         except DocxRefusedError as refused:
             entry["refusal"] = refused.code
         out[path.name] = entry

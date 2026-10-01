@@ -11,7 +11,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from browser_oracle import digest, reader_lines, sections
+from browser_oracle import sections
+from label_docx.browser import digest, reader_lines
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
 _MANIFESTS = {"sources", "expected", "word", "browser"}

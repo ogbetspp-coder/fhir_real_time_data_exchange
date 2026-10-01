@@ -1,0 +1,230 @@
+{
+  "killed": 732,
+  "mutants": 763,
+  "survivors": [
+    {
+      "code": "return None",
+      "equivalent": "the function returns None at its end anyway",
+      "function": "_Fonts.font",
+      "kind": "statement",
+      "line": 230
+    },
+    {
+      "code": "\"thead\",",
+      "equivalent": "a row group is always met beside a table or a row, which end the paragraph; text directly in one is refused by the reader",
+      "function": "<module>",
+      "kind": "str:'thead'",
+      "line": 672
+    },
+    {
+      "code": "\"tbody\",",
+      "equivalent": "a row group is always met beside a table or a row, which end the paragraph; text directly in one is refused by the reader",
+      "function": "<module>",
+      "kind": "str:'tbody'",
+      "line": 673
+    },
+    {
+      "code": "return",
+      "equivalent": "an empty run then adds an empty segment, or no hidden characters: nothing either way",
+      "function": "_Story.flush_run",
+      "kind": "statement",
+      "line": 461
+    },
+    {
+      "code": "raise CertificationError(\"the ledger does not balance\")",
+      "equivalent": "the counts follow from the sequences, which are equal by then: the ledger is a second statement of the same fact, stated in the certificate",
+      "function": "DocxSource.certify",
+      "kind": "statement",
+      "line": 629
+    },
+    {
+      "code": "self.pending = False",
+      "equivalent": "the parser starts at the div, a block, which ends the (empty) paragraph and clears it",
+      "function": "_Div.__init__",
+      "kind": "bool",
+      "line": 696
+    },
+    {
+      "code": "parsed.close()",
+      "equivalent": "the div ends with its own end tag, so nothing is left buffered",
+      "function": "EpiSource._section",
+      "kind": "call",
+      "line": 788
+    },
+    {
+      "code": "parsed.flush()",
+      "equivalent": "the div's end tag, a block's, has ended the last paragraph",
+      "function": "EpiSource._section",
+      "kind": "call",
+      "line": 789
+    },
+    {
+      "code": "raise CertificationError(\"the ledger does not balance\")",
+      "equivalent": "the counts follow from the sequences, which are equal by then: the ledger is a second statement of the same fact, stated in the certificate",
+      "function": "EpiSource.certify",
+      "kind": "statement",
+      "line": 859
+    },
+    {
+      "code": "return tag.rsplit(\"}\", 1)[-1]",
+      "equivalent": "an element's tag holds one '}', after its namespace",
+      "function": "_local",
+      "kind": "int:1",
+      "line": 87
+    },
+    {
+      "code": "low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code",
+      "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
+      "function": "_symbol_reading",
+      "kind": "compare:0",
+      "line": 255
+    },
+    {
+      "code": "low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code",
+      "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
+      "function": "_symbol_reading",
+      "kind": "compare:1",
+      "line": 255
+    },
+    {
+      "code": "continue",
+      "equivalent": "a paragraph's properties are walked as a container instead: they hold no run, and text in them is refused either way",
+      "function": "_Story.inline",
+      "kind": "statement",
+      "line": 324
+    },
+    {
+      "code": "low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code",
+      "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
+      "function": "_symbol_reading",
+      "kind": "int:61440",
+      "line": 255
+    },
+    {
+      "code": "low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code",
+      "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
+      "function": "_symbol_reading",
+      "kind": "int:61695",
+      "line": 255
+    },
+    {
+      "code": "low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code",
+      "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
+      "function": "_Story.token",
+      "kind": "compare:0",
+      "line": 425
+    },
+    {
+      "code": "low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code",
+      "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
+      "function": "_Story.token",
+      "kind": "compare:1",
+      "line": 425
+    },
+    {
+      "code": "return element.get(_w(\"val\"), \"true\").lower() not in (\"0\", \"false\", \"off\")",
+      "equivalent": "any value outside the off list is on: 'Xrue' is on as 'true' is",
+      "function": "_on",
+      "kind": "str:'true'",
+      "line": 141
+    },
+    {
+      "code": "if child.tag == _w(\"pPr\"):",
+      "equivalent": "a paragraph's properties are walked as a container instead: they hold no run, and text in them is refused either way",
+      "function": "_Story.inline",
+      "kind": "str:'pPr'",
+      "line": 321
+    },
+    {
+      "code": "low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code",
+      "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
+      "function": "_Story.token",
+      "kind": "int:61440",
+      "line": 425
+    },
+    {
+      "code": "low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code",
+      "equivalent": "the Symbol table holds neither 0x00 nor 0xFF nor 0x100: a code at either edge of the U+F000 range, or just past it, is refused before and after",
+      "function": "_Story.token",
+      "kind": "int:61695",
+      "line": 425
+    },
+    {
+      "code": "for index, (mine, theirs) in enumerate(zip(self.body, paragraphs, strict=True)):",
+      "equivalent": "the lengths are compared just before, so zip(strict=True) never raises",
+      "function": "DocxSource.certify",
+      "kind": "bool",
+      "line": 614
+    },
+    {
+      "code": "for index, (mine, theirs) in enumerate(zip(self.sections, value[\"sections\"], strict=True)):",
+      "equivalent": "the lengths are compared just before, so zip(strict=True) never raises",
+      "function": "EpiSource.certify",
+      "kind": "bool",
+      "line": 850
+    },
+    {
+      "code": "self.mark(\"note\", (kind, self.story[1]))",
+      "equivalent": "a marker's label is compared only with 'page'; any other is a note mark",
+      "function": "_Story.run",
+      "kind": "str:'note'",
+      "line": 364
+    },
+    {
+      "code": "self.mark(\"note\", (kind, int(child.get(_w(\"id\"), \"\"))))",
+      "equivalent": "a marker's label is compared only with 'page'; any other is a note mark",
+      "function": "_Story.run",
+      "kind": "str:'note'",
+      "line": 366
+    },
+    {
+      "code": "zip(mine.sections, theirs[\"sections\"], strict=True)",
+      "equivalent": "the lengths are compared just before, so zip(strict=True) never raises",
+      "function": "EpiSource.certify.section",
+      "kind": "bool",
+      "line": 835
+    },
+    {
+      "code": "if note.get(_w(\"type\"), \"normal\") in _NOTE_LAYOUT:",
+      "equivalent": "the default only has to be outside the layout types, as 'Xormal' is",
+      "function": "DocxSource.__init__",
+      "kind": "str:'normal'",
+      "line": 582
+    },
+    {
+      "code": "zip(mine_paragraphs, theirs, strict=True)",
+      "equivalent": "the lengths are compared just before, so zip(strict=True) never raises",
+      "function": "DocxSource.certify",
+      "kind": "bool",
+      "line": 625
+    },
+    {
+      "code": "self.open_tables.append([self.tables, -1, -1])",
+      "equivalent": "the cell count starts again at each row; only the row count's start matters, and its mutant is caught",
+      "function": "_Div.handle_starttag",
+      "kind": "int:1",
+      "line": 723
+    },
+    {
+      "code": "if a != b",
+      "equivalent": "where a difference is found only words the refusal",
+      "function": "EpiSource.certify.section",
+      "kind": "compare:0",
+      "line": 817
+    },
+    {
+      "code": "self.ledger.symbol += sum(1 for a, b in zip(text, mapped, strict=True) if a != b)",
+      "equivalent": "the Symbol table maps one character to one, so the two are the same length",
+      "function": "_Story.token",
+      "kind": "bool",
+      "line": 406
+    }
+  ],
+  "target": "src/label_docx/certify.py",
+  "targetSha256": "a2173a37c63db21e57ca56a3d89f71b2cc08a07e96924a98f50e48f61f9f2aa3",
+  "tests": [
+    "tests/test_certify.py",
+    "tests/test_robustness.py",
+    "tests/test_output.py"
+  ]
+}

@@ -5,6 +5,7 @@
                                        first, 200 after)
     GET  /v1/documents/<id>            the reader's result (canonical JSON), read or refused
     GET  /v1/documents/<id>/source     the document's bytes as ingested
+    GET  /v1/documents/<id>/verification   the browser's verdicts on an ePI's result
     GET  /v1/health                    the reader, format and runtime the service answers with
 
 ``<id>`` is the SHA-256 of the document's bytes. The same bytes always get the same receipt and
@@ -19,6 +20,7 @@ whitespace comes from its Unicode database (``check_environment``).
 from __future__ import annotations
 
 import importlib.resources
+import json
 import re
 import sys
 import unicodedata
@@ -27,10 +29,10 @@ from pathlib import Path
 from socketserver import ThreadingMixIn
 from wsgiref.simple_server import WSGIRequestHandler, WSGIServer, make_server
 
-from label_docx import documents
-from label_docx.output import FORMAT_VERSION, canonical
+from label_docx import browser, documents
+from label_docx.output import FORMAT_VERSION, Json, canonical
 from label_docx.reader import READER_VERSION
-from label_docx.store import Store, StoreError
+from label_docx.store import Store, StoreError, Verifier
 
 # The largest document accepted, in bytes; the reader caps each part at 20 MiB.
 MAX_DOCUMENT_BYTES = 64 * 1024 * 1024
@@ -43,7 +45,7 @@ FHIR_JSON = "application/fhir+json"
 type StartResponse = Callable[[str, list[tuple[str, str]]], object]
 type Environ = dict[str, object]
 
-_DOCUMENT = re.compile(r"/v1/documents/([0-9a-f]{64})(/source)?")
+_DOCUMENT = re.compile(r"/v1/documents/([0-9a-f]{64})(/source|/verification)?")
 
 
 def check_environment() -> None:
@@ -114,11 +116,25 @@ class Service:
             return (*_error("404 Not Found", f"no such path: {path}"), [])
         if method != "GET":
             return (*_error("405 Method Not Allowed", "use GET"), [("Allow", "GET")])
-        document, source = match.group(1), match.group(2) is not None
+        document, part = match.group(1), match.group(2)
+        if part == "/verification":
+            if self.store.source(document) is None:
+                return (*_error("404 Not Found", f"no document {document}"), [])
+            verdicts = self.store.verifications(document)
+            return "200 OK", JSON, canonical({"verifications": verdicts}), []
+        source = part == "/source"
         body = self.store.source(document) if source else self.store.result(document)
         if body is None:
             return (*_error("404 Not Found", f"no document {document}"), [])
         if not source:
+            disagreement = self.store.disagreement(document)
+            if disagreement is not None:
+                # The browser shows a section otherwise than the result reads: not served.
+                message: Json = {
+                    "error": "the browser shows otherwise",
+                    "verification": disagreement,
+                }
+                return "409 Conflict", JSON, canonical(message), []
             return "200 OK", JSON, body, []
         return "200 OK", FHIR_JSON if documents.kind(body) is documents.EPI else DOCX, body, []
 
@@ -136,7 +152,12 @@ class Service:
             return (*_error("400 Bad Request", "the document was cut short"), [])
         ingested = self.store.ingest(data)
         status = "201 Created" if ingested.created else "200 OK"
-        return status, JSON, ingested.receipt, [("Location", f"/v1/documents/{ingested.document}")]
+        if ingested.verification is None:
+            verified = "not-verified"
+        else:
+            verified = "differs" if json.loads(ingested.verification)["differs"] else "agrees"
+        headers = [("Location", f"/v1/documents/{ingested.document}"), ("Verification", verified)]
+        return status, JSON, ingested.receipt, headers
 
 
 class _ThreadingServer(ThreadingMixIn, WSGIServer):
@@ -149,11 +170,29 @@ class _QuietHandler(WSGIRequestHandler):
         sys.stderr.write(f"{self.address_string()} {format % args}\n")
 
 
-def serve(root: Path, host: str = "127.0.0.1", port: int = 8080) -> None:
+def browser_verifier(choice: str) -> Verifier | None:
+    """The browser to hold ePIs to: Chrome where installed (``auto``), or none (``off``)."""
+    if choice == "off":
+        return None
+    chrome = browser.find_chrome()
+    if chrome is None:
+        if choice == "on":
+            raise SystemExit("label-docx: --browser on, but Chrome is not installed")
+        return None
+    return lambda data, result: browser.verify_epi(data, result, chrome)
+
+
+def serve(
+    root: Path, host: str = "127.0.0.1", port: int = 8080, verifier: Verifier | None = None
+) -> None:
     """Serve the store at ``root`` until interrupted."""
     check_environment()
+    service = Service(Store(root, browser=verifier))
     with make_server(
-        host, port, Service(Store(root)), server_class=_ThreadingServer, handler_class=_QuietHandler
+        host, port, service, server_class=_ThreadingServer, handler_class=_QuietHandler
     ) as server:
-        sys.stderr.write(f"label-docx {READER_VERSION} serving {root} on http://{host}:{port}\n")
+        held = "every ePI held to Chrome" if verifier else "ePIs not held to a browser"
+        sys.stderr.write(
+            f"label-docx {READER_VERSION} serving {root} on http://{host}:{port} ({held})\n"
+        )
         server.serve_forever()

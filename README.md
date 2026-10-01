@@ -103,8 +103,9 @@ uv run label-docx-service verify --store /path/to/store            # audit every
 | Request                              | Answer                                                  |
 | ------------------------------------ | ------------------------------------------------------- |
 | `POST /v1/documents` (.docx or ePI)  | the receipt: 201 the first time, 200 after, same bytes  |
-| `GET /v1/documents/<sha256>`         | the reader's result: read, or refused with the reason   |
+| `GET /v1/documents/<sha256>`         | the reader's result: read, or refused with the reason; 409 if Chrome shows an ePI otherwise |
 | `GET /v1/documents/<sha256>/source`  | the document's bytes as ingested                        |
+| `GET /v1/documents/<sha256>/verification` | Chrome's verdicts on an ePI's result, per Chrome version |
 | `GET /v1/health`                     | the readers, formats, Python and Unicode versions       |
 
 What it guarantees:
@@ -119,12 +120,20 @@ What it guarantees:
   to the store, however consistent.
 - **Every version is kept.** Results are kept per reader and format version: a new reader adds
   its results beside the old ones, so what a document was read as on any date can be shown.
+- **Every read is certified.** The independent conservation check accounts for every character
+  of every read (see [docs/conservation.md](docs/conservation.md)); its certificate is in the
+  result and the receipt.
+- **Every ePI is held to a browser.** Where Chrome is installed (`--browser auto`, the default;
+  `on` to require it, `off` to skip), the service has Chrome show each ePI it reads and compares
+  every section, text and formatting, with the result. The verdict is kept beside the result,
+  once per Chrome version; the response says `Verification: agrees`, `differs` or
+  `not-verified`. A result Chrome shows otherwise is kept but never served.
 - **A refusal is an answer.** A document the reader cannot read exactly is kept, with its refusal
   code and detail, and answered the same way every time. A PDF is refused by name: it holds glyphs
   placed on a page, not the text Word holds, and the reader will not guess at it.
 
-EMA publishes approved SmPCs as PDF. Their exact text is in EMA's ePI (FHIR), which EMA Flow's
-ePI reader reads; the authored Word SmPC and Module 3 sections are what this service reads.
+EMA publishes approved SmPCs as PDF. Their exact text is in EMA's ePI (FHIR), which this service
+reads too, alongside authored Word SmPC and Module 3 documents.
 
 ## List labels
 
@@ -242,7 +251,7 @@ downloads.
 
 ## How the claims are held
 
-`docs/requirements.md` lists the requirements (R-01 to R-27) with the tests that prove each; the
+`docs/requirements.md` lists the requirements (R-01 to R-29) with the tests that prove each; the
 table below is the short form.
 
 | Claim                                                            | Where                        |
@@ -271,6 +280,8 @@ table below is the short form.
 | Every read is certified character by character by an independent check | `tests/test_certify.py` |
 | The check refuses all 9,192 changed results tried, of 16 kinds    | `tests/test_certify.py`      |
 | Damaged files are refused or certified, never an error           | `tests/test_robustness.py`   |
+| Every fault made in the check is caught by its tests, or cannot matter | `tests/test_checker_mutants.py` |
+| Each ePI ingested is held to Chrome; a disagreement is never served | `tests/test_browser_verify.py` |
 
 ## Set-up and checks
 

@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 from label_docx.documents import kind
-from label_docx.service import check_environment, serve
+from label_docx.service import browser_verifier, check_environment, serve
 from label_docx.store import Store, StoreError
 
 
@@ -49,17 +49,25 @@ def service_main(argv: list[str] | None = None) -> int:
     serving.add_argument("--store", type=Path, required=True)
     serving.add_argument("--host", default="127.0.0.1")
     serving.add_argument("--port", type=int, default=8080)
+    for command in (serving,):
+        command.add_argument(
+            "--browser",
+            choices=("auto", "on", "off"),
+            default="auto",
+            help="hold every ePI to Chrome: where installed (auto), always (on), never (off)",
+        )
     ingesting = commands.add_parser("ingest", help="ingest files; print one receipt each")
     ingesting.add_argument("--store", type=Path, required=True)
+    ingesting.add_argument("--browser", choices=("auto", "on", "off"), default="auto")
     ingesting.add_argument("files", type=Path, nargs="+")
     verifying = commands.add_parser("verify", help="read every kept document again and compare")
     verifying.add_argument("--store", type=Path, required=True)
     args = parser.parse_args(argv)
     if args.command == "serve":
-        serve(args.store, args.host, args.port)
+        serve(args.store, args.host, args.port, browser_verifier(args.browser))
         return 0
     check_environment()
-    store = Store(args.store)
+    store = Store(args.store, browser=browser_verifier(getattr(args, "browser", "off")))
     if args.command == "verify":
         failed = 0
         documents = store.documents()

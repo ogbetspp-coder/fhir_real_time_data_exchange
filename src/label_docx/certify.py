@@ -23,13 +23,14 @@ moved, merged or split, or a page number, note mark or table cell put elsewhere.
 fails closed: a result it cannot account for is not served (``output``/``epi_output`` turn it
 into the refusal ``uncertified``).
 
-What the check allows the reader to choose, and so cannot itself rule on, is stated and counted
-in the certificate: a run whose fonts include Symbol may be read through the Symbol table or as
-stored (``symbolMapped``; which one Word draws is held to Word, ``tests/test_word_oracle.py``),
-and a run of whitespace whose formatting includes hidden may be left out (``hiddenWhitespace``).
-Every other choice is fixed. The set-aside reasons are fixed too: a field's instruction (code,
-not shown), a page number (set by the layout; its place must be in ``pages``), a page or column
-break (layout).
+The check leaves the reader no choice: every token has one reading. Two of them depend on the
+run's formatting, and the check works both out itself, by rules written here and not shared with
+the reader (``_Fonts``): whether a run is drawn in the Symbol font (its text is then read
+through the Symbol table, counted as ``symbolMapped``), and whether it is hidden (hidden
+whitespace is left out, counted as ``hiddenWhitespace``; hidden text with characters to show is
+never certified). The set-aside reasons are fixed too: a field's instruction (code, not shown),
+a page number (set by the layout; its place must be in ``pages``), a page or column break
+(layout).
 
 Its scope is the text the reader claims to read: for a .docx the body and the footnotes and
 endnotes; for an ePI the Composition's section titles and divs. Text the package holds elsewhere
@@ -60,7 +61,7 @@ from typing import Any
 
 from label_docx.reader import SYMBOL_FONT
 
-CHECKER_VERSION = "conservation-check/1.0.0"
+CHECKER_VERSION = "conservation-check/1.1.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _RELS = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -112,12 +113,9 @@ class _Ledger:
 
 @dataclass
 class _Segment:
-    """One run's shown text, with the readings the check allows, or a zero-width marker."""
+    """The text one run shows (as the check reads it), or a zero-width marker."""
 
-    readings: tuple[str, ...] = ()
-    # What each reading costs in the ledger beyond the output: (hidden, symbol) counts.
-    symbol_reading: int | None = None
-    hidden_reading: int | None = None
+    text: str = ""
     marker: tuple[str, Any] | None = None
 
 
@@ -127,83 +125,136 @@ class _Paragraph:
     table: tuple[int, int, int] | None = None
 
 
-class _Fonts:
-    """What a run's formatting could include: its fonts, and whether anything hides it.
+_THEME_SLOT = {
+    "ascii": "asciiTheme",
+    "hAnsi": "hAnsiTheme",
+    "eastAsia": "eastAsiaTheme",
+    "cs": "cstheme",
+}
+_SCRIPT = {"Ascii": "latin", "HAnsi": "latin", "EastAsia": "ea", "Bidi": "cs"}
 
-    Deliberately wider than the reader's cascade: every style a run could take formatting from
-    (its own, its character style's chain, its paragraph style's chain, its tables' styles'
-    chains, the default styles and the document defaults), every font slot, and every theme font
-    a slot could name. Wider only lets the reader choose more; it never lets text through.
+
+def _on(element: ET.Element | None) -> bool | None:
+    """A toggle element's setting: None when absent, else on unless its value says off."""
+    if element is None:
+        return None
+    return element.get(_w("val"), "true").lower() not in ("0", "false", "off")
+
+
+class _Fonts:
+    """The two run properties that decide which characters a run shows: font and hidden.
+
+    Worked out here, by Word's precedence, written down on its own (it shares no code with the
+    reader): the run's own properties, then its character style, its paragraph style and the
+    innermost table's style, each with its ``basedOn`` chain, then the document defaults; a
+    style id that is absent or unknown means the default style of its kind (the last marked
+    default). A font slot (``ascii``, ``hAnsi``...) is set by the first level that names it, a
+    theme reference there naming the theme's typeface for its script. A run is hidden when it
+    says so itself, or, saying nothing, when any level says so (the reading the reader states;
+    Word's prints are held to it by ``tests/test_word_oracle.py``).
     """
 
     def __init__(self, styles: ET.Element | None, theme: ET.Element | None) -> None:
+        self.kind: dict[str, str] = {}
         self.based: dict[str, str | None] = {}
         self.rpr: dict[str, ET.Element | None] = {}
-        self.defaults: list[str] = []
+        self.defaults: dict[str, str] = {}
         self.doc_rpr: ET.Element | None = None
         if styles is not None:
-            for style in styles.iter(_w("style")):
-                style_id = style.get(_w("styleId"), "")
+            for style in styles.findall(_w("style")):
+                style_id = style.get(_w("styleId"))
+                if style_id is None:
+                    continue
+                kind = style.get(_w("type"), "paragraph")
                 based = style.find(_w("basedOn"))
+                self.kind[style_id] = kind
                 self.based[style_id] = None if based is None else based.get(_w("val"))
                 self.rpr[style_id] = style.find(_w("rPr"))
                 if style.get(_w("default")) in ("1", "true", "on"):
-                    self.defaults.append(style_id)
-            defaults = styles.find(f"{_w('docDefaults')}/{_w('rPrDefault')}/{_w('rPr')}")
-            self.doc_rpr = defaults
-        self.theme: set[str] = set()
-        if theme is not None:
-            for node in theme.iter():
-                if _local(node.tag) in ("latin", "ea", "cs") and node.get("typeface"):
-                    self.theme.add(node.get("typeface", ""))
+                    self.defaults[kind] = style_id
+            self.doc_rpr = styles.find(f"{_w('docDefaults')}/{_w('rPrDefault')}/{_w('rPr')}")
+        self.theme: dict[str, str] = {}
+        scheme = (
+            None
+            if theme is None
+            else next((n for n in theme.iter() if _local(n.tag) == "fontScheme"), None)
+        )
+        for group in [] if scheme is None else list(scheme):
+            prefix = _local(group.tag).removesuffix("Font")
+            for child in group:
+                if _local(child.tag) in ("latin", "ea", "cs"):
+                    self.theme[f"{prefix}:{_local(child.tag)}"] = child.get("typeface", "")
 
-    def chain(self, style_id: str | None) -> list[ET.Element]:
+    def chain(self, style_id: str | None, kind: str) -> list[ET.Element]:
+        if style_id is None or style_id not in self.kind:
+            style_id = self.defaults.get(kind)
         out: list[ET.Element] = []
         seen: set[str] = set()
-        while style_id is not None and style_id not in seen:
+        while style_id is not None and style_id in self.kind and style_id not in seen:
             seen.add(style_id)
-            rpr = self.rpr.get(style_id)
+            rpr = self.rpr[style_id]
             if rpr is not None:
                 out.append(rpr)
-            style_id = self.based.get(style_id)
+            style_id = self.based[style_id]
         return out
 
-    def properties(self, run: ET.Element, styles: list[str | None]) -> list[ET.Element]:
+    def levels(
+        self, run: ET.Element, paragraph_style: str | None, table_style: str | None, in_table: bool
+    ) -> list[ET.Element]:
         own = run.find(_w("rPr"))
-        found = [own] if own is not None else []
-        style = own.find(_w("rStyle")) if own is not None else None
-        ids = [None if style is None else style.get(_w("val")), *styles, *self.defaults]
-        for style_id in ids:
-            found += self.chain(style_id)
+        style = None if own is None else own.find(_w("rStyle"))
+        found = [] if own is None else [own]
+        found += self.chain(None if style is None else style.get(_w("val")), "character")
+        found += self.chain(paragraph_style, "paragraph")
+        if in_table:
+            found += self.chain(table_style, "table")
         if self.doc_rpr is not None:
             found.append(self.doc_rpr)
         return found
 
-    def may_be_symbol(self, properties: list[ET.Element]) -> bool:
-        names: set[str] = set()
-        for rpr in properties:
-            fonts = rpr.find(_w("rFonts"))
+    def font(self, levels: list[ET.Element], slot: str) -> str | None:
+        for level in levels:
+            fonts = level.find(_w("rFonts"))
             if fonts is None:
                 continue
-            for name, value in fonts.attrib.items():
-                names |= self.theme if _local(name).endswith("Theme") else {value}
-        return any(name.lower().replace(" ", "") in ("symbol", "symbolmt") for name in names)
+            theme = fonts.get(_w(_THEME_SLOT[slot]))
+            if theme is not None:
+                prefix = "major" if theme.startswith("major") else "minor"
+                script = _SCRIPT.get(theme.removeprefix(prefix), "")
+                key = f"{prefix}:{script}"
+                if key not in self.theme:
+                    raise CertificationError(f"the theme font {theme} is not in the theme")
+                return self.theme[key]
+            if fonts.get(_w(slot)) is not None:
+                return fonts.get(_w(slot))
+        return None
+
+    def symbol(self, levels: list[ET.Element]) -> bool:
+        """Whether the run's text is drawn in Symbol: its ``ascii`` and ``hAnsi`` fonts both."""
+        slots = {slot: _is_symbol(self.font(levels, slot)) for slot in _THEME_SLOT}
+        if any(slots.values()) and not (slots["ascii"] and slots["hAnsi"]):
+            raise CertificationError("Symbol set for only some of a run's characters")
+        return slots["ascii"]
 
     @staticmethod
-    def may_be_hidden(properties: list[ET.Element]) -> bool:
-        return any(
-            rpr.find(_w("vanish")) is not None or rpr.find(_w("specVanish")) is not None
-            for rpr in properties
-        )
+    def hidden(levels: list[ET.Element], own: ET.Element | None) -> bool:
+        direct = None if own is None else _on(own.find(_w("vanish")))
+        if direct is not None:
+            return direct
+        return any(_on(level.find(_w("vanish"))) for level in levels)
 
 
-def _symbol_reading(text: str) -> str | None:
+def _is_symbol(name: str | None) -> bool:
+    return name is not None and name.lower().replace(" ", "") in ("symbol", "symbolmt")
+
+
+def _symbol_reading(text: str) -> str:
     out: list[str] = []
     for character in text:
         code = ord(character)
         low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code
         if low not in SYMBOL_FONT:
-            return None
+            raise CertificationError(f"a Symbol character outside the table: {code:#06x}")
         out.append(SYMBOL_FONT[low])
     return "".join(out)
 
@@ -226,33 +277,31 @@ class _Story:
     # The block structure: paragraphs in document order, and the cell each stands in.
 
     def blocks(
-        self, element: ET.Element, table: tuple[int, int, int] | None, styles: list[str | None]
+        self, element: ET.Element, table: tuple[int, int, int] | None, table_style: str | None
     ) -> None:
         for child in element:
             local = _local(child.tag)
             if child.tag == _w("p"):
-                self.paragraph(child, table, styles)
+                self.paragraph(child, table, table_style)
             elif child.tag == _w("tbl"):
-                self.table(child, table, styles)
+                self.table(child, table)
             elif local == "t":
                 raise CertificationError("text outside a paragraph")
             else:
-                self.blocks(child, table, styles)
+                self.blocks(child, table, table_style)
 
-    def table(
-        self, element: ET.Element, outer: tuple[int, int, int] | None, styles: list[str | None]
-    ) -> None:
+    def table(self, element: ET.Element, outer: tuple[int, int, int] | None) -> None:
         index = self.tables
         self.tables += 1
         style = element.find(f"{_w('tblPr')}/{_w('tblStyle')}")
-        inner = [*styles, None if style is None else style.get(_w("val"))]
+        own = None if style is None else style.get(_w("val"))
         rows = _owned(element, _w("tr"), _w("tbl"))
         for row_index, row in enumerate(rows):
             for cell_index, cell in enumerate(_owned(row, _w("tc"), _w("tr"))):
-                self.blocks(cell, outer or (index, row_index, cell_index), inner)
+                self.blocks(cell, outer or (index, row_index, cell_index), own)
 
     def paragraph(
-        self, element: ET.Element, table: tuple[int, int, int] | None, styles: list[str | None]
+        self, element: ET.Element, table: tuple[int, int, int] | None, table_style: str | None
     ) -> None:
         if any(node.tag == _w("p") for node in element.iter() if node is not element):
             raise CertificationError("a paragraph inside a paragraph")
@@ -260,7 +309,9 @@ class _Story:
         style = None if properties is None else properties.find(_w("pStyle"))
         here = _Paragraph(table=table)
         self.current = here
-        self.styles = [None if style is None else style.get(_w("val")), *styles]
+        self.paragraph_style = None if style is None else style.get(_w("val"))
+        self.table_style = table_style
+        self.in_table = table is not None
         self.inline(element)
         self.paragraphs.append(here)
 
@@ -294,17 +345,18 @@ class _Story:
         self.current.segments.append(_Segment(marker=(kind, value)))
 
     def run(self, run: ET.Element) -> None:
+        levels = self.fonts.levels(run, self.paragraph_style, self.table_style, self.in_table)
+        symbol = self.fonts.symbol(levels)
+        hidden = self.fonts.hidden(levels, run.find(_w("rPr")))
         shown: list[str] = []
-        # Characters of w:t in the run, the only ones the Symbol table may map.
-        stored: list[tuple[int, int]] = []
         for child in run:
             local = _local(child.tag)
             if local in _RUN_SILENT:
                 continue
             if local in _NOTE_MARKS:
                 kind = "footnote" if local.startswith("footnote") else "endnote"
-                self.flush_run(run, shown, stored)
-                shown, stored = [], []
+                self.flush_run(shown, hidden)
+                shown = []
                 if local.endswith("Ref"):
                     # A note's echo of its own mark, at the start of its text.
                     if self.story is None or self.story[0] != kind:
@@ -314,68 +366,74 @@ class _Story:
                     self.mark("note", (kind, int(child.get(_w("id"), ""))))
                 continue
             if local == "fldChar":
-                self.flush_run(run, shown, stored)
-                shown, stored = [], []
+                self.flush_run(shown, hidden)
+                shown = []
                 self.field(child)
                 continue
             if local == "instrText":
+                if not self.in_instruction():
+                    raise CertificationError("field code outside a field's instruction")
                 text = child.text or ""
                 self.ledger.instruction += len(text)
                 self.ledger.field_code += len(text)
-                if self.fields and self.fields[-1][0]:
+                if self.fields[-1][0]:
                     self.fields[-1][1].append(text)
                 continue
-            token, length, is_text = self.token(child, local)
+            token = self.token(child, local, symbol)
+            # One token for each character of a text element, one for any other element.
+            length = len(child.text or "") if local == "t" else 1
             if self.in_instruction():
                 self.ledger.field_code += length
-                if self.fields and self.fields[-1][0]:
+                if self.fields[-1][0]:
                     self.fields[-1][1].append(token)
             elif self.layout:
                 self.ledger.page_numbers += length
             elif not token and local == "br":
                 self.ledger.page_breaks += 1
             else:
-                if is_text:
-                    stored.append((len("".join(shown)), len(token)))
                 shown.append(token)
-        self.flush_run(run, shown, stored)
+        self.flush_run(shown, hidden)
 
-    def token(self, child: ET.Element, local: str) -> tuple[str, int, bool]:
-        """What one run child stands for, how many source tokens it is, and if it is w:t."""
+    def token(self, child: ET.Element, local: str, symbol: bool) -> str:
+        """What one run child stands for, as the check reads it."""
         if local == "t":
             text = child.text or ""
             if len(child):
                 raise CertificationError("an element inside a text element")
             self.ledger.text += len(text)
-            return text, len(text), True
+            if symbol:
+                mapped = _symbol_reading(text)
+                self.ledger.symbol += sum(1 for a, b in zip(text, mapped, strict=True) if a != b)
+                return mapped
+            return text
         self.ledger.elements += 1
         if local in ("tab", "ptab"):
-            return "\t", 1, False
+            return "\t"
         if local == "br":
             if child.get(_w("type")) in ("page", "column"):
                 # Layout: a page or column break stands for no character.
-                return "", 1, False
-            return "\n", 1, False
+                return ""
+            return "\n"
         if local == "cr":
-            return "\n", 1, False
+            return "\n"
         if local == "noBreakHyphen":
-            return "\u2011", 1, False
+            return "\u2011"
         if local == "softHyphen":
-            return "\u00ad", 1, False
+            return "\u00ad"
         if local == "sym":
             code = int(child.get(_w("char"), "0"), 16)
             low = code - 0xF000 if 0xF000 <= code <= 0xF0FF else code
             if low not in SYMBOL_FONT:
                 raise CertificationError(f"a w:sym outside the Symbol table: {code:#06x}")
             self.ledger.symbol += 1
-            return SYMBOL_FONT[low], 1, False
+            return SYMBOL_FONT[low]
         if local in ("drawing", "pict"):
             # A picture stands for one character. Text inside one (a text box, WordArt, whose
             # text is an attribute of its textpath) is text this check does not place.
             texts = {"t", "txbx", "txbxContent", "textbox", "textpath"}
             if any(_local(n.tag) in texts for n in child.iter()):
                 raise CertificationError(f"text inside a {local}")
-            return _OBJECT, 1, False
+            return _OBJECT
         raise CertificationError(f"a run holds {local}, which the check does not know")
 
     def field(self, child: ET.Element) -> None:
@@ -397,41 +455,35 @@ class _Story:
         else:
             raise CertificationError(f"a field character {kind!r} out of place")
 
-    def flush_run(self, run: ET.Element, shown: list[str], stored: list[tuple[int, int]]) -> None:
+    def flush_run(self, shown: list[str], hidden: bool) -> None:
         text = "".join(shown)
         if not text:
             return
-        properties = self.fonts.properties(run, self.styles)
-        readings = [text]
-        segment = _Segment()
-        if stored and self.fonts.may_be_symbol(properties):
-            mapped = list(text)
-            ok = True
-            for start, length in stored:
-                reading = _symbol_reading(text[start : start + length])
-                if reading is None:
-                    ok = False
-                    break
-                mapped[start : start + length] = list(reading)
-            if ok and "".join(mapped) != text:
-                segment.symbol_reading = len(readings)
-                readings.append("".join(mapped))
-        if not text.strip() and self.fonts.may_be_hidden(properties):
-            segment.hidden_reading = len(readings)
-            readings.append("")
-        segment.readings = tuple(readings)
-        self.current.segments.append(segment)
+        if hidden:
+            if text.strip():
+                # Hidden text Word does not show: the reader refuses it, never reads it.
+                raise CertificationError("hidden text with characters to show")
+            self.ledger.hidden += len(text)
+            return
+        self.current.segments.append(_Segment(text=text))
 
 
 def _owned(element: ET.Element, wanted: str, stop: str) -> list[ET.Element]:
-    """``wanted`` descendants of ``element`` not inside another ``stop`` below it."""
+    """``wanted`` descendants of ``element``: a table's rows, or a row's cells.
+
+    Through any wrapper (a content control, custom XML), not into what is found. A ``stop`` met
+    on the way (a table inside a table but outside its cells, a row inside a row) is refused:
+    its text would otherwise be passed over.
+    """
     out: list[ET.Element] = []
 
     def visit(node: ET.Element) -> None:
         for child in node:
             if child.tag == wanted:
                 out.append(child)
-            elif child.tag != stop:
+            elif child.tag == stop:
+                raise CertificationError(f"a {_local(stop)} outside the cells of another")
+            else:
                 visit(child)
 
     visit(element)
@@ -447,49 +499,22 @@ def _code(instruction: str) -> str | None:
 
 
 def _match(paragraph: _Paragraph, value: dict[str, Json], ledger: _Ledger, where: str) -> None:
-    """The output paragraph must be the tokens, read by one allowed reading per run."""
+    """The output paragraph must be exactly the tokens the check read, and its marks placed."""
     text: str = value["text"]
-    # Positions reachable after each segment, with the reading taken: first reading first.
-    states: list[dict[int, tuple[int, int]]] = [{0: (-1, -1)}]
-    for segment in paragraph.segments:
-        previous = states[-1]
-        here: dict[int, tuple[int, int]] = {}
-        for position in previous:
-            if segment.marker is not None:
-                here.setdefault(position, (position, -1))
-                continue
-            for choice, reading in enumerate(segment.readings):
-                if text.startswith(reading, position):
-                    here.setdefault(position + len(reading), (position, choice))
-        if not here:
-            raise CertificationError(f"{where}: the text is not the document's")
-        states.append(here)
-    if len(text) not in states[-1]:
-        raise CertificationError(f"{where}: the text is not the document's")
-    # Walk back the reading taken, to count it and to place the markers.
-    position = len(text)
-    taken: list[tuple[int, int]] = []
-    for index in range(len(paragraph.segments), 0, -1):
-        before, choice = states[index][position]
-        taken.append((position, choice))
-        position = before
-    taken.reverse()
+    expected: list[str] = []
     pages: list[int] = []
     notes: list[tuple[int, tuple[str, int]]] = []
-    for segment, (end, choice) in zip(paragraph.segments, taken, strict=True):
-        if segment.marker is not None:
-            kind, payload = segment.marker
-            if kind == "page":
-                pages.append(end)
-            else:
-                notes.append((end, payload))
-            continue
-        stored = segment.readings[0]
-        if choice == segment.hidden_reading:
-            ledger.hidden += len(stored)
-        elif choice == segment.symbol_reading:
-            mapped = segment.readings[choice]
-            ledger.symbol += sum(1 for a, b in zip(stored, mapped, strict=True) if a != b)
+    position = 0
+    for segment in paragraph.segments:
+        if segment.marker is None:
+            expected.append(segment.text)
+            position += len(segment.text)
+        elif segment.marker[0] == "page":
+            pages.append(position)
+        else:
+            notes.append((position, segment.marker[1]))
+    if text != "".join(expected):
+        raise CertificationError(f"{where}: the text is not the document's")
     if pages != list(value["pages"]):
         raise CertificationError(f"{where}: the page numbers are not where the document has them")
     if notes != [(n["offset"], (n["kind"], n["id"])) for n in value["notes"]]:
@@ -546,7 +571,7 @@ class DocxSource:
             if body is None:
                 raise CertificationError("no body")
             story = _Story(fonts, self.ledger)
-            story.blocks(body, None, [])
+            story.blocks(body, None, None)
             self.body = story.paragraphs
             self.notes: dict[str, dict[int, list[_Paragraph]]] = {}
             self.not_read: dict[str, int] = {}
@@ -562,7 +587,7 @@ class DocxSource:
                         continue
                     note_id = int(note.get(_w("id"), ""))
                     story = _Story(fonts, self.ledger, (kind, note_id))
-                    story.blocks(note, None, [])
+                    story.blocks(note, None, None)
                     self.notes[kind][note_id] = story.paragraphs
             self.scope = sorted(
                 {main, *(related[k] for k in ("footnotes", "endnotes") if k in related)}

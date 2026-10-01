@@ -1,17 +1,21 @@
 {
   "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics_en.docx": {
+    "certificateSha256": "c28daf4a75d3a516f339e09cd66bef669d353a165b5d748f2556c760cf19ed20",
     "paragraphsSha256": "3b25403cedfb288848d1fac80d0cab2c0c0b73aa5faf29cb1d3c4e1e8f75e2ab",
     "sha256": "13031dfae722bfe2479cb9323be96adfe18941da1c489731ea805082e5f886b3"
   },
   "qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48-undesirable-effects-summary-product-characteristics_en.docx": {
+    "certificateSha256": "b21e7718a54f829500abef196d71458266ea0516a0fa7a9d96bc33e8d481cede",
     "paragraphsSha256": "688e6ec721c805d307c0d82253580f8bfb651233a84e69e9a3775b9405ef122f",
     "sha256": "68a8026e6d99f22f9a380edf04df34bb5f29f35574f9e507fb4b5d5f16e996ae"
   },
   "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products_en.docx": {
+    "certificateSha256": "4147b0ac3410850c9a1d7ff9981110e326b5911462a33a7afd2838b2936794ca",
     "paragraphsSha256": "0c27c92780c133371c52d7b1e29ca70993da724520bd1477abf00e346b803836",
     "sha256": "10aed02c52b69740041841d09a3fca2239bc9839eb3317bc1c1dd732532a9215"
   },
   "qrd-product-information-template-version-104_en.docx": {
+    "certificateSha256": "207d6f9e5b8b60e4947f62cc04d19e849b0797ccbcac7b1cb687ce40afee41ef",
     "paragraphsSha256": "21e1b108d9a9fa880778db0ec334698432a2f58ab88700e7808fcead11c29486",
     "sha256": "6c9da03b2c72f055c81dc14f12c82da61a1609e7beffcc71f95e8046d7104fd1"
   }

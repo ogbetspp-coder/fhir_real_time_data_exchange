@@ -198,12 +198,33 @@ async function ingest(file) {
   const answer = await fetch("/v1/documents", { method: "POST", body: bytes });
   const receiptText = await answer.text();
   const receipt = JSON.parse(receiptText);
-  const resultText = await (await fetch(`/v1/documents/${receipt.document}`)).text();
+  const served = await fetch(`/v1/documents/${receipt.document}`);
+  const resultText = await served.text();
   const result = JSON.parse(resultText);
-  show(file.name, receipt, receiptText, result, resultText, answer.status);
+  const verdicts = (await (await fetch(`/v1/documents/${receipt.document}/verification`)).json()).verifications;
+  if (served.status === 409) return disagreed(file.name, receipt, result.verification);
+  show(file.name, receipt, receiptText, result, resultText, answer.status, verdicts);
 }
 
-function show(name, receipt, receiptText, result, resultText, status) {
+// The browser showed a section otherwise than the result reads: the result is not shown.
+function disagreed(name, receipt, verdict) {
+  const card = el("div", { class: "card" },
+    el("div", { class: "verdict" }, el("span", { class: "badge refused" }, "Not served"), el("strong", {}, name)),
+    el("div", { class: "refusal" }, `${verdict.application} shows ${verdict.differs.length} section(s) otherwise than the reader read them: `,
+      verdict.differs.map(d => `section ${d.section} (${d.where})`).join("; "),
+      el("div", { class: "legend" }, "Kept for review; never served while the browser disagrees.")));
+  out.replaceChildren(card);
+}
+
+// What the browser said about an ePI read.
+function browserLine(verdicts) {
+  if (!verdicts.length) return el("div", { class: "again" }, "Not checked against a browser (Chrome not installed here).");
+  const v = verdicts[verdicts.length - 1];
+  return el("div", { class: "again same" },
+    `Checked against ${v.application}: ${v.agrees} of ${v.sections - v.refused} sections read show exactly as the browser shows them, text and formatting.`);
+}
+
+function show(name, receipt, receiptText, result, resultText, status, verdicts) {
   const card = el("div", { class: "card" });
   const read = receipt.outcome !== "refused";
   const part = receipt.outcome === "read-in-part";
@@ -231,6 +252,7 @@ function show(name, receipt, receiptText, result, resultText, status) {
       el("div", { class: "legend" }, "The reader will not guess: nothing is returned for a document it cannot read exactly.")));
   }
   if (result.certificate) card.append(proof(result.certificate, result.sections !== undefined));
+  if (result.sections !== undefined && read) card.append(browserLine(verdicts));
   out.replaceChildren(card);
   if (read) {
     const doc = el("div", { class: "card" });

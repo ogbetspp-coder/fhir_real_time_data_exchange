@@ -20,9 +20,10 @@ refuse. Every rule below serves that.
   Chrome (`scripts/browser_oracle.py record corpus/ema-epi`); where the browser's answer is not
   on record, refuse the section.
 - **Never serve an uncertified read.** Every result passes `label_docx.certify`, which reads
-  the source on its own; never make it share logic with the readers, and never widen what it
-  lets the reader choose (Symbol table, hidden whitespace) without a test and a line in
-  `docs/conservation.md`. A change it does not catch is a missing check, not a flaky test.
+  the source on its own; never make it share logic with the readers, and never let it accept
+  more than one reading of a token. A change it does not catch is a missing check, not a flaky
+  test, and every mutant of it (`scripts/mutate_checker.py`) must be killed or recorded as
+  equivalent with the reason.
 - **Trace every test.** `docs/requirements.md` names, for each requirement, the tests that prove
   it; a new test goes there, and `tests/test_traceability.py` fails on a test that proves nothing
   or a requirement that names a test that is gone.
