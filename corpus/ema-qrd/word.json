@@ -24,7 +24,13 @@
     ]
   },
   "fields": {},
-  "method": "list labels: convert numbers to text, what each list item gained; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF",
+  "method": "list labels: convert numbers to text, what each list item gained; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside",
   "notes": {},
+  "prints": {
+    "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics_en.docx": true,
+    "qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48-undesirable-effects-summary-product-characteristics_en.docx": true,
+    "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products_en.docx": true,
+    "qrd-product-information-template-version-104_en.docx": true
+  },
   "recorded": "2026-09-30"
 }

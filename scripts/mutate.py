@@ -56,8 +56,41 @@ def _pick[T](items: list[T], rng: random.Random) -> T | None:
     return items[rng.randrange(len(items))] if items else None
 
 
+_ANY_RUN = re.compile(r"<w:r(?:\s[^>]*)?>(?:(?!</w:r>).)*?</w:r>", re.S)
+_LAYOUT = {"PAGEREF", "PAGE", "NUMPAGES", "SECTIONPAGES"}
+
+
+def _page_numbers(xml: str) -> list[tuple[int, int]]:
+    """Where page-number fields stand: Word sets their text from the layout, not the file."""
+    spans: list[tuple[int, int]] = []
+    stack: list[tuple[int, list[str]]] = []
+    for run in _ANY_RUN.finditer(xml):
+        body = run.group(0)
+        if 'fldCharType="begin"' in body:
+            stack.append((run.start(), []))
+        for instruction in re.findall(r"<w:instrText[^>]*>([^<]*)</w:instrText>", body):
+            if stack:
+                stack[-1][1].append(instruction)
+        if 'fldCharType="end"' in body and stack:
+            start, code = stack.pop()
+            words = "".join(code).split()
+            if words and words[0].upper() in _LAYOUT:
+                spans.append((start, run.end()))
+    return spans
+
+
+def _outside(spans: list[tuple[int, int]], position: int) -> bool:
+    return not any(a <= position < b for a, b in spans)
+
+
 def _visible_texts(xml: str) -> list[re.Match[str]]:
-    return [m for m in _TEXT.finditer(xml) if unescape(m.group(2)).strip()]
+    """Text runs a reader of the page sees, page numbers aside."""
+    aside = _page_numbers(xml)
+    return [
+        m
+        for m in _TEXT.finditer(xml)
+        if unescape(m.group(2)).strip() and _outside(aside, m.start())
+    ]
 
 
 def _replace_text(xml: str, match: re.Match[str], text: str) -> str:
@@ -117,8 +150,11 @@ def delete_paragraph(xml: str, rng: random.Random) -> str | None:
 
 def _with_property(xml: str, rng: random.Random, prop: str, absent: str) -> str | None:
     """A run with text gains ``prop`` in its run properties, where ``absent`` is not there."""
+    aside = _page_numbers(xml)
     runs = [
-        m for m in _RUN.finditer(xml) if _visible_texts(m.group(0)) and absent not in m.group(0)
+        m
+        for m in _RUN.finditer(xml)
+        if _visible_texts(m.group(0)) and absent not in m.group(0) and _outside(aside, m.start())
     ]
     match = _pick(runs, rng)
     if match is None:

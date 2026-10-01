@@ -16,7 +16,14 @@ from typing import Any
 
 import pytest
 
-from word_oracle import field_verdict, note_verdict, reader_labels, reader_note_marks, verdict
+from word_oracle import (
+    field_verdict,
+    note_verdict,
+    print_verdict,
+    reader_labels,
+    reader_note_marks,
+    verdict,
+)
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
 RECORDS = sorted(CORPUS.glob("*/word.json"))
@@ -122,6 +129,35 @@ def test_the_reader_reads_fields_only_where_word_prints_what_it_shows(
     key = f"{path.parent.name}/{path.name}"
     result = field_verdict(word, path)
     # A stale-field refusal agrees with Word when Word prints other than it shows.
+    if key in REFUSED and REFUSED[key] != "stale-field":
+        assert result == f"reader refuses: {REFUSED[key]}"
+    else:
+        assert result == "agrees"
+
+
+def _print_cases() -> list[tuple[Path, bool]]:
+    out: list[tuple[Path, bool]] = []
+    for record in RECORDS:
+        prints = _record(record)["prints"]
+        out += [(record.parent / name, same) for name, same in sorted(prints.items())]
+    return out
+
+
+def test_every_corpus_document_has_words_print() -> None:
+    for record in RECORDS:
+        prints = _record(record)["prints"]
+        present = {path.name for path in record.parent.glob("*.docx")}
+        assert set(prints) == present, f"{record.parent.name}: run scripts/word_oracle.py record"
+
+
+@pytest.mark.parametrize(
+    ("path", "same"), _print_cases(), ids=lambda value: getattr(value, "stem", "")
+)
+def test_the_reader_reads_only_documents_word_prints_as_it_shows_them(
+    path: Path, same: bool
+) -> None:
+    key = f"{path.parent.name}/{path.name}"
+    result = print_verdict(same, path)
     if key in REFUSED and REFUSED[key] != "stale-field":
         assert result == f"reader refuses: {REFUSED[key]}"
     else:

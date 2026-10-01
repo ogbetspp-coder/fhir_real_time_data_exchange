@@ -342,7 +342,7 @@ def test_a_field_nested_in_an_instruction_does_not_leak_its_result() -> None:
 
 
 @pytest.mark.parametrize(
-    "code", ["PAGE", ' DATE \\@ "d MMMM yyyy"', "SEQ Table \\# 00", "NUMPAGES", "TOC", ""]
+    "code", [' DATE \\@ "d MMMM yyyy"', "SEQ Table \\# 00", "IF 1 = 1", "MERGEFIELD Name", ""]
 )
 def test_fields_word_recomputes_are_refused(code: str) -> None:
     complex_field = p(
@@ -1787,3 +1787,42 @@ def test_a_note_reference_prints_its_notes_mark_or_is_refused() -> None:
     with pytest.raises(DocxRefusedError) as caught:
         read(over, fnote(1))
     assert caught.value.code == "computed-field"
+
+
+# --- tables of contents and page numbers (docx-reader/1.10.0) ----------------------------------
+
+
+def test_a_table_of_contents_is_read_as_stored_and_its_page_numbers_placed() -> None:
+    entry = p(
+        r('<w:fldChar w:fldCharType="begin"/>')
+        + r('<w:instrText xml:space="preserve"> TOC \\o "1-2" </w:instrText>')
+        + r('<w:fldChar w:fldCharType="separate"/>')
+        + r("<w:t>1</w:t><w:tab/><w:t>Stability</w:t><w:tab/>")
+        + _field("PAGEREF _Toc1 \\h", "4")
+    )
+    end = p(r('<w:fldChar w:fldCharType="end"/>') + r("<w:t>Stability</w:t>"))
+    paragraphs = read_docx(docx(entry + end))
+    # The entry is what Word prints; the page number, set by the layout, is not in the text.
+    assert [(x.text, x.pages) for x in paragraphs] == [("1\tStability\t", (12,)), ("Stability", ())]
+
+
+def test_page_fields_are_placed_not_read() -> None:
+    simple = p(
+        r("<w:t xml:space='preserve'>Page </w:t>")
+        + '<w:fldSimple w:instr=" PAGE ">'
+        + r("<w:t>7</w:t>")
+        + "</w:fldSimple>"
+    )
+    paragraph = read_docx(docx(simple))[0]
+    assert (paragraph.text, paragraph.pages) == ("Page ", (5,))
+    hidden = p(
+        '<w:fldSimple w:instr=" PAGE ">' + r("<w:t>7</w:t>", "<w:vanish/>") + "</w:fldSimple>"
+    )
+    assert refusal(hidden) == "hidden-text"
+    across = p(
+        r('<w:fldChar w:fldCharType="begin"/>')
+        + r("<w:instrText>PAGE</w:instrText>")
+        + r('<w:fldChar w:fldCharType="separate"/>')
+        + r("<w:t>7</w:t>")
+    )
+    assert refusal(across + p(r('<w:fldChar w:fldCharType="end"/>'))) == "unbalanced-field"

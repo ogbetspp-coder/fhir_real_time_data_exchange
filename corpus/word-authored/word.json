@@ -1,0 +1,23 @@
+{
+  "application": "Microsoft Word 16.113.3 (macOS)",
+  "drawn": {
+    "table-of-contents-stale.docx": [
+      "1\t",
+      "1.1\t",
+      "2\t"
+    ],
+    "table-of-contents.docx": [
+      "1\t",
+      "1.1\t",
+      "2\t"
+    ]
+  },
+  "fields": {},
+  "method": "list labels: convert numbers to text, what each list item gained; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside",
+  "notes": {},
+  "prints": {
+    "table-of-contents-stale.docx": true,
+    "table-of-contents.docx": true
+  },
+  "recorded": "2026-09-30"
+}

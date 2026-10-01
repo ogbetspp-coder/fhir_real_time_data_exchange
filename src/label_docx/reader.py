@@ -40,6 +40,8 @@ What a paragraph carries:
 - ``table``: ``(table, row, cell)`` counted from zero in document order, else ``None``. A nested
   table's paragraphs carry the outermost cell; cells are counted as ``<w:tc>`` elements, not
   grid columns.
+- ``pages``: where in ``text`` Word draws a page number (a table of contents' page, a PAGE
+  field). Word sets it from the layout when it prints, so it is never in ``text``.
 - ``notes``: the footnote and endnote marks in the paragraph (``NoteReference``): where each
   stands in ``text``, which note it refers to, and the mark Word draws there. Like a list label,
   the mark is computed and never put into ``text``; see "Notes" below.
@@ -68,26 +70,29 @@ table declares symbol-encoded (charset 02), is refused.
 
 Fields keep their stored result and drop their instruction, however deeply nested, so ``DOCPROPERTY
 ... MERGEFORMAT`` never reaches the text. Fields whose stored result is what Word shows and prints
-are read: HYPERLINK and DOCPROPERTY. SEQ (caption numbers), STYLEREF (a heading's number or text),
-REF (a cross-reference: a bookmark's text) and NOTEREF (the mark of the note a bookmark holds) Word
-shows as stored but recomputes when it prints or saves as PDF, so the reader computes them as Word
-does and reads them only where the stored result is the computed one; otherwise screen and print
-disagree, and the document is refused (``stale-field``). A REF or NOTEREF to a bookmark that is not
-there (Word prints an error), that runs across paragraphs, or over a note mark (REF) is refused. SEQ
-counts each identifier in document order: one more than the last, ``\r`` n sets the count, ``\c``
-repeats it, ``\h`` counts and shows nothing, ``\s`` n restarts it after any paragraph in a built-in
-style "heading 1" to "heading n" (Word goes by the style's name, not its outline level), and ``\*``
-shows it in ARABIC, ROMAN, roman, ALPHABETIC or alphabetic. STYLEREF finds the nearest paragraph of
-the style (a number n is "heading n") before the field, else after it, and shows its text, or with
-``\s`` its list label without the final period. Each rule is Word's answer to a case in
-``corpus/numbering-cases``. Other switches, a SEQ or STYLEREF in a note or nested in another field's
-code, and a result that runs past its paragraph are refused. Any other field whose result would be
-shown (PAGE, DATE, TOC, IF, a formula...) is refused, because Word recomputes it on display or
-print. The code is the first word of the instruction; a field nested in the instruction ahead of or
-inside that word makes the code unknown, and the field is refused. So are a field with no stored
-result (no ``separate``, such as a form checkbox or a SYMBOL field, or an empty ``fldSimple``), a
-form field, a field marked for update, any field in a document whose settings ask Word to update
-fields on open, and field code outside an instruction.
+are read: HYPERLINK, DOCPROPERTY and TOC (a table of contents, whose entries Word prints as stored
+until someone updates it). Page numbers (PAGEREF, as in a table of contents' entries, PAGE,
+NUMPAGES, SECTIONPAGES) Word sets from the page layout when it prints; their stored text is left out
+of ``text`` and their place recorded in ``pages``. SEQ (caption numbers), STYLEREF (a heading's
+number or text), REF (a cross-reference: a bookmark's text) and NOTEREF (the mark of the note a
+bookmark holds) Word shows as stored but recomputes when it prints or saves as PDF, so the reader
+computes them as Word does and reads them only where the stored result is the computed one;
+otherwise screen and print disagree, and the document is refused (``stale-field``). A REF or NOTEREF
+to a bookmark that is not there (Word prints an error), that runs across paragraphs, or over a note
+mark (REF) is refused. SEQ counts each identifier in document order: one more than the last, ``\r``
+n sets the count, ``\c`` repeats it, ``\h`` counts and shows nothing, ``\s`` n restarts it after any
+paragraph in a built-in style "heading 1" to "heading n" (Word goes by the style's name, not its
+outline level), and ``\*`` shows it in ARABIC, ROMAN, roman, ALPHABETIC or alphabetic. STYLEREF
+finds the nearest paragraph of the style (a number n is "heading n") before the field, else after
+it, and shows its text, or with ``\s`` its list label without the final period. Each rule is Word's
+answer to a case in ``corpus/numbering-cases``. Other switches, a SEQ or STYLEREF in a note or
+nested in another field's code, and a result that runs past its paragraph are refused. Any other
+field whose result would be shown (DATE, IF, a formula...) is refused, because Word recomputes it on
+display or print. The code is the first word of the instruction; a field nested in the instruction
+ahead of or inside that word makes the code unknown, and the field is refused. So are a field with
+no stored result (no ``separate``, such as a form checkbox or a SYMBOL field, or an empty
+``fldSimple``), a form field, a field marked for update, any field in a document whose settings ask
+Word to update fields on open, and field code outside an instruction.
 
 List labels. Word draws "4.8", "b)" or a bullet before a numbered paragraph from the numbering
 part; the reader computes that label by Word's rules, each of which is Word's own answer to a case
@@ -197,8 +202,9 @@ from dataclasses import dataclass, field, replace
 # formatting that cannot change the text; 1.6.0 reads footnotes and endnotes, with their marks
 # by the rules Word showed; 1.7.0 reads SEQ and STYLEREF fields whose stored result is what Word
 # prints; 1.8.0 names a PDF in its refusal; 1.9.0 computes REF and NOTEREF, which Word reprints,
-# and refuses them where the stored result is not what it prints.
-READER_VERSION = "docx-reader/1.9.0"
+# and refuses them where the stored result is not what it prints; 1.10.0 reads tables of
+# contents, which Word prints as stored, and places page numbers, which it sets from the layout.
+READER_VERSION = "docx-reader/1.10.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -427,6 +433,8 @@ class Paragraph:
     marks: tuple[Mark, ...] = ()
     mark_hidden: bool = False
     notes: tuple[NoteReference, ...] = ()
+    # Where Word draws a page number (PAGEREF, PAGE...): set by the layout, so never in ``text``.
+    pages: tuple[int, ...] = ()
 
     @property
     def has_drawing(self) -> bool:
@@ -951,6 +959,11 @@ class _ParagraphReader:
         # of each open field's result if it is one of those, else None.
         self.computed: list[tuple[str, int, int]] = []
         self.results: list[int | None] = []
+        # Where a page number stands, and how many layout fields' results are open: their text
+        # is the page number when Word last laid the document out, not what it prints.
+        self.pages: list[int] = []
+        self.layout = 0
+        self.layout_open: list[bool] = []
         # Bookmark starts (id, name, offset) and ends (id, offset), for REF and NOTEREF.
         self.bookmark_starts: list[tuple[str, str, int]] = []
         self.bookmark_ends: list[tuple[str, int]] = []
@@ -979,6 +992,12 @@ class _ParagraphReader:
                 instruction = child.get(_w("instr"), "")
                 code = None if self.in_instruction() else _check_field(instruction)
                 before = self.length
+                if code in _LAYOUT_FIELDS and not self.layout:
+                    self.pages.append(self.length)
+                    self.layout += 1
+                    self.container(child)
+                    self.layout -= 1
+                    continue
                 self.container(child)
                 if self.length == before:
                     raise DocxRefusedError("field-without-result", "a simple field shows nothing")
@@ -1014,6 +1033,8 @@ class _ParagraphReader:
         )
         symbol = _in_symbol(self.styles, properties, self.table_style)
         emitted: list[str] = []
+        # Page-number text, left out of the text but still drawn: it must not be hidden.
+        placed: list[str] = []
         references: list[NoteReference] = []
         for child in run:
             tag = child.tag
@@ -1040,12 +1061,14 @@ class _ParagraphReader:
             else:
                 produced = self._special(child)
             if not self.in_instruction():
-                emitted.append(produced)
+                (placed if self.layout else emitted).append(produced)
             elif self.fields[-1]:
                 self.instructions[-1].append(produced)
         text = "".join(emitted)
         if references and properties.toggle("vanish"):
             raise DocxRefusedError("hidden-text", "a hidden note mark")
+        if "".join(placed).strip() and properties.toggle("vanish"):
+            raise DocxRefusedError("hidden-text", "a hidden page number")
         self.notes += references
         if not text:
             return
@@ -1090,13 +1113,17 @@ class _ParagraphReader:
             self.fields.append(True)
             self.instructions.append([])
             self.results.append(None)
+            self.layout_open.append(False)
         elif kind == "separate" and self.fields:
-            # The result is shown, so it must be one Word shows as stored, or one the reader
-            # computes and checks.
-            if not any(self.fields[:-1]) and (
-                _check_field("".join(self.instructions[-1])) in _COMPUTED_FIELDS
-            ):
+            # The result is shown, so it must be one Word shows as stored, one the reader
+            # computes and checks, or a page number.
+            code = None if any(self.fields[:-1]) else _check_field("".join(self.instructions[-1]))
+            if code in _COMPUTED_FIELDS:
                 self.results[-1] = offset
+            elif code in _LAYOUT_FIELDS and not self.layout:
+                self.pages.append(offset)
+                self.layout += 1
+                self.layout_open[-1] = True
             self.fields[-1] = False
         elif kind == "end" and self.fields:
             if self.fields[-1]:
@@ -1105,6 +1132,8 @@ class _ParagraphReader:
             start = self.results.pop()
             if start is not None:
                 self.computed.append(("".join(self.instructions[-1]), start, offset))
+            if self.layout_open.pop():
+                self.layout -= 1
             self.fields.pop()
             self.instructions.pop()
 
@@ -1227,7 +1256,9 @@ def _faint(properties: _Properties) -> bool:
 # (corpus/numbering-cases records it for DOCPROPERTY and HYPERLINK). Word recomputes others when
 # it lays out or prints the page (PAGE, NUMPAGES, DATE, TIME, AUTONUM, LISTNUM, IF, formulas...),
 # so their stored result may not be what a reader sees.
-_STORED_FIELDS = {"HYPERLINK", "DOCPROPERTY"}
+_STORED_FIELDS = {"HYPERLINK", "DOCPROPERTY", "TOC"}
+# Page numbers, which Word sets from the layout when it prints: never known from the file.
+_LAYOUT_FIELDS = {"PAGEREF", "PAGE", "NUMPAGES", "SECTIONPAGES"}
 # Fields Word recomputes when it prints or saves as PDF, which the reader computes too and reads
 # only where the stored result is what Word prints (see "Fields" in the module docstring). REF
 # and NOTEREF are here because Word reprints them (corpus/numbering-cases, fields-ref-stale and
@@ -1239,7 +1270,7 @@ def _check_field(instruction: str) -> str:
     """The field's code, if its result is one the reader can vouch for; refused otherwise."""
     words = instruction.split()
     code = words[0].upper() if words else ""
-    if code not in _STORED_FIELDS | _COMPUTED_FIELDS:
+    if code not in _STORED_FIELDS | _COMPUTED_FIELDS | _LAYOUT_FIELDS:
         raise DocxRefusedError("computed-field", f"a {code or 'blank'} field")
     return code
 
@@ -1328,8 +1359,10 @@ def _paragraph(
         raise DocxRefusedError("unbalanced-field", "a paragraph ends inside a field instruction")
     if any(start is not None for start in reader.results):
         raise DocxRefusedError(
-            "unbalanced-field", "a SEQ or STYLEREF result runs past its paragraph"
+            "unbalanced-field", "a computed field's result runs past its paragraph"
         )
+    if reader.layout:
+        raise DocxRefusedError("unbalanced-field", "a page number runs past its paragraph")
     numbering = _numbering(
         [
             ppr,
@@ -1364,6 +1397,7 @@ def _paragraph(
         ),
         mark_hidden=mark_hidden,
         notes=tuple(reader.notes),
+        pages=tuple(reader.pages),
     ), context
 
 

@@ -30,7 +30,16 @@ def test_a_read_is_canonical_and_names_its_source_and_versions() -> None:
     assert (value["format"], value["reader"]) == (FORMAT_VERSION, READER_VERSION)
     assert value["source"] == {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
     first = value["paragraphs"][0]
-    assert sorted(first) == ["markHidden", "marks", "notes", "numbering", "style", "table", "text"]
+    assert sorted(first) == [
+        "markHidden",
+        "marks",
+        "notes",
+        "numbering",
+        "pages",
+        "style",
+        "table",
+        "text",
+    ]
     listed = next(x for x in value["paragraphs"] if x["numbering"] and x["numbering"]["numId"])
     assert listed["numbering"] == {"level": 0, "numId": 21, "suffix": "tab", "text": "\u2022"}
 

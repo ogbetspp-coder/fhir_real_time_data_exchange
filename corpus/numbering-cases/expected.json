@@ -1,34 +1,34 @@
 {
   "ancestor-never-counted.docx": {
-    "paragraphsSha256": "59d4fcbd3a16f64f1c9a72f2df36c9baab22dde604c0eaff621cfb4c92245d4d",
+    "paragraphsSha256": "a9a983588879ad82d7e3a81092eb9a2ebd0fafc7f505484cfb7273f41b0ab8b1",
     "sha256": "617e136f80bd10bd5c208c4431e43acb31bbe05864cb6a3f4e8fc54efbfb7837"
   },
   "ancestor-two-levels.docx": {
-    "paragraphsSha256": "b9ec8daa1e943e2f0cbd84c7e3178120eaf9da2b6dba4bc013df431a7d345171",
+    "paragraphsSha256": "e80c7aa423035b546b953c28c046e7318361c6668de3d7aaf6049d9f0ca0840c",
     "sha256": "b9dc3744b284c81a68ab252f2050e17fcb331003cd10e5e9be8dbfa984f5d9a7"
   },
   "bullets.docx": {
-    "paragraphsSha256": "bb5f56651b17094ef662b58607188de0952acffbda80f3c5b8c319f1be02bc63",
+    "paragraphsSha256": "09c7e8822d129595aeaa6b541f2611b314f449dec71d4fcb7e714055c8742919",
     "sha256": "62a355d1e912cb232cc60eacbd917ff31642219a2e0e428a88cb0cec3071b14b"
   },
   "fields-chapter-captions.docx": {
-    "paragraphsSha256": "9d3a811b0fadacc8a4a074c0df542c8745a2942cad6974488b37d8c3eba6b708",
+    "paragraphsSha256": "83d52c7b3bda5bb37d16609df501f4d2fcd2a25a6dd9f02b294e4465480e3091",
     "sha256": "7ef7e7939ed5b8f081515b30657c59b4d5af685309507a994f23d5fa5c199ad5"
   },
   "fields-chapter-dotted.docx": {
-    "paragraphsSha256": "649a1bd06cf79bd7857fb60cf708efabda26ad1a2453a248e603be34e58f8946",
+    "paragraphsSha256": "a5c767a85ffcaeb65dd5240a638cc626ce7eb6ab8fb942f36e09d663d54b16d8",
     "sha256": "adea78c1b9715abdeccbfc3fd8e373dae6cf8ac7661ce152a9d6d0ded933432c"
   },
   "fields-chapter-reset-level-2.docx": {
-    "paragraphsSha256": "36fee93ec64dd44d8e168c851c9d761dabb721d31f9c123291e2da9b4ccffe62",
+    "paragraphsSha256": "33d61e3c23fc3ba06b92c14e985b549cd411cd2eafb3c83cf4dba90330e092a7",
     "sha256": "3bb60d3a0b7bfcfe0ed52e22bd767051a481e38cc6c001ba2e3deac38156a83b"
   },
   "fields-chapter-reset.docx": {
-    "paragraphsSha256": "7e4e967dbebd94d4589a003d588914be05707592f266dec1688ce52b6851cd2b",
+    "paragraphsSha256": "c556532f2bf767dd462f68a06e34e2e09ffa0f7b11cf2b44942c77357cbedefd",
     "sha256": "6ac7a96f4521a6fd75259153a96d75647750fdc9571079f073beb177ea79950e"
   },
   "fields-heading-by-name.docx": {
-    "paragraphsSha256": "22dae2a38c2319d35f55b69fd155a76eb45c34fb589218899ff1ae9368b3ae66",
+    "paragraphsSha256": "aa3d097c3be580563dde567917a401c14e6606128c0877fbfa2fc2fcd27e2ccc",
     "sha256": "ee0a173064750f01fd51479ca2ff822123dd230fd1e118a466cfd345464ab2ec"
   },
   "fields-noteref-stale.docx": {
@@ -36,11 +36,11 @@
     "sha256": "2a13e4089d823427215772a3b7026f472ff6537733e72e1366e4d820267b07fc"
   },
   "fields-noteref.docx": {
-    "paragraphsSha256": "bd2f333b7a0defc9d4c082b662e1ed4ea644925252acf83e2b5a9686559b7353",
+    "paragraphsSha256": "e0afbfe695ca8e5ec82a2a8f6522873c3fa099c4ae5416bccfce94444606485b",
     "sha256": "e3032ddf3d4fc689f0f98b2a280cea475861d352f8ba19a68cfe8f5fcc60da65"
   },
   "fields-ref-caption.docx": {
-    "paragraphsSha256": "2cccee08b600994f2b3b01a24cbcd7ffa3068be5c5fe80aa0ef5efc8f8ee1a9b",
+    "paragraphsSha256": "eefd016827b790c8b43fef151993905b4f8bd0cc46b9b9234676291fd1af3783",
     "sha256": "22985d27fec53c65b992e2267841fedf0f04260d1e3807e077d229aed02ee724"
   },
   "fields-ref-missing.docx": {
@@ -52,23 +52,23 @@
     "sha256": "aadaa74b16eed4f18115fb8c84f8d97ab8e8b8a7855f0e9c632e26b944f832ad"
   },
   "fields-ref.docx": {
-    "paragraphsSha256": "48d6b5a20b6d6b4457554d3c5ac130ad5bddf7d708d8cc363b2b662dc0e75b51",
+    "paragraphsSha256": "43c3a5a1b1108026cea9189c2fddda7645b858f31cedd6ec0f505bf4f01a4a36",
     "sha256": "48d644b4a225777e38a0f775da0d1015005881acc3045b9e1a2ba14075d40e30"
   },
   "fields-seq-formats.docx": {
-    "paragraphsSha256": "3adf30f763860965fd8ecdfda618d2535e4d674d7245bd85181e5d43d2035799",
+    "paragraphsSha256": "c23a17dc6c096b2cfd24a2a5bd931fb859b95e9886d6c567d495ffdb9b7bde9d",
     "sha256": "09e3ebda048ab49e2a6b3bd947bc25c883a6768fa85a0ccfa0af2523ec048e05"
   },
   "fields-seq-identifiers.docx": {
-    "paragraphsSha256": "affd0448341d6a18487bae03e0241e0c99faeaac9013c87ce3542ef7bbdd9df4",
+    "paragraphsSha256": "6f977d6227d8345892c83a2c0a8fe0d0aeea0547a5a95e254f8f29252e3dd80a",
     "sha256": "e19103afde4d87129ccbec4e508bb4213c4968bc10f17f8672d4201cd2299847"
   },
   "fields-seq-switches.docx": {
-    "paragraphsSha256": "66ce1c922f4a979af4252017c30b298d415f906d9c501b23376ff703a40fdc25",
+    "paragraphsSha256": "99bf33c608bc85ce5a161769be13fff0bebaba761bd6951f7a25ba35351725b3",
     "sha256": "3abf1d1951c0d83197eee8b6281befb3791d16e5ac6944f21b09455d75195259"
   },
   "fields-seq.docx": {
-    "paragraphsSha256": "b6fe21c484635adc876060dd78c78320fd545b1067d1b1800d41457b01059884",
+    "paragraphsSha256": "4404d77713e203736514429c384796f0828530638fcbbffe59aa6ecba50a9115",
     "sha256": "fb03611eb720cb2673f7f88bacffdb92d38df0e0a1f440269ed11d0ba4918eed"
   },
   "fields-stale.docx": {
@@ -76,51 +76,51 @@
     "sha256": "22e42c8c0532dd985bb4a9df1848490495a1e6c1269ef09a0aab605032878861"
   },
   "fields-stored.docx": {
-    "paragraphsSha256": "68d867b35fde379a9e04999c243901e34b4c25735068c650258cba60c99a3da1",
+    "paragraphsSha256": "8672a4b5b9b2015b235ccc69df5e62b778b8ba10c425961940a9dae435093707",
     "sha256": "ff92577f32a18cb195acc09176557962df0ef46a58a81b2c8c721053f03cd866"
   },
   "fields-styleref-forward.docx": {
-    "paragraphsSha256": "665154b8d8027e3893f643f4c00b831604cd7c492dfdcdfcda1d919471f77003",
+    "paragraphsSha256": "59ee7e82094531a987fee665741c77e1eff6d4c7e9e180615c388bd6b5418726",
     "sha256": "9ace8ecefeaf3e37c11eebe462c49eaffc068396ed8ed47512b126f4b1bf32e5"
   },
   "formats.docx": {
-    "paragraphsSha256": "6ca6579b6dcf75e9b33e7801c40a71fb70b5c2b56efda4ee74053341ff352720",
+    "paragraphsSha256": "b1202e57d02a77dc13e1eb4ecf89df9a6245a218baf4aac5e2a62f0024e33747",
     "sha256": "494ff88e90f40d1f4216752a2f4bf44c85b6f019a6e6471e139d2f53eab325e4"
   },
   "legal.docx": {
-    "paragraphsSha256": "802ad4a7bc919f370b29a95be616f360219fa94e87ba8195b9d853e77ba3150f",
+    "paragraphsSha256": "f63729ef28ed650296eb637747cd13aceb6f9943444620e4d018907048b4d73b",
     "sha256": "be5983db03b9e8a1781f8b837617ba2798a07153b37cb3a6e645e30fd04b65fd"
   },
   "level-override-first.docx": {
-    "paragraphsSha256": "e62fafbecb2e987e4ea34bae5a7ab71ff8c68c97c7731bdc4b5d0efd64356c6f",
+    "paragraphsSha256": "5bce37b66d67564fd6e1adc45f147cc13006dae4ff65aac963dc00402684a792",
     "sha256": "112a6938b56f6b3f93c30cd27869cc05cb0be1ca092e0de360bf8cfe5689385a"
   },
   "level-override-shared.docx": {
-    "paragraphsSha256": "ee2782201441f37cc4e1905bc06fb1fa25599d52599a25ab2dfa87ce2f74fefb",
+    "paragraphsSha256": "8f45bbffb283d9ec0dc4694228a4fb28dd3401edcb538fb0d289aab58901654a",
     "sha256": "b886c90c0ca7f51dbf1a26cdfbf257c51fc6ca0e8f70b8de61a9e5f942d4e551"
   },
   "level-override-start.docx": {
-    "paragraphsSha256": "68a136363586d91de448a2220cf3960148d9ce2277c8b165a4308db21a14b3b1",
+    "paragraphsSha256": "a56fe6cc80e1293972de8535e0fe81d6b95a9b8bd79ea9e98c5a452f079bdc23",
     "sha256": "46aa4382142654524821092aaf461a7f62df62cc25b7afdb6aa6eb783dc63ee3"
   },
   "level-override.docx": {
-    "paragraphsSha256": "b4af53a35644e103a502ef20a57eace19c3e1d38bfb95b03ca326dcfdc7fbfdf",
+    "paragraphsSha256": "a4112e405a9b68d8db349178781175e78a097afe87594cea155640ced347cf7e",
     "sha256": "9a345eee6dbd4ae92fca25235e2ec006f2fab5f3b82d806cc03608a188c4015e"
   },
   "missing-start.docx": {
-    "paragraphsSha256": "9aeb66cab9815f0e0360834ee34301d29bf541d4fb47d308bd3e466413e5454d",
+    "paragraphsSha256": "15f2d3cee2b55301f370d119e2124afd4c02b675a23152b6c30074537380a126",
     "sha256": "f4b020efcd8da3cec4d6d41cbd3538d5b310c3e8b10ddc5e9aec12078e8a49bc"
   },
   "multilevel.docx": {
-    "paragraphsSha256": "ecd1f43f73d5e0cb4046caab8295cfe846c748408cb65fb793a37afef40ff78d",
+    "paragraphsSha256": "4a206d1215033a0d590bc5127df3078484219aacc9f9a11d8505ced673e19802",
     "sha256": "4190a564d1cc563a180fc6db24a5fa14ddf95902e65fd51872c13cd35b6447a5"
   },
   "notes-chicago.docx": {
-    "paragraphsSha256": "2262c5b5b1edfbbedac84740f0f9b2cd8fe30bdaf2d33a47d1761e949c5774d8",
+    "paragraphsSha256": "6de692ef0c9bcd39911294d9b6062597f7ef48bc17cf1c7385ffebe6d0261c3d",
     "sha256": "028d55ff20fb8ce1cef138b588cef733aede9e022e9f52c8a6c717295de3e559"
   },
   "notes-continuous.docx": {
-    "paragraphsSha256": "99806a8eff96f2a912343f0ae5e30210021bcafa527d3c3b18702f97f3bbd199",
+    "paragraphsSha256": "60922c21d60fd148e1d5f4ba144f67a348b3fc65c4cb71ea47fdb03957f9174b",
     "sha256": "cefb0cc55bb723e6a71b6857618a833487bdbd7ae8eb581dea40498f8bdcec31"
   },
   "notes-custom-mark.docx": {
@@ -128,43 +128,43 @@
     "sha256": "697f8f35be0c31f75da2bb0aaf446c90bda6e1c45b72c29396f8a3abd6bb4269"
   },
   "notes-document-format.docx": {
-    "paragraphsSha256": "444d6a5784ffdcdfd8ab2d13a3045c2d12181b0ee2dbf57d6fe471ce16faed2e",
+    "paragraphsSha256": "958eb2a56f239f293b3739c3228c7e0dc30ba3f5d5d80ce8aae0b938157be892",
     "sha256": "566a66f4c2e6a2f2449017a8db77d276cf2c08f64e876923578abf3dfe6e4ecf"
   },
   "notes-each-section.docx": {
-    "paragraphsSha256": "b51bb0db2e7e1266fadad8d0f88982e80736379b1e8d8c014bfc4f8e8efcbb18",
+    "paragraphsSha256": "7d1ac23cf2052be8ec97d80d5e6164b25c3f4627098deff6111f83128e67efdd",
     "sha256": "5787b5db07058aa972c2872c5f4b4494d629c2111956c56321609dc94ed29403"
   },
   "notes-endnotes.docx": {
-    "paragraphsSha256": "2dd2d8bb5347b98fbabb3e8ae8b808d4a39a74a99ebf22dd54d7375c03a9c2e1",
+    "paragraphsSha256": "fc550dfc0757cc4929506d23a7cb316c159b430280aef98e1010ef0cfafc6822",
     "sha256": "222872d0fc7fb674e0aebcd40d002bc9f753197a5bfaec70ea2a0fa280180925"
   },
   "notes-in-table.docx": {
-    "paragraphsSha256": "960ba9bcc8fa89d0480a6481a015d61310869ee216d81e7175c5756b71fa1897",
+    "paragraphsSha256": "745e2be0ad576631c16a743ac43c4d3d7c7b157f9bf36a980f5ccc49a7f56730",
     "sha256": "e4d9c36963916688854f9599bb14a0cb2a70940e826747de48e793c61f9c2399"
   },
   "notes-mixed.docx": {
-    "paragraphsSha256": "b866505ad3253d96188fdc3fe5c6d66688da3d47bd2374eba6b0baa0d15f22d4",
+    "paragraphsSha256": "006e34853ea701c8564e982745b34c133fd380c5e6df7abefaf9d28fc123dfb8",
     "sha256": "267a03b96efbdb67cf1243dbd8d2349573c25772b16558f8629e9ffa2150c1ef"
   },
   "notes-section-chicago.docx": {
-    "paragraphsSha256": "d0e6fb187ce0d6c1bbe4fe2b3b77a965851ddcb6fae0a420605eb54272c0b54f",
+    "paragraphsSha256": "1efa797341710cce2ae3badfd446ea9dddb0396f6b435f4cad6452f367777f9e",
     "sha256": "3fa4c70a131538b2ae05c68ed7f2fb5827a83a4d026829ca21363f2a2d587211"
   },
   "notes-section-format.docx": {
-    "paragraphsSha256": "fef762125a0c7c273b08d68c67462f45e1047472dfd824be0ba666d9b6940fb6",
+    "paragraphsSha256": "c97a7644f72f2d918f09be399f35b2373d9da630b9a4eb99d427c62932ac7163",
     "sha256": "be84d1f0183a7217f07c1783c5979a2e367866a5398b09a5dee2e24b38b59c5a"
   },
   "notes-section-rules.docx": {
-    "paragraphsSha256": "8ebb1df59dca3301a73508b926741a7a201f2fd8d47d5aa5567f9cf39a8dabf2",
+    "paragraphsSha256": "f0217f7de4cb77f5cccad8ef389261a3eae83acd459da52e845c5178c525f727",
     "sha256": "b9b25b7a8c607b1695508ae055c4687dfa9c47ed5625bae0dea071dbc0e62834"
   },
   "notes-section-start-continuous.docx": {
-    "paragraphsSha256": "401a4d518843cfeab5060bc9dc359358a649b3248ab1b6cc2a296baa1651a60f",
+    "paragraphsSha256": "9e0336636047d474d35a3eb3e0fde497c0fdf582ccd07365da695623b76c3e49",
     "sha256": "bd2cec4279b10b43210780c61eba89761a59dc0740c2922aadf388268a953e6d"
   },
   "notes-start-format.docx": {
-    "paragraphsSha256": "444d6a5784ffdcdfd8ab2d13a3045c2d12181b0ee2dbf57d6fe471ce16faed2e",
+    "paragraphsSha256": "958eb2a56f239f293b3739c3228c7e0dc30ba3f5d5d80ce8aae0b938157be892",
     "sha256": "bdbbdcb5e543123b4a659e7d37ddb867ba11d426e111973d05f6f258313efc10"
   },
   "numbering-style-link-one-way.docx": {
@@ -172,67 +172,67 @@
     "sha256": "04ef975df766eebdbff187c73fe89bde80804c79438ffc6bf8986b236b3644ac"
   },
   "numbering-style-link.docx": {
-    "paragraphsSha256": "f4a2e95bdec1976ec404fad29dbaaa35fe4a6f7137f38e6eacb7e148112f267b",
+    "paragraphsSha256": "bb3b1a1025b982b18ce805896418a9d49984a7d2a7ff231b554ff1f0c2b33bf8",
     "sha256": "b4c87364de3fb2c67610fc2dac0ad0e9fd0ba1c19f188af37ce9717bb49ea021"
   },
   "override-ancestor.docx": {
-    "paragraphsSha256": "451af88bf1c00ed7f1b0758eaabb364615d62742f84641790c9123de65b4450a",
+    "paragraphsSha256": "53a46f0fdf5116f631cb026435a3b2890cdce38641d0efe78d577619de2c84ed",
     "sha256": "0600d4876dc95c1b4aa8f01df4550a8f9c8a7581e8e2c6f31ce81bd9910fb224"
   },
   "override-deeper-level.docx": {
-    "paragraphsSha256": "8ebfa2a0cfcc2f1e614d4ca4dcced85f84b0a31770f4c26fdbe688d9075d8e09",
+    "paragraphsSha256": "18df5b917d3959b2ca40000d920f06bb8eb620078eb302f66f35f7bffc3a3edc",
     "sha256": "11d58b08f224a041fbbce024fac1a5d03234294c19f196c74acdb073ece1e221"
   },
   "override-implicit-ancestor.docx": {
-    "paragraphsSha256": "ab8abe3b3a7d9b5adf2418a1e0fcab3a7b88cc6c6a05e9de25dde48b370e53dc",
+    "paragraphsSha256": "2f3394dae8b4f43e3460da87781e545eae6d937919e8d1bffeda705978738cdb",
     "sha256": "e55961207231b8972fabbedfed9594e0eef2a7b2dce397c30e6d95ccbafd43e3"
   },
   "override-restart-within.docx": {
-    "paragraphsSha256": "bbd5746a284138e6f7339e2139aba4c92f75dc2117e18f73c73d9ec14255e7ef",
+    "paragraphsSha256": "56df760cdaec103cfa286842309761b7c1c6941243691d4a6b8c2c011e7b9a35",
     "sha256": "3612d10fe863e0f3486c9127efa08463052c4fdd0c8ef52be5c25e6f93c3d2fe"
   },
   "override-return.docx": {
-    "paragraphsSha256": "df6526b852bfef5da561866e9f362348740c52697c4b9a75c5d5b60eb19321be",
+    "paragraphsSha256": "0599d87b8c495c2118d73b743aab02060ab4a0a2a9e7db9a920fa4f65a00988f",
     "sha256": "eb5f8c7b32b9764e6082aaf139160dfc79715edee6c84d5fea84e3aab27d513b"
   },
   "plain-after-restart.docx": {
-    "paragraphsSha256": "9f065699747e23df67d9031bf5fcc0451c13f7dc10f61bfaad5705769699b563",
+    "paragraphsSha256": "fcd49ef3f71cc549e772909119f787c76c85d2c461ce253bda7b4c04f7164b25",
     "sha256": "a0842636db8d397723bb68625e1b6f1609253af03e73d4d217ff656efe7ab9de"
   },
   "restart-after-first.docx": {
-    "paragraphsSha256": "71b0bbc1fc748192f879e26487f4fbe40a3e63bdf98bb2098d7ff5e65732a964",
+    "paragraphsSha256": "e0ae74aae1255122e6fcec02664f65b4c4d88eb7b570d04c16c78478cc47e888",
     "sha256": "aa48a48f3a8dca6613701ef7af8c0c88c40c514dcb15fd6d358e4f2cfe5fabfe"
   },
   "restart-never.docx": {
-    "paragraphsSha256": "24927b2ee089b6e6d5d6511e5de2d0c0850337c2e0c42dad9610c875fa2f41b3",
+    "paragraphsSha256": "6c8bf2d4cbceb791cd65d988ee2e6ec0485b22bcb12973545d5d9c0d86942e65",
     "sha256": "04b6b2a16e3313a51e521195aaefc5605eb517cef49b2a6066c5a51b37603c22"
   },
   "return-after-restart.docx": {
-    "paragraphsSha256": "e4b5eb4d20cd4f5c8fe01fd2a4101d15c15ef3b10f03eeab5ecbd6c6ebb97d42",
+    "paragraphsSha256": "bd3faf84536dcc82dd95534473ece504d15d01e75b030896ffcc3a56c3ed68c6",
     "sha256": "20a86c73e2af321d272d2bfa0a49ac70485b8afad9fe6fe3eb06337b3419f730"
   },
   "shared-continue.docx": {
-    "paragraphsSha256": "7b37ed3ebf8f184cac4ed956578affc2105298c538a5f0343e7b8273dde25ca8",
+    "paragraphsSha256": "920113d93eb26bcbacbbddf59f6087998496a0367d100ebec8e98bcc24bd3ca0",
     "sha256": "a408beea90ff48a64c408ef33b2587f2cd8d6d6e5c9d00eb9ccf0ed2cefcf462"
   },
   "start-override-first.docx": {
-    "paragraphsSha256": "eb1b942b7c7b97f9b7390d309c6c0334fd65a2f95b28ec3b7dbe5ad26dc15172",
+    "paragraphsSha256": "0697f1fab1e570a087fca31b6334a14320612bcb04863e4022d1ed9217a05139",
     "sha256": "c1d3b8a65704c41c3faa573cf97432eca280fb06f39a14029080182141b23c71"
   },
   "start-override-restart.docx": {
-    "paragraphsSha256": "12f0bee26bea41c86bae0619f9b0500a753d48adb08149815d3a0f27843d53fe",
+    "paragraphsSha256": "f59e43b547c13138d28c79cf25e326eec2293ac3a8f1fbb3a39c59ba84da5cc1",
     "sha256": "00d5a7e5d691662c597f023d491b903fba6cdd3b9ef2e6f1844ecddaa791cd07"
   },
   "style-tied-deeper-level.docx": {
-    "paragraphsSha256": "819c41a1075754415de76820ecbf244b310eb12295c09ab534aee456c2278734",
+    "paragraphsSha256": "c44631dca321adc61ae9714d54a37f0831fb0199497c077c70520031abfb7401",
     "sha256": "73f18d5ea4c000816683ea221ec26d49664f6119af4def1308ff3c79f34adf33"
   },
   "style-tied-level-zero.docx": {
-    "paragraphsSha256": "ffc328b97eb304de6d8c397e16181eb3cdcceff65a8cbe2e739671ba7c19dfbd",
+    "paragraphsSha256": "bf94c9f6213a267a541cc426cd5f5bfe50374f76cda37b666a71946c9d6864cf",
     "sha256": "11653d3f9bc4b19e5deac3399388b666050afa5c12e47424e37a13ae1ed8fece"
   },
   "two-definitions.docx": {
-    "paragraphsSha256": "1b9421183c57234a5960d44fd79ba4fb681814a4cd8f7d1eebaf91dded52c188",
+    "paragraphsSha256": "3b0f1d1654f54435998942906c8bc15c05d317d4ae94c8eb6141413e9f4ef3d3",
     "sha256": "a1c97b8fdf82d03e15f35ec89a2a88a129f35035c6af7088b64ae1ad73c68627"
   }
 }

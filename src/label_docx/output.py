@@ -16,7 +16,9 @@ A read::
 
 Each paragraph's ``notes`` lists its footnote and endnote marks (``offset``, ``kind``, ``id``,
 ``mark``); ``footnotes`` and ``endnotes`` list the notes in the order the body refers to them,
-each with its ``id``, ``mark`` and ``paragraphs``.
+each with its ``id``, ``mark`` and ``paragraphs``. Each paragraph's ``pages`` lists the offsets
+where Word draws a page number (a table of contents' PAGEREF, a PAGE field): Word sets it from
+the page layout when it prints, so its value is never in ``text`` and never known.
 
 A refusal::
 
@@ -35,8 +37,8 @@ from label_docx.reader import READER_VERSION, DocxRefusedError, Note, Paragraph,
 
 # The version of the shape above. A change to this file changes its hash in versions.lock.json.
 # 1.1.0 adds numbering.text and numbering.suffix, the list label; 1.2.0 adds paragraphs' notes
-# and the footnotes and endnotes.
-FORMAT_VERSION = "label-docx-json/1.2.0"
+# and the footnotes and endnotes; 1.3.0 adds paragraphs' pages, where Word draws a page number.
+FORMAT_VERSION = "label-docx-json/1.3.0"
 
 type Json = str | int | bool | list[Json] | dict[str, Json] | None
 
@@ -55,6 +57,7 @@ def paragraph(item: Paragraph) -> dict[str, Json]:
         "notes": [
             {"id": n.id, "kind": n.kind, "mark": n.mark, "offset": n.offset} for n in item.notes
         ],
+        "pages": list(item.pages),
         "numbering": (
             None
             if item.numbering is None

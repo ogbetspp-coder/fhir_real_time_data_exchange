@@ -1,0 +1,10 @@
+{
+  "table-of-contents-stale.docx": {
+    "paragraphsSha256": "17b4d4420e6c5c23f93a53617db60b84818a7ff06bab29e55a787935fef84e25",
+    "sha256": "46415f5c5f5441fe1a614797a67c71cdc46bca7fd5410e7ae67c2176ecb9ba48"
+  },
+  "table-of-contents.docx": {
+    "paragraphsSha256": "4109b8e9e6b93236b476d1df8f5808c686bf10e8de15aec921211b746fc82d2c",
+    "sha256": "d819dcff034ab633389ddb759dccc1b952c6e40874bd15f4fa5b5d70101db395"
+  }
+}

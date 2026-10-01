@@ -383,7 +383,7 @@
       ]
     }
   },
-  "method": "list labels: convert numbers to text, what each list item gained; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF",
+  "method": "list labels: convert numbers to text, what each list item gained; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF; prints: the whole text as shown and after saving as PDF, page numbers aside",
   "notes": {
     "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products-cover-page_en.docx": {
       "body": [
@@ -401,6 +401,26 @@
         "1"
       ]
     }
+  },
+  "prints": {
+    "atmp-product-information-template-version-11_bg.docx": true,
+    "atmp-product-information-template-version-11_el.docx": true,
+    "atmp-product-information-template-version-11_en.docx": true,
+    "mutual-recognition-decentralised-referral-product-information-template-version-42_en.docx": true,
+    "mutual-recognition-decentralised-referral-product-information-template-version-42_et.docx": true,
+    "psusa-nationally-authorised-products-template_en.docx": true,
+    "qrd-annex-iv-conditional-positive-template_en.docx": true,
+    "qrd-annex-iv-exceptional-circumstances-positive-template_en.docx": true,
+    "qrd-annex-iv-standard-positive-template_en.docx": true,
+    "qrd-annex-related-article-127a-template_en.docx": true,
+    "qrd-annex-template_en.docx": true,
+    "qrd-annex-template_es.docx": true,
+    "qrd-appendix-i-statements-use-section-46-pregnancy-lactation-summary-product-characteristics-cover-page_en.docx": true,
+    "qrd-appendix-ii-medical-dictionary-regulatory-activities-terminology-be-used-section-48-undesirable-effects-summary-product-characteristics-cover-page_en.docx": true,
+    "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products-cover-page_en.docx": true,
+    "qrd-appendix-v-adverse-drug-reaction-reporting-details_en.docx": true,
+    "qrd-product-information-template-version-104_es.docx": true,
+    "qrd-psur-annex-iv-template_en.docx": true
   },
   "recorded": "2026-09-30"
 }

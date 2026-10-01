@@ -36,6 +36,11 @@ with markers around every field, reads the text Word shows, saves it as PDF, and
 again. The reader must read a document only where every field shows what Word prints, and refuse
 one (``stale-field``) where any does not.
 
+The fourth is the whole document. For every document, the oracle reads the text Word shows and
+the text after it saves as PDF, with the page numbers (PAGEREF, PAGE...) set aside, since Word
+sets those from the layout. The reader may read a document only where the two are the same: any
+field, known to the reader or not, that Word reprints differently is caught here.
+
 Word runs sandboxed: each file is copied into Word's container, where it opens without a
 permission prompt, and removed after.
 """
@@ -306,6 +311,80 @@ def field_verdict(word: dict[str, list[str]], path: Path) -> str:
     return "agrees"
 
 
+_ANY_RUN = re.compile(r"<w:r(?:\s[^>]*)?>(?:(?!</w:r>).)*?</w:r>", re.S)
+_LAYOUT = {"PAGEREF", "PAGE", "NUMPAGES", "SECTIONPAGES"}
+
+
+def _set_page_numbers_aside(xml: str) -> str:
+    """``xml`` with ``@@P@@`` and ``@@/P@@`` around every page-number field."""
+    spans: list[tuple[int, int]] = []
+    stack: list[tuple[int, list[str]]] = []
+    for run in _ANY_RUN.finditer(xml):
+        body = run.group(0)
+        if 'fldCharType="begin"' in body:
+            stack.append((run.start(), []))
+        for instruction in re.findall(r"<w:instrText[^>]*>([^<]*)</w:instrText>", body):
+            if stack:
+                stack[-1][1].append(instruction)
+        if 'fldCharType="end"' in body and stack:
+            start, code = stack.pop()
+            words = "".join(code).split()
+            if words and words[0].upper() in _LAYOUT:
+                spans.append((start, run.end()))
+    for match in re.finditer(r"<w:fldSimple\b[^>]*w:instr=\"\s*(\w+).*?</w:fldSimple>", xml, re.S):
+        if match.group(1).upper() in _LAYOUT:
+            spans.append((match.start(), match.end()))
+    for start, end in sorted(spans, reverse=True):
+        xml = (
+            xml[:start]
+            + "<w:r><w:t>@@P@@</w:t></w:r>"
+            + xml[start:end]
+            + "<w:r><w:t>@@/P@@</w:t></w:r>"
+            + xml[end:]
+        )
+    return xml
+
+
+def word_prints_what_it_shows(path: Path) -> bool:
+    """Whether the text Word prints (saved as PDF) is the text it shows, page numbers aside."""
+    with zipfile.ZipFile(path) as source:
+        parts = [(info, source.read(info)) for info in source.infolist()]
+    CONTAINER.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=CONTAINER) as folder:
+        copy = Path(folder) / path.name
+        with zipfile.ZipFile(copy, "w", zipfile.ZIP_DEFLATED) as target:
+            for info, content in parts:
+                written = content
+                if info.filename == "word/document.xml":
+                    written = _set_page_numbers_aside(content.decode("utf-8")).encode("utf-8")
+                target.writestr(info.filename, written)
+        done = subprocess.run(
+            ["osascript", "-", str(copy), str(copy.with_suffix(".pdf")), copy.name],
+            input=PRINT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
+        )
+    if done.returncode != 0:
+        raise SystemExit(f"{path.name}: Word failed: {done.stderr.strip()}")
+    shown, _, printed = done.stdout.rstrip("\n").partition(SEPARATOR)
+    aside = re.compile(r"@@P@@.*?@@/P@@", re.S)
+    # Word's answer ends in a line feed, stripped with the whole answer from the printed text.
+    return aside.sub("", shown).rstrip("\n") == aside.sub("", printed).rstrip("\n")
+
+
+def print_verdict(same: bool, path: Path) -> str:
+    """Whether the reader reads only where Word prints what it shows."""
+    try:
+        read_docx(path.read_bytes())
+    except DocxRefusedError as refused:
+        if refused.code == "stale-field" and not same:
+            return "agrees"
+        return f"reader refuses: {refused.code}"
+    return "agrees" if same else "differs: the reader reads a document Word prints differently"
+
+
 def word_note_marks(path: Path) -> dict[str, list[str]] | None:
     """The marks Word draws at the body's note references and in the notes, or None if none."""
     probe = _probe(path.read_bytes())
@@ -405,6 +484,7 @@ def main() -> int:
     answers: dict[str, list[str]] = {}
     note_answers: dict[str, dict[str, list[str]]] = {}
     field_answers: dict[str, dict[str, list[str]]] = {}
+    print_answers: dict[str, bool] = {}
     differs = False
     for path in paths:
         if not path.read_bytes().startswith(b"PK\x03\x04"):
@@ -417,6 +497,7 @@ def main() -> int:
             word = word_labels(path)
             marks = word_note_marks(path)
             fields = word_fields(path)
+            same = word_prints_what_it_shows(path)
         except SystemExit as failed:
             if args.command == "record":
                 raise
@@ -429,6 +510,9 @@ def main() -> int:
             note_answers[path.name] = marks
             if result == "agrees":
                 result = note_verdict(marks, reader_note_marks(path))
+        print_answers[path.name] = same
+        if result in ("agrees", "reader refuses: stale-field"):
+            result = print_verdict(same, path)
         if fields is not None:
             field_answers[path.name] = fields
             # A refusal for a stale field is the right answer for the labels too.
@@ -445,12 +529,14 @@ def main() -> int:
             "method": (
                 "list labels: convert numbers to text, what each list item gained; note marks: "
                 "saved as text, what Word wrote between markers around each mark; fields: the "
-                "text between markers around each, as shown and after saving as PDF"
+                "text between markers around each, as shown and after saving as PDF; prints: the "
+                "whole text as shown and after saving as PDF, page numbers aside"
             ),
             "recorded": datetime.date.today().isoformat(),
             "drawn": answers,
             "notes": note_answers,
             "fields": field_answers,
+            "prints": print_answers,
         }
         target = args.folder / "word.json"
         target.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", "utf-8")

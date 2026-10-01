@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "1.0.0",
+  "note": "Authored by Microsoft Word 16.113.3 (macOS) through scripts/word_authored.py; the stale variants are Word's files edited as the script says.",
+  "sources": [
+    {
+      "name": "A table of contents with page numbers, inserted by Word.",
+      "file": "table-of-contents.docx",
+      "sha256": "d819dcff034ab633389ddb759dccc1b952c6e40874bd15f4fa5b5d70101db395",
+      "bytes": 13677
+    },
+    {
+      "name": "The same after a heading was renamed and pages moved: entry and page numbers stale.",
+      "file": "table-of-contents-stale.docx",
+      "sha256": "46415f5c5f5441fe1a614797a67c71cdc46bca7fd5410e7ae67c2176ecb9ba48",
+      "bytes": 11612
+    }
+  ]
+}

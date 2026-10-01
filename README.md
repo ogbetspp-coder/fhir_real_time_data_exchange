@@ -71,6 +71,8 @@ or, refused, `"refusal":{"code":"tracked-change","detail":"ins"}` in place of `p
   whose characters are in `text`). The top-level `footnotes` and `endnotes` list the notes in the
   order the body refers to them, each with `id`, `mark` and `paragraphs`; a note's first
   paragraph carries its own mark at the start, as Word draws it.
+- `pages` lists where Word draws a page number (a table of contents, a `PAGE` field). Word sets
+  it from the page layout when it prints, so it is placed, never read.
 - `source.sha256` ties the result to the exact input bytes; `reader` and `format` tie it to the
   exact code (see "Versions").
 
@@ -189,10 +191,12 @@ downloads.
 ## What it does not read
 
 - **Headers, footers, comments.** Separate parts, not read.
-- **Fields Word computes from the layout or the clock** (`PAGE`, `DATE`, tables of contents,
-  whose page numbers depend on layout) and **equations** are refused, as are `SEQ` captions with
-  no stored result (three WHO Module 2.3 templates: Word shows nothing there and prints a
-  number).
+- **Page numbers** are placed, not read: Word sets them from the page layout when it prints. A
+  table of contents is read as stored (Word prints it so until someone updates it), its page
+  numbers placed.
+- **Fields Word computes from the clock or a formula** (`DATE`, `IF`...) and **equations** are
+  refused, as are `SEQ` captions with no stored result (three WHO Module 2.3 templates: Word
+  shows nothing there and prints a number).
 - **Word 97-2003 documents (.doc)** are refused, including under a .docx name: EMA's site
   serves one. Save them as .docx in Word first.
 - **Documents with tracked changes** are refused, not resolved. Accept or reject all changes in
@@ -214,6 +218,7 @@ table below is the short form.
 | List labels counted and drawn as Word does, or refused           | `tests/test_reader.py`       |
 | Every corpus list label and note mark is the one Word draws      | `tests/test_word_oracle.py`  |
 | Fields are read only where Word prints what it shows            | `tests/test_word_oracle.py`  |
+| Every document read is one Word prints as it shows it            | `tests/test_word_oracle.py`  |
 | The numbering cases are what their script writes, byte for byte  | `tests/test_corpus.py`       |
 | The EMA template's 7 Symbol bullets and 9 Word 6 dashes          | `tests/test_reader.py`       |
 | A .doc, or a zip that is not the whole file, is never read        | `tests/test_reader.py`       |
@@ -264,6 +269,8 @@ public or synthetic documents go here:
   hold: a VML picture (Estonian), smart-tag properties and a stray private-use character
   (Spanish), and Cyrillic and Greek text (Bulgarian, Greek ATMP).
 - `numbering-cases/`: synthetic, written by `scripts/numbering_cases.py`.
+- `word-authored/`: written by Microsoft Word itself through `scripts/word_authored.py` (a table of
+  contents with page numbers, and the same gone stale), so they hold exactly what Word writes.
 
 EMA's files are reproduced with acknowledgement as the EMA permits. The WHO and SAHPRA Module 2.3
 templates were checked (above) but are not reproduced, their terms of reuse being unclear. To
