@@ -39,11 +39,18 @@
       "2\t"
     ],
     "fields-heading-by-name.docx": [],
+    "fields-noteref-stale.docx": [],
+    "fields-noteref.docx": [],
+    "fields-ref-caption.docx": [],
+    "fields-ref-missing.docx": [],
+    "fields-ref-stale.docx": [],
+    "fields-ref.docx": [],
     "fields-seq-formats.docx": [],
     "fields-seq-identifiers.docx": [],
     "fields-seq-switches.docx": [],
     "fields-seq.docx": [],
     "fields-stale.docx": [],
+    "fields-stored.docx": [],
     "fields-styleref-forward.docx": [
       "1\t"
     ],
@@ -274,6 +281,58 @@
         "named heading 1"
       ]
     },
+    "fields-noteref-stale.docx": {
+      "printed": [
+        "1"
+      ],
+      "shown": [
+        "7"
+      ]
+    },
+    "fields-noteref.docx": {
+      "printed": [
+        "2"
+      ],
+      "shown": [
+        "2"
+      ]
+    },
+    "fields-ref-caption.docx": {
+      "printed": [
+        "1",
+        "2",
+        "Table 2"
+      ],
+      "shown": [
+        "1",
+        "2",
+        "Table 2"
+      ]
+    },
+    "fields-ref-missing.docx": {
+      "printed": [
+        "Error! Reference source not found."
+      ],
+      "shown": [
+        "old text"
+      ]
+    },
+    "fields-ref-stale.docx": {
+      "printed": [
+        "below 25 C"
+      ],
+      "shown": [
+        "below 30 C"
+      ]
+    },
+    "fields-ref.docx": {
+      "printed": [
+        "below 25 C"
+      ],
+      "shown": [
+        "below 25 C"
+      ]
+    },
     "fields-seq-formats.docx": {
       "printed": [
         "1",
@@ -346,6 +405,16 @@
         "7"
       ]
     },
+    "fields-stored.docx": {
+      "printed": [
+        "a stored title",
+        "the agency's page"
+      ],
+      "shown": [
+        "a stored title",
+        "the agency's page"
+      ]
+    },
     "fields-styleref-forward.docx": {
       "printed": [
         "Late"
@@ -357,6 +426,24 @@
   },
   "method": "list labels: convert numbers to text, what each list item gained; note marks: saved as text, what Word wrote between markers around each mark; fields: the text between markers around each, as shown and after saving as PDF",
   "notes": {
+    "fields-noteref-stale.docx": {
+      "body": [
+        "1"
+      ],
+      "notes": [
+        "1"
+      ]
+    },
+    "fields-noteref.docx": {
+      "body": [
+        "1",
+        "2"
+      ],
+      "notes": [
+        "1",
+        "2"
+      ]
+    },
     "notes-chicago.docx": {
       "body": [
         "1",

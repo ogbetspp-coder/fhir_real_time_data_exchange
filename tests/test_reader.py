@@ -205,7 +205,7 @@ def test_a_complex_field_keeps_its_result_and_drops_its_instruction() -> None:
 def test_text_inside_a_field_instruction_is_dropped() -> None:
     body = p(
         r('<w:fldChar w:fldCharType="begin"/>')
-        + r("<w:instrText>REF </w:instrText><w:t>not_shown</w:t><w:tab/>")
+        + r("<w:instrText>HYPERLINK </w:instrText><w:t>not_shown</w:t><w:tab/>")
         + r('<w:fldChar w:fldCharType="separate"/>')
         + r("<w:t>shown</w:t>")
         + r('<w:fldChar w:fldCharType="end"/>')
@@ -215,7 +215,7 @@ def test_text_inside_a_field_instruction_is_dropped() -> None:
 
 def test_simple_fields_hyperlinks_and_content_controls_are_read_through() -> None:
     body = p(
-        '<w:fldSimple w:instr=" REF x ">' + r("<w:t>1</w:t>") + "</w:fldSimple>"
+        '<w:fldSimple w:instr=" HYPERLINK x ">' + r("<w:t>1</w:t>") + "</w:fldSimple>"
         '<w:hyperlink w:anchor="x">' + r("<w:t>2</w:t>") + "</w:hyperlink>"
         "<w:sdt><w:sdtContent>" + r("<w:t>3</w:t>") + "</w:sdtContent></w:sdt>"
     )
@@ -713,9 +713,13 @@ def test_a_font_the_font_table_declares_symbol_encoded_is_refused() -> None:
             ),
             "stale-field",
         ),
-        (p('<w:fldSimple w:instr="REF x"/>'), "field-without-result"),
+        (p('<w:fldSimple w:instr="HYPERLINK x"/>'), "field-without-result"),
         (
-            p('<w:fldSimple w:instr="REF x" w:dirty="1">' + r("<w:t>1</w:t>") + "</w:fldSimple>"),
+            p(
+                '<w:fldSimple w:instr="HYPERLINK x" w:dirty="1">'
+                + r("<w:t>1</w:t>")
+                + "</w:fldSimple>"
+            ),
             "stale-field",
         ),
     ],
@@ -949,7 +953,7 @@ def test_a_field_nested_before_the_code_hides_the_code_and_is_refused() -> None:
         + separate
         + r("<w:t>DATE</w:t>")
         + end
-        + r('<w:instrText xml:space="preserve"> REF bm </w:instrText>')
+        + r('<w:instrText xml:space="preserve"> HYPERLINK bm </w:instrText>')
         + separate
         + r("<w:t>stale</w:t>")
         + end
@@ -985,7 +989,7 @@ def test_numbering_from_the_paragraph_defaults_or_a_table_style_is_reported() ->
 
 
 def test_fields_in_a_document_that_updates_them_on_open_are_refused() -> None:
-    field = p('<w:fldSimple w:instr=" REF x ">' + r("<w:t>1</w:t>") + "</w:fldSimple>")
+    field = p('<w:fldSimple w:instr=" HYPERLINK x ">' + r("<w:t>1</w:t>") + "</w:fldSimple>")
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as package:
         package.writestr("_rels/.rels", ROOT_RELS.format(target="word/document.xml"))
@@ -1074,7 +1078,7 @@ def test_the_template_keeps_its_symbol_font_braces_and_its_own_drift() -> None:
         p(r("<w:t>kept<w:x/>lost</w:t>")),
         p(
             r('<w:fldChar w:fldCharType="begin"/>')
-            + r("<w:instrText>REF<w:x/> lost</w:instrText>")
+            + r("<w:instrText>HYPERLINK<w:x/> lost</w:instrText>")
             + r('<w:fldChar w:fldCharType="separate"/>')
             + r("<w:t>kept</w:t>")
             + r('<w:fldChar w:fldCharType="end"/>')
@@ -1722,3 +1726,64 @@ def test_unicode_text_set_in_the_symbol_font_is_refused(character: str) -> None:
     with pytest.raises(DocxRefusedError) as caught:
         read_docx(docx(p(r(f"<w:t>{character}</w:t>", SYMBOL))))
     assert caught.value.code == "unmapped-symbol"
+
+
+# --- cross-references (docx-reader/1.9.0) ------------------------------------------------------
+
+
+def _field(code: str, stored: str) -> str:
+    return (
+        r('<w:fldChar w:fldCharType="begin"/>')
+        + r(f'<w:instrText xml:space="preserve"> {code} </w:instrText>')
+        + r('<w:fldChar w:fldCharType="separate"/>')
+        + (r(f'<w:t xml:space="preserve">{stored}</w:t>') if stored else "")
+        + r('<w:fldChar w:fldCharType="end"/>')
+    )
+
+
+def _marked(name: str, inner: str, key: int = 1) -> str:
+    return f'<w:bookmarkStart w:id="{key}" w:name="{name}"/>{inner}<w:bookmarkEnd w:id="{key}"/>'
+
+
+def test_a_cross_reference_that_prints_its_stored_text_is_read() -> None:
+    body = p(_marked("t", r("<w:t>below 25 C</w:t>"))) + p(_field("REF t \\h", "below 25 C"))
+    assert text_of(body) == ["below 25 C", "below 25 C"]
+
+
+@pytest.mark.parametrize(
+    ("body", "code"),
+    [
+        # Stored as other text than the bookmark's: Word prints the bookmark's.
+        (
+            p(_marked("t", r("<w:t>below 25 C</w:t>"))) + p(_field("REF t", "below 30 C")),
+            "stale-field",
+        ),
+        # A bookmark that is not there: Word prints an error.
+        (p(_field("REF gone", "old")), "computed-field"),
+        # A bookmark across paragraphs, or between them.
+        (
+            p('<w:bookmarkStart w:id="1" w:name="t"/>' + r("<w:t>a</w:t>"))
+            + p(r("<w:t>b</w:t>") + '<w:bookmarkEnd w:id="1"/>')
+            + p(_field("REF t", "a")),
+            "computed-field",
+        ),
+        # A switch whose effect is not on record.
+        (p(_marked("t", r("<w:t>x</w:t>"))) + p(_field("REF t \\p", "x")), "computed-field"),
+    ],
+)
+def test_cross_references_the_reader_cannot_vouch_for_are_refused(body: str, code: str) -> None:
+    assert refusal(body) == code
+
+
+def test_a_note_reference_prints_its_notes_mark_or_is_refused() -> None:
+    body = p(r("<w:t>a</w:t>") + _marked("fn", ref(1))) + p(_field("NOTEREF fn \\h", "1"))
+    assert read(body, fnote(1)).body[1].text == "1"
+    stale = p(r("<w:t>a</w:t>") + _marked("fn", ref(1))) + p(_field("NOTEREF fn", "7"))
+    with pytest.raises(DocxRefusedError) as caught:
+        read(stale, fnote(1))
+    assert caught.value.code == "stale-field"
+    # A REF over a note mark would print the mark, which is not in the text.
+    over = p(_marked("fn", r("<w:t>a</w:t>") + ref(1))) + p(_field("REF fn", "a"))
+    with pytest.raises(DocxRefusedError) as caught:
+        read(over, fnote(1))
+    assert caught.value.code == "computed-field"

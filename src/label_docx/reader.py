@@ -66,27 +66,28 @@ font per character and the reader cannot be sure which characters it draws in Sy
 font (Wingdings, Webdings, Zapf Dingbats, Marlett, MT Extra), or any font the document's font
 table declares symbol-encoded (charset 02), is refused.
 
-Fields keep their stored result and drop their instruction, however deeply nested, so
-``DOCPROPERTY ... MERGEFORMAT`` never reaches the text. Fields whose stored result is what Word
-shows and prints are read: HYPERLINK, REF, NOTEREF and DOCPROPERTY. SEQ (caption numbers) and
-STYLEREF (a heading's number or text) Word shows as stored but recomputes when it prints or saves
-as PDF, so the reader computes them as Word does and reads them only where the stored result is
-the computed one; otherwise screen and print disagree, and the document is refused
-(``stale-field``). SEQ counts each identifier in document order: one more than the last, ``\r``
-n sets the count, ``\c`` repeats it, ``\h`` counts and shows nothing, ``\s`` n restarts it
-after any paragraph in a built-in style "heading 1" to "heading n" (Word goes by the style's
-name, not its outline level), and ``\*`` shows it in ARABIC, ROMAN, roman, ALPHABETIC or
-alphabetic. STYLEREF finds the nearest paragraph of the style (a number n is "heading n") before
-the field, else after it, and shows its text, or with ``\s`` its list label without the final
-period. Each rule is Word's answer to a case in ``corpus/numbering-cases``. Other switches, a SEQ
-or STYLEREF in a note or nested in another field's code, and a result that runs past its paragraph
-are refused. Any other field whose result would be shown (PAGE, DATE, TOC, IF, a formula...) is
-refused, because Word recomputes it on display or print. The code is the first word of the
-instruction; a field nested in the instruction ahead of or inside that word makes the code
-unknown, and the field is refused. So
-are a field with no stored result (no ``separate``, such as a form checkbox or a SYMBOL field,
-or an empty ``fldSimple``), a form field, a field marked for update, any field in a document
-whose settings ask Word to update fields on open, and field code outside an instruction.
+Fields keep their stored result and drop their instruction, however deeply nested, so ``DOCPROPERTY
+... MERGEFORMAT`` never reaches the text. Fields whose stored result is what Word shows and prints
+are read: HYPERLINK and DOCPROPERTY. SEQ (caption numbers), STYLEREF (a heading's number or text),
+REF (a cross-reference: a bookmark's text) and NOTEREF (the mark of the note a bookmark holds) Word
+shows as stored but recomputes when it prints or saves as PDF, so the reader computes them as Word
+does and reads them only where the stored result is the computed one; otherwise screen and print
+disagree, and the document is refused (``stale-field``). A REF or NOTEREF to a bookmark that is not
+there (Word prints an error), that runs across paragraphs, or over a note mark (REF) is refused. SEQ
+counts each identifier in document order: one more than the last, ``\r`` n sets the count, ``\c``
+repeats it, ``\h`` counts and shows nothing, ``\s`` n restarts it after any paragraph in a built-in
+style "heading 1" to "heading n" (Word goes by the style's name, not its outline level), and ``\*``
+shows it in ARABIC, ROMAN, roman, ALPHABETIC or alphabetic. STYLEREF finds the nearest paragraph of
+the style (a number n is "heading n") before the field, else after it, and shows its text, or with
+``\s`` its list label without the final period. Each rule is Word's answer to a case in
+``corpus/numbering-cases``. Other switches, a SEQ or STYLEREF in a note or nested in another field's
+code, and a result that runs past its paragraph are refused. Any other field whose result would be
+shown (PAGE, DATE, TOC, IF, a formula...) is refused, because Word recomputes it on display or
+print. The code is the first word of the instruction; a field nested in the instruction ahead of or
+inside that word makes the code unknown, and the field is refused. So are a field with no stored
+result (no ``separate``, such as a form checkbox or a SYMBOL field, or an empty ``fldSimple``), a
+form field, a field marked for update, any field in a document whose settings ask Word to update
+fields on open, and field code outside an instruction.
 
 List labels. Word draws "4.8", "b)" or a bullet before a numbered paragraph from the numbering
 part; the reader computes that label by Word's rules, each of which is Word's own answer to a case
@@ -195,8 +196,9 @@ from dataclasses import dataclass, field, replace
 # 1.4.0 refused: VML pictures, smart-tag and custom-XML properties, and conditional table
 # formatting that cannot change the text; 1.6.0 reads footnotes and endnotes, with their marks
 # by the rules Word showed; 1.7.0 reads SEQ and STYLEREF fields whose stored result is what Word
-# prints; 1.8.0 names a PDF in its refusal.
-READER_VERSION = "docx-reader/1.8.0"
+# prints; 1.8.0 names a PDF in its refusal; 1.9.0 computes REF and NOTEREF, which Word reprints,
+# and refuses them where the stored result is not what it prints.
+READER_VERSION = "docx-reader/1.9.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -949,6 +951,9 @@ class _ParagraphReader:
         # of each open field's result if it is one of those, else None.
         self.computed: list[tuple[str, int, int]] = []
         self.results: list[int | None] = []
+        # Bookmark starts (id, name, offset) and ends (id, offset), for REF and NOTEREF.
+        self.bookmark_starts: list[tuple[str, str, int]] = []
+        self.bookmark_ends: list[tuple[str, int]] = []
         self.parts: list[str] = []
         self.length = 0
         self.marks: list[Mark] = []
@@ -991,6 +996,12 @@ class _ParagraphReader:
                 content = child.find(_w("sdtContent"))
                 if content is not None:
                     self.container(content)
+            elif tag == _w("bookmarkStart"):
+                self.bookmark_starts.append(
+                    (child.get(_w("id"), ""), child.get(_w("name"), ""), self.length)
+                )
+            elif tag == _w("bookmarkEnd"):
+                self.bookmark_ends.append((child.get(_w("id"), ""), self.length))
             elif tag in _PROPERTIES or tag in _MARKERS:
                 continue
             else:
@@ -1212,13 +1223,16 @@ def _faint(properties: _Properties) -> bool:
     return False
 
 
-# Fields whose stored result is what Word shows until someone updates them by hand. Word
-# recomputes others when it lays out or prints the page (PAGE, NUMPAGES, DATE, TIME, SEQ,
-# AUTONUM, LISTNUM, IF, formulas...), so their stored result may not be what a reader sees.
-_STORED_FIELDS = {"HYPERLINK", "REF", "NOTEREF", "DOCPROPERTY"}
-# Fields Word computes, which the reader computes too and reads only where the stored result is
-# what Word computes (see "Fields" in the module docstring).
-_COMPUTED_FIELDS = {"SEQ", "STYLEREF"}
+# Fields whose stored result is what Word shows and prints until someone updates them by hand
+# (corpus/numbering-cases records it for DOCPROPERTY and HYPERLINK). Word recomputes others when
+# it lays out or prints the page (PAGE, NUMPAGES, DATE, TIME, AUTONUM, LISTNUM, IF, formulas...),
+# so their stored result may not be what a reader sees.
+_STORED_FIELDS = {"HYPERLINK", "DOCPROPERTY"}
+# Fields Word recomputes when it prints or saves as PDF, which the reader computes too and reads
+# only where the stored result is what Word prints (see "Fields" in the module docstring). REF
+# and NOTEREF are here because Word reprints them (corpus/numbering-cases, fields-ref-stale and
+# fields-noteref-stale): a cross-reference stored as one text prints as another.
+_COMPUTED_FIELDS = {"SEQ", "STYLEREF", "REF", "NOTEREF"}
 
 
 def _check_field(instruction: str) -> str:
@@ -1284,8 +1298,11 @@ class _Context:
     # notes whose marks are custom.
     section: int = 0
     custom: frozenset[tuple[str, int]] = frozenset()
-    # The SEQ and STYLEREF fields: instruction, and the stored result's start and end in text.
+    # The fields the reader computes: instruction, and the stored result's start and end in text.
     fields: tuple[tuple[str, int, int], ...] = ()
+    # Bookmark starts (id, name, offset) and ends (id, offset) in the paragraph.
+    bookmark_starts: tuple[tuple[str, str, int], ...] = ()
+    bookmark_ends: tuple[tuple[str, int], ...] = ()
 
 
 def _paragraph(
@@ -1328,6 +1345,8 @@ def _paragraph(
         section=section,
         custom=frozenset(reader.custom),
         fields=tuple(reader.computed),
+        bookmark_starts=tuple(reader.bookmark_starts),
+        bookmark_ends=tuple(reader.bookmark_ends),
     )
     return Paragraph(
         text="".join(reader.parts),
@@ -1962,7 +1981,9 @@ def _heading_level(style: str | None, styles: _Styles) -> int | None:
     return int(match.group(1)) if match else None
 
 
-def _verify_fields(paragraphs: list[Paragraph], contexts: list[_Context], styles: _Styles) -> None:
+def _verify_fields(
+    paragraphs: list[Paragraph], contexts: list[_Context], styles: _Styles, loose: set[str]
+) -> None:
     """Refuse a SEQ or STYLEREF field whose stored result is not what Word prints.
 
     Word shows a field's stored result on screen and recomputes SEQ and STYLEREF when it prints
@@ -1975,6 +1996,7 @@ def _verify_fields(paragraphs: list[Paragraph], contexts: list[_Context], styles
         for c in contexts
     ]
     levels = [_heading_level(c.style, styles) for c in contexts]
+    bookmarks = _bookmarks(contexts, loose)
     # Per SEQ identifier: its value, and the paragraph of its last field.
     counted: dict[str, tuple[int, int]] = {}
     for index, (paragraph, context) in enumerate(zip(paragraphs, contexts, strict=True)):
@@ -1983,13 +2005,67 @@ def _verify_fields(paragraphs: list[Paragraph], contexts: list[_Context], styles
             code = tokens[0].upper()
             if code == "SEQ":
                 shown = _seq(tokens[1:], index, counted, levels)
-            else:
+            elif code == "STYLEREF":
                 shown = _styleref(tokens[1:], index, paragraphs, names)
+            else:
+                shown = _reference(code, tokens[1:], paragraphs, bookmarks)
             stored = paragraph.text[start:end]
             if stored != shown:
                 raise DocxRefusedError(
                     "stale-field", f"a {code} field shows {stored!r}; Word prints {shown!r}"
                 )
+
+
+def _bookmarks(contexts: list[_Context], loose: set[str]) -> dict[str, tuple[int, int, int] | None]:
+    """Each bookmark's paragraph, start and end; None for one REF cannot be read from.
+
+    That is one that starts and ends in different paragraphs or between them, has no end, or
+    shares its name with another.
+    """
+    starts: dict[str, tuple[str, int, int]] = {}
+    ends: dict[str, tuple[int, int]] = {}
+    for index, context in enumerate(contexts):
+        for key, name, offset in context.bookmark_starts:
+            starts[key] = (name, index, offset)
+        for key, offset in context.bookmark_ends:
+            ends[key] = (index, offset)
+    spans: dict[str, tuple[int, int, int] | None] = {}
+    for key, (name, index, start) in starts.items():
+        end = ends.get(key)
+        whole = key not in loose and end is not None and end[0] == index and name not in spans
+        spans[name] = (index, start, end[1]) if whole and end is not None else None
+    return spans
+
+
+def _reference(
+    code: str,
+    tokens: list[str],
+    paragraphs: list[Paragraph],
+    bookmarks: dict[str, tuple[int, int, int] | None],
+) -> str:
+    """What REF (the bookmark's text) or NOTEREF (its note's mark) prints."""
+    arguments, switches = _switches(tokens, set(), {"h", "f"} if code == "NOTEREF" else {"h"})
+    if len(arguments) != 1 or "*" in switches:
+        raise DocxRefusedError("computed-field", f"a {code} field the reader cannot compute")
+    name = arguments[0]
+    if name not in bookmarks:
+        # Word prints "Error! Reference source not found." [fields-ref-missing].
+        raise DocxRefusedError("computed-field", f"a {code} to a bookmark that is not there")
+    span = bookmarks[name]
+    if span is None:
+        raise DocxRefusedError("computed-field", f"a {code} to a bookmark it cannot read")
+    index, start, end = span
+    paragraph = paragraphs[index]
+    inside = [n for n in paragraph.notes if start <= n.offset <= end]
+    if code == "NOTEREF":
+        # The mark of the note referred to in the bookmark [fields-noteref].
+        if len(inside) != 1 or inside[0].mark is None:
+            raise DocxRefusedError("computed-field", "a NOTEREF to a bookmark without one note")
+        return inside[0].mark
+    if inside:
+        raise DocxRefusedError("computed-field", "a REF to a bookmark holding a note mark")
+    # The bookmark's text [fields-ref].
+    return paragraph.text[start:end]
 
 
 def _seq(
@@ -2071,6 +2147,8 @@ class _Body:
         self.runs = runs
         # The sectPr closing each section so far; a paragraph holding one ends its section.
         self.sections: list[ET.Element] = []
+        # Ids of bookmarks that start or end between paragraphs, which REF cannot be read from.
+        self.loose_bookmarks: set[str] = set()
 
     def blocks(
         self, element: ET.Element, table: tuple[int, int, int] | None, table_style: str | None
@@ -2101,6 +2179,8 @@ class _Body:
                     self.blocks(content, table, table_style)
             elif tag == _w("customXml"):
                 self.blocks(child, table, table_style)
+            elif tag in (_w("bookmarkStart"), _w("bookmarkEnd")):
+                self.loose_bookmarks.add(child.get(_w("id"), ""))
             elif tag in (_w("sectPr"), _w("tcPr")) or tag in _PROPERTIES or tag in _MARKERS:
                 continue
             else:
@@ -2190,9 +2270,12 @@ def read_document(data: bytes) -> Document:
     reader.blocks(body, None, None)
     _check_accounted(document, runs)
     paragraphs = _labelled(reader.out, reader.contexts, lists)
-    _verify_fields(paragraphs, reader.contexts, styles)
     sections: list[ET.Element | None] = [*reader.sections, body.find(_w("sectPr"))]
     marks = _note_marks(paragraphs, reader.contexts, sections)
+    # NOTEREF prints a note's mark, so the fields are checked once the marks are known.
+    _verify_fields(
+        [_with_marks(p, marks) for p in paragraphs], reader.contexts, styles, reader.loose_bookmarks
+    )
     notes = {
         kind: _read_notes(part, kind, styles)
         for kind, part in zip(_NOTE_KINDS, parts[5:], strict=True)

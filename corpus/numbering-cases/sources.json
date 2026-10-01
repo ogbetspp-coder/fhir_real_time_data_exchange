@@ -231,6 +231,48 @@
       "bytes": 3590
     },
     {
+      "name": "A cross-reference (REF) to bookmarked text prints that text.",
+      "file": "fields-ref.docx",
+      "sha256": "48d644b4a225777e38a0f775da0d1015005881acc3045b9e1a2ba14075d40e30",
+      "bytes": 3122
+    },
+    {
+      "name": "A REF stored as other text than its bookmark's (the reader refuses).",
+      "file": "fields-ref-stale.docx",
+      "sha256": "aadaa74b16eed4f18115fb8c84f8d97ab8e8b8a7855f0e9c632e26b944f832ad",
+      "bytes": 2975
+    },
+    {
+      "name": "A REF to a bookmark that is not there; Word prints an error (the reader refuses).",
+      "file": "fields-ref-missing.docx",
+      "sha256": "caec02bbde333b95b35c54951058e834f39344da16c644f07e1bc1bf3414f8c7",
+      "bytes": 2841
+    },
+    {
+      "name": "A cross-reference to a caption: the caption's bookmark holds its SEQ.",
+      "file": "fields-ref-caption.docx",
+      "sha256": "22985d27fec53c65b992e2267841fedf0f04260d1e3807e077d229aed02ee724",
+      "bytes": 3689
+    },
+    {
+      "name": "A NOTEREF prints the mark of the note its bookmark holds.",
+      "file": "fields-noteref.docx",
+      "sha256": "e3032ddf3d4fc689f0f98b2a280cea475861d352f8ba19a68cfe8f5fcc60da65",
+      "bytes": 4194
+    },
+    {
+      "name": "A NOTEREF stored as 7 for note 1 (the reader refuses).",
+      "file": "fields-noteref-stale.docx",
+      "sha256": "2a13e4089d823427215772a3b7026f472ff6537733e72e1366e4d820267b07fc",
+      "bytes": 3910
+    },
+    {
+      "name": "DOCPROPERTY and HYPERLINK, which Word prints as stored.",
+      "file": "fields-stored.docx",
+      "sha256": "ff92577f32a18cb195acc09176557962df0ef46a58a81b2c8c721053f03cd866",
+      "bytes": 3155
+    },
+    {
       "name": "Captions stored as 7 and 7, which Word prints as 1 and 2 (the reader refuses).",
       "file": "fields-stale.docx",
       "sha256": "22e42c8c0532dd985bb4a9df1848490495a1e6c1269ef09a0aab605032878861",

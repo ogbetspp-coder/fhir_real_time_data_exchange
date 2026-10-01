@@ -28,8 +28,14 @@ REFUSED = {
     # A custom-marked footnote whose text holds footnoteRef: Word draws there the number the
     # next footnote will take, which no reference shows.
     "numbering-cases/notes-custom-mark.docx": "ambiguous-numbering",
+    # A REF to a bookmark that is not there: Word prints "Error! Reference source not found."
+    "numbering-cases/fields-ref-missing.docx": "computed-field",
     # Captions stored as 7 and 7, which Word shows on screen and prints as 1 and 2.
     "numbering-cases/fields-stale.docx": "stale-field",
+    # A cross-reference stored as other text than its bookmark's, and a note reference stored as 7
+    # for note 1: Word prints the bookmark's text and the mark 1.
+    "numbering-cases/fields-ref-stale.docx": "stale-field",
+    "numbering-cases/fields-noteref-stale.docx": "stale-field",
     # EMA's stray U+F02D in Times New Roman, a code no font draws as the template means it.
     "ema-templates/qrd-product-information-template-version-104_es.docx": "private-use-character",
 }

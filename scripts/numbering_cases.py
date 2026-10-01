@@ -151,6 +151,14 @@ def seq(stored: str, switches: str = "", identifier: str = "Table") -> str:
     return para(words(f"{identifier} "), field(code, stored))
 
 
+def bookmark(key: int, name: str, *pieces: str) -> str:
+    """``pieces`` inside a bookmark, as Word marks the target of a cross-reference."""
+    return (
+        f'<w:bookmarkStart w:id="{key}" w:name="{name}"/>{"".join(pieces)}'
+        f'<w:bookmarkEnd w:id="{key}"/>'
+    )
+
+
 def heading(level: int, text: str) -> str:
     """A paragraph in the built-in style "heading <level>"."""
     return para(words(text), props=f'<w:pStyle w:val="Heading{level}"/>')
@@ -489,6 +497,50 @@ CASES: dict[str, Case] = {
         OUTLINE_NUMBERING,
         para(field("STYLEREF 1", "Late")) + heading(1, "Late"),
         HEADINGS,
+    ),
+    "fields-ref": Case(
+        "A cross-reference (REF) to bookmarked text prints that text.",
+        "",
+        para(words("Store "), bookmark(1, "store", words("below 25 C")), words("."))
+        + para(words("Keep it "), field(f"REF store {BACKSLASH}h", "below 25 C")),
+    ),
+    "fields-ref-stale": Case(
+        "A REF stored as other text than its bookmark's (the reader refuses).",
+        "",
+        para(bookmark(1, "store", words("below 25 C"))) + para(field("REF store", "below 30 C")),
+    ),
+    "fields-ref-missing": Case(
+        "A REF to a bookmark that is not there; Word prints an error (the reader refuses).",
+        "",
+        para(field("REF gone", "old text")),
+    ),
+    "fields-ref-caption": Case(
+        "A cross-reference to a caption: the caption's bookmark holds its SEQ.",
+        "",
+        para(bookmark(1, "_Ref1", words("Table "), field("SEQ Table", "1")))
+        + para(bookmark(2, "_Ref2", words("Table "), field("SEQ Table", "2")))
+        + para(words("See "), field(f"REF _Ref2 {BACKSLASH}h", "Table 2"), words(".")),
+    ),
+    "fields-noteref": Case(
+        "A NOTEREF prints the mark of the note its bookmark holds.",
+        "",
+        para(words("a"), bookmark(1, "fn1", cite(1)))
+        + para(words("b"), bookmark(2, "fn2", cite(2)))
+        + para(words("see note "), field(f"NOTEREF fn2 {BACKSLASH}h", "2")),
+        footnotes=notes("footnote", 1, 2),
+    ),
+    "fields-noteref-stale": Case(
+        "A NOTEREF stored as 7 for note 1 (the reader refuses).",
+        "",
+        para(words("a"), bookmark(1, "fn1", cite(1)))
+        + para(words("see note "), field(f"NOTEREF fn1 {BACKSLASH}h", "7")),
+        footnotes=notes("footnote", 1),
+    ),
+    "fields-stored": Case(
+        "DOCPROPERTY and HYPERLINK, which Word prints as stored.",
+        "",
+        para(field("DOCPROPERTY Title", "a stored title"))
+        + para(field('HYPERLINK "https://example.org"', "the agency's page")),
     ),
     "fields-stale": Case(
         "Captions stored as 7 and 7, which Word prints as 1 and 2 (the reader refuses).",

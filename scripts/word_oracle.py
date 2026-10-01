@@ -138,7 +138,9 @@ _FIELD = re.compile(
     r"w:fldCharType=\"end\"(?:(?!</w:r>).)*?</w:r>|<w:fldSimple\b.*?</w:fldSimple>",
     re.S,
 )
-_COMPUTED = re.compile(r"(?:instr=\"|<w:instrText[^>]*>)\s*(?:SEQ|STYLEREF)\b")
+_COMPUTED = re.compile(
+    r"(?:instr=\"|<w:instrText[^>]*>)\s*(?:SEQ|STYLEREF|REF|NOTEREF|DOCPROPERTY|HYPERLINK)\b"
+)
 
 # A run holding a note reference (in the body) or a note's echo of its mark (in a note).
 _NOTE_RUN = {
@@ -232,7 +234,8 @@ def _probe(data: bytes) -> bytes | None:
 def word_fields(path: Path) -> dict[str, list[str]] | None:
     """The results Word shows and prints for the document's fields.
 
-    None if the document has no SEQ or STYLEREF field.
+    None if the document has no field the reader reads (SEQ, STYLEREF, REF, NOTEREF,
+    DOCPROPERTY, HYPERLINK).
     """
     with zipfile.ZipFile(path) as source:
         parts = [(info, source.read(info)) for info in source.infolist()]
@@ -263,8 +266,31 @@ def word_fields(path: Path) -> dict[str, list[str]] | None:
     if done.returncode != 0:
         raise SystemExit(f"{path.name}: Word failed: {done.stderr.strip()}")
     shown, _, printed = done.stdout.rstrip("\n").partition(SEPARATOR)
-    between = re.compile(r"@@F@@(.*?)@@/@@", re.S)
-    return {"shown": between.findall(shown), "printed": between.findall(printed)}
+    return {"shown": _between_markers(shown), "printed": _between_markers(printed)}
+
+
+def _between_markers(text: str) -> list[str]:
+    """Each field's text, in document order, without the markers.
+
+    Markers nest where a field's text holds a copy of another's: a cross-reference to a caption
+    prints the caption's text, markers and all. Only the outermost markers are a field's own.
+    """
+    values: list[str] = []
+    depth = 0
+    clean: list[str] = []
+    start = 0
+    for piece in re.split(r"(@@F@@|@@/@@)", text):
+        if piece == "@@F@@":
+            if depth == 0:
+                start = len(clean)
+            depth += 1
+        elif piece == "@@/@@" and depth:
+            depth -= 1
+            if depth == 0:
+                values.append("".join(clean[start:]))
+        else:
+            clean.append(piece)
+    return values
 
 
 def field_verdict(word: dict[str, list[str]], path: Path) -> str:
