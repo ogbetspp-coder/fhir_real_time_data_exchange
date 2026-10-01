@@ -1705,3 +1705,18 @@ def test_a_table_in_a_note_is_read() -> None:
         ("", None),
         ("cell", (0, 0, 0)),
     ]
+
+
+@pytest.mark.parametrize(
+    "character", ["\u03b4", "\u2264", "\u2022", "\u2265", "\u2212", "\u223c", "\u00b5", "\u00d7"]
+)
+def test_unicode_text_set_in_the_symbol_font_is_refused(character: str) -> None:
+    # PDF converters write Unicode characters in runs set in Symbol, as pdf2docx does for the HL7
+    # PQ IG's Module 3 examples. Word 16.113.3, asked to draw them (saved as PDF, the page
+    # rendered and read), drew delta as a trademark sign, less-than-or-equal as a double prime,
+    # micro as proportional-to, the multiplication sign as a dot, and the bullet as a missing
+    # glyph, while greater-than-or-equal, minus and tilde came out as themselves. The text says
+    # one thing and Word shows another, so neither is read.
+    with pytest.raises(DocxRefusedError) as caught:
+        read_docx(docx(p(r(f"<w:t>{character}</w:t>", SYMBOL))))
+    assert caught.value.code == "unmapped-symbol"
