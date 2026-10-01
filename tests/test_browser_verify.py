@@ -151,3 +151,21 @@ def test_chrome_draws_the_list_markers_the_reader_reads_and_sees_a_changed_one()
     assert any(
         "list marker" in d["where"] for d in browser.verify_epi(EPI, changed, CHROME)["differs"]
     )
+
+
+def test_strict_service_serves_no_read_its_application_has_not_checked(tmp_path: Path) -> None:
+    unchecked = Service(Store(tmp_path / "a"), require=frozenset({"epi"}))
+    _, headers, body = _call(unchecked, "POST", "/v1/documents", EPI)
+    assert headers["Verification"] == "not-verified"
+    document = json.loads(body)["document"]
+    status, _, body = _call(unchecked, "GET", f"/v1/documents/{document}")
+    assert status == "409 Conflict"
+    assert "not yet checked by Chrome" in json.loads(body)["error"]
+    # A .docx is not held to it, and a refusal is served: nothing was read.
+    _, _, body = _call(unchecked, "POST", "/v1/documents", DOCX)
+    assert _call(unchecked, "GET", f"/v1/documents/{json.loads(body)['document']}")[0] == "200 OK"
+    _, _, body = _call(unchecked, "POST", "/v1/documents", b'{"resourceType": "Bundle"}')
+    assert _call(unchecked, "GET", f"/v1/documents/{json.loads(body)['document']}")[0] == "200 OK"
+    checked = Service(Store(tmp_path / "b", browser=_agreeing), require=frozenset({"epi"}))
+    _, _, body = _call(checked, "POST", "/v1/documents", EPI)
+    assert _call(checked, "GET", f"/v1/documents/{json.loads(body)['document']}")[0] == "200 OK"

@@ -163,7 +163,7 @@ def chrome_version(chrome: Path = CHROME) -> str:
 def browser_sections(divs: list[str], chrome: Path = CHROME) -> list[dict[str, Any]]:
     """What Chrome shows for each div: its text, and the facts of each text node's piece."""
     payload = json.dumps(divs).replace("<", "\\u003c")
-    with tempfile.TemporaryDirectory() as folder:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:
         page = Path(folder) / "page.html"
         page.write_text(PAGE.format(divs=payload), "utf-8")
         # Chrome writes the page as soon as it has run, then stays open (its extensions and
@@ -233,7 +233,9 @@ def _kinds(facts: dict[str, Any]) -> frozenset[str]:
         kinds.add("border")
     if facts["strike"]:
         kinds.add("strike")
-    shift = facts["shift"]
+    # Lengths come back in CSS pixels (1pt is 1.333...px): rounded to a thousandth of a point,
+    # a one-point shift is one point, not 0.99999.
+    shift = round(facts["shift"], 3)
     if "super" in facts["align"] or shift <= -epi._SHIFT_MARK_POINTS:
         kinds.add("superscript")
     if "sub" in facts["align"] or shift >= epi._SHIFT_MARK_POINTS:
@@ -244,11 +246,13 @@ def _kinds(facts: dict[str, Any]) -> frozenset[str]:
         kinds.add(f"shading-{background}")
     text = epi._rgb(colour, (0, 0, 0)) if colour else None
     under = epi._rgb(background, (0xFF, 0xFF, 0xFF))
-    size = float(facts["size"].removesuffix("px")) * 0.75
-    if text is None or epi._contrast(text, under) < epi._FAINT_CONTRAST or size < 2:
+    size = round(float(facts["size"].removesuffix("px")) * 0.75, 3)
+    if text is None or epi._contrast(text, under) < epi._FAINT_CONTRAST:
         kinds.add("faint")
     elif colour is not None and colour != "#000000" and not epi._dark(colour):
         kinds.add(f"color-{colour}")
+    if size < 2:
+        kinds.add("faint")
     return frozenset(kinds)
 
 
@@ -434,7 +438,7 @@ def browser_markers(divs: list[str], chrome: Path = CHROME) -> list[list[str]]:
     announces), so it is the marker drawn, not one worked out here.
     """
     payload = json.dumps(divs).replace("<", "\\u003c")
-    with tempfile.TemporaryDirectory() as folder:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:
         page = Path(folder) / "markers.html"
         page.write_text(_MARKERS_PAGE.format(divs=payload), "utf-8")
         tools = _DevTools(chrome, folder)

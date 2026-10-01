@@ -52,31 +52,43 @@ def service_main(argv: list[str] | None = None) -> int:
     for command in (serving,):
         command.add_argument(
             "--browser",
-            choices=("auto", "on", "off"),
+            choices=("auto", "on", "require", "off"),
             default="auto",
-            help="hold every ePI to Chrome: where installed (auto), always (on), never (off)",
+            help=(
+                "hold every ePI to Chrome: where installed (auto), always (on), always and serve "
+                "no read Chrome has not checked (require), never (off)"
+            ),
         )
     ingesting = commands.add_parser("ingest", help="ingest files; print one receipt each")
     ingesting.add_argument("--store", type=Path, required=True)
-    ingesting.add_argument("--browser", choices=("auto", "on", "off"), default="auto")
+    ingesting.add_argument("--browser", choices=("auto", "on", "require", "off"), default="auto")
     for command in (serving, ingesting):
         command.add_argument(
             "--word",
-            choices=("auto", "on", "off"),
+            choices=("auto", "on", "require", "off"),
             default="off",
-            help="hold every .docx to Microsoft Word (macOS; about a minute a document)",
+            help=(
+                "hold every .docx to Microsoft Word (macOS; about a minute a document); "
+                "require: serve no read Word has not checked"
+            ),
         )
     ingesting.add_argument("files", type=Path, nargs="+")
     verifying = commands.add_parser("verify", help="read every kept document again and compare")
     verifying.add_argument("--store", type=Path, required=True)
     args = parser.parse_args(argv)
     if args.command == "serve":
+        required = frozenset(
+            kind
+            for kind, choice in (("epi", args.browser), ("docx", args.word))
+            if choice == "require"
+        )
         serve(
             args.store,
             args.host,
             args.port,
             browser_verifier(args.browser),
             word_verifier(args.word),
+            required,
         )
         return 0
     check_environment()

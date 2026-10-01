@@ -81,8 +81,11 @@ def _error(status: str, message: str) -> tuple[str, str, bytes]:
 class Service:
     """The WSGI application over a store."""
 
-    def __init__(self, store: Store) -> None:
+    def __init__(self, store: Store, require: frozenset[str] = frozenset()) -> None:
         self.store = store
+        # The kinds of document ("epi", "docx") whose reads are served only once their
+        # application (Chrome, Word) has checked them and agrees.
+        self.require = require
 
     def __call__(self, environ: Environ, start_response: StartResponse) -> Iterable[bytes]:
         """Answer one request."""
@@ -135,6 +138,20 @@ class Service:
                     "verification": disagreement,
                 }
                 return "409 Conflict", JSON, canonical(message), []
+            reading = documents.kind(self.store.source(document) or b"")
+            if reading.name in self.require and "refusal" not in json.loads(body):
+                agreed = [
+                    v
+                    for v in self.store.verifications(document)
+                    if isinstance(v, dict) and not v["differs"]
+                ]
+                if not agreed:
+                    # Strict: a read no application has checked is not served.
+                    application = "Chrome" if reading is documents.EPI else "Microsoft Word"
+                    message = {
+                        "error": f"not yet checked by {application}, which this service requires"
+                    }
+                    return "409 Conflict", JSON, canonical(message), []
             return "200 OK", JSON, body, []
         return "200 OK", FHIR_JSON if documents.kind(body) is documents.EPI else DOCX, body, []
 
@@ -171,23 +188,29 @@ class _QuietHandler(WSGIRequestHandler):
 
 
 def browser_verifier(choice: str) -> Verifier | None:
-    """The browser to hold ePIs to: Chrome where installed (``auto``), or none (``off``)."""
+    """The browser to hold ePIs to, by the ``--browser`` choice.
+
+    Chrome where installed (``auto``), always (``on`` and ``require``), or none (``off``).
+    """
     if choice == "off":
         return None
     chrome = browser.find_chrome()
     if chrome is None:
-        if choice == "on":
+        if choice in ("on", "require"):
             raise SystemExit("label-docx: --browser on, but Chrome is not installed")
         return None
     return lambda data, result: browser.verify_epi(data, result, chrome)
 
 
 def word_verifier(choice: str) -> Verifier | None:
-    """Word to hold .docx reads to: where installed (``auto``), always (``on``), never (``off``)."""
+    """Word to hold .docx reads to, by the ``--word`` choice.
+
+    Where installed (``auto``), always (``on``, ``require``), never (``off``).
+    """
     if choice == "off":
         return None
     if word.find_word() is None:
-        if choice == "on":
+        if choice in ("on", "require"):
             raise SystemExit("label-docx: --word on, but Microsoft Word is not installed")
         return None
     return word.verify_docx
@@ -199,10 +222,11 @@ def serve(
     port: int = 8080,
     verifier: Verifier | None = None,
     word_check: Verifier | None = None,
+    require: frozenset[str] = frozenset(),
 ) -> None:
     """Serve the store at ``root`` until interrupted."""
     check_environment()
-    service = Service(Store(root, browser=verifier, word=word_check))
+    service = Service(Store(root, browser=verifier, word=word_check), require)
     with make_server(
         host, port, service, server_class=_ThreadingServer, handler_class=_QuietHandler
     ) as server:

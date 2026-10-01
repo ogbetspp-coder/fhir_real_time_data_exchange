@@ -139,8 +139,11 @@ from label_docx.reader import Mark, Numbering, Paragraph
 
 # The version of the rules above. A change to this file changes its hash in versions.lock.json,
 # and tests/test_versions_lock.py then requires a new version here.
-# 1.1.0 draws list markers as the browser does.
-READER_VERSION = "epi-reader/1.1.0"
+# 1.1.0 draws list markers as the browser does; 1.2.0 lets an element's own style replace its
+# default lines (a sup styled sub is lowered only), sizes text by the cascade (faint under 2pt),
+# and draws a link styled inherit or currentcolor in the colour around it: each found by
+# generated sections held to Chrome (scripts/fuzz_epi.py).
+READER_VERSION = "epi-reader/1.2.0"
 XHTML = "http://www.w3.org/1999/xhtml"
 OBJECT = "\ufffc"
 _COLLAPSIBLE = " \t\n\r\f"
@@ -693,19 +696,12 @@ def _style(style: str) -> set[str]:
             points = _points(value)
             if points is None:
                 raise _RefusedError("unsupported-style", f"font-size: {value}")
-            if points < 2:
-                kinds.add("faint")
         elif name == "vertical-align":
-            if value in ("super", "sub"):
-                kinds.add("superscript" if value == "super" else "subscript")
-            elif value not in ("top", "middle", "bottom", "baseline"):
+            # Marked by the element's own value (``_own_lines``), which a later one replaces.
+            if value not in ("super", "sub", "top", "middle", "bottom", "baseline"):
                 raise _RefusedError("unsupported-style", f"vertical-align: {value}")
         elif name == "text-decoration":
             words = set(value.split())
-            if "line-through" in words:
-                kinds.add("strike")
-            if "underline" in words:
-                kinds.add("underline")
             if words - {"underline", "none", "line-through", "solid"}:
                 raise _RefusedError("unsupported-style", f"text-decoration: {value}")
         else:
@@ -881,11 +877,21 @@ def _font(style: str, builder: _Builder, name: str) -> None:
     declarations = [("font-weight", _DEFAULT_WEIGHT[name])] if name in _DEFAULT_WEIGHT else []
     if name in _DEFAULT_ITALIC:
         declarations.append(("font-style", "italic"))
+    if name in ("sup", "sub"):
+        # The browser's style sheet: font-size: smaller, the parent's size over 1.2.
+        builder.size = builder.size / 1.2
     declarations += [
-        (n, v) for n, v in _importance_ordered(style) if n in ("font-weight", "font-style")
+        (n, v)
+        for n, v in _importance_ordered(style)
+        if n in ("font-weight", "font-style", "font-size")
     ]
     for property_name, value in declarations:
-        if property_name == "font-weight":
+        if property_name == "font-size":
+            points = _points(value)
+            if points is None:  # pragma: no cover - refused by _style first
+                raise _RefusedError("unsupported-style", f"font-size: {value}")
+            builder.size = points
+        elif property_name == "font-weight":
             if value == "normal":
                 builder.weight = 400
             elif value == "bold":
@@ -905,14 +911,22 @@ def _font(style: str, builder: _Builder, name: str) -> None:
 
 
 def _font_kinds(builder: _Builder) -> set[str]:
-    """Bold where the weight is drawn bold, italic where the text slants."""
+    """Bold where the weight is drawn bold, italic where the text slants, faint where tiny.
+
+    A size under two points is faint whatever its colour (and keeps its colour mark).
+    """
     kinds = {"bold"} if builder.weight >= _BOLD_WEIGHT else set()
+    if builder.size < _TINY_POINTS:
+        kinds.add("faint")
     return kinds | {"italic"} if builder.italic else kinds
+
+
+_TINY_POINTS: Final = 2.0
 
 
 # --- paragraphs -----------------------------------------------------------------------------
 
-_PaintState = tuple[str | None, str | None, bool, bool, bool, int, bool]
+_PaintState = tuple[str | None, str | None, bool, bool, bool, int, bool, float]
 
 
 @dataclass
@@ -956,6 +970,8 @@ class _Builder:
     # The text's font weight and whether it is italic, as a browser computes them.
     weight: int = 400
     italic: bool = False
+    # The text's size in points, as a browser computes it (16px, 12pt, by default).
+    size: float = 12.0
 
     def paint_state(self) -> _PaintState:
         """What an element's colour, background, shift and font set, to restore after it."""
@@ -967,6 +983,7 @@ class _Builder:
             self.raised,
             self.weight,
             self.italic,
+            self.size,
         )
 
     def restore_paint(self, state: _PaintState) -> None:
@@ -978,6 +995,7 @@ class _Builder:
             self.raised,
             self.weight,
             self.italic,
+            self.size,
         ) = state
 
     def text(self, text: str, marks: frozenset[str]) -> None:
@@ -1301,23 +1319,22 @@ def _walk_element(
     inherited = {
         k
         for k in marks
-        if k not in (_FAINT_COLOUR, "bold", "italic") and not k.startswith(("color-", "shading-"))
+        if k not in (_FAINT_COLOUR, "faint", "bold", "italic")
+        and not k.startswith(("color-", "shading-"))
     }
     kinds = inherited | _check_attributes(element, name)
+    around = builder.colour
     if name == "a" and element.get("href") is not None:
         # A browser draws a link in its link colour (blue) unless the link's own style says
         # otherwise; the colour of the text around it is not inherited.
         builder.colour = _LINK_COLOUR
     _paint_element(element.get("style", ""), builder, name)
+    declared_colour = dict(_importance_ordered(element.get("style", ""))).get("color")
+    if declared_colour in ("inherit", "currentcolor"):
+        # For the colour itself both mean the colour of the text around it, link or not.
+        builder.colour = around
     kinds |= _colour_kinds(builder) | _font_kinds(builder)
-    if name == "sup":
-        kinds.add("superscript")
-    elif name == "sub":
-        kinds.add("subscript")
-    elif name in ("s", "strike"):
-        kinds.add("strike")
-    elif name == "u" or (name == "a" and element.get("href") is not None):
-        kinds.add("underline")
+    kinds |= _own_lines(name, element)
     if name in _INLINE:
         kinds |= _inline_borders(element.get("style", ""))
     here = frozenset(kinds)
@@ -1448,6 +1465,40 @@ def _ordinal(number: int, fmt: str) -> str:
     return str(number)
 
 
+# What an element draws by the browser's default style sheet, before its own style: a raised or
+# lowered line, and a decoration line.
+_DEFAULT_ALIGN: Final = {"sup": "super", "sub": "sub"}
+
+
+def _own_lines(name: str, element: ET.Element) -> set[str]:
+    """The superscript, subscript, underline and strike an element draws itself.
+
+    Its own ``vertical-align`` and ``text-decoration`` (the last declared, ``!important`` last)
+    replace what the browser's style sheet gives the element (``sup`` raised, ``sub`` lowered,
+    ``u`` and a link underlined, ``s`` and ``strike`` struck): a ``sup`` styled
+    ``vertical-align: sub`` is lowered only, a ``u`` styled ``line-through`` struck only.
+    Decorations then reach everything inside (``inherited``), which cannot take them away;
+    ``vertical-align`` raises inline text only.
+    """
+    declared = dict(_importance_ordered(element.get("style", "")))
+    kinds: set[str] = set()
+    align = declared.get("vertical-align", _DEFAULT_ALIGN.get(name, "baseline"))
+    if name in _INLINE and align in ("super", "sub"):
+        kinds.add("superscript" if align == "super" else "subscript")
+    if name == "u" or (name == "a" and element.get("href") is not None):
+        default = "underline"
+    elif name in ("s", "strike"):
+        default = "line-through"
+    else:
+        default = "none"
+    words = set(declared.get("text-decoration", default).split())
+    if "underline" in words:
+        kinds.add("underline")
+    if "line-through" in words:
+        kinds.add("strike")
+    return kinds
+
+
 def _table(element: ET.Element, builder: _Builder, marks: frozenset[str], depth: int) -> None:
     # A row group and a row stand between the table and each cell: they count toward the bound.
     builder.nesting += 2
@@ -1478,7 +1529,11 @@ def _table_rows(element: ET.Element, builder: _Builder, marks: frozenset[str], d
             # A browser draws a table's first header group at the top, wherever it is written.
             raise _RefusedError("unsupported-element", "thead after the table's body")
         body_seen = body_seen or part_name != "thead"
-        part_marks = _check_attributes(part, part_name) if part_name != "tr" else set()
+        part_marks = (
+            _check_attributes(part, part_name) | _own_lines(part_name, part)
+            if part_name != "tr"
+            else set()
+        )
         _, own = _left_offsets(part.get("style", ""))
         part_indent = own if own is not None else builder.indent
         # A row group's and a row's colour and background reach their cells' text.
@@ -1489,7 +1544,9 @@ def _table_rows(element: ET.Element, builder: _Builder, marks: frozenset[str], d
         for row in rows:
             if _local(row) != "tr":
                 raise _RefusedError("unsupported-element", f"{_local(row)} in a table body")
-            row_marks = frozenset(set(marks) | part_marks | _check_attributes(row, "tr"))
+            row_marks = frozenset(
+                set(marks) | part_marks | _check_attributes(row, "tr") | _own_lines("tr", row)
+            )
             builder.restore_paint(part_paint)
             _paint_element(row.get("style", ""), builder, "tr")
             _, own = _left_offsets(row.get("style", "") if row is not part else "")

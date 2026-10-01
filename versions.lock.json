@@ -7,7 +7,8 @@
   },
   "epi-reader": {
     "epi-reader/1.0.0": "ff99976f4c23101d29b0c038837222bc0cfc0139831fffcbca63d6e045c7e25b",
-    "epi-reader/1.1.0": "f337c648a32711d25f07630df5c2a00c84b02f12337e2e5bde7649d3c88e24cc"
+    "epi-reader/1.1.0": "f337c648a32711d25f07630df5c2a00c84b02f12337e2e5bde7649d3c88e24cc",
+    "epi-reader/1.2.0": "8f8cca3a75a5adb6296944edcd4042fa77304620888a953b6b7a790d6d3a6da5"
   },
   "format": {
     "label-docx-json/1.0.0": "5f1aa016f095c2975f647d1c0e03eb547b25ae493571e21b7a171a8c86f320ab",
