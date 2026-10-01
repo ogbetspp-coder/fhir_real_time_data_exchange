@@ -9,6 +9,8 @@ from pathlib import Path
 from numbering_cases import wanted
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
+# A corpus set's own records, beside its documents.
+_MANIFESTS = {"sources", "expected", "word", "browser"}
 
 
 def test_the_numbering_cases_are_what_their_script_writes() -> None:
@@ -20,7 +22,9 @@ def test_the_numbering_cases_are_what_their_script_writes() -> None:
 def test_every_corpus_file_is_the_recorded_byte_copy() -> None:
     for sources in sorted(CORPUS.glob("*/sources.json")):
         recorded = {s["file"]: s for s in json.loads(sources.read_text("utf-8"))["sources"]}
-        present = {path.name for path in sources.parent.glob("*.docx")}
+        present = {path.name for path in sources.parent.glob("*.docx")} | {
+            path.name for path in sources.parent.glob("*.json") if path.stem not in _MANIFESTS
+        }
         assert present == set(recorded), sources.parent.name
         for name, source in recorded.items():
             data = (sources.parent / name).read_bytes()

@@ -1,7 +1,8 @@
 """The ingestion service: an HTTP API over the store, as a WSGI application.
 
     GET  /                             a page to read a document by hand (a demonstration)
-    POST /v1/documents                 the .docx bytes; answers the receipt (201 first, 200 after)
+    POST /v1/documents                 a .docx or an ePI Bundle (JSON); answers the receipt (201
+                                       first, 200 after)
     GET  /v1/documents/<id>            the reader's result (canonical JSON), read or refused
     GET  /v1/documents/<id>/source     the document's bytes as ingested
     GET  /v1/health                    the reader, format and runtime the service answers with
@@ -26,6 +27,7 @@ from pathlib import Path
 from socketserver import ThreadingMixIn
 from wsgiref.simple_server import WSGIRequestHandler, WSGIServer, make_server
 
+from label_docx import documents
 from label_docx.output import FORMAT_VERSION, canonical
 from label_docx.reader import READER_VERSION
 from label_docx.store import Store, StoreError
@@ -36,6 +38,7 @@ PYTHON = (3, 14)
 UNICODE = "16.0.0"
 JSON = "application/json"
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+FHIR_JSON = "application/fhir+json"
 
 type StartResponse = Callable[[str, list[tuple[str, str]]], object]
 type Environ = dict[str, object]
@@ -60,6 +63,10 @@ def health() -> bytes:
             "format": FORMAT_VERSION,
             "python": f"{PYTHON[0]}.{PYTHON[1]}",
             "reader": READER_VERSION,
+            "readers": {
+                k.name: {"format": k.format, "reader": k.reader}
+                for k in (documents.DOCX, documents.EPI)
+            },
             "unicode": UNICODE,
         }
     )
@@ -111,7 +118,9 @@ class Service:
         body = self.store.source(document) if source else self.store.result(document)
         if body is None:
             return (*_error("404 Not Found", f"no document {document}"), [])
-        return "200 OK", DOCX if source else JSON, body, []
+        if not source:
+            return "200 OK", JSON, body, []
+        return "200 OK", FHIR_JSON if documents.kind(body) is documents.EPI else DOCX, body, []
 
     def _ingest(self, environ: Environ) -> tuple[str, str, bytes, list[tuple[str, str]]]:
         length = str(environ.get("CONTENT_LENGTH") or "")

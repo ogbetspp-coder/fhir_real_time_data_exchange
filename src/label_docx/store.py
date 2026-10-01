@@ -2,7 +2,8 @@
 
 A document is named by the SHA-256 of its bytes. Its bytes are kept once, and the reader's
 result (canonical JSON, read or refused) is kept once per reader and format version, beside the
-results of every earlier version, which are never touched. Ingesting the same bytes again finds
+results of every earlier version, which are never touched. The reader is the .docx reader, or
+the ePI reader for JSON (``documents.kind``). Ingesting the same bytes again finds
 what is there and returns it byte for byte; nothing is computed twice under the same versions,
 and nothing stored is ever replaced.
 
@@ -29,8 +30,8 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from label_docx.output import FORMAT_VERSION, Json, canonical, read
-from label_docx.reader import READER_VERSION
+from label_docx.documents import Kind, kind
+from label_docx.output import Json, canonical
 
 _ID = re.compile(r"[0-9a-f]{64}")
 
@@ -93,27 +94,28 @@ class Store:
             raise KeyError(document)
         return self.root / "documents" / document[:2] / document
 
-    def _result_path(self, document: str) -> Path:
-        reader, fmt = _version(READER_VERSION), _version(FORMAT_VERSION)
+    def _result_path(self, document: str, reading: Kind) -> Path:
+        reader, fmt = _version(reading.reader), _version(reading.format)
         return self._folder(document) / reader / fmt / "result.json"
 
     def ingest(self, data: bytes) -> Ingested:
         """Keep ``data`` and the reader's result for it, or find them kept already."""
         document = hashlib.sha256(data).hexdigest()
         created = _write_once(self._folder(document) / "source", data)
-        path = self._result_path(document)
+        reading = kind(data)
+        path = self._result_path(document, reading)
         if path.exists() and path.with_name("receipt.json").exists():
-            result = self._checked(document, path)
+            result = self._checked(document, path, reading)
         elif path.exists():
             # Kept without its receipt (the store stopped between the two): read the source
             # again, and receipt the kept result only if it is what the reader makes of it.
-            result, _ = read(data)
+            result, _ = reading.read(data)
             _same(path, result)
         else:
-            result, _ = read(data)
+            result, _ = reading.read(data)
             created = _write_once(path, result) or created
         value = json.loads(result)
-        receipt = _receipt(document, result, value)
+        receipt = _receipt(document, result, value, reading)
         created = _write_once(path.with_name("receipt.json"), receipt) or created
         return Ingested(document, receipt, result, "refusal" not in value, created)
 
@@ -127,18 +129,22 @@ class Store:
         if source is None:
             raise KeyError(document)
         kept = self.result(document)
-        if kept is not None and kept != read(source)[0]:
+        if kept is not None and kept != kind(source).read(source)[0]:
             raise StoreError(f"the kept result for {document} is not what the reader makes of it")
 
     def result(self, document: str) -> bytes | None:
         """The current reader's result for a kept document, or None if there is none."""
-        path = self._result_path(document)
+        source = self.source(document)
+        if source is None:
+            return None
+        reading = kind(source)
+        path = self._result_path(document, reading)
         # A result is served only with its receipt; one without is ingested again first.
         if not path.with_name("receipt.json").exists():
             return None
-        return self._checked(document, path)
+        return self._checked(document, path, reading)
 
-    def _checked(self, document: str, path: Path) -> bytes:
+    def _checked(self, document: str, path: Path, reading: Kind) -> bytes:
         result = path.read_bytes()
         recorded = json.loads(path.with_name("receipt.json").read_bytes())["result"]["sha256"]
         if hashlib.sha256(result).hexdigest() != recorded:
@@ -147,8 +153,8 @@ class Store:
         # The result names the source it was read from and the versions that read it.
         if (
             value.get("source", {}).get("sha256") != document
-            or value.get("reader") != READER_VERSION
-            or value.get("format") != FORMAT_VERSION
+            or value.get("reader") != reading.reader
+            or value.get("format") != reading.format
             or canonical(value) != result
         ):
             raise StoreError(f"{path} is not this reader's result for {document}")
@@ -165,13 +171,20 @@ class Store:
         return data
 
 
-def _receipt(document: str, result: bytes, value: dict[str, Json]) -> bytes:
-    """What ingesting a document answers: the same bytes every time for the same document."""
+def _receipt(document: str, result: bytes, value: dict[str, Json], reading: Kind) -> bytes:
+    """What ingesting a document answers: the same bytes every time for the same document.
+
+    The outcome is ``read``, ``refused``, or for an ePI with sections the reader refused,
+    ``read-in-part``: those sections hold no text, and their refusals say why.
+    """
+    outcome = "refused" if "refusal" in value else "read"
+    if value.get("refusedSections"):
+        outcome = "read-in-part"
     receipt: dict[str, Json] = {
         "document": document,
-        "format": FORMAT_VERSION,
-        "outcome": "refused" if "refusal" in value else "read",
-        "reader": READER_VERSION,
+        "format": reading.format,
+        "outcome": outcome,
+        "reader": reading.reader,
         "result": {"bytes": len(result), "sha256": hashlib.sha256(result).hexdigest()},
     }
     if "refusal" in value:

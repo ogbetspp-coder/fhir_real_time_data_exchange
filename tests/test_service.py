@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import io
 import json
@@ -14,7 +15,7 @@ from wsgiref.simple_server import WSGIServer, make_server
 
 import pytest
 
-from label_docx import output, store
+from label_docx import documents, epi_output, output
 from label_docx.cli import service_main
 from label_docx.output import canonical, read
 from label_docx.service import Service, check_environment, health
@@ -130,7 +131,9 @@ def test_a_new_reader_version_adds_its_result_and_leaves_the_old_one(
     kept = Store(tmp_path)
     old = kept.ingest(TEMPLATE)
     _, old_path = _paths(tmp_path, old.document)
-    monkeypatch.setattr(store, "READER_VERSION", "docx-reader/99.0.0")
+    monkeypatch.setattr(
+        documents, "DOCX", dataclasses.replace(documents.DOCX, reader="docx-reader/99.0.0")
+    )
     monkeypatch.setattr(output, "READER_VERSION", "docx-reader/99.0.0")
     new = kept.ingest(TEMPLATE)
     assert new.created
@@ -273,3 +276,57 @@ def test_the_demonstration_page_is_served(tmp_path: Path) -> None:
     assert headers["Content-Type"].startswith("text/html")
     assert b"/v1/documents" in page
     assert _call(Service(Store(tmp_path)), "POST", "/", b"x")[0].startswith("405")
+
+
+EPI = (CORPUS / "ema-epi" / "jentadueto-smpc-en.json").read_bytes()
+EPI_IN_PART = (CORPUS / "ema-epi" / "brukinsa-smpc-en.json").read_bytes()
+
+
+def test_an_epi_is_read_by_the_epi_reader_and_kept_like_a_docx(tmp_path: Path) -> None:
+    kept = Store(tmp_path)
+    first = kept.ingest(EPI)
+    again = Store(tmp_path).ingest(EPI)
+    assert (first.created, again.created) == (True, False)
+    assert first.receipt == again.receipt
+    assert first.result == epi_output.read(EPI)[0]
+    receipt = json.loads(first.receipt)
+    assert (receipt["reader"], receipt["format"], receipt["outcome"]) == (
+        documents.EPI.reader,
+        documents.EPI.format,
+        "read",
+    )
+    kept.verify(first.document)
+    assert kept.result(first.document) == first.result
+
+
+def test_an_epi_with_a_refused_section_is_read_in_part(tmp_path: Path) -> None:
+    receipt = json.loads(Store(tmp_path).ingest(EPI_IN_PART).receipt)
+    assert receipt["outcome"] == "read-in-part"
+    result = json.loads(Store(tmp_path).result(receipt["document"]) or b"")
+    assert result["refusedSections"] == 1
+
+
+def test_the_reader_is_chosen_from_the_bytes_alone() -> None:
+    assert documents.kind(EPI) is documents.EPI
+    assert documents.kind(b" \r\n\t{}") is documents.EPI
+    assert documents.kind(TEMPLATE) is documents.DOCX
+    assert documents.kind(b"\xef\xbb\xbf{}") is documents.DOCX
+    assert json.loads(documents.kind(b"[]").read(b"[]")[0])["refusal"]["code"] == (
+        "invalid-package"
+    )
+
+
+def test_an_epi_over_http_names_its_reader_and_its_source_type(tmp_path: Path) -> None:
+    service = Service(Store(tmp_path))
+    status, _, body = _call(service, "POST", "/v1/documents", EPI)
+    assert status == "201 Created"
+    document = json.loads(body)["document"]
+    _, headers, source = _call(service, "GET", f"/v1/documents/{document}/source")
+    assert (source, headers["Content-Type"]) == (EPI, "application/fhir+json")
+    _, _, docx_body = _call(service, "POST", "/v1/documents", TEMPLATE)
+    _, headers, _ = _call(
+        service, "GET", f"/v1/documents/{json.loads(docx_body)['document']}/source"
+    )
+    assert headers["Content-Type"].endswith("wordprocessingml.document")
+    readers = json.loads(health())["readers"]
+    assert readers["epi"] == {"format": documents.EPI.format, "reader": documents.EPI.reader}

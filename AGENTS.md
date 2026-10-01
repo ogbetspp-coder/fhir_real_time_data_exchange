@@ -16,13 +16,16 @@ refuse. Every rule below serves that.
   drawn starts with a case in `scripts/numbering_cases.py` and Word's answer to it
   (`scripts/word_oracle.py record corpus/numbering-cases`, macOS with Word). Where Word's answer
   is not on record, refuse.
+- **ePI follows the browser.** A change to how an ePI section is read is held to headless
+  Chrome (`scripts/browser_oracle.py record corpus/ema-epi`); where the browser's answer is not
+  on record, refuse the section.
 - **Trace every test.** `docs/requirements.md` names, for each requirement, the tests that prove
   it; a new test goes there, and `tests/test_traceability.py` fails on a test that proves nothing
   or a requirement that names a test that is gone.
 - **Version every change.** Changing `src/label_docx/reader.py` means bumping `READER_VERSION`;
-  changing `src/label_docx/output.py` means bumping `FORMAT_VERSION`. Then run
-  `scripts/lock.py` and review the diff of `corpus/*/expected.json`. Never re-lock a version to
-  other code.
+  changing `src/label_docx/output.py` means bumping `FORMAT_VERSION`; the same for `epi.py`
+  and `epi_output.py`. Then run `scripts/lock.py` and review the diff of
+  `corpus/*/expected.json`. Never re-lock a version to other code.
 - **Public or synthetic documents only** in `corpus/` and in tests, each set with a
   `sources.json`. No client or confidential labels in the repository.
 - **Tests never print label text.** A failure names a file, a code or a digest.

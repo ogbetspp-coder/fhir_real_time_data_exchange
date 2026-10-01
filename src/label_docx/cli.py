@@ -1,4 +1,4 @@
-"""``label-docx FILE``: read a .docx and write its canonical JSON.
+"""``label-docx FILE``: read a .docx (or an ePI Bundle, JSON) and write its canonical JSON.
 
 Exit status 0 when the document was read, 2 when it was refused (the JSON names the code and the
 detail), 1 when the file could not be opened. The output is written to ``--output`` or to
@@ -12,7 +12,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from label_docx.output import read
+from label_docx.documents import kind
 from label_docx.service import check_environment, serve
 from label_docx.store import Store, StoreError
 
@@ -30,7 +30,7 @@ def main(argv: list[str] | None = None) -> int:
     except OSError as error:
         sys.stderr.write(f"label-docx: cannot read {args.file}: {error.strerror}\n")
         return 1
-    result, ok = read(data)
+    result, ok = kind(data).read(data)
     if args.output is None:
         sys.stdout.buffer.write(result)
         sys.stdout.buffer.flush()

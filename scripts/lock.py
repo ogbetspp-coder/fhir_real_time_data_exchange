@@ -9,8 +9,10 @@ locked to other code; ``tests/test_locks.py`` refuses that until the version is 
 already in the lock is never re-locked to other code: bump it instead.
 
 ``corpus/*/expected.json`` records, for every .docx in the corpus, its SHA-256 and the SHA-256 of
-its canonical paragraphs (or its refusal code). A change to what the reader produces for any of
-them fails the tests until this script is run and the change reviewed in the diff.
+its canonical paragraphs (or its refusal code), and for every ePI its SHA-256, the SHA-256 of its
+canonical sections and how many sections the reader refused (or the document's refusal code).
+A change to what the reader produces for any of them fails the tests until this script is run
+and the change reviewed in the diff.
 """
 
 from __future__ import annotations
@@ -21,7 +23,8 @@ import json
 import sys
 from pathlib import Path
 
-from label_docx import output, reader
+from label_docx import documents, epi, epi_output, output, reader
+from label_docx.epi import EpiRefusedError, read_epi
 from label_docx.output import FORMAT_VERSION, canonical
 from label_docx.reader import READER_VERSION, DocxRefusedError, read_docx
 
@@ -32,8 +35,8 @@ CORPUS = ROOT / "corpus"
 type Lock = dict[str, dict[str, str]]
 
 
-def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+def _sha256(*paths: Path) -> str:
+    return hashlib.sha256(b"".join(path.read_bytes() for path in paths)).hexdigest()
 
 
 def current_versions() -> dict[str, tuple[str, str]]:
@@ -41,6 +44,13 @@ def current_versions() -> dict[str, tuple[str, str]]:
     return {
         "reader": (READER_VERSION, _sha256(Path(reader.__file__))),
         "format": (FORMAT_VERSION, _sha256(Path(output.__file__))),
+        "epi-reader": (epi.READER_VERSION, _sha256(Path(epi.__file__))),
+        # The ePI format is written by epi_output with output's paragraphs, for the documents
+        # documents.kind sends it.
+        "epi-format": (
+            epi_output.FORMAT_VERSION,
+            _sha256(*(Path(str(m.__file__)) for m in (epi_output, output, documents))),
+        ),
     }
 
 
@@ -55,9 +65,27 @@ def locked_versions(lock: Lock) -> Lock:
     return out
 
 
+# A corpus set's own records, beside its documents.
+MANIFESTS = {"sources", "expected", "word", "browser"}
+
+
 def expected(folder: Path) -> dict[str, dict[str, str]]:
-    """What the reader produces for every .docx in ``folder``."""
+    """What the readers produce for every .docx and every ePI (.json) in ``folder``."""
     out: dict[str, dict[str, str]] = {}
+    for path in sorted(folder.glob("*.json")):
+        if path.stem in MANIFESTS:
+            continue
+        data = path.read_bytes()
+        entry = {"sha256": hashlib.sha256(data).hexdigest()}
+        try:
+            document = read_epi(data)
+            body = canonical([epi_output.section(s) for s in document.sections])
+            entry["sectionsSha256"] = hashlib.sha256(body).hexdigest()
+            refused = sum(1 for s in epi.walk(document.sections) if s.refusal)
+            entry["refusedSections"] = str(refused)
+        except EpiRefusedError as refused_document:
+            entry["refusal"] = refused_document.code
+        out[path.name] = entry
     for path in sorted(folder.glob("*.docx")):
         data = path.read_bytes()
         entry = {"sha256": hashlib.sha256(data).hexdigest()}

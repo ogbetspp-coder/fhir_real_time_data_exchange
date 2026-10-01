@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from label_docx import epi, epi_output
 from label_docx.cli import main
 from label_docx.output import FORMAT_VERSION, Json, canonical, read
 from label_docx.reader import READER_VERSION
@@ -98,3 +99,18 @@ def test_footnotes_are_written_with_their_marks_and_paragraphs() -> None:
     echo = footnote["paragraphs"][0]["notes"][0]
     assert (echo["offset"], echo["mark"]) == (0, "1")
     assert value["endnotes"] == []
+
+
+def test_an_epi_result_is_canonical_and_names_its_source_and_versions() -> None:
+    data = (TEMPLATE.parents[1] / "ema-epi" / "jentadueto-smpc-en.json").read_bytes()
+    result, ok = epi_output.read(data)
+    value = json.loads(result)
+    assert ok
+    assert canonical(value) == result
+    assert value["source"] == {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+    assert (value["reader"], value["format"]) == (epi.READER_VERSION, epi_output.FORMAT_VERSION)
+    first = value["sections"][0]
+    assert set(first) == {"code", "notes", "paragraphs", "refusal", "sections", "title"}
+    refused, ok = epi_output.read(b"{}")
+    assert not ok
+    assert json.loads(refused)["refusal"]["code"] == "invalid-bundle"

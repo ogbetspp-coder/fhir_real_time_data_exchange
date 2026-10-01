@@ -1,4 +1,10 @@
 {
+  "epi-format": {
+    "label-epi-json/1.0.0": "04a1a22d95b7570feebe380292650de5983c44f4e6da7d0616d234ca68a891f6"
+  },
+  "epi-reader": {
+    "epi-reader/1.0.0": "ff99976f4c23101d29b0c038837222bc0cfc0139831fffcbca63d6e045c7e25b"
+  },
   "format": {
     "label-docx-json/1.0.0": "5f1aa016f095c2975f647d1c0e03eb547b25ae493571e21b7a171a8c86f320ab",
     "label-docx-json/1.1.0": "7d2945eed4cd74998fd4bc9346787a1152d1b846fc351db4bcaec979d8643d28",

@@ -31,6 +31,10 @@ normalises, trims or repairs.
   across processes, hash seeds and locales, and however the .docx is zipped.
 - **No runtime dependencies.** The standard library only (`zipfile`, `xml.etree`).
 
+It also reads **EMA electronic product information (ePI)**, the FHIR document Bundles the EMA
+publishes as JSON: the text a browser shows for each section, or that section refused with the
+reason (see [EMA ePI](#ema-epi) below).
+
 ## Use
 
 ```bash
@@ -92,10 +96,10 @@ uv run label-docx-service verify --store /path/to/store            # audit every
 
 | Request                              | Answer                                                  |
 | ------------------------------------ | ------------------------------------------------------- |
-| `POST /v1/documents` (the .docx)     | the receipt: 201 the first time, 200 after, same bytes  |
+| `POST /v1/documents` (.docx or ePI)  | the receipt: 201 the first time, 200 after, same bytes  |
 | `GET /v1/documents/<sha256>`         | the reader's result: read, or refused with the reason   |
 | `GET /v1/documents/<sha256>/source`  | the document's bytes as ingested                        |
-| `GET /v1/health`                     | the reader, format, Python and Unicode versions         |
+| `GET /v1/health`                     | the readers, formats, Python and Unicode versions       |
 
 What it guarantees:
 
@@ -142,6 +146,31 @@ Recorded with Microsoft Word 16.113.3 for macOS, over every corpus set: the read
 Word on every list label of every document it reads, and each document it refuses is listed in
 the test with its reason (footnotes, EMA's stray private-use character in its Spanish template,
 a numbering-style link with no link back).
+
+## EMA ePI
+
+An ePI is a FHIR document Bundle: one Composition whose sections each hold an XHTML `div`, Word
+exported to HTML with inline styles on nearly every element. `label_docx.epi` reads each
+section's div to the text a browser shows, in the same paragraphs and marks as a .docx, or refuses
+that section with a code, and the rest of the document is still read. The rules and refusals
+are the module docstring of [`src/label_docx/epi.py`](src/label_docx/epi.py).
+
+**A browser is the reference**, as Word is for a .docx. `scripts/browser_oracle.py` has headless
+Chrome parse every section as HTML, lay it out and report the text it shows and what it computed
+for each piece (weight, slant, colour, background, decorations, raised or lowered text). The
+reader must agree character for character and mark for mark, or refuse. On 2026-10-01 every
+document the EMA's public ePI API lists was checked: 108 Bundles (SmPC, package leaflet,
+labelling, Annex II; English, Swedish, Danish, Spanish, Dutch), 3,347 sections.
+
+| Outcome                                                              | Sections |
+| -------------------------------------------------------------------- | -------: |
+| Read, the text and marks the browser shows                           |    3,222 |
+| Read otherwise than the browser shows                                |        0 |
+| Refused (a Symbol font, malformed markup in EMA's data, capitals the viewer's language decides, layout that draws text over text...) | 125 |
+
+`uv run --frozen python scripts/browser_oracle.py compare FILE.json` checks any ePI and prints
+only verdicts. List numbers and bullets, which a browser draws outside the text, are not yet
+compared.
 
 ## Checking your own documents
 
@@ -207,7 +236,7 @@ downloads.
 
 ## How the claims are held
 
-`docs/requirements.md` lists the requirements (R-01 to R-17) with the tests that prove each; the
+`docs/requirements.md` lists the requirements (R-01 to R-23) with the tests that prove each; the
 table below is the short form.
 
 | Claim                                                            | Where                        |
@@ -231,6 +260,8 @@ table below is the short form.
 | A change to the reader or the format changes its version         | `tests/test_locks.py`        |
 | The corpus files are the recorded byte copies                    | `tests/test_corpus.py`       |
 | The interpreter's Unicode database is the pinned one (16.0.0)    | `tests/test_environment.py`  |
+| Each ePI rule, read as a browser shows it or refused             | `tests/test_epi.py`          |
+| Every ePI section read is what Chrome shows, text and marks      | `tests/test_browser_oracle.py` |
 
 ## Set-up and checks
 
@@ -251,10 +282,12 @@ python3.14 -m venv .uv-bootstrap
 
 ## Versions
 
-Every result names `reader` (`docx-reader/x.y.z`) and `format` (`label-docx-json/x.y.z`).
+Every result names `reader` (`docx-reader/x.y.z`, or `epi-reader/x.y.z` for an ePI) and
+`format` (`label-docx-json/x.y.z`, or `label-epi-json/x.y.z`).
 `versions.lock.json` holds the SHA-256 of the file behind each version, and
 `corpus/*/expected.json` the digest each corpus document reads to. Changing
-`src/label_docx/reader.py` or `src/label_docx/output.py` fails the tests until the version is
+`src/label_docx/reader.py`, `src/label_docx/output.py`, `src/label_docx/epi.py` or
+`src/label_docx/epi_output.py` fails the tests until the version is
 bumped and `scripts/lock.py` run; a change in what any corpus document reads to shows up as a
 diff in `expected.json` to review. A locked version is never re-locked to other code.
 
@@ -270,6 +303,8 @@ public or synthetic documents go here:
   hold: a VML picture (Estonian), smart-tag properties and a stray private-use character
   (Spanish), and Cyrillic and Greek text (Bulgarian, Greek ATMP).
 - `numbering-cases/`: synthetic, written by `scripts/numbering_cases.py`.
+- `ema-epi/`: every ePI the EMA's public API listed on 2026-10-01 (108 Bundles), with Chrome's
+  answers (`browser.json`).
 - `word-authored/`: written by Microsoft Word itself through `scripts/word_authored.py` (a table of
   contents with page numbers, and the same gone stale), so they hold exactly what Word writes.
 
