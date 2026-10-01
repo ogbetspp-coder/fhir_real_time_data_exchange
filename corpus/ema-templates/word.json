@@ -355,6 +355,24 @@
       "\uf0b7\t"
     ]
   },
-  "method": "convert numbers to text; what each list item gained",
+  "method": "list labels: convert numbers to text, what each list item gained; note marks: saved as text, what Word wrote between markers around each mark",
+  "notes": {
+    "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products-cover-page_en.docx": {
+      "body": [
+        "1"
+      ],
+      "notes": [
+        "1"
+      ]
+    },
+    "qrd-appendix-v-adverse-drug-reaction-reporting-details_en.docx": {
+      "body": [
+        "1"
+      ],
+      "notes": [
+        "1"
+      ]
+    }
+  },
   "recorded": "2026-09-30"
 }

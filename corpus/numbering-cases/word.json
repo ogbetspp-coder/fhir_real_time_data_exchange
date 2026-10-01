@@ -69,6 +69,19 @@
       "2.1.1\t",
       "2.2\t"
     ],
+    "notes-chicago.docx": [],
+    "notes-continuous.docx": [],
+    "notes-custom-mark.docx": [],
+    "notes-document-format.docx": [],
+    "notes-each-section.docx": [],
+    "notes-endnotes.docx": [],
+    "notes-in-table.docx": [],
+    "notes-mixed.docx": [],
+    "notes-section-chicago.docx": [],
+    "notes-section-format.docx": [],
+    "notes-section-rules.docx": [],
+    "notes-section-start-continuous.docx": [],
+    "notes-start-format.docx": [],
     "numbering-style-link-one-way.docx": [
       "\t",
       "Section 1\t",
@@ -162,6 +175,168 @@
       "2.\t"
     ]
   },
-  "method": "convert numbers to text; what each list item gained",
+  "method": "list labels: convert numbers to text, what each list item gained; note marks: saved as text, what Word wrote between markers around each mark",
+  "notes": {
+    "notes-chicago.docx": {
+      "body": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6"
+      ],
+      "notes": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6"
+      ]
+    },
+    "notes-continuous.docx": {
+      "body": [
+        "1",
+        "2",
+        "3"
+      ],
+      "notes": [
+        "1",
+        "2",
+        "3"
+      ]
+    },
+    "notes-custom-mark.docx": {
+      "body": [
+        "1",
+        "",
+        "2"
+      ],
+      "notes": [
+        "1",
+        "2",
+        "2"
+      ]
+    },
+    "notes-document-format.docx": {
+      "body": [
+        "1",
+        "2"
+      ],
+      "notes": [
+        "1",
+        "2"
+      ]
+    },
+    "notes-each-section.docx": {
+      "body": [
+        "1",
+        "2",
+        "1",
+        "2"
+      ],
+      "notes": [
+        "1",
+        "2",
+        "1",
+        "2"
+      ]
+    },
+    "notes-endnotes.docx": {
+      "body": [
+        "i",
+        "ii"
+      ],
+      "notes": [
+        "i",
+        "ii"
+      ]
+    },
+    "notes-in-table.docx": {
+      "body": [
+        "1",
+        "2"
+      ],
+      "notes": [
+        "1",
+        "2"
+      ]
+    },
+    "notes-mixed.docx": {
+      "body": [
+        "1",
+        "i",
+        "2"
+      ],
+      "notes": [
+        "1",
+        "2",
+        "i"
+      ]
+    },
+    "notes-section-chicago.docx": {
+      "body": [
+        "*",
+        "\u2020",
+        "\u2021",
+        "\u00a7",
+        "**",
+        "\u2020\u2020"
+      ],
+      "notes": [
+        "*",
+        "\u2020",
+        "\u2021",
+        "\u00a7",
+        "**",
+        "\u2020\u2020"
+      ]
+    },
+    "notes-section-format.docx": {
+      "body": [
+        "1",
+        "2",
+        "C"
+      ],
+      "notes": [
+        "1",
+        "2",
+        "C"
+      ]
+    },
+    "notes-section-rules.docx": {
+      "body": [
+        "v",
+        "vi"
+      ],
+      "notes": [
+        "v",
+        "vi"
+      ]
+    },
+    "notes-section-start-continuous.docx": {
+      "body": [
+        "1",
+        "2",
+        "12"
+      ],
+      "notes": [
+        "1",
+        "2",
+        "12"
+      ]
+    },
+    "notes-start-format.docx": {
+      "body": [
+        "1",
+        "2"
+      ],
+      "notes": [
+        "1",
+        "2"
+      ]
+    }
+  },
   "recorded": "2026-09-30"
 }

@@ -1,114 +1,166 @@
 {
   "ancestor-never-counted.docx": {
-    "paragraphsSha256": "a17fedb131452992cecf2c0c7a64534c405eb9120111d4ebf08ff9882f5eed52",
+    "paragraphsSha256": "59d4fcbd3a16f64f1c9a72f2df36c9baab22dde604c0eaff621cfb4c92245d4d",
     "sha256": "617e136f80bd10bd5c208c4431e43acb31bbe05864cb6a3f4e8fc54efbfb7837"
   },
   "ancestor-two-levels.docx": {
-    "paragraphsSha256": "4d69a36b6cdedce6788ca8401b722338946294ad2e6e34e6a8d81acce5024418",
+    "paragraphsSha256": "b9ec8daa1e943e2f0cbd84c7e3178120eaf9da2b6dba4bc013df431a7d345171",
     "sha256": "b9dc3744b284c81a68ab252f2050e17fcb331003cd10e5e9be8dbfa984f5d9a7"
   },
   "bullets.docx": {
-    "paragraphsSha256": "b156261b90f265f513db57aaab1c78560f113d47cf5744af89df299857df6d74",
+    "paragraphsSha256": "bb5f56651b17094ef662b58607188de0952acffbda80f3c5b8c319f1be02bc63",
     "sha256": "62a355d1e912cb232cc60eacbd917ff31642219a2e0e428a88cb0cec3071b14b"
   },
   "formats.docx": {
-    "paragraphsSha256": "4f5b521a5582f5dd1a8cb1aedf17651c6d3fc84ec2b6df40f2e6adab1f3a8389",
+    "paragraphsSha256": "6ca6579b6dcf75e9b33e7801c40a71fb70b5c2b56efda4ee74053341ff352720",
     "sha256": "494ff88e90f40d1f4216752a2f4bf44c85b6f019a6e6471e139d2f53eab325e4"
   },
   "legal.docx": {
-    "paragraphsSha256": "e8d37635c6d4ec02353d72c5dcbdbe7e965a9b42479aa9aae7811761d3113525",
+    "paragraphsSha256": "802ad4a7bc919f370b29a95be616f360219fa94e87ba8195b9d853e77ba3150f",
     "sha256": "be5983db03b9e8a1781f8b837617ba2798a07153b37cb3a6e645e30fd04b65fd"
   },
   "level-override-first.docx": {
-    "paragraphsSha256": "4b48eed8b71a37833753a974a54472ac8faead3002239a46c5e1b66d1f797970",
+    "paragraphsSha256": "e62fafbecb2e987e4ea34bae5a7ab71ff8c68c97c7731bdc4b5d0efd64356c6f",
     "sha256": "112a6938b56f6b3f93c30cd27869cc05cb0be1ca092e0de360bf8cfe5689385a"
   },
   "level-override-shared.docx": {
-    "paragraphsSha256": "196936934f61024a11e9402e29dfd156dbcdb7f001878b95270c9a66aaa2d371",
+    "paragraphsSha256": "ee2782201441f37cc4e1905bc06fb1fa25599d52599a25ab2dfa87ce2f74fefb",
     "sha256": "b886c90c0ca7f51dbf1a26cdfbf257c51fc6ca0e8f70b8de61a9e5f942d4e551"
   },
   "level-override-start.docx": {
-    "paragraphsSha256": "009d867e83876a7e9001c2f53b228cb719a2eb370982bdbfc28f893573110f6b",
+    "paragraphsSha256": "68a136363586d91de448a2220cf3960148d9ce2277c8b165a4308db21a14b3b1",
     "sha256": "46aa4382142654524821092aaf461a7f62df62cc25b7afdb6aa6eb783dc63ee3"
   },
   "level-override.docx": {
-    "paragraphsSha256": "b018e063684a0e43771f5db3b3f4ff181fdcce77fb4ee17b4218d5e34f559abb",
+    "paragraphsSha256": "b4af53a35644e103a502ef20a57eace19c3e1d38bfb95b03ca326dcfdc7fbfdf",
     "sha256": "9a345eee6dbd4ae92fca25235e2ec006f2fab5f3b82d806cc03608a188c4015e"
   },
   "missing-start.docx": {
-    "paragraphsSha256": "35292590161c1df3e33abb32b26fe78e4524163c209d284d39b0080887dc0148",
+    "paragraphsSha256": "9aeb66cab9815f0e0360834ee34301d29bf541d4fb47d308bd3e466413e5454d",
     "sha256": "f4b020efcd8da3cec4d6d41cbd3538d5b310c3e8b10ddc5e9aec12078e8a49bc"
   },
   "multilevel.docx": {
-    "paragraphsSha256": "b1759279cfd5098c169fa2c4981d42cc011dab3b6e4b8c692c6be3626e67868d",
+    "paragraphsSha256": "ecd1f43f73d5e0cb4046caab8295cfe846c748408cb65fb793a37afef40ff78d",
     "sha256": "4190a564d1cc563a180fc6db24a5fa14ddf95902e65fd51872c13cd35b6447a5"
+  },
+  "notes-chicago.docx": {
+    "paragraphsSha256": "2262c5b5b1edfbbedac84740f0f9b2cd8fe30bdaf2d33a47d1761e949c5774d8",
+    "sha256": "028d55ff20fb8ce1cef138b588cef733aede9e022e9f52c8a6c717295de3e559"
+  },
+  "notes-continuous.docx": {
+    "paragraphsSha256": "99806a8eff96f2a912343f0ae5e30210021bcafa527d3c3b18702f97f3bbd199",
+    "sha256": "cefb0cc55bb723e6a71b6857618a833487bdbd7ae8eb581dea40498f8bdcec31"
+  },
+  "notes-custom-mark.docx": {
+    "refusal": "ambiguous-numbering",
+    "sha256": "697f8f35be0c31f75da2bb0aaf446c90bda6e1c45b72c29396f8a3abd6bb4269"
+  },
+  "notes-document-format.docx": {
+    "paragraphsSha256": "444d6a5784ffdcdfd8ab2d13a3045c2d12181b0ee2dbf57d6fe471ce16faed2e",
+    "sha256": "566a66f4c2e6a2f2449017a8db77d276cf2c08f64e876923578abf3dfe6e4ecf"
+  },
+  "notes-each-section.docx": {
+    "paragraphsSha256": "b51bb0db2e7e1266fadad8d0f88982e80736379b1e8d8c014bfc4f8e8efcbb18",
+    "sha256": "5787b5db07058aa972c2872c5f4b4494d629c2111956c56321609dc94ed29403"
+  },
+  "notes-endnotes.docx": {
+    "paragraphsSha256": "2dd2d8bb5347b98fbabb3e8ae8b808d4a39a74a99ebf22dd54d7375c03a9c2e1",
+    "sha256": "222872d0fc7fb674e0aebcd40d002bc9f753197a5bfaec70ea2a0fa280180925"
+  },
+  "notes-in-table.docx": {
+    "paragraphsSha256": "960ba9bcc8fa89d0480a6481a015d61310869ee216d81e7175c5756b71fa1897",
+    "sha256": "e4d9c36963916688854f9599bb14a0cb2a70940e826747de48e793c61f9c2399"
+  },
+  "notes-mixed.docx": {
+    "paragraphsSha256": "b866505ad3253d96188fdc3fe5c6d66688da3d47bd2374eba6b0baa0d15f22d4",
+    "sha256": "267a03b96efbdb67cf1243dbd8d2349573c25772b16558f8629e9ffa2150c1ef"
+  },
+  "notes-section-chicago.docx": {
+    "paragraphsSha256": "d0e6fb187ce0d6c1bbe4fe2b3b77a965851ddcb6fae0a420605eb54272c0b54f",
+    "sha256": "3fa4c70a131538b2ae05c68ed7f2fb5827a83a4d026829ca21363f2a2d587211"
+  },
+  "notes-section-format.docx": {
+    "paragraphsSha256": "fef762125a0c7c273b08d68c67462f45e1047472dfd824be0ba666d9b6940fb6",
+    "sha256": "be84d1f0183a7217f07c1783c5979a2e367866a5398b09a5dee2e24b38b59c5a"
+  },
+  "notes-section-rules.docx": {
+    "paragraphsSha256": "8ebb1df59dca3301a73508b926741a7a201f2fd8d47d5aa5567f9cf39a8dabf2",
+    "sha256": "b9b25b7a8c607b1695508ae055c4687dfa9c47ed5625bae0dea071dbc0e62834"
+  },
+  "notes-section-start-continuous.docx": {
+    "paragraphsSha256": "401a4d518843cfeab5060bc9dc359358a649b3248ab1b6cc2a296baa1651a60f",
+    "sha256": "bd2cec4279b10b43210780c61eba89761a59dc0740c2922aadf388268a953e6d"
+  },
+  "notes-start-format.docx": {
+    "paragraphsSha256": "444d6a5784ffdcdfd8ab2d13a3045c2d12181b0ee2dbf57d6fe471ce16faed2e",
+    "sha256": "bdbbdcb5e543123b4a659e7d37ddb867ba11d426e111973d05f6f258313efc10"
   },
   "numbering-style-link-one-way.docx": {
     "refusal": "unsupported-numbering",
     "sha256": "04ef975df766eebdbff187c73fe89bde80804c79438ffc6bf8986b236b3644ac"
   },
   "numbering-style-link.docx": {
-    "paragraphsSha256": "e749c7bd17b7142f7b6b0eed10ad1e9906a686f717abc0f8d2e8c2a0eb0dd7b1",
+    "paragraphsSha256": "f4a2e95bdec1976ec404fad29dbaaa35fe4a6f7137f38e6eacb7e148112f267b",
     "sha256": "b4c87364de3fb2c67610fc2dac0ad0e9fd0ba1c19f188af37ce9717bb49ea021"
   },
   "override-ancestor.docx": {
-    "paragraphsSha256": "eeb5ce22c773d79ab487d290342a9c7b34b54f15c9bad3ad301570b9c00831f0",
+    "paragraphsSha256": "451af88bf1c00ed7f1b0758eaabb364615d62742f84641790c9123de65b4450a",
     "sha256": "0600d4876dc95c1b4aa8f01df4550a8f9c8a7581e8e2c6f31ce81bd9910fb224"
   },
   "override-deeper-level.docx": {
-    "paragraphsSha256": "9987874f309f92a0d977a27a120f42b29a70928d6ee2e24dde443e9ace502f13",
+    "paragraphsSha256": "8ebfa2a0cfcc2f1e614d4ca4dcced85f84b0a31770f4c26fdbe688d9075d8e09",
     "sha256": "11d58b08f224a041fbbce024fac1a5d03234294c19f196c74acdb073ece1e221"
   },
   "override-implicit-ancestor.docx": {
-    "paragraphsSha256": "251a11386fdee8a3343c37f9371c4da2d2f23362271e28b540078a040cabd785",
+    "paragraphsSha256": "ab8abe3b3a7d9b5adf2418a1e0fcab3a7b88cc6c6a05e9de25dde48b370e53dc",
     "sha256": "e55961207231b8972fabbedfed9594e0eef2a7b2dce397c30e6d95ccbafd43e3"
   },
   "override-restart-within.docx": {
-    "paragraphsSha256": "130731172eefd4624d782179d4d7360d1ad256f2815884923040f5ea3b6fa453",
+    "paragraphsSha256": "bbd5746a284138e6f7339e2139aba4c92f75dc2117e18f73c73d9ec14255e7ef",
     "sha256": "3612d10fe863e0f3486c9127efa08463052c4fdd0c8ef52be5c25e6f93c3d2fe"
   },
   "override-return.docx": {
-    "paragraphsSha256": "9b8c3079d885da6a494f93e695b3b45839ca70c2e82a665a7322b1aec67f5bb1",
+    "paragraphsSha256": "df6526b852bfef5da561866e9f362348740c52697c4b9a75c5d5b60eb19321be",
     "sha256": "eb5f8c7b32b9764e6082aaf139160dfc79715edee6c84d5fea84e3aab27d513b"
   },
   "plain-after-restart.docx": {
-    "paragraphsSha256": "29432bb033571c98fdbafbfdba2b09c97c8ff750d2f0c4c387b11ac6c7f761df",
+    "paragraphsSha256": "9f065699747e23df67d9031bf5fcc0451c13f7dc10f61bfaad5705769699b563",
     "sha256": "a0842636db8d397723bb68625e1b6f1609253af03e73d4d217ff656efe7ab9de"
   },
   "restart-after-first.docx": {
-    "paragraphsSha256": "3bd4ade7e66f97d28c5583abd78aa718fcc5873066baf6b4dd0f592651499b6c",
+    "paragraphsSha256": "71b0bbc1fc748192f879e26487f4fbe40a3e63bdf98bb2098d7ff5e65732a964",
     "sha256": "aa48a48f3a8dca6613701ef7af8c0c88c40c514dcb15fd6d358e4f2cfe5fabfe"
   },
   "restart-never.docx": {
-    "paragraphsSha256": "27cb5039977cce44e682608056047a9a4510237d127ab3af76cf61e08be7ac46",
+    "paragraphsSha256": "24927b2ee089b6e6d5d6511e5de2d0c0850337c2e0c42dad9610c875fa2f41b3",
     "sha256": "04b6b2a16e3313a51e521195aaefc5605eb517cef49b2a6066c5a51b37603c22"
   },
   "return-after-restart.docx": {
-    "paragraphsSha256": "9c8f561bc104eb4b8dd3b72c811c3cb964d0db5fa80ad509351d165b35a4ee00",
+    "paragraphsSha256": "e4b5eb4d20cd4f5c8fe01fd2a4101d15c15ef3b10f03eeab5ecbd6c6ebb97d42",
     "sha256": "20a86c73e2af321d272d2bfa0a49ac70485b8afad9fe6fe3eb06337b3419f730"
   },
   "shared-continue.docx": {
-    "paragraphsSha256": "925710c3312e4a7c087696744dcc5c8e5196a4d7677a345921e2ebde2a1d0151",
+    "paragraphsSha256": "7b37ed3ebf8f184cac4ed956578affc2105298c538a5f0343e7b8273dde25ca8",
     "sha256": "a408beea90ff48a64c408ef33b2587f2cd8d6d6e5c9d00eb9ccf0ed2cefcf462"
   },
   "start-override-first.docx": {
-    "paragraphsSha256": "67bc2fb0c8a627675b3fe5122cef3f32bc0a4e5c47f144d3cce1e2c28b0ee2ab",
+    "paragraphsSha256": "eb1b942b7c7b97f9b7390d309c6c0334fd65a2f95b28ec3b7dbe5ad26dc15172",
     "sha256": "c1d3b8a65704c41c3faa573cf97432eca280fb06f39a14029080182141b23c71"
   },
   "start-override-restart.docx": {
-    "paragraphsSha256": "61604191908e4ee6124ab037af30ded13486191f8b53eea3c7fac63a4ba36185",
+    "paragraphsSha256": "12f0bee26bea41c86bae0619f9b0500a753d48adb08149815d3a0f27843d53fe",
     "sha256": "00d5a7e5d691662c597f023d491b903fba6cdd3b9ef2e6f1844ecddaa791cd07"
   },
   "style-tied-deeper-level.docx": {
-    "paragraphsSha256": "cff925b1ef1c42a5fd612d120b0d91ecb000ed75c972c8144cf033d017199f32",
+    "paragraphsSha256": "819c41a1075754415de76820ecbf244b310eb12295c09ab534aee456c2278734",
     "sha256": "73f18d5ea4c000816683ea221ec26d49664f6119af4def1308ff3c79f34adf33"
   },
   "style-tied-level-zero.docx": {
-    "paragraphsSha256": "9fa8232ee97dc95674cda978581ca95eb63b7feaf577360b88404808e6fc29e3",
+    "paragraphsSha256": "ffc328b97eb304de6d8c397e16181eb3cdcceff65a8cbe2e739671ba7c19dfbd",
     "sha256": "11653d3f9bc4b19e5deac3399388b666050afa5c12e47424e37a13ae1ed8fece"
   },
   "two-definitions.docx": {
-    "paragraphsSha256": "c6bcf51d9b9001834761dda51ea04cd7dfaaeac6c638479c4041a056d09a060a",
+    "paragraphsSha256": "1b9421183c57234a5960d44fd79ba4fb681814a4cd8f7d1eebaf91dded52c188",
     "sha256": "a1c97b8fdf82d03e15f35ec89a2a88a129f35035c6af7088b64ae1ad73c68627"
   }
 }

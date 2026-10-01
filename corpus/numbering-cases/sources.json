@@ -169,6 +169,84 @@
       "file": "bullets.docx",
       "sha256": "62a355d1e912cb232cc60eacbd917ff31642219a2e0e428a88cb0cec3071b14b",
       "bytes": 3721
+    },
+    {
+      "name": "Footnotes number 1, 2, 3 through the document.",
+      "file": "notes-continuous.docx",
+      "sha256": "cefb0cc55bb723e6a71b6857618a833487bdbd7ae8eb581dea40498f8bdcec31",
+      "bytes": 3955
+    },
+    {
+      "name": "Footnotes restart in each section (numRestart eachSect).",
+      "file": "notes-each-section.docx",
+      "sha256": "5787b5db07058aa972c2872c5f4b4494d629c2111956c56321609dc94ed29403",
+      "bytes": 4352
+    },
+    {
+      "name": "Footnotes from 5 in lower roman (the document's footnotePr).",
+      "file": "notes-start-format.docx",
+      "sha256": "bdbbdcb5e543123b4a659e7d37ddb867ba11d426e111973d05f6f258313efc10",
+      "bytes": 4351
+    },
+    {
+      "name": "The document's footnotePr, with the separators Word lists in it, and no section's.",
+      "file": "notes-document-format.docx",
+      "sha256": "566a66f4c2e6a2f2449017a8db77d276cf2c08f64e876923578abf3dfe6e4ecf",
+      "bytes": 4396
+    },
+    {
+      "name": "Footnotes from 5 in lower roman, set on the section as Word writes them.",
+      "file": "notes-section-rules.docx",
+      "sha256": "b9b25b7a8c607b1695508ae055c4687dfa9c47ed5625bae0dea071dbc0e62834",
+      "bytes": 3838
+    },
+    {
+      "name": "Footnotes in symbols (chicago) set on the section, past the fourth.",
+      "file": "notes-section-chicago.docx",
+      "sha256": "3fa4c70a131538b2ae05c68ed7f2fb5827a83a4d026829ca21363f2a2d587211",
+      "bytes": 4413
+    },
+    {
+      "name": "Footnotes in symbols (chicago), past the fourth.",
+      "file": "notes-chicago.docx",
+      "sha256": "028d55ff20fb8ce1cef138b588cef733aede9e022e9f52c8a6c717295de3e559",
+      "bytes": 4926
+    },
+    {
+      "name": "A footnote with a custom mark between two numbered ones: does it take a number?",
+      "file": "notes-custom-mark.docx",
+      "sha256": "697f8f35be0c31f75da2bb0aaf446c90bda6e1c45b72c29396f8a3abd6bb4269",
+      "bytes": 4035
+    },
+    {
+      "name": "Endnotes in Word's default format.",
+      "file": "notes-endnotes.docx",
+      "sha256": "222872d0fc7fb674e0aebcd40d002bc9f753197a5bfaec70ea2a0fa280180925",
+      "bytes": 3726
+    },
+    {
+      "name": "Footnotes and endnotes count apart.",
+      "file": "notes-mixed.docx",
+      "sha256": "267a03b96efbdb67cf1243dbd8d2349573c25772b16558f8629e9ffa2150c1ef",
+      "bytes": 4573
+    },
+    {
+      "name": "A footnote in a table cell counts in document order.",
+      "file": "notes-in-table.docx",
+      "sha256": "e4d9c36963916688854f9599bb14a0cb2a70940e826747de48e793c61f9c2399",
+      "bytes": 3787
+    },
+    {
+      "name": "Continuous footnotes; the second section sets numStart 10.",
+      "file": "notes-section-start-continuous.docx",
+      "sha256": "bd2cec4279b10b43210780c61eba89761a59dc0740c2922aadf388268a953e6d",
+      "bytes": 4064
+    },
+    {
+      "name": "Continuous footnotes; the second section sets upper letters.",
+      "file": "notes-section-format.docx",
+      "sha256": "be84d1f0183a7217f07c1783c5979a2e367866a5398b09a5dee2e24b38b59c5a",
+      "bytes": 4071
     }
   ]
 }

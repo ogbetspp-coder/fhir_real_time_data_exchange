@@ -11,7 +11,12 @@ units or bytes: a consumer in JavaScript must index by code point.
 
 A read::
 
-    {"format": ..., "paragraphs": [...], "reader": ..., "source": {"bytes": n, "sha256": hex}}
+    {"endnotes": [...], "footnotes": [...], "format": ..., "paragraphs": [...], "reader": ...,
+     "source": {"bytes": n, "sha256": hex}}
+
+Each paragraph's ``notes`` lists its footnote and endnote marks (``offset``, ``kind``, ``id``,
+``mark``); ``footnotes`` and ``endnotes`` list the notes in the order the body refers to them,
+each with its ``id``, ``mark`` and ``paragraphs``.
 
 A refusal::
 
@@ -26,11 +31,12 @@ from __future__ import annotations
 import hashlib
 import json
 
-from label_docx.reader import READER_VERSION, DocxRefusedError, Paragraph, read_docx
+from label_docx.reader import READER_VERSION, DocxRefusedError, Note, Paragraph, read_document
 
 # The version of the shape above. A change to this file changes its hash in versions.lock.json.
-# 1.1.0 adds numbering.text and numbering.suffix, the list label.
-FORMAT_VERSION = "label-docx-json/1.1.0"
+# 1.1.0 adds numbering.text and numbering.suffix, the list label; 1.2.0 adds paragraphs' notes
+# and the footnotes and endnotes.
+FORMAT_VERSION = "label-docx-json/1.2.0"
 
 type Json = str | int | bool | list[Json] | dict[str, Json] | None
 
@@ -46,6 +52,9 @@ def paragraph(item: Paragraph) -> dict[str, Json]:
     return {
         "markHidden": item.mark_hidden,
         "marks": [{"end": m.end, "kind": m.kind, "start": m.start} for m in item.marks],
+        "notes": [
+            {"id": n.id, "kind": n.kind, "mark": n.mark, "offset": n.offset} for n in item.notes
+        ],
         "numbering": (
             None
             if item.numbering is None
@@ -67,6 +76,13 @@ def paragraphs(items: list[Paragraph]) -> list[Json]:
     return [paragraph(item) for item in items]
 
 
+def notes(items: tuple[Note, ...]) -> list[Json]:
+    """Footnotes or endnotes as JSON, in the order the body refers to them."""
+    return [
+        {"id": n.id, "mark": n.mark, "paragraphs": paragraphs(list(n.paragraphs))} for n in items
+    ]
+
+
 def read(data: bytes) -> tuple[bytes, bool]:
     """The canonical JSON result of reading ``data``, and whether it was read (not refused)."""
     source: dict[str, Json] = {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
@@ -76,8 +92,11 @@ def read(data: bytes) -> tuple[bytes, bool]:
         "source": source,
     }
     try:
-        envelope["paragraphs"] = paragraphs(read_docx(data))
+        document = read_document(data)
     except DocxRefusedError as refused:
         envelope["refusal"] = {"code": refused.code, "detail": refused.detail}
         return canonical(envelope), False
+    envelope["paragraphs"] = paragraphs(list(document.body))
+    envelope["footnotes"] = notes(document.footnotes)
+    envelope["endnotes"] = notes(document.endnotes)
     return canonical(envelope), True

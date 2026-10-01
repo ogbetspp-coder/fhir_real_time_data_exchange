@@ -23,6 +23,13 @@ seen, so it is left out on both sides. Word writes a Symbol-font character as th
 private-use code in any other font is one the reader refuses, so the mapping cannot hide a
 difference.
 
+Footnote and endnote marks are the second reference. Word does not report the mark it draws,
+so the oracle writes a copy of the document with ``@@n@@`` before and ``@@/@@`` after every note
+reference's run (and every note's echo of its mark), has Word save the copy as text, and reads
+what Word wrote between them. Text runs take no part in note numbering, so the marks are those
+of the document itself. Word saves text in Mac OS Roman, which holds every mark the reader draws
+(digits, letters, roman numerals, *, †, ‡, §).
+
 Word runs sandboxed: each file is copied into Word's container, where it opens without a
 permission prompt, and removed after.
 """
@@ -31,15 +38,19 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import io
+import itertools
 import json
 import plistlib
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import zipfile
 from pathlib import Path
 
-from label_docx.reader import SYMBOL_FONT, DocxRefusedError, read_docx
+from label_docx.reader import SYMBOL_FONT, DocxRefusedError, read_document, read_docx
 
 WORD = Path("/Applications/Microsoft Word.app")
 CONTAINER = Path.home() / "Library/Containers/com.microsoft.Word/Data"
@@ -70,6 +81,37 @@ end run
 """
 
 SUFFIXES = {"tab": "\t", "legacy": "\t", "space": " ", "nothing": ""}
+
+# The document saved as text.
+EXPORT = """
+on run argv
+  set target to (POSIX file (item 1 of argv)) as string
+  set output to (POSIX file (item 2 of argv)) as string
+  tell application "Microsoft Word"
+    open file name target
+    repeat 600 times
+      try
+        if (name of every document) contains {item 3 of argv} then exit repeat
+      end try
+      delay 0.1
+    end repeat
+    save as document (item 3 of argv) file name output file format format Unicode text
+    close document (item 4 of argv) saving no
+  end tell
+end run
+"""
+
+# A run holding a note reference (in the body) or a note's echo of its mark (in a note).
+_NOTE_RUN = {
+    "reference": re.compile(
+        r"<w:r(?:\s[^>]*)?>(?:(?!</w:r>).)*?<w:(?:footnote|endnote)Reference\b(?:(?!</w:r>).)*?</w:r>",
+        re.S,
+    ),
+    "echo": re.compile(
+        r"<w:r(?:\s[^>]*)?>(?:(?!</w:r>).)*?<w:(?:footnote|endnote)Ref\b(?:(?!</w:r>).)*?</w:r>",
+        re.S,
+    ),
+}
 
 
 def word_version() -> str:
@@ -118,6 +160,87 @@ def word_labels(path: Path) -> list[str]:
     return [a[: len(a) - len(b)] for b, a in zip(before, after, strict=True) if a != b]
 
 
+def _marked(xml: str, kind: str, tag: str, count: itertools.count[int]) -> tuple[str, int]:
+    """``xml`` with ``@@<tag><n>@@`` before and ``@@/@@`` after every ``kind`` run."""
+
+    def wrap(run: re.Match[str]) -> str:
+        before = f"<w:r><w:t>@@{tag}{next(count)}@@</w:t></w:r>"
+        return before + run.group(0) + "<w:r><w:t>@@/@@</w:t></w:r>"
+
+    return _NOTE_RUN[kind].subn(wrap, xml)
+
+
+def _probe(data: bytes) -> bytes | None:
+    """A copy of the document with markers around its note marks, or None if it has none."""
+    with zipfile.ZipFile(io.BytesIO(data)) as source:
+        parts = [(info, source.read(info)) for info in source.infolist()]
+    count = itertools.count()
+    references = 0
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as target:
+        for info, content in parts:
+            written = content
+            if info.filename == "word/document.xml":
+                xml, references = _marked(content.decode("utf-8"), "reference", "B", count)
+                written = xml.encode("utf-8")
+            elif info.filename in ("word/footnotes.xml", "word/endnotes.xml"):
+                xml, _ = _marked(content.decode("utf-8"), "echo", "N", count)
+                written = xml.encode("utf-8")
+            target.writestr(info.filename, written)
+    return out.getvalue() if references else None
+
+
+def word_note_marks(path: Path) -> dict[str, list[str]] | None:
+    """The marks Word draws at the body's note references and in the notes, or None if none."""
+    probe = _probe(path.read_bytes())
+    if probe is None:
+        return None
+    CONTAINER.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=CONTAINER) as folder:
+        copy = Path(folder) / path.name
+        text = copy.with_suffix(".txt")
+        copy.write_bytes(probe)
+        done = subprocess.run(
+            ["osascript", "-", str(copy), str(text), copy.name, text.name],
+            input=EXPORT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
+        )
+        if done.returncode != 0:
+            raise SystemExit(f"{path.name}: Word failed: {done.stderr.strip()}")
+        saved = text.read_bytes().decode("mac_roman")
+    found = re.findall(r"@@([BN])\d+@@(.*?)@@/@@", saved, re.S)
+    return {
+        "body": [mark for where, mark in found if where == "B"],
+        "notes": [mark for where, mark in found if where == "N"],
+    }
+
+
+def reader_note_marks(path: Path) -> dict[str, list[str]] | str:
+    """The reader's marks at the body's note references and in the notes, or its refusal."""
+    try:
+        document = read_document(path.read_bytes())
+    except DocxRefusedError as refused:
+        return refused.code
+    notes = [*document.footnotes, *document.endnotes]
+    return {
+        "body": [n.mark or "" for p in document.body for n in p.notes],
+        "notes": [n.mark or "" for note in notes for p in note.paragraphs for n in p.notes],
+    }
+
+
+def note_verdict(word: dict[str, list[str]], reader: dict[str, list[str]] | str) -> str:
+    """Whether the reader's note marks are Word's."""
+    if isinstance(reader, str):
+        return f"reader refuses: {reader}"
+    for where in ("body", "notes"):
+        if reader[where] != word[where]:
+            return f"differs in the {where}' note marks: Word {word[where]}, reader {reader[where]}"
+    return "agrees"
+
+
 def reader_labels(path: Path) -> list[str] | str:
     """What the reader draws before each of ``path``'s list items, or its refusal code."""
     try:
@@ -164,6 +287,7 @@ def main() -> int:
     args = parser.parse_args()
     paths = sorted(args.folder.glob("*.docx")) if args.command == "record" else args.files
     answers: dict[str, list[str]] = {}
+    note_answers: dict[str, dict[str, list[str]]] = {}
     differs = False
     for path in paths:
         if not path.read_bytes().startswith(b"PK\x03\x04"):
@@ -174,6 +298,7 @@ def main() -> int:
             continue
         try:
             word = word_labels(path)
+            marks = word_note_marks(path)
         except SystemExit as failed:
             if args.command == "record":
                 raise
@@ -182,6 +307,10 @@ def main() -> int:
             continue
         answers[path.name] = word
         result = verdict(word, reader_labels(path))
+        if marks is not None:
+            note_answers[path.name] = marks
+            if result == "agrees":
+                result = note_verdict(marks, reader_note_marks(path))
         differs = differs or result.startswith("differs")
         sys.stdout.write(f"{path.name}: {result}\n")
         if result.startswith("reader refuses"):
@@ -190,9 +319,13 @@ def main() -> int:
     if args.command == "record":
         record = {
             "application": word_version(),
-            "method": "convert numbers to text; what each list item gained",
+            "method": (
+                "list labels: convert numbers to text, what each list item gained; note marks: "
+                "saved as text, what Word wrote between markers around each mark"
+            ),
             "recorded": datetime.date.today().isoformat(),
             "drawn": answers,
+            "notes": note_answers,
         }
         target = args.folder / "word.json"
         target.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", "utf-8")

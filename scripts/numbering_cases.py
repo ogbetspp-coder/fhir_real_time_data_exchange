@@ -39,6 +39,10 @@ class Case(NamedTuple):
     numbering: str
     body: str
     styles: str = ""
+    footnotes: str = ""
+    endnotes: str = ""
+    settings: str = ""
+    final: str = "<w:sectPr/>"
 
 
 def lvl(
@@ -86,6 +90,47 @@ def styled(style: str) -> str:
     """A paragraph in ``style`` that sets no list of its own."""
     return f'<w:p><w:pPr><w:pStyle w:val="{style}"/></w:pPr><w:r><w:t>styled</w:t></w:r></w:p>'
 
+
+def words(text: str) -> str:
+    """A run of text."""
+    return f'<w:r><w:t xml:space="preserve">{text}</w:t></w:r>'
+
+
+def cite(key: int, kind: str = "footnote", custom: bool = False) -> str:
+    """A run holding a reference to note ``key``."""
+    follows = ' w:customMarkFollows="1"' if custom else ""
+    return f'<w:r><w:{kind}Reference w:id="{key}"{follows}/></w:r>'
+
+
+def para(*pieces: str, props: str = "") -> str:
+    """A paragraph of ``pieces``."""
+    return f"<w:p>{f'<w:pPr>{props}</w:pPr>' if props else ''}{''.join(pieces)}</w:p>"
+
+
+def note(key: int, kind: str = "footnote") -> str:
+    """A note: its mark's echo, then its text."""
+    return (
+        f'<w:{kind} w:id="{key}"><w:p><w:r><w:{kind}Ref/></w:r>{words(f" note {key}")}</w:p>'
+        f"</w:{kind}>"
+    )
+
+
+def notes(kind: str, *keys: int) -> str:
+    """The separators Word writes, and notes ``keys``."""
+    return (
+        f'<w:{kind} w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:{kind}>'
+        f'<w:{kind} w:type="continuationSeparator" w:id="0"><w:p><w:r>'
+        f"<w:continuationSeparator/></w:r></w:p></w:{kind}>" + "".join(note(k, kind) for k in keys)
+    )
+
+
+def section(footnote_pr: str = "") -> str:
+    """A sectPr, with footnote properties if given."""
+    inner = f"<w:footnotePr>{footnote_pr}</w:footnotePr>" if footnote_pr else ""
+    return f"<w:sectPr>{inner}</w:sectPr>"
+
+
+EACH_SECTION = '<w:numRestart w:val="eachSect"/>'
 
 SECTIONS = abstract(1, lvl(0, text="%1."), lvl(1, text="%1.%2"), lvl(2, text="%1.%2.%3"))
 SHARED = (
@@ -301,11 +346,123 @@ CASES: dict[str, Case] = {
             (1, 0), (2, 0), (3, 0, '<w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/></w:rPr>')
         ),
     ),
+    "notes-continuous": Case(
+        "Footnotes number 1, 2, 3 through the document.",
+        "",
+        para(words("a"), cite(1)) + para(words("b"), cite(2), words(" c"), cite(3)),
+        footnotes=notes("footnote", 1, 2, 3),
+    ),
+    "notes-each-section": Case(
+        "Footnotes restart in each section (numRestart eachSect).",
+        "",
+        para(words("a"), cite(1))
+        + para(words("b"), cite(2), props=section(EACH_SECTION))
+        + para(words("c"), cite(3))
+        + para(words("d"), cite(4)),
+        footnotes=notes("footnote", 1, 2, 3, 4),
+        final=section(EACH_SECTION),
+    ),
+    "notes-start-format": Case(
+        "Footnotes from 5 in lower roman (the document's footnotePr).",
+        "",
+        para(words("a"), cite(1)) + para(words("b"), cite(2)),
+        footnotes=notes("footnote", 1, 2),
+        settings='<w:footnotePr><w:numFmt w:val="lowerRoman"/><w:numStart w:val="5"/>'
+        "</w:footnotePr>",
+    ),
+    "notes-document-format": Case(
+        "The document's footnotePr, with the separators Word lists in it, and no section's.",
+        "",
+        para(words("a"), cite(1)) + para(words("b"), cite(2)),
+        footnotes=notes("footnote", 1, 2),
+        settings='<w:footnotePr><w:numFmt w:val="upperRoman"/><w:numStart w:val="3"/>'
+        '<w:footnote w:id="-1"/><w:footnote w:id="0"/></w:footnotePr>',
+    ),
+    "notes-section-rules": Case(
+        "Footnotes from 5 in lower roman, set on the section as Word writes them.",
+        "",
+        para(words("a"), cite(1)) + para(words("b"), cite(2)),
+        footnotes=notes("footnote", 1, 2),
+        final=section('<w:numFmt w:val="lowerRoman"/><w:numStart w:val="5"/>'),
+    ),
+    "notes-section-chicago": Case(
+        "Footnotes in symbols (chicago) set on the section, past the fourth.",
+        "",
+        para(words("a"), *(cite(k) for k in range(1, 7))),
+        footnotes=notes("footnote", *range(1, 7)),
+        final=section('<w:numFmt w:val="chicago"/>'),
+    ),
+    "notes-chicago": Case(
+        "Footnotes in symbols (chicago), past the fourth.",
+        "",
+        para(words("a"), *(cite(k) for k in range(1, 7))),
+        footnotes=notes("footnote", *range(1, 7)),
+        settings='<w:footnotePr><w:numFmt w:val="chicago"/></w:footnotePr>',
+    ),
+    "notes-custom-mark": Case(
+        "A footnote with a custom mark between two numbered ones: does it take a number?",
+        "",
+        para(words("a"), cite(1))
+        + para(words("b"), cite(2, custom=True), words("\u2020"))
+        + para(words("c"), cite(3)),
+        footnotes=notes("footnote", 1, 2, 3),
+    ),
+    "notes-endnotes": Case(
+        "Endnotes in Word's default format.",
+        "",
+        para(words("a"), cite(1, "endnote")) + para(words("b"), cite(2, "endnote")),
+        endnotes=notes("endnote", 1, 2),
+    ),
+    "notes-mixed": Case(
+        "Footnotes and endnotes count apart.",
+        "",
+        para(words("a"), cite(1), cite(1, "endnote"), cite(2)),
+        footnotes=notes("footnote", 1, 2),
+        endnotes=notes("endnote", 1),
+    ),
+    "notes-in-table": Case(
+        "A footnote in a table cell counts in document order.",
+        "",
+        "<w:tbl><w:tr><w:tc>"
+        + para(words("a"), cite(1))
+        + "</w:tc></w:tr></w:tbl>"
+        + para(words("b"), cite(2)),
+        footnotes=notes("footnote", 1, 2),
+    ),
+    "notes-section-start-continuous": Case(
+        "Continuous footnotes; the second section sets numStart 10.",
+        "",
+        para(words("a"), cite(1))
+        + para(words("b"), cite(2), props=section())
+        + para(words("c"), cite(3)),
+        footnotes=notes("footnote", 1, 2, 3),
+        final=section('<w:numStart w:val="10"/>'),
+    ),
+    "notes-section-format": Case(
+        "Continuous footnotes; the second section sets upper letters.",
+        "",
+        para(words("a"), cite(1))
+        + para(words("b"), cite(2), props=section())
+        + para(words("c"), cite(3)),
+        footnotes=notes("footnote", 1, 2, 3),
+        final=section('<w:numFmt w:val="upperLetter"/>'),
+    ),
 }
 
 
 def package(case: Case) -> bytes:
     """``case`` as a complete .docx, stored, with fixed timestamps."""
+    # Parts only the note cases have, so the list cases' bytes do not change.
+    extra = [
+        (name, content)
+        for name, content in (
+            ("footnotes", case.footnotes),
+            ("endnotes", case.endnotes),
+            ("settings", case.settings),
+        )
+        if content
+    ]
+    roots = {"footnotes": "w:footnotes", "endnotes": "w:endnotes", "settings": "w:settings"}
     parts = {
         "[Content_Types].xml": (
             '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -315,7 +472,11 @@ def package(case: Case) -> bytes:
             f'<Override PartName="/word/document.xml" ContentType="{MAIN}.document.main+xml"/>'
             f'<Override PartName="/word/styles.xml" ContentType="{MAIN}.styles+xml"/>'
             f'<Override PartName="/word/numbering.xml" ContentType="{MAIN}.numbering+xml"/>'
-            "</Types>"
+            + "".join(
+                f'<Override PartName="/word/{name}.xml" ContentType="{MAIN}.{name}+xml"/>'
+                for name, content in extra
+            )
+            + "</Types>"
         ),
         "_rels/.rels": (
             f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="{RELS}">'
@@ -326,11 +487,15 @@ def package(case: Case) -> bytes:
             f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="{RELS}">'
             f'<Relationship Id="rId1" Type="{OFFICE}/styles" Target="styles.xml"/>'
             f'<Relationship Id="rId2" Type="{OFFICE}/numbering" Target="numbering.xml"/>'
-            "</Relationships>"
+            + "".join(
+                f'<Relationship Id="rId{3 + i}" Type="{OFFICE}/{name}" Target="{name}.xml"/>'
+                for i, (name, content) in enumerate(extra)
+            )
+            + "</Relationships>"
         ),
         "word/document.xml": (
             f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="{W}">'
-            f"<w:body>{case.body}<w:sectPr/></w:body></w:document>"
+            f"<w:body>{case.body}{case.final}</w:body></w:document>"
         ),
         "word/styles.xml": (
             f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="{W}">'
@@ -341,6 +506,11 @@ def package(case: Case) -> bytes:
             f"{case.numbering}</w:numbering>"
         ),
     }
+    for name, content in extra:
+        parts[f"word/{name}.xml"] = (
+            f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><{roots[name]} xmlns:w="{W}">'
+            f"{content}</{roots[name]}>"
+        )
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_STORED) as archive:
         for name, content in parts.items():

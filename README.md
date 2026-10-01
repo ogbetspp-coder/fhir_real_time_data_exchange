@@ -14,6 +14,8 @@ normalises, trims or repairs.
 - **List labels as Word draws them.** "4.8", "b)", "•" are computed from the numbering part by
   Word's rules, and reported beside the text (never inserted into it). The rules are held to
   Microsoft Word's own answers for every corpus document (`corpus/*/word.json`).
+- **Footnotes and endnotes**, with the marks Word draws ("1", "iv", "*") beside the text, and
+  each note's own paragraphs read by the same rules.
 - **Nothing passed over.** Every run in the main document part is read exactly once, run content
   stands only inside runs, and there is no character data outside `<w:t>` and `<w:instrText>`.
   A document where any of that fails is refused (`stray-text`, `unread-content`).
@@ -35,11 +37,12 @@ uv run label-docx label.docx -o out.json  # or to a file
 Exit status: `0` read, `2` refused, `1` the file could not be opened.
 
 ```python
-from label_docx import read_docx, DocxRefusedError
+from label_docx import read_document, DocxRefusedError
 
-# Each Paragraph has text, style, numbering, table, marks and mark_hidden.
+# Each Paragraph has text, style, numbering, table, marks, mark_hidden and notes.
 try:
-    paragraphs = read_docx(data)
+    document = read_document(data)  # .body, .footnotes, .endnotes; read_docx(data) is the body
+
 except DocxRefusedError as refused:
     refused.code, refused.detail
 ```
@@ -60,6 +63,11 @@ or, refused, `"refusal":{"code":"tracked-change","detail":"ins"}` in place of `p
   `space`, `nothing`, or `legacy` for a Word 6 level, where the gap is layout, not a character).
   `text` and `suffix` are null when `numId` is 0 (not in a list). A consumer that wants the line
   as Word shows it puts `numbering.text` before the paragraph's `text`.
+- `notes` lists the paragraph's footnote and endnote marks: `offset` (where the mark stands in
+  `text`, in code points), `kind`, `id`, and `mark` (what Word draws; null for a custom mark,
+  whose characters are in `text`). The top-level `footnotes` and `endnotes` list the notes in the
+  order the body refers to them, each with `id`, `mark` and `paragraphs`; a note's first
+  paragraph carries its own mark at the start, as Word draws it.
 - `source.sha256` ties the result to the exact input bytes; `reader` and `format` tie it to the
   exact code (see "Versions").
 
@@ -122,24 +130,26 @@ dossiers are not published at all.
 
 | Outcome                                                              | Documents |
 | -------------------------------------------------------------------- | --------: |
-| Read, every list label the one Word draws                            |       324 |
-| Refused: footnotes (WHO, SAHPRA, two EMA appendices)                 |         9 |
-| Refused: mail-merge fields (EMA Annex IV templates)                  |         8 |
+| Read, every list label the one Word draws                            |       329 |
+| Refused: fields Word computes (EMA Annex IV mail merge, WHO `SEQ`)   |        11 |
+| Refused: an equation (SAHPRA)                                        |         1 |
 | Refused: EMA's stray U+F02D (SmPC template: es, fr, ro, sv)          |         4 |
 | Refused: an unaccepted tracked insertion (EMA Appendix I, is)        |         1 |
 | Refused: a .doc under a .docx name (EMA Annex IV, lv)                |         1 |
 | Refused: a list item run on after a hidden mark (EMA ATMP, no)       |         1 |
 
-No document was read with a list label other than Word's. Five EMA files could not be
+No document was read with a list label or a note mark other than Word's. (Before footnotes were
+read, 1.5.0 refused nine of these documents for them; 1.6.0 reads five, and the other four stop
+at a `SEQ` field or an equation.) Five EMA files could not be
 downloaded (HTTP errors after rate limiting); Health Canada and the TGA refuse scripted
 downloads.
 
 ## What it does not read
 
-- **Headers, footers, footnotes, endnotes, comments.** Separate parts, not read. A footnote
-  *reference* in the body is refused, so no footnote is lost silently. Footnotes are the most
-  common reason public regulator templates are refused (9 of 348, the WHO and SAHPRA Module 2.3
-  templates among them), so they are the next piece of work.
+- **Headers, footers, comments.** Separate parts, not read.
+- **Fields Word computes** (`SEQ` caption numbers such as "Table 1", `PAGE`, `DATE`) and
+  **equations** are refused. Automatic caption numbering is common in Module 3 documents (three
+  WHO Module 2.3 templates hold it), so it is a candidate for the next piece of work.
 - **Word 97-2003 documents (.doc)** are refused, including under a .docx name: EMA's site
   serves one. Save them as .docx in Word first.
 - **Documents with tracked changes** are refused, not resolved. Accept or reject all changes in
@@ -156,7 +166,7 @@ downloads.
 | No text passed over: the 13 cases 1.1.0 lost silently            | `tests/test_reader.py`       |
 | The EMA QRD files keep their ≥, °, Symbol braces and pictures    | `tests/test_reader.py`       |
 | List labels counted and drawn as Word does, or refused           | `tests/test_reader.py`       |
-| Every corpus list label is the one Microsoft Word draws          | `tests/test_word_oracle.py`  |
+| Every corpus list label and note mark is the one Word draws      | `tests/test_word_oracle.py`  |
 | The numbering cases are what their script writes, byte for byte  | `tests/test_corpus.py`       |
 | The EMA template's 7 Symbol bullets and 9 Word 6 dashes          | `tests/test_reader.py`       |
 | A .doc, or a zip that is not the whole file, is never read        | `tests/test_reader.py`       |
@@ -224,4 +234,6 @@ assumptions about counting with Word's answers: it reads the cases 1.3.0 refused
 and draws the one label 1.3.0 got wrong (a level counted after a deeper one) as Word does.
 1.5.0 reads what public regulator templates hold and 1.4.0 refused without cause (VML pictures,
 smart-tag and custom-XML properties, conditional table formatting that cannot change the text),
-and refuses a .doc under a .docx name, which 1.4.0 opened as the zip of its theme.
+and refuses a .doc under a .docx name, which 1.4.0 opened as the zip of its theme. 1.6.0 reads
+footnotes and endnotes (`label-docx-json/1.2.0`), their marks numbered by the rules Word showed:
+the section's settings, not the document's, and start plus the notes before.

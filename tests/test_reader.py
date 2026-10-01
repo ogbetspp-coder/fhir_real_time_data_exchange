@@ -12,7 +12,14 @@ from pathlib import Path
 
 import pytest
 
-from label_docx.reader import DocxRefusedError, Numbering, read_docx
+from label_docx.reader import (
+    Document,
+    DocxRefusedError,
+    NoteReference,
+    Numbering,
+    read_document,
+    read_docx,
+)
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 SOURCES = Path(__file__).resolve().parents[1] / "corpus" / "ema-qrd"
@@ -52,8 +59,13 @@ def docx(
     minor_font: str | None = None,
     fonts: str | None = None,
     numbering: str | None = None,
+    footnotes: str | None = None,
+    endnotes: str | None = None,
 ) -> bytes:
     parts: dict[str, tuple[str, str]] = {}
+    for kind, content in (("footnotes", footnotes), ("endnotes", endnotes)):
+        if content is not None:
+            parts[kind] = (f"{kind}.xml", f'<w:{kind} xmlns:w="{W}">{content}</w:{kind}>')
     if numbering is not None:
         parts["numbering"] = (
             "numbering.xml",
@@ -254,7 +266,6 @@ def test_visible_text_and_hidden_paragraph_marks_are_read() -> None:
 @pytest.mark.parametrize(
     "body",
     [
-        p(r('<w:footnoteReference w:id="1"/>')),
         p(r("<w:object/>")),
         p(r("<w:pict/>")),
         p(r("<w:drawing><w:txbxContent>" + p(r("<w:t>x</w:t>")) + "</w:txbxContent></w:drawing>")),
@@ -1566,3 +1577,131 @@ def test_a_zip_archive_that_is_not_the_whole_file_is_refused(data: bytes) -> Non
     with pytest.raises(DocxRefusedError) as caught:
         read_docx(data)
     assert caught.value.code == "invalid-package"
+
+
+# --- footnotes and endnotes (docx-reader/1.6.0) ------------------------------------------------
+
+
+def ref(key: int, kind: str = "footnote", custom: bool = False, props: str = "") -> str:
+    follows = ' w:customMarkFollows="1"' if custom else ""
+    return r(f'<w:{kind}Reference w:id="{key}"{follows}/>', props)
+
+
+def fnote(key: int, body: str | None = None, kind: str = "footnote") -> str:
+    inner = (
+        body
+        if body is not None
+        else p(r(f"<w:{kind}Ref/>") + r("<w:t xml:space='preserve'> n</w:t>"))
+    )
+    return f'<w:{kind} w:id="{key}">{inner}</w:{kind}>'
+
+
+SEPARATORS = (
+    '<w:footnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:footnote>'
+)
+
+
+def read(body: str, footnotes: str | None = None, endnotes: str | None = None) -> Document:
+    return read_document(docx(body, footnotes=footnotes, endnotes=endnotes))
+
+
+def test_a_footnote_mark_stands_at_its_offset_and_the_note_is_read() -> None:
+    document = read(p(r("<w:t>ab</w:t>") + ref(1) + r("<w:t>c</w:t>")), SEPARATORS + fnote(1))
+    (paragraph,) = document.body
+    assert paragraph.text == "abc"
+    assert paragraph.notes == (NoteReference(2, "footnote", 1, "1"),)
+    (note,) = document.footnotes
+    assert (note.id, note.mark) == (1, "1")
+    assert note.paragraphs[0].text == " n"
+    assert note.paragraphs[0].notes == (NoteReference(0, "footnote", 1, "1"),)
+    # read_docx gives the body alone.
+    assert read_docx(docx(p(r("<w:t>ab</w:t>") + ref(1)), footnotes=fnote(1)))[0].text == "ab"
+
+
+def test_notes_are_listed_in_the_order_the_body_refers_to_them() -> None:
+    document = read(
+        p(ref(7) + ref(3) + ref(1, "endnote")), fnote(3) + fnote(7), fnote(1, kind="endnote")
+    )
+    assert [(n.id, n.mark) for n in document.footnotes] == [(7, "1"), (3, "2")]
+    assert [(n.id, n.mark) for n in document.endnotes] == [(1, "i")]
+
+
+def test_a_custom_mark_is_read_as_text_and_takes_no_number() -> None:
+    plain = p(r("<w:t xml:space='preserve'> n</w:t>"))
+    document = read(
+        p(ref(1) + ref(2, custom=True) + r("<w:t>\u2020</w:t>") + ref(3)),
+        fnote(1) + fnote(2, plain) + fnote(3),
+    )
+    assert document.body[0].text == "\u2020"
+    assert [n.mark for n in document.body[0].notes] == ["1", None, "2"]
+
+
+@pytest.mark.parametrize(
+    ("body", "footnotes", "code"),
+    [
+        # A reference to a note that is not there, or to one referred to twice.
+        (p(ref(1)), None, "invalid-package"),
+        (p(ref(1) + ref(1)), fnote(1), "invalid-package"),
+        # A note nothing refers to: Word does not show it, but its text is in the file.
+        (p(ref(1)), fnote(1) + fnote(2), "unread-content"),
+        # A hidden mark, a mark in a field code, a mark in a note, an echo in the body.
+        (p(ref(1, props="<w:vanish/>")), fnote(1), "hidden-text"),
+        (
+            p(
+                r('<w:fldChar w:fldCharType="begin"/>')
+                + r('<w:instrText>REF x</w:instrText><w:footnoteReference w:id="1"/>')
+                + r('<w:fldChar w:fldCharType="separate"/>')
+                + r("<w:t>1</w:t>")
+                + r('<w:fldChar w:fldCharType="end"/>')
+            ),
+            fnote(1),
+            "unsupported-element",
+        ),
+        (
+            p(ref(1)),
+            fnote(1, p(r('<w:footnoteReference w:id="2"/>'))) + fnote(2),
+            "unsupported-element",
+        ),
+        (p(r("<w:footnoteRef/>")), None, "unsupported-element"),
+        # A list in a note: whether it counts with the body's lists is not on record.
+        (
+            p(ref(1)),
+            fnote(1, p(r("<w:t>x</w:t>"), '<w:numPr><w:numId w:val="3"/></w:numPr>')),
+            "unsupported-numbering",
+        ),
+        # The echo of a custom mark, where Word draws the next note's number.
+        (p(ref(1, custom=True) + r("<w:t>*</w:t>")), fnote(1), "ambiguous-numbering"),
+    ],
+)
+def test_note_marks_the_reader_cannot_vouch_for_are_refused(
+    body: str, footnotes: str | None, code: str
+) -> None:
+    with pytest.raises(DocxRefusedError) as caught:
+        read(body, footnotes)
+    assert caught.value.code == code
+
+
+@pytest.mark.parametrize(
+    ("footnote_pr", "code"),
+    [
+        ('<w:numRestart w:val="eachPage"/>', "ambiguous-numbering"),
+        ('<w:numFmt w:val="ordinal"/>', "unsupported-numbering"),
+        ('<w:numFmt w:val="decimal" w:format="01"/>', "unsupported-numbering"),
+    ],
+)
+def test_note_numbering_that_depends_on_layout_or_language_is_refused(
+    footnote_pr: str, code: str
+) -> None:
+    body = p(ref(1)) + f"<w:sectPr><w:footnotePr>{footnote_pr}</w:footnotePr></w:sectPr>"
+    with pytest.raises(DocxRefusedError) as caught:
+        read(body, fnote(1))
+    assert caught.value.code == code
+
+
+def test_a_table_in_a_note_is_read() -> None:
+    table = "<w:tbl><w:tr><w:tc>" + p(r("<w:t>cell</w:t>")) + "</w:tc></w:tr></w:tbl>"
+    document = read(p(ref(1)), fnote(1, p(r("<w:footnoteRef/>")) + table))
+    assert [(x.text, x.table) for x in document.footnotes[0].paragraphs] == [
+        ("", None),
+        ("cell", (0, 0, 0)),
+    ]

@@ -40,6 +40,9 @@ What a paragraph carries:
 - ``table``: ``(table, row, cell)`` counted from zero in document order, else ``None``. A nested
   table's paragraphs carry the outermost cell; cells are counted as ``<w:tc>`` elements, not
   grid columns.
+- ``notes``: the footnote and endnote marks in the paragraph (``NoteReference``): where each
+  stands in ``text``, which note it refers to, and the mark Word draws there. Like a list label,
+  the mark is computed and never put into ``text``; see "Notes" below.
 
 Styles. Run properties are looked up on the run, then its character style, its paragraph
 style, its table style (inside a table only) and the document defaults, each style with its
@@ -94,13 +97,25 @@ are placed as a run's are: a Symbol bullet (U+F0B7) is mapped to "•", a Wingdi
 refused. ``suffix`` is ``tab``, ``space`` or ``nothing`` (``w:suff``), or ``legacy`` for a Word 6
 level, where the gap is layout and not a character.
 
+Notes. ``read_document`` returns the footnotes and endnotes with the body, each note's
+paragraphs read by every rule above, in the order the body refers to them; ``read_docx``
+returns the body alone. A note's mark is its section's ``numStart`` plus the number of notes of
+its kind before it, in the document or, where the section restarts them (``numRestart``
+``eachSect``), in the section; it is drawn in the section's format: decimal, roman, letters, or
+symbols (``chicago``: *, †, ‡, §, then each doubled...). The section's ``footnotePr`` and
+``endnotePr`` decide this; Word ignores the settings part's. Footnotes default to decimal,
+endnotes to lower roman, and each kind counts apart. A note with a custom mark takes no number;
+its mark is the stored text that follows the reference. Every rule is Word's answer to a case in
+``corpus/numbering-cases``, held by ``tests/test_word_oracle.py``. Every note must be referred
+to exactly once, and every reference must name a note.
+
 What it refuses (``DocxRefusedError.code``):
 
 - ``tracked-change``: any revision anywhere in the body, including changed formatting and
   deleted paragraph marks. Such a document has more than one text.
-- ``hidden-text``: a run with text that is hidden, directly or at any level of the style
-  hierarchy (hiding is treated as a fact as soon as any level asserts it, unless the run itself
-  says it is visible).
+- ``hidden-text``: a run with text, or a note mark, that is hidden, directly or at any level of
+  the style hierarchy (hiding is treated as a fact as soon as any level asserts it, unless the
+  run itself says it is visible).
 - ``unmapped-symbol``: a Symbol-font code the table does not hold, a malformed code, or a symbol
   in any other font.
 - ``symbol-font``: text in a dingbat font, or a Symbol font the reader cannot place.
@@ -115,7 +130,8 @@ What it refuses (``DocxRefusedError.code``):
   in a document set to update fields on open.
 - ``stale-field``: a field marked for update.
 - ``unsupported-element``: anything that can carry text and is not read above, and any element
-  the reader does not know: text boxes, footnote and endnote references, embedded objects,
+  the reader does not know: text boxes, a note mark in a field code or inside a note, a note's
+  echo of its mark outside that note, embedded objects,
   charts and other non-picture drawings, alternate content, math, ``altChunk``, form fields,
   content controls bound to data (in any namespace), VML that is not a picture, conditional
   table formatting that could change the text, text in a vertically merged-away cell, and a
@@ -123,25 +139,29 @@ What it refuses (``DocxRefusedError.code``):
 - ``invalid-package``: not a readable .docx, no main document relationship, a part name that
   occurs twice (ignoring case), a related part that is missing or duplicated, a part that
   cannot be read (bad checksum, truncated, encrypted), a part that is not UTF-8 or declares
-  another encoding, a DTD, a part over the size cap, a style id defined twice, or a list number
-  that is not a number.
+  another encoding, a DTD, a part over the size cap, a style id defined twice, a list number
+  that is not a number, a note defined twice, referred to twice, or referred to and not there.
 - ``stray-text``: character data in the main document part outside ``<w:t>`` and
   ``<w:instrText>`` (whitespace between elements aside), or an element inside either of them.
 - ``unread-content``: a run the reader did not reach (inside section, paragraph or cell
-  properties, say), or run content standing outside a run.
+  properties, say), run content standing outside a run, or a note nothing refers to (Word does
+  not show it; its text is in the file all the same).
 - ``unsupported-numbering``: a list label the reader cannot draw exactly: a ``numId`` or level
   with no definition (or no numbering part), a level outside 0 to 8, a format other than those
   above (ordinal and text formats depend on the language), a custom format, a picture bullet, a
   level holding anything else the reader does not know (alternate content, say), a ``%n`` for a
   deeper level, a bullet level that shows a counter, a number past a format's range, a label in
-  capitals or small capitals with letters in it, or a numbering-style link the reader cannot
-  follow (no ``styleLink`` back, or to a list with overrides).
+  capitals or small capitals with letters in it, a numbering-style link the reader cannot
+  follow (no ``styleLink`` back, or to a list with overrides), a list in a note, or a note
+  number format other than those above.
 - ``ambiguous-numbering``: a label drawn hidden (the paragraph mark or the level is hidden) or a
   numbered paragraph run on after a hidden paragraph mark, for which Word's list API reports a
-  label but not whether or where it is drawn; or a label that shows a level whose start the
-  reader cannot find (only a ``lvlOverride`` defines it).
+  label but not whether or where it is drawn; a label that shows a level whose start the
+  reader cannot find (only a ``lvlOverride`` defines it); note numbers that restart on each page,
+  which depends on layout; or the echo of a custom mark inside its note, where Word draws the
+  number the next note will take.
 
-Headers, footers, footnotes, comments and the glossary are separate parts and are not read.
+Headers, footers, comments and the glossary are separate parts and are not read.
 """
 
 from __future__ import annotations
@@ -159,8 +179,9 @@ from dataclasses import dataclass, field, replace
 # accepts the font hint "default"; 1.4.0 counts lists by the rules Word showed
 # (corpus/numbering-cases/word.json); 1.5.0 reads what public regulator templates hold and
 # 1.4.0 refused: VML pictures, smart-tag and custom-XML properties, and conditional table
-# formatting that cannot change the text.
-READER_VERSION = "docx-reader/1.5.0"
+# formatting that cannot change the text; 1.6.0 reads footnotes and endnotes, with their marks
+# by the rules Word showed.
+READER_VERSION = "docx-reader/1.6.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -276,6 +297,10 @@ _MARKERS = {
 # Run children that carry no text of their own. A comment reference points at a comment, which
 # is not part of the body text Word lays out.
 _RUN_SILENT = {_w(name) for name in ("rPr", "lastRenderedPageBreak", "commentReference")}
+# A note's mark in the body, and its echo at the start of the note's text.
+_NOTE_REFERENCES = {
+    _w(name) for name in ("footnoteReference", "endnoteReference", "footnoteRef", "endnoteRef")
+}
 # Paragraph-level containers whose children are read as the paragraph's own. fldSimple's
 # children are the field's displayed result; its instruction is an attribute and is dropped.
 _INLINE_TRANSPARENT = {_w(name) for name in ("hyperlink", "smartTag", "customXml")}
@@ -301,6 +326,10 @@ _RUN_CONTENT = {
         "softHyphen",
         "drawing",
         "fldChar",
+        "footnoteReference",
+        "endnoteReference",
+        "footnoteRef",
+        "endnoteRef",
     )
 }
 
@@ -349,11 +378,29 @@ class Mark:
 
 
 @dataclass(frozen=True)
-class Paragraph:
-    """One paragraph of the body, as the reader produced it.
+class NoteReference:
+    """A footnote or endnote mark in a paragraph: Word draws ``mark`` before ``text[offset]``.
 
-    The module docstring describes ``text``, ``marks``, ``mark_hidden``, ``numbering`` and
-    ``table``; ``style`` is the paragraph style id written on the paragraph, if any.
+    ``kind`` is ``footnote`` or ``endnote`` and ``id`` the note's id. ``mark`` is the number or
+    symbol Word draws ("1", "iv", "*"), or None for a note with a custom mark, whose characters
+    are stored, and so read, in ``text``. The mark is computed, not stored, so it is never put
+    into ``text``. A note's own text repeats its mark where the note's ``footnoteRef`` or
+    ``endnoteRef`` stands, and that paragraph carries a reference to the note itself.
+    """
+
+    offset: int
+    kind: str
+    id: int
+    mark: str | None = None
+
+
+@dataclass(frozen=True)
+class Paragraph:
+    """One paragraph of the body or of a note, as the reader produced it.
+
+    The module docstring describes ``text``, ``marks``, ``mark_hidden``, ``numbering``,
+    ``table`` and ``notes``; ``style`` is the paragraph style id written on the paragraph, if
+    any.
     """
 
     text: str
@@ -362,11 +409,31 @@ class Paragraph:
     table: tuple[int, int, int] | None
     marks: tuple[Mark, ...] = ()
     mark_hidden: bool = False
+    notes: tuple[NoteReference, ...] = ()
 
     @property
     def has_drawing(self) -> bool:
         """Whether the text holds a picture (U+FFFC OBJECT REPLACEMENT CHARACTER)."""
         return OBJECT in self.text
+
+
+@dataclass(frozen=True)
+class Note:
+    """A footnote or endnote: its id, the mark its references draw, and its paragraphs."""
+
+    kind: str
+    id: int
+    mark: str | None
+    paragraphs: tuple[Paragraph, ...]
+
+
+@dataclass(frozen=True)
+class Document:
+    """The body's paragraphs, and the footnotes and endnotes in the order they are referenced."""
+
+    body: tuple[Paragraph, ...]
+    footnotes: tuple[Note, ...] = ()
+    endnotes: tuple[Note, ...] = ()
 
 
 # --- package -------------------------------------------------------------------------------
@@ -841,12 +908,17 @@ class _ParagraphReader:
         paragraph_style: str | None,
         table_style: str | None,
         runs: set[ET.Element],
+        story: tuple[str, int] | None,
     ) -> None:
         self.styles = styles
         self.paragraph_style = paragraph_style
         self.table_style = table_style
         # Every run read, shared across the body, for the accounting in read_docx.
         self.runs = runs
+        # The note being read (kind and id), or None in the body.
+        self.story = story
+        self.notes: list[NoteReference] = []
+        self.custom: set[tuple[str, int]] = set()
         self.parts: list[str] = []
         self.length = 0
         self.marks: list[Mark] = []
@@ -899,8 +971,15 @@ class _ParagraphReader:
         )
         symbol = _in_symbol(self.styles, properties, self.table_style)
         emitted: list[str] = []
+        references: list[NoteReference] = []
         for child in run:
             tag = child.tag
+            if tag in _NOTE_REFERENCES:
+                if self.in_instruction():
+                    raise DocxRefusedError("unsupported-element", "a note mark in a field code")
+                offset = self.length + sum(len(part) for part in emitted)
+                references.append(self._note(child, offset))
+                continue
             if tag == _w("fldChar"):
                 self._field(child)
                 continue
@@ -922,6 +1001,9 @@ class _ParagraphReader:
             elif self.fields[-1]:
                 self.instructions[-1].append(produced)
         text = "".join(emitted)
+        if references and properties.toggle("vanish"):
+            raise DocxRefusedError("hidden-text", "a hidden note mark")
+        self.notes += references
         if not text:
             return
         if properties.toggle("vanish"):
@@ -932,6 +1014,22 @@ class _ParagraphReader:
         self.parts.append(text)
         self.length += len(text)
         self._mark(properties, start, self.length)
+
+    def _note(self, child: ET.Element, offset: int) -> NoteReference:
+        """A note reference in the body, or a note's echo of its own mark in the note."""
+        tag = _local(child.tag)
+        kind = "footnote" if tag.startswith("footnote") else "endnote"
+        if tag.endswith("Ref"):
+            # footnoteRef or endnoteRef: where a note repeats the mark that refers to it.
+            if self.story is None or self.story[0] != kind:
+                raise DocxRefusedError("unsupported-element", f"{tag} outside a {kind}")
+            return NoteReference(offset, kind, self.story[1])
+        if self.story is not None:
+            raise DocxRefusedError("unsupported-element", f"{tag} inside a note")
+        note = _int(child.get(_w("id"), ""), f"{tag} id")
+        if child.get(_w("customMarkFollows")) in ("1", "true", "on"):
+            self.custom.add((kind, note))
+        return NoteReference(offset, kind, note)
 
     def _field(self, child: ET.Element) -> None:
         if len(child):
@@ -1130,7 +1228,7 @@ def _numbering(levels: list[ET.Element | None]) -> Numbering | None:
 
 
 @dataclass(frozen=True)
-class _ListContext:
+class _Context:
     """What the list-label pass needs of a paragraph besides the paragraph itself."""
 
     # The paragraph style in force (after falling back to the default), its table's style, and
@@ -1138,6 +1236,10 @@ class _ListContext:
     style: str | None
     table_style: str | None
     mark: ET.Element | None
+    # The section the paragraph ends in or belongs to, counted from 0 (body only), and the
+    # notes whose marks are custom.
+    section: int = 0
+    custom: frozenset[tuple[str, int]] = frozenset()
 
 
 def _paragraph(
@@ -1146,7 +1248,9 @@ def _paragraph(
     table: tuple[int, int, int] | None,
     table_style: str | None,
     runs: set[ET.Element],
-) -> tuple[Paragraph, _ListContext]:
+    story: tuple[str, int] | None = None,
+    section: int = 0,
+) -> tuple[Paragraph, _Context]:
     ppr = element.find(_w("pPr"))
     style = None
     if ppr is not None:
@@ -1155,7 +1259,7 @@ def _paragraph(
     mark_rpr = ppr.find(_w("rPr")) if ppr is not None else None
     mark = _Properties(styles, mark_rpr, style, table_style)
     mark_hidden = mark.toggle("vanish") or mark.toggle("specVanish")
-    reader = _ParagraphReader(styles, style, table_style, runs)
+    reader = _ParagraphReader(styles, style, table_style, runs, story)
     reader.container(element)
     if reader.in_instruction():
         raise DocxRefusedError("unbalanced-field", "a paragraph ends inside a field instruction")
@@ -1167,8 +1271,12 @@ def _paragraph(
             styles.default_ppr,
         ]
     )
-    context = _ListContext(
-        style=styles.effective(style, "paragraph"), table_style=table_style, mark=mark_rpr
+    context = _Context(
+        style=styles.effective(style, "paragraph"),
+        table_style=table_style,
+        mark=mark_rpr,
+        section=section,
+        custom=frozenset(reader.custom),
     )
     return Paragraph(
         text="".join(reader.parts),
@@ -1185,6 +1293,7 @@ def _paragraph(
             ],
         ),
         mark_hidden=mark_hidden,
+        notes=tuple(reader.notes),
     ), context
 
 
@@ -1448,7 +1557,7 @@ class _Lists:
             raise _refuse_numbering(f"numbering style {name!r} names no list the reader can use")
         return linked.abstract
 
-    def label(self, numbering: Numbering, context: _ListContext) -> Numbering:
+    def label(self, numbering: Numbering, context: _Context) -> Numbering:
         """``numbering`` with the label Word draws, counted in document order."""
         level = numbering.level
         if level not in _LEVELS:
@@ -1527,7 +1636,7 @@ class _Lists:
         level: int,
         levels: dict[int, _Level],
         definition: _Level,
-        context: _ListContext,
+        context: _Context,
     ) -> str:
         if definition.unsupported is not None:
             raise _refuse_numbering(definition.unsupported)
@@ -1593,7 +1702,7 @@ def _number(value: int, fmt: str) -> str:
 
 
 def _labelled(
-    paragraphs: list[Paragraph], contexts: list[_ListContext], lists: _Lists
+    paragraphs: list[Paragraph], contexts: list[_Context], lists: _Lists
 ) -> list[Paragraph]:
     """``paragraphs`` with the label of every numbered one, counted in document order."""
     out: list[Paragraph] = []
@@ -1612,16 +1721,154 @@ def _labelled(
     return out
 
 
+# --- notes ---------------------------------------------------------------------------------
+
+_NOTE_KINDS = ("footnote", "endnote")
+# Word's defaults when neither the settings nor the section set a format.
+_NOTE_DEFAULT_FORMAT = {"footnote": "decimal", "endnote": "lowerRoman"}
+_NOTE_FORMATS = {"decimal", "upperRoman", "lowerRoman", "upperLetter", "lowerLetter", "chicago"}
+_CHICAGO = ("*", "\u2020", "\u2021", "\u00a7")
+# Separators and continuation notices: layout, not notes, and never referenced.
+_NOTE_LAYOUT = {"separator", "continuationSeparator", "continuationNotice"}
+
+
+@dataclass(frozen=True)
+class _NoteRules:
+    format: str
+    start: int
+    restart: str
+
+
+def _note_rules(kind: str, section: ET.Element | None) -> _NoteRules:
+    """How ``kind`` notes are numbered in a section, from its sectPr alone.
+
+    Word ignores the footnotePr and endnotePr of the settings part, even with the separators it
+    lists there (corpus/numbering-cases, notes-document-format), and applies the section's.
+    """
+    properties = section.find(_w(f"{kind}Pr")) if section is not None else None
+    values: dict[str, str] = {}
+    for name in ("numFmt", "numStart", "numRestart"):
+        element = properties.find(_w(name)) if properties is not None else None
+        if element is None:
+            continue
+        if name == "numFmt" and element.get(_w("format")) is not None:
+            raise _refuse_numbering(f"a custom {kind} number format")
+        if element.get(_w("val")) is not None:
+            values[name] = element.get(_w("val"), "")
+    return _NoteRules(
+        format=values.get("numFmt", _NOTE_DEFAULT_FORMAT[kind]),
+        start=_int(values.get("numStart", "1"), "numStart"),
+        restart=values.get("numRestart", "continuous"),
+    )
+
+
+def _note_mark(value: int, fmt: str) -> str:
+    """The mark for the ``value``-th note in the note number format ``fmt``."""
+    if fmt not in _NOTE_FORMATS:
+        raise _refuse_numbering(f"the note number format {fmt}")
+    if fmt != "chicago":
+        return _number(value, fmt)
+    if value < 1:
+        raise _refuse_numbering(f"the note number {value} in symbols")
+    # *, †, ‡, §, then each doubled, then tripled...
+    return _CHICAGO[(value - 1) % 4] * ((value - 1) // 4 + 1)
+
+
+def _note_marks(
+    paragraphs: list[Paragraph], contexts: list[_Context], sections: list[ET.Element | None]
+) -> dict[tuple[str, int], str | None]:
+    """The mark of every note the body refers to, by Word's rules.
+
+    Each rule is Word's answer to a case in corpus/numbering-cases, named in brackets. A note's
+    number is its section's numStart plus the number of notes of its kind before it: in the
+    document [notes-continuous, notes-section-start-continuous], or in its section when the
+    section restarts them [notes-each-section]; footnotes and endnotes count apart
+    [notes-mixed]. It is drawn in its section's format [notes-section-format,
+    notes-section-chicago]. A note with a custom mark takes no number [notes-custom-mark].
+    """
+    marks: dict[tuple[str, int], str | None] = {}
+    before: dict[tuple[str, int | None], int] = {}
+    for paragraph, context in zip(paragraphs, contexts, strict=True):
+        for reference in paragraph.notes:
+            kind, key = reference.kind, (reference.kind, reference.id)
+            if key in marks:
+                raise DocxRefusedError(
+                    "invalid-package", f"{kind} {reference.id} referred to twice"
+                )
+            if key in context.custom:
+                marks[key] = None
+                continue
+            rules = _note_rules(kind, sections[context.section])
+            if rules.restart == "eachPage":
+                # The count restarts on each page, which depends on how Word lays the pages out.
+                raise DocxRefusedError("ambiguous-numbering", f"{kind} numbers restart each page")
+            if rules.restart not in ("continuous", "eachSect"):
+                raise _refuse_numbering(f"{kind} numbers restart {rules.restart}")
+            scope = (kind, context.section if rules.restart == "eachSect" else None)
+            marks[key] = _note_mark(rules.start + before.get(scope, 0), rules.format)
+            # Every note counts in the document and in its section, whichever rule a later
+            # section follows.
+            for counted in {(kind, None), (kind, context.section)}:
+                before[counted] = before.get(counted, 0) + 1
+    return marks
+
+
+def _read_notes(
+    root: ET.Element | None, kind: str, styles: _Styles
+) -> dict[int, tuple[Paragraph, ...]]:
+    """The paragraphs of every note in a footnotes or endnotes part, by id."""
+    if root is None:
+        return {}
+    _check_part(root)
+    notes: dict[int, tuple[Paragraph, ...]] = {}
+    for element in root:
+        if element.tag != _w(kind):
+            raise DocxRefusedError("unsupported-element", f"{_local(element.tag)} in {kind}s")
+        if element.get(_w("type"), "normal") in _NOTE_LAYOUT:
+            continue
+        if element.get(_w("type"), "normal") != "normal":
+            raise DocxRefusedError(
+                "unsupported-element", f"a {kind} of type {element.get(_w('type'))}"
+            )
+        note = _int(element.get(_w("id"), ""), f"{kind} id")
+        if note in notes:
+            raise DocxRefusedError("invalid-package", f"{kind} {note} is defined twice")
+        runs: set[ET.Element] = set()
+        reader = _Body(styles, runs, (kind, note))
+        reader.blocks(element, None, None)
+        _check_accounted(element, runs)
+        if any(p.numbering is not None and p.numbering.num_id for p in reader.out):
+            # Whether a list in a note counts with the body's lists is not yet on record.
+            raise _refuse_numbering(f"a list in a {kind}")
+        notes[note] = tuple(reader.out)
+    return notes
+
+
+def _with_marks(paragraph: Paragraph, marks: dict[tuple[str, int], str | None]) -> Paragraph:
+    if not paragraph.notes:
+        return paragraph
+    return replace(
+        paragraph, notes=tuple(replace(n, mark=marks[(n.kind, n.id)]) for n in paragraph.notes)
+    )
+
+
 # --- blocks and tables ---------------------------------------------------------------------
 
 
 class _Body:
-    def __init__(self, styles: _Styles) -> None:
+    """Reads the blocks of one story: the body, or one note."""
+
+    def __init__(
+        self, styles: _Styles, runs: set[ET.Element], story: tuple[str, int] | None = None
+    ) -> None:
         self.styles = styles
+        self.story = story
         self.out: list[Paragraph] = []
-        self.contexts: list[_ListContext] = []
+        self.contexts: list[_Context] = []
         self.tables = 0
-        self.runs: set[ET.Element] = set()
+        self.runs = runs
+        # The sectPr closing each section so far; a paragraph holding one ends its section.
+        self.sections: list[ET.Element] = []
 
     def blocks(
         self, element: ET.Element, table: tuple[int, int, int] | None, table_style: str | None
@@ -1629,9 +1876,20 @@ class _Body:
         for child in element:
             tag = child.tag
             if tag == _w("p"):
-                paragraph, context = _paragraph(child, self.styles, table, table_style, self.runs)
+                paragraph, context = _paragraph(
+                    child,
+                    self.styles,
+                    table,
+                    table_style,
+                    self.runs,
+                    self.story,
+                    len(self.sections),
+                )
                 self.out.append(paragraph)
                 self.contexts.append(context)
+                closing = child.find(f"{_w('pPr')}/{_w('sectPr')}")
+                if closing is not None:
+                    self.sections.append(closing)
             elif tag == _w("tbl"):
                 self.table(child, table)
             elif tag == _w("sdt"):
@@ -1695,6 +1953,11 @@ def _collect(element: ET.Element, wanted: str, out: list[ET.Element], silent: se
 
 def read_docx(data: bytes) -> list[Paragraph]:
     """Every body paragraph of a .docx, in document order, or ``DocxRefusedError``."""
+    return list(read_document(data).body)
+
+
+def read_document(data: bytes) -> Document:
+    """The body, footnotes and endnotes of a .docx, or ``DocxRefusedError``."""
     package = _Package(data)
     with package.zip:
         mains = package.related("", "officeDocument")
@@ -1704,8 +1967,8 @@ def read_docx(data: bytes) -> list[Paragraph]:
         if document is None:
             raise DocxRefusedError("invalid-package", f"no {mains[0]}")
         parts: list[ET.Element | None] = []
-        for kind in ("styles", "theme", "fontTable", "settings", "numbering"):
-            targets = package.related(mains[0], kind)
+        for kind in ("styles", "theme", "fontTable", "settings", "numbering", *_NOTE_KINDS):
+            targets = package.related(mains[0], kind + "s" if kind in _NOTE_KINDS else kind)
             if len(targets) > 1:
                 raise DocxRefusedError("invalid-package", f"more than one {kind} part")
             part = package.part(targets[0]) if targets else None
@@ -1716,19 +1979,63 @@ def read_docx(data: bytes) -> list[Paragraph]:
         if parts[3] is not None:
             styles.update_fields = bool(_on(parts[3].find(_w("updateFields"))))
         lists = _Lists(parts[4], styles)
-    for element in document.iter():
+    _check_part(document)
+    body = document.find(_w("body"))
+    if body is None:
+        raise DocxRefusedError("invalid-package", "no w:body")
+    runs: set[ET.Element] = set()
+    reader = _Body(styles, runs)
+    reader.blocks(body, None, None)
+    _check_accounted(document, runs)
+    paragraphs = _labelled(reader.out, reader.contexts, lists)
+    sections: list[ET.Element | None] = [*reader.sections, body.find(_w("sectPr"))]
+    marks = _note_marks(paragraphs, reader.contexts, sections)
+    notes = {
+        kind: _read_notes(part, kind, styles)
+        for kind, part in zip(_NOTE_KINDS, parts[5:], strict=True)
+    }
+    for kind, key in marks:
+        if key not in notes[kind]:
+            raise DocxRefusedError("invalid-package", f"a reference to {kind} {key}, not defined")
+    for (kind, key), mark in marks.items():
+        if mark is None and any(n.kind == kind for p in notes[kind][key] for n in p.notes):
+            # Word draws the next note's number there, which no reference shows
+            # (corpus/numbering-cases, notes-custom-mark).
+            raise DocxRefusedError("ambiguous-numbering", f"the mark in custom-marked {kind} {key}")
+    for kind in _NOTE_KINDS:
+        unreferenced = sorted(key for key in notes[kind] if (kind, key) not in marks)
+        if unreferenced:
+            # Word does not show a note nothing refers to; its text is in the file all the same.
+            raise DocxRefusedError("unread-content", f"{kind} {unreferenced[0]}, never referred to")
+    order = [(n.kind, n.id) for paragraph in paragraphs for n in paragraph.notes]
+
+    def in_order(kind: str) -> tuple[Note, ...]:
+        return tuple(
+            Note(
+                kind,
+                key,
+                marks[(kind, key)],
+                tuple(_with_marks(p, marks) for p in notes[kind][key]),
+            )
+            for k, key in order
+            if k == kind
+        )
+
+    return Document(
+        body=tuple(_with_marks(p, marks) for p in paragraphs),
+        footnotes=in_order("footnote"),
+        endnotes=in_order("endnote"),
+    )
+
+
+def _check_part(root: ET.Element) -> None:
+    """Refuse a part with tracked changes, alternate content, or text outside text elements."""
+    for element in root.iter():
         if element.tag in _TRACKED:
             raise DocxRefusedError("tracked-change", _local(element.tag))
         if element.tag == f"{{{MC}}}AlternateContent":
             raise DocxRefusedError("unsupported-element", "AlternateContent")
-    _check_character_data(document)
-    body = document.find(_w("body"))
-    if body is None:
-        raise DocxRefusedError("invalid-package", "no w:body")
-    reader = _Body(styles)
-    reader.blocks(body, None, None)
-    _check_accounted(document, reader.runs)
-    return _labelled(reader.out, reader.contexts, lists)
+    _check_character_data(root)
 
 
 def _check_character_data(document: ET.Element) -> None:

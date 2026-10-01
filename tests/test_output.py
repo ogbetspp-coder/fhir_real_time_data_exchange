@@ -26,11 +26,11 @@ def test_a_read_is_canonical_and_names_its_source_and_versions() -> None:
     assert ok
     value = json.loads(result)
     assert result == canonical(value)
-    assert sorted(value) == ["format", "paragraphs", "reader", "source"]
+    assert sorted(value) == ["endnotes", "footnotes", "format", "paragraphs", "reader", "source"]
     assert (value["format"], value["reader"]) == (FORMAT_VERSION, READER_VERSION)
     assert value["source"] == {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
     first = value["paragraphs"][0]
-    assert sorted(first) == ["markHidden", "marks", "numbering", "style", "table", "text"]
+    assert sorted(first) == ["markHidden", "marks", "notes", "numbering", "style", "table", "text"]
     listed = next(x for x in value["paragraphs"] if x["numbering"] and x["numbering"]["numId"])
     assert listed["numbering"] == {"level": 0, "numId": 21, "suffix": "tab", "text": "\u2022"}
 
@@ -71,3 +71,21 @@ def test_the_command_line_writes_the_same_bytes_and_exits_by_outcome(
     assert json.loads(capsysbinary.readouterr().out)["refusal"]["code"] == "invalid-package"
     assert main([str(tmp_path / "missing.docx")]) == 1
     assert b"cannot read" in capsysbinary.readouterr().err
+
+
+def test_footnotes_are_written_with_their_marks_and_paragraphs() -> None:
+    cover = (
+        Path(__file__).resolve().parents[1]
+        / "corpus"
+        / "ema-templates"
+        / "qrd-appendix-iii-quality-review-documents-templates-human-medicinal-products"
+        "-cover-page_en.docx"
+    )
+    value = json.loads(read(cover.read_bytes())[0])
+    marked = [n for p in value["paragraphs"] for n in p["notes"]]
+    assert [(n["kind"], n["mark"]) for n in marked] == [("footnote", "1")]
+    (footnote,) = value["footnotes"]
+    assert (footnote["id"], footnote["mark"]) == (marked[0]["id"], "1")
+    echo = footnote["paragraphs"][0]["notes"][0]
+    assert (echo["offset"], echo["mark"]) == (0, "1")
+    assert value["endnotes"] == []
