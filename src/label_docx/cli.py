@@ -13,6 +13,8 @@ import sys
 from pathlib import Path
 
 from label_docx.output import read
+from label_docx.service import check_environment, serve
+from label_docx.store import Store, StoreError
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -35,6 +37,47 @@ def main(argv: list[str] | None = None) -> int:
     else:
         args.output.write_bytes(result)
     return 0 if ok else 2
+
+
+def service_main(argv: list[str] | None = None) -> int:
+    """``label-docx-service``: serve a store over HTTP, or ingest files into it."""
+    parser = argparse.ArgumentParser(
+        prog="label-docx-service", description="Ingest .docx documents into a write-once store."
+    )
+    commands = parser.add_subparsers(dest="command", required=True)
+    serving = commands.add_parser("serve", help="serve the store over HTTP")
+    serving.add_argument("--store", type=Path, required=True)
+    serving.add_argument("--host", default="127.0.0.1")
+    serving.add_argument("--port", type=int, default=8080)
+    ingesting = commands.add_parser("ingest", help="ingest files; print one receipt each")
+    ingesting.add_argument("--store", type=Path, required=True)
+    ingesting.add_argument("files", type=Path, nargs="+")
+    verifying = commands.add_parser("verify", help="read every kept document again and compare")
+    verifying.add_argument("--store", type=Path, required=True)
+    args = parser.parse_args(argv)
+    if args.command == "serve":
+        serve(args.store, args.host, args.port)
+        return 0
+    check_environment()
+    store = Store(args.store)
+    if args.command == "verify":
+        failed = 0
+        documents = store.documents()
+        for document in documents:
+            try:
+                store.verify(document)
+            except StoreError as failure:
+                failed += 1
+                sys.stderr.write(f"{failure}\n")
+        sys.stdout.write(f"{len(documents) - failed} of {len(documents)} documents verified\n")
+        return 1 if failed else 0
+    refused = False
+    for path in args.files:
+        ingested = store.ingest(path.read_bytes())
+        refused = refused or not ingested.read
+        sys.stdout.buffer.write(ingested.receipt)
+    sys.stdout.buffer.flush()
+    return 2 if refused else 0
 
 
 if __name__ == "__main__":

@@ -74,6 +74,45 @@ or, refused, `"refusal":{"code":"tracked-change","detail":"ins"}` in place of `p
 - `source.sha256` ties the result to the exact input bytes; `reader` and `format` tie it to the
   exact code (see "Versions").
 
+## The ingestion service
+
+`label-docx-service` keeps documents and what the reader made of them in a write-once,
+content-addressed store, and answers over HTTP:
+
+```bash
+uv run label-docx-service serve --store /path/to/store            # http://127.0.0.1:8080
+curl --data-binary @label.docx http://127.0.0.1:8080/v1/documents    # the receipt
+curl http://127.0.0.1:8080/v1/documents/<sha256>                     # the result
+uv run label-docx-service ingest --store /path/to/store *.docx     # without HTTP
+uv run label-docx-service verify --store /path/to/store            # audit every result
+```
+
+| Request                              | Answer                                                  |
+| ------------------------------------ | ------------------------------------------------------- |
+| `POST /v1/documents` (the .docx)     | the receipt: 201 the first time, 200 after, same bytes  |
+| `GET /v1/documents/<sha256>`         | the reader's result: read, or refused with the reason   |
+| `GET /v1/documents/<sha256>/source`  | the document's bytes as ingested                        |
+| `GET /v1/health`                     | the reader, format, Python and Unicode versions         |
+
+What it guarantees:
+
+- **The same bytes, the same answer.** A document is named by the SHA-256 of its bytes; the
+  receipt and the result for it are the same bytes whoever sends it, however often, on any
+  machine running the pinned runtime. The service will not start on another Python or Unicode
+  version.
+- **Nothing kept is changed.** The source, result and receipt are each written once (a new file
+  or nothing); a result is served only if it hashes to what its receipt records; and `verify`
+  reads every kept source again and requires the kept result byte for byte, which catches any edit
+  to the store, however consistent.
+- **Every version is kept.** Results are kept per reader and format version: a new reader adds
+  its results beside the old ones, so what a document was read as on any date can be shown.
+- **A refusal is an answer.** A document the reader cannot read exactly is kept, with its refusal
+  code and detail, and answered the same way every time. A PDF is refused by name: it holds glyphs
+  placed on a page, not the text Word holds, and the reader will not guess at it.
+
+EMA publishes approved SmPCs as PDF. Their exact text is in EMA's ePI (FHIR), which EMA Flow's
+ePI reader reads; the authored Word SmPC and Module 3 sections are what this service reads.
+
 ## List labels
 
 Word does not store "4.8" in the paragraph; it computes it from `numbering.xml` each time it
@@ -243,3 +282,4 @@ and refuses a .doc under a .docx name, which 1.4.0 opened as the zip of its them
 footnotes and endnotes (`label-docx-json/1.2.0`), their marks numbered by the rules Word showed:
 the section's settings, not the document's, and start plus the notes before. 1.7.0 reads SEQ and
 STYLEREF fields whose stored result is what Word prints, by rules Word answered in 11 cases.
+1.8.0 names a PDF in its refusal, for the ingestion service.

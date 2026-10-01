@@ -149,7 +149,8 @@ What it refuses (``DocxRefusedError.code``):
   content controls bound to data (in any namespace), VML that is not a picture, conditional
   table formatting that could change the text, text in a vertically merged-away cell, and a
   style reference that names a style of another kind.
-- ``invalid-package``: not a readable .docx, no main document relationship, a part name that
+- ``invalid-package``: not a readable .docx (a PDF or a Word 97-2003 document is named as one),
+  no main document relationship, a part name that
   occurs twice (ignoring case), a related part that is missing or duplicated, a part that
   cannot be read (bad checksum, truncated, encrypted), a part that is not UTF-8 or declares
   another encoding, a DTD, a part over the size cap, a style id defined twice, a list number
@@ -194,8 +195,8 @@ from dataclasses import dataclass, field, replace
 # 1.4.0 refused: VML pictures, smart-tag and custom-XML properties, and conditional table
 # formatting that cannot change the text; 1.6.0 reads footnotes and endnotes, with their marks
 # by the rules Word showed; 1.7.0 reads SEQ and STYLEREF fields whose stored result is what Word
-# prints.
-READER_VERSION = "docx-reader/1.7.0"
+# prints; 1.8.0 names a PDF in its refusal.
+READER_VERSION = "docx-reader/1.8.0"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -488,6 +489,12 @@ def _whole_archive(data: bytes) -> None:
     """
     if data.startswith(_OLE):
         raise DocxRefusedError("invalid-package", "a Word 97-2003 document (.doc), not a .docx")
+    if data.lstrip(b"\x00\t\n\r ")[:5] == b"%PDF-":
+        # A PDF holds glyphs placed on a page, not the text and structure Word holds: what it
+        # shows can be drawn from a font with no record of the characters meant.
+        raise DocxRefusedError(
+            "invalid-package", "a PDF, not a .docx: its text cannot be read exactly"
+        )
     if not data.startswith(_LOCAL_HEADER):
         raise DocxRefusedError("invalid-package", "not a zip archive from its first byte")
     end = data.rfind(_END_RECORD)

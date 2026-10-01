@@ -23,6 +23,8 @@ refuse. Every rule below serves that.
 - **Public or synthetic documents only** in `corpus/` and in tests, each set with a
   `sources.json`. No client or confidential labels in the repository.
 - **Tests never print label text.** A failure names a file, a code or a digest.
+- **The store is write-once.** Never add a code path that rewrites or deletes a kept source,
+  result or receipt; a new reader version adds results beside the old ones.
 - **No runtime dependencies.** The standard library only; development tools are pinned exactly
   in `pyproject.toml` and `uv.lock`.
 
